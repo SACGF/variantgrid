@@ -2,7 +2,7 @@ import itertools
 from typing import Iterable
 
 from celery.result import AsyncResult
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
@@ -183,12 +183,30 @@ def bulk_group_permissions(request, class_name):
     return render(request, 'snpdb/data/bulk_group_permissions.html', context)
 
 
+def get_vcf_sample_stats(vcf, klass):
+    ss_fields = ("sample_id", "sample__name", "variant_count", "ref_count", "het_count", "hom_count", "unk_count")
+    ss_values_qs = klass.objects.filter(sample__vcf=vcf).order_by("sample").values(*ss_fields)
+
+    sample_stats_count = {}
+    sample_names = []
+    sample_zygosities = defaultdict(list)
+    for value_dict in ss_values_qs:
+        sample_id = value_dict.pop("sample_id")
+        sample_names.append(value_dict.pop("sample__name"))
+        variant_count = value_dict.pop("variant_count")
+        sample_stats_count[sample_id] = variant_count
+        for k, v in value_dict.items():
+            sample_zygosities[k].append(v)
+
+    return sample_stats_count, sample_names, tuple(sample_zygosities.items())
+
+
 def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
-    ss_fields = ("sample_id", "variant_count")
-    sample_stats = dict(SampleStats.objects.filter(sample__vcf=vcf).values_list(*ss_fields))
-    sample_stats_passing_filter = dict(SampleStatsPassingFilter.objects.filter(sample__vcf=vcf).values_list(*ss_fields))
+
+    sample_stats_count, sample_names, sample_zygosities = get_vcf_sample_stats(vcf, SampleStats)
+    sample_stats_pass_count, _, sample_zygosities_pass = get_vcf_sample_stats(vcf, SampleStatsPassingFilter)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
                                              fields=["vcf_sample_name", "name", "patient", "specimen", "bam_file_path"],
@@ -222,8 +240,10 @@ def view_vcf(request, vcf_id):
         messages.add_message(request, messages.WARNING, msg, extra_tags='import-message')
 
     context = {'vcf': vcf,
-               'sample_stats': sample_stats,
-               'sample_stats_passing_filter': sample_stats_passing_filter,
+               'sample_stats_count': sample_stats_count,
+               'sample_stats_pass_count': sample_stats_pass_count,
+               'sample_names': sample_names,
+               'sample_zygosities': sample_zygosities,
                'vcf_form': vcf_form,
                'samples_form': samples_form,
                'patient_form': PatientForm(user=request.user),  # blank

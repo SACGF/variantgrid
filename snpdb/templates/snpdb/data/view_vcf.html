@@ -7,6 +7,9 @@
 
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+
 <style type="text/css">
 input#bam_pattern {
     width: 300px;
@@ -202,6 +205,11 @@ table#sample-formset input[type="text"] {
         $("#vcf-header").hide();
     }
 
+    function drawZygosityGraphs() {
+        const sample_zygosities = {{ sample_zygosities | jsonify }};
+        const sample_names = {{ sample_names | jsonify }};
+        showStackedBar('sample-zygosities-graph', 'Sample Zygosities', sample_zygosities, sample_names);
+    }
 {% endblock %}
 
 {% block jsdocumentready %}
@@ -226,7 +234,9 @@ table#sample-formset input[type="text"] {
         var sampleName = $("input", sampleNameCell).val();
         addCreatePatientButton(dialog, $(this), sampleName);
     });
-    
+
+    drawZygosityGraphs();
+
 {% endblock %}
 
 
@@ -239,6 +249,7 @@ table#sample-formset input[type="text"] {
 <div id="vcf-tabs">
     <ul>
         <li><a href="#details">Details</a></li>
+        <li><a href="#vcf-stats">Stats</a></li>
         <li><a href="#vcf-info">VCF Info</a></li>
         {% if has_write_permission %}
         <li><a href="{% url 'group_permissions' 'snpdb.models.VCF' vcf.pk %}">Sharing / Permissions</a></li>
@@ -322,10 +333,10 @@ table#sample-formset input[type="text"] {
                     <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
                     {% if vcf.import_status == 'S' %}
                         <td>
-                        {% with ss=sample_stats|get_item:form.instance.pk %}
+                        {% with ss=sample_stats_count|get_item:form.instance.pk %}
                             {% if ss %}
                                 {{ ss }}
-                                {% with sspf=sample_stats_passing_filter|get_item:form.instance.pk %}
+                                {% with sspf=sample_stats_pass_count|get_item:form.instance.pk %}
                                     {% if sspf %}
                                         ({{ sspf }})
                                     {% endif %}
@@ -371,6 +382,9 @@ table#sample-formset input[type="text"] {
         </p>
 
     </form>
+    </div>
+    <div id="vcf-stats">
+        <div id="sample-zygosities-graph"></div>
     </div>
     <div id="vcf-info">
         <fieldset class="form-fields">
