@@ -1,0 +1,12 @@
+*.py[cod]
+*.o
+vcf_reader
+*~
+data/*
+media_root/*
+/.settings/
+__pycache__/
+LabNameLocations.csv
+/jshintrc
+dump.rdb
+watcherTasks.xml

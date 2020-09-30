@@ -1,0 +1,53 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% load record_data_state_tags %}
+{% block title %}{{ vcf_file }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+{% endblock %}
+
+{% block jsdocumentready %}
+{% endblock %}
+
+{% block submenu_page_content %}
+
+	<div>
+	<img class='vcenter' src="{% static 'icons/vcf_64.png' %}" /> <b>{{ vcf_file }}</b>
+	</div>
+
+	<form>
+		{{ form.as_p }}
+	</form>
+
+	{% record_data_state_helper vcf_file %}
+
+	<div>
+		<h3>Input</h3>
+		<ul>
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' vcf_file.bam_file.unaligned_reads.sequencing_run.pk %}">{{ vcf_file.bam_file.unaligned_reads.sequencing_run }}</a></li>  
+		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' vcf_file.bam_file.unaligned_reads.pk %}">{{ vcf_file.bam_file.unaligned_reads }}</a></li>
+		<li>Bam: <a href="{% url 'view_bam_file' vcf_file.bam_file.pk %}">{{ vcf_file.bam_file }}</a></li>
+		</ul>
+
+		{% if vcf_file.upload_pipeline %}
+		<h3>Imported as a VariantGrid VCF</h3>
+		<ul>
+			{% if vcf_file.upload_pipeline.uploadedvcf.vcf %}
+			<li><a href="{% url 'view_vcf' vcf_file.upload_pipeline.uploadedvcf.vcf.pk %}">View VCF {{ vcf_file.upload_pipeline.uploadedvcf.vcf.pk }}</a>
+			({{ vcf_file.upload_pipeline.uploadedvcf.vcf.get_import_status_display }})
+			{% endif %}
+			<li><a href="{% url 'view_upload_pipeline' vcf_file.upload_pipeline.pk %}">View Upload Processing</a>
+			({{ vcf_file.upload_pipeline.get_status_display }})
+
+		</ul>
+		{% endif %}
+
+		<h3>Made from this data</h3>
+		<ul>
+			{% for qc in vcf_file.qc_set.all %}
+				<li class='seqauto-record qc data-state-{{ qc.data_state }}'><a href="{% url 'view_qc' qc.pk %}">{{ qc }}</a>
+			{% endfor %}
+		</ul>
+	</div>
+
+{% endblock %}

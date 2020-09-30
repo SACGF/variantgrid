@@ -1,0 +1,3207 @@
+[{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA7169043",
+  "externalRecords": {
+    "ClinVarAlleles": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/?term=254944[alleleid]",
+        "alleleId": 254944,
+        "preferredName": "NM_020937.3(FANCM):c.1397-3_1397-2delTA"
+      }
+    ],
+    "ClinVarVariations": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/variation/261381",
+        "RCV": [
+          "RCV000241683",
+          "RCV000264347"
+        ],
+        "variationId": 261381
+      }
+    ],
+    "ExAC": [
+      {
+        "@id": "http://exac.broadinstitute.org/variant/14-45628283-TTA-T",
+        "id": "14-45628283-TTA-T",
+        "variant": "14:45628283 TTA / T"
+      }
+    ],
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr14:g.45628296_45628297del?assembly=hg19",
+        "id": "chr14:g.45628296_45628297del"
+      },
+      {
+        "@id": "http://myvariant.info/v1/variant/chr14:g.45628286_45628287del?assembly=hg19",
+        "id": "chr14:g.45628286_45628287del"
+      },
+      {
+        "@id": "http://myvariant.info/v1/variant/chr14:g.45628284_45628285del?assembly=hg19",
+        "id": "chr14:g.45628284_45628285del"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr14:g.45159093_45159094del?assembly=hg38",
+        "id": "chr14:g.45159093_45159094del"
+      },
+      {
+        "@id": "http://myvariant.info/v1/variant/chr14:g.45159081_45159082del?assembly=hg38",
+        "id": "chr14:g.45159081_45159082del"
+      }
+    ],
+    "dbSNP": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/112326758",
+        "rs": 112326758
+      },
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/886038661",
+        "rs": 886038661
+      }
+    ],
+    "gnomAD": [
+      {
+        "@id": "http://gnomad.broadinstitute.org/variant/14-45628283-TTA-T",
+        "id": "14-45628283-TTA-T",
+        "variant": "14:45628283 TTA / T"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "14",
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 45159082,
+          "referenceAllele": "TA",
+          "start": 45159080
+        }
+      ],
+      "hgvs": [
+        "NC_000014.9:g.45159093_45159094del",
+        "CM000676.2:g.45159093_45159094del"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000062"
+    },
+    {
+      "chromosome": "14",
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 44698035,
+          "referenceAllele": "TA",
+          "start": 44698033
+        }
+      ],
+      "hgvs": [
+        "NC_000014.7:g.44698046_44698047del"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000014"
+    },
+    {
+      "chromosome": "14",
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 45628285,
+          "referenceAllele": "TA",
+          "start": 45628283
+        }
+      ],
+      "hgvs": [
+        "NC_000014.8:g.45628296_45628297del",
+        "CM000676.1:g.45628296_45628297del"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000038"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 28150,
+          "referenceAllele": "TA",
+          "start": 28148
+        }
+      ],
+      "hgvs": [
+        "NG_007417.1:g.28161_28162del",
+        "LRG_502:g.28161_28162del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000573"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1411,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1411,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "NM_001308133.1:c.1319-3_1319-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001295062.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS026161"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1489,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1489,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "NM_001308134.1:c.1397-3_1397-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001295063.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS026162"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1495,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1495,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "NM_020937.2:c.1397-3_1397-2del",
+        "LRG_502t1:c.1397-3_1397-2del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS036705"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1489,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1489,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "NM_020937.3:c.1397-3_1397-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_065988.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS036706"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_011537034.1:c.1397-3_1397-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_011535336.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS104004"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1410,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1410,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_011537035.1:c.1319-3_1319-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_011535337.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS104005"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_011537036.1:c.1397-3_1397-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_011535338.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS104006"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_011537034.2:c.1397-3_1397-2del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS552724"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1410,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1410,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_011537035.3:c.1319-3_1319-2del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS552725"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_017021523.1:c.1397-3_1397-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016877012.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS572701"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 710,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 710,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_017021524.2:c.434-3_434-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016877013.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS572702"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1277,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1277,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_017021525.2:c.212-3_212-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016877014.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS572703"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 521,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 521,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_017021526.2:c.212-3_212-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016877015.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS572704"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1302,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1302,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XM_017021527.1:c.212-3_212-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016877016.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS572705"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XR_001750470.1:n.1489-3_1489-2del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS597745"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XR_001750471.2:n.1489-3_1489-2del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS597746"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "XR_001750472.1:n.1489-3_1489-2del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS597747"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1498,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1498,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN023168",
+      "geneNCBI_id": 57697,
+      "geneSymbol": "FANCM",
+      "hgvs": [
+        "NM_020937.4:c.1397-3_1397-2del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS670157"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1481,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1481,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "hgvs": [
+        "ENST00000267430.9:c.1397-3_1397-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000267430.5:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS251992"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1396,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1396,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "hgvs": [
+        "ENST00000542564.6:c.1319-3_1319-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000442493.2:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS363528"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1488,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 1488,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "hgvs": [
+        "ENST00000556036.5:c.1397-3_1397-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000450596.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS371909"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 151,
+          "endIntronDirection": "-",
+          "endIntronOffset": 13,
+          "referenceAllele": "TA",
+          "start": 151,
+          "startIntronDirection": "-",
+          "startIntronOffset": 15
+        }
+      ],
+      "hgvs": [
+        "ENST00000556250.5:n.152-3_152-2del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000452033.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS372072"
+    }
+  ],
+  "type": "nucleotide"
+}
+,{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA9762888",
+  "externalRecords": {
+    "ExAC": [
+      {
+        "@id": "http://exac.broadinstitute.org/variant/20-10030188-T-A",
+        "id": "20-10030188-T-A",
+        "variant": "20:10030188 T / A"
+      }
+    ],
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr20:g.10030188T>A?assembly=hg19",
+        "id": "chr20:g.10030188T>A"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr20:g.10049540T>A?assembly=hg38",
+        "id": "chr20:g.10049540T>A"
+      }
+    ],
+    "dbSNP": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/652633",
+        "rs": 652633
+      }
+    ],
+    "gnomAD": [
+      {
+        "@id": "http://gnomad.broadinstitute.org/variant/20-10030188-T-A",
+        "id": "20-10030188-T-A",
+        "variant": "20:10030188 T / A"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 10049540,
+          "referenceAllele": "T",
+          "start": 10049539
+        }
+      ],
+      "hgvs": [
+        "NC_000020.11:g.10049540T>A",
+        "CM000682.2:g.10049540T>A"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000068"
+    },
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 9978188,
+          "referenceAllele": "T",
+          "start": 9978187
+        }
+      ],
+      "hgvs": [
+        "NC_000020.9:g.9978188T>A"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000020"
+    },
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 10030188,
+          "referenceAllele": "T",
+          "start": 10030187
+        }
+      ],
+      "hgvs": [
+        "NC_000020.10:g.10030188T>A",
+        "CM000682.1:g.10030188T>A"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000044"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1396,
+          "referenceAllele": "T",
+          "start": 1395
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_001303472.1:c.404T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001290401.1:p.Leu135Gln",
+        "hgvsWellDefined": "NP_001290401.1:p.Leu135Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS025545"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1414,
+          "referenceAllele": "T",
+          "start": 1413
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_022096.5:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_071379.3:p.Leu324Gln",
+        "hgvsWellDefined": "NP_071379.3:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS037194"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1350,
+          "referenceAllele": "T",
+          "start": 1349
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_198798.2:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_942093.1:p.Leu324Gln",
+        "hgvsWellDefined": "NP_942093.1:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS044722"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "T",
+          "end": 499,
+          "endIntronDirection": "-",
+          "endIntronOffset": 22891,
+          "referenceAllele": "A",
+          "start": 499,
+          "startIntronDirection": "-",
+          "startIntronOffset": 22892
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN044312",
+      "geneNCBI_id": 100131208,
+      "geneSymbol": "SNAP25-AS1",
+      "hgvs": [
+        "NR_040710.1:n.500-22892A>T"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS051218"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 883,
+          "referenceAllele": "T",
+          "start": 882
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "XM_005260792.2:c.404T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005260849.1:p.Leu135Gln",
+        "hgvsWellDefined": "XP_005260849.1:p.Leu135Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS062927"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1426,
+          "referenceAllele": "T",
+          "start": 1425
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_022096.6:c.971T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS670372"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1300,
+          "referenceAllele": "T",
+          "start": 1299
+        }
+      ],
+      "hgvs": [
+        "ENST00000378380.4:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000367631.3:p.Leu324Gln",
+        "hgvsWellDefined": "ENSP00000367631.3:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS272005"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1372,
+          "referenceAllele": "T",
+          "start": 1371
+        }
+      ],
+      "hgvs": [
+        "ENST00000378392.5:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000367644.1:p.Leu324Gln",
+        "hgvsWellDefined": "ENSP00000367644.1:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS272011"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1278,
+          "referenceAllele": "T",
+          "start": 1277
+        }
+      ],
+      "hgvs": [
+        "ENST00000488991.1:n.1278T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS327148"
+    }
+  ],
+  "type": "nucleotide"
+}
+,{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA8646859",
+  "externalRecords": {
+    "ExAC": [
+      {
+        "@id": "http://exac.broadinstitute.org/variant/17-48445674-CCTGGTCAG-C",
+        "id": "17-48445674-CCTGGTCAG-C",
+        "variant": "17:48445674 CCTGGTCAG / C"
+      }
+    ],
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr17:g.48445675_48445682del?assembly=hg19",
+        "id": "chr17:g.48445675_48445682del"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr17:g.50368315_50368322del?assembly=hg38",
+        "id": "chr17:g.50368315_50368322del"
+      },
+      {
+        "@id": "http://myvariant.info/v1/variant/chr17:g.50368314_50368321del?assembly=hg38",
+        "id": "chr17:g.50368314_50368321del"
+      }
+    ],
+    "dbSNP": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/60604051",
+        "rs": 60604051
+      },
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/111380254",
+        "rs": 111380254
+      },
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/147592975",
+        "rs": 147592975
+      },
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/149049206",
+        "rs": 149049206
+      }
+    ],
+    "gnomAD": [
+      {
+        "@id": "http://gnomad.broadinstitute.org/variant/17-48445674-CCTGGTCAG-C",
+        "id": "17-48445674-CCTGGTCAG-C",
+        "variant": "17:48445674 CCTGGTCAG / C"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "17",
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 50368321,
+          "referenceAllele": "CTGGTCAG",
+          "start": 50368313
+        }
+      ],
+      "hgvs": [
+        "NC_000017.11:g.50368331_50368338del",
+        "CM000679.2:g.50368331_50368338del"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000065"
+    },
+    {
+      "chromosome": "17",
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 45800681,
+          "referenceAllele": "CTGGTCAG",
+          "start": 45800673
+        }
+      ],
+      "hgvs": [
+        "NC_000017.9:g.45800691_45800698del"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000017"
+    },
+    {
+      "chromosome": "17",
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 48445682,
+          "referenceAllele": "CTGGTCAG",
+          "start": 48445674
+        }
+      ],
+      "hgvs": [
+        "NC_000017.10:g.48445692_48445699del",
+        "CM000679.1:g.48445692_48445699del"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000041"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 102,
+          "referenceAllele": "CTGGTCAG",
+          "start": 94
+        }
+      ],
+      "hgvs": [
+        "NG_029665.1:g.112_119del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS004561"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 271,
+          "endIntronDirection": "-",
+          "endIntronOffset": 32,
+          "referenceAllele": "CTGACCAG",
+          "start": 271,
+          "startIntronDirection": "-",
+          "startIntronOffset": 40
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN014483",
+      "geneNCBI_id": 51264,
+      "geneSymbol": "MRPL27",
+      "hgvs": [
+        "NM_016504.2:c.241-23_241-16del"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_057588.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS034739"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 254,
+          "endIntronDirection": "-",
+          "endIntronOffset": 32,
+          "referenceAllele": "CTGACCAG",
+          "start": 254,
+          "startIntronDirection": "-",
+          "startIntronOffset": 40
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN014483",
+      "geneNCBI_id": 51264,
+      "geneSymbol": "MRPL27",
+      "hgvs": [
+        "NM_016504.3:c.241-23_241-16del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS669159"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 284,
+          "endIntronDirection": "-",
+          "endIntronOffset": 32,
+          "referenceAllele": "CTGACCAG",
+          "start": 284,
+          "startIntronDirection": "-",
+          "startIntronOffset": 40
+        }
+      ],
+      "hgvs": [
+        "ENST00000225969.8:c.241-23_241-16del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000225969.4:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS248536"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 1978,
+          "referenceAllele": "CTGACCAG",
+          "start": 1970
+        }
+      ],
+      "hgvs": [
+        "ENST00000442592.3:c.*1666_*1673del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000388915.3:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS296951"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 296,
+          "endIntronDirection": "-",
+          "endIntronOffset": 17,
+          "referenceAllele": "CTGACCAG",
+          "start": 296,
+          "startIntronDirection": "-",
+          "startIntronOffset": 25
+        }
+      ],
+      "hgvs": [
+        "ENST00000503633.5:c.*16-8_*16-1del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000425126.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS335888"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 290,
+          "endIntronDirection": "-",
+          "endIntronOffset": 32,
+          "referenceAllele": "CTGACCAG",
+          "start": 290,
+          "startIntronDirection": "-",
+          "startIntronOffset": 40
+        }
+      ],
+      "hgvs": [
+        "ENST00000507088.5:c.76-23_76-16del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000421865.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS338471"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 187,
+          "endIntronDirection": "-",
+          "endIntronOffset": 17,
+          "referenceAllele": "CTGACCAG",
+          "start": 187,
+          "startIntronDirection": "-",
+          "startIntronOffset": 25
+        }
+      ],
+      "hgvs": [
+        "ENST00000508200.5:n.188-8_188-1del"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS339282"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "",
+          "end": 458,
+          "endIntronDirection": "-",
+          "endIntronOffset": 32,
+          "referenceAllele": "CTGACCAG",
+          "start": 458,
+          "startIntronDirection": "-",
+          "startIntronOffset": 40
+        }
+      ],
+      "hgvs": [
+        "ENST00000511860.1:c.76-23_76-16del"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000426037.1:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS342035"
+    }
+  ],
+  "type": "nucleotide"
+}
+,{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA382246068",
+  "externalRecords": {
+    "ClinVarAlleles": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/?term=433516[alleleid]",
+        "alleleId": 433516,
+        "preferredName": "NM_001080463.1(DYNC2H1):c.5972T>A (p.Met1991Lys)"
+      }
+    ],
+    "ClinVarVariations": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/variation/439632",
+        "RCV": [
+          "RCV000507888"
+        ],
+        "variationId": 439632
+      }
+    ],
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr11:g.103048382T>A?assembly=hg19",
+        "id": "chr11:g.103048382T>A"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr11:g.103177653T>A?assembly=hg38",
+        "id": "chr11:g.103177653T>A"
+      }
+    ],
+    "gnomAD": [
+      {
+        "@id": "http://gnomad.broadinstitute.org/variant/11-103048382-T-A",
+        "id": "11-103048382-T-A",
+        "variant": "11:103048382 T / A"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "11",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 103177653,
+          "referenceAllele": "T",
+          "start": 103177652
+        }
+      ],
+      "hgvs": [
+        "NC_000011.10:g.103177653T>A",
+        "CM000673.2:g.103177653T>A"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000059"
+    },
+    {
+      "chromosome": "11",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 102553592,
+          "referenceAllele": "T",
+          "start": 102553591
+        }
+      ],
+      "hgvs": [
+        "NC_000011.8:g.102553592T>A"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000011"
+    },
+    {
+      "chromosome": "11",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 103048382,
+          "referenceAllele": "T",
+          "start": 103048381
+        }
+      ],
+      "hgvs": [
+        "NC_000011.9:g.103048382T>A",
+        "CM000673.1:g.103048382T>A"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000035"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 73223,
+          "referenceAllele": "T",
+          "start": 73222
+        }
+      ],
+      "hgvs": [
+        "NG_016423.1:g.73223T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS003177"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 73223,
+          "referenceAllele": "T",
+          "start": 73222
+        }
+      ],
+      "hgvs": [
+        "NG_016423.2:g.73223T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS673679"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "NM_001080463.1:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001073932.1:p.Met1991Lys",
+        "hgvsWellDefined": "NP_001073932.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS010221"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "NM_001377.2:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001368.2:p.Met1991Lys",
+        "hgvsWellDefined": "NP_001368.2:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS026763"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_006718903.2:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_006718966.1:p.Met1991Lys",
+        "hgvsWellDefined": "XP_006718966.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS072840"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_017018291.1:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016873780.1:p.Met1991Lys",
+        "hgvsWellDefined": "XP_016873780.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS570260"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 5370,
+          "referenceAllele": "T",
+          "start": 5369
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_017018292.1:c.5354T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016873781.1:p.Met1785Lys",
+        "hgvsWellDefined": "XP_016873781.1:p.Met1785Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS570261"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_017018293.1:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016873782.1:p.Met1991Lys",
+        "hgvsWellDefined": "XP_016873782.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS570262"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6121,
+          "referenceAllele": "T",
+          "start": 6120
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "NM_001377.3:c.5972T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS664959"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 2258,
+          "endIntronDirection": "+",
+          "endIntronOffset": 43234,
+          "referenceAllele": "T",
+          "start": 2258,
+          "startIntronDirection": "+",
+          "startIntronOffset": 43233
+        }
+      ],
+      "hgvs": [
+        "ENST00000334267.11:c.2205+43234T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000334021.7:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS259871"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "hgvs": [
+        "ENST00000375735.6:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000364887.2:p.Met1991Lys",
+        "hgvsWellDefined": "ENSP00000364887.2:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS270843"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 5972,
+          "referenceAllele": "T",
+          "start": 5971
+        }
+      ],
+      "hgvs": [
+        "ENST00000398093.7:n.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000381167.3:p.Met1991Lys",
+        "hgvsWellDefined": "ENSP00000381167.3:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS278130"
+    }
+  ],
+  "type": "nucleotide"
+}
+,{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA9762888",
+  "externalRecords": {
+    "ExAC": [
+      {
+        "@id": "http://exac.broadinstitute.org/variant/20-10030188-T-A",
+        "id": "20-10030188-T-A",
+        "variant": "20:10030188 T / A"
+      }
+    ],
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr20:g.10030188T>A?assembly=hg19",
+        "id": "chr20:g.10030188T>A"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr20:g.10049540T>A?assembly=hg38",
+        "id": "chr20:g.10049540T>A"
+      }
+    ],
+    "dbSNP": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/652633",
+        "rs": 652633
+      }
+    ],
+    "gnomAD": [
+      {
+        "@id": "http://gnomad.broadinstitute.org/variant/20-10030188-T-A",
+        "id": "20-10030188-T-A",
+        "variant": "20:10030188 T / A"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 10049540,
+          "referenceAllele": "T",
+          "start": 10049539
+        }
+      ],
+      "hgvs": [
+        "NC_000020.11:g.10049540T>A",
+        "CM000682.2:g.10049540T>A"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000068"
+    },
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 9978188,
+          "referenceAllele": "T",
+          "start": 9978187
+        }
+      ],
+      "hgvs": [
+        "NC_000020.9:g.9978188T>A"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000020"
+    },
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 10030188,
+          "referenceAllele": "T",
+          "start": 10030187
+        }
+      ],
+      "hgvs": [
+        "NC_000020.10:g.10030188T>A",
+        "CM000682.1:g.10030188T>A"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000044"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1396,
+          "referenceAllele": "T",
+          "start": 1395
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_001303472.1:c.404T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001290401.1:p.Leu135Gln",
+        "hgvsWellDefined": "NP_001290401.1:p.Leu135Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS025545"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1414,
+          "referenceAllele": "T",
+          "start": 1413
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_022096.5:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_071379.3:p.Leu324Gln",
+        "hgvsWellDefined": "NP_071379.3:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS037194"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1350,
+          "referenceAllele": "T",
+          "start": 1349
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_198798.2:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_942093.1:p.Leu324Gln",
+        "hgvsWellDefined": "NP_942093.1:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS044722"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "T",
+          "end": 499,
+          "endIntronDirection": "-",
+          "endIntronOffset": 22891,
+          "referenceAllele": "A",
+          "start": 499,
+          "startIntronDirection": "-",
+          "startIntronOffset": 22892
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN044312",
+      "geneNCBI_id": 100131208,
+      "geneSymbol": "SNAP25-AS1",
+      "hgvs": [
+        "NR_040710.1:n.500-22892A>T"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS051218"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 883,
+          "referenceAllele": "T",
+          "start": 882
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "XM_005260792.2:c.404T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005260849.1:p.Leu135Gln",
+        "hgvsWellDefined": "XP_005260849.1:p.Leu135Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS062927"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1426,
+          "referenceAllele": "T",
+          "start": 1425
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_022096.6:c.971T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS670372"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1300,
+          "referenceAllele": "T",
+          "start": 1299
+        }
+      ],
+      "hgvs": [
+        "ENST00000378380.4:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000367631.3:p.Leu324Gln",
+        "hgvsWellDefined": "ENSP00000367631.3:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS272005"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1372,
+          "referenceAllele": "T",
+          "start": 1371
+        }
+      ],
+      "hgvs": [
+        "ENST00000378392.5:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000367644.1:p.Leu324Gln",
+        "hgvsWellDefined": "ENSP00000367644.1:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS272011"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1278,
+          "referenceAllele": "T",
+          "start": 1277
+        }
+      ],
+      "hgvs": [
+        "ENST00000488991.1:n.1278T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS327148"
+    }
+  ],
+  "type": "nucleotide"
+}
+,{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA9762888",
+  "externalRecords": {
+    "ExAC": [
+      {
+        "@id": "http://exac.broadinstitute.org/variant/20-10030188-T-A",
+        "id": "20-10030188-T-A",
+        "variant": "20:10030188 T / A"
+      }
+    ],
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr20:g.10030188T>A?assembly=hg19",
+        "id": "chr20:g.10030188T>A"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr20:g.10049540T>A?assembly=hg38",
+        "id": "chr20:g.10049540T>A"
+      }
+    ],
+    "dbSNP": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/snp/652633",
+        "rs": 652633
+      }
+    ],
+    "gnomAD": [
+      {
+        "@id": "http://gnomad.broadinstitute.org/variant/20-10030188-T-A",
+        "id": "20-10030188-T-A",
+        "variant": "20:10030188 T / A"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 10049540,
+          "referenceAllele": "T",
+          "start": 10049539
+        }
+      ],
+      "hgvs": [
+        "NC_000020.11:g.10049540T>A",
+        "CM000682.2:g.10049540T>A"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000068"
+    },
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 9978188,
+          "referenceAllele": "T",
+          "start": 9978187
+        }
+      ],
+      "hgvs": [
+        "NC_000020.9:g.9978188T>A"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000020"
+    },
+    {
+      "chromosome": "20",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 10030188,
+          "referenceAllele": "T",
+          "start": 10030187
+        }
+      ],
+      "hgvs": [
+        "NC_000020.10:g.10030188T>A",
+        "CM000682.1:g.10030188T>A"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000044"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1396,
+          "referenceAllele": "T",
+          "start": 1395
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_001303472.1:c.404T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001290401.1:p.Leu135Gln",
+        "hgvsWellDefined": "NP_001290401.1:p.Leu135Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS025545"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1414,
+          "referenceAllele": "T",
+          "start": 1413
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_022096.5:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_071379.3:p.Leu324Gln",
+        "hgvsWellDefined": "NP_071379.3:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS037194"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1350,
+          "referenceAllele": "T",
+          "start": 1349
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_198798.2:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_942093.1:p.Leu324Gln",
+        "hgvsWellDefined": "NP_942093.1:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS044722"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "T",
+          "end": 499,
+          "endIntronDirection": "-",
+          "endIntronOffset": 22891,
+          "referenceAllele": "A",
+          "start": 499,
+          "startIntronDirection": "-",
+          "startIntronOffset": 22892
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN044312",
+      "geneNCBI_id": 100131208,
+      "geneSymbol": "SNAP25-AS1",
+      "hgvs": [
+        "NR_040710.1:n.500-22892A>T"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS051218"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 883,
+          "referenceAllele": "T",
+          "start": 882
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "XM_005260792.2:c.404T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005260849.1:p.Leu135Gln",
+        "hgvsWellDefined": "XP_005260849.1:p.Leu135Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS062927"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1426,
+          "referenceAllele": "T",
+          "start": 1425
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN015803",
+      "geneNCBI_id": 63926,
+      "geneSymbol": "ANKEF1",
+      "hgvs": [
+        "NM_022096.6:c.971T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS670372"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1300,
+          "referenceAllele": "T",
+          "start": 1299
+        }
+      ],
+      "hgvs": [
+        "ENST00000378380.4:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000367631.3:p.Leu324Gln",
+        "hgvsWellDefined": "ENSP00000367631.3:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS272005"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1372,
+          "referenceAllele": "T",
+          "start": 1371
+        }
+      ],
+      "hgvs": [
+        "ENST00000378392.5:c.971T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000367644.1:p.Leu324Gln",
+        "hgvsWellDefined": "ENSP00000367644.1:p.Leu324Gln"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS272011"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 1278,
+          "referenceAllele": "T",
+          "start": 1277
+        }
+      ],
+      "hgvs": [
+        "ENST00000488991.1:n.1278T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS327148"
+    }
+  ],
+  "type": "nucleotide"
+}
+,{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA345331023",
+  "externalRecords": {
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr1:g.227400866T>C?assembly=hg19",
+        "id": "chr1:g.227400866T>C"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr1:g.227213165T>C?assembly=hg38",
+        "id": "chr1:g.227213165T>C"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "1",
+      "coordinates": [
+        {
+          "allele": "C",
+          "end": 227213165,
+          "referenceAllele": "T",
+          "start": 227213164
+        }
+      ],
+      "hgvs": [
+        "NC_000001.11:g.227213165T>C",
+        "CM000663.2:g.227213165T>C"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000049"
+    },
+    {
+      "chromosome": "1",
+      "coordinates": [
+        {
+          "allele": "C",
+          "end": 225467489,
+          "referenceAllele": "T",
+          "start": 225467488
+        }
+      ],
+      "hgvs": [
+        "NC_000001.9:g.225467489T>C"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000001"
+    },
+    {
+      "chromosome": "1",
+      "coordinates": [
+        {
+          "allele": "C",
+          "end": 227400866,
+          "referenceAllele": "T",
+          "start": 227400865
+        }
+      ],
+      "hgvs": [
+        "NC_000001.10:g.227400866T>C",
+        "CM000663.1:g.227400866T>C"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000025"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1268,
+          "referenceAllele": "A",
+          "start": 1267
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "NM_003607.3:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_003598.2:p.Asn109Asp",
+        "hgvsWellDefined": "NP_003598.2:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS028837"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1268,
+          "referenceAllele": "A",
+          "start": 1267
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "NM_014826.4:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_055641.3:p.Asn109Asp",
+        "hgvsWellDefined": "NP_055641.3:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS033501"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273317.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005273374.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_005273374.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS067540"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273318.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005273375.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_005273375.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS067541"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273320.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005273377.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_005273377.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS067542"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273321.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005273378.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_005273378.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS067543"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273322.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005273379.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_005273379.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS067544"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273324.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_005273381.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_005273381.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS067545"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_006711834.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_006711897.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_006711897.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS069327"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_006711835.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_006711898.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_006711898.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS069328"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544306.1:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_011542608.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_011542608.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS111218"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544307.1:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_011542609.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_011542609.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS111219"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544308.1:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_011542610.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_011542610.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS111220"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544309.1:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_011542611.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_011542611.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS111221"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "NM_001366010.1:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001352939.1:p.Asn109Asp",
+        "hgvsWellDefined": "NP_001352939.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS524359"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "NM_001366011.1:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001352940.1:p.Asn109Asp",
+        "hgvsWellDefined": "NP_001352940.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS524360"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1635,
+          "referenceAllele": "A",
+          "start": 1634
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "NM_001366019.1:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001352948.1:p.Asn109Asp",
+        "hgvsWellDefined": "NP_001352948.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS524362"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273317.4:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS537428"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273318.4:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS537429"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1476,
+          "referenceAllele": "A",
+          "start": 1475
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273320.4:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS537430"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273321.4:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS537431"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_005273322.4:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS537432"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_006711834.4:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS538098"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_006711835.4:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS538099"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1645,
+          "referenceAllele": "A",
+          "start": 1644
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544306.3:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS555598"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544307.3:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS555599"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544308.3:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS555600"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1380,
+          "referenceAllele": "A",
+          "start": 1379
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_011544309.3:c.325A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS555601"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_017002578.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016858067.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_016858067.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS558520"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1803,
+          "referenceAllele": "A",
+          "start": 1802
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_017002579.2:c.13A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016858068.1:p.Asn5Asp",
+        "hgvsWellDefined": "XP_016858068.1:p.Asn5Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS558521"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1553,
+          "referenceAllele": "A",
+          "start": 1552
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_017002580.2:c.13A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016858069.1:p.Asn5Asp",
+        "hgvsWellDefined": "XP_016858069.1:p.Asn5Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS558522"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1803,
+          "referenceAllele": "A",
+          "start": 1802
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_017002581.2:c.13A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016858070.1:p.Asn5Asp",
+        "hgvsWellDefined": "XP_016858070.1:p.Asn5Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS558523"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1293,
+          "referenceAllele": "A",
+          "start": 1292
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN001737",
+      "geneNCBI_id": 8476,
+      "geneSymbol": "CDC42BPA",
+      "hgvs": [
+        "XM_017002582.2:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016858071.1:p.Asn109Asp",
+        "hgvsWellDefined": "XP_016858071.1:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS558524"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 857,
+          "referenceAllele": "A",
+          "start": 856
+        }
+      ],
+      "hgvs": [
+        "ENST00000334218.9:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000335341.6:p.Asn109Asp",
+        "hgvsWellDefined": "ENSP00000335341.6:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS259861"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1268,
+          "referenceAllele": "A",
+          "start": 1267
+        }
+      ],
+      "hgvs": [
+        "ENST00000366764.6:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000355726.3:p.Asn109Asp",
+        "hgvsWellDefined": "ENSP00000355726.3:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS266007"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1268,
+          "referenceAllele": "A",
+          "start": 1267
+        }
+      ],
+      "hgvs": [
+        "ENST00000366766.6:c.-1884A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000355728.3:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS266008"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 325,
+          "referenceAllele": "A",
+          "start": 324
+        }
+      ],
+      "hgvs": [
+        "ENST00000366767.7:n.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000355729.3:p.Asn109Asp",
+        "hgvsWellDefined": "ENSP00000355729.3:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS266009"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 1617,
+          "referenceAllele": "A",
+          "start": 1616
+        }
+      ],
+      "hgvs": [
+        "ENST00000366769.7:c.325A>G"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000355731.3:p.Asn109Asp",
+        "hgvsWellDefined": "ENSP00000355731.3:p.Asn109Asp"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS266010"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 305,
+          "referenceAllele": "A",
+          "start": 304
+        }
+      ],
+      "hgvs": [
+        "ENST00000462553.2:n.305A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS306779"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "G",
+          "end": 190,
+          "referenceAllele": "A",
+          "start": 189
+        }
+      ],
+      "hgvs": [
+        "ENST00000478573.6:n.190A>G"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS319152"
+    }
+  ],
+  "type": "nucleotide"
+}
+,{
+  "@context": "http://reg.test.genome.network/schema/allele.jsonld",
+  "@id": "http://reg.test.genome.network/allele/CA382246068",
+  "externalRecords": {
+    "ClinVarAlleles": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/?term=433516[alleleid]",
+        "alleleId": 433516,
+        "preferredName": "NM_001080463.1(DYNC2H1):c.5972T>A (p.Met1991Lys)"
+      }
+    ],
+    "ClinVarVariations": [
+      {
+        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/variation/439632",
+        "RCV": [
+          "RCV000507888"
+        ],
+        "variationId": 439632
+      }
+    ],
+    "MyVariantInfo_hg19": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr11:g.103048382T>A?assembly=hg19",
+        "id": "chr11:g.103048382T>A"
+      }
+    ],
+    "MyVariantInfo_hg38": [
+      {
+        "@id": "http://myvariant.info/v1/variant/chr11:g.103177653T>A?assembly=hg38",
+        "id": "chr11:g.103177653T>A"
+      }
+    ],
+    "gnomAD": [
+      {
+        "@id": "http://gnomad.broadinstitute.org/variant/11-103048382-T-A",
+        "id": "11-103048382-T-A",
+        "variant": "11:103048382 T / A"
+      }
+    ]
+  },
+  "genomicAlleles": [
+    {
+      "chromosome": "11",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 103177653,
+          "referenceAllele": "T",
+          "start": 103177652
+        }
+      ],
+      "hgvs": [
+        "NC_000011.10:g.103177653T>A",
+        "CM000673.2:g.103177653T>A"
+      ],
+      "referenceGenome": "GRCh38",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000059"
+    },
+    {
+      "chromosome": "11",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 102553592,
+          "referenceAllele": "T",
+          "start": 102553591
+        }
+      ],
+      "hgvs": [
+        "NC_000011.8:g.102553592T>A"
+      ],
+      "referenceGenome": "NCBI36",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000011"
+    },
+    {
+      "chromosome": "11",
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 103048382,
+          "referenceAllele": "T",
+          "start": 103048381
+        }
+      ],
+      "hgvs": [
+        "NC_000011.9:g.103048382T>A",
+        "CM000673.1:g.103048382T>A"
+      ],
+      "referenceGenome": "GRCh37",
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS000035"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 73223,
+          "referenceAllele": "T",
+          "start": 73222
+        }
+      ],
+      "hgvs": [
+        "NG_016423.1:g.73223T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS003177"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 73223,
+          "referenceAllele": "T",
+          "start": 73222
+        }
+      ],
+      "hgvs": [
+        "NG_016423.2:g.73223T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS673679"
+    }
+  ],
+  "transcriptAlleles": [
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "NM_001080463.1:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001073932.1:p.Met1991Lys",
+        "hgvsWellDefined": "NP_001073932.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS010221"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "NM_001377.2:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "NP_001368.2:p.Met1991Lys",
+        "hgvsWellDefined": "NP_001368.2:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS026763"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_006718903.2:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_006718966.1:p.Met1991Lys",
+        "hgvsWellDefined": "XP_006718966.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS072840"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_017018291.1:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016873780.1:p.Met1991Lys",
+        "hgvsWellDefined": "XP_016873780.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS570260"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 5370,
+          "referenceAllele": "T",
+          "start": 5369
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_017018292.1:c.5354T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016873781.1:p.Met1785Lys",
+        "hgvsWellDefined": "XP_016873781.1:p.Met1785Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS570261"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "XM_017018293.1:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "XP_016873782.1:p.Met1991Lys",
+        "hgvsWellDefined": "XP_016873782.1:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS570262"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6121,
+          "referenceAllele": "T",
+          "start": 6120
+        }
+      ],
+      "gene": "http://reg.test.genome.network/gene/GN002962",
+      "geneNCBI_id": 79659,
+      "geneSymbol": "DYNC2H1",
+      "hgvs": [
+        "NM_001377.3:c.5972T>A"
+      ],
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS664959"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 2258,
+          "endIntronDirection": "+",
+          "endIntronOffset": 43234,
+          "referenceAllele": "T",
+          "start": 2258,
+          "startIntronDirection": "+",
+          "startIntronOffset": 43233
+        }
+      ],
+      "hgvs": [
+        "ENST00000334267.11:c.2205+43234T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000334021.7:p.="
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS259871"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 6116,
+          "referenceAllele": "T",
+          "start": 6115
+        }
+      ],
+      "hgvs": [
+        "ENST00000375735.6:c.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000364887.2:p.Met1991Lys",
+        "hgvsWellDefined": "ENSP00000364887.2:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS270843"
+    },
+    {
+      "coordinates": [
+        {
+          "allele": "A",
+          "end": 5972,
+          "referenceAllele": "T",
+          "start": 5971
+        }
+      ],
+      "hgvs": [
+        "ENST00000398093.7:n.5972T>A"
+      ],
+      "proteinEffect": {
+        "hgvs": "ENSP00000381167.3:p.Met1991Lys",
+        "hgvsWellDefined": "ENSP00000381167.3:p.Met1991Lys"
+      },
+      "referenceSequence": "http://reg.test.genome.network/refseq/RS278130"
+    }
+  ],
+  "type": "nucleotide"
+}
+]

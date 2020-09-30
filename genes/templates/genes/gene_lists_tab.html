@@ -1,0 +1,120 @@
+{% load static %}
+<div>
+<link href="{% static 'css/companies.css' %}" rel="stylesheet">
+<style>
+.category-name {
+    height: 40px;
+}
+
+
+// JQueryUI tab styling - from http://www.webdeveasy.com/style-your-jquery-ui-tabs/
+.style-tabs {
+    background: none;
+    width: 480px;
+}
+.style-tabs,
+.style-tabs .ui-tabs-nav li a,
+.style-tabs .ui-tabs-nav {
+    padding: 0;
+}
+.style-tabs .ui-tabs-panel {
+    padding: 5px;
+}
+.style-tabs .ui-widget-header {
+    border: none;
+    background: url(images/TabMenu.png) repeat;
+    height: 74px;
+    width: 100%;
+}
+.style-tabs .ui-corner-all {
+    -moz-border-radius: 0;
+    -webkit-border-radius: 0;
+    border-radius: 0;
+}
+.style-tabs .ui-tabs-nav li {
+    position: relative;
+    height: 100%;
+    cursor: pointer;
+    margin: 0;
+    top: 0;
+}
+.style-tabs .ui-widget-header .ui-state-default {
+    background: none;
+    border: none;
+}
+.style-tabs .ui-tabs-nav li.ui-tabs-active,
+.style-tabs .ui-tabs-nav li:hover {
+    background: url(images/SelectedMiddle.png) repeat;
+}
+.style-tabs .ui-tabs-nav li .icon {
+    color: #787878;
+    background-position: center 3px;
+    padding-top: 40px;
+    font-weight: bold;
+    font-size: 12px;
+    text-align: center;
+    width: 80px;
+}
+.style-tabs .ui-tabs-nav li.ui-tabs-active .icon,
+.style-tabs .ui-tabs-nav li:hover .icon {
+    color: #414141;
+}
+.style-tabs .ui-tabs-nav li.ui-tabs-active .icon:before,
+.style-tabs .ui-tabs-nav li:hover .icon:before {
+    content: url(images/SelectedSides.png);
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+.style-tabs .ui-tabs-nav li.ui-tabs-active .icon:after,
+.style-tabs .ui-tabs-nav li:hover .icon:after {
+    content: url(images/SelectedSides.png);
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+.style-tabs .ui-tabs-nav li a {
+    outline: none;
+}
+.style-tabs .ui-tabs-nav li.ui-tabs-active a {
+    cursor: pointer;
+}
+</style>
+	{% load jqgrid_tags %}
+
+<script type="text/javascript">
+    $(document).ready(function() {
+        $("#gene-listtabs").tabs();
+    });
+</script>
+
+	<div id="gene-listtabs">
+		<ul>
+		  {% for category in categories %}
+                <li>
+                <a href="#category-{{ category.name }}">
+                    {% if category.icon_css_class %}
+                        <div class="icon {{ category.icon_css_class }}"></div>
+                    {% else %}
+                        <div class="category-name">
+                        {{ category.name }}
+                        </div>
+                    {% endif %}
+                </a>
+            </li>
+          {% endfor %}
+	  	</ul>
+        {% for category in categories %}
+		<div id="category-{{ category.name }}">
+		{% if category.pk %}
+            {% if category.name == 'Uploaded' %}
+                <a href="{% url 'upload' %}">Upload new gene list.</a>
+            {% endif %}
+			{% jqgrid 'gene_lists_grid' category.name search=False delete=True gene_list_category_id=category.pk %}
+        {% else %}
+            {% jqgrid 'uncategorised_gene_lists_grid' category.name search=False delete=True %}
+        {% endif %}
+		</div>
+		{% endfor %}
+	</div>
+</div>

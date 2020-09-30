@@ -1,0 +1,9 @@
+{% load ui_utils %}
+{% if site_messages %}{% for site_message in site_messages %}
+    <div class="site-message border rounded m-2 p-2 bg-light">
+        {{ site_message.severity | severity_icon }} {{ site_message.message }}
+        {% if site_message.timestamp %}<span>
+            <div class="convert-timestamp time-ago" data-timestamp="{{ site_message.timestamp }}"></div>
+        </span>{% endif %}
+    </div>
+{% endfor %}{% endif %}

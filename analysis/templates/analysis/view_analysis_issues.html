@@ -1,0 +1,96 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load js_tags %}
+{% load jqgrid_tags %}
+{% block title %}Analysis Issues{% endblock title %}
+{% block submenu %}{% menu_bar_analysis %}{% endblock %}
+{% block head %}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            let nodesStatusSummary = {{ nodes_status_summary |jsonify }};
+
+            function showSummaryGraph(selector, summaryData) {
+                let data = [];
+                let summary_and_colors = [
+                    ["Queued", 'rgb(50, 50, 50)'],
+                    ["Running", 'rgb(50,171, 96)'],
+                    ["User Error", 'rgb(255, 79, 0)'],
+                    ["Error", 'rgb(170, 50, 50)'],
+                    ["Finished", 'rgb(35, 110, 80)'],
+                ];
+
+                for (let i=0 ; i<summary_and_colors.length ; ++i) {
+                    let name = summary_and_colors[i][0];
+                    let color = summary_and_colors[i][1];
+                    let c = summaryData[name] || 0;
+                    let trace = {
+                        x: [c],
+                        y: ["counts"],
+                        orientation: 'h',
+                        name: name,
+                        marker: {
+                            color: color
+                        },
+                        type: 'bar'
+                    };
+                    data.push(trace);
+                }
+
+                var layout = {
+                    width: 800,
+                    height: 100,
+                    barmode: 'stack',
+                    showlegend: true,
+                    legend: {orientation: 'h'},
+                    xaxis: {
+                        autorange: true,
+                        showgrid: false,
+                        zeroline: false,
+                        showline: false,
+                        autotick: true,
+                        ticks: '',
+                        showticklabels: false
+                    },
+                    margin: {
+                        l: 100,
+                        r: 100,
+                        b: 50,
+                        t: 20,
+                        //pad: 4
+                    },
+                };
+                Plotly.newPlot(selector, data, layout);
+            }
+
+            showSummaryGraph("analysis-node-summary-graph", nodesStatusSummary);
+
+            jQuery.extend($.fn.fmatter , {
+                analysisNodeLink : function(cellvalue, options, rowObject) {
+                    let analysisId = rowObject.analysis_id;
+                    let nodeId = rowObject.id;
+                    // Hack as Urls can use dictionary as kwargs (set in JqGrid colmodel override)
+                    rowObject.hack_kwargs = {analysis_id: analysisId, active_node_id: nodeId};
+                    return linkFormatter(cellvalue, options, rowObject);
+                }
+            });
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+
+    <div class="container-table">
+        <h3>Analysis Issues</h3>
+        <div class="container">
+            <div id="analysis-node-summary-graph"></div>
+            {% for field, count in field_counts.items %}
+                {% labelled label=field %}{{ count }}{% endlabelled %}
+            {% endfor %}
+        </div>
+        {% jqgrid 'analysis_node_issues_grid' search=False %}
+    </div>
+
+{% endblock content %}

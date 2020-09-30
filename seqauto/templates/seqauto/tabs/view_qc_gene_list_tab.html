@@ -1,0 +1,44 @@
+{% load jqgrid_tags %}
+{% load help_tags %}
+<script>
+    function gene_list_genes_grid_init_func(grid, pagerId) {
+        var download_genes_grid = function() {
+        {% if qc_gene_list %}
+            var url = "{% url 'gene_list_genes_grid' gene_list_id=qc_gene_list.pk op='download' %}";
+            window.location = url;
+        {% endif %}
+        }
+
+        grid.jqGrid('navButtonAdd', pagerId, {
+                    caption : "Download",
+                    buttonicon : "ui-icon-arrowthickstop-1-s",
+                    onClickButton : download_genes_grid,
+                    position : "first",
+                    title : "Export",
+                    cursor : "pointer"
+        });
+    }
+
+
+    $(document).ready(function() {
+    });
+
+</script>
+{% if qc_gene_list %}
+    <div id="qc-gene-list">
+    {% page_help user 'seqauto/sample_qc_gene_list' 'Sample QC Gene List' %}
+    
+    {% if qc_gene_list.custom_text_gene_list.gene_list.import_status == 'S' %}
+        {% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' 'gene_list_genes_grid_init_func' False gene_list_id=qc_gene_list.custom_text_gene_list.gene_list.pk %}
+    {% else %}
+        <b>Error:</b>
+        {% if qc_gene_list.custom_text_gene_list.gene_list.import_status == 'E' %}
+            <pre>
+             {{ qc_gene_list.custom_text_gene_list.gene_list.error_message }}
+            </pre>
+        {% else %}
+            Unknown Error.                      
+        {% endif %}
+    {% endif %}
+    </div>
+{% endif %}

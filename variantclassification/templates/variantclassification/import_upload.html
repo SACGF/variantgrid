@@ -1,0 +1,32 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block title %}File Upload{% endblock %}
+
+{% block content %}
+    <div class="container">
+        {% if labs %}
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <h3>Classifications MVL.json Upload</h3>
+                {% labelled label="Upload for Lab" %}
+                    <select name="lab" id="upload-lab" class="form-control">
+                        {% for lab in labs %}
+                            <option value="{{ lab.group_name }}">{{ lab.name }}</option>
+                        {% endfor %}
+                    </select>
+                {% endlabelled %}
+                {% labelled label="Upload File" %}
+                    <input type="file" name="file">
+                {% endlabelled %}
+                <input type="submit" class="btn btn-primary">
+            </form>
+        {% else %}
+            <div class="chunk borderless">
+                <p>You don't belong to any labs that are configured to upload classification files</p>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

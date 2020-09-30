@@ -1,0 +1,122 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block inlinejs %}
+{{ block.super }}
+
+function showGnomadPopulations() {
+    $("#id_gnomad_af").prop("checked", false);
+    $("#id_gnomad_popmax_af").prop("checked", false);
+    $("#show-gnomad-populations-link").fadeOut();
+    $("#gnomad-populations").slideDown();
+}
+{% endblock inlinejs %}
+
+{% block docreadyjs %}
+    var pop_form = $("form#population");
+    ajaxForm(pop_form);
+
+    var gnomadPopulationSelector = $("input[type='checkbox']", "#id_gnomad_population");
+    function deselectGnomadPopulations() {
+        gnomadPopulationSelector.prop("checked", false);
+        $("#show-gnomad-populations-link").fadeIn();
+        $("#gnomad-populations").slideUp();
+    }
+
+    $("#id_gnomad_af").click(function() {
+        if ($(this).is(":checked")) {
+            deselectGnomadPopulations();
+            $("#id_gnomad_popmax_af").prop("checked", false);
+        }
+    });
+
+    $("#id_gnomad_popmax_af").click(function() {
+        if ($(this).is(":checked")) {
+            deselectGnomadPopulations();
+            $("#id_gnomad_af").prop("checked", false);
+        }
+    });
+    
+    function selectedGnomadPopulations() {
+        return gnomadPopulationSelector.filter(function() { return $(this).is(":checked")});
+    }
+
+    function changeUseInternalCounts() {
+       var internalPop = $("#internal-population-container");
+       if ($("#id_use_internal_counts").is(":checked")) {
+            internalPop.slideDown();
+       } else {
+           internalPop.slideUp();
+       }
+    }
+
+    // Show hidden things if set
+    if (selectedGnomadPopulations().length) {
+        $("#show-gnomad-populations-link").hide();
+        $("#gnomad-populations").show();
+    }
+    
+    $("#id_use_internal_counts").change(changeUseInternalCounts);
+    changeUseInternalCounts();
+	
+{% endblock docreadyjs %}
+
+{% block content %}
+<style>
+    #id_percent, #id_internal_percent {
+        width: 80px;
+    }
+    
+    #id_max_samples {
+        width: 60px;
+    }
+
+    .disease-warning {
+        color: #FF8C00;
+    }
+
+    #gnomad-options {
+        margin-left: 50px;
+    }
+
+</style>
+<div>
+	<form id="population" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+		<div>Max population frequency of {{ form.percent }} % in
+		<span title='ANY - remove if frequency is above cutoff in any database (much more strict). ALL - Only remove if frequency is above cutoff in all databases. Note: ALL retains variants with a missing entry from any database'>
+		  {{ form.group_operation }}
+		</span> ticked database(s) below.</div>
+        <div>
+            <a target='_blank' href='http://gnomad.broadinstitute.org/about'>gnomAD</a> <i>138,632 individual genomes/exomes.</i>
+            <div id="gnomad-options">
+                <span>{{ form.gnomad_af }} <i>AF (average)</i></span>
+                <span>{{ form.gnomad_popmax_af }} <i>Popmax (Highest sub-pop frequency)</i>  </span>
+                <a id='show-gnomad-populations-link' href='javascript:showGnomadPopulations()'>Pick individual gnomAD populations</a>
+                <div id='gnomad-populations' class='hidden'>
+                {{ form.gnomad_population }}
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div>{{ form.topmed_af }} <a target='_blank' href='https://www.nhlbiwgs.org/'>TOPMed</a> <i>TOPMed, ~144k participants from >80 different studies.</i> <span class="disease-warning">Warning: some patients have disease phenotypes</span></div>
+            <div>{{ form.af_1kg }} <a target='_blank' href='http://www.1000genomes.org'>1000 genomes</a> <i>1kg Phase3_v5. Global pop. ~2,500 individuals</i></div>
+            <div>{{ form.af_uk10k }} <a target='_blank' href='http://www.uk10k.org'>UK10K project</a> <i>WGS for controls. 3,781 individuals</i></div>
+        </div>
+        <div><b>gnomAD hom alt max:</b> {{ form.gnomad_hom_alt_max }}</div>
+        <div id='db-restrictions-container'>
+            <h3>Internal Population Frequency</h3>
+            Filter based on samples in this database {{ form.use_internal_counts }}
+            <div id='internal-population-container' class='hidden'>
+                <div><b>Keep internally classified (likely) pathogenic:</b> {{ form.keep_internally_classified_pathogenic }} </div>
+                <div><b>Max percent:</b> {{ form.internal_percent }} (Note: results vary over time with # of samples in database) </div>
+                <div><b>Max count:</b> {{ form.max_samples }} ({{ form.zygosity }}) (of the {{ num_samples }} samples in the database)</div>
+            </div>
+        </div>
+
+		<button id='population-save' class="btn btn-primary">save</button>
+    	{{ form.media }}
+	</form>
+</div>
+
+{% endblock content %}

@@ -1,0 +1,74 @@
+{% extends "analysis/node_editors/grid_editor_gene_tab.html" %}
+
+{% block docreadyjs %}
+    var tissueNodeForm = $('form#tissue-node');
+    ajaxForm(tissueNodeForm);
+    accordionForm(tissueNodeForm);
+{% endblock docreadyjs %}
+
+{% block inlinejs %}
+    {{ block.super }}
+
+	function tissue_gene_grid_init_func(grid, pagerId) {
+		var download_genes_grid = function() {
+		{% if annotation_version.human_protein_atlas_version and node.tissue_sample %}
+			var url = "{% url 'tissue_gene_grid' human_protein_atlas_version_id=annotation_version.human_protein_atlas_version.pk tissue_sample_id=node.tissue_sample.pk min_abundance=node.min_abundance op='download' %}";
+			window.location = url;
+		{% endif %}
+		}
+
+		grid.jqGrid('navButtonAdd', pagerId, {
+			        caption : "Download",
+			        buttonicon : "ui-icon-arrowthickstop-1-s",
+			        onClickButton : download_genes_grid,
+			        position : "first",
+			        title : "Export",
+			        cursor : "pointer"
+		});
+	}
+{% endblock inlinejs %}
+
+{% block gene_list_grid %}
+{% if annotation_version.human_protein_atlas_version and node.tissue_sample %}
+	<b>Human Protein Atlas Tissue:</b> {{ node.tissue_sample.name }} (Abundance >= {{ node.min_abundance }})
+	
+	{% load jqgrid_tags %}
+	{% jqgrid 'tissue_gene_grid' 'tissue-gene-list' False None 'jqgrid/jqgrid.html' 'tissue_gene_grid_init_func' False human_protein_atlas_version_id=annotation_version.human_protein_atlas_version.pk tissue_sample_id=node.tissue_sample.pk min_abundance=node.min_abundance %}
+{% else %}
+	No tissue sample selected.
+{% endif %}
+{% endblock gene_list_grid %}
+
+{% block content %}
+<style>
+#text-explaination {
+	font-size: 0.8em;
+}
+</style>
+<div>
+	<form id="tissue-node" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+		<div id="accordion-container">
+			<ul class="accordion">
+				<li>
+		        <h3>Human Protein Atlas</h3>
+				<div>
+				<div><b>Tissue:</b> {{ form.tissue_sample }}</div>
+				<div><b>Min Abundance:</b> {{ form.min_abundance }}</div>
+				</div>
+		        </li>
+		        <li>
+		        <h3>Tissue Specificity from UniprotKB</h3>
+				<div><b>Text Search:</b> {{ form.text_tissue }}
+				<div id='text-explaination'>This is a <b>case-insensitive</b> search for words in <b>any order</b>, eg "fetal lung" would match "Fetal Lung", "Fetal Brain and Lung" and "Adult Lung and Fetal Brain"</span></div>
+		        </li>
+			</ul>
+		</div>
+		<button id='tissue-node-save' class="btn btn-primary">save</button>
+	</form>
+</div>
+
+{% endblock content %}

@@ -1,0 +1,30 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Columns{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        {% page_help page_id='settings/columns_help' title="Custom Columns"%}
+
+        <div class="card">
+            <div class="card-header">Create New Column</div>
+            <div class="card-body">
+                <form method="post">
+                    {% crispy form %}
+                </form>
+            </div>
+        </div>
+
+        <p>
+        Click to edit your columns or clone a global set.
+        </p>
+
+        {% load jqgrid_tags %}
+        {% jqgrid 'custom_columns_grid' 'columns' search=False delete=True gbox_id='columns-grid-filter-container' template_name='snpdb/grids/custom_columns_grid.html' %}
+    </div>
+{% endblock %}

@@ -1,0 +1,22 @@
+<script type="text/javascript">
+$(document).ready(function () {
+/*		
+	var form = $("ul.messages").parents("form");
+	form.change(function() {
+		var displayedUnsavedChangesMessage = form.attr("displayedUnsavedChangesMessage");
+		if (!displayedUnsavedChangesMessage) {
+			$("ul.messages").insert("<li class='info'>Unsaved changes</li>");
+			form.attr("displayedUnsavedChangesMessage", true);
+		}
+	});	
+	
+	// $("li.info", "ul.messages").delay(3000).fadeOut("slow");
+*/
+});
+</script>
+
+<ul class="messages">
+    {% for message in messages %}
+    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+    {% endfor %}
+</ul>

@@ -1,0 +1,12 @@
+{% extends "analysis/tags/base_related_analyses.html" %}
+{% block create_analyses %}
+{% if trio.cohort.import_status == "S" %}
+    <ul>
+        <li><a href="{% url 'create_karyomapping_analysis_for_trio' trio.pk %}">Create Karyomapping analysis for trio</a></li>
+    </ul>
+
+    {% load related_analyses_tags %}
+    {% analysis_templates_tag trio=trio %}
+
+{% endif %}
+{% endblock create_analyses %}

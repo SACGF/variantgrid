@@ -1,0 +1,61 @@
+{% extends "snpdb/tags/related_data.html" %}
+{% load model_tags %}
+
+{% block related_data %}
+{{ block.super }}
+
+{% if cohorts_and_samples %}
+<div id='related-cohorts'>
+    <h3>Cohorts</h3>
+    <table>
+        <tr>
+        <th>Cohort
+        {% if show_sample_info %}
+        <th>Samples
+        {% endif %}
+    
+    {% for cohort, samples in cohorts_and_samples %}
+        <tr> 
+        <td><a href="{% url 'view_cohort' cohort.pk %}">{{ cohort }}</a>
+        {% if samples %}
+        <td>{{ samples }}
+        {% endif %}
+    {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+
+{% if trios_and_samples %}
+<div id='related-trios'>
+    <h3>Trios</h3>
+    {% for trio, samples in trios_and_samples %}
+        <div> 
+            <a href="{% url 'view_trio' trio.pk %}">{{ trio }}</a> - {% trio_short_description trio %}
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+
+{% if pedigrees_and_samples %}
+<div id='related-pedigrees'>
+    <h3>Pedigrees</h3>
+    <table>
+        <tr>
+        <th>Pedigree
+        {% if show_sample_info %}
+        <th>Samples
+        {% endif %}
+    
+    {% for pedigree, samples in pedigrees_and_samples %}
+        <tr> 
+        <td><a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
+        {% if samples %}
+        <td>{{ samples }}
+        {% endif %}
+    {% endfor %}
+    </table>
+</div>
+{% endif %}
+{% endblock %}

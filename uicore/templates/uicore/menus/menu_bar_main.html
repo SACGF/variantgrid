@@ -1,0 +1,20 @@
+{% load ui_menus %}
+
+{% menu_top 'sequencing_data' app_name='seqauto' title='Sequencing' %}
+{% menu_top 'data' app_name='snpdb/data|upload' %}
+{% menu_top 'patients' app_name='patients|snpdb/cohorts|pedigree|snpdb/trios' %}
+
+{% if pathology_tests_enabled %}
+    {% menu_top 'pathology_tests' app_name='pathtests' title="Tests" %}
+{% endif %}
+
+{% menu_top 'analyses' app_name='analysis' title="Analysis" %}
+{% menu_top 'classifications' app_name='variantclassification|snpdb/labs' %}
+{% menu_top 'genes|genes' app_name='genes' title='Genes' %}
+{% menu_top 'variantopedia_wiki|variants' app_name='variantopedia|variants|manual_variant_entry' title='Variants' %}
+{% menu_top 'annotation' app_name='annotation' title='Annotation' %}
+<a class="nav-link" target="_blank" href="{{ help_url }}">Help</a>
+<a id="suggestion" class="nav-link" data-toggle="tooltip" title="Suggestion / Bug Report" href="javascript:suggestionDialog('{{ user.username }}')"><i class="fas fa-bug mt-1"></i></a>
+<!--
+<button type="button" style="color:#866" class="btn bg-transparent" data-toggle="modal" data-target="#vgReportModal"><i class="fas fa-bug mt-1"></i></button>
+-->

@@ -1,0 +1,387 @@
+import collections
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
+from django.utils.decorators import method_decorator
+from rest_framework.response import Response
+from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
+    HTTP_500_INTERNAL_SERVER_ERROR
+from rest_framework.views import APIView
+from typing import Optional
+
+from library.log_utils import report_exc_info
+from library.utils import empty_to_none
+from snpdb.models.models_enums import ImportSource
+from variantclassification.enums import SubmissionSource, ShareLevel
+from variantclassification.models import VariantClassificationRef, VariantClassificationImport, \
+    VariantClassificationJsonParams, PatchMeta
+from variantclassification.models.evidence_mixin import EvidenceMixin, VCStore
+from variantclassification.models.flag_types import variant_classification_flag_types
+from variantclassification.models.variant_classification import VariantClassificationProcessError, \
+    VariantClassificationModification
+from variantclassification.models.variant_classification_patcher import patch_merge_age_units, patch_fuzzy_age
+from variantclassification.tasks.classification_import_task import process_variant_classification_import_task
+
+class BulkInserter:
+
+    def __init__(self, user: User, api_version=1, force_publish=False):
+        """
+        @param force_publish if True, then validation errors will not stop records
+        from being published
+        """
+        self.user = user
+        self.import_for_genome_build = {}
+        self.single_insert = False
+        self.api_version = api_version
+
+        self.force_publish = force_publish
+
+    @transaction.atomic
+    def insert(self, data: dict, record_id: str = None, request=None):
+        if self.single_insert:
+            raise VariantClassificationProcessError('If record_id is provided in URL cannot insert more than one record')
+
+        data_copy = dict()
+        data_copy.update(data)
+        data = data_copy
+
+        try:
+            record_ref: VariantClassificationRef
+            source = VariantClassificationView.verify_source(data)
+            user = self.user
+
+            if record_id:
+                self.single_insert = True
+                record_ref = VariantClassificationRef.init_from_str(user, record_id)
+                if data.get('id'):
+                    raise VariantClassificationProcessError('If providing id part, do not provide id in URL')
+            else:
+                id_part = data.pop('id', None)
+                if not id_part:
+                    keys_label = ', '.join(data.keys())
+                    raise VariantClassificationProcessError(f'Must provide "id" segment with submission - keys = ({keys_label})')
+                if isinstance(id_part, collections.Mapping):
+                    id_part['user'] = user
+                    record_ref = VariantClassificationRef.init_from_parts(**id_part)
+                else:
+                    record_ref = VariantClassificationRef.init_from_str(user, str(id_part))
+
+            record_ref.check_security(must_be_writable=True)
+
+            operation = None
+            operation_data = None
+
+            # if you say test=true, we just want validation messages back
+            save = not data.pop('test', False)
+
+            share_level = ShareLevel.from_key(data.pop('publish', None)) or ShareLevel.from_key(data.pop('share', None))
+            if share_level == ShareLevel.CURRENT_USER:
+                share_level = None
+
+            delete_value = data.pop('delete', None)
+            requested_delete = delete_value is True
+            requested_undelete = delete_value is False
+
+            for op in ['create', 'upsert', 'overwrite', 'data', 'patch']:
+                op_data = data.pop(op, None)
+                if op == 'data':
+                    op = 'upsert'
+
+                if op_data is not None:
+                    if operation:
+                        raise VariantClassificationProcessError('Can only provide 1 of create, overwrite, data, patch or upsert')
+                    else:
+                        operation = op
+                        operation_data = op_data or {}
+
+            # if we're deleting, don't do anything else
+            if requested_delete:
+                operation = None
+                operation_data = None
+                share_level = None
+
+            if operation_data:
+                operation_data = EvidenceMixin.to_patch(operation_data)
+
+            # converts data before we even look at it
+            # good place to manipulate multi-keys, e.g.
+            # if we get age and age_units separately and want to merge
+            def pre_process(base_data: VCStore):
+                nonlocal operation_data
+                patch_meta = PatchMeta(patch=operation_data, existing=base_data)
+                patch_merge_age_units(patch_meta)
+                if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
+                    patch_fuzzy_age(patch_meta)
+
+            record = None
+            patch_messages = None
+            patched_keys = None
+            if operation:
+                # operation modifiers
+                immutable = source == SubmissionSource.API and not data.pop('editable', False)
+
+                if record_ref.version is not None:
+                    raise VariantClassificationProcessError("Can't perform operation on version")
+
+                if operation == 'create' and record_ref.exists():
+                    raise VariantClassificationProcessError('Record already exists, cannot create')
+
+                if operation == 'patch' and not record_ref.exists():
+                    raise VariantClassificationProcessError('Record does not exist, cannot patch')
+
+                if operation in ('create', 'upsert', 'overwrite') and not record_ref.exists():
+                    # creating a new record
+
+                    pre_process({})
+                    record = record_ref.create(
+                        source=source,
+                        data=operation_data,
+                        save=save,
+                        make_fields_immutable=immutable)
+
+                    # We only want to link the variant on initial create - as patching may cause issues
+                    # as classifications change variants. So the variant is immutable
+                    if save:
+                        try:
+                            genome_build = record.get_genome_build()
+                            vc_import = self.import_for_genome_build.get(genome_build.pk)
+                            if vc_import is None:
+                                vc_import = VariantClassificationImport.objects.create(user=user,
+                                                                                       genome_build=genome_build)
+                                self.import_for_genome_build[genome_build.pk] = vc_import
+                            record.variant_classification_import = vc_import
+                        except:
+                            pass
+
+                        #mark the fact that we're searching for a variant
+                        if not record.variant:
+                            record.set_variant()
+                        record.save()
+                        record.publish_latest(user=user)
+                else:
+                    # patching existing records
+                    record = record_ref.record
+                    record.check_can_write(user)
+
+                    ### THE ACTUAL PATCHING OF DATA VALUES
+                    pre_process(record.evidence)
+                    patch_result = record.patch_value(operation_data,
+                                                      clear_all_fields=operation == 'overwrite',
+                                                      user=user,
+                                                      source=source,
+                                                      save=save,
+                                                      make_patch_fields_immutable=immutable)
+                    patch_messages = patch_result['messages']
+                    patched_keys = patch_result['modified']
+
+            else:
+                record = record_ref.record
+
+            if not record:
+                if requested_delete:
+                    return {"deleted": True}
+                else:
+                    raise VariantClassificationProcessError('Record not found')
+
+            data_request = data.pop('return_data', False)
+            flatten = data_request == 'flat'
+            include_data = data_request or flatten
+            if include_data == 'changes':
+                include_data = bool(patched_keys)
+
+            if patch_messages is None:
+                patch_messages = []
+
+            if data:
+                patch_messages.append({'code': 'unexpected_parameters', 'message': 'Unexpected parameters ' + str(data)})
+
+            if save:
+                if requested_delete:
+                    record.check_can_write(user)
+
+                    params = VariantClassificationJsonParams(
+                        version=record_ref.version,
+                        include_data=include_data,
+                        current_user=user,
+                        flatten=flatten,
+                        include_lab_config=data.pop('config', False),
+                        api_version=self.api_version)
+
+                    response_data = record.as_json(params)
+
+                    if record.share_level_enum >= ShareLevel.ALL_USERS:
+                        record.set_withdrawn(user=user, withdraw=True)
+                        response_data['withdrawn'] = True
+                    else:
+                        response_data['deleted'] = True
+                        record.delete()
+
+                    return response_data
+
+                elif share_level:
+                    record.check_can_write(user)
+
+                    if share_level < record.share_level_enum:
+                        # raise ValueError('Record was already published at ' + record.share_level_enum.key + ', can no longer publish at ' + share_level.key)
+                        patch_messages.append({'code': 'shared_higher', 'message': f"The record is already shared as '{record.share_level_enum.key}', re-sharing at that level instead of '{share_level}'"})
+                        record.publish_latest(share_level=record.share_level_enum, user=user)
+
+                    elif not self.force_publish and record.has_errors():
+                        patch_messages.append({'code': 'share_failure', 'message': 'Cannot share record with errors'})
+
+                    else:
+                        record.publish_latest(share_level=share_level, user=user)
+                        patch_messages.append({'code': 'shared', 'message': 'Latest revision is now shared with ' + str(share_level)})
+
+                if requested_undelete:
+                    record.set_withdrawn(user=user, withdraw=False)
+
+                if record.withdrawn:
+                    # Withdrawn records are no longer automatically un-withdrawn
+                    # record.set_withdrawn(user=user, withdraw=False)
+                    patch_messages.append({'code': 'withdrawn', 'message': 'The record you updated is withdrawn and will not appear to users'})
+
+            else:
+                patch_messages.append({'code': 'test_mode', 'message': 'Test mode on, no changes have been saved'})
+
+            # Check to see if the current record matches the previous one exactly
+            # then if the most recent record isn't marked as published, delete it.
+            # - note we only compare against the very immediate previous record
+            recent_modifications = list(VariantClassificationModification.objects.filter(variant_classification=record.id).order_by('-created')[:2])
+            resolution = 'closed'
+            if recent_modifications:
+                latest_mod = recent_modifications[0]
+                if not latest_mod.is_last_edited:
+                    raise ValueError('Assertion error - expected most recent record to be last edited')
+
+                if len(recent_modifications) >= 2:
+                    previous_mod = recent_modifications[1]
+
+                    # if this latest record isn't published, and it matches the previous record exactly, ew can delete it
+                    if not latest_mod.published and latest_mod.evidence == previous_mod.evidence:
+                        latest_mod.delete()
+                        previous_mod.is_last_edited = True
+                        previous_mod.save()
+                        latest_mod = previous_mod
+
+                has_modifications = not latest_mod.published
+
+                has_errors = record.has_errors()
+                resolution = 'closed'
+                if has_errors:
+                    resolution = 'in_error'
+                elif has_modifications:
+                    resolution = 'open'
+
+            if save:
+                record.flag_collection_safe.ensure_resolution(
+                    flag_type=variant_classification_flag_types.variant_classification_outstanding_edits,
+                    resolution=resolution
+                )
+
+            json_data = record.as_json(VariantClassificationJsonParams(
+                version=record_ref.version,
+                include_data=include_data,
+                current_user=user,
+                flatten=flatten,
+                include_lab_config=data.pop('config', False),
+                api_version=self.api_version
+            ))
+            if patch_messages:
+                json_data['patch_messages'] = patch_messages
+            return json_data
+
+        except VariantClassificationProcessError as ve:
+            print(ve)
+            return {'fatal_error': str(ve)}
+        except Exception as e:
+            print(e)
+            report_exc_info(request=request)
+            raise e
+            # return {'internal_error': True}  # don't tell client
+
+    def finish(self):
+        if settings.VARIANT_CLASSIFICATION_MATCH_VARIANTS:
+            for vc_import in self.import_for_genome_build.values():
+                task = process_variant_classification_import_task.si(vc_import.pk, ImportSource.API)
+                task.apply_async()
+
+
+class VariantClassificationView(APIView):
+    api_version = 1
+
+    @staticmethod
+    def verify_source(data) -> Optional[str]:
+        source = SubmissionSource(data.pop('source', SubmissionSource.API))
+        if not source.is_valid_user_source():
+            raise ValueError('Illegal value for source, should be "' + SubmissionSource.API.value + '" or "' + SubmissionSource.FORM.value + '"')
+        return source
+
+    @method_decorator(login_required)
+    def get(self, request, **kwargs) -> Response:
+        """
+        Provide an id in the URL to retrieve that specific record, otherwise get
+        header information on all available records
+        """
+        record_id = empty_to_none(kwargs.get('record_id', None))
+        if record_id is None:
+            # bulk get has been deprecated on this URL for now
+            return Response(status=HTTP_200_OK, data={})
+
+        else:
+            record_ref = VariantClassificationRef.init_from_str(request.user, record_id)
+            record_ref.check_exists()
+            record_ref.check_security()
+
+            include_config = request.query_params.get('config', '').lower() == 'true'
+
+            flatten = request.query_params.get('data', '').lower() == 'flat'
+            include_data = request.query_params.get('data', '').lower() != 'false'
+
+            response_data = record_ref.as_json(VariantClassificationJsonParams(
+                current_user=request.user,
+                include_data=include_data,
+                flatten=flatten,
+                include_lab_config=include_config,
+                api_version=self.api_version))
+
+            return Response(status=HTTP_200_OK, data=response_data)
+
+    @method_decorator(login_required)
+    def post(self, request, **kwargs) -> Response:
+        """ Create a new record """
+
+        if not settings.UPLOAD_ENABLED:
+            raise PermissionDenied("Uploads are currently disabled (settings.UPLOAD_ENABLED=False)")
+
+        user = request.user
+        record_id = empty_to_none(kwargs.get('record_id', None))
+
+        importer = BulkInserter(user=user, api_version=self.api_version)
+        data = request.data
+        if isinstance(data, list):
+            json_data = []
+            for record_data in data:
+                result = importer.insert(record_data)
+                json_data.append(result)
+
+        else:
+            jsonny = request.data
+            if isinstance(jsonny.get('records'), list):
+                json_data = []
+                for record_data in jsonny.get('records'):
+                    result = importer.insert(record_data)
+                    json_data.append(result)
+                json_data = {"results": json_data}
+            else:
+                json_data = importer.insert(request.data, record_id)
+                if 'fatal_error' in json_data:
+                    return Response(status=HTTP_400_BAD_REQUEST, data=json_data)
+                elif 'internal_error' in json_data:
+                    return Response(status=HTTP_500_INTERNAL_SERVER_ERROR, data=json_data)
+
+        importer.finish()
+
+        return Response(status=HTTP_200_OK, data=json_data)

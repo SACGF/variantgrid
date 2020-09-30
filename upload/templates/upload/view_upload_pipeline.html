@@ -1,0 +1,289 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load static %}
+{% load humanize %}
+{% load js_tags %}
+{% load model_helpers %}
+{% block submenu %}
+    {% menu_bar_data %}
+{% endblock %}
+{% block title %}View upload{% endblock %}
+{% block head %}
+    {% if has_upload_steps and step_start_end_lines %}
+        <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+        <script>
+            var COLORS = [  '#e6194b',
+                            '#3cb44b',
+                            '#ffe119',
+                            '#0082c8',
+                            '#f58231',
+                            '#911eb4',
+                            '#46f0f0',
+                            '#f032e6',
+                            '#d2f53c',
+                            '#fabebe',
+                            '#008080',
+                            '#e6beff',
+                            '#aa6e28',
+                            '#800000',
+                            '#aaffc3',
+                            '#808000',
+                            '#ffd8b1',
+                            '#000080',
+                            '#808080',
+                            '#000000',
+            ];
+
+            function plotIntervalsGraph(selector, title, step_order, step_start_end_lines) {
+                // There's no way to put shapes in the legend, so we'll make fake
+                // traces, then only show the legend for them
+                var data = [];
+                var shapes = [];
+
+                var color_index = 0;
+                var y = 0;
+                var y_step = -1;
+                for (var i=0 ; i<step_order.length ; ++i) {
+                    var color = COLORS[color_index];
+                    ++color_index;
+                    var step = step_order[i];
+                    var step_lines = step_start_end_lines[step];
+
+                    var fake_trace = {
+                        x: [null],
+                        y: [null],
+                        mode: 'markers',
+                        name: step,
+                        marker: {'color' : color},
+                        visible: 'legendonly',
+                    };
+                    data.push(fake_trace);
+
+                    var running_markers = {
+                        x: [],
+                        y: [],
+                        type: 'scatter',
+                        mode: 'markers',
+                        marker: {'color' : color, symbol: 'triangle-right'},
+                        showlegend: false,
+                    };
+                    data.push(running_markers);
+
+                    var crash_markers = {
+                        x: [],
+                        y: [],
+                        type: 'scatter',
+                        mode: 'markers',
+                        marker: {'color' : color, symbol: 'x'},
+                        showlegend: false,
+                    };
+                    data.push(crash_markers);
+
+                    for (var j=0 ; j<step_lines.length ; ++j) {
+                        var step_line = step_lines[j];
+
+                        for (var s=0 ; s<step_line.length ; s++) {
+                            var start_stop = step_line[s];
+                            var x_start = start_stop[0];
+                            var x_end = start_stop[1];
+                            var status = start_stop[2];
+
+                            var shape = {
+                                x0: x_start,
+                                x1: x_end,
+                                y0: y,
+                                y1: y,
+                                type: 'line',
+                                line: {
+                                    'color': color,
+                                    width: 3,
+                                }
+                            };
+                            shapes.push(shape);
+
+                            if (status == 'P') { // processing - still running
+                                running_markers.x.push(x_end);
+                                running_markers.y.push(y);
+                            } else if (status == 'E') { // error
+                                crash_markers.x.push(x_end);
+                                crash_markers.y.push(y);
+                            }
+                        }
+                        y += y_step;
+                    }
+                }
+
+
+                var layout = {
+                  'title': title,
+                  'xaxis' : { showgrid: false,
+                              zeroline: false,
+                              title: 'seconds'},
+                  'yaxis' : { showgrid: false,
+                              showticklabels: false,
+                              linewidth: 0,
+                              zeroline: false,
+                              showline: false, },
+                  'showlegend': true,
+                  'shapes': shapes,
+                };
+
+                Plotly.newPlot(selector, data, layout);
+
+            }
+
+            $(document).ready(function() {
+                var step_order = {{ step_order | jsonify }};
+                var step_start_end_lines = {{ step_start_end_lines | jsonify }};
+
+                plotIntervalsGraph('upload-steps-graph', "Job Times", step_order, step_start_end_lines);
+            });
+        </script>
+    {% endif %}
+    <style>
+        .import-message {
+          white-space: pre;
+        }
+
+        #warnings-or-errors {
+            height: 30px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+	<div class="container">
+        <h3>Upload Pipeline</h3>
+	    <fieldset class="form-fields">
+        {% comment %}
+        <!-- todo convert this to bootstrap, but crispy_forms can't accept a model, only forms -->
+        {% endcomment %}
+		{{ upload_pipeline | as_p }}
+
+		<p><label>file type</label><span>{{ upload_pipeline.get_file_type_display }}</span></p>
+
+	{% if upload_pipeline.file_type == 'V' %}
+		{% if uploaded_vcf %}
+			<p>
+                <label>UploadedVCF</label>
+			    <span>{{ uploaded_vcf.pk }}</span>
+			</p>
+            <p>
+                <label>Path</label>
+                <span>{{ uploaded_vcf.uploaded_file.get_filename }}</span>
+            </p>
+            {% if uploaded_vcf.vcf_importer %}
+            <p>
+                <label>Importer Version</label>
+                <span>{{ uploaded_vcf.vcf_importer }}</span>
+            </p>
+            {% endif %}
+            <p>
+                <label>VCF</label>
+                {% if uploaded_vcf.vcf %}
+                <a href="{% url 'view_vcf' uploaded_vcf.vcf.pk %}">{{ uploaded_vcf.vcf }}</a>
+                {% else %}
+                <span>VCF is still being imported</span>
+                {% endif %}
+            </p>
+            {% if uploaded_vcf.backendvcf.sample_sheet.sequencing_run %}
+            <p>
+                <label>SequencingRun</label>
+                <span><a href="{% url 'view_sequencing_run' uploaded_vcf.backendvcf.sample_sheet.sequencing_run.pk %}">{{ uploaded_vcf.backendvcf.sample_sheet.sequencing_run }}</a> - Auto uploaded from {{ uploaded_vcf.backendvcf.vcf }}</span>
+            </p>
+            {% endif %}
+		{% else %}
+			<p>Data for this VCF has been deleted.</p>
+		{% endif %}
+	{% elif upload_pipeline.file_type == 'G' %}
+		{% if uploaded_gene_list %}
+			<p>
+                <label>UploadedGeneList</label>
+                <span>{{ uploaded_gene_list.pk }}</span>
+			</p>
+			<p>
+                <label>GeneList</label>
+                {% if uploaded_gene_list.gene_list %}
+			        <a href="{% url 'view_gene_list' uploaded_gene_list.gene_list.pk %}">{{ uploaded_gene_list.gene_list }}</a>
+			    {% else %}
+			        <span>GeneList is still being imported</span>
+			    {% endif %}
+			</p>
+		{% else %}
+            <p>GeneList for this file has been deleted.</p>
+		{% endif %}
+	{% elif upload_pipeline.file_type == 'C' %}
+		{% if uploaded_cuffdiff %}
+			<p>
+                <label>UploadedCuffDiff</label>
+                <span>{{ uploaded_cuffdiff.pk }}</span>
+			</p>
+            <p>
+                <label>GeneList</label>
+                {% if uploaded_cuffdiff.cuff_diff_file %}
+			        <a href="{% url 'view_expression_file' uploaded_cuffdiff.cuff_diff_file.pk %}">{{ uploaded_cuffdiff.cuff_diff_file }}</a>
+			    {% else %}
+			        <span>CuffDiff file is still being imported</span>
+                {% endif %}
+            </p>
+		{% else %}
+            <p>CuffDiff File for this file has been deleted.</p>
+		{% endif %}
+	{% endif %}
+
+		{% if allow_retry_import %}
+			<div class="buttons">
+			  <form id="retry-upload-form" action={% url 'upload_retry_import' upload_pipeline.pk %} method="post">
+				{% csrf_token %}
+				<button class="btn btn-primary" id='retry-import-button' type='submit'>Retry Import</button>
+			  </form>
+			</div>
+		{% endif %}
+	    </fieldset>
+
+        {% if step_total_stats %}
+            <h3>Steps</h3>
+            <table class="table">
+            <thead>
+                <tr>
+                    <th class="step">Step Name</th>
+                    <th class="num">Runs</th>
+                    <th class="num">Items Processed</th>
+                    <th class="num">Total Seconds</th>
+                </tr>
+            </thead>
+            {% for step_name, num_runs, items_processed, total_seconds in step_total_stats %}
+                <tr>
+                    <td class="step">{{ step_name }}</td>
+                    <td class="num"> {{ num_runs | intcomma }}</td>
+                    <td class="num"> {{ items_processed | intcomma }}</td>
+                    <td class="num"> {{ total_seconds | floatformat:1 }}</td>
+                </tr>
+            {% endfor %}
+            </table>
+        {% endif %}
+
+
+		{% if more_warning_or_error_details %}
+		<div id='warnings-or-errors'>
+		<a href="{% url "view_upload_pipeline_warnings_and_errors" upload_pipeline.pk %}">
+    		<img id='vts-errors-icon' style='width: 30px; height: 30px' class='left' src="{% static 'icons/warning.png' %}" />
+    		View Warnings and Errors
+    	</a>
+        </div>
+		{% endif %}
+	</div>
+
+    <div class="container-table">
+	{% if has_upload_steps %}
+    <div id='upload-steps-graph'></div>
+	<div id="upload-steps-container">
+	{% load jqgrid_tags %}
+	{% jqgrid 'upload_step_grid' name='upload_step' search=True upload_pipeline_id=upload_pipeline.pk %}
+	</div>
+	{% endif %}
+    </div>
+
+
+{% endblock %}

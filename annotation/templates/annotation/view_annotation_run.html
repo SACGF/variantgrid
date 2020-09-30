@@ -1,0 +1,66 @@
+{% extends menu_annotation_base %}
+
+{% block title %}Annotation Run: {{ annotation_run }} {% endblock title %}
+
+{% block css %}
+tr#pipeline_output-row td.field {
+    white-space: pre-line;
+}
+
+#annotation-status-link {
+    margin-bottom: 30px;
+}
+
+#annotation-run-table {
+    margin-bottom: 100px;
+}
+
+{% endblock css %}
+
+{% block submenu_page_content %}
+    {% load model_helpers %}
+	{% load help_tags %}
+	{% load humanize %}
+	{% page_help user 'annotation/view_annotation_run' %}
+
+    <div>
+        <div id='annotation-status-link'>
+           <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Back to Variant Annotation Runs</a>
+        </div>
+    
+        {% include "messages/messages.html" %}
+    
+        {% if can_retry_annotation_run %}
+          <form id="retry-annotation-form" action={% url 'retry_annotation_run' annotation_run.pk %} method="post">
+            {% csrf_token %}
+            <button type='submit' class="btn btn-primary">Retry Annotation</button>
+          </form>
+        {% endif %}
+        {% if can_retry_annotation_run_upload %}
+          <form id="retry-annotation-upload-form" action={% url 'retry_annotation_run_upload' annotation_run.pk %} method="post">
+            {% csrf_token %}
+            <button type='submit' class="btn btn-primary">Retry Annotation (upload only)</button>
+          </form>
+        {% endif %}
+
+
+        <h3>Annotation Range Lock</h3>
+        <table class="summary">
+        <tr><th>Version <th class="num">Count <th class="num">Min Variant <th class="num">Max Variant
+        <tr><td>{{ annotation_run.annotation_range_lock.version }}
+            <td class="num">{{ annotation_run.annotation_range_lock.count | intcomma }}
+            <td class="num">{{ annotation_run.annotation_range_lock.min_variant_id | intcomma }}
+            <td class="num">{{ annotation_run.annotation_range_lock.max_variant_id | intcomma }}
+        </table>
+        
+        <h3>{{ annotation_run }}</h3> 
+    
+        <table id="annotation-run-table" class="name-field data">
+        {{ annotation_run | as_table | safe }}
+        </table>
+
+        <div class="clear"></div>
+       
+    </div>
+
+{% endblock submenu_page_content %}

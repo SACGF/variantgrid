@@ -1,0 +1,32 @@
+##fileformat=VCFv4.1
+##source=freeBayes v0.9.20-16-g3e35e72
+##reference=/data/biodb/db/hg19_nc_012920_1.fa
+##phasing=none
+##commandline="/opt/bioinf/bin/freebayes -t /data/scratch-ssd/Illuminadata/160323_K00165_0092_BH72NJBBXX/Fastq/WES/regions/nexterarapidcapture_exome_targetedregions_v1.2.fullchrM.plus50bp.part.aa.bed -f /data/biodb/db/hg19_nc_012920_1.fa /data/scratch-ssd/Illuminadata/160323_K00165_0092_BH72NJBBXX/Fastq/WES/62261108_S29/62261108_S29.bqrt.bam"
+##contig=<ID=chrM,length=2147483647>
+##contig=<ID=chr1,length=2147483647>
+##contig=<ID=chr2,length=2147483647>
+##contig=<ID=chr3,length=2147483647>
+##contig=<ID=chr4,length=2147483647>
+##contig=<ID=chr5,length=2147483647>
+##contig=<ID=chr6,length=2147483647>
+##contig=<ID=chr7,length=2147483647>
+##contig=<ID=chr8,length=2147483647>
+##contig=<ID=chr9,length=2147483647>
+##contig=<ID=chr10,length=2147483647>
+##contig=<ID=chr11,length=2147483647>
+##contig=<ID=chr12,length=2147483647>
+##contig=<ID=chr13,length=2147483647>
+##contig=<ID=chr14,length=2147483647>
+##contig=<ID=chr15,length=2147483647>
+##contig=<ID=chr16,length=2147483647>
+##contig=<ID=chr17,length=2147483647>
+##contig=<ID=chr18,length=2147483647>
+##contig=<ID=chr19,length=2147483647>
+##contig=<ID=chr20,length=2147483647>
+##contig=<ID=chr21,length=2147483647>
+##contig=<ID=chr22,length=2147483647>
+##contig=<ID=chrX,length=2147483647>
+##contig=<ID=chrY,length=2147483647>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+1	169519049	.	T	C	.	.	.

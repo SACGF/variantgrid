@@ -1,0 +1,63 @@
+{% load ui_utils %}
+{% load js_tags %}
+{% load tz %}
+{% if variant_allele %}
+    <div data-variant_id="{{ variant_allele.variant.pk }}" class="card">
+        <div class="card-header"><a href="{% url 'view_variant' variant_allele.variant.pk %}">{{ variant_allele.genome_build.name }}</a></div>
+        <div class="card-body">
+            {% if variant_show_canonical_hgvs %}
+                {% labelled label='Canonical c.HGVS' value_css="variant-c-hgvs" hint="tiny" %}{{ variant_allele.variant.canonical_c_hgvs }}{% endlabelled %}
+            {% endif %}
+            {% labelled label='Variant Coordinate' value_css="variant-coordinate" hint="tiny" %}
+                {{ variant_allele.variant }}
+                {% if variant_allele.variant.is_abbreviated %}
+                    <a class="ml-2" data-toggle="collapse" href="#variant-coordinate-{{ variant_allele.pk }}">Show all bases</a>
+                    <div class="collapse" id="variant-coordinate-{{ variant_allele.pk }}">
+                        {{ variant_allele.variant.full_string  }}
+                    </div>
+                {% endif %}
+
+            {% endlabelled %}
+            {% if user.is_superuser and variant_allele.error %}
+                {% labelled label="Error" value_clss="variant-coordinate" hint="tiny" %}{{ variant_allele.error | jsonify }}{% endlabelled %}
+            {% endif %}
+            {% labelled label='Origin' hint="tiny" %}{{ variant_allele.get_origin_display }}{% endlabelled%}
+            {% labelled label='Conversion Tool' hint="tiny" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
+            {% labelled id_prefix="quick-links" hint="tiny" id=variant_allele.variant_id value_css="quick-links" label="Quick Links" %}Loading ...{% endlabelled %}
+        </div>
+        {% if can_create_classification %}
+            <div class="card-footer">
+
+                <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant_allele.variant.pk %}">
+                    <i class="fas fa-plus-circle"></i> New Classification
+                </a>
+
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+    <div class="card">
+        <div class="card-header">{{ genome_build.name }}</div>
+        <div class="card-body">
+        {% if user.is_superuser and liftover_error_qs.exists %}
+            {% for liftover_error in liftover_error_qs %}
+                <p>
+                    <span class="admin-only">
+                    <b>Liftover Failed: </b> {{ liftover_error.liftover }} on {{ liftover_error.liftover.modified | localtime }}
+                    </span>
+                </p>
+                {% if liftover_error.variant %}
+                    <p>
+                        {{ liftover_error.liftover.get_conversion_tool_display }} returned:
+                        <a href="{% url 'view_variant' liftover_error.variant.pk %}">{{ liftover_error.variant }}</a>
+                         which is NOT linked to this allele.
+                    </p>
+                {% endif %}
+                {{ liftover_error.error_message }}
+            {% endfor %}
+        {% else %}
+            {% labelled label='Warning' %}Not lifted over{% endlabelled %}
+        {% endif %}
+        </div>
+    </div>
+{% endif %}

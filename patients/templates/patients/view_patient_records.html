@@ -1,0 +1,24 @@
+{% extends menu_patients_base %}
+
+{% block title %}Patient Records{% endblock title %}
+{% block css %}
+#patient-header {
+    margin-bottom: 10px; 
+}
+{% endblock css %}
+
+{% block submenu_page_content %}
+    <div>
+        <div id='patient-header'>
+            <h3>Patient Records</h3>
+            <div>
+                <a href="{% url 'patient_record_imports' %}">Previous patient records imports</a>
+            </div>
+        </div>
+        <div>
+            {% load jqgrid_tags %}
+            {% jqgrid 'patient_record_grid' 'patient-record' False None patient_records_id=patient_records.pk %}
+        </div>
+    </div>
+{% endblock submenu_page_content %}
+

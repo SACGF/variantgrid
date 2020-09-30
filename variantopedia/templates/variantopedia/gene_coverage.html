@@ -1,0 +1,39 @@
+{% load static %}
+
+<style>
+#gene-coverage-logo {
+    float: left;
+    margin-right: 20px;
+}
+
+#gene-coverage-data {
+    float: left;
+}
+
+table#coverage-table {
+    text-align: right;
+}
+
+table#coverage-table .coverage-sample-column {
+    padding-left: 10px;
+}
+</style>
+
+<h3>Gene Coverage</h3>
+
+<div id='gene-coverage-logo'>
+    <img  src="{% static 'icons/gene_coverage.png' %}" />
+    <div>
+    {{ gene_symbol }}
+    </div>
+</div>
+<div id='gene-coverage-data' gene_symbol='{{ gene_symbol }}'>
+    
+    <table id='coverage-table'>
+        <tr><td> <th class='coverage-sample-column'>Samples
+    {% for min_depth, count in twenty_x_coverage_percent_counts %}
+        <tr><td>>={{ min_depth }}% of gene @ 20x</td> <td>{{ count }}</td>
+    {% endfor %}
+    </table>
+</div>
+<div class='clear'><div>

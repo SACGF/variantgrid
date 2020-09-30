@@ -1,0 +1,16 @@
+{% extends "external_abstract_base.html" %}
+{% load static %}
+{% block footer %}
+    Please contact <span id='addr'></span> for a login.
+
+    <script>
+        // lame attempt to defeat spam email harvesters
+        $(document).ready(function() {
+            var domain = 'sa.gov.au';
+            var l = 'lawrence';
+            var f = 'david';
+            
+            $('#addr').html(f + '.' + l + '@' + domain);
+        });
+    </script>
+{% endblock %}

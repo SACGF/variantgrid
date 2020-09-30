@@ -1,0 +1,102 @@
+{% extends menu_data_base %}
+{% load static %}
+{% block css %}
+{{ block.super }}
+
+#permissions-table {
+    border-collapse: collapse;
+}
+
+#permissions-table td, #permissions-table th {
+    padding: 2px;
+    text-align: center;
+}
+
+.read-column {
+    border-left: 1px solid gray;
+}
+    
+{% endblock %}
+
+{% block jshead %}
+function checkIfAllChecked(toggle, array) {
+    var numChecked = 0;
+    array.each(function() { numChecked += $(this).is(":checked"); });
+    var allChecked = numChecked == array.length;
+    $(toggle).prop('checked', allChecked);
+}
+
+function checkboxSetup(addClickHandler) {
+    $(".toggle-column").each(function() {
+        var columnName = $(this).attr("column_name");
+        var columnInputs = $("input[type=checkbox]", "td." + columnName);
+        checkIfAllChecked(this, columnInputs);
+
+        if (addClickHandler) {
+            $(this).click(function() {
+                columnInputs.prop('checked', $(this).is(":checked"));
+            });
+        }
+    });
+}
+{% endblock %}
+
+{% block jsdocumentready %}
+    checkboxSetup(true);
+    
+    $("input[type=checkbox]", "table#permissions-table").click(function() {
+        checkboxSetup(false);
+    });
+    
+    $("button#save-group-permissions").button();
+{% endblock %}
+
+
+{% block submenu_page_content %}
+<h3>Bulk Change Permissions</h3>
+
+<form id="group-permission-form" method="post" action="{{ request.path }}">
+{% csrf_token %}
+    <table id='permissions-table'>
+    <tr>
+        <th>Name
+        {% for g in groups %}
+        <th colspan=2>
+            {{ g }}
+        </th>        
+        {% endfor %}
+    </tr>
+    <tr>
+        <th>
+        {% for g in groups %}
+            <th class='read-column'>Read
+            <th>Write
+        {% endfor %}
+    </tr>
+    <tr>
+        <th>
+        {% for g in groups %}
+            <th class="read-column"> <input type="checkbox" class="toggle-column" column_name="{{g.pk}}-read-column"></th>
+            <th class="write-column"><input type="checkbox" class="toggle-column" column_name="{{g.pk}}-write-column"></th>
+        {% endfor %}
+    </tr>
+
+    {% for obj, permission_forms in objects_and_forms %}
+    <tr>
+        <th>
+            {% if obj.get_absolute_url %}
+                <a href="{{ obj.get_absolute_url }}">{{ obj }}</a>
+            {% else %}
+                {{ obj }}
+            {% endif %}
+        {% for form in permission_forms %}
+            <td class='read-column {{form.group.pk}}-read-column'>{{ form.read }}
+            <td class='write-column {{form.group.pk}}-write-column'>{{ form.write }}
+        {% endfor %}
+    {% endfor %}
+    </table>
+    {% include "messages/messages.html" %}
+    <button id='save-group-permissions'>Save Permissions</button>
+</form>
+
+{% endblock %}

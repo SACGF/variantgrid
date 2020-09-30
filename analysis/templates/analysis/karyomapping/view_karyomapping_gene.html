@@ -1,0 +1,91 @@
+{% load static %}
+{% load js_tags %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script>
+// data goes here
+var VARIANT_ID_LOOKUP = {{ variant_id_lookup | jsonify }};
+var KARYOTYPE_BIN_SCATTER_DATA = {{ karyotype_bin_scatter_data | jsonify }};
+var KARYOTYPE_BIN_LABELS = {{ karyotype_bin_labels | jsonify }};
+
+function reverseArray(array) {
+    return array.slice().reverse();
+}
+
+function showKaryotypeScatter() {
+    var data = []
+     
+    for(var i=0 ; i<KARYOTYPE_BIN_LABELS.length ; i++) {
+        var k = KARYOTYPE_BIN_LABELS[i];
+        var k_data = KARYOTYPE_BIN_SCATTER_DATA[k];
+        // console.log("k: " + k);
+        // console.log(k_data);
+        var x_data = k_data['x'];
+        if (!x_data.length) {
+            x_data = [null]; // always show even if empty
+        }
+        
+        var trace = {
+          x: x_data,
+          y: Array(x_data.length).fill(k),
+          mode: 'markers',
+          type: 'scatter',
+          name: k,
+          text: k_data['text'],
+          marker: { size: 12 },
+          visible: true,
+        };
+        data.push(trace);
+    }
+
+    var description = 'Karyomapping {{ kag.karyomapping_analysis.proband.sample }}';
+    var geneDescription = "{{ kag.gene }} ('{{ strand }}' strand) Up: {{ kag.upstream_kb }}KB, Down: {{ kag.downstream_kb }})KB";
+    var coordinates = "{{ iv }}";
+    
+    var layout = {
+        title: [description, geneDescription, coordinates].join('\n'),
+        showlegend: false,
+        type: 'category',
+        xaxis : {
+            // showgrid: false,
+            showline: false,
+        },
+        yaxis : {
+            showticklabels: true,
+            showline: false,
+            categoryorder: "array",
+            categoryarray:  reverseArray(KARYOTYPE_BIN_LABELS),
+        },
+        
+    };
+    
+    Plotly.newPlot('karyotype-graph', data, layout);
+}
+
+$(document).ready(function() {
+    showKaryotypeScatter();
+});
+
+</script>
+<div>
+    <p>
+    <div id='karyotype-graph'></div>
+    <div id='karyotype-data'>
+        <div id='csv-download-container'>
+            <a class='csv-download-link' title='Download CSV' href="{% url 'download_karyomapping_gene_csv' kag.pk %}">
+                <div class='csv-icon icon32 left'></div>
+                <div class='left'>Download as CSV</div>
+                <div class='clear'></div>
+            </a>
+        </div>
+
+        <div>
+        <table>
+            <tr><th>Name <th>Count
+        {% for kb, count in karyotype_bin_counts.items %}
+            <tr><td> {{ kb }} <td> {{ count }} </tr>
+        {% endfor %}
+        </table>
+        </div>
+    </div>
+
+</div>

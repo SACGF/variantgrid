@@ -1,0 +1,85 @@
+{% load static %}
+{% load ui_tabs_builder %}
+{% load js_tags %}
+{% load crispy_forms_field %}
+{% load ui_utils %}
+<div id='analysis-settings-container'>
+<script>
+	IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
+    
+	function reloadNodes() {
+		$.ajax({
+		    type: "POST",
+		    url: "{% url 'analysis_reload' analysis.pk %}",
+		    success: function(data) {
+		    	if (IN_ANALYSIS) {
+                    checkAndMarkDirtyNodes();
+		    	}
+		    }
+		});
+	}
+
+	$(document).ready(function() {
+        ANALYSIS_SETTINGS = {{ new_analysis_settings|jsonify }};
+		//$("#analysis-tabs").tabs();
+        setupAjaxTabs($("#analysis-tabs"));
+
+        $('button#close-analysis-settings').click(function() {
+            $("#analysis-settings-container").parent().empty();            
+        });
+
+		if (!IN_ANALYSIS) {
+		  $("#force-reload-nodes-button").hide();
+		}
+
+        let options = {
+            target: "#analysis-settings-container",
+            success: function(data) {
+                if (data.analysis_id) {
+                    window.open(Urls.analysis(data.analysis_id), '_blank');
+                }
+            },
+        };
+        let analysisTemplateForm = $('form#analysis-template-form');
+        analysisTemplateForm.ajaxForm(options);
+	});
+</script>
+
+<div>
+    <div id="analysis-tabs">
+        {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_details_tab' param=analysis.pk label="Analysis Settings" %}
+        {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_node_counts_tab' param=analysis.pk label="Node Counts" %}
+        {% if analysis.annotation_version %}
+            {% ui_register_tab tab_set="analysis_tab" url='view_annotation_version_details' param=analysis.annotation_version.pk label="Annotation Version" %}
+        {% endif %}
+        {% if analysis.analysistemplaterun %}
+            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_run_tab' param=analysis.pk label="Template Run" %}
+        {% endif %}
+
+        {% if has_write_permission %}
+            {% ui_register_tab_embedded tab_set="analysis_tab" label="Sharing / Permissions" %}{% url 'group_permissions' 'analysis.models.Analysis' analysis.pk %}{% end_ui_register_tab_embedded %}
+        {% endif %}
+        {% if analysis.template_type != 'T' %}
+            {% ui_register_tab_embedded tab_set="analysis_tab" label="Create Template" %}
+                <div id="create-template">
+                  <form id="analysis-template-form" method="post" action="{{ request.path }}">
+                    {% csrf_token %}
+                      {% labelled label="Unique Name" %}
+                        {% crispy_field create_analysis_template_form.name %}
+                      {% endlabelled %}
+                    <button id='create-analysis-template' class="btn btn-outline-primary">Create template from this analysis</button>
+                  </form>
+                </div>
+            {% end_ui_register_tab_embedded %}
+        {% endif %}
+
+        {% ui_render_tabs tab_set="analysis_tab" %}
+	</div>
+	<hr>
+	<div>
+		<button class="btn btn-outline-danger" id='force-reload-nodes-button' type='button'>Force Reload Nodes</button>
+        <button class="btn btn-outline-primary" id='close-analysis-settings' type='button'>Close</button>
+	</div>
+
+</div>
+</div>

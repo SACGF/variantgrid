@@ -1,0 +1,23 @@
+{% extends menu_data_base %}
+
+{% block title %}{{ variant }} history{% endblock %}
+
+
+{% block submenu_page_content %}
+    {% load help_tags %}
+    {% page_help user 'variantopedia/view_variant_annotation_history_help' %}
+
+	<div>
+        <h3>{{ variant }} Annotation History</h3>
+        <p>
+            <a href="{% url 'view_variant' variant.pk %}">Back to {{ variant }} variant details page...</a>
+        </p>
+	</div>
+	
+	<div>
+        {% load model_fields_version_diff_tags %}
+        {% model_fields_version_diff annotation_by_version annotation_versions %}
+	</div>
+
+
+{% endblock %}

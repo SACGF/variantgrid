@@ -1,0 +1,106 @@
+{% extends menu_annotation_base %}
+{% load static %}
+{% load ui_help %}
+{% load js_tags %}
+{% load jqgrid_tags %}
+
+{% block title %}Annotation Status{% endblock title %}
+{% block head %}
+{{ block.super }}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endblock %}
+
+{% block jsdocumentready %}
+	let genomeBuildSummaryJSON = {{ genome_build_summary | jsonify }};
+
+	function showSummaryGraph(buildName, buildData) {
+		let selector = "build-" + buildName + "-summary-graph";
+        let data = [];
+        let summary_and_colors = [
+            ["Queued", 'rgb(50, 50, 50)'],
+            ["Running", 'rgb(50,171, 96)'],
+            ["Error", 'rgb(170, 50, 50)'],
+            ["Finished", 'rgb(35, 110, 80)'],
+        ];
+
+        for (let i=0 ; i<summary_and_colors.length ; ++i) {
+            let name = summary_and_colors[i][0];
+            let color = summary_and_colors[i][1];
+            let c = buildData[name] || 0;
+            let trace = {
+                x: [c],
+                y: ["counts"],
+                orientation: 'h',
+                name: name,
+                marker: {
+                    color: color
+                },
+                type: 'bar'
+            };
+            data.push(trace);
+        }
+
+        var layout = {
+            width: 800,
+            height: 100,
+            barmode: 'stack',
+            showlegend: true,
+            legend: {orientation: 'h'},
+            xaxis: {
+                autorange: true,
+                showgrid: false,
+                zeroline: false,
+                showline: false,
+                autotick: true,
+                ticks: '',
+                showticklabels: false
+            },
+            margin: {
+                l: 100,
+                r: 100,
+                b: 50,
+                t: 20,
+                //pad: 4
+            },
+        };
+        Plotly.newPlot(selector, data, layout);
+	}
+
+    for(let buildName in genomeBuildSummaryJSON) {
+        let buildData = genomeBuildSummaryJSON[buildName];
+        showSummaryGraph(buildName, buildData);
+    }
+
+    $("#annotation-runs-tabs").tabs();
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+    <div class="container-table">
+        {% page_help 'annotation/variant_annotation_runs_help' 'Variant Annotation Runs' %}
+
+        <div id="annotation-runs-tabs">
+            <ul>
+                {% for build_name in genome_build_field_counts %}
+                <li><a href="#build-{{ build_name }}-details">{{ build_name }}</a></li>
+                {% endfor %}
+            </ul>
+            {% for build_name, field_counts in genome_build_field_counts.items %}
+                <div id="build-{{ build_name }}-details">
+                    <div id="build-{{ build_name }}-summary-graph"></div>
+                    <table>
+                        {%  for field, count in field_counts.items %}
+                            <tr>
+                              <th>{{ field }}:</th>
+                              <td>{{ count }}</td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+
+                    {% jqgrid 'annotation_run_grid' build_name template_name='annotation/grids/annotation_run_grid.html' search=False genome_build_name=build_name %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+{% endblock submenu_page_content %}

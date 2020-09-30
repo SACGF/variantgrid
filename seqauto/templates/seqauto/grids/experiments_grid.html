@@ -1,0 +1,8 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block formatter %}
+    viewExperimentLink : function(experimentId) {
+        let url = Urls.view_experiment(experimentId);
+        return "<a href='" + url + "'>" + experimentId + "</a>";
+    }
+{% endblock formatter %}

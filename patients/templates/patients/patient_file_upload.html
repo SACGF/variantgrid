@@ -1,0 +1,48 @@
+{% extends 'jfu/upload_form.html' %}
+{% load static %}
+
+{% block JS_INIT %}
+        var fileUpload = $('#fileupload').fileupload({
+            {% block JS_OPTS %}
+            autoUpload: true,
+            sequentialUploads: true,
+
+            {% endblock JS_OPTS %}
+        });
+        
+        // Use this to do anything to modify upload (eg populate previous uploads)
+        if (window.fileupload_ready) {
+            window.fileupload_ready();
+        }
+        
+        
+{% endblock JS_INIT %}
+
+
+{% block JS_JQUERY %}
+    {% comment %}
+    JQuery already included
+    {% endcomment %}
+{% endblock JS_JQUERY %}
+
+{% block JS_BOOTSTRAP %}
+    {% comment %}
+    Don't use boostrap
+    {% endcomment %}
+{% endblock JS_BOOTSTRAP %}
+
+{% block CSS_BOOTSTRAP %}
+    {% comment %}
+    Don't use boostrap
+    {% endcomment %}
+{% endblock CSS_BOOTSTRAP %}
+
+{% block JS_JQUERY_FILEUPLOAD_UI %}
+{% comment %}
+ The File Upload user interface plugin.
+ dlawrence - Also added jquery UI to get that to work
+{% endcomment %}
+
+<script src="{% static 'js/jquery.fileupload-ui.js' %}"></script>
+<script src="{% static 'js/jquery.fileupload-jquery-ui.js' %}"></script>
+{% endblock JS_JQUERY_FILEUPLOAD_UI %}

@@ -1,0 +1,8 @@
+{% extends "analysis/tags/base_related_analyses.html" %}
+{% block create_analyses %}
+
+    {% load related_analyses_tags %}
+    {% analysis_templates_tag pedigree=pedigree %}
+
+{% endblock create_analyses %}
+    

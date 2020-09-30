@@ -1,0 +1,134 @@
+<!-- Based on https://codepen.io/polinovskyi/pen/embZmw -->
+<style>
+.progress-bar-tag .clearfix:after {
+    clear: both;
+    content: "";
+    display: block;
+    height: 0;
+}
+
+.progress-bar-tag .container {
+    margin: 0px;
+}
+
+.progress-bar-tag .nav {
+    margin-top: 40px;
+}
+
+.progress-bar-tag .pull-right {
+    float: right;
+}
+
+.progress-bar-tag a, .progress-bar-tag a:active {
+    color: #333;
+    text-decoration: none;
+}
+
+.progress-bar-tag a:hover {
+    color: #999;
+}
+
+/* Breadcrups CSS */
+
+.progress-bar-tag .arrow-steps .step {
+    font-size: 14px;
+    text-align: center;
+    color: #666;
+    cursor: default;
+    margin: 0 3px;
+    padding: 10px 10px 10px 30px;
+    min-width: 180px;
+    float: left;
+    position: relative;
+    background-color: #d9e3f7;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none; 
+  transition: background-color 0.2s ease;
+}
+
+.progress-bar-tag .arrow-steps .step:after,
+.progress-bar-tag .arrow-steps .step:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    right: -17px;
+    width: 0;
+    height: 0;
+    border-top: 19px solid transparent;
+    border-bottom: 17px solid transparent;
+    border-left: 17px solid #d9e3f7;    
+    z-index: 2;
+  transition: border-color 0.2s ease;
+}
+
+.progress-bar-tag .arrow-steps .step:before {
+    right: auto;
+    left: 0;
+    border-left: 17px solid #fff;   
+    z-index: 0;
+}
+
+.progress-bar-tag .arrow-steps .step:first-child {
+    margin: 0;
+}
+
+.progress-bar-tag .arrow-steps .step:first-child:before {
+    border: none;
+}
+
+/*
+// rounded corners 1st one
+.progress-bar-tag .arrow-steps .step:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+*/
+
+.progress-bar-tag .arrow-steps .step span {
+    position: relative;
+}
+
+.progress-bar-tag .arrow-steps .step span:before {
+    opacity: 0;
+    content: "✔";
+    position: absolute;
+    top: -2px;
+    left: -20px;
+}
+
+.progress-bar-tag .arrow-steps .step.done span:before {
+    opacity: 1;
+    -webkit-transition: opacity 0.3s ease 0.5s;
+    -moz-transition: opacity 0.3s ease 0.5s;
+    -ms-transition: opacity 0.3s ease 0.5s;
+    transition: opacity 0.3s ease 0.5s;
+}
+
+.progress-bar-tag .arrow-steps .step.current {
+    color: #fff;
+    background-color: #23468c;
+}
+
+.progress-bar-tag .arrow-steps .step.current:after {
+    border-left: 17px solid #23468c;
+}
+
+
+/* This is here to stop the last step:after doesn't go out of the container */
+.progress-bar-tag .right-of-steps {
+    width: 17px;
+}
+
+</style>
+<div class="progress-bar-tag">
+    <div class="container"> 
+        <div class="arrow-steps clearfix flex-center-container">
+            {% for step in steps %}
+            <div class="{{ step.css_class }} flex-grow"> <span>{{ step.name }}</span> </div>
+            {% endfor %}
+            <div class="right-of-steps"></div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,22 @@
+{% extends menu_data_base %}
+
+{% block title %}Staff Only{% endblock %}
+
+{% block submenu_page_content %}
+
+    <p>
+    <b>Error:</b> You tried to access <i>{{ request.GET.next }}</i> that requires Staff/Admin privileges.
+    </p>
+
+    <p>
+    Here's who you are:
+
+    <table>
+    <tr><th>Username <th> is_staff <th>is_superuser
+    <tr><td>{{ request.user }} <td> {{ request.user.is_staff }} <td> {{ request.user.is_superuser }}
+    </table>
+    
+    <p>
+    Please contact your systems admin if you have any issues.
+
+{% endblock %}

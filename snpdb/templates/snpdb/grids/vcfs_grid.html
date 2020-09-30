@@ -1,0 +1,25 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block style %}
+.vcf-select {
+    float: left;
+}
+
+.create-analysis-link {
+    float: right;
+}
+
+{% endblock %}
+
+{% block formatter %}
+    viewVCFLink : function(cellvalue, options, rowObject) {
+        let view_details_link = linkFormatter(cellvalue, options, rowObject);
+        return "<span class='vcf_id-container'>" + view_details_link + "</span>";
+    },
+    viewImportStatus : function(importStatus) {
+        if (importStatus == 'Annotation Required') { 
+            importStatus = "<a href='{% url "variant_annotation_runs" %}'>" + importStatus + "</a>";
+        }
+        return importStatus;
+    }
+{% endblock %}

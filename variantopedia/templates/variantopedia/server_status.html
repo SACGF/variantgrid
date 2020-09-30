@@ -1,0 +1,143 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load jqgrid_tags %}
+{% load seqauto_graph_tags %}
+{% load static %}
+{% block title %}Server Status{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block head %}
+    {% if seqauto_enabled %}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+    {% endif %}
+    <style type="text/css">
+        div#reference-check {
+            margin: 20px 0px 20px 0px;
+        }
+
+        #celery-workers {
+           height: 50px;
+        }
+
+        div.worker-ok {
+           background-color: #00aa00;
+        }
+
+        div.worker-error {
+           background-color: #aa0000;
+        }
+
+        .status-check {
+            padding: 2px;
+            margin: 5px;
+        }
+
+        #dashboard-notices {
+            border: 2px solid black;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+	<div class="container">
+		<h3>Sequencing</h3>
+
+        {% if seqauto_enabled %}
+        <div>
+        {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Month' "month_offset" %}
+        </div>
+        {% endif %}
+
+        {% if not can_access_reference %}
+        <div id="reference-check">
+            <b>Reference:</b> <span class="status-check error">Can't access reference directory.</span>
+        </div>
+        {% endif %}
+
+        {% labelled id="redis" label="Redis" %}<div class="alert alert-{{ redis_status }}">{{  redis_message }}</div>{% endlabelled %}
+        {% labelled id="highest_variant" label="Highest Variant Annotated w/latest" %}<div class="alert alert-{{ highest_variant_annotated.status }}">{{  highest_variant_annotated.message }}</div>{% endlabelled %}
+
+
+        {% if celery_workers %}
+            <h3>Celery Workers</h3>
+            {% for worker, worker_info in celery_workers.items %}
+
+                {% labelled id=worker label=worker %}
+                    <div class="alert {% if worker_info.ok %}alert-primary{% else %}alert-danger{% endif %}">
+                        {{ worker_info.status }}
+                        {% if worker_info.ok %}
+                            {{ worker_info.active }} jobs
+                            {% if worker_info.scheduled %}
+                                ({{ worker_info.scheduled }} scheduled)
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% endlabelled %}
+
+            {% endfor %}
+        {% endif %}
+
+        {% if dashboard_notices %}
+            <div id="dashboard-notices">
+                {{ dashboard_notices.notice_header }}
+                {% if dashboard_notices.events %}
+                <h3>Errors</h3>
+                <a href="{% url 'eventlog' %}">View Errors</a>
+                <ul class='messages'>
+                    {% for e in dashboard_notices.events %}
+                        <li class='error'>{{ e }}
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if dashboard_notices.vcfs %}
+                <h3>VCFs</h3>
+                <ul>
+                    {% for vcf in dashboard_notices.vcfs %}
+                        <li><a href="{% url 'view_vcf' vcf.pk %}">{{ vcf }}</a>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if dashboard_notices.analyses_created or dashboard_notices.analyses_modified %}
+                    <h3>Analyses</h3>
+                    {% if dashboard_notices.analyses_created %}
+                        <ul><b>Created:</b>
+                            {% for a in dashboard_notices.analyses_created %}
+                                <li>
+                                {% if url_name_visible.analysis %}
+                                    <a href="{% url 'analysis' a.pk %}">{{ a }}</a>
+                                {% else %}
+                                    {{ a }}
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if dashboard_notices.analyses_modified %}
+                    <ul><b>Modified:</b>
+                        {% for a in dashboard_notices.analyses_modified %}
+                            <li>
+                            {% if url_name_visible.analysis %}
+                                <a href="{% url 'analysis' a.pk %}">{{ a }}</a>
+                            {% else %}
+                                {{ a }}
+                            {% endif %}
+        
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <div>
+            {% if url_name_visible.view_upload_stats %}
+                <a href="{% url 'view_upload_stats' %}" class="btn btn-outline-primary">Upload Stats</a>
+            {% endif %}
+            <a href="{% url 'database_statistics' %}" class="btn btn-outline-primary">Database statistics</a>
+        </div>
+
+	</div>
+
+{% endblock %}

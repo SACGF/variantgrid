@@ -1,0 +1,306 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block submenu %}{% menu_bar_annotations %}{% endblock %}
+{% block head %}
+    <style>
+        #bottom-spacer {
+            width: 100%;
+            height: 50px;
+        }
+
+        #columns-legend {
+            border: 1px solid black;
+            margin: 50px;
+            padding: 10px;
+            width: 200px;
+        }
+
+        #column-legend-header {
+            text-align: center;
+            padding: 10px;
+        }
+
+        .main-content table.table td {
+            width: 33%;
+            word-break: break-all;
+        }
+    </style>
+    <script>
+        $(document).ready(() => {
+            fixLinks();
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+
+<div class="container">
+    <div>
+        <p>
+        In August 2019 we switched from an in-house annotation pipeline to using <a href="https://asia.ensembl.org/info/docs/tools/vep/script/index.html">Variant Effect Predictor</a> (<b>VEP</b>), by Ensembl.
+        
+        <p>
+        This was done for for the following reasons
+        
+        <ul>
+        <li>Choice of RefSeq and Ensembl annotations.
+        <li>GRCh38 genome build
+        <li><a href="https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html">Large number of plugins</a>, easy to add custom annotations.
+        </ul>
+
+        <p>
+        The choice of which transcript is shown on the grid and filtered in an analysis has changed, see <a href="https://asia.ensembl.org/info/docs/tools/vep/script/vep_other.html#pick">VEP pick</a>, this is in the in-page help above the transcripts in the variant details page.
+        </p>
+        <p>
+        Different annotations especially transcript choice can make a big difference, for a discussion on this see <a href="https://genomemedicine.biomedcentral.com/articles/10.1186/gm543">Choice of transcripts and software has a large effect on variant annotation.</a>
+        </p>
+        <p>
+        If you require an annotation that was removed, or know of other annotations you want added, let me know.  Easy ones to add are:
+        <ul>
+        <li><a href="https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html">VEP Plugins</a> 
+        <li><a href="https://usf.app.box.com/s/cdws8yx5occ603ccbknwyamz5reapdug">dbNSFP</a>
+        <li>VCF, bed, bigwig, GTF/GFF 
+        </ul>
+    </div>
+
+    <div id='columns-legend'>
+        <div id='column-legend-header'>
+            <b>Column Changes</b>
+        </div>
+        <div class="d-flex flex-row">
+            <div class='color-box deletion'></div><div class="align-self-center ml-2"> - Deletion</div>
+        </div>
+        <div class="d-flex flex-row mt-2">
+            <div class='color-box modification'></div><div class="align-self-center ml-2"> - Modification</div>
+        </div>
+        <div class="d-flex flex-row mt-2">
+            <div class='color-box addition'></div><div class="align-self-center ml-2"> - Addition</div>
+        </div>
+    </div>
+
+    <h4 class="mt-4">Variant Info</h4>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Old</th>
+                <th>New</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class='modification'>snpeff_amino_acid_change</td>
+                <td class='modification'>amino_acids</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td class='modification'>snpeff_codon_change</td>
+                <td class='modification'>codons</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td class='modification'>snpeff_effect</td>
+                <td class='modification'>consequence</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td class='modification'>snpeff_impact</td>
+                <td class='modification'>impact</td>
+                <td>
+            </td>
+            <tr>
+                <td class='deletion'>frac_of_func_tss,frac_of_lof_tss</td>
+                <td>-</td>
+                <td>These summarised annotation across multiple-transcripts</td>
+            </tr>
+            <tr>
+                <td class='deletion'>mirna_bind_site,tf_binding</td>
+                <td>-</td>
+                <td>Gene regulation</td>
+            </tr>
+            <tr>
+                <td class='modification'>branch_point,low_complexity_region,segment_duplication</td>
+                <td class='modification'>flags,repeatmasker</td>
+                <td>Slightly new way to identify troublesome regions</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>hgvs_c,hgvs_p</td>
+                <td>HGVS</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>canonical,distance,exon,intron</td>
+                <td>New gene info</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4 class="mt-4">Population Frequency</h4>
+
+    <p>
+    All populations frequencies are now in Allele Frequency (0->1)
+
+    <p>
+    This is automatically handled in the population node, but be aware of values in the grid or on variant details page.
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Old</th>
+                <th>New</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class='deletion'>rare,extremely_rare</td>
+                <td>-</td>
+                <td>Can set a low % in pop filter</td>
+            <tr>
+                <td class='deletion'>ESP,ExAC</td>
+                <td>-</td>
+                <td>Superseded by gnomAD</td>
+            <tr>
+                <td>-</td>
+                <td class='addition'>gnomad_popmax, gnomad_popmax_af</td>
+                <td>Highest population and frequency</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>topmed_af</td>
+                <td>TopMed</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4 class="mt-4">Splicing</h4>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Old</th>
+                <th>New</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>-</td>
+                <td class='addition'>dbscsnv_ada_score, dbscsnv_rf_score</td>
+                <td>Splicing consensus score - <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/">dbSNV</a></td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>maxentscan_alt,maxentscan_diff,maxentscan_ref</td>
+                <td>MaxEntScan - probability of splice site</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>splice_region</td>
+                <td><a href="http://www.ensembl.info/2018/10/26/cool-stuff-the-vep-can-do-splice-site-variant-annotation/">VEP SpliceRegion plugin</a></td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>SpliceAI AG/AL/DG/DL score and position</td>
+                <td><a href="https://pubmed.ncbi.nlm.nih.gov/30661751/">SpliceAI paper</a> - splicing prediction w/Deep learning</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4 class="mt-4">Conservation / Pathogenicity</h4>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Old</th>
+                <th>New</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class='deletion'>tgi_tier,sacgf_tier</td>
+                <td>-</td>
+                <td>Removed ranking algorithms</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>mutation_assessor_pred_most_damaging</td>
+                <td>Pathogenicity tool: <a href="http://mutationassessor.org/r3/">MutationAssessors</a> functional impact of a variant - predicted functional, i.e. high ("H") or medium ("M"), or predicted non-functional, i.e. low ("L") or neutral ("N"). The MAori score cutoffs between "H" and "M", "M" and "L", and "L" and "N", are 3.5, 1.935 and 0.8, respectively. The rankscore cutoffs between "H" and "M", "M" and "L", and "L" and "N", are 0.9307, 0.52043 and 0.19675, respectively. All Transcripts.</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>loftool</td>
+                <td><a href="https://www.ncbi.nlm.nih.gov/pubmed/27563026">LoFtool</a>: a gene intolerance score based on loss-of-function variants in 60,706 individuals.</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>grantham</td>
+                <td>Grantham Score</td>
+            </tr>
+            <tr>
+                <td class='modification'>phylop</td>
+                <td class='modification'>phylop_30_way_mammalian,phylop_46_way_mammalian,phylop_100_way_vertebrate</td>
+                <td>Was 30 way, now expanded into 3 columns</td>
+            </tr>
+            <tr>
+                <td>-</td>
+                <td class='addition'>phastcons_30_way_mammalian,phastcons_46_way_mammalian,phastcons_100_way_vertebrate</td>
+                <td>PhastCons conservation score (3 columns)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4 class="mt-4">External Identifiers</h4>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Old</th>
+                <th>New</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class='deletion'>cosmic_phe</td>
+                <td>-</td>
+                <td>Still provide COMIC phenotype, link to site</td>
+            </tr>
+            <tr>
+                <td class='modification'>next_prot</td>
+                <td class='modification'>interpro_domain,domains</td>
+                <td>Superseeded by InterPro</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4 class="mt-4">Literature</h4>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Old</th>
+                <th>New</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>-</td>
+                <td class='addition'>pubmed</td>
+                <td>PubMed Ids</td>
+            <tr>
+                <td>-</td>
+                <td class='addition'>mastermind literature counts 1/2/3</td>
+                <td><a href="https://www.genomenon.com/cvr">MasterMind</a> literature counts (cDNA/Protein/AA changes)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+{% endblock content %}

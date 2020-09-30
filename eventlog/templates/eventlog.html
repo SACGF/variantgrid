@@ -1,0 +1,92 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load datatable_tags %}
+
+{% block title %}Event Log{% endblock title  %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block head %}
+    <script>
+        // Custom renderer specified by datatable_config
+        function severityRenderer(data, type, row) {
+            let domMaker = () => {
+                switch (data) {
+                    case 'E': return $('<div>', {text: 'error', class: 'alert alert-danger text-center', role: 'alert'});
+                    case 'W': return $('<div>', {text: 'warning', class: 'alert alert-warning text-center', role: 'alert'});
+                    case 'I': return $('<div>', {text: 'info', class: 'alert alert-info text-center', role: 'alert'});
+                    case 'D': return $('<div>', {text: 'debug', class: 'alert alert-success text-center', role: 'alert'});
+                    default: return $('<span>', {text: data});
+                }
+            };
+            let dom = domMaker();
+            dom.addClass('severity');
+            return dom.prop('outerHTML');
+        }
+
+        function datatableFilter(data) {
+            data.filter = $("select#predefined-filters").val();
+            data.exclude_admin = $("#exclude-admin").is(":checked")
+        }
+
+        function applyFilters() {
+            $('#event-datatable').DataTable().ajax.reload();
+        }
+
+        $(document).ready(() => {
+            $("select#predefined-filters").change(applyFilters);
+            $("#exclude-admin").click(applyFilters);
+            {% datatable_definition table_config=datatable_config table_id='event-datatable' url='event_log_datatable' data='datatableFilter' responsive=True %}
+        });
+    </script>
+    <style>
+        td.dt-date {
+            min-width: 130px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        td.dt-severity {
+            width: 70px;
+        }
+        td.dt-severity span {
+            padding: 4px;
+            border-radius: 4px;
+            display: inline-block;
+            width: 55px;
+            text-align: center;
+        }
+        td.dt-user {
+            font-size: 12px;
+            color: #666666;
+            width: 170px;
+        }
+        td.dt-app_name {
+            width: 100px;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h3>Event Log</h3>
+
+        <form class="form-inline">
+            <div class="form-group">
+            <label class="mr-2" for="predefined-filters">Filters</label>
+            <select id="predefined-filters" class="form-control form-control-sm">
+                <option value='everything'></option>
+                <option value='logins'>Logins</option>
+                <option value='vc_downloads'>Variant Classification Downloads</option>
+                <option value='searches'>Searches</option>
+                <option value='errors'>Errors</option>
+                <option value='events'>Events</option>
+                <option value='warnings_and_errors'>Warnings and Errors</option>
+            </select>
+            </div>
+            <div class="form-check ml-4">
+                <input class="form-check-input" type="checkbox" id="exclude-admin">
+                <label class="form-check-label ml-1" for="exclude-admin">Exclude admin users, bots</label>
+            </div>
+
+        </form>
+
+        {% datatable datatable_config 'event-datatable' class_name='event-table responsive sticky-header' %}
+    </div>
+{% endblock content %}

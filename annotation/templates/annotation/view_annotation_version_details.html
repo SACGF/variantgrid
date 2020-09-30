@@ -1,0 +1,19 @@
+<div id='view-annotation-version-details'>
+    {% load model_helpers %}
+    
+    <table class="table as_table">
+    {{ annotation_version | as_table | safe }}
+    </table>
+    
+    {% if annotation_version.variant_annotation_version %}
+        <h3>Variant Annotation Details</h3>
+        
+        <p>
+        See <a target="_blank" href="{% url 'view_annotation_descriptions' %}">Annotation Descriptions</a> for details on how VEP fields are mapped to columns.
+        </p>
+
+        <table class="table as_table">
+        {{ annotation_version.variant_annotation_version | as_table | safe }}
+        </table>
+    {% endif %}
+</div>

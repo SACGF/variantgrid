@@ -1,0 +1,17 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block title %}Enrichment Kits{% endblock %}
+{% block submenu %}{% menu_bar_sequencing %}{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h3>Enrichment Kits</h3>
+
+        {% load jqgrid_tags %}
+
+        <div class='grid-container'>
+        {% jqgrid 'enrichment_kit_list_grid' 'EnrichmentKits' False None 'seqauto/grids/enrichment_kits_list_grid.html' delete=False %}
+        </div>
+    </div>
+{% endblock %}

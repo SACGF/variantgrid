@@ -1,0 +1,15 @@
+.bg-theme {
+    background-color: #ccdcba !important;
+}
+a.nav-link {
+    color: #444 !important;
+    &:hover {
+        color: #000 !important;
+    }
+    &.active {
+        color: #222 !important;
+    }
+}
+.navbar-brand {
+    background-image: url("/static/images/AGHA WHITE REVERSED LOGO 3L stacked-01.png");
+}

@@ -1,0 +1,25 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block docreadyjs %}
+    ajaxForm($("form#zygosity-node-form"));
+{% endblock docreadyjs %}
+
+{% block content %}
+<div>
+	<form id="zygosity-node-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+		<table>
+		<tr>
+		<td><b>Sample:</b> {{ form.sample }}
+		</tr>
+		<tr>
+		<td>
+		<b>Genotype:</b> {{ form.zygosity }} <b>Exclude:</b> {{ form.exclude }}
+		<button id='zygosity-node-save' class="btn btn-primary">save</button>
+		</td>
+		</tr>
+		</table>
+        {{ form.media }}
+	</form>
+</div>
+{% endblock content %}

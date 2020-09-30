@@ -1,0 +1,98 @@
+{% extends "uicore/page/base.html" %}
+{% load js_tags %}
+{% load crispy_forms_field %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block title %}Manual Variant Entry{% endblock %}
+{% block head %}
+    <style>
+    .un-annotated {
+        color: gray !important;
+    }
+    th.date {
+        width: 120px;
+        min-width: 120px;
+    }
+    </style>
+{% endblock %}
+{% block submenu %}
+    {% menu_bar_variants %}
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h3>Manual Variant Entry</h3>
+        <form method="post" id='manual-variant-entry-form'>
+            <div class="card">
+                <div class="card-header">Create</div>
+                <div class="card-body">
+                    <p>
+                        Enter one variant per line as either "chrom:pos ref>alt" eg:
+                        <pre>
+                        1:169519049 T>C
+                        </pre>
+                    </p>
+                    {% csrf_token %}
+                    {% crispy_field form.variants_text %}
+                    {% if form.non_field_errors %}
+                        <ul class='list-group'>
+                        {% for error in form.non_field_errors %}
+                            <li class="list-group-item list-group-item-error">{{ error|escape }}</li>
+                        {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% labelled label="Genome Build" %}
+                        {{ form.genome_build }}
+                    {% endlabelled %}
+                    <button class='btn btn-primary' id='add-variants'><i class="fas fa-plus-circle"></i> Add Variants</button>
+                </div>
+            </div>
+        </form>
+
+        {% if mvec_qs.exists %}
+            <h4>Manually Entered Variants</h4>
+            <p>Listed below are your manually entered variants and the state of their annotation.
+            <table class="table">
+                <thead>
+                <tr>
+                <th class="date">Date
+                <th>Status
+                <th>Genome build
+                <th>Variants
+                </thead>
+            {% for mvec in mvec_qs %}
+                <tr>
+                <td>{% timestamp mvec.created %}
+                <td>
+                {% if url_name_visible.view_upload_pipeline and mvec.uploadedmanualvariantentrycollection %}
+                    <a class="hover-link" href="{% url 'view_upload_pipeline' mvec.uploadedmanualvariantentrycollection.uploaded_file.uploadpipeline.pk %}">
+                {% endif %}
+                {{ mvec.get_import_status_display }}
+                {% if mvec.uploadedmanualvariantentrycollection %}
+                    </a>
+                {% endif %}
+                <td> {{ mvec.genome_build }}
+                <td>
+                {% if mvec.manualvariantentry_set.exists %}
+                    {% for mve in mvec.manualvariantentry_set.all %}
+                        <span class="variant-coordinate"><b>{{ mve.entry_text | truncatechars:50 }}</b></span>
+                            {% if mve.error_message %}
+                            <ul class='messages'>
+                                <li class="error">{{ mve.error_message|default_if_none:'' }}</li>
+                            </ul>
+                            {% endif %}
+                            {% for cmv in mve.unique_created_variants %}
+                                <br/>
+                                {% if cmv.variant.variantannotation_set.exists %}
+                                    <a class="hover-link variant-coordinate" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
+                                {% else %}
+                                    <a class="hover-link variant-coordinate un-annotated" title="Not annotated" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
+                                {% endif %}
+                            {% endfor %}
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+            </table>
+        {% endif %}
+   </div>
+
+{% endblock %}

@@ -1,0 +1,191 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% load js_tags %}
+{% block title %}Trio Wizard{% endblock title %}
+
+{% block head %}
+<style>
+#form-submitted-dialog {
+    display: none;
+    text-align: center;
+}
+
+#trio-title {
+    float: left;
+}
+
+#trio-logo {
+    float: left;
+}
+
+#trio-table {
+  border-collapse: collapse;
+}
+
+td.patient-phenotype { 
+  border: solid;
+  border-width: 1px 0;
+  padding: 5px;
+}
+
+tr:first-child td.patient-phenotype {
+  border-top: none;
+}
+
+tr:last-child td.patient-phenotype {
+  border-bottom: none;
+}
+
+#form-submitted-dialog > .TrioNode {
+    margin: 0 auto;
+}
+
+#proband-description {
+    text-align: left;
+}
+
+.TrioNode { 
+    background-image: url({% static 'images/node_icons/trio.png' %});
+    width: 118px;
+    height: 100px;
+}
+
+.TrioNode.mother-affected { 
+    background-image: url({% static 'images/node_icons/trio_mother_affected.png' %});
+}
+
+.TrioNode.father-affected { 
+    background-image: url({% static 'images/node_icons/trio_father_affected.png' %});
+}
+
+.TrioNode.mother-affected.father-affected { 
+    background-image: url({% static 'images/node_icons/trio_mother_affected_father_affected.png' %});
+}
+
+</style>
+<script src="{% static 'js/patient_phenotype.js' %}"></script>
+<script>
+var patient_description_results = {{ patient_description_results | jsonify }};
+
+function changeTrioLogo(selector, cssClass) {
+    var trioLogo = $('.TrioNode');
+    if ($(selector).is(":checked")) {
+        trioLogo.addClass(cssClass);
+    } else {
+        trioLogo.removeClass(cssClass);
+    }
+}
+
+function setProbandPhenoText() {
+    var pp = $("#proband-phenos");
+    pp.empty();
+    var i=0;
+    var displayedTerms = new Set();
+
+    $("select", ".sample-select").each(function() {
+        if ($(this).val() == 'P') {
+            var results = patient_description_results[i][1];
+            if (results) {
+                $("#proband-text").html("Using proband phenotypes:");
+                for (var m=0 ; m<results.length ; ++m) {
+                    var result = results[m]
+                    var resultType = result["match_type"];
+                    var resultMatch = result["match"];
+                    if (!displayedTerms.has(resultMatch) && (resultType == 'H' || resultType == 'O')) {
+                        pp.append($("<li>" + resultMatch + "</li>"));
+                        displayedTerms.add(resultMatch);
+                    }
+                }
+            }
+        } 
+    });    
+}
+
+</script>
+{% endblock head %}
+
+{% block jsdocumentready %}
+
+    for (var i=0 ; i<patient_description_results.length ; ++i) {
+        var pdr = patient_description_results[i];
+        var phenotypeText = pdr[0];
+        var phenotypeMatches = pdr[1];
+        
+        if (phenotypeText) {
+            var resultSelector = $("#patient-results-" + (i+1));
+            displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches)
+        }
+    }
+
+
+    $("#create-trio-button").click(function() {
+        setProbandPhenoText();
+    
+        $("#form-submitted-dialog").dialog({
+            dialogClass: "no-close",
+            minWidth: 500,
+        });
+
+    });
+
+    $("#id_mother_affected").click(function() {
+        changeTrioLogo(this, "mother-affected");
+    });
+    $("#id_father_affected").click(function() {
+        changeTrioLogo(this, "father-affected");
+    });
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+	<div>
+	    <div id='trio-logo' class="TrioNode"></div>
+	    
+		<h3 id='trio-title'>Create Trio Wizard</h3>
+		<div class='clear'></div>
+        </div>
+
+        <form id="trio-form" method="post">
+            {% csrf_token %}
+            <div>
+            <b>Mother Affected:</b> {{ form.mother_affected }}{{ form.mother_affected.errors }}
+            <b>Father Affected:</b> {{ form.father_affected }}{{ form.father_affected.errors }}
+            </div> 
+
+            <table id='trio-table'>
+                <tr><td> {{ sample_1.name }}
+                    <td class='sample-select'> {{ form.sample_1 }}{{ form.sample_1.errors }}
+                    <td> {{ sample_1.patient | default_if_none:"" }} 
+                    <td id='patient-results-1' class='patient-phenotype'>
+                <tr><td> {{ sample_2.name }}
+                    <td class='sample-select'> {{ form.sample_2 }}{{ form.sample_2.errors }}
+                    <td> {{ sample_2.patient | default_if_none:"" }}
+                    <td id='patient-results-2' class='patient-phenotype'>
+                <tr><td> {{ sample_3.name }}
+                    <td class='sample-select'> {{ form.sample_3 }}{{ form.sample_3.errors }}
+                    <td> {{ sample_3.patient | default_if_none:"" }} 
+                    <td id='patient-results-3' class='patient-phenotype'>
+            </table>
+
+            {% if form.non_field_errors %}
+                <ul class='messages'>
+                {% for error in form.non_field_errors %}
+                    <li class="error">{{ error|escape }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+
+            <button id='create-trio-button' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Trio</button>
+        </form>
+        <div id='form-submitted-dialog'>
+            <div><img src="{% static 'images/spinner.gif' %}" /> Creating Trio...</div>
+            <div class="TrioNode"></div>
+            <div id='proband-description'>
+                <div id='proband-text'></div>
+                <ul id='proband-phenos'></ul>
+            </div>
+            </div>
+
+	</div>
+
+{% endblock submenu_page_content %}

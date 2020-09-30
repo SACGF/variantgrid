@@ -1,0 +1,58 @@
+#!/bin/csh
+
+#PBS -V
+
+### Job name
+#PBS -N {{ name }}
+
+### Join queuing system output and error files into a single output file
+#PBS -j oe
+
+### Send email to user when job aborts
+#PBS -m a
+
+### email address for user
+#PBS -M {{ email }}
+
+### Queue name that job is submitted to
+#PBS -q {{ queue }}
+
+### Set out
+#PBS -o {{ out }}
+
+### Request nodes, memory, walltime. NB THESE ARE REQUIRED. 
+###i 
+### run, change these entries
+#PBS -l nodes=1:ppn={{ cores }}
+#PBS -l mem={{mem}}gb,vmem={{mem}}gb
+#PBS -l walltime=99:00:00
+
+# This jobs working directory
+
+echo Running on host `hostname`
+echo Time is `date`
+
+# Load required modules
+module purge
+module load python/2.7.9
+module load R/3.1.3
+module load picard/1.117
+module load samtools/1.0
+
+setenv PYTHONPATH "${PYTHONPATH}:{{ pythonpath }}"
+setenv PATH "${PATH}:{{ path }}"
+setenv USERNAME `whoami`
+setenv SCRATCH_DIR "/scratch/${USERNAME}/{{ name }}"
+
+echo Working directory is ${SCRATCH_DIR}
+mkdir -p ${SCRATCH_DIR}
+cd ${SCRATCH_DIR}
+
+{% autoescape off %}
+{{ command }}
+{% endautoescape %}
+
+{% if job_script_complete %}
+{{ job_script_complete }} --job_script_id={{ job_script_pk }} --return_code=$status
+{% endif %}
+

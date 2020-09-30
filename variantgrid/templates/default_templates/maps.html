@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}Maps{% endblock %}
+{% block head %}
+{{ block.super }}
+<script>
+	var mapIds = ["Locations-Map", "Families_Map"]
+	function tabActivateFunc(event, ui) {
+		var active = $("#tabs").tabs('option', 'active');
+		var mapName = mapIds[active];
+		var map = window.leafletMaps[mapName];
+		map.invalidateSize();
+	}
+
+	$(document).ready(function() {
+		console.log("init maps");
+		var tabs = $("#tabs");
+		tabs.tabs({"activate" : tabActivateFunc}).css({height: '100%'});
+		tabs.bind('tabsselect', function(event, ui) {
+   			$(".ui-tabs-panel", this).empty();
+				//;
+		});
+	});
+
+</script>
+<style>
+
+#runx1-lab-locations {
+  width: 100%;
+  height: 100%;
+  padding: 60px;
+
+}
+
+.leaflet-container {  /* map thumbnail */
+    width:  1000px;
+    height: 600px;
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% load lab_location_tags %}
+
+
+<div id='runx1-lab-locations'>
+  <div id='tabs'>
+      <ul id='tab_selected'>
+        <li><a href='#Map1' data-toggle="tab">Labs</a></li>
+        <li><a href='#Map2' data-toggle="tab">Families</a></li>
+      </ul>
+    <div id='Map1'>{% lab_locations samples_only=False involved_only=True zoom_level=2 %}</div>
+    <div id='Map2'>{% lab_families samples_only=False involved_only=False zoom_level=2 %}</div>
+  </div>
+</div>
+
+
+
+{% endblock %}

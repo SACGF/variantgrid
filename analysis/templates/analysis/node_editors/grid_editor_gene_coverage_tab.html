@@ -1,0 +1,104 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load jqgrid_tags %}
+
+{% block docreadyjs %}
+	{% if node.has_gene_coverage != None %}
+		$("#gene-tabs").tabs();
+		var shadowColor = "{{ node.shadow_color }}";
+		var tabsToColor = ["#gene-list-tab", "#incomplete-coverage-tab"];
+		for (var i=0 ; i<tabsToColor.length ; ++i) {
+			$(tabsToColor[i]).children().css({"background-color" : shadowColor});
+		}
+
+	{% endif %}
+
+{% endblock docreadyjs %}
+
+{% block inlinejs %}
+    {{ block.super }}
+
+	function gene_list_genes_grid_init_func(grid, pagerId, args) {
+		var download_genes_grid = function() {
+			var url = Urls.gene_list_genes_grid(args.gene_list_id, 'download');
+			window.location = url;
+		}
+
+		grid.jqGrid('navButtonAdd', pagerId, {
+			        caption : "Download",
+			        buttonicon : "ui-icon-arrowthickstop-1-s",
+			        onClickButton : download_genes_grid,
+			        position : "first",
+			        title : "Export",
+			        cursor : "pointer"
+		});
+	}
+{% endblock inlinejs %}
+
+{% block node_editor_tab_links_second %}
+{% if node.status == 'R' %}
+	{% if node.has_gene_coverage != None %}
+	    	<li id='gene-list-tab'><a href="#node-genes">Genes/Coverage</a></li>
+	{% else %}
+	    	<li id='gene-list-tab'><a href="#node-genes">Genes</a></li>
+	{% endif %}
+{% endif %}
+{% endblock node_editor_tab_links_second %}
+
+{% block node_editor_tabs_second %}
+    {% if node.status == 'R' %}
+		<div id="node-genes">
+	    {% if gene_lists %}
+            {% if node.has_gene_coverage != None %}
+            <div id="gene-tabs">
+                <ul>
+                    {% if incomplete_gene_coverage %}
+                    <li id='incomplete-coverage-tab'><a href="#gene-incomplete-coverage">Incomplete Coverage</a></li>
+                    {% endif %}
+                    <li><a href="#gene-list-genes">Genes</a></li>
+                    <li><a href="#gene-coverage">Coverage</a></li>
+                </ul>
+                {% if incomplete_gene_coverage %}
+                <div id="gene-incomplete-coverage">
+                    {% for sample, cov, no_coverage_gene_names in incomplete_gene_coverage %}
+                        <b>Sample: {{ sample }}</b>
+                        <div>
+                        Genes with no coverage: {{ no_coverage_gene_names }}
+                        </div>
+                        {% jqgrid 'uncovered_genes_grid' 'UncoveredGenes' False None 'jqgrid/jqgrid.html' None False gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}
+                    {% endfor %}
+
+                    <p>Minimum depth required is {{ min_coverage }}</p>
+                </div>
+                {% endif %}
+                <div id="gene-list-genes">
+                    {%  for gene_list in gene_lists %}
+                        {% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' 'gene_list_genes_grid_init_func' False gene_list_id=gene_list.pk %}
+                    {%  endfor %}
+                </div>
+                <div id="gene-coverage">
+                    {% for sample, cov, _ in sample_coverage_and_uncovered %}
+                        <b>{{ sample }}</b>
+                        {% if cov %}
+                        <div>Showing genes in gene list. <a href='{% url 'view_qc' cov.qcgenecoverage.qc.pk %}'>Full coverage</a></div>
+                        {% jqgrid 'gene_coverage_collection_gene_list_grid' 'GeneCoverage' search=False gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}
+                        {% else %}
+                            Sample has no coverage.
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+                {% for gene_list in gene_lists %}
+                    <h3>{{ gene_list }}</h3>
+                    {% jqgrid 'gene_list_genes_grid' gene_list.pk search=False init_func='gene_list_genes_grid_init_func' gene_list_id=gene_list.pk %}
+                {% endfor %}
+
+                <div>No coverage information available.</div>
+            {% endif %}
+		{% else %}
+			No Gene List selected
+		{% endif %}
+		</div>
+    {% endif %}
+{% endblock node_editor_tabs_second %}
+

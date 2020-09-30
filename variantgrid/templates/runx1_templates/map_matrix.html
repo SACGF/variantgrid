@@ -1,0 +1,195 @@
+{% load static %}
+{% load i18n %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+
+{% if user.is_authenticated %}
+    var setCursorToPointer = function() {
+        $(".data").css({"cursor" : "pointer"});
+    };
+    $("#runx1-gene-sample-matrix").load("{% url 'user_global_sample_gene_matrix' %}", setCursorToPointer);
+{% else %}
+    $("#runx1-gene-sample-matrix").load("{% url 'public_global_sample_gene_matrix' %}");
+{% endif %}
+
+{% if user.is_authenticated %}
+    $(document).on("click", ".data", function(event) {
+        var rowname = $(this).parent().find('th').html().trim();
+        var cell_value = $(event.target).text();
+        if (rowname.includes("gene") && (cell_value != '')){
+          // get gene from row header
+          var pos1 = rowname.indexOf(">");
+          var pos2 = rowname.indexOf("<", pos1);
+          var geneSymbol = rowname.substring((pos1+1), (pos2));
+          // get sampleid and sample name from column header
+          var colname = ($('thead tr th').eq($(this).index()).html().trim());
+          var sample = ($('thead tr th').eq($(this).index()).text());
+          if (colname.includes("sample")){
+            pos1 = colname.indexOf("sample");
+            pos2 = colname.indexOf(">");
+            var sampleId = colname.substring((pos1+7), (pos2-1));
+            showPopup(sampleId, geneSymbol, sample);
+          }
+        }
+    });
+
+    function showPopup(sampleId, geneSymbol, sample) {
+        // create template url
+        const SVGD_URL = Urls.sample_variants_gene_detail(sampleId, geneSymbol);
+        const str_title = "Showing " + geneSymbol + " variant(s) for sample " + sample;
+        $("#sample-variants").dialog({ title: str_title, width: "80%", height: 400, modal: true}).dialog('open').load(SVGD_URL);
+    }
+{% endif %}
+
+    $('#classifications-hotspot-graph-container').load("/genes/hotspot_graph/public");
+
+});
+</script>
+{% block content %}
+<style>
+#runx1-logo-description-container {
+    width: 40%;
+    font-family: Verdana, Geneva, PT, sans-serif;
+}
+
+#front-page-title {
+    width: 400px;
+}
+
+#runx1-logo-and-research-container {
+    margin: 50px;
+}
+
+#runx1-research-program-text {
+    font-size: 26px;
+}
+
+.front-page-info {
+    font-size: 16px;
+    color: #eeeeee;
+    background-color: #7d1416;
+    padding: 20px;
+}
+
+.front-page-info a {
+    color: inherit;
+}
+
+#runx1-gene-sample-matrix {
+    margin-left: 10px;
+}
+
+#runx1-gene-sample-matrix thead th {
+    padding-left: 15px;
+	padding-right: 15px;
+}
+
+#runx1-gene-sample-matrix tbody td {
+    padding-left: 1px;
+	padding-right: 1px;
+	padding-top: 1px;
+	padding-bottom: 1px;
+}
+
+
+#runx1-lab-locations {
+    margin: 50px 50px 0px 0px;
+}
+
+#runx1-lab-locations, .leaflet-container {  /* map thumbnail */
+    width:  500px;
+    height: 300px;
+}
+
+#sample-variants{
+    display: none;
+    border: 1px solid black;
+    width: 100%;
+    height: 100%;
+}
+
+.ui-dialog {
+    z-index: 100000 !important ;
+}
+
+.ui-dialog.position{
+    my: "center",
+    at: "center",
+    of: $("body"),
+    within: $("body")
+}
+
+.front-page-only {
+    display: none;
+}
+
+.logged-in-page-only {
+    display: none;
+}
+
+.highlight-gene {
+    color: #eeeeee;
+    background-color: #7d1416;
+    font-size: 18px;
+    padding: 2px;
+}
+
+</style>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+<div class='content-wrapper'>
+    <div>
+        <div id='runx1-logo-description-container' class='left'>
+            <div id='runx1-logo-and-research-container'>
+                <div id='front-page-title'>
+                    <img title="The RUNX1 Research Program" alt="The RUNX1 Research Program" src="{% static 'images/runx1-logo-standard.png' %}">
+                </div>
+                <div id='runx1-research-program-text' class='left'>The RUNX1 Research Program</div>
+            </div>
+            <div class='front-page-info front-page-only'>
+            <p>
+            RUNX1db has been designed to import, aggregate and analyse genomic variants from RUNX1 patients and their families. The database is a part of the
+            RUNX1 foundation's program to collect research data from partners around the globe into a central resource. From this page you can access maps to
+            see where our partners are located, and use the table to see summary results from our cohort of samples. If you wish to have an account to access
+            the RUNX1db site please contact our team at</p>
+            <div style="text-align: center;"><span id='addr'></span></div>
+            <p>with your name, contact details and affiliation.</p>
+              <script>
+                  // awesome attempt to defeat spam email harvesters
+                  $(document).ready(function() {
+                      var domain = 'unisa.edu.au';
+                      var l = 'RUNX1DB';
+                      var f = 'CCB';
+
+                      $('#addr').html(f + '-' + l + '@' + domain);
+                  });
+              </script>
+            </div>
+            <div class='front-page-info logged-in-page-only'>
+                <p>Below is a Sample/Gene matrix. Rows are genes, columns are samples.
+                <ul>
+                <li>Click a gene name to view the gene page
+                <li>Click a cell to view the variants in that gene for the sample
+                <li>Click a sample name to create an analysis (view / filter all variants in that sample).
+                </ul>
+                <p>Click the map to view lab/family locations.
+
+            </div>
+        </div>
+        <div id='runx1-lab-locations' class='right'>
+          <a href="{% url 'maps' %}">
+          {% load lab_location_tags %}
+          {% lab_locations %}
+          </a>
+        </div>
+      <div class='clear'></div>
+    </div>
+
+  <div id='classifications-hotspot-graph-container'></div>
+  <div id="sample-variants" class="dialog">
+  </div>
+  <div id='runx1-gene-sample-matrix'>
+  </div>
+</div>
+<br>
+{% endblock %}

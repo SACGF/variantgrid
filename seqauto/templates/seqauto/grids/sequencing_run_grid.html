@@ -1,0 +1,82 @@
+{% extends "jqgrid/jqgrid.html" %}
+{% load static %}
+{% block style %}
+
+.sequencing-run-link {
+    font-size: 1.5em;
+}
+
+.vcf-success {
+    background-image: url({% static 'icons/vcf_64.png' %})
+}
+
+.vcf-error {
+    background-image: url({% static 'icons/cross.png' %})
+}
+
+.vcf-loading {
+    background-image: url({% static 'icons/loading.gif' %})
+}
+
+{% endblock %} 
+
+
+{% block jshead %}
+    function get_icon_class(importStatus) {
+        if (importStatus == 'success') {
+            return "vcf-success";
+        } else if (importStatus == 'error') {
+            return "vcf-error";
+        } else if (importStatus == 'created' || importStatus == 'importing' || importStatus == 'Annotating Variants') {
+            return "vcf-loading";
+        }
+        return null;
+    }
+{% endblock %} 
+
+
+{% block formatter %}
+   		viewSequencingRunLink : function(sequencingRunId) {
+			const URL = Urls.view_sequencing_run(sequencingRunId);
+	    	return "<a class='sequencing-run-link' href='" + URL + "'>" + sequencingRunId + "</a>";
+		},
+        viewVCFLink : function(vcfId, options, rowObject) {
+            var vcfLink = '';
+            if (vcfId) {
+                const URL = Urls.view_vcf(vcfId);
+                var importStatus = rowObject.vcffromsequencingrun__vcf__import_status;
+                
+                var iconClass = get_icon_class(importStatus);
+                var linkInner;
+                if (iconClass) {
+                    linkInner = "<div title='View VCF' class='grid-link-icon vcf-icon " + iconClass + "'></div>";
+                } else {
+                    linkInner = 'VCF ' + vcfId;
+                    linkInner += "(" + importStatus + ")";
+                }
+                vcfLink = "<a href='" + URL + "'>" + linkInner + "</a>";
+            }
+            return vcfLink;
+        },
+        showGoldStandardIcon : function(val) {
+            var cell_value = '';
+            if (val) {
+                cell_value = '<div title="Gold Standard" class="grid-link-icon gold-standard-icon"></div>';
+            }
+            return cell_value;
+        },
+        showHiddenIcon : function(val) {
+            var cell_value = '';
+            if (val) {
+                cell_value = '<div title="Hidden" class="grid-link-icon hidden-eye-icon"></div>';
+            }
+            return cell_value;
+        },
+        showBadIcon : function(val) {
+            var cell_value = '';
+            if (val) {
+                cell_value = '<div title="Run marked as bad" class="grid-link-icon bad-run-icon"></div>';
+            }
+            return cell_value;
+        }
+{% endblock %}

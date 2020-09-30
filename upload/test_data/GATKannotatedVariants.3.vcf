@@ -1,0 +1,156 @@
+##fileformat=VCFv4.1
+##ApplyRecalibration="analysis_type=ApplyRecalibration input_file=[] read_buffer_size=null phone_home=STANDARD gatk_key=null tag=NA read_filter=[] intervals=null excludeIntervals=null interval_set_rule=UNION interval_merging=ALL interval_padding=0 reference_sequence=/data/sacgf/reference/hg19/bwa/bwa_v0.6.2/hg19.fa nonDeterministicRandomSeed=false disableRandomization=false maxRuntime=-1 maxRuntimeUnits=MINUTES downsampling_type=BY_SAMPLE downsample_to_fraction=null downsample_to_coverage=1000 enable_experimental_downsampling=false baq=OFF baqGapOpenPenalty=40.0 performanceLog=null useOriginalQualities=false BQSR=null quantize_quals=0 disable_indel_quals=false emit_original_quals=false preserve_qscores_less_than=6 defaultBaseQualities=-1 validation_strictness=SILENT remove_program_records=false keep_program_records=false unsafe=null num_threads=1 num_cpu_threads_per_data_thread=1 num_io_threads=0 monitorThreadEfficiency=false num_bam_file_handles=null read_group_black_list=null pedigree=[] pedigreeString=[] pedigreeValidationType=STRICT allow_intervals_with_unindexed_bam=false generateShadowBCF=false logging_level=INFO log_to_file=null help=false input=[(RodBinding name=input source=/scratch/aschreiber/CLL_SNPS_raw.vcf)] recal_file=(RodBinding name=recal_file source=/scratch/aschreiber/CLL_snps.recal) tranches_file=/scratch/aschreiber/CLL_snps.tranches out=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub no_cmdline_in_header=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub sites_only=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub bcf=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub ts_filter_level=99.0 ignore_filter=null mode=SNP filter_mismatching_base_and_quals=false"
+##CombineVariants="analysis_type=CombineVariants input_file=[] read_buffer_size=null phone_home=STANDARD gatk_key=null tag=NA read_filter=[] intervals=null excludeIntervals=null interval_set_rule=UNION interval_merging=ALL interval_padding=0 reference_sequence=/data/sacgf/reference/hg19/bwa/bwa_v0.6.2/hg19.fa nonDeterministicRandomSeed=false disableRandomization=false maxRuntime=-1 maxRuntimeUnits=MINUTES downsampling_type=BY_SAMPLE downsample_to_fraction=null downsample_to_coverage=1000 enable_experimental_downsampling=false baq=OFF baqGapOpenPenalty=40.0 performanceLog=null useOriginalQualities=false BQSR=null quantize_quals=0 disable_indel_quals=false emit_original_quals=false preserve_qscores_less_than=6 defaultBaseQualities=-1 validation_strictness=SILENT remove_program_records=false keep_program_records=false unsafe=null num_threads=1 num_cpu_threads_per_data_thread=1 num_io_threads=0 monitorThreadEfficiency=false num_bam_file_handles=null read_group_black_list=null pedigree=[] pedigreeString=[] pedigreeValidationType=STRICT allow_intervals_with_unindexed_bam=false generateShadowBCF=false logging_level=INFO log_to_file=null help=false variant=[(RodBinding name=variant source=/scratch/aschreiber/CLL_chrom_1_variants.vcf), (RodBinding name=variant2 source=/scratch/aschreiber/CLL_chrom_2_variants.vcf), (RodBinding name=variant3 source=/scratch/aschreiber/CLL_chrom_3_variants.vcf), (RodBinding name=variant4 source=/scratch/aschreiber/CLL_chrom_4_variants.vcf), (RodBinding name=variant5 source=/scratch/aschreiber/CLL_chrom_5_variants.vcf), (RodBinding name=variant6 source=/scratch/aschreiber/CLL_chrom_6_variants.vcf), (RodBinding name=variant7 source=/scratch/aschreiber/CLL_chrom_7_variants.vcf), (RodBinding name=variant8 source=/scratch/aschreiber/CLL_chrom_8_variants.vcf), (RodBinding name=variant9 source=/scratch/aschreiber/CLL_chrom_9_variants.vcf), (RodBinding name=variant10 source=/scratch/aschreiber/CLL_chrom_10_variants.vcf), (RodBinding name=variant11 source=/scratch/aschreiber/CLL_chrom_11_variants.vcf), (RodBinding name=variant12 source=/scratch/aschreiber/CLL_chrom_12_variants.vcf), (RodBinding name=variant13 source=/scratch/aschreiber/CLL_chrom_13_variants.vcf), (RodBinding name=variant14 source=/scratch/aschreiber/CLL_chrom_14_variants.vcf), (RodBinding name=variant15 source=/scratch/aschreiber/CLL_chrom_15_variants.vcf), (RodBinding name=variant16 source=/scratch/aschreiber/CLL_chrom_16_variants.vcf), (RodBinding name=variant17 source=/scratch/aschreiber/CLL_chrom_17_variants.vcf), (RodBinding name=variant18 source=/scratch/aschreiber/CLL_chrom_18_variants.vcf), (RodBinding name=variant19 source=/scratch/aschreiber/CLL_chrom_19_variants.vcf), (RodBinding name=variant20 source=/scratch/aschreiber/CLL_chrom_20_variants.vcf), (RodBinding name=variant21 source=/scratch/aschreiber/CLL_chrom_21_variants.vcf), (RodBinding name=variant22 source=/scratch/aschreiber/CLL_chrom_22_variants.vcf), (RodBinding name=variant23 source=/scratch/aschreiber/CLL_chrom_X_variants.vcf), (RodBinding name=variant24 source=/scratch/aschreiber/CLL_chrom_Y_variants.vcf)] out=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub no_cmdline_in_header=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub sites_only=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub bcf=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub genotypemergeoption=UNSORTED filteredrecordsmergetype=KEEP_IF_ANY_UNFILTERED multipleallelesmergetype=BY_TYPE rod_priority_list=null printComplexMerges=false filteredAreUncalled=false minimalVCF=false setKey=set assumeIdenticalSamples=false minimumN=1 suppressCommandLineHeader=false mergeInfoWithMaxAC=false filter_mismatching_base_and_quals=false"
+##FILTER=<ID=FSFilter,Description="FS > 200.0">
+##FILTER=<ID=LowQual,Description="Low quality">
+##FILTER=<ID=QDFilter,Description="QD < 2.0">
+##FILTER=<ID=ReadPosFilter,Description="ReadPosRankSum < -20">
+##FILTER=<ID=VQSRTrancheSNP99.00to99.90,Description="Truth sensitivity tranche level for SNP model at VQS Lod: -1.0987 <= x < 0.9408">
+##FILTER=<ID=VQSRTrancheSNP99.90to100.00+,Description="Truth sensitivity tranche level for SNP model at VQS Lod < -444.0744">
+##FILTER=<ID=VQSRTrancheSNP99.90to100.00,Description="Truth sensitivity tranche level for SNP model at VQS Lod: -444.0744 <= x < -1.0987">
+##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification">
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency, for each ALT allele, in the same order as listed">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities">
+##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP Membership">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth; some reads may have been filtered">
+##INFO=<ID=DS,Number=0,Type=Flag,Description="Were any of the samples downsampled?">
+##INFO=<ID=Dels,Number=1,Type=Float,Description="Fraction of Reads Containing Spanning Deletions">
+##INFO=<ID=END,Number=1,Type=Integer,Description="Stop position of the interval">
+##INFO=<ID=FS,Number=1,Type=Float,Description="Phred-scaled p-value using Fisher's exact test to detect strand bias">
+##INFO=<ID=HaplotypeScore,Number=1,Type=Float,Description="Consistency of the site with at most two segregating haplotypes">
+##INFO=<ID=InbreedingCoeff,Number=1,Type=Float,Description="Inbreeding coefficient as estimated from the genotype likelihoods per-sample when compared against the Hardy-Weinberg expectation">
+##INFO=<ID=MLEAC,Number=A,Type=Integer,Description="Maximum likelihood expectation (MLE) for the allele counts (not necessarily the same as the AC), for each ALT allele, in the same order as listed">
+##INFO=<ID=MLEAF,Number=A,Type=Float,Description="Maximum likelihood expectation (MLE) for the allele frequency (not necessarily the same as the AF), for each ALT allele, in the same order as listed">
+##INFO=<ID=MQ,Number=1,Type=Float,Description="RMS Mapping Quality">
+##INFO=<ID=MQ0,Number=1,Type=Integer,Description="Total Mapping Quality Zero Reads">
+##INFO=<ID=MQRankSum,Number=1,Type=Float,Description="Z-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualities">
+##INFO=<ID=QD,Number=1,Type=Float,Description="Variant Confidence/Quality by Depth">
+##INFO=<ID=RPA,Number=.,Type=Integer,Description="Number of times tandem repeat unit is repeated, for each allele (including reference)">
+##INFO=<ID=RU,Number=1,Type=String,Description="Tandem repeat unit (bases)">
+##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias">
+##INFO=<ID=SNPEFF_AMINO_ACID_CHANGE,Number=1,Type=String,Description="Old/New amino acid for the highest-impact effect resulting from the current variant (in HGVS style)">
+##INFO=<ID=SNPEFF_CODON_CHANGE,Number=1,Type=String,Description="Old/New codon for the highest-impact effect resulting from the current variant">
+##INFO=<ID=SNPEFF_EFFECT,Number=1,Type=String,Description="The highest-impact effect resulting from the current variant (or one of the highest-impact effects, if there is a tie)">
+##INFO=<ID=SNPEFF_EXON_ID,Number=1,Type=String,Description="Exon ID for the highest-impact effect resulting from the current variant">
+##INFO=<ID=SNPEFF_FUNCTIONAL_CLASS,Number=1,Type=String,Description="Functional class of the highest-impact effect resulting from the current variant: [NONE, SILENT, MISSENSE, NONSENSE]">
+##INFO=<ID=SNPEFF_GENE_BIOTYPE,Number=1,Type=String,Description="Gene biotype for the highest-impact effect resulting from the current variant">
+##INFO=<ID=SNPEFF_GENE_NAME,Number=1,Type=String,Description="Gene name for the highest-impact effect resulting from the current variant">
+##INFO=<ID=SNPEFF_IMPACT,Number=1,Type=String,Description="Impact of the highest-impact effect resulting from the current variant [MODIFIER, LOW, MODERATE, HIGH]">
+##INFO=<ID=SNPEFF_TRANSCRIPT_ID,Number=1,Type=String,Description="Transcript ID for the highest-impact effect resulting from the current variant">
+##INFO=<ID=STR,Number=0,Type=Flag,Description="Variant is a short tandem repeat">
+##INFO=<ID=VQSLOD,Number=1,Type=Float,Description="Log odds ratio of being a true variant versus being false under the trained gaussian mixture model">
+##INFO=<ID=culprit,Number=1,Type=String,Description="The annotation which was the worst performing in the Gaussian mixture model, likely the reason why the variant was filtered out">
+##INFO=<ID=EVS:clinical_association,Number=.,Type=String,Description="clinicalAssociation">
+##INFO=<ID=EVS:consScoreGERP,Number=1,Type=Float,Description="consScoreGERP">
+##INFO=<ID=EVS:scorePhastCons,Number=1,Type=Float,Description="scorePhastCons">
+##INFO=<ID=EVS:functionGVS,Number=.,Type=String,Description="functionGVS">
+##INFO=<ID=dbSNP:freq,Number=1,Type=Float,Description="Global Minor Allele Frequency [0, 0.5]; global population is 1000GenomesProject phase 1 genotype data from 629 individuals, released in the 08-04-2010 dataset">
+##INFO=<ID=EVS:granthamScore,Number=.,Type=String,Description="granthamScore">
+##INFO=<ID=EVS:Indel_wi_5,Number=.,Type=String,Description="Value transferred from another external VCF resource">
+##INFO=<ID=EVS:freq,Number=.,Type=String,Description="Minor Allele Frequency in the order of EA,AA,All">
+##INFO=<ID=EVS:polyPhen,Number=.,Type=String,Description="polyPhen">
+##INFO=<ID=COSMIC:Entry,Number=.,Type=String,Description="Value transferred from another external VCF resource">
+##INFO=<ID=set,Number=1,Type=String,Description="Source VCF for the merged record in CombineVariants">
+##OriginalSnpEffCmd="SnpEff eff -c /home/users/aschreiber/LocalPrograms/snpEff_2_0_5/snpEff.config -onlyCoding true -i vcf -o vcf GRCh37.65 /scratch/aschreiber/CLL_filtered.vcf "
+##OriginalSnpEffVersion="2.0.5 (build 2011-12-24), by Pablo Cingolani"
+##SelectVariants="analysis_type=SelectVariants input_file=[] read_buffer_size=null phone_home=STANDARD gatk_key=null tag=NA read_filter=[] intervals=null excludeIntervals=null interval_set_rule=UNION interval_merging=ALL interval_padding=0 reference_sequence=/data/sacgf/reference/hg19/bwa/bwa_v0.6.2/hg19.fa nonDeterministicRandomSeed=false disableRandomization=false maxRuntime=-1 maxRuntimeUnits=MINUTES downsampling_type=BY_SAMPLE downsample_to_fraction=null downsample_to_coverage=1000 enable_experimental_downsampling=false baq=OFF baqGapOpenPenalty=40.0 performanceLog=null useOriginalQualities=false BQSR=null quantize_quals=0 disable_indel_quals=false emit_original_quals=false preserve_qscores_less_than=6 defaultBaseQualities=-1 validation_strictness=SILENT remove_program_records=false keep_program_records=false unsafe=null num_threads=1 num_cpu_threads_per_data_thread=1 num_io_threads=0 monitorThreadEfficiency=false num_bam_file_handles=null read_group_black_list=null pedigree=[] pedigreeString=[] pedigreeValidationType=STRICT allow_intervals_with_unindexed_bam=false generateShadowBCF=false logging_level=INFO log_to_file=null help=false variant=(RodBinding name=variant source=/scratch/aschreiber/CLL_raw_variants.vcf) discordance=(RodBinding name= source=UNBOUND) concordance=(RodBinding name= source=UNBOUND) out=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub no_cmdline_in_header=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub sites_only=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub bcf=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub sample_name=[] sample_expressions=null sample_file=null exclude_sample_name=[] exclude_sample_file=[] select_expressions=[] excludeNonVariants=false excludeFiltered=false regenotype=false restrictAllelesTo=ALL keepOriginalAC=false mendelianViolation=false mendelianViolationQualThreshold=0.0 select_random_fraction=0.0 remove_fraction_genotypes=0.0 selectTypeToInclude=[INDEL] keepIDs=null fullyDecode=false forceGenotypesDecode=false justRead=false maxIndelSize=2147483647 ALLOW_NONOVERLAPPING_COMMAND_LINE_SAMPLES=false filter_mismatching_base_and_quals=false"
+##UnifiedGenotyper="analysis_type=UnifiedGenotyper input_file=[/scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/303c.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/307.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/308nc.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/403.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/AU_cll_01_FHS_287.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/AU_cll_01_FHS_291.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/AU_CLL_786.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/AU_CLL_787.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/AU_CLL_788.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/CLL_BF1.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/CLL_BF2.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/CLL_BF43_L6_S8_Lib9thru12.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/FHS_005.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/FHS_047.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/riki_1a.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/riki_1b.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/riki_5a.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/riki_5b.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/USA_CLL_01_KL.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/USA_cll_01_RT.sorted.bwa.hg19.bam, /scratch/aschreiber/CLL_temp/HorwitzLabAugust2012/USA_cll_01_SG.sorted.bwa.hg19.bam] read_buffer_size=null phone_home=STANDARD gatk_key=null tag=NA read_filter=[] intervals=[8] excludeIntervals=null interval_set_rule=UNION interval_merging=ALL interval_padding=0 reference_sequence=/data/sacgf/reference/hg19/bwa/bwa_v0.6.2/hg19.fa nonDeterministicRandomSeed=false disableRandomization=false maxRuntime=-1 maxRuntimeUnits=MINUTES downsampling_type=BY_SAMPLE downsample_to_fraction=null downsample_to_coverage=250 enable_experimental_downsampling=false baq=OFF baqGapOpenPenalty=40.0 performanceLog=null useOriginalQualities=false BQSR=null quantize_quals=0 disable_indel_quals=false emit_original_quals=false preserve_qscores_less_than=6 defaultBaseQualities=-1 validation_strictness=SILENT remove_program_records=false keep_program_records=false unsafe=null num_threads=4 num_cpu_threads_per_data_thread=1 num_io_threads=0 monitorThreadEfficiency=false num_bam_file_handles=null read_group_black_list=null pedigree=[] pedigreeString=[] pedigreeValidationType=STRICT allow_intervals_with_unindexed_bam=false generateShadowBCF=false logging_level=INFO log_to_file=null help=false genotype_likelihoods_model=BOTH pcr_error_rate=1.0E-4 computeSLOD=false annotateNDA=false pair_hmm_implementation=ORIGINAL min_base_quality_score=17 max_deletion_fraction=0.05 min_indel_count_for_genotyping=5 min_indel_fraction_per_sample=0.25 indel_heterozygosity=1.25E-4 indelGapContinuationPenalty=10 indelGapOpenPenalty=45 indelHaplotypeSize=80 indelDebug=false ignoreSNPAlleles=false allReadsSP=false ignoreLaneInfo=false reference_sample_calls=(RodBinding name= source=UNBOUND) reference_sample_name=null sample_ploidy=2 min_quality_score=1 max_quality_score=40 site_quality_prior=20 min_power_threshold_for_calling=0.95 min_reference_depth=100 exclude_filtered_reference_sites=false heterozygosity=0.001 genotyping_mode=DISCOVERY output_mode=EMIT_VARIANTS_ONLY standard_min_confidence_threshold_for_calling=30.0 standard_min_confidence_threshold_for_emitting=30.0 alleles=(RodBinding name= source=UNBOUND) max_alternate_alleles=6 p_nonref_model=EXACT_INDEPENDENT contamination_fraction_to_filter=0.05 logRemovedReadsFromContaminationFiltering=null exactcallslog=null dbsnp=(RodBinding name=dbsnp source=/data/sacgf/reference/hg19/dbSNP/dbSNP135_GRCh37.3.vcf) comp=[] out=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub no_cmdline_in_header=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub sites_only=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub bcf=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub debug_file=null metrics_file=null annotation=[] excludeAnnotation=[] filter_mismatching_base_and_quals=false"
+##VariantAnnotator="analysis_type=VariantAnnotator input_file=[] read_buffer_size=null phone_home=STANDARD gatk_key=null tag=NA read_filter=[] intervals=[/scratch/aschreiber/CLL_filtered.vcf] excludeIntervals=null interval_set_rule=UNION interval_merging=ALL interval_padding=0 reference_sequence=/data/sacgf/reference/hg19/bwa/bwa_v0.6.2/hg19.fa nonDeterministicRandomSeed=false disableRandomization=false maxRuntime=-1 maxRuntimeUnits=MINUTES downsampling_type=BY_SAMPLE downsample_to_fraction=null downsample_to_coverage=1000 enable_experimental_downsampling=false baq=OFF baqGapOpenPenalty=40.0 performanceLog=null useOriginalQualities=false BQSR=null quantize_quals=0 disable_indel_quals=false emit_original_quals=false preserve_qscores_less_than=6 defaultBaseQualities=-1 validation_strictness=SILENT remove_program_records=false keep_program_records=false unsafe=null num_threads=1 num_cpu_threads_per_data_thread=1 num_io_threads=0 monitorThreadEfficiency=false num_bam_file_handles=null read_group_black_list=null pedigree=[] pedigreeString=[] pedigreeValidationType=STRICT allow_intervals_with_unindexed_bam=false generateShadowBCF=false logging_level=INFO log_to_file=null help=false variant=(RodBinding name=variant source=/scratch/aschreiber/CLL_filtered.vcf) snpEffFile=(RodBinding name=snpEffFile source=/scratch/aschreiber/CLL_annotatedVariants.vcf) dbsnp=(RodBinding name= source=UNBOUND) comp=[] resource=[] out=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub no_cmdline_in_header=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub sites_only=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub bcf=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub annotation=[SnpEff] excludeAnnotation=[] group=[] expression=[] useAllAnnotations=false list=false alwaysAppendDbsnpId=false MendelViolationGenotypeQualityThreshold=0.0 requireStrictAlleleMatch=false filter_mismatching_base_and_quals=false"
+##VariantFiltration="analysis_type=VariantFiltration input_file=[] read_buffer_size=null phone_home=STANDARD gatk_key=null tag=NA read_filter=[] intervals=null excludeIntervals=null interval_set_rule=UNION interval_merging=ALL interval_padding=0 reference_sequence=/data/sacgf/reference/hg19/bwa/bwa_v0.6.2/hg19.fa nonDeterministicRandomSeed=false disableRandomization=false maxRuntime=-1 maxRuntimeUnits=MINUTES downsampling_type=BY_SAMPLE downsample_to_fraction=null downsample_to_coverage=1000 enable_experimental_downsampling=false baq=OFF baqGapOpenPenalty=40.0 performanceLog=null useOriginalQualities=false BQSR=null quantize_quals=0 disable_indel_quals=false emit_original_quals=false preserve_qscores_less_than=6 defaultBaseQualities=-1 validation_strictness=SILENT remove_program_records=false keep_program_records=false unsafe=null num_threads=1 num_cpu_threads_per_data_thread=1 num_io_threads=0 monitorThreadEfficiency=false num_bam_file_handles=null read_group_black_list=null pedigree=[] pedigreeString=[] pedigreeValidationType=STRICT allow_intervals_with_unindexed_bam=false generateShadowBCF=false logging_level=INFO log_to_file=null help=false variant=(RodBinding name=variant source=/scratch/aschreiber/CLL_Indels_raw.vcf) mask=(RodBinding name= source=UNBOUND) out=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub no_cmdline_in_header=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub sites_only=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub bcf=org.broadinstitute.sting.gatk.io.stubs.VariantContextWriterStub filterExpression=[QD < 2.0, ReadPosRankSum < -20, FS > 200.0] filterName=[QDFilter, ReadPosFilter, FSFilter] genotypeFilterExpression=[] genotypeFilterName=[] clusterSize=3 clusterWindowSize=0 maskExtension=0 maskName=Mask missingValuesInExpressionsShouldEvaluateAsFailing=false invalidatePreviousFilters=false filter_mismatching_base_and_quals=false"
+##contig=<ID=1,length=249250621,assembly=hg19>
+##contig=<ID=2,length=243199373,assembly=hg19>
+##contig=<ID=3,length=198022430,assembly=hg19>
+##contig=<ID=4,length=191154276,assembly=hg19>
+##contig=<ID=5,length=180915260,assembly=hg19>
+##contig=<ID=6,length=171115067,assembly=hg19>
+##contig=<ID=7,length=159138663,assembly=hg19>
+##contig=<ID=8,length=146364022,assembly=hg19>
+##contig=<ID=9,length=141213431,assembly=hg19>
+##contig=<ID=10,length=135534747,assembly=hg19>
+##contig=<ID=11,length=135006516,assembly=hg19>
+##contig=<ID=12,length=133851895,assembly=hg19>
+##contig=<ID=13,length=115169878,assembly=hg19>
+##contig=<ID=14,length=107349540,assembly=hg19>
+##contig=<ID=15,length=102531392,assembly=hg19>
+##contig=<ID=16,length=90354753,assembly=hg19>
+##contig=<ID=17,length=81195210,assembly=hg19>
+##contig=<ID=18,length=78077248,assembly=hg19>
+##contig=<ID=19,length=59128983,assembly=hg19>
+##contig=<ID=20,length=63025520,assembly=hg19>
+##contig=<ID=21,length=48129895,assembly=hg19>
+##contig=<ID=22,length=51304566,assembly=hg19>
+##contig=<ID=X,length=155270560,assembly=hg19>
+##contig=<ID=Y,length=59373566,assembly=hg19>
+##contig=<ID=MT,length=16569,assembly=hg19>
+##contig=<ID=GL000207.1,length=4262,assembly=hg19>
+##contig=<ID=GL000226.1,length=15008,assembly=hg19>
+##contig=<ID=GL000229.1,length=19913,assembly=hg19>
+##contig=<ID=GL000231.1,length=27386,assembly=hg19>
+##contig=<ID=GL000210.1,length=27682,assembly=hg19>
+##contig=<ID=GL000239.1,length=33824,assembly=hg19>
+##contig=<ID=GL000235.1,length=34474,assembly=hg19>
+##contig=<ID=GL000201.1,length=36148,assembly=hg19>
+##contig=<ID=GL000247.1,length=36422,assembly=hg19>
+##contig=<ID=GL000245.1,length=36651,assembly=hg19>
+##contig=<ID=GL000197.1,length=37175,assembly=hg19>
+##contig=<ID=GL000203.1,length=37498,assembly=hg19>
+##contig=<ID=GL000246.1,length=38154,assembly=hg19>
+##contig=<ID=GL000249.1,length=38502,assembly=hg19>
+##contig=<ID=GL000196.1,length=38914,assembly=hg19>
+##contig=<ID=GL000248.1,length=39786,assembly=hg19>
+##contig=<ID=GL000244.1,length=39929,assembly=hg19>
+##contig=<ID=GL000238.1,length=39939,assembly=hg19>
+##contig=<ID=GL000202.1,length=40103,assembly=hg19>
+##contig=<ID=GL000234.1,length=40531,assembly=hg19>
+##contig=<ID=GL000232.1,length=40652,assembly=hg19>
+##contig=<ID=GL000206.1,length=41001,assembly=hg19>
+##contig=<ID=GL000240.1,length=41933,assembly=hg19>
+##contig=<ID=GL000236.1,length=41934,assembly=hg19>
+##contig=<ID=GL000241.1,length=42152,assembly=hg19>
+##contig=<ID=GL000243.1,length=43341,assembly=hg19>
+##contig=<ID=GL000242.1,length=43523,assembly=hg19>
+##contig=<ID=GL000230.1,length=43691,assembly=hg19>
+##contig=<ID=GL000237.1,length=45867,assembly=hg19>
+##contig=<ID=GL000233.1,length=45941,assembly=hg19>
+##contig=<ID=GL000204.1,length=81310,assembly=hg19>
+##contig=<ID=GL000198.1,length=90085,assembly=hg19>
+##contig=<ID=GL000208.1,length=92689,assembly=hg19>
+##contig=<ID=GL000191.1,length=106433,assembly=hg19>
+##contig=<ID=GL000227.1,length=128374,assembly=hg19>
+##contig=<ID=GL000228.1,length=129120,assembly=hg19>
+##contig=<ID=GL000214.1,length=137718,assembly=hg19>
+##contig=<ID=GL000221.1,length=155397,assembly=hg19>
+##contig=<ID=GL000209.1,length=159169,assembly=hg19>
+##contig=<ID=GL000218.1,length=161147,assembly=hg19>
+##contig=<ID=GL000220.1,length=161802,assembly=hg19>
+##contig=<ID=GL000213.1,length=164239,assembly=hg19>
+##contig=<ID=GL000211.1,length=166566,assembly=hg19>
+##contig=<ID=GL000199.1,length=169874,assembly=hg19>
+##contig=<ID=GL000217.1,length=172149,assembly=hg19>
+##contig=<ID=GL000216.1,length=172294,assembly=hg19>
+##contig=<ID=GL000215.1,length=172545,assembly=hg19>
+##contig=<ID=GL000205.1,length=174588,assembly=hg19>
+##contig=<ID=GL000219.1,length=179198,assembly=hg19>
+##contig=<ID=GL000224.1,length=179693,assembly=hg19>
+##contig=<ID=GL000223.1,length=180455,assembly=hg19>
+##contig=<ID=GL000195.1,length=182896,assembly=hg19>
+##contig=<ID=GL000212.1,length=186858,assembly=hg19>
+##contig=<ID=GL000222.1,length=186861,assembly=hg19>
+##contig=<ID=GL000200.1,length=187035,assembly=hg19>
+##contig=<ID=GL000193.1,length=189789,assembly=hg19>
+##contig=<ID=GL000194.1,length=191469,assembly=hg19>
+##contig=<ID=GL000225.1,length=211173,assembly=hg19>
+##contig=<ID=GL000192.1,length=547496,assembly=hg19>
+##contig=<ID=NC_007605,length=171823,assembly=hg19>
+##reference=file:///data/sacgf/reference/hg19/bwa/bwa_v0.6.2/hg19.fa
+##source=SelectVariants
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	303c	307	308nc	403	AU_CLL_786	AU_CLL_787	AU_CLL_788	AU_cll_01_FHS_287	AU_cll_01_FHS_291	CLL_BF1	CLL_BF2	CLL_BF43_L6_S8_Lib9thru12	FHS_005	FHS_047	USA_CLL_01_KL	USA_cll_01_RT	USA_cll_01_SG	riki_1a	riki_1b	riki_5a	riki_5b
+5	110096939	rs7724788	G	A	1048.93	PASS	AC=3;AF=0.188;AN=16;BaseQRankSum=0.665;DB;DP=203;Dels=0.00;FS=1.595;HaplotypeScore=0.4929;MLEAC=3;MLEAF=0.188;MQ=37.00;MQ0=0;MQRankSum=-0.458;QD=15.43;ReadPosRankSum=1.037;SNPEFF_AMINO_ACID_CHANGE=E147;SNPEFF_CODON_CHANGE=gaG/gaA;SNPEFF_EFFECT=SYNONYMOUS_CODING;SNPEFF_EXON_ID=exon_5_110096904_110097955;SNPEFF_FUNCTIONAL_CLASS=SILENT;SNPEFF_GENE_BIOTYPE=processed_transcript;SNPEFF_GENE_NAME=SLC25A46;SNPEFF_IMPACT=LOW;SNPEFF_TRANSCRIPT_ID=ENST00000509442;VQSLOD=6.50;culprit=MQ;EVS:clinical_association=unknown;EVS:consScoreGERP=1.1;EVS:scorePhastCons=1.0;EVS:functionGVS=coding-synonymous;dbSNP:freq=0.173674588665448;EVS:granthamScore=NA;EVS:freq=7.6518,39.8019,18.8209;EVS:polyPhen=unknown;set=variant	GT:AD:DP:GQ:PL	./.	./.	./.	./.	0/1:5,3:8:96:96,0,176	0/0:21,0:20:57:0,57,760	0/0:26,0:25:75:0,75,978	./.	./.	0/0:37,0:36:99:0,105,1392	0/0:10,0:10:30:0,30,400	0/0:41,0:39:99:0,117,1537	0/1:17,16:31:99:510,0,505	0/1:12,15:25:99:485,0,365	./.	./.	./.	./.	./.	./.	./.
+X	129759589	.	C	T	48.41	PASS	AC=4;AF=0.400;AN=10;BaseQRankSum=0.895;DP=13;Dels=0.00;FS=0.000;HaplotypeScore=0.3577;MLEAC=4;MLEAF=0.400;MQ=36.22;MQ0=0;MQRankSum=0.296;QD=6.05;ReadPosRankSum=1.580;SNPEFF_EFFECT=INTRON;SNPEFF_FUNCTIONAL_CLASS=NONE;SNPEFF_GENE_BIOTYPE=protein_coding;SNPEFF_GENE_NAME=ENOX2;SNPEFF_IMPACT=MODIFIER;SNPEFF_TRANSCRIPT_ID=ENST00000338144;VQSLOD=1.10;culprit=MQ;set=variant	GT:AD:DP:GQ:PL	./.	./.	./.	./.	./.	0/0:2,0:2:3:0,3,40	0/1:4,1:5:22:24,0,22	./.	./.	./.	./.	1/1:0,1:1:3:32,3,0	0/1:1,1:2:24:24,0,29	0/0:2,0:2:3:0,3,40	./.	./.	./.	./.	./.	./.	./.
+1	116570121	rs2452550	C	T	1156.02	PASS	AC=3;AF=0.071;AN=42;BaseQRankSum=0.989;DB;DP=511;Dels=0.00;FS=0.000;HaplotypeScore=0.0951;InbreedingCoeff=0.5919;MLEAC=3;MLEAF=0.071;MQ=53.99;MQ0=0;MQRankSum=4.828;QD=21.81;ReadPosRankSum=-0.916;SNPEFF_EFFECT=INTRON;SNPEFF_FUNCTIONAL_CLASS=NONE;SNPEFF_GENE_BIOTYPE=protein_coding;SNPEFF_GENE_NAME=SLC22A15;SNPEFF_IMPACT=MODIFIER;SNPEFF_TRANSCRIPT_ID=ENST00000369502;VQSLOD=4.42;culprit=FS;dbSNP:freq=0.111517367458867;set=variant	GT:AD:DP:GQ:PL	0/0:31,1:30:90:0,90,1233	0/0:10,0:10:30:0,30,408	0/0:14,0:14:42:0,42,585	0/0:22,0:21:63:0,63,867	0/0:2,0:2:6:0,6,80	0/0:14,0:14:39:0,39,520	0/0:20,0:19:57:0,57,742	0/0:29,0:28:78:0,78,1056	0/0:39,0:38:99:0,108,1479	0/0:26,0:25:75:0,75,1000	0/0:7,0:7:21:0,21,280	0/0:32,0:31:93:0,93,1235	0/0:25,0:24:72:0,72,957	0/0:27,0:26:78:0,78,1035	0/0:31,0:30:90:0,90,1237	0/1:18,9:25:99:257,0,613	0/0:34,0:33:99:0,99,1347	0/0:30,0:29:87:0,87,1201	1/1:1,25:24:69:960,69,0	0/0:28,0:27:81:0,81,1120	0/0:36,0:35:99:0,105,1450

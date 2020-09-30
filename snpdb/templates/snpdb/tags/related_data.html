@@ -1,0 +1,32 @@
+{% block related_data %}
+{% endblock %}
+
+{% if has_variant_classifications %}
+{% load static %}
+{% load datatable_tags %}
+{% load js_tags %}
+<div>
+    <script>
+    function classificationFilter(data, type) {
+        data.sample_ids = "{{ sample_ids_list }}";
+        return data;
+    }
+
+    $(document).ready(function() {
+        let tableDom = $('#vc-datatable');
+        if (tableDom.length) {
+            EKeys.load().then(() => {
+                {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='variant_classification_datatables' data='classificationFilter' hide_filter_count=True %};
+                let vcDatatable = $('#vc-datatable');
+                vcDatatable.on('draw.dt', () => {
+                    Flags.instance.init({userId: '{{user.id}}'});
+                });
+            });
+        }
+    });
+    </script>
+
+    <h3>Variant Classifications</h3>
+    {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
+</div>
+{% endif %}

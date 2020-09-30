@@ -1,0 +1,47 @@
+from django.conf import settings
+from django.test import TestCase
+import os
+from unittest import skip
+
+from upload.vcf.vcf_import import vcf_detect_genome_build_from_filename, GenomeBuildDetectionException
+
+
+class TestVCFDetectBuild(TestCase):
+    TEST_DATA = os.path.join(settings.BASE_DIR, "upload", "test_data", "vcf", "detect_build_by_header")
+
+    def test_no_contigs(self):
+        """ No way to tell what to do """
+        vcf_filename = os.path.join(self.TEST_DATA, "no_contigs.vcf")
+        try:
+            vcf_detect_genome_build_from_filename(vcf_filename)
+            self.fail("Should have thrown exception for no contigs!")
+        except GenomeBuildDetectionException:
+            pass
+
+    def test_bad_contigs(self):
+        """ #1608 - Got a VCF from Centogene that had maxint32 for all contig lengths"""
+        vcf_filename = os.path.join(self.TEST_DATA, "bad_contigs.vcf")
+        try:
+            vcf_detect_genome_build_from_filename(vcf_filename)
+            self.fail("Should have thrown exception for BAD contigs!")
+        except GenomeBuildDetectionException:
+            pass
+
+    @skip  # TODO: Issue #1857 - Proper handling of hg19 vs GRCh37
+    def test_detect_hg19(self):
+        """ hg19 - due to MT size  """
+        vcf_filename = os.path.join(self.TEST_DATA, "hg19_contigs.vcf")
+        genome_build = vcf_detect_genome_build_from_filename(vcf_filename)
+        self.assertEqual("hg19", genome_build.name, "Matched hg19 genome")
+
+    def test_detect_grch37(self):
+        """ GRCh37 - due to MT size  """
+        for filename in ["grch37_research_contigs.vcf", "grch37_research_contigs_assembly.vcf"]:
+            vcf_filename = os.path.join(self.TEST_DATA, filename)
+            genome_build = vcf_detect_genome_build_from_filename(vcf_filename)
+            self.assertEqual("GRCh37", genome_build.name, "Matched GRCh37 genome")
+
+    def test_freebayes_grch37(self):
+        vcf_filename = os.path.join(self.TEST_DATA, "freebayes_b37.vcf")
+        genome_build = vcf_detect_genome_build_from_filename(vcf_filename)
+        self.assertEqual("GRCh37", genome_build.name, "Matched GRCh37 genome")

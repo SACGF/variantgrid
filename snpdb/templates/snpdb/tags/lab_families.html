@@ -1,0 +1,31 @@
+{% load leaflet_tags %}
+{% leaflet_js %}
+{% leaflet_css %}
+{% load static %}
+
+<div>
+<script type="text/javascript">
+  function map_init_families(map, options) {
+    var mapId = map._container.id;
+    window.leafletMaps = window.leafletMaps || {};
+    window.leafletMaps[mapId] = map;
+    var Esri_NatGeoWorldMapFam = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', {
+	attribution: 'Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC',
+	maxZoom: 16
+    }).addTo(map);
+    map.setView([19.434403, 37.238392], {{ zoom_level }});
+  {% for lab in lab_info %}
+    var MyIcon = new L.DivIcon.SVGIcon({
+        color: "red",
+        circleText: "{{ lab.labproject.families }}",
+        fontSize: 10
+    });
+    var marker = L.marker([{{ lab.lat }}, {{ lab.long }}], {icon: MyIcon});
+    marker.bindPopup("<h3>{{ lab.organization }}</h3><p><a href='{{ lab.url }}' alt='{{ lab.name }}'>{{ lab.name }}</a>, {{ lab.labproject.leader }}</p><p>{{ lab.city }}, {{ lab.country }}</p>").addTo(map);
+  {% endfor %}
+  }
+
+</script>
+
+{% leaflet_map "Families_Map" callback="map_init_families" %}
+</div>

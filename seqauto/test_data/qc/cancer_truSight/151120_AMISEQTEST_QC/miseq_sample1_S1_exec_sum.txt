@@ -1,0 +1,62 @@
+Version 0.1.0
+Date run 11/11/2016
+Sample miseq_sample1_S1
+Dir path data /tau/data/clinical/aligned/inherited_truSight/160930_NB501009_0055_AHGKHHAFXX_GATK/miseq_sample1_S1 or VCF
+Dir path QC /tau/data/clinical/qc/inherited_truSight/160930_NB501009_0055_AHGKHHAFXX_QC/blah
+
+	Observed	Range in reference standard
+% of bases with >20x coverage across GOI	100.00
+% of bases with >10x coverage across GOI	100.00
+Mean coverage across GOI	462.15	271.85 - 580.83
+Mean coverage across kit	378.76	264.39 - 459.05
+Uniformity of Coverage	98.26	93.11 - 98.41
+Read enrichment (%)	69.65	59.23 - 76.83
+Duplicated alignable reads	20.89	15.94 - 24.98
+Median insert	229.00	149.80 - 256.60
+Ts/Tv	2.578	2.36 - 2.77
+Number SNPs	2255	1758.40 - 2244.00
+%SNPs in dbSNP	97.78	96.52 - 98.70
+Number indels	438	289.40 - 469.80
+%indels in dbSNP	67.12	63.16 - 71.97
+
+SexMatch=yes	VCFsex=F (chrX SNP hom=55 / het=138)	BAMsex=F (Reads chrX=3073342 / chrY=3790)
+
+GOI with less than 100% of bases having at least 20x coverage
+1. In sample but not in reference standard
+
+Gene	Transcript	Exon Coordinate	Min coverage	Mean coverage	Mean (reference standard)	% bases >20x	% bases <10x	% bases @ 0x	Estimated Sensitivity of Detection
+
+2. In sample and in reference standard: 
+
+Gene	Transcript	Exon Coordinate	Min coverage	Mean coverage	Mean (reference standard)	% bases >20x	% bases <10x	% bases @ 0x	Estimated Sensitivity of Detection
+
+Genes tested: Total = 1
+CFTR
+Genes with omitted alternate haplotypes: 
+
+Low complexity
+Transcript	Exon	Low_complexity_start:low_complexity_end	Low_complexity_sequence	Low_complexity_length
+CFTR:NM_000492	chr7:117120148:117120201	117120190:117120199	T	7
+CFTR:NM_000492	chr7:117188694:117188877	117188681:117188690	T	7
+CFTR:NM_000492	chr7:117188694:117188877	117188659:117188683	TG	22
+CFTR:NM_000492	chr7:117231987:117232711	117232265:117232274	A	7
+CFTR:NM_000492	chr7:117242879:117242917	117242845:117242855	A	8
+CFTR:NM_000492	chr7:117254666:117254767	117254796:117254805	A	7
+
+###############################################################
+# Description of terms:
+#
+# All ranges are from the 5th to the 95th percentile
+# Mean coverage across GOI: ref range for GOI (per sample) only. Defaults to longest transcript if not specified
+# Mean coverage across kit: all genes from vendor specified bed
+# Uniformity of Coverage: % of bases at at least 20% of the mean depth
+# Read enrichment (%): reads on target
+# Duplicated alignable reads: PCR duplicated reads
+# Median insert: distance between read pairs
+# Ts/Tv: transition/transversion - 3 is ideal
+# 
+###############################################################
+
+Program versions:
+
+

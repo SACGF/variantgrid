@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css?family=Raleway:400,500');
+/// Font wise
+
+html, body {
+    font-size: 14px;
+    font-family: 'Raleway',serif;
+}
+
+nav.navbar {
+    border-bottom: 1px solid #bbb;
+
+    a.nav-link {
+        padding-top: 0px;
+        padding-bottom: 0px;
+        margin-bottom: 0px;
+        align-self: center;
+        &.active {
+            color: #000;
+        }
+    }
+}
+
+.navbar-brand {
+    // insert a background-image via branding.scss
+    background-size: contain;
+    background-position: center center;
+    background-repeat: no-repeat;
+    height: 35px;
+}
+
+/// FUNDAMENTAL LAYOUT
+.nav-side-bar {
+    border-right: 1px solid #cfcfcf;
+    -ms-flex: 0 0 200px;
+    flex: 0 0 200px;
+    position: fixed;
+    width: 160px;
+    top: 49px;
+    // turn the below on if you want to have a scrollable menu
+    // at the cost of a vertical bar down the entire menu
+    // height: 100%;
+    // overflow-y: scroll;
+    // padding-bottom: 50px;
+
+    nav {
+        padding-top: 10px;
+        background-color: white;
+        min-height: 200px;
+        .nav-link {
+            cursor: pointer;
+            text-align: right;
+            line-height: 2rem;
+            &.active {
+                color: #000;
+            }
+        }
+    }
+}
+.main-content {
+    background-color: white;
+    margin-left: 170px;
+    padding-top: 80px;
+    padding-bottom: 60px;
+
+    overflow: scroll;
+    max-width: calc(100vw);
+    height: calc(100vh);
+}
+
+nav .nav-link:hover {
+    text-decoration: underline;
+    text-decoration-color: rgba(0,0,0,0.3);
+}
+
+.navbar-brand {
+    width: 170px;
+}
+
+#navbar-search-form {
+    margin-block-end: 0;
+    max-width: 300px;
+    min-length: 100px;
+}
+#navbar-search-button {
+    height: 27px;
+}
+
+i.fas {
+    margin-right: 4px;
+}
+
+.row.equal .card {
+    height: 100%;
+}

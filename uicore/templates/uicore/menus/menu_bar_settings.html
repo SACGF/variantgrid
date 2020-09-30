@@ -1,0 +1,18 @@
+{% load ui_menus %}
+
+{% menu_item 'admin' href="/admin" admin_only=True external=True%}
+{% menu_item 'eventlog' title="Event Log" admin_only=True %}
+{% menu_item 'keycloak_admin' title="Keycloak" admin_only=True %}
+{% menu_item 'server_status' admin_only=True %}
+
+{% menu_item 'change_password' %}
+{% menu_item 'custom_columns' %}
+{% menu_item 'igv_integration' title="IGV Integration" %}
+{% if not seqauto_enabled %}
+    {% menu_item 'sequencing_software_versions' title="Sequencing / Software Versions" %}
+{% endif %}
+{% menu_item 'tag_settings' title="Tags" %}
+{% menu_item 'view_user_settings' title="User Settings" %}
+{% menu_item 'version' href="/version" %}
+<hr/>
+{% menu_item 'auth_logout' title="Logout <i class=\"fas fa-sign-out-alt\"></i>" css_class='logout' %}

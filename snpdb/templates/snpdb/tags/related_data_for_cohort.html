@@ -1,0 +1,25 @@
+{% extends "snpdb/tags/related_data.html" %}
+{% load model_tags %}
+{% block related_data %}
+{{ block.super }}
+
+    {% if cohort.sub_cohort_set.exists %}
+        <h3>Sub cohorts</h3>
+        {% for sub_cohort in cohort.sub_cohort_set.all %}
+            <div>
+                <a href="{{ sub_cohort.get_absolute_url }}">{{ sub_cohort }}</a> - {{ sub_cohort }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if cohort.trio_set.exists %}
+    <div id='related-trios'>
+        <h3>Trios</h3>
+        {% for trio in cohort.trio_set.all %}
+            <div>
+                <a href="{% url 'view_trio' trio.pk %}">{{ trio }}</a> - {% trio_short_description trio %}
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endblock %}

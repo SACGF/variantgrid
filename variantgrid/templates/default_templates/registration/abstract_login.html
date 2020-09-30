@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head %}
+<style>
+    #oidc-login-box {
+        width: 100%;
+        position: absolute;
+        top: 100px;
+        text-align: center;
+    }
+</style>
+{%  if use_oidc %}
+<script type="text/javascript">
+    $(document).ready(function () {
+        $("button").button();
+    });
+    function login() {
+        window.location = '{% url 'oidc_authentication_init' %}'
+    }
+    function resume() {
+        window.location = '/';
+    }
+</script>
+{% endif %}
+{{ block.super }}
+<meta name="description" content="VariantGrid: An source available variant database, and web analysis platform."/>
+{% endblock %}
+
+{% block login_form %}
+    {% if not use_oidc %}
+    <form id='login' method="post" action="." role="login">
+    
+    {% csrf_token %} 
+        <table id='login-table'>
+        <tr>
+        {% if form.non_field_errors %}
+            <td>{{ form.non_field_errors }}</td>
+        {% endif %}
+        <td><input id='username' name="username" placeholder="Username" autofocus />
+        <td><input id='password' type="password" name="password" placeholder="Password" />
+        <td><button type="submit" name="go" class="btn">Log in</button>
+        </table>
+      <input type="hidden" name="next" value="{{ next }}" />
+    </form>
+    {% endif %}
+{% endblock %}
+
+
+{% block content %}
+    <div id="oidc-login-box">
+    {% if user.is_authenticated %}
+        <button id="resume_session" onclick="resume()">Continue as {{ user.username }}</button>
+    {% elif use_oidc %}
+    <button id="login" onclick="login()">Login</button>
+    {% endif %}
+    </div>
+{% endblock %}

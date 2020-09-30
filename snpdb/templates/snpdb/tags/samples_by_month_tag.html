@@ -1,0 +1,29 @@
+{% if cumulative_samples_json %}
+<!-- Needs plotly and plotly_helpers included -->
+{% load js_tags %}
+<script>
+function plotSamplesByMonthGraph(x, y) {
+    var data = [
+      { x: x,
+        y: y,
+        type: 'line'
+      },
+    ];
+
+    var layout = {  title: "Cumulative samples",
+                    xaxis: {title: "Month"},
+                    yaxis: {title: "Samples"},
+    };
+
+    Plotly.newPlot('samples-per-month', data, layout);
+}
+
+
+$(document).ready(function() {
+    var x = {{ labels | jsonify }};
+    var y = {{ cumulative_samples | jsonify }};
+    plotSamplesByMonthGraph(x, y);
+});
+</script>
+<div id='samples-per-month'></div>
+{% endif %}

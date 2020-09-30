@@ -1,0 +1,68 @@
+{% extends menu_data_base %}
+{% load static %}
+{% load help_tags %}
+
+{% block title %}{{ gic.name }}{% endblock %}
+{% block head %}
+	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+	<script src="{% static 'js/generated_graphs.js' %}"></script>
+	<style>
+		#genomic-intervals-graph, #genomic-intervals-graph img {
+		    width: 640px;
+	    	height: 480px;
+	    	text-align: center;
+		}
+	</style>
+{% endblock %}
+
+{% block jsdocumentready %}
+
+    $("#genomic-intervals-tabs").tabs();
+
+	var graph_selector = $('#genomic-intervals-graph');
+	{% if gic.import_status == 'S' %}
+		var poll_url = "{% url 'genomic_intervals_graph' gic.id %}";
+		var delete_url = "{% url 'cached_generated_file_delete' %}";
+
+		poll_graph_status(graph_selector, poll_url, delete_url);
+	{% else %}
+		graph_selector.removeAttr('id');
+		graph_selector.removeClass();
+		graph_selector.html("Genomic Intervals have not finished importing.");
+	{% endif %}
+
+    $("button#save-genomic-intervals-collection").button();
+
+{% endblock %}
+
+{% block submenu_page_content %}
+	<div id="genomic_intervals">
+		<h3>Genomic Intervals: {{ gic.name }}</h3>
+
+        <div id="genomic-intervals-tabs">
+            <ul>
+                <li><a href="#details">Details</a></li>
+                {% if has_write_permission %}
+                <li><a href="{% url 'group_permissions' 'snpdb.models.GenomicIntervalsCollection' gic.pk %}">Sharing / Permissions</a></li>
+                {% endif %}
+            </ul>
+            <div id="details">
+                {% page_help user 'data/view_genomic_intervals_help' 'Genomic Intervals Help' %}
+
+                <form method="post" id='genomic-intervals-collection-form'>
+                    {% csrf_token %}
+
+                    {{  form.as_p }}
+                    {% if has_write_permission %}
+                        <button id='save-genomic-intervals-collection'>save</button>
+                    {% else %}
+                        You can view but not modify this data.
+                    {% endif %}
+            		{% include "messages/messages.html" %}
+                </form>
+            </div>
+        </div>
+
+        <div id='genomic-intervals-graph' class='generated-graph graph-loading'></div>
+	</div>
+{% endblock %}

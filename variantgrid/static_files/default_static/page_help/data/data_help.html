@@ -1,0 +1,32 @@
+<div>
+This page shows data that has been uploaded into VariantGrid.
+
+<P>
+
+<P>
+Use tabs to switch between file types, and click the link in the 1st column to view specific details.
+
+<P>
+<b>Samples:</b> This contains a list of variants and genotype calls (eg homozygous), depth and quality. Loaded from the sample column of a VCF file.
+Used by the <i>SampleNode</i> on the analysis page.
+
+<P>
+The SampleNode can only load samples with an import_status of Success. Annotation Required means the sample contains variants which have no annotation records, they will be set to 'Success' when the <a href="/annotation/variant_annotation_runs">Variant Annotation Run</a> is complete.
+
+<P>
+<b>VCF:</b> VCF (VCF file). Can contain multiple samples, and set sequencer / bioinformatics details.
+
+<P>
+<b>Bed File:</b> A file containing genomic intervals (ranges). Used by the <i>IntervalsIntersectionNode</i> to filter variants to ranges.
+
+<P>
+<b>Gene Lists:</b> A list of gene names (GAPDH) or Transcript IDs (Ensembl). Used by the <i>GeneListNode</i> to filter variants to transcripts or gene names.
+
+<P>
+<b>Pedigree:</b> Pedigree / Inheritance information. Used by the <i>PedigreeNode</i>, which produces a list of variants according to inheritance patterns.
+
+<P>
+<b>Expression:</b> Cuffdiff Gene Expression. Used by the <i>ExpressionNode</i> node to filter by expression (min counts or by fold change).
+
+
+</div>

@@ -1,0 +1,39 @@
+{% extends menu_pathtests_base %}
+{% load static %}
+{% load related_data_for_pathtests_tags %}
+
+{% block title %}Pathology Test Order {{ pathology_test_order }}{% endblock title %}
+
+{% block jsdocumentready %}
+function setCaseLink() {
+    console.log("set case link");
+    var caseSelector = $("#id_case");
+    caseSelector.after("<a class='cross-link' id='case-link'>View Case</a>");
+    function mySetCaseLink() {
+        var pk = caseSelector.find(":selected").val();
+        setCrossLink($("#case-link"), Urls.view_case, pk);
+    }
+    mySetCaseLink();
+    caseSelector.change(mySetCaseLink);
+}
+
+setCaseLink();
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+
+    <h3>Pathology Test Order {{ pathology_test_order }}</h3>
+
+    <form method="post" id='pathology-test-order-form'>
+        {% csrf_token %}
+        {{ form.as_p }}
+        {% if can_write %}
+            <input type="submit" value='save' />
+        {% endif %}
+        {% include "messages/messages.html" %}
+        {{ form.media }}
+    </form>
+
+    {% related_data_for_pathology_test_order pathology_test_order %}
+
+{% endblock submenu_page_content %}

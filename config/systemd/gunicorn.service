@@ -1,0 +1,19 @@
+[Unit]
+Description=VG web server
+After=network.target
+
+[Service]
+User=variantgrid
+WorkingDirectory=/mnt/variantgrid
+ExecStartPre=/bin/mkdir -p /var/log/variantgrid
+ExecStart=/usr/local/bin/gunicorn --bind 127.0.0.1:8000 -t 3600 -w 8 --pid /run/gunicorn/gunicorn.pid --log-level debug --log-file /var/log/variantgrid/gunicorn.log variantgrid.wsgi:application
+ExecReload = /bin/kill -s HUP $MAINPID
+ExecStop = /bin/kill -s TERM $MAINPID
+PIDFile=/run/gunicorn/gunicorn.pid
+Restart=always
+PrivateTmp=true
+RuntimeDirectory=gunicorn
+RuntimeDirectoryMode=0750
+
+[Install]
+WantedBy=multi-user.target

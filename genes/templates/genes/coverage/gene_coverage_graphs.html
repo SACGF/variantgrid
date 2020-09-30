@@ -1,0 +1,85 @@
+{% load static %}
+{% load js_tags %}
+{% load seqauto_graph_tags %}
+
+<div id='gene-coverage-graphs'>
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<style>
+.coverage-graph {
+    width: 100%;
+    height: 400px;
+}
+
+</style>
+<script>
+MIN_WIDTH = 600;
+var enrichment_kits_list = {{ enrichment_kits_list | jsonify }};
+var gene_symbols = {{ gene_symbols | jsonify }};
+var field_enrichment_kit_gene = {{ field_enrichment_kit_gene | jsonify }};
+
+function showCoveragePlot(field_name) {
+    var graphId = "field-" + field_name + "-graph";
+    var enrichment_kit_data = field_enrichment_kit_gene[field_name];
+    var enrichment_kit_boxplots = [];
+
+    enrichment_kit_boxplots = [];
+    for (var p=0 ; p<enrichment_kits_list.length ; p++) {
+        var enrichment_kit = enrichment_kits_list[p];
+        var x_arrays = [];
+        var y_arrays = [];
+        for (var g=0 ; g<gene_symbols.length ; g++) {
+            var geneSymbol = gene_symbols[g];
+            var geneData = enrichment_kit_data[enrichment_kit][geneSymbol];
+            var y = geneData;
+            var x = Array(y.length).fill(geneSymbol);
+            
+            x_arrays.push(x);
+            y_arrays.push(y);
+        }
+        
+        var flattened_x = [].concat.apply([], x_arrays);
+        var flattened_y = [].concat.apply([], y_arrays);
+        
+        var d = {
+            name: enrichment_kit,
+            type: 'box',
+            x: flattened_x,
+            y: flattened_y,
+            boxpoints: 'all',
+            pointpos: 0,
+            jitter: 0.3,
+        };
+        enrichment_kit_boxplots.push(d);
+    }
+    
+    var width = Math.max(0.9 * $("#gene-coverage-graphs").width(), MIN_WIDTH);
+    var layout = defaultLayout(field_name, width);
+    layout['boxmode'] = 'group';
+    Plotly.newPlot(graphId, enrichment_kit_boxplots, layout);    
+}
+
+
+$(document).ready(function() {
+{% if has_coverage %}
+    {% for field in fields %}
+        showCoveragePlot("{{ field }}");
+    {% endfor %}
+{% endif %}
+});
+
+</script>
+<div>
+<h3>Gene Coverage</h3>
+
+{% if has_coverage %}
+    {% for field in fields %}
+        <div id='field-{{ field }}-graph' class='coverage-graph'></div>
+    {% endfor %}
+{% else %}
+    There is no recorded coverage for these genes
+{% endif %}
+
+</div>
+
+</div>

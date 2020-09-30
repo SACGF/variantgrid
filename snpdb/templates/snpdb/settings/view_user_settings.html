@@ -1,0 +1,132 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load avatar_tags %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load user_tags %}
+{% load ui_tabs_builder %}
+{% block title %}Settings{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block head %}
+    <script>
+        function changeAvatar() {
+            var editAvatar = $("#edit-avatar");
+            function changeAvatarLoaded() {
+                $("#avatar-preview").hide();
+                $("input[type=submit]", editAvatar).button()
+            }
+            editAvatar.load("{% url 'avatar_change' %}", changeAvatarLoaded);
+        }
+    </script>
+{% endblock %}
+{% block content %}
+<div class="container">
+    {% ui_register_tab_embedded label="Lab Activity" tab_set="user_tabs" %}
+        <h4>User Details</h4>
+        {% if use_oidc %}
+            <form method="post" action="{{ form_url }}">
+                {% csrf_token %}
+                <input name="action" type="hidden" value="password-reset"/>
+                {% labelled id="password_reset" label="Password Reset" %}
+                    Clicking on "Request Password Reset Email" will generate an email<br/>
+                    from <span class="mono">{{ accounts_email }}</span> to <span class="mono">{{ user.email }}</span><br/>
+                    with a link that will let you change your password.<br/><br/>
+                        <button class="btn btn-outline-primary" click="passwordReset()">Request Password Reset Email</button><br/><br/>
+                        If after pressing the button you don't receive an email, please check your spam folder.
+                    </p>
+                {% endlabelled %}
+            </form>
+            <hr/>
+        {% endif %}
+
+        <form class='user-settings-form' id="user-settings-form" enctype="multipart/form-data" method="post" action="{{ form_url }}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="" />
+            {% labelled id="avatar" label="Avatar" %}
+                <div id='edit-avatar'></div>
+                {% avatar user class='circular-avatar' %}<a class="hover-link" href="javascript:changeAvatar()"><br/>Change avatar</a>
+            {% endlabelled %}
+            {% labelled id="user_name" label="User name" %}{{ user.username }}{% endlabelled %}
+            {% if use_oidc %}
+                {% labelled id="first_name" label="First name" %}{{ user.first_name }}{% endlabelled %}
+                {% labelled id="last_name" label="Last name" %}{{ user.last_name }}{% endlabelled %}
+                {% labelled id="email" label="Email address" %}{{ user.email }}{% endlabelled %}
+            {% else %}
+                {% crispy user_form form_helper.horizontal_nested %}
+            {% endif %}
+
+            {% crispy user_contact_form form_helper.horizontal_nested %}
+            {% if user.is_superuser %}
+                {% labelled id="is_admin" label="Admin" %}True{% endlabelled %}
+            {% endif %}
+
+            {% if group_initial_perm_forms %}
+            <h3>Groups</h3>
+            <p>
+                The settings below are how data is initially shared with your groups.
+                You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
+            </p>
+            <div>
+                <label>Initial group permissions</label>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="text-left">Group</th>
+                            <th scope="col" class="text-center">Read</th>
+                            <th scope="col" class="text-center">Write</th>
+                            {% if labs_by_group_name %}
+                                <th scope="col" class="text-left">Lab</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for group, gip_form in group_initial_perm_forms.items %}
+                        <tr>
+                            <td>{{ group }}</td>
+                            <td class="text-center">{{ gip_form.read }}</td>
+                            <td class="text-center">{{ gip_form.write }}</td>
+                        {% if labs_by_group_name %}
+                            <td>
+                                {% with lab=labs_by_group_name|get_item:group.name %}
+                                    {% if lab %}
+                                        {% if url_name_visible.view_lab %}
+                                            <a class='hover-link' href="{% url 'view_lab' lab.pk %}">{{ lab }}</a>
+                                        {% else %}
+                                            {{ lab }}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endif %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <h4>Labs</h4>
+                <ul class="list-group">
+                {% for _, lab in labs_by_group_name.items %}
+                    {% if url_name_visible.view_lab %}
+                        <a class='list-group-item list-group-item-action' href="{% url 'view_lab' lab.pk %}">{{ lab }}</a>
+                    {% else %}
+                        <li class="list-group-item">{{ lab }}</li>
+                    {% endif %}
+                {% endfor %}
+                </ul>
+            {% endif %}
+            {% settings_override form=user_settings_form override_level="User" override_source=override_source override_values=override_values %}
+            <input type="submit" class="btn btn-primary" value="Save">
+        </form>
+    {% end_ui_register_tab_embedded %}
+    {% if url_name_visible.analysis and url_name_visible.user_settings_node_counts_tab %}
+        {% ui_register_tab label="Node Counts" url="user_settings_node_counts_tab" tab_set="user_tabs" %}
+    {% endif %}
+    {% ui_render_tabs tab_set="user_tabs" %}
+</div>
+
+{% endblock content %}

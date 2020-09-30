@@ -1,0 +1,82 @@
+{# Analysis can be turned off in that case URLs won't resolve so just skip #}
+{% if url_name_visible.analysis %}
+    {% load js_tags %}
+
+    <h3>Analyses</h3>
+    
+    <div id='create-analyses'>
+    <h4>Create Analysis:</h4>
+    {% block create_analyses %}
+    {% endblock create_analyses %}
+    </div>
+    
+    {% if analysis_details %}
+        <table class="styled">
+            <tr>
+            <th>Analysis
+            <th>Type
+            <th>Created by
+            {% if show_sample_info %}
+            <th>Samples
+            {% endif %}
+        
+        {% for analysis, sample_info in analysis_details %}
+            <tr> 
+            <td><a href="{% url 'analysis' analysis.pk %}">{{ analysis }}</a>
+            <td>{{ analysis.get_analysis_type_display }}
+            <td>{{ analysis.user }}
+            {% if show_sample_info %}
+            <td>{{ sample_info }}
+            {% endif %}
+        {% endfor %}
+        </table>
+    {% endif %}
+
+    {% if karyomapping_analyses %}
+    <h3>Karyomapping</h3>
+    
+        <table class="styled">
+        <tr>
+            <th>Name
+            <th>Created by
+        {% for ka in karyomapping_analyses %}
+        <tr>
+            <td><a href="{% url 'view_karyomapping_analysis' ka.pk %}">{{ ka }}</a>
+            <td>{{ ka.user }}
+        {% endfor %}
+        </table>
+    {% endif %}
+
+
+    {% if variant_tag_genome_build_names %}
+        {% load user_tag_color_tags %}
+        {% render_tag_styles_and_formatter %}
+
+        <script>
+            function getRelatedVariantsExtraFilters() {
+                var variantTagGridParams = {
+                    analysis_ids : {{ analysis_ids_list | jsonify }},
+                };
+                return JSON.stringify(variantTagGridParams);
+            }
+        
+            function getRelatedVariantTagsConfigUrl() { 
+                return "extra_filters=" + getRelatedVariantsExtraFilters();
+            }
+            
+            function relatedAnalysesGridInitFunc(grid, pagerId) {
+                grid[0].p.postData["extra_filters"] = getRelatedVariantsExtraFilters;
+            }
+        </script>
+        <h3>Variants tagged in analyses</h3>
+        {% load jqgrid_tags %}
+        {%  for genome_build_name in variant_tag_genome_build_names %}
+            {% user_data_grid_filter genome_build_name 'Analyses Variant Tags' %}
+            {% jqgrid 'analyses_variant_tags_grid' genome_build_name genome_build_name=genome_build_name search=False download_grid_json_as_csv=True jqgrid_config_get_parameters_func='getRelatedVariantTagsConfigUrl' init_func='relatedAnalysesGridInitFunc' %}
+        {%  endfor %}
+    {% endif %}
+    
+    {% block end_of_template %}
+    {% endblock end_of_template %}
+    
+{% endif %}

@@ -1,0 +1,32 @@
+<div class='clinvar-citation' id='clinvar-citation-{{ citation.citation_id }}'>
+    <script>
+    function showAbstract(clinvar_citation_id) {
+        var cvc = $("#clinvar-citation-" + clinvar_citation_id);
+        $(".abstract", cvc).show();
+        $(".show-abstract-link", cvc).hide(); 
+    }
+    </script>
+    <p><a href='{{ citation.citation_link }}'>{{ citation.title }}</a>
+    <div class='supp'>
+        {% if citation.authors %}
+        <div class='desc'>
+            {{ citation.authors }}
+        </div>
+        {% endif %}
+        <div class='details'>
+            {{ citation.journal | default_if_none:"" }}
+        <span class='aux'>
+            <span class='rprtid'>{{ citation.source }}: {{ citation.citation_id }}</span>
+        </span>
+        {% if citation.abstract %}
+        <a class='show-abstract-link' href='javascript:showAbstract("{{ citation.citation_id }}")'>Show abstract.</a>
+        {% endif %}
+        </div>
+    </div>
+
+    {% if citation.abstract %}
+    <p class='abstract' style='display: none;'>
+    {{ citation.abstract }}
+    </p>
+    {% endif %}
+</div>

@@ -1,0 +1,119 @@
+{% extends menu_data_base %}
+{% load static %}
+
+{% block head %}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+    <style>
+
+    .sequencing-run-link {
+        font-size: 1.5em;
+    }
+
+</style>
+{% endblock %}
+{% block jsdocumentready %}
+{% endblock %}
+{% block submenu_page_content %}
+	<div class="container">
+	{% comment %}
+    {% load help_tags %}
+    {% page_help user 'variantopedia/dashboard_help' 'Help' %}
+    {% endcomment %}
+
+    {% if sapath_enabled %}
+        {% if user_has_cases %}
+            <script>
+            $(document).ready(function() {
+                var myCases = $("#my-cases");
+                myCases.html('<div class="cases-loading"><img src="{% static 'images/spinner.gif' %}" /> Loading cases...</div>');
+                myCases.load("{% url 'my_cases_tab' %}");
+            });
+            </script>
+            <div id='my-cases'>
+            </div>      
+        {% endif %}
+    {% endif %}
+
+    {% if seqauto_enabled %}
+        <div>
+        {% load seqauto_graph_tags %}
+        {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Sequencing Samples By Month' "month_offset" %}
+        </div>
+        {% if url_name_visible.sequencing_stats %}
+        <a href="{% url 'sequencing_stats' %}">More sequencing graphs</a>
+        {% endif %}
+
+        {% if latest_sequencing_vcfs %}
+            <h3>Recently Uploaded Sequencing Data</h3>
+            <table>
+            {% for sp in latest_sequencing_vcfs %}
+            <tr><td>
+                    <div title='{{ sp.sequencing_run.sequencer }}' class='sequencer'>
+                        <div class='sequencer-icon icon32 {{ sp.sequencing_run.sequencer.sequencer_model.css_class }}'>
+                        </div>
+                        <span class='sequencer-name-text'>{{ sp.sequencing_run.sequencer.name }}</span>
+                    </div>
+                    {% if url_name_visible.view_sequencing_run %}
+                        <a class='sequencing-run-link' href="{% url 'view_sequencing_run' sp.sequencing_run.pk %}">{{ sp.sequencing_run }}</a>
+                    {% else %}
+                        {{ sp.sequencing_run }}
+                    {% endif %}
+                <td>
+                    <a href="{% url 'view_vcf' sp.vcf.pk %}"><div title='Combined VCF' class='vcf-icon icon32'></div></a>
+
+                <td>
+                <table>           
+                {% for ss in sp.sequencing_run.sequencingruncurrentsamplesheet.sample_sheet.sequencingsample_set.all %}
+                    {% if not ss.is_control %}
+                    <tr>
+                    <td>{% if ss.samplefromsequencingsample %}
+                        <a href="{% url 'view_sample' ss.samplefromsequencingsample.sample.pk %}">
+                        {% endif %}
+                        {{ ss.sample_name }}
+                        {% if ss.samplefromsequencingsample %}
+                        </a>
+                        {% endif %}
+                    </td>
+                    <!-- Commented out showing patients... (bit dodgy) -->
+                    {% if ENABLE_PATIENTS_ON_FRONTPAGE %}
+                    <td>{% if ss.samplefromsequencingsample.sample.patient %}
+                        <a href="{% url 'view_patient' ss.samplefromsequencingsample.sample.patient.pk %}"><div class='patient-icon'></div>{{ ss.samplefromsequencingsample.sample.patient }}</a>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+                </table>        
+
+
+            {% endfor %}
+            </table>        
+        {% endif %}
+
+    {% else %}
+        <div>
+        {% load sample_graph_tags %}
+        {% samples_by_month_graph %}
+        </div>
+    {% endif %}
+
+        <P>
+        Please report bugs on <a class="hover-link external-link" href="https://github.com/SACGF/variantgrid/issues">github issue tracker</a>.
+
+        <div>
+            {{ dashboard_notices.notice_header }}
+            {% if dashboard_notices.vcfs %}
+            <h3>VCFs</h3>
+            <ul>
+                {% for vcf in dashboard_notices.vcfs %}
+                    <li><a href="{% url 'view_vcf' vcf.pk %}">{{ vcf }}</a>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+
+	</div>
+
+{% endblock %}

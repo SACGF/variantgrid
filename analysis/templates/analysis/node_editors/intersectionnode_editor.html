@@ -1,0 +1,79 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block docreadyjs %}
+    var intersectionNodeForm = $('form#intersection-node-form');
+    accordionForm(intersectionNodeForm);
+    ajaxForm(intersectionNodeForm);
+
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<style>
+	#accordion-container {
+		width: 100% !important;
+	}
+	
+	#intersectionnode-custom-range input {
+		width: 100px;
+	}
+
+	#intersectionnode-hgvs input {
+		width: 400px;
+	}
+
+
+</style>
+
+<div>
+	<form id="intersection-node-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+		<div id="accordion-container">
+			<ul class="accordion">
+		        <h3>Genomic Intervals</h3>
+		        <div>
+					<div><b>GenomicIntervals:</b> {{ form.genomic_intervals_collection }}</div>
+					
+					{% comment 'old left/right functionality' %}
+					<div><b>Left:</b> {{ form.left }}bp <b>Right:</b> {{ form.right }}bp
+					{% endcomment %}
+		        </div>
+		        </li>
+                <li>
+                <h3>Custom Range</h3>
+                    <div id='intersectionnode-custom-range'>
+                    {{ form.chrom.errors }}{{ form.chrom }} : 
+                    {{ form.start.errors }}{{ form.start }} - 
+                    {{ form.end.errors }}{{ form.end }}
+                    </div>
+                </li>
+                <li>
+                <h3>HGVS</h3>
+                    <div id='intersectionnode-hgvs'>
+                    {{ form.hgvs_name.errors }}{{ form.hgvs_name }}
+                    </div>
+                </li>
+                <li>
+                <h3>EnrichmentKit</h3>
+                <div>
+                    {% if enrichment_kit %}
+                        <b>EnrichmentKit:</b>{{ enrichment_kit }} 
+                    {% else %}
+                        Can't determine enrichment_kit from input samples
+                    {% endif %}
+                </div>
+                <li>
+			</ul>
+		</div>
+        {{ form.non_field_errors }}
+		<div>
+			<button id='intersection-save' class="btn btn-primary">save</button>
+		</div>
+        {{ form.media }}
+	</form>
+</div>
+{% endblock content %}

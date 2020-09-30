@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+  <head>
+    <title>Terms and Conditions</title>
+    {% block styles %}{% endblock %}
+    <link href="{% static 'js/lib/jquery-ui-1.12.1.custom/jquery-ui.min.css' %}" rel="stylesheet">
+    <script src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+    <script src="{% static 'js/lib/jquery-ui.min.js' %}"></script>
+    <!-- layout must be after jquery-ui or resize doesn't work -->
+    <script src="{% static 'js/lib/jquery-3.3.1/jquery.layout-1.4.4.js' %}"></script>
+    <link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
+    <link href="{% static 'css/global.css' %}" rel="stylesheet">
+    <link href="{% static 'css/branding.css' %}" rel="stylesheet">
+    <style type="text/css">
+    #content {
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    #header {
+        width: 100%;
+    }
+    #outer-container {
+        height: 100%;
+        flex-direction: column;
+        align-items: center;
+    }
+    #termsandconditions-section h1 {
+        font-size: 30pt;
+    }
+    h4 {
+        font-size: 16px;
+    }
+    .toc-container {
+        border: 1px solid lightgray;
+        border-radius: 8px;
+        font-size: 16px;
+    }
+    .toc-container a {
+        color: #4444bb !important;
+        text-decoration: none;
+    }
+    .toc-container a:hover {
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    h4 {
+        font-size: 16px;
+    }
+    input[type='submit'] {
+        margin-top: 20px;
+        font-size: 20px;
+    }
+    </style>
+    <script>
+        $(document).ready(function () {
+            $('a').each((index, a) => {
+                if (a.innerText.indexOf('Print') != -1) {
+                    $(a).remove();
+                }
+            });
+            $(`:submit`).val('Accept to continue').button();
+        });
+    </script>
+  </head>
+  <body class='external'>
+    <div id='outer-container' class='display-flex'>
+        <div id="header" class='flex-none'>
+            <a href='/' title="Return to {{ site_name }} homepage" class='no-link-style'>
+                <div id='menu-logo' class='left'></div>
+            </a>
+        </div>
+
+        <div id="content" class='flex-1'>
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+  </body>
+</html>

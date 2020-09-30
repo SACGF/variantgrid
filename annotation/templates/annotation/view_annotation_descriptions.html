@@ -1,0 +1,313 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block submenu %}{% menu_bar_annotations %}{% endblock %}
+{% block title %}VariantGrid Annotations{% endblock title %}
+
+{% block head %}
+    <style>
+        .color-box {
+            float: left;
+            margin-right: 10px;
+        }
+
+         .annotation-level-header {
+            margin: 10px 0px 10px 0px;
+         }
+
+        .annotation-level-title {
+            float: left;
+        }
+
+        .annotations-table .annotation-row th {
+            text-align: right;
+            padding-right: 5px;
+            max-width: 250px;
+            min-width: 250px;
+        }
+
+        .vep-source-field {
+            display: none;
+        }
+
+        .vep-category {
+            color: #fff;
+            border-radius: 5px;
+            white-space: nowrap;
+            text-align: center;
+            padding: 2px;
+        }
+
+        .vep-category-C {
+            background-color: #02599C;
+        }
+
+        .vep-category-E {
+            background-color: #333333;
+        }
+
+        .vep-category-F {
+            background-color: #FF7F50;
+        }
+
+        .vep-category-G {
+            background-color: #97f988;
+            color: #680677;
+        }
+
+        .vep-category-H {
+            background-color: #9400D3;
+        }
+
+        .vep-category-L {
+            background-color: #6A5ACD;
+        }
+
+        .vep-category-N {
+            background-color: #E75480;
+        }
+
+        .vep-category-P {
+            background-color: #1E90FF;
+        }
+
+        .vep-category-Y {
+            background-color: ;
+        }
+
+        .vep-category-D {
+            background-color: #ff9900;
+        }
+
+        .vep-category-Q {
+            background-color: #5F81A9;
+        }
+
+        .vep-category-S {
+            background-color: red;
+        }
+
+        .vep-category-V {
+        }
+    </style>
+    <script>
+        $(document).ready(() => {
+            fixLinks();
+            $("#show-vep").change(function () {
+                if ($(this).is(":checked")) {
+                    $(".vep-source-field").show();
+                } else {
+                    $(".vep-source-field").hide();
+                }
+            });
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+	{% load ui_help %}
+	{% page_help page_id='annotation/view_annotation_descriptions_help' title="VariantGrid Annotations"%}
+
+    <ul>
+    <li><a class="hover-link" href="{% url 'about_new_vep_columns' %}">Column changes switching to VEP</a>
+    <li>To customise how these annotations appear in analysis grids, see <a class="hover-link" href="{% url 'custom_columns' %}">VariantGrid Columns</a><br>
+    <li>To see an example of annotations in use, <a class="hover-link" href="{% url 'search' %}">search</a> for a variant in the top right box.
+    </ul>
+
+    <div>
+        <div class="card">
+            <div class="card-header d-flex align-center">
+                <div class="color-box genotype-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>Sample Level</b> Imported VCF sample/genotype fields</div>
+            </div>
+            <!-- Hardcode Sample level special fields -->
+            <div class="card-body">
+                {% labelled label="Sample Zygosity" %}Zygosity call (HET/HOM_ALT/REF or Unknown){% endlabelled %}
+
+                {% labelled label="AD (Allele Depth)" %}
+                    Unfiltered allele depth, the number of reads that support each of the reported alleles. All reads at the position
+                    (including reads that did not pass the variant caller’s filters) are included in this number, except reads that were
+                    considered uninformative. Reads are considered uninformative when they do not provide enough statistical evidence
+                    to support one allele over another.
+                {% endlabelled %}
+
+                {% labelled label="AF (Allele Frequency)" %}
+                Calculated for each allele as <code>100.0 * AD / (sum of all AD for that locus)</code>
+                {% endlabelled %}
+
+                {% labelled label="DP (Depth)" %}
+                    Filtered depth, at the sample level. This gives you the number of filtered reads that support each of the reported alleles.
+                    You can check the variant caller’s documentation to see which filters are applied by default. Only reads that passed the variant
+                    caller’s filters are included in this number. However, unlike the AD calculation, uninformative reads are included in DP.</span>
+                {% endlabelled %}
+
+                {% labelled label="GQ (Genotype Quality)" %}
+                    Genotype Quality, the Phred-scaled marginal (or unconditional) probability of the called genotype.
+                {% endlabelled %}
+
+                {% labelled label="PL (Phred Likelihood)" %}
+                    Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification
+                {% endlabelled %}
+
+        {% comment %}
+            {% for v in variantgrid_columns_by_annotation_level.S %}
+                <tr class='annotation-row'>
+                    <th>{{ v.pk }}
+                    <td>{{ v.description | safe }}
+                </tr>
+            {% endfor %}
+        {% endcomment %}
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header d-flex align-center">
+                <div class="color-box database-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>Database</b> Internal database stats</div>
+            </div>
+            <div class="card-body">
+                {% for v in variantgrid_columns_by_annotation_level.D %}
+                    {% labelled label=v.pk %}{{ v.description }}{% endlabelled %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header"><h5>Settings</h5></div>
+            <div class="card-body">
+                {% labelled label="" %}
+                    <input id='show-vep' type='checkbox' class="form-check-input">
+                    <label for="show-vep" class="form-check-label">Show Ensembl Variant Effect Predictor source fields</label>
+                {% endlabelled %}
+            </div>
+        </div>
+
+        <div class='card mt-4'>
+            <div class="card-header align-center">
+                <div class="color-box transcript-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>Transcript Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a> - can have different values per transcript</div>
+            </div>
+            <div class="card-body">
+                <table class='annotations-table table'>
+                {% for v in variantgrid_columns_by_annotation_level.T %}
+                    <tr class='annotation-row'>
+                        <th>{{ v.pk }}
+                        <td>
+                        {% if v.columnvepfield %}
+                            <div class='vep-category vep-category-{{ v.columnvepfield.category }}'>
+                                {{ v.columnvepfield.get_category_display }}
+                            </div>
+                        {% endif %}
+                        </td>
+                        <td>
+                        {% if v.columnvepfield %}
+                            <div class='vep-source-field'>
+                                {{ v.columnvepfield.source_field }}
+                                {% if v.columnvepfield.source_field_processing_description %}
+                                    ({{ v.columnvepfield.source_field_processing_description }})
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        </td>
+                        <td>
+                        {% if v.columnvepfield %}
+                            <div class='vep-source-field'>
+                                {% if v.columnvepfield.vep_plugin %}
+                                    Plugin: <b>{{ v.columnvepfield.get_vep_plugin_display }}</b>
+                                {% endif %}
+
+                                {% if v.columnvepfield.vep_custom %}
+                                    (custom)
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        </td>
+                        <td>{{ v.description | safe }}
+                        {% if v.columnvepfield.vep_plugin == 'd' %}
+                            Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
+                        {% endif %}
+                        </td>
+                     </tr>
+                {% endfor %}
+                </table>
+            </div>
+        </div>
+
+
+        <div class="card mt-4">
+            <div class="card-header align-center">
+                <div class="color-box variant-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>Variant Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a></div>
+            </div>
+            <div class="card-body">
+        <table class='annotations-table table'>
+        {% for v in variantgrid_columns_by_annotation_level.V %}
+            <tr class='annotation-row'>
+                <th>{{ v.pk }}
+                <td>
+                {% if v.columnvepfield %}
+                        <div class='vep-category vep-category-{{ v.columnvepfield.category }}'>
+                            {{ v.columnvepfield.get_category_display }}
+                        </div>
+                {% endif %}
+                </td>
+                <td>
+                {% if v.columnvepfield %}
+                    <div class='vep-source-field'>
+                        {{ v.columnvepfield.source_field }}
+                        {% if v.columnvepfield.source_field_processing_description %}
+                            ({{ v.columnvepfield.source_field_processing_description }})
+                        {% endif %}
+                    </div>
+                {% endif %}                    
+                </td>
+                <td>
+                {% if v.columnvepfield %}
+                    <div class='vep-source-field'>
+                        {% if v.columnvepfield.vep_plugin %}
+                            Plugin: <b>{{ v.columnvepfield.get_vep_plugin_display }}</b>
+                        {% endif %}
+
+                        {% if v.columnvepfield.vep_custom %}
+                            (custom)
+                        {% endif %}
+                    </div>
+                {% endif %}
+                </td>
+                <td>{{ v.description | safe }}
+                {% if v.columnvepfield.vep_plugin == 'd' %}
+                    Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
+                {% endif %}
+                </td>
+        {% endfor %}
+        </table>
+        </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header align-center">
+                <div class="color-box clinvar-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>ClinVar</b> Clinical Variants from <a class="hover-link" target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/intro/">NCBI</a></div>
+            </div>
+            <div class="card-body">
+                {% for v in variantgrid_columns_by_annotation_level.C %}
+                    {% labelled label=v.pk %}{{ v.description | safe }}{% endlabelled %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header align-center">
+                <div class="color-box gene-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>Gene Level</b> Per-gene information, matched via gene associated with variant's assigned ensembl_transcript_id</div>
+            </div>
+            <div class="card-body">
+                {% for v in variantgrid_columns_by_annotation_level.G %}
+                    {% labelled label=v.pk %}{{ v.description | safe }}{% endlabelled %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

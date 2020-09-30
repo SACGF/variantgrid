@@ -1,0 +1,375 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_field %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load static %}
+{% load js_tags %}
+{% load jqgrid_tags %}
+{% load user_tag_color_tags %}
+{% load wiki_tags %}
+{% load datatable_tags %}
+{% block title %}{{ gene_symbol }}{% endblock title %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+
+{% block head %}
+    {% render_tag_styles_and_formatter %}
+    <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+    <script src="{% static 'js/generated_graphs.js' %}"></script>
+    <style>
+        #hotspot-graph, #hotspot-graph img {
+            width: 100%;
+            height: 480px;
+            text-align: center;
+        }
+
+        #transcripts {
+            margin-left: 10px;
+        }
+
+        .transcript-version {
+            padding-left: 5px;
+        }
+
+        .filter-message {
+            margin-right: 10px;
+        }
+
+        {% load user_tag_color_tags %}
+        {% render_node_count_colors_css %}
+    </style>
+    <script>
+        window.ANALYSIS_SETTINGS = {
+            show_igv_links : false,
+            open_variant_details_in_new_window: true,
+        };
+
+        let gridFilterVisible = false;
+        let geneClassificationsGridParams = {};
+        let geneVariantsGridParams = {};
+
+        function load_classifications_hotspot_graph(geneSymbol) {
+            let url = Urls.classifications_gene_symbol_hotspot_graph("{{ genome_build.pk }}", geneSymbol);
+            $('#classifications-hotspot-graph-container').load(url, function() {
+                $(".hotspot-graph", this).attr("hotspot_graph_click_func", "viewGeneClassificationsHotspotGraphClickFunc");
+            });
+        }
+
+        function load_hotspot_graph(geneSymbol) {
+            let url = Urls.gene_symbol_hotspot_graph("{{ genome_build.pk }}", geneSymbol);
+            $('#hotspot-graph-container').load(url, function() {
+                $(".hotspot-graph", this).attr("hotspot_graph_click_func", "viewGeneHotspotGraphClickFunc");
+            });
+        }
+
+        function showFilter() {
+            gridFilterVisible = true; // so it won't hide on reload.
+            $("#show-filter-link").hide();
+            var filterBox = $("#searchmodfbox_gene-variants-grid");
+            filterBox.slideDown();
+        }
+
+        $(window).bind('resize', function() {
+            let maxWidth = 1450;
+            let space = $(window).width() - 160;
+            let desiredWidth = Math.min(maxWidth, space);
+            let grid = $("#gene-classifications-grid");
+            if (grid && grid.length) {
+                grid.setGridWidth(desiredWidth);
+            }
+        });
+
+        function showTranscripts() {
+            $("#show-transcripts-link").hide();
+            $("#transcripts").slideDown();
+        }
+
+        function viewGeneHotspotGraphClickFunc(transcript_version_id, text, protein_position) {
+            $("#gene-variants-grid-filtering-message").empty().html("Filtering to " + text).parent().show();
+            geneVariantsGridParams["protein_position"] = protein_position;
+            geneVariantsGridParams["protein_position_transcript_version_id"] = transcript_version_id;
+            $("#gene-variants-grid").trigger("reloadGrid");
+        }
+
+        function viewGeneClassificationsHotspotGraphClickFunc(transcript_version_id, text, protein_position) {
+            $("#gene-classifications-grid-filtering-message").empty().html("Filtering to " + text).parent().show();
+            geneClassificationsGridParams["protein_position"] = protein_position;
+            geneClassificationsGridParams["protein_position_transcript_version_id"] = transcript_version_id;
+            $('#vc-datatable').DataTable().ajax.reload();
+        }
+
+        $(document).ready(() => {
+            let tableDom = $('#vc-datatable');
+            if (tableDom.length) {
+                EKeys.load().then(() => {
+                    {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='variant_classification_datatables' data='classificationFilter' hide_filter_count=True %};
+                    let vcDatatable = $('#vc-datatable');
+                    vcDatatable.on('draw.dt', () => {
+                        Flags.instance.init({userId: '{{user.id}}'});
+                    });
+                });
+            }
+
+            {% if show_classifications_hotspot_graph %}
+                load_classifications_hotspot_graph("{{ gene_symbol }}");
+            {% endif %}
+            {% if show_hotspot_graph %}
+                load_hotspot_graph("{{ gene_symbol }}");
+            {% endif %}
+
+            {% if has_gene_coverage and url_name_visible.gene_symbol_coverage_collection_graphs %}
+                var gcContainer = $("#qc-gene-coverage-graph-container");
+                var loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
+                gcContainer.html(loading_icon);
+                gcContainer.load("{% url 'gene_symbol_coverage_collection_graphs' genome_build.name gene_symbol.pk %}");
+            {% endif %}
+
+            // copy gene info into summary
+            var geneInfo = $(".gene-info-container");
+            geneInfo.clone().appendTo($("#summary-gene-icons-container"));
+            fixLinks();
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+	<div class="container">
+        <h3>{{ gene_symbol }}</h3>
+        {% if show_annotation %}
+            {% page_help_embedded page_id='genes/view_gene_symbol_help' title='View Gene Symbol' %}
+                <p>Columns in the grid are from your <a href="/snpdb/settings">User Settings</a>,
+                    minus the gene level annotation (this appears in the <a data-toggle="collapse" href="#full-gene-info">full summary...</a>)
+                <p>The 2nd column: 'Sample Count' shows the number of samples which have this variant. A hotspot graph shows variants from this gene if any appear in samples.
+            {% end_page_help_embedded %}
+        {% endif %}
+
+        {% if gene_symbol.aliases_to_for %}
+            <div class="card mb-4">
+                <div class="card-header">Aliases</div>
+                <div class="card-body card-body-list">
+                    <ul class="list-group">
+                    {% for alias_summary in gene_symbol.aliases_to_for %}
+                        {% if alias_summary.my_symbol_is_main %}
+                            {% if alias_summary.other_symbol_in_database %}
+                                <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action list-group-item-light">
+                                    <b>{{ alias_summary.other_symbol }}</b> is an alias of {{ gene_symbol }} ({{ alias_summary.source }})
+                                </a>
+                            {% else %}
+                                <li class="list-group-item  list-group-item-light"><b>{{ alias_summary.other_symbol }}</b> is an alias of {{ gene_symbol }} ({{ alias_summary.source }})</li>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action">
+                                <i class="fas fa-arrow-circle-right"></i> {{ gene_symbol }} is an alias for <b>{{ alias_summary.other_symbol }}</b> ({{ alias_summary.source }})
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="row">
+            {% if consortium_genes_and_aliases %}
+                {% for annotation_consortium, genes_and_aliases in consortium_genes_and_aliases.items %}
+                <div class="col-12 col-lg-6 {% if not forloop.first %}mt-4 mt-lg-0{% endif %}">
+                    <div class="card">
+                        <div class="card-header"><h5>{{ annotation_consortium }}</h5></div>
+                        <div class="card-body card-body-list">
+                            <ul class="list-group">
+                              {% for gene_id, aliases in genes_and_aliases.items %}
+                                  <li class="list-group-item">
+                                      <a class="hover-link" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
+                                        {% if aliases %} (aka: {% for alias in aliases %}<a class="comma-sep" href="{% url 'view_gene_symbol' alias %}">{{ alias }}</a>{% endfor %}){% endif %}
+                                      </a>
+                                  </li>
+                              {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        {% if show_annotation %}
+            {% if gene_annotation %}
+                <p>Gene Annotation Version: <a class="hover-link" href="{% url 'annotation_versions' %}">{{ gene_annotation.version }}</a>
+                {% if num_gene_annotation_versions > 1 %}
+                    - <a href="{% url 'view_gene_annotation_history' gene_symbol.pk %}">Compare {{ num_gene_annotation_versions }} historical versions</a>.
+                {% endif %}
+            {% endif %}
+
+            <div id='gene-info' >
+                {% if gene_annotation %}
+                <div class='short-summary'>
+                    <p>
+                        <b>{{ gene_annotation.hgnc_name }}:</b> {{ gene_annotation.refseq_gene_summary }}
+                    </p>
+                    <div id='summary-gene-icons-container'></div>
+                    <a class="hover-link" data-toggle="collapse" href="#full-gene-info">Show full summary...</a>
+                </div>
+                {% else %}
+                    <!-- No annotation for this gene -->
+                {% endif %}
+
+                <div id='full-gene-info' class="collapse">
+                    {% for grid_column_name, description, data in gene_level_columns %}
+                        <p>
+                            {% labelled hint="tiny" id=grid_column_name label=description %}{{ data  }} {% endlabelled %}
+                        </p>
+                    {% endfor %}
+                    {% if gene_infos.exists %}
+                        <h4>Gene Info</h4>
+                        <div class='gene-info-container'>
+                            {% for gi in gene_infos %}
+                                <div class='gene-icon {{ gi.icon_css_class }}' title='{{ gi.name }}'></div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% load gene_disease_tags %}
+            {% gene_disease gene_symbol %}
+
+            {% if mim_and_hpo_for_gene %}
+                <h4>OMIM and Human Phenotype Ontology</h4>
+
+                <table class="table">
+                    <thead>
+                    <tr><th>MIM Morbid</th><th>Description</th><th>HPOs</th>
+                    </thead>
+                    <tbody>
+                    {% for mim, hpo_list in mim_and_hpo_for_gene %}
+                        <tr><td><a class="hover-link" href="https://www.omim.org/entry/{{ mim.accession }}">{{ mim.accession }}</a>
+                            <td>{{ mim.description }}
+                            <td>
+                            {% if hpo_list %}
+                                {% for hpo in hpo_list %}
+                                    <a class="hover-link" href="http://compbio.charite.de/hpoweb/showterm?id={{ hpo.hpo_id }}">{{ hpo }}</a>&#160;
+                                {% endfor %}
+                            {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        {% endif %}
+
+        {% if show_wiki %}
+        <h4>Wiki</h4>
+
+        {% wiki_editor gene_symbol.genesymbolwiki class_name='genes.models.GeneSymbolWiki' unique_keyword='gene_symbol_id' unique_value=gene_symbol.pk %}
+        {% endif %}
+
+        {% if citations %}
+        {% load citation_tags %}
+        {% retrieve_cached_citations citations %}
+        {% endif %}
+
+        <h4>Variant Classifications</h4>
+
+        {% if has_classified_variants %}
+            <script>
+
+            function classificationFilter(data, type) {
+                data.gene_symbol = "{{ gene_symbol }}";
+                Object.assign(data, geneClassificationsGridParams);
+            }
+
+            function clearGeneClassificationsGrid() {
+                geneClassificationsGridParams = {};
+                $('#vc-datatable').DataTable().ajax.reload();
+                $("#gene-classifications-grid-filtering-message").empty().parent().hide();
+            }
+
+            </script>
+
+            {% if show_classifications_hotspot_graph %}
+                <div id='classifications-hotspot-graph-container'></div>
+            {% endif %}
+
+            <span class="hidden">
+                <span class="filter-message" id="gene-classifications-grid-filtering-message"></span>
+                <a class='hover-link' href="javascript:clearGeneClassificationsGrid()">Show all...</a>
+            </span>
+            {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
+        {% else %}
+            There are no classifications for this gene.
+        {% endif %}
+
+
+        {% if has_tagged_variants %}
+            <script>
+                function getGeneGridExtraFilters() {
+                    var gridParams = {
+                        gene_symbol : "{{ gene_symbol }}",
+                    };
+                    return JSON.stringify(gridParams);
+                }
+
+                function getGeneGridConfigUrl() {
+                    return "extra_filters=" + getGeneGridExtraFilters();
+                }
+
+                function geneGridInitFunc(grid, pagerId) {
+                    grid[0].p.postData["extra_filters"] = getGeneGridExtraFilters;
+                }
+            </script>
+            <h3>Tagged Variants</h3>
+            {% user_data_grid_filter 'gene_variant_tags' 'Analyses Variant Tags' %}
+            {% jqgrid 'analyses_variant_tags_grid' 'gene_variant_tags' genome_build_name=genome_build.name search=False jqgrid_config_get_parameters_func='getGeneGridConfigUrl' init_func='geneGridInitFunc' %}
+        {% endif %}
+
+        {% if show_annotation %}
+            <h3>Variants</h3>
+
+            {% if show_hotspot_graph %}
+                <div id='hotspot-graph-container'></div>
+            {% endif %}
+
+            {% if has_variants %}
+                <a class='hover-link' id='show-filter-link' href="javascript:showFilter()">Filter grid...</a>
+                <span class="hidden">
+                    <span class="filter-message" id="gene-variants-grid-filtering-message"></span>
+                    <a class='hover-link' href="javascript:clearGeneVariantsGrid()">Show all...</a>
+                </span>
+        		<table id="grid"></table>
+        		<div id="pager"></div>
+                <script>
+                    function initialHideFilter() {
+                        if (!gridFilterVisible) {
+                            $("#searchmodfbox_gene-variants-grid").hide();
+                        }
+                    }
+
+                    function getGeneVariantsGridExtraFilters() {
+                        return JSON.stringify(geneVariantsGridParams);
+                    }
+
+                    function clearGeneVariantsGrid() {
+                        geneVariantsGridParams = {};
+                        $("#gene-variants-grid").trigger("reloadGrid");
+                        $("#gene-variants-grid-filtering-message").empty().parent().hide();
+                    }
+
+                    function geneVariantsGridInitFunc(grid, pagerId) {
+                        grid[0].p.postData["extra_filters"] = getGeneVariantsGridExtraFilters;
+                    }
+                </script>
+                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='variantopedia/grids/gene_variants_grid.html' delete=False gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='initialHideFilter' %}
+            {% else %}
+                There are no variants for this gene.
+            {% endif %}
+        {% endif %}
+
+        {% if gene_in_gene_lists %}
+            <h3>Gene Lists containing {{ gene_symbol }}</h3>
+            {% jqgrid 'gene_lists_for_gene_symbol_grid' category.name search=False delete=False gene_symbol=gene_symbol.pk %}
+        {% endif %}
+
+        <div id='qc-gene-coverage-graph-container'>
+        </div>
+	</div>
+
+{% endblock content %}

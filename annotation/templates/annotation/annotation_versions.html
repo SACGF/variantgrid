@@ -1,0 +1,57 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% block submenu %}{% menu_bar_annotations %}{% endblock %}
+{% load js_tags %}
+{% load ui_tabs_builder %}
+{% block title %}Annotation Version{% endblock title %}
+{% block content %}
+    <div class="container">
+        {% load ui_help %}
+        {% page_help page_id='annotation/annotation_versions_help' title='Annotation Versions'%}
+
+        {% ui_register_tabs tab_set="annotation_versions" %}
+        {% for build_name, av_data in annotation_versions.items %}
+            {% ui_register_tab_embedded tab_set="annotation_versions" label=build_name %}
+                <table class='table'>
+                    <thead>
+                        <tr>
+                            <th>Version</th>
+                            <th>Annotation Date</th>
+                            <th>Variant</th>
+                            <th>Gene</th>
+                            <th>ClinVar</th>
+                            <th>Human Protein Atlas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for av in av_data.1 %}
+                        <tr>
+                        <td>{{ av.pk }}</td>
+                        <td>{% timestamp av.annotation_date %}</td>
+                        <td>{{ av.variant_annotation_version|default_if_none:'' }}</td>
+                        <td>{{ av.ensembl_gene_annotation_version|default_if_none:'' }}</td>
+                        <td>{{ av.clinvar_version|default_if_none:'' }}</td>
+                        <td>{{ av.human_protein_atlas_version|default_if_none:'' }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class='annotation-version-history'>
+                    <h3>Variant Annotation Versions</h3>
+
+                    <a href="#vep-command-{{ build_name }}" class="hover-link" data-toggle="collapse">Show VEP command...</a>
+                    <div id="vep-command-{{ build_name }}" class="collapse">
+<pre class="border border-info p-2">
+{{ av_data.0 }}
+</pre>
+                    </div>
+                    {% load jqgrid_tags %}
+                    {% jqgrid 'variant_annotation_version_grid' build_name search=False delete=False genome_build_name=build_name %}
+                    </div>
+                </div>
+            {% end_ui_register_tab_embedded %}
+        {% endfor %}
+        {% ui_render_tabs tab_set="annotation_versions" %}
+    </div>
+{% endblock content %}

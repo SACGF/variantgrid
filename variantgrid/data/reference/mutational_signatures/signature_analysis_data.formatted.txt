@@ -1,0 +1,208 @@
+[Signature 1]
+Cancer types = Found in all cancer types and in most cancer samples.
+Proposed aetiology = Result of an endogenous mutational process initiated by spontaneous deamination of 5-methylcytosine.
+Additional mutational features = Associated with small numbers of small insertions and deletions in most tissue types.
+Comments = Correlates with age of cancer diagnosis.
+
+
+[Signature 2]
+Cancer types = Found in 22 cancer types, but most commonly in cervical and bladder cancers. In most of these 22 cancer types, Signature 2 is present in at least 10% of samples.
+Proposed aetiology = Attributed to activity of the AID/APOBEC family of cytidine deaminases. On the basis of similarities in the sequence context of cytosine mutations caused by APOBEC enzymes in experimental systems, a role for APOBEC1, APOBEC3A and/or APOBEC3B in human cancer appears more likely than for other members of the family.
+Additional mutational features = Transcriptional strand bias of mutations has been observed in exons, but is not present or is weaker in introns.
+Comments = Usually found in the same samples as Signature 13. It has been proposed that activation of AID/APOBEC cytidine deaminases is due to viral infection, retrotransposon jumping or to tissue inflammation. Currently, there is limited evidence to support these hypotheses. A germline deletion polymorphism involving APOBEC3A and APOBEC3B is associated with the presence of large numbers of Signature 2 and 13 mutations and with predisposition to breast cancer. Mutations of similar patterns to Signatures 2 and 13 are commonly found in the phenomenon of local hypermutation present in some cancers, known as kataegis, potentially implicating AID/APOBEC enzymes in this process as well.
+
+
+[Signature 3]
+Cancer types = Found in breast, ovarian, and pancreatic cancers.
+Proposed aetiology = Associated with failure of DNA double-strand break-repair by homologous recombination.
+Additional mutational features = Associates strongly with elevated numbers of large (longer than 3bp) insertions and deletions with overlapping microhomology at breakpoint junctions.
+Comments = Strongly associated with germline and somatic BRCA1 and BRCA2 mutations in breast, pancreatic, and ovarian cancers. In pancreatic cancer, responders to platinum therapy usually exhibit Signature 3 mutations.
+
+
+[Signature 4]
+Cancer types = Found in head and neck cancer, liver cancer, lung adenocarcinoma, lung squamous carcinoma, small cell lung carcinoma, and oesophageal cancer.
+Proposed aetiology = Associated with smoking and its profile is similar to the mutational pattern observed in experimental systems exposed to tobacco carcinogens (e.g., benzo[a]pyrene). Signature 4 is likely due to tobacco mutagens.
+Additional mutational features = Exhibits transcriptional strand bias for C>A mutations, compatible with the notion that damage to guanine is repaired by transcription-coupled nucleotide excision repair. Signature 4 is also associated with CC>AA dinucleotide substitutions.
+Comments = Found in cancers associated with tobacco chewing and appears different from Signature 4.
+
+
+[Signature 5]
+Cancer types = Found in all cancer types and most cancer samples.
+Proposed aetiology =unknown.
+Additional mutational features = Exhibits transcriptional strand bias for T>C substitutions at ApTpN context.
+Comments = N/A
+
+
+[Signature 6]
+Cancer types = Found in 17 cancer types and is most common in colorectal and uterine cancers. In most other cancer types, Signature 6 is found in less than 3% of examined samples.
+Proposed aetiology = Associated with defective DNA mismatch repair and is found in microsatellite unstable tumours.
+Additional mutational features = Associated with high numbers of small (shorter than 3bp) insertions and deletions at mono/polynucleotide repeats.
+Comments = One of four mutational signatures associated with defective DNA mismatch repair and is often found in the same samples as Signatures 15, 20, and 26.
+
+
+[Signature 7]
+Cancer types = Found predominantly in skin cancers and in cancers of the lip categorized as head and neck or oral squamous cancers.
+Proposed aetiology = Based on its prevalence in ultraviolet exposed areas and the similarity of the mutational pattern to that observed in experimental systems exposed to ultraviolet light Signature 7 is likely due to ultraviolet light exposure.
+Additional mutational features = Associated with large numbers of CC>TT dinucleotide mutations at dipyrimidines. Additionally, Signature 7 exhibits a strong transcriptional strand-bias indicating that mutations occur at pyrimidines (viz., by formation of pyrimidine-pyrimidine photodimers) and these mutations are being repaired by transcription-coupled nucleotide excision repair.
+Comments = N/A
+
+
+[Signature 8]
+Cancer types = Found in breast cancer and medulloblastoma.
+Proposed aetiology = unknown
+Additional mutational features = Exhibits weak strand bias for C>A substitutions and is associated with double nucleotide substitutions, notably CC>AA.
+Comments = N/A
+
+
+[Signature 9]
+Cancer types = Found in chronic lymphocytic leukaemias and malignant B-cell lymphomas.
+Proposed aetiology = Characterized by a pattern of mutations that has been attributed to polymerase η, which is implicated with the activity of AID during somatic hypermutation.
+Additional mutational features = N/A
+Comments = Chronic lymphocytic leukaemias that possess immunoglobulin gene hypermutation (IGHV-mutated) have elevated numbers of mutations attributed to Signature 9 compared to those that do not have immunoglobulin gene hypermutation.
+
+
+[Signature 10]
+Cancer types = Found in six cancer types, notably colorectal and uterine cancer, usually generating huge numbers of mutations in small subsets of samples.
+Proposed aetiology = It has been proposed that the mutational process underlying this signature is altered activity of the error-prone polymerase POLE. The presence of large numbers of Signature 10 mutations is associated with recurrent POLE somatic mutations, viz., Pro286Arg and Val411Leu.
+Additional mutational features = Exhibits strand bias for C>A mutations at TpCpT context and T>G mutations at TpTpT context.
+Comments = Associated with some of most mutated cancer samples. Samples exhibiting this mutational signature have been termed ultra-hypermutators.
+
+
+[Signature 11]
+Cancer types = Found in melanoma and glioblastoma.
+Proposed aetiology = Exhibits a mutational pattern resembling that of alkylating agents. Patient histories have revealed an association between treatments with the alkylating agent temozolomide and Signature 11 mutations.
+Additional mutational features = Exhibits a strong transcriptional strand-bias for C>T substitutions indicating that mutations occur on guanine and that these mutations are effectively repaired by transcription-coupled nucleotide excision repair.
+Comments = N/A
+
+
+[Signature 12]
+Cancer types = Found in liver cancer.
+Proposed aetiology = unknown
+Additional mutational features = Exhibits a strong transcriptional strand-bias for T>C substitutions.
+Comments = Usually contributes a small percentage (<20%) of the mutations observed in a liver cancer sample.
+
+
+[Signature 13]
+Cancer types = Found in 22 cancer types and seems to be commonest in cervical and bladder cancers. In most of these 22 cancer types, Signature 13 is present in at least 10% of samples.
+Proposed aetiology = Attributed to activity of the AID/APOBEC family of cytidine deaminases converting cytosine to uracil. On the basis of similarities in the sequence context of cytosine mutations caused by APOBEC enzymes in experimental systems, a role for APOBEC1, APOBEC3A and/or APOBEC3B in human cancer appears more likely than for other members of the family. Signature 13 causes predominantly C>G mutations. This may be due to generation of abasic sites after removal of uracil by base excision repair and replication over these abasic sites by REV1.
+Additional mutational features = Transcriptional strand bias of mutations has been observed in exons, but is not present or is weaker in introns.
+Comments = Usually found in the same samples as Signature 13. It has been proposed that activation of AID/APOBEC cytidine deaminases is due to viral infection, retrotransposon jumping or to tissue inflammation. Currently, there is limited evidence to support these hypotheses. A germline deletion polymorphism involving APOBEC3A and APOBEC3B is associated with the presence of large numbers of Signature 2 and 13 mutations and with predisposition to breast cancer. Mutations of similar patterns to Signatures 2 and 13 are commonly found in the phenomenon of local hypermutation present in some cancers, known as kataegis, potentially implicating AID/APOBEC enzymes in this process as well.
+
+
+[Signature 14]
+Cancer types = Observed in four uterine cancers and a single adult low-grade glioma sample.
+Proposed aetiology = unknown
+Additional mutational features = N/A
+Comments = Generates very high numbers of somatic mutations (>200 mutations per MB) in all samples in which it has been observed.
+
+
+[Signature 15]
+Cancer types = Found in several stomach cancers and a single small cell lung carcinoma.
+Proposed aetiology = Associated with defective DNA mismatch repair.
+Additional mutational features = Associated with high numbers of small (shorter than 3bp) insertions and deletions at mono/polynucleotide repeats.
+Comments = One of four mutational signatures associated with defective DNA mismatch repair and is often found in the same samples as Signatures 6, 20, and 26.
+
+
+[Signature 16]
+Cancer types = Found in liver cancer.
+Proposed aetiology = unknown
+Additional mutational features = Exhibits an extremely strong transcriptional strand bias for T>C mutations at ApTpN context, with T>C mutations occurring almost exclusively on the transcribed strand.
+Comments = N/A
+
+
+[Signature 17]
+Cancer types = Found in oesophagus cancer, breast cancer, liver cancer, lung adenocarcinoma, B-cell lymphoma, stomach cancer and melanoma.
+Proposed aetiology = unknown
+Additional mutational features = N/A
+Comments = N/A
+
+
+[Signature 18]
+Cancer types = Found commonly in neuroblastoma. Additionally, Signature 18 has been also observed in breast and stomach carcinomas.
+Proposed aetiology = unknown
+Additional mutational features = N/A
+Comments = N/A
+
+
+[Signature 19]
+Cancer types = Found only in pilocytic astrocytoma.
+Proposed aetiology = unknown
+Additional mutational features = N/A
+Comments = N/A
+
+
+[Signature 20]
+Cancer types = Found in stomach and breast cancers.
+Proposed aetiology = Believed to be associated with defective DNA mismatch repair.
+Additional mutational features = Associated with high numbers of small (shorter than 3bp) insertions and deletions at mono/polynucleotide repeats.
+Comments = One of four mutational signatures associated with defective DNA mismatch repair and is often found in the same samples as Signatures 6, 15, and 26.
+
+
+[Signature 21]
+Cancer types = Found only in stomach cancer.
+Proposed aetiology = unknown
+Additional mutational features = N/A
+Comments = Found only in four samples all generated by the same sequencing centre. The mutational pattern of Signature 21 is somewhat similar to the one of Signature 26. Additionally, Signature 21 is found only in samples that also have Signatures 15 and 20. As such, Signature 21 is probably also related to microsatellite unstable tumours.
+
+
+[Signature 22]
+Cancer types = Found in urothelial (renal pelvis) carcinoma and liver cancers.
+Proposed aetiology = Found in cancer samples with known exposures to aristolochic acid. Additionally, the pattern of mutations exhibited by the signature is consistent with the one previous observed in experimental systems exposed to aristolochic acid.
+Additional mutational features = Exhibits a very strong transcriptional strand bias for T>A mutations indicating adenine damage that is being repaired by transcription-coupled nucleotide excision repair.
+Comments = Has a very high mutational burden in urothelial carcinoma; however, its mutational burden is much lower in liver cancers.
+
+
+[Signature 23]
+Cancer types = Found only in a single liver cancer sample.
+Proposed aetiology = unknown
+Additional mutational features = Exhibits very strong transcriptional strand bias for C>T mutations.
+Comments = N/A
+
+
+[Signature 24]
+Cancer types = Observed in a subset of liver cancers.
+Proposed aetiology = Found in cancer samples with known exposures to aflatoxin. Additionally, the pattern of mutations exhibited by the signature is consistent with that previous observed in experimental systems exposed to aflatoxin.
+Additional mutational features = Exhibits a very strong transcriptional strand bias for C>A mutations indicating guanine damage that is being repaired by transcription-coupled nucleotide excision repair.
+Comments = N/A
+
+
+[Signature 25]
+Cancer types = Observed in Hodgkin lymphomas.
+Proposed aetiology = unknown
+Additional mutational features = Exhibits transcriptional strand bias for T>A mutations.
+Comments = This signature has only been identified in Hodgkin’s cell lines. Data is not available from primary Hodgkin lymphomas.
+
+
+[Signature 26]
+Cancer types = Found in breast cancer, cervical cancer, stomach cancer and uterine carcinoma.
+Proposed aetiology = Believed to be associated with defective DNA mismatch repair.
+Additional mutational features = Associated with high numbers of small (shorter than 3bp) insertions and deletions at mono/polynucleotide repeats.
+Comments = One of four mutational signatures associated with defective DNA mismatch repair and is often found in the same samples as Signatures 6, 15 and 20.
+
+
+[Signature 27]
+Cancer types = Observed in a subset of kidney clear cell carcinomas.
+Proposed aetiology = unknown
+Additional mutational features = Exhibits very strong transcriptional strand bias for T>A mutations. Associated with high numbers of small (shorter than 3bp) insertions and deletions at mono/polynucleotide repeats.
+Comments = N/A
+
+
+[Signature 28]
+Cancer types = Observed in a subset of stomach cancers.
+Proposed aetiology = unknown
+Additional mutational features = N/A
+Comments = N/A
+
+
+[Signature 29]
+Cancer types = Observed only in gingivo-buccal oral squamous cell carcinoma.
+Proposed aetiology = Found in cancer samples from individuals with a tobacco chewing habit.
+Additional mutational features = Exhibits transcriptional strand bias for C>A mutations indicating guanine damage that is most likely repaired by transcription-coupled nucleotide excision repair. Signature 29 is also associated with CC>AA dinucleotide substitutions.
+Comments = The Signature 29 pattern of C>A mutations due to tobacco chewing appears different from the pattern of mutations due to tobacco smoking reflected by Signature 4.
+
+
+[Signature 30]
+Cancer types = Observed in a small subset of breast cancers.
+Proposed aetiology = unknown
+Additional mutational features = N/A
+Comments = N/A

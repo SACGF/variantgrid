@@ -1,0 +1,83 @@
+<div class='user-data-grid-filter-panel'>
+<script>
+	$(document).ready(function() {
+		var grid_id = "{{ grid_id }}";
+		var grid_name =  '{{ caption }}';
+		
+		function send_user_data_update(extra_data) {
+            var data = 'grid_name=' + grid_name + extra_data;
+            console.log(data);
+            $.ajax({
+                type: "POST",
+                data: data,
+                url: '{% url 'set_user_data_grid_config' %}',
+                success: function(data) {
+                    var grid = $("#" + grid_id).trigger("reloadGrid");
+                },
+            });
+		}
+		
+		
+		var form = $('#user-data-grid-filter-form-{{ grid_id }}');
+		
+		$("input[type='checkbox']", form).change(function() {
+			//console.log("checkbox changed!");
+			var checked = $(this).is(":checked");
+			var filter_level = $(this).attr('filter-level');
+			
+			var extra_data = '&filter_level=' + filter_level + '&checked=' + checked;
+			send_user_data_update(extra_data)
+		});
+		
+		$(".user-data-filter-name-choice-select", form).change(function () {
+            var extra_data = '&filter_name=' + $(this).val();
+            send_user_data_update(extra_data)
+		});
+		
+	});
+	
+</script>
+
+<form id='user-data-grid-filter-form-{{ grid_id }}' class="form-inline">
+	{% csrf_token %}
+	{% if group_data %}
+        <div class="form-check m-2">
+            <label class="form-check-label">
+                <input class="form-check-input" filter-level='groups' id="groups-{{ grid_id }}" type='checkbox' {{ user_grid_config.show_group_data | yesno:"checked," }} />
+                Show Group Data
+            </label>
+        </div>
+	{% endif %}
+	{% if incomplete_data %}
+        <div class="form-check m-2">
+            <label class="form-check-label">
+                <input class="form-check-input" filter-level='incomplete' id="incomplete-{{ grid_id }}" type='checkbox' {{ user_grid_config.show_incomplete_data | yesno:"checked," }} />
+                Show Incomplete Data
+            </label>
+        </div>
+	{% endif %}
+    {% if hidden_data %}
+        <div class="form-check m-2">
+            <label class="form-check-label">
+                <input class="form-check-input" filter-level='hidden' id="hidden-{{ grid_id }}" type='checkbox' {{ user_grid_config.show_hidden_data | yesno:"checked," }} />
+                Show Hidden Data
+            </label>
+        </div>
+    {% endif %}
+
+    {% if filter_name_choices %}
+        <div class="form-group">
+            <select class='user-data-filter-name-choice-select form-control'>
+            {% for code, label in filter_name_choices %}
+                {% if user_data_grid_filter_config.filter_name == code %}
+                    <option selected value="{{ code }}">{{ label }}</option>
+                {% else %}
+                    <option value="{{ code }}">{{ label }}</option>
+                {% endif %}
+            {% endfor %}
+            </select>
+        </div>
+    {% endif %}
+</form>
+
+</div>

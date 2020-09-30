@@ -1,0 +1,10 @@
+{% load ui_help %}
+<div>
+    <div>
+        {% page_help page_id='seqauto/experiments_help' title='Experiments' show_title=False %}
+    </div>
+    <div>
+        {% load jqgrid_tags %}
+        {% jqgrid 'experiments_grid' 'Experiments' search=False template_name='seqauto/grids/experiments_grid.html' delete=True %}
+    </div>
+</div>

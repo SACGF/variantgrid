@@ -1,0 +1,15 @@
+.column-icon {
+    width: 40px;
+    height: 40px;
+    background-size: 40px 40px;
+    margin: auto;
+    float: left;
+}
+
+.active-pathology-test {
+    background-image: url(/static/icons/test_tube_active.png);
+}
+
+.obsolete-pathology-test {
+    background-image: url(/static/icons/test_tube_obsolete.png);
+}

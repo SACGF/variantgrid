@@ -1,0 +1,148 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_field %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+
+{% block title %}Search{% endblock %}
+{% block head %}
+    <style>
+        .example {
+            font-family: monospace;
+            color: #444444;
+            display: inline-block;
+            background-color: #f2f2f2;
+            border-radius: 2px;
+            padding: 2px 4px 2px 4px;
+            margin: 4px 4px 4px 0;
+        }
+        .search-message {
+            padding: 3px 3px 3px 0;
+            color: #444;
+            display: block;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+
+    <div class="container">
+        <h3>Search</h3>
+
+        <form id="search-form inline-form" method="get">
+            <div class="input-group">
+                {% crispy_field form.search %}
+                <div class="input-group-append">
+                    <button id='search-page-button' class="input-group-append btn btn-primary">Go</button>
+                </div>
+            </div>
+        </form>
+
+        {% if search %}
+            <p>
+                <b>Searched:</b>
+                {% if search_results.search_types %}
+                    {{ search_results.search_types_string }}.
+                {% else %}
+                    <b>error - could not recognise search pattern.</b>
+                {% endif %}
+            </p>
+            <div id='results' class="mt-4">
+                <h4>Results</h4>
+                {% if search_results.results %}
+                    <table class="table">
+                        {% for search_result in search_results.results %}
+                            {% if not search_result.is_debug_data %}
+                                <tr {% if not search_result.is_preferred_build or not search_result.is_preferred_annotation %}
+                                    class="not-preferred hover-detail" title="Search result is not in preferred build and/or annotation consortium"
+                                {% endif %}
+                                >
+                                    <td>{{ search_result.header_string }}</td>
+                                    <td>{% if search_result.messages %}{% for message in search_result.messages %}
+                                        <span class="text-danger">{{ message }}</span>
+                                    {% endfor %}<br>{% endif %}
+                                        <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </table>
+                {% else %}
+                    <p class="error-value" style="padding-left:20px;">No results found.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <div class="mt-4">
+        <h4>Accepted Inputs</h4>
+        <div class="row equal">
+            <div class="col-12 col-lg-6">
+                <div class="card">
+                    <div class="card-header">Variants</div>
+                    <div class="card-body">
+                        {% labelled label="HGVS" %}
+                            Supports 'c.' and '.g'. If no transcript version is provided, the most recent is used.<br/>
+                            <span class="example">NM_001080463.1:c.5972T>A</span><br/>
+                            <span class="example">NM_000492.3(CFTR):c.1438G>T</span><br/>
+                            <span class="example">NC_000007.13:g.117199563G>T</span><br/>
+                            The <a class="hover-link" href="http://reg.clinicalgenome.org/redmine/projects/registry/gene_to_hgvs">ClinGen Allele Registry</a> is useful to find transcripts.
+                        {% endlabelled %}
+                        {% labelled label="Locus" %}<span class="example">chr1:169519049</span>{% endlabelled %}
+                        {% labelled label="Variant" %}
+                            <span class="example">1:169519049 T>C</span>, <span class="example">1-169519049-T-C</span> (gnomAD style) or by ID: <span class="example">v1001 or {{ variant_vcf_db_prefix }}1001</span>
+                        {% endlabelled %}
+                        {% labelled label="dbSNP ID" %}<span class="example">rs6025</span>{% endlabelled %}
+                        {% labelled label="ClinGenAllele" %}<span class="example">CA285410130</span>{% endlabelled %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card">
+                    <div class="card-header">Data</div>
+                    <div class="card-body">
+                        {% if url_name_visible.genes %}
+                            {% labelled label="Gene Symbol" %}
+                                1 word, case insensitive name match <span class="example">gata2</span>, <span class="example">GATA2</span>.<br/>
+                                Select "All builds" to view both RefSeq and Ensembl genes, otherwise it loads {{ build_annotation_descriptions }}
+                            {% endlabelled %}
+                            {% labelled label="Gene ID" %}
+                                <span class="example">ENSG00000179348</span>
+                            {% endlabelled %}
+                            {% labelled label="Transcript ID" %}
+                                <span class="example">NM_001080463</span> or with version <span class="example">NM_001080463.2</span>
+                            {% endlabelled %}
+                        {% endif %}
+                        {% if url_name_visible.patients %}
+                            {% labelled label="Sample" %}
+                                case insensitive search match in name
+                            {% endlabelled %}
+                            {% labelled label="Patients" %}
+                                <span class="example">Last, First</span> or <span class="example">First</span> or <span class="example">Last</span>
+                            {% endlabelled %}
+                        {% endif %}
+                        {% if url_name_visible.sequencing_data %}
+                            {% labelled label="Flowcell" %}
+                                1 word: 6 digits then underscore <span class="example">160513_NB501009_0029_AH3FFJBGXY</span>
+                            {% endlabelled %}
+                        {% endif %}
+                        {% labelled label="Classification" %}
+                            The Lab Record ID of the record <span class="example">vc1545</span>
+                        {% endlabelled %}
+                        {% labelled label="Lab, Organisation" %}
+                            At least three letters <span class="example">path</span>
+                        {% endlabelled %}
+                        {% if external_codes %}
+                            {% labelled label="Patient/Case/Pathology tests with external codes" %}
+                                <ul>
+                                    {% for code in external_codes %}
+                                        <li>{{ code }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endlabelled %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+{% endblock %}

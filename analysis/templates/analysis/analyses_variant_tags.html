@@ -1,0 +1,86 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% block title %}Analyses Variant Tags{% endblock title %}
+
+{% block head %}
+{{ block.super }}
+{% load user_tag_color_tags %}
+{% render_tag_styles_and_formatter %}
+<script>
+    gridParams = {};
+    function getVariantTagsGridExtraFilters() {
+        return JSON.stringify(gridParams);
+    }
+
+    function variantTagsGridInitFunc(grid, pagerId) {
+        grid[0].p.postData["extra_filters"] = getVariantTagsGridExtraFilters;
+    }
+
+    function showAll() {
+        gridParams = {};
+        $("#tag-filter-description").hide();
+        reloadGrid();
+    }
+
+    function reloadGrid() {
+        var grid = $("#analyses_variant_tags-grid");
+        grid.trigger("reloadGrid");
+    }
+</script>
+<style>
+#tag-top-bar .grid-tag {
+    cursor: pointer;
+}
+
+#tag-filter-description {
+    display: none;
+}
+</style>
+{% endblock head %}
+
+{% block jsdocumentready %}
+    jQuery.extend($.fn.fmatter , {
+        geneLinkFormatter : function(pk, options, rowObject) {
+            var viewLink = "";
+            var geneId = rowObject["variant__variantannotation__transcript__gene_id"];
+            if (geneId) {
+                const URL = Urls.view_gene(geneId);
+                viewLink = "<a class='grid-link' target='_blank' href='" + URL + "'>" + pk + "</div></a>";
+            }
+            return viewLink;
+        }
+    });
+    
+    $(".grid-tag", "#tag-top-bar").click(function() {
+        var tagId = $(this).attr("tag_id");
+        gridParams = {"tag" : tagId};
+        var tagHtml = '<span class="tagged-' + tagId + '" title="Tagged as ' + tagId + '"><span class="user-tag-colored">' + tagId + '</span></span>';
+        $("#tag-filter-description-text").html("Filtering to " + tagHtml);
+        $("#tag-filter-description").show()
+        reloadGrid();
+    });
+    
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+    {% load genome_build_tags %}
+    {% genome_build_url_arg user 'genome_build_analyses_variant_tags' genome_build %}
+
+    <h3>Analyses Variant Tags ({{ genome_build }})</h3>
+
+    {% if tag_counts %}
+        <div id='tag-top-bar'> Click to filter:
+        {% for tag, count in tag_counts %}
+            <span class="grid-tag tagged-{{tag}}" title="Tagged as {{tag}}" tag_id="{{tag}}">
+                <span class="user-tag-colored">{{ tag }}</span> : {{ count }}
+            </span>
+        {% endfor %}
+        <div id="tag-filter-description"><span id="tag-filter-description-text"></span> <a href="javascript:showAll();">Show All</a></div>
+        </div>
+    {% endif %}
+
+    {% load jqgrid_tags %}
+    {% user_data_grid_filter 'analyses_variant_tags' 'Analyses Variant Tags' %}
+    {% jqgrid 'analyses_variant_tags_grid' 'analyses_variant_tags' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
+
+{% endblock submenu_page_content %}

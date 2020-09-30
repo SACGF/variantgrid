@@ -1,0 +1,82 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% load tz %}
+{% load model_helpers %}
+{% block title %}{{ enrichment_kit }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+{% endblock %}
+
+{% block submenu_page_content %}
+    <p>
+    Back to <a href="{% url 'enrichment_kits_list' %}">enrichment kits list</a>
+    </p>
+
+    <h2>{{ enrichment_kit }}</h2>
+
+    <table id='enrichment-kit-table'>
+    <tr><th>ID
+        <td>{{ enrichment_kit.id }}
+    <tr><th>Name
+        <td>{{ enrichment_kit.name }}
+    <tr><th>Version
+        <td>{{ enrichment_kit.version }}
+    <tr><th>Manufacturer
+        <td>{{ enrichment_kit.manufacturer }}
+    <tr><th>Bed File
+        <td>{{ enrichment_kit.bed_file }}
+    <tr><th>Genomic Intervals
+        <td>{% if enrichment_kit.genomic_intervals %}
+            <a href="{% url 'view_genomic_intervals' enrichment_kit.genomic_intervals.pk %}">{{ enrichment_kit.genomic_intervals }}</a>
+            {% endif %}
+    <tr><th>Gene List
+        <td>{% if enrichment_kit.gene_list %}
+            <a href="{% url 'view_gene_list' enrichment_kit.gene_list.pk %}">{{ enrichment_kit.gene_list }}</a>
+            {% endif %}
+    </table>
+
+    <div>
+    <h2>Gold Standard Runs</h2>
+    {% if enrichment_kit.goldreference %}
+        <p>
+            Gold reference created on {{ enrichment_kit.goldreference.created|localtime }}
+        {% if enrichment_kit.goldreference.import_status == 'S' %}
+            <a href="{% url 'view_gold_coverage_summary' enrichment_kit.goldreference.pk %}">View Gold gene summaries</a>
+        {% elif enrichment_kit.goldreference.import_status == 'E' %}
+            <B>Error:</b>
+            <pre>
+            {{ enrichment_kit.goldreference.error_exception }}
+            </pre>
+        {% endif %}
+        </p>
+    {% endif %}
+
+    <h4>Sequencing Runs</h4>
+    {% if gold_sequencing_runs_qs.exists %}
+        <ul>
+        {% for sequencing_run in gold_sequencing_runs_qs %}
+            <li><a href="{% url 'view_sequencing_run' sequencing_run.pk %}">{{ sequencing_run }}</a>
+        {% endfor %}
+        </ul>
+    {% else %}
+        There are no Gold-standard sequencing runs for this kit. 
+    {% endif %}
+    </div>
+
+    <div>
+        <h2>Canonical Transcripts</h2>
+        <p>
+        {% if enrichment_kit.canonicaltranscriptcollection %}
+            <a href="{% url 'view_canonical_transcript_collection' enrichment_kit.canonicaltranscriptcollection.pk %}">{{ enrichment_kit.canonicaltranscriptcollection }}</a>
+        {% else %}
+            Canonical Transcripts not set.
+            
+            {% if default_canonical_transcript_collection %}
+            Using system default of             <a href="{% url 'view_canonical_transcript_collection' default_canonical_transcript_collection.pk %}">{{ default_canonical_transcript_collection }}</a>
+            {% else %}
+            No system default set.
+            {% endif %}
+        {% endif %}
+    </div>
+
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends menu_pathtests_base %}
+{% load static %}
+{% block title %}Pathology Tests{% endblock title %}
+
+{% block jshead %}
+function showForm() {
+    var box = $("#show-form-container");
+    box.empty();
+    box.html("<b>Create New Pathology Test</b>");
+    $("div#new-pathology-test-form-container").slideDown('slow');
+}
+{% endblock jshead %}
+
+{% block jsdocumentready %}
+jQuery.extend($.fn.fmatter , {
+        viewPathologyTestLink : function(cellvalue, options, rowObject) {
+            var pathologyTest = encodeURIComponent(rowObject.name);
+            const VIEW_PATHOLOGY_TEST_URL = Urls.view_pathology_test(pathologyTest);
+            var viewLink = "<a class='grid-link' href=" + VIEW_PATHOLOGY_TEST_URL + "><div class='grid-link-icon view-details-link'></div> " + cellvalue + " </a>";
+            return "<span>" + viewLink + "</span>";
+        },
+        viewPathologyTestVersionLink : function(cellvalue, options, rowObject) {
+            if (cellvalue) {
+                const ptvId = rowObject.activepathologytestversion__pathology_test_version;
+                const VIEW_PATHOLOGY_TEST_VERSION_URL = Urls.view_pathology_test_version(ptvId);
+                cellvalue = "<a href='" + VIEW_PATHOLOGY_TEST_VERSION_URL + "'>Version " + cellvalue + "</a>";
+            } else {
+                cellvalue = '';
+            }
+            return cellvalue;
+        },
+
+});
+
+$('select', "#pathology-test-form").change(function() {
+    var name = $(this).val();
+    window.location = Urls.view_pathology_test(name);
+});
+$('select', "#pathology-test-version-form").change(function() {
+    var pathologyTestVersionId = $(this).val();
+    window.location = Urls.view_pathology_test_version(pathologyTestVersionId);
+});
+
+// When one of gene list or pathology test version forms changes - blank the other one 
+var geneListSelect = $("#id_gene_list", "#new-pathology-test-form");
+var pathologyTestVersionSelect = $("#id_pathology_test_version", "#new-pathology-test-form");
+var clearingNewTestAutocompletes = false;
+geneListSelect.change(function() {
+    if (!clearingNewTestAutocompletes) {
+        clearingNewTestAutocompletes = true;
+        clearAutocompleteChoice(pathologyTestVersionSelect);
+    }
+    clearingNewTestAutocompletes = false;
+});
+
+pathologyTestVersionSelect.change(function() {
+    if (!clearingNewTestAutocompletes) {
+        clearingNewTestAutocompletes = true;
+        clearAutocompleteChoice(geneListSelect);
+    }
+    clearingNewTestAutocompletes = false;
+
+});
+
+
+{% if create_pathology_test_form.errors %}
+    $("div#new-pathology-test-form-container").show();
+{% endif %}
+
+$("#new-pathology-test").click(showForm);
+
+{% endblock jsdocumentready %}
+
+{% block css %}
+{{ block.super }}
+
+#jump-box label {
+    display: none;
+}
+
+{% endblock css %}
+
+{% block submenu_page_content %}
+    {% load ui_help %}
+    {% page_help 'pathtests/manage_pathology_tests_help' 'Manage Pathology Tests' %}
+
+    <table id='jump-box'>
+        <tr><th>Pathology Test:</th>
+            <td>
+                <form id='pathology-test-form'>{{ pathology_test_form.as_p }}{{ pathology_test_version_form.media }} </form>
+            </td>
+        </tr>
+        <tr><th>Historical Test:</th>
+            <td>
+                <form id='pathology-test-version-form'>{{ pathology_test_version_form.as_p }} </form>
+            </td>
+        </tr>
+    </table>
+
+    <div id="show-form-container">
+        <button id='new-pathology-test' class="btn btn-primary">New Pathology Test</button>
+    </div>
+    <div id="new-pathology-test-form-container" class='hidden'>
+      <p>
+      Create a new test using <b>either</b> an existing gene list or pathology test as a starting point.
+      </p> 
+      <form id="new-pathology-test-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {{ create_pathology_test_form.as_p }}
+          <button id="create-pathology-test-button" class="btn btn-primary">Create</button>
+        {% include "messages/messages.html" %}
+      </form>
+    </div>
+
+    {% load jqgrid_tags %}
+    {% jqgrid 'pathology_tests_grid' 'Pathology Tests' False None 'jqgrid/jqgrid.html' %}
+
+{% endblock submenu_page_content %}
+
+

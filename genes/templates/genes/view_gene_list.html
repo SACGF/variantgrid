@@ -1,0 +1,83 @@
+{% extends menu_genes_base %}
+{% load static %}
+{% load help_tags %}
+
+{% block title %}{{ gene_list.name }}{% endblock title %}
+
+{% block jshead %}
+	function gene_list_genes_grid_init_func(grid, pagerId) {
+		var download_genes_grid = function() {
+		{% if gene_list %}
+			var url = "{% url 'gene_list_genes_grid' gene_list_id=gene_list.pk op='download' %}";
+			window.location = url;
+		{% endif %}
+		}
+
+		grid.jqGrid('navButtonAdd', pagerId, {
+			        caption : "Download",
+			        buttonicon : "ui-icon-arrowthickstop-1-s",
+			        onClickButton : download_genes_grid,
+			        position : "first",
+			        title : "Export",
+			        cursor : "pointer"
+		});
+	}
+{% endblock jshead %}
+
+{% block jsdocumentready %}
+    $("#gene-list-tabs").tabs();
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+
+    <div id="gene-list-tabs">
+        <ul>
+            <li><a href="#details">Details</a></li>
+            <li><a href="#wiki">Wiki{% if gene_list.genelistwiki %}*{% endif %}</a></li>
+            {% if has_write_permission %}
+            <li><a href="{% url 'group_permissions' 'genes.models.GeneList' gene_list.pk %}">Sharing / Permissions</a></li>
+            {% endif %}
+        </ul>
+        <div id="details">
+            <form method="post" id='gene-form'>
+                {% csrf_token %}
+                {% page_help 'genes/view_gene_list_help' 'GeneList' %}
+
+    			<fieldset class="form-fields small">
+    			{{ gene_list_form.as_p }}
+                {% if has_write_permission %}
+                    <div class="buttons">
+                    <button id="save-gene-list-button" class="btn btn-primary">Save</button>
+                    </div>
+                {% endif %}
+                </fieldset>
+
+                {% include "messages/messages.html" %}
+        
+                {% if not has_write_permission %}
+                    You can view but not modify this data.
+                {% endif %}
+            </form>
+    	</div>
+        <div id="wiki">
+            {% load wiki_tags %}
+            {% wiki_editor gene_list.genelistwiki class_name='genes.models.GeneListWiki' unique_keyword='gene_list_id' unique_value=gene_list.pk %}
+        </div>
+    </div>
+
+    {% if gene_list.import_status == 'S' %}
+    <div>
+    {% with gene_list_id=gene_list.pk|stringformat:"s" %}
+        <a class='hover-link' id='gene-grid-link' href="{% url 'passed_gene_grid' 'gene-list-'|add:gene_list_id %}">
+            <div class='left gene-grid-icon'></div>
+            <span class='left'> View/Edit in GeneGrid</span>
+            <div class='clear'></div>
+        </a>
+    {% endwith %}
+    </div>
+    {% endif %}
+
+	{% load jqgrid_tags %}
+	{% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' 'gene_list_genes_grid_init_func' False gene_list_id=gene_list.pk %}
+
+{% endblock submenu_page_content %}

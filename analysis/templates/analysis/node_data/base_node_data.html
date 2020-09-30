@@ -1,0 +1,48 @@
+{% block top %}{% endblock top %}
+
+<style>
+	{% block css %}{% endblock css %}
+</style>
+
+<script type="text/javascript">
+    function on_error_function(errors) {
+        hideLoadingOverlay();
+        //console.log("on_error_function");
+        var html = "<div>Node errors:</div><ul class='messages'>";
+        for (i=0 ; i<errors.length ; ++i) {
+            html += "<li class='error'>" + errors[i] + "</li>";
+        }
+        html += "</ul>"
+        $("#node-data-container").empty();
+        $("#error-container").html(html).show();
+    }
+
+	function load_node_editor(node_edit_url) {
+	    $("#node-editor-container").empty();
+        $.ajax(node_edit_url, {
+            suppressErrors: true,
+            success: function(html) {
+                $("#node-editor-container").html(html);
+            },
+            error: function(xhr, error) {
+                console.log(error);
+                var message = "Error Loading Node Editor. Status: " + xhr.status + ". ";
+                if (xhr.status >= 500) {
+                    message += "Internal server error";
+                } else if (xhr.status >= 400) {
+                    message += "Error retrieving data - perhaps try reloading node?";
+                }
+                on_error_function([message]);
+            }
+        });
+	}
+	{% block javascript %}{% endblock javascript %}
+	
+	$(document).ready(function() {
+		$("#error-container").empty();
+	    {% block docreadyjs %}{% endblock docreadyjs %}
+	});
+</script>
+
+{% block content %}
+{% endblock content %}

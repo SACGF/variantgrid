@@ -1,0 +1,15 @@
+div.graph-loading {
+	background: url(/static/icons/loading.gif) no-repeat center center;
+}
+
+div.graph-failure {
+	background: url(/static/icons/dead.png) no-repeat center center;
+}
+
+div.generated-graph {
+    border: 1px solid #ccc;
+    overflow: hidden;
+    width: 640px;
+    height: 480px;
+}
+

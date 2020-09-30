@@ -1,0 +1,4 @@
+Dear Shariant User,
+
+A variant classification belonging to your lab "{{ lab.name}}"{% if entered %} has been detected as discordant with another variant classification.{% else %} is no longer marked as discordant.{% endif %}
+Log in to Shariant at {{ review_link }} to review.

@@ -1,0 +1,129 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load static %}
+{% load js_tags %}
+{% load crispy_forms_tags %}
+{% block title %}Sequencing Historical Graphs{% endblock %}
+{% block submenu %}{% menu_bar_sequencing %}{% endblock %}
+{% block head %}
+	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+	<style>
+		div#node-generated-graph {
+		    border: 1px solid #ccc;
+		    width: 800px;
+		    height: 600px;
+		    overflow: hidden;
+		}
+		
+		#initial-message {
+			text-align: center;
+			margin: 20px;
+		}
+		
+		#percent-container {
+			display: none;
+		}
+		
+		#error-container {
+			color: #ee0000;
+		}
+		
+	</style>
+
+    <script src="{% static 'js/generated_graphs.js' %}"></script>
+    <script>
+        var QC_TYPES_TOTALS = {{ qc_type_totals | jsonify }};
+        var SHOW_ENRICHMENT_KIT = {{ show_enrichment_kit | jsonify }};
+
+        function changeGraph() {
+            var qc_type = $("#id_qc_type").val();
+            var totalField = QC_TYPES_TOTALS[qc_type];
+            var percent_selector = $("input#percent");
+            var percent_container = percent_selector.parent();
+            if (totalField) {
+                percent_container.show();
+            } else {
+                percent_container.hide();
+            }
+        }
+
+        function loadGraph() {
+            console.log("loadGraph");
+            var graph_selector = $('#node-generated-graph');
+            var qc_column = $('#id_qc_column').val();
+            var percent_selector = $("input#percent");
+            var graph_type = $("#id_qc_graph_type").val();
+            var enrichment_kit_separation = $('#id_enrichment_kit_separation').val();
+            var enrichment_kit_id = $("#id_enrichment_kit").val() || "NO_ENRICHMENT_KIT";
+            var percent = percent_selector.is(":checked");
+
+            var error_messages = [];
+            if (!qc_column) {
+                error_messages.push("No QC Column selected");
+            }
+
+            console.log("enrichment_kit_separation: " + enrichment_kit_separation);
+            console.log("show enrichment_kit: ");
+            console.log(SHOW_ENRICHMENT_KIT);
+            if (SHOW_ENRICHMENT_KIT[enrichment_kit_separation]) {
+                console.log("enrichment_kit_separation " + enrichment_kit_separation + " enrichment_kit name " + enrichment_kit_id);
+                if (!enrichment_kit_id) {
+                    error_messages.push("'User selected enrichment_kit' requires you to select a enrichment_kit");
+                }
+            }
+
+            var errorContainer = $("#error-container");
+            if (error_messages.length) {
+                errorContainer.html(error_messages.join(', '));
+            } else {
+                errorContainer.empty();
+                clearGraph(graph_selector);
+                const POLL_URL = Urls.qc_column_historical_graph(qc_column, graph_type, enrichment_kit_separation, enrichment_kit_id, percent);
+                poll_graph_status(graph_selector, POLL_URL, Urls.cached_generated_file_delete());
+            }
+        }
+
+        function changeEnrichmentKitSeparation() {
+            var selected = $('#id_enrichment_kit_separation').val();
+            var enrichment_kitParent = $("#id_enrichment_kit").parent();
+            if (SHOW_ENRICHMENT_KIT[selected]) {
+                enrichment_kitParent.show();
+            } else {
+                enrichment_kitParent.hide();
+            }
+        }
+
+        $(document).ready(() => {
+            changeEnrichmentKitSeparation();
+
+            var percent_container = $("#percent-container");
+            var qc_column = $('#id_qc_column');
+            var qc_column_container = qc_column.parent();
+            qc_column_container.append(percent_container); // move to here.
+
+            qc_column.change(changeGraph);
+            $('#id_enrichment_kit_separation').change(changeEnrichmentKitSeparation);
+
+            var graph_selector = $('#node-generated-graph');
+            graph_selector.html("<div id='initial-message'>Select a column to graph</div>");
+
+            $("button#load-graph").button().click(loadGraph);
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+	<div class="container">
+    <h3>QC Graphs</h3>
+    <form>
+    <!-- This never gets posted, just read and AJAX GETs only -->
+        {% crispy form form_helper.horizontal_nested %}
+        {% labelled label="Percent" %}<input id='percent' type="checkbox" />{% endlabelled %}
+        <button class="btn btn-primary" id='load-graph'>Load Graph</button>
+    </form>
+
+	<div id='error-container'></div>
+	<div id='node-generated-graph'></div>
+    </div>
+{% endblock content %}

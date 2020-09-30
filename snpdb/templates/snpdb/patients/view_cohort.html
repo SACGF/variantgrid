@@ -1,0 +1,450 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% load related_data_tags %}
+{% load related_analyses_tags %}
+
+{% block title %}Cohort {% endblock %}
+{% block head %}
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
+<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
+<style>
+	table#grid-container {
+		width: 100%;
+		height: 100%;
+	}
+
+	span.grid-container {
+		width: 100%;
+		overflow: auto;
+	}
+	
+	.ui-jqgrid-titlebar {
+		display: none;
+	}	
+
+	.cohort-button {
+		width: 36px;
+		height: 36px;
+		background-size: 36px 36px;
+	}
+
+	.left-floater {
+		float: left;
+	}
+	
+	.right-floater {
+		float: right;
+	}
+	
+	#right-toolbar {
+		text-align: left;
+	}
+
+	#left-toolbar {
+		text-align: right;
+	}
+	
+	#add-to-cohort-button {
+		float: right;
+		margin-left: 10px;
+		background-image: url({% static 'icons/arrow_green_right_small.png' %});	
+	}
+
+	#remove-from-cohort-button {
+		margin-right: 10px;
+		float: left;
+		background-image: url({% static 'icons/arrow_red_left_small.png' %});	
+	}
+
+	div.loading {
+		background: url({% static 'icons/loading.gif' %}) no-repeat center center;
+	    width: 16px;
+	    height: 16px;
+	    float: left;
+	}
+	
+	.cohort-message {
+		display: none;
+	}
+	
+</style>
+{% endblock %}
+{% block jshead %}
+	const CC_STATUS_MODIFIED = "modified";
+	const CC_STATUS_RUNNING = "running";
+	const CC_STATUS_COMPLETE = "complete";
+	const CC_STATUS_FAILURE = "failure";
+	let cohortCountStatus = CC_STATUS_MODIFIED;
+	let numGridsLoaded = 0;
+
+	function gridComplete(grid) {
+        numGridsLoaded++;
+		messageCheck();
+	}
+
+	function getSelectedSamples(grid) {
+		var samples = [];
+
+		$("input.sample-checkbox", grid).each(function() {
+			if ($(this).is(":checked")) {
+				var sampleId = $(this).attr("sample_id")
+				samples.push(sampleId);
+			}
+		});
+		return samples;
+	}
+
+	function messageCheck() {
+        if (numGridsLoaded <2) {
+            return;
+        }
+	
+		$(".cohort-message").hide();
+		let totalSamples = $("input.sample-checkbox", "#right-grid").length;
+        let samplesTabState = null;
+        
+		if (totalSamples == 0) {
+			$('#no-cohort-samples').show();
+			samplesTabState = "error";
+		} else {
+			if (totalSamples >= 2) {
+				$(".multiple-samples").show();
+			}
+
+			if (cohortCountStatus == CC_STATUS_MODIFIED) {
+			    $("#related-data-container").hide();
+				$("#launch-task").show();
+                samplesTabState = "warning";
+			} else if (cohortCountStatus == CC_STATUS_RUNNING) {
+				var task_info = $('#task-info');
+				var loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
+				task_info.html(loading_icon);
+				task_info.append("Cohort Count task is running...");
+				$('#task-info').show();
+			} else if (cohortCountStatus == CC_STATUS_COMPLETE) {
+				var html = "Your cohort has been processed successfully. ";
+				$('#task-info').html(html);
+				$('#task-info').show();
+			} else if (cohortCountStatus == CC_STATUS_FAILURE) {
+                var html = "<b>Cohort Processing failed</b> - click to try again?";
+                $('#task-info').html(html);
+                $('#task-info').show();
+                $("#launch-task").show();
+			}
+
+			if (cohortCountStatus == CC_STATUS_COMPLETE) {
+				showDetailsTab();
+			} else {
+                hideDetailsTab();
+			}
+		}
+
+        let samplesTabChildren = $("#samples-tab").children();
+        samplesTabChildren.removeClass("warning").removeClass("error");
+        if (samplesTabState) {
+            samplesTabChildren.addClass(samplesTabState);
+        }
+	}
+
+	function reloadGrids() {
+		$(".jqgrid").each(function() {
+			$(this).trigger('reloadGrid');
+		});
+		
+		// Untick any select all stuff
+		$("input.select-all").each(function() {
+			$(this).prop('checked', false);
+		});
+		
+		
+	}
+
+	function editCohortSample(cohortOp, samples) {
+		var data = 'cohort_op=' + cohortOp + '&sample_ids=' + JSON.stringify(samples);
+		$.ajax({
+		    type: "POST",
+	    	data: data,
+	    	url: "{% url 'cohort_sample_edit' cohort.pk %}",
+	    	success: reloadGrids,
+		});
+		
+	}
+	
+	function addToCohort() {
+		cohortCountStatus = CC_STATUS_MODIFIED;
+		var samples = getSelectedSamples("#left-grid");
+		editCohortSample('add', samples);
+	}
+
+	function removeFromCohort() {
+		cohortCountStatus = CC_STATUS_MODIFIED;
+		var samples = getSelectedSamples("#right-grid");
+		editCohortSample('remove', samples);
+	}
+
+	function selectAll(checkbox, grid) {
+		var checked = $(checkbox).is(":checked");
+		$("input.sample-checkbox", grid).each(function() {
+			$(this).prop('checked', checked);
+		});
+	}
+
+	function setupCohortGrid(grid, pagerId, cohortOp) {
+		$(function () {
+	    	$.getJSON("{% url 'cohort_sample_grid' op='config' cohort_id=cohort.pk %}", function(data) {
+				var postData = data["postData"] || {};
+				var extraFilters = {"cohort_op" : cohortOp};
+				postData["extra_filters"] = JSON.stringify(extraFilters);
+
+				data["postData"] = postData;
+				data['sortname'] = 'id';
+				data['sortorder'] = 'desc';
+				data['gridComplete'] = function() {
+					gridComplete(grid);
+				};
+				
+				data["pager"] = pagerId;
+
+			    grid.jqGrid(data)
+	            	.navGrid(pagerId,
+	                	{add: false, edit: false, del: false, view: true, search:false},
+			       		{}, // edit options
+			        	{}, // add options
+			       	 	{}, // del options 
+			        	{ multipleSearch:true, closeOnEscape:true }, // search options 
+			        	{ jqModal:false, closeOnEscape:true} // view options 
+		        	);
+		    });
+		});
+	}
+
+	function count_complete(result) {
+		cohortCountStatus = CC_STATUS_COMPLETE;
+		messageCheck();
+	}
+
+	function count_complete_failure(result) {
+        cohortCountStatus = CC_STATUS_FAILURE;
+        messageCheck();
+	}
+
+	function poll_cohort_task(data) {
+	    if ("status" in data) {
+	       var status = data["status"];
+	       if (status == "SUCCESS") {
+	           cohortCountStatus = CC_STATUS_COMPLETE;
+	       } else {
+	           cohortCountStatus = CC_STATUS_FAILURE;
+	       }
+	       messageCheck();
+	    } else if ("celery_task" in data) {
+            var celery_task = data["celery_task"];
+    		cohortCountStatus = CC_STATUS_RUNNING;
+		    messageCheck();
+		    poll_task_status(celery_task, count_complete, count_complete_failure);
+		}
+	}
+	
+	POLL_FREQUENCY = 1000;
+	
+	function poll_task_status(celery_task, success, failure) {
+		const POLL_URL = Urls.job_state(celery_task);
+
+		$.getJSON(POLL_URL, function(data) {
+			if (data.status == "SUCCESS") {
+				success(data["result"]);
+			} else if (data.status == 'FAILURE') {
+				failure(data["result"]);
+			} else {
+				this_func = function() { poll_task_status(celery_task, success, failure); };
+				window.setTimeout(this_func, POLL_FREQUENCY);
+			}
+		});
+	}
+
+    function hideDetailsTab() {
+        $("#details-tab").hide();
+        $("#cohort-tabs").tabs({"active" : 1});
+    }
+
+    function showDetailsTab() {
+        $("#details-tab").show();
+        // $('#details').show();
+        $("#cohort-tabs").tabs({"active" : 0});
+    }
+    
+
+{% endblock %}
+
+{% block jsdocumentready %}
+	jQuery.extend($.fn.fmatter , {
+   		viewSampleLink : function(sampleId) {
+   			var attr = {'type' : 'checkbox', 'class': 'sample-checkbox', sample_id : sampleId};
+			var checkbox = $("<input/>", attr);
+			var checkbox_html = $('<div>').append(checkbox).html();
+			var url = Urls.view_sample(sampleId);
+			var sampleLink = "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
+	    	return "<span>" + checkbox_html + " " + sampleLink + "</span>";
+		}
+	});
+
+    $("button#change-name").button();
+
+	$("#launch-cohort-count-task-button").button().click(function () {
+    	$.getJSON("{% url 'create_cohort_genotype' cohort.id %}", function(data) {
+			poll_cohort_task(data);
+    	});
+	});
+
+	var grid = $("#left-grid");
+	setupCohortGrid(grid, '#left-pager', 'exclude_cohort');
+
+	var grid = $("#right-grid");
+	setupCohortGrid(grid, '#right-pager', 'show_cohort');
+
+	$("#add-to-cohort-button").attr('href', "javascript:addToCohort()");
+	$("#remove-from-cohort-button").attr('href', "javascript:removeFromCohort()");
+
+	$("#select-all-left-grid").change(function() { selectAll(this, '#left-grid') });
+	$("#select-all-right-grid").change(function() { selectAll(this, '#right-grid') });
+
+	{% if cohort_genotype_collection %}
+		{% if cohort.import_status == "S" %}
+			count_complete('loaded done');
+		{% else %}
+		    count_complete_failure("Failed");
+		{% endif %}
+	{% elif cohort_genotype_collection.celery_task %}
+		var celery_task = "{{ cohort_genotype_collection.celery_task }}";
+		poll_cohort_task({"celery_task" : celery_task});
+	{% endif %}
+	
+   $('#id_sample', 'form#cohort-form').change(function() {
+        var sample_id = $(this).val();
+        if (sample_id) {
+            editCohortSample('add', [sample_id.toString()]);
+            clearAutocompleteChoice($(this));
+        }
+    });
+
+	messageCheck();
+
+{% if cohort_genotype_collection %}
+    $("#cohort-tabs").tabs({"active" : 0});
+{% else %}
+    $("#cohort-tabs").tabs({"active" : 1});
+    hideDetailsTab();    
+{% endif %}
+    
+
+
+{% endblock %}
+{% load help_tags %}
+{% block submenu_page_content %}
+<form id="cohort-form" method="post">
+    {% csrf_token %}
+    <div>
+    {{ form.name }}<button id='change-name'>Change Name</button>
+    <b>Genome Build:</b> {{ cohort.genome_build }}
+    {% if cohort.parent_cohort %}
+        <div>
+        This is a sub cohort of <a href="{{ cohort.parent_cohort.get_absolute_url }}">{{ cohort.parent_cohort }}</a>
+        </div>
+    {% endif %}
+    </div>
+    
+    <div id="cohort-tabs">
+    <ul>
+        <li><a id='details-tab' href="{% url 'view_cohort_details_tab' cohort.pk %}">Details</a></li>
+        <li id="samples-tab"><a href="#samples">Add/Remove Samples</a></li>
+        {% if has_write_permission %}
+        <li><a href="{% url 'group_permissions' 'snpdb.models.Cohort' cohort.pk %}">Sharing / Permissions</a></li>
+        {% endif %}
+    </ul>
+    <div id="details">
+    </div>
+    <div id="samples">
+        {% page_help user 'patients/view_cohort_help' %}
+    		<table id="grid-container">
+    		<tr><th>Available Samples ({{ cohort.genome_build }})</th><th>Cohort Samples</th> 
+            <tr><td>
+                <div id='sample-entry-container'>
+                    <b>Search Samples:</b>
+                    {{ sample_form.sample }}{{ sample_form.media }}
+                </div>
+                <td>
+                    <div>
+                        <div class="cohort-message multiple-samples">
+                            <a href='{% url 'cohort_sort' cohort.id %}'>Sort Cohort Order</a>
+                        </div>
+                    </div>  
+                </td>
+    
+    		<tr>
+    		<td>
+    		<span>
+    			<input id="select-all-left-grid" type='checkbox' class="select-all" />
+    			Select all
+    		</span>
+    		<span id="left-toolbar">
+    			<span class='right-floater'>
+    			<span class='left-floater'>Add to cohort</span>
+    			<a id="add-to-cohort-button" class="cohort-button"></a>
+    			</span>
+    		</span>
+    		</td>
+    		<td>
+    		<span id="right-toolbar">
+    			<a id="remove-from-cohort-button" class="cohort-button"></a>
+    			Remove from cohort
+    		</span>
+    		<span class="right-floater">
+    			<input id="select-all-right-grid" type='checkbox' class="select-all" />
+    			Select all
+    		</span>
+    		</td>
+    
+    		<tr>
+    		<td width="50%">
+    			<span class='grid-container'>
+    			<table id="left-grid" class='jqgrid'></table>
+    			<div id="left-pager"></div>
+    			</span>
+    		</td>
+    		<td width="50%">
+    			<span class='grid-container'>
+    			<table id="right-grid" class='jqgrid'></table>
+    			<div id="right-pager"></div>
+    			</span>
+    		</td>
+    		</tr>
+    		</table>
+    
+    		{% include "messages/messages.html" %}
+
+            <div id='cohort-count-task'>
+                <div class="cohort-message" id='task-info'>TASK INFO</div>
+                <div class="cohort-message" id='no-cohort-samples'>
+                    <ul class="messages">
+                    <li class="error">Your cohort contains no samples.</li>
+                    </ul>
+                </div>
+                <div class="cohort-message" id='launch-task'>
+                    <ul class="messages">
+                    <li class="warning">Cohort has been modified - you need to click <b>Save Cohort</b> before using in an analysis.</li>
+                    </ul>
+                    <button id='launch-cohort-count-task-button' type='button'>Save cohort</button>
+                </div>
+            </div>
+    </div>
+    </div>
+</form>
+
+    <div id='related-data-container'>
+    {% related_data_for_cohort cohort %}
+    {% related_analyses_for_cohort cohort %}
+    </div>
+
+{% endblock %}
+
+

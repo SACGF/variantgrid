@@ -1,0 +1,8 @@
+{% extends 'external_abstract_base.html' %}
+{% comment %}
+    This is used so you can inherit from this template and menu_XXX_base, and use 'submenu_page_content' block name
+{% endcomment %}
+{% block content %}
+    {% block submenu_page_content %}
+    {% endblock submenu_page_content %}
+{% endblock content %}

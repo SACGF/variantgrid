@@ -1,0 +1,16 @@
+<p>
+Embed Pubmed IDs to have links and abstracts appear below. Examples: <kbd>PMID: 9697696</kbd> or <kbd>PubMed: 9697696</kbd> or <kbd>NCBIBookShelf: NBK447152</kbd> or <kbd>PubMedCentral: 3583621</kbd>
+</p>
+{% if citations_ids_list %}
+{% load static %}
+<div id='citations-container'>
+    <h3>Literature</h3>
+    <div id='citations' class='show-citations'>
+        <img src="{% static 'images/spinner.gif' %}" /> Loading citations...
+    </div>
+    <script>
+    var citations_url = "{% url 'citations_tab' citations_ids_list %}";
+    $("#citations").load(citations_url);
+    </script>
+</div>
+{% endif %}

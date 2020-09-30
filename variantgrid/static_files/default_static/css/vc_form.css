@@ -1,0 +1,439 @@
+table.diff {
+  background-color: white;
+  width: inherit;
+}
+table.diff th, table.diff td {
+  padding: 4px 6px 4px 6px;
+}
+table.diff tbody td:not(.filler), table.diff thead th:not(:first-of-type) {
+  border-left: 1px dashed lightgrey;
+}
+table.diff thead th:first-of-type {
+  z-index: 101;
+  left: 0;
+}
+table.diff thead th {
+  position: sticky;
+  z-index: 100;
+  top: -36px;
+  background-color: white;
+  padding-top: 6px;
+  padding-bottom: 4px;
+  max-width: 260px;
+  min-width: 260px;
+  width: 260px;
+  word-break: break-all;
+}
+table.diff tbody {
+  background-color: white;
+}
+table.diff tbody tr.empty:not(.criteria) {
+  display: none;
+}
+table.diff tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 100;
+  background-color: white;
+  text-align: right;
+}
+table.diff tbody th.citation-row {
+  font-weight: normal;
+  text-align: left;
+}
+table.diff tbody th.citation-row .show-abstract-link {
+  display: inline-block;
+}
+table.diff tbody th .citation {
+  display: inline;
+}
+table.diff tbody th .citation .title {
+  display: inline-block;
+}
+table.diff tbody td, table.diff tbody th {
+  max-width: 260px;
+  min-width: 260px;
+  width: 260px;
+  word-break: break-all;
+}
+table.diff tbody tr.textarea td {
+  word-break: normal;
+}
+table.diff tbody .group th {
+  font-weight: bold;
+}
+table.diff tbody tr.row.note th, table.diff tbody tr.option-row th th {
+  color: gray;
+}
+table.diff tbody tr.row.note th, table.diff tbody tr.row.note td, table.diff tbody tr.option-row th th, table.diff tbody tr.option-row th td {
+  font-size: smaller;
+}
+table.diff tbody tr.option-row td, table.diff tbody tr.citation-row td {
+  text-align: center;
+}
+table.diff tbody tr {
+  background-color: white;
+}
+table.diff tbody tr.differences {
+  background-color: #f4dddd;
+}
+table.diff tbody tr.blanks {
+  background-color: #f6f6f8;
+}
+table.diff tbody tr {
+  /*
+  .explained:after {
+      content: "\f05a";
+      font-family: "FontAwesome";
+      opacity: 0.5;
+      margin-left: 8px;
+      position: absolute;
+      right: 6px;
+      bottom: 4px;
+  }
+   */
+}
+table.diff tbody tr td {
+  position: relative;
+}
+table.diff tbody tr .explain-icon {
+  position: absolute;
+  right: 0px;
+  top: 0.4rem;
+}
+
+.share-dialog .share-level-selection {
+  margin-top: 4px;
+  display: flex;
+  padding: 16px 8px 16px 8px;
+  border: 1px solid lightgray;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.share-dialog .share-level-selection img {
+  margin-left: 12px;
+  margin-right: 12px;
+}
+.share-dialog .share-level-selection .check-icon {
+  width: 16px;
+  height: 16px;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 16px;
+}
+.share-dialog .share-level-selection.included {
+  opacity: 0.5;
+  background-color: #ededf2;
+  cursor: not-allowed;
+}
+.share-dialog .share-level-selection.included .check-icon {
+  background-image: url("../icons/tick.svg");
+}
+.share-dialog .share-level-selection.current {
+  background-color: #bdbdf2;
+}
+.share-dialog .share-level-selection.current .check-icon {
+  background-image: url("../icons/tick.svg");
+}
+.share-dialog .share-level-selection.newly-included {
+  background-color: #ddddff;
+}
+.share-dialog .share-level-selection.newly-included .check-icon {
+  background-image: url("../icons/tick.svg");
+}
+.share-dialog .share-level-selection.not-included:hover {
+  background-color: #ccccff;
+}
+
+.custom-scientific {
+  display: inline-flex;
+  flex-grow: 1;
+  align-items: center;
+}
+.custom-scientific input {
+  flex-grow: 1;
+}
+.custom-scientific input::placeholder {
+  font-size: smaller;
+  position: relative;
+  bottom: 1px;
+}
+.custom-scientific .notation {
+  margin-left: 6px;
+  color: gray;
+  font-size: smaller;
+  font-family: monospace;
+  width: 65px;
+}
+.custom-scientific .immutable {
+  width: inherit !important;
+}
+
+.submission-source {
+  display: inline-block;
+  width: 18px !important;
+  height: 16px !important;
+  background-position: center center;
+  background-size: 16px 16px !important;
+  background-repeat: no-repeat;
+  position: relative;
+  padding: 2px;
+  margin-right: 2px;
+  opacity: 0.5;
+}
+.submission-source.api {
+  background-image: url("../icons/submission_sources/api.svg");
+}
+.submission-source.consensus {
+  background-image: url("../icons/submission_sources/consensus.svg");
+}
+.submission-source.form {
+  background-image: url("../icons/submission_sources/form.svg");
+}
+.submission-source.variantgrid {
+  background-image: url("../icons/submission_sources/variantgrid.svg");
+}
+.submission-source.flag-source {
+  background-image: url("../icons/flags/flag.svg");
+}
+
+.not-met {
+  color: #AAAAAA !important;
+}
+
+.override {
+  cursor: help;
+}
+.override:after {
+  content: "*";
+  color: #888;
+}
+
+.classification-table tbody tr {
+  height: 39px;
+  font-size: 12px;
+}
+.classification-table td.dt-gene_symbol, .classification-table td.gene_symbol {
+  width: 60px;
+}
+.classification-table td.dt-clinical_significance, .classification-table td.cs {
+  width: 125px;
+}
+.classification-table td.allele_origin {
+  width: 90px;
+}
+.classification-table td.dt-condition, .classification-table td.condition {
+  min-width: 200px;
+  max-width: 200px;
+  word-break: break-word;
+}
+.classification-table td.dt-lab, .classification-table td.lab {
+  width: 150px;
+}
+.classification-table td.dt-created, .classification-table td.created {
+  font-size: 12px;
+  width: 140px;
+  min-width: 100px;
+}
+.classification-table td.dt-id, .classification-table td.id {
+  width: 200px;
+  min-width: 150px;
+  word-break: break-word;
+}
+.classification-table td.dt-id img, .classification-table td.id img {
+  display: inline;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+}
+.classification-table td.dt-id .search-result, .classification-table td.id .search-result {
+  color: #444444;
+  margin-top: 4px;
+}
+.classification-table td.dt-id .search-result .match, .classification-table td.id .search-result .match {
+  font-weight: bold;
+}
+.classification-table td.dt-c_hgvs, .classification-table td.hgvs {
+  min-width: 150px;
+  max-width: 150px;
+  word-break: break-all;
+}
+.classification-table td.dt-c_hgvs .genome-build, .classification-table td.hgvs .genome-build {
+  font-size: 12px;
+}
+.classification-table td.dt-user, .classification-table td.user {
+  font-size: 10px;
+  color: #666666;
+}
+.classification-table td.dt-flags {
+  width: 110px;
+  min-width: 110px;
+}
+.classification-table td .flags {
+  padding: 2px;
+}
+.classification-table td .flags .flag {
+  width: 16px;
+  height: 16px;
+  background-size: 16px 16px;
+}
+
+#vc-form .accordion {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+#vc-form .accordion .card:last-of-type > * {
+  border-bottom: none;
+}
+
+#vc-extras {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: column;
+  height: 100%;
+  width: 610px;
+  font-size: small;
+  line-height: 1.3;
+}
+#vc-extras .card {
+  width: 300px;
+}
+#vc-extras #vcform-summary .card-header {
+  background-color: #ece;
+}
+#vc-extras #vcform-summary .card-body {
+  background-color: #fdf;
+}
+#vc-extras #vcform-errors .card-header {
+  background-color: #dcc;
+}
+#vc-extras #vcform-errors .list-group-item {
+  background-color: #ffebeb;
+}
+#vc-extras #vcform-flags .card-header {
+  background-color: #ccc;
+}
+#vc-extras #vcform-flags .card-body {
+  background-color: #ddd;
+}
+#vc-extras #vcform-publish .card-header {
+  background-color: #cdc;
+}
+#vc-extras #vcform-publish .list-group-item:not(.list-group-item-success) {
+  background-color: #dfd;
+}
+#vc-extras #vcform-help .card-header {
+  background-color: #ccd;
+}
+#vc-extras #vcform-help .card-body {
+  min-height: 200px;
+  background-color: #eef;
+}
+#vc-extras .share-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+#vc-extras .description {
+  color: #444;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+#vc-extras .description p {
+  margin-block-start: 0;
+  margin-bottom: 0;
+  margin-block-end: 0;
+}
+#vc-extras .description p + p {
+  margin-top: 0.75rem;
+}
+#vc-extras .row + .row {
+  margin-top: 6px;
+}
+#vc-extras .card-header {
+  padding: 4px 4px 4px 8px !important;
+}
+#vc-extras .card-body:not(.no-padding):not(.card-body-list) {
+  padding: 10px !important;
+}
+#vc-extras .list-group-item {
+  padding: 8px !important;
+}
+
+.summary-crit {
+  font-family: monospace;
+}
+.summary-crit table {
+  width: 100%;
+}
+.summary-crit table .row-header {
+  text-align: right;
+  padding-right: 4px;
+}
+.summary-crit table .col-header {
+  text-align: center;
+}
+.summary-crit table td {
+  border: 1px solid #ccc;
+  text-align: center;
+  height: 2rem;
+  width: 12.5%;
+}
+.summary-crit table td.B-cell {
+  background-color: #ccccff;
+}
+.summary-crit table td.P-cell {
+  background-color: #ffcccc;
+}
+.summary-crit table td.blank-cell {
+  background-color: #eee;
+}
+.summary-crit table td.rejected-cell {
+  background-color: #ddd;
+}
+.summary-crit table td .met {
+  font-weight: bold;
+}
+.summary-crit table td .possible, .summary-crit table td .not-met {
+  color: #888888;
+  font-size: small;
+}
+.summary-crit table td span + span {
+  margin-left: 4px;
+}
+.summary-crit table tr {
+  cursor: pointer;
+}
+.summary-crit table tr:hover th.row-header {
+  color: blue;
+  text-decoration: underline;
+}
+.summary-crit .table-5-note {
+  font-size: small;
+  color: grey;
+  cursor: help;
+}
+.summary-crit .calculated-result {
+  margin-top: 8px;
+}
+.summary-crit .weights {
+  margin-top: 8px;
+  font-size: smaller;
+}
+
+tr.template-download {
+  opacity: 1 !important;
+}
+tr.template-download .toggle {
+  display: none;
+}
+
+.fileupload-buttonbar .start, .fileupload-buttonbar .cancel, .fileupload-buttonbar .delete, .fileupload-buttonbar .toggle {
+  display: none;
+}
+.fileupload-buttonbar .btn {
+  margin-left: 8px;
+}
+
+/*# sourceMappingURL=vc_form.css.map */

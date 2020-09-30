@@ -1,0 +1,128 @@
+from typing import Optional, Dict
+
+import ijson
+import requests
+
+from library.guardian_utils import admin_bot
+from library.oauth import OAuthConnector
+from library.utils import make_json_safe_in_place, batch_iterator
+from snpdb.models.models import Lab, Organization
+from sync.models.enums import SyncStatus
+from sync.models.models import SyncDestination, SyncRun
+from variantclassification.models.evidence_key import EvidenceKeyMap
+from variantclassification.views.variant_classification_view import BulkInserter
+
+
+def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
+    config = sync_destination.config
+    shariant = OAuthConnector.shariant_oauth_connector()
+
+    required_build = config.get('genome_build', 'GRCh37')
+    params = {'share_level': 'public', 'type': 'json', 'build': required_build}
+
+    exclude_labs = config.get('exclude_labs', None)
+    if exclude_labs:
+        params['exclude_labs'] = ','.join(exclude_labs)
+
+    def sanitize_data(known_keys: EvidenceKeyMap, data: dict, source_url: str) -> dict:
+        skipped_keys = []
+        sanitized = {}
+        for key, blob in data.items():
+            if key == 'owner':
+                pass
+            elif known_keys.get(key).is_dummy:
+                skipped_keys.append(key)
+            else:
+                sanitized[key] = blob
+
+        source_url_note = None
+        if skipped_keys:
+            key_list = ', '.join(skipped_keys)
+            source_url_note = f'Unable to import {key_list}'
+
+        source_url_blob = {
+            "value": source_url,
+            "note": source_url_note
+        }
+        sanitized["source_url"] = source_url_blob
+
+        return sanitized
+
+    def shariant_download_to_upload(known_keys: EvidenceKeyMap, record: dict) -> Optional[Dict]:
+        meta = record.get('meta', {})
+        record_id = meta.get('id')
+
+        source_url = shariant.url(f'variantclassification/variant_classification/{record_id}')
+        data = record.get('data')
+        data = sanitize_data(known_keys, data, source_url)
+
+        lab_group_name = meta.get('lab_id')
+
+        lab = Lab.objects.filter(group_name=lab_group_name).first()
+        if not lab:
+            parts = lab_group_name.split('/')
+            org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
+            lab = Lab.objects.create(
+                group_name=lab_group_name,
+                name=meta.get('lab_name'),
+                organization=org,
+                city='Unknown',
+                country='Australia',
+                external=True,
+            )
+
+        #in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
+        if lab.external:
+            return None
+
+        record = {
+            "id": record.get('id'),
+            "publish": record.get('publish'),
+            "data": data,
+        }
+        return record
+
+    run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
+    run.save()
+    try:
+        response = requests.get(shariant.url('variantclassification/api/classifications/export'),
+                                auth=shariant.auth(),
+                                params=params,
+                                stream=True)
+
+        evidence_keys = EvidenceKeyMap()
+
+        count = 0
+        skipped = 0
+
+        def records():
+            nonlocal skipped
+            for record in ijson.items(response.raw, 'records.item'):
+                make_json_safe_in_place(record)
+                mapped = shariant_download_to_upload(evidence_keys, record)
+                if mapped:
+                    yield mapped
+                else:
+                    skipped = skipped + 1
+
+        for batch in batch_iterator(records(), batch_size=10):
+            inserter = BulkInserter(user=admin_bot(), force_publish=True)
+            try:
+                for record in batch:
+                    inserter.insert(record)
+                    count = count + 1
+            finally:
+                inserter.finish()
+
+        run.status = SyncStatus.SUCCESS
+        run.meta = {
+            "records_upserted": count,
+            "records_skipped": skipped
+        }
+        run.save()
+    finally:
+        if run.status == SyncStatus.IN_PROGRESS:
+            run.status = SyncStatus.FAILED
+            run.save()
+
+    return run

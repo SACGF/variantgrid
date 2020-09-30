@@ -1,0 +1,133 @@
+{% extends menu_data_base %}
+{% load static %}
+
+{% block title %}{{ ped_file.name }}{% endblock title %}
+{% block head %}
+    {{ block.super }}
+	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+	<script src="{% static 'js/generated_graphs.js' %}"></script>
+{% endblock %}
+
+{% block css %}
+    div.generated-graph {
+        width: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    div.generated-graph img {
+        width: 100%;
+    }
+
+    .ped-family-container {
+        margin-bottom: 20px;
+    }
+
+	table.ped-family-table {
+		border-collapse: collapse;
+	}
+	
+	table.ped-family-table td, table.ped-family-table th {
+		border: 1px solid black;
+		padding: 5px;
+	}
+{% endblock css %}
+
+{% block jsdocumentready %}
+    {%  if draw_pedigree_chart %}
+        var graph_selector = $('#pedigree-chart');
+        {% if ped_file.import_status == 'S' %}
+            var poll_url = "{% url 'pedigree_chart' ped_file.pk %}";
+            var delete_url = "{% url 'cached_generated_file_delete' %}";
+
+            poll_graph_status(graph_selector, poll_url, delete_url);
+        {% else %}
+            graph_selector.removeAttr('id');
+            graph_selector.removeClass();
+            graph_selector.html("Pedigree File not imported.");
+        {% endif %}
+    {% endif %}
+
+    $('button#new-pedigree').click(function() {
+        var pedForm = $(this).parents(".pedigree-form");
+        var family_id = $("input[name='family_id']", pedForm).val();
+
+        var cohortId = $("#id_cohort").find(":selected").val();
+        if (cohortId) {
+            window.location = Urls.create_pedigree_from_cohort_and_ped_file_family(cohortId, family_id);
+        }
+    });
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+
+	<div id="ped_file">
+		<h3>PED file: {{ ped_file.name }}</h3>
+			<table>
+			{{ ped_file_form.as_table }}
+            {% if ped_file.uploadedpedfile.uploaded_file.uploadpipeline %}
+                {% if url_name_visible.view_upload_pipeline %}              
+                    <tr>
+                    <th>Processing</th>
+                    <td><a href="{% url 'view_upload_pipeline' ped_file.uploadedpedfile.uploaded_file.uploadpipeline.pk %}">View upload processing</a></td>
+                    </tr>
+                {% endif %}
+            {% endif %}
+
+			</table>
+	</div>
+
+    <div id='pedigree-chart' class='generated-graph graph-loading'></div>
+
+	{% for family in ped_file.pedfilefamily_set.all %}
+		<div class="ped-family-container" id="family-{{family.name}}">
+			<h3>Pedigree: {{ family.name }}</h3>
+			
+			<table class='ped-family-table'>
+				<tr>
+				<th>Sample
+				<th>Father
+				<th>Mother
+				<th>Sex
+				<th>Affected
+				</tr>
+			{% for record in family.pedfilerecord_set.all %}
+				<tr>
+				<td>{{ record.sample }}
+				<td>{{ record.father.sample }}
+				<td>{{ record.mother.sample }}
+				<td>{{ record.sex }}
+				<td>{{ record.affection }}
+				</tr>
+			{% endfor %}
+			</table>
+			
+          <div id="new">
+            <h3>Create Pedigree from family</h3>
+            <form class="pedigree-form" method="post" action="">
+                {% csrf_token %}
+                <p>Create a pedigree by mapping samples from a PED file to samples from a cohort.
+                <p>The cohort must contain all samples - you may need to make a <a class="hover-link" href="{% url 'cohorts' %}">cohort</a> first.
+                <div>
+                <span>{{ cohort_form }}</span>
+                {{ cohort_form.media }}
+                <input type="hidden" name="family_id" value="{{ family.pk }}" />
+
+                <span><button id='new-pedigree' type='button'>Create</button></span>
+                </div>
+            </form>
+          </div>
+
+			{% if family.pedigree_set.exists %}
+			     <h3>Pedigrees from this Pedigree</h3>
+			     <table>
+                {% for pedigree in family.pedigree_set.all %}
+                    <tr><td><a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
+                {% endfor %}
+                </table>
+			{% endif %}
+			
+		</div>
+	
+	{% endfor %}
+{% endblock submenu_page_content %}

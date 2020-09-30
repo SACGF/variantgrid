@@ -1,0 +1,38 @@
+<div id="patient-specimens">
+    {% load help_tags %}
+    {% page_help user 'patients/view_patient_help2' 'Specimens Help' %}
+    <script type="text/javascript">
+        var targetParent = $("#patient-specimens").parent();
+    
+        $(document).ready(function() {
+            var options = {
+                target: targetParent,
+            };
+            $('form#patient-specimens-form').ajaxForm(options); 
+            $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
+    
+            var title = "Specimens";
+            {% if num_specimens %}
+            title += " ({{ num_specimens }})"
+            {% endif %}
+            $("#specimens-tab-link").html(title);
+        });
+    </script>
+    <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
+    	{% csrf_token %}
+    
+    	<table>
+            {{ specimen_formset.as_table }}
+    	</table>
+        <table>
+        {% if has_write_permission %}
+        <td><button id='save-button' class="btn btn-primary">Save</button></td>
+        <td><button id="reset-button" type='reset' class="btn btn-secondary">Reset</button></td>
+        {% else %}
+            You can view but not modify this patient.
+        {% endif %}
+        </tr>
+        </table>
+        {% include "messages/messages.html" %}
+    </form>
+</div>

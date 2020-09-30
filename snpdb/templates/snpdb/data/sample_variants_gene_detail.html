@@ -1,0 +1,27 @@
+{% load datatable_tags %}
+{% load js_tags %}
+<div id='sample-variants-gene-details'>
+<script>
+function classificationFilter(data, type) {
+    data.gene_symbol = "{{ gene_symbol }}";
+    data.sample_ids = "{{ sample_ids }}";
+    return data
+}
+
+$(document).ready(function() {
+    let tableDom = $('#vc-datatable');
+    if (tableDom.length) {
+        EKeys.load().then(() => {
+            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='variant_classification_datatables' data='classificationFilter' hide_filter_count=True %};
+            let vcDatatable = $('#vc-datatable');
+            vcDatatable.on('draw.dt', () => {
+                Flags.instance.init({userId: '{{user.id}}'});
+            });
+        });
+    }
+});
+</script>
+
+{% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
+
+</div>

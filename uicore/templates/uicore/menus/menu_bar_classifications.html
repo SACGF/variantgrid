@@ -1,0 +1,15 @@
+{% load user_tags %}
+{% load ui_menus %}
+
+{% menu_item 'activity' admin_only=True %}
+{% menu_item 'hgvs_issues' title="HGVS Issues" admin_only=True %}
+
+{% menu_item 'classifications' other_urls='/variantclassification/variant_classification' %}
+{% menu_item 'variant_classification_dashboard' title="Issues" badge_count=classification_issue_count %}
+{% menu_item 'overlaps' title="Overlaps" %}
+{% menu_item 'labs' %}
+{% menu_item 'classification_graphs' title="Graphs / Stats" %}
+{% menu_item 'evidence_keys_logged_in' title="Evidence Keys" %}
+{% menu_item 'variant_classification_export' title="Export" %}
+{% menu_item 'variant_classification_import_tool' title="Import" admin_only=True %}
+{% menu_item 'variant_classification_import_upload' title="Upload" %}

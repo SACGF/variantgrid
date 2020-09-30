@@ -1,0 +1,2 @@
+{% if citation_link %}<a href='{{ citation_link | safe }}'>{{ source }}:{{ citation_id }}</a> {{ first_author|default_if_none:'' }} {% if not single_author %}et al {% endif %} {{ year|default_if_none:'' }}{% else %}{{ source }}:{{ citation_id }}{% endif %}<br/>
+{{ title }}

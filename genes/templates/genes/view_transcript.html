@@ -1,0 +1,57 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_field %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% block title %}Transcript: {{ transcript }}{% endblock title %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h3>Transcript: {{ transcript }}</h3>
+
+        {% if transcript.annotation_consortium == 'R' %}
+            <h4>RefSeq transcript versions</h4>
+            {% page_help 'genes/transcript_version_refseq' 'RefSeq transcript versions' show_title=False %}
+        {% endif %}
+        {% if transcript.annotation_consortium == 'E' %}
+            <h4>Ensembl transcript versions</h4>
+            {% page_help 'genes/transcript_version_ensembl' 'Ensembl transcript versions' show_title=False %}
+        {% endif %}
+
+        <h4>Transcript versions and lengths</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for genome_build_id in genome_build_ids %}
+                        <th>{{ genome_build_id }} length</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <th>Gene</th>
+                    {% for genes in build_genes %}
+                        <td>
+                            {% for g in genes %}
+                                <a class="hover-link" href="{% url 'view_gene' g.pk %}">{{ g }}</a>
+                            {% endfor %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for version_data in transcript_versions %}
+                    <tr>
+                        {% for d in version_data %}
+                            {% if forloop.first %}
+                                <td><a class="hover-link" href="{% url 'view_transcript_version' transcript.pk d %}">Version {{ identifier }}.{{ d }}</a></td>
+                            {% else %}
+                                <td>{{ d.length | default_if_none:"Unknown" }}</td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock content %}

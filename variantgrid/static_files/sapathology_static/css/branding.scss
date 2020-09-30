@@ -1,0 +1,135 @@
+.bg-theme {
+    background-color: rgb(247,249,252);
+}
+
+a.nav-link {
+    color: #666 !important;
+    &:hover {
+        color: #000 !important;
+    }
+    &.active {
+        color: #222 !important;
+    }
+}
+
+.navbar-brand {
+    background-image: url(/static/images/sapath_logo_from_pdf.png);
+}
+
+///* This file is overwritten in sapathology_testvm_static - if you change this, change that!  */
+//#site-name:before {
+//    content: "VariantGrid";
+//}
+//
+//:root {
+//  --main-fg-color: black;
+//  --main-bg-color: #FFFFFF;
+//}
+//
+//.main-title-theme-background-color {
+//  background-color: var(--main-bg-color);
+//}
+//
+//.main-title-theme-primary-text-color {
+//  color: var(--main-fg-color);
+//}
+//
+//.main-title-theme-secondary-background-color {
+//  background-color: #054f94;
+//}
+//
+//.main-title-theme-secondary-text-color {
+//  color: var(--main-bg-color);
+//}
+//
+//#big-site-logo {
+//    width: 500px;
+//    height: 156px;
+//    background-repeat: no-repeat;
+//    background-size: 500px 156px;
+//    background-image: url("/static/images/sapath_logo_from_pdf.png");
+//}
+//
+//@import url('https://fonts.googleapis.com/css?family=Raleway:400,600');
+//
+//body {
+//   font-family: 'Raleway',serif;
+//   font-size: 14px;
+//}
+//
+//body.external {
+//   font-size: 18pt;
+//}
+//
+//body.external h1 {
+//    font-size: 60pt;
+//}
+//
+//body.external h2 {
+//    font-size: 40pt;
+//}
+//
+//body.external h3 {
+//    font-size: 24pt;
+//}
+//
+//a {
+//    color: inherit;
+//}
+//
+//
+//
+//
+//
+//#vg-help-container {
+//    float: right;
+//    margin-right: 20px;
+//}
+//
+//
+//.documentation-link {
+//    color: #ffffff;
+//    font-size: 20px;
+//    float: none;
+//    display: table-cell;
+//    vertical-align: middle;
+//    height:50px;
+//    padding-left: 10px;
+//    padding-right: 10px;
+//}
+//
+//#header {
+//    background-color: #054f94;
+//    color: #ffffff;
+//}
+//
+//body.external #footer {
+//    background-color: #2B3939;
+//    color: #ffffff;
+//    padding: 30px;
+//    text-align: center;
+//}
+//
+//
+///* logged in top left logo */
+//#menuContainer #menu-logo {
+//    margin: 4px 4px 0px 4px;
+//    width: 132px;
+//    height: 42px;
+//    background-repeat:no-repeat;
+//    background-size: 132px 42px;
+//    background-image: url("/static/images/sapath_logo_from_pdf.png");
+//}
+//
+//#top-menu-container {
+//    padding-top: 10px;
+//}
+//
+//
+//.submenu a, #top-menu a {
+//    color: #22529E;
+//}
+//
+//#email-icon {
+//    background-image: url(/static/icons/email19_black.png);
+//}

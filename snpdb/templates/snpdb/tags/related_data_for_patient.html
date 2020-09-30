@@ -1,0 +1,59 @@
+{% extends "snpdb/tags/related_data.html" %}
+{% block related_data %}
+{{ block.super }}
+{% load related_data_tags %}
+
+<div id="samples">
+    <h3>Samples for patient:</h3>
+    {% if samples %}
+        <table>
+            <tr>
+            <th>ID
+            <th>Sample Name
+            <th>VCF
+            <th>VCF date
+            <th>Tissue
+            </tr>
+        {% for sample in samples %}
+            <tr> 
+            <td><a href="{% url 'view_sample' sample.pk %}">{{ sample.pk }}</a>
+            <td>{{ sample.name }}
+            <td><a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
+            <td>{{ sample.vcf.date }}
+            <td>{{ sample.tissue }}
+            </tr>
+        {% endfor %}
+        </table>
+    {% else %}
+    <p>There are no samples linked to this patient</p>
+    {% endif %}
+
+    {% if cases %}
+    <h3>Cases for patient:</h3>
+    <table>
+        <tr>
+            <th>Case</th>
+            <th>Lead Scientist</th>
+            <th>Result Required</th>
+            <th>Report Date</th>
+            <th>Status</th>
+            <th>Workflow status</th>
+            <th>Investigation type</th>
+        </tr>
+        {% for case in cases %}
+        <tr>
+            <td><a href="{{ case.get_absolute_url }}">{{ case }}</a></td>
+            <td>{{ case.lead_scientist }}</td>
+            <td>{{ case.result_required }}</td>
+            <td>{{ case.report_date }}</td>
+            <td>{{ case.get_status_display }}</td>
+            <td>{{ case.get_workflow_status_display }}</td>
+            <td>{{ case.get_investigation_type_display }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+</div>
+{% endblock %}
+

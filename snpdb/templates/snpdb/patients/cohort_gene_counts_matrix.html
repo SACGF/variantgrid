@@ -1,0 +1,37 @@
+<style>
+.sample-gene-matrix {
+    width: 90%;
+    float: left;
+}
+
+#legend tr td {
+    padding: 10px;
+}
+
+#legend th {
+    align: center;
+    padding: 10px;
+}
+</style>
+<div id='gene-counts-graph'>
+    <table id='legend' class='left'>
+    <th>
+      Legend
+    </th>
+    <tr>
+    {% for gv in gene_values %}
+        <td style='{{ gv.style }}'>
+            {% if gv.label %}
+                {{ gv.label }}
+            {% else %}
+                &nbsp;
+            {% endif %}
+        </td>
+    {% endfor %}
+  </tr>
+    </table>
+
+    {{ text_table_html | safe }}
+
+    <div class='clear'></div>
+</div>

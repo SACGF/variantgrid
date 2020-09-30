@@ -1,0 +1,41 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% load record_data_state_tags %}
+{% block title %}{{ combo_vcf_file }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+{% endblock %}
+
+{% block jsdocumentready %}
+{% endblock %}
+
+{% block submenu_page_content %}
+
+	<div>
+	<img class='vcenter' src="{% static 'icons/vcf_64.png' %}" /> <b>{{ combo_vcf_file }}</b>
+	</div>
+
+	{% record_data_state_helper combo_vcf_file %}
+
+	<div>
+		<h3>Input</h3>
+		<ul>
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' combo_vcf_file.sample_sheet.sequencing_run.pk %}">{{ combo_vcf_file.sample_sheet.sequencing_run }}</a></li>  
+		</ul>
+
+		{% if combo_vcf_file.upload_pipeline %}
+		<h3>Imported as a VariantGrid VCF</h3>
+		<ul>
+			{% if combo_vcf_file.upload_pipeline.uploadedvcf.vcf.import_status == 'S' %}
+			<li><a href="{% url 'view_vcf' combo_vcf_file.upload_pipeline.uploadedvcf.vcf.pk %}">View VCF {{ combo_vcf_file.upload_pipeline.uploadedvcf.vcf.pk }}</a>
+			({{ combo_vcf_file.upload_pipeline.uploadedvcf.vcf.get_import_status_display }})
+            {% else %}
+			<li><a href="{% url 'view_upload_pipeline' combo_vcf_file.upload_pipeline.pk %}">View Upload Processing</a>
+			({{ combo_vcf_file.upload_pipeline.get_status_display }})
+            {% endif %}
+
+		</ul>
+		{% endif %}
+	</div>
+
+{% endblock %}

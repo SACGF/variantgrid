@@ -1,0 +1,47 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_field %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
+{% load static %}
+{% load js_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block title %}Data{% endblock %}
+
+{% block head %}
+    <script>
+        function close_existing_grid() {
+            console.log("close_existing_grid");
+            if (typeof grid !== 'undefined') {
+                grid.jqGrid('GridUnload');
+                delete grid;
+            }
+            if (typeof reloadGridTimeout != 'undefined') {
+                clearTimeout(reloadGridTimeout);
+                delete reloadGridTimeout;
+            }
+        }
+
+        $(document).ready(function() {
+            var tabs = $("#tabs");
+            tabs.tabs().css({height: '100%'});
+            tabs.bind('tabsselect', function(event, ui) {
+                $(".ui-tabs-panel", this).empty();
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="container-table">
+        {% page_help page_id='data/data_help' title='Data' %}
+        {% ui_register_tab tab_set="data-tabs" label="Samples" url="samples" url_check=True %}
+        {% ui_register_tab tab_set="data-tabs" label="VCF" url="vcfs" url_check=True %}
+        {% ui_register_tab tab_set="data-tabs" label="Bed Files" url="bed_files" url_check=True %}
+        {% ui_register_tab tab_set="data-tabs" label="Pedigree .ped Files" url="ped_files" url_check=True %}
+        {% ui_register_tab tab_set="data-tabs" label="Gene Expression" url="expression_files" url_check=True %}
+
+        {% ui_render_tabs tab_set="data-tabs" css="container-table" %}
+    </div>
+{% endblock %}

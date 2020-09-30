@@ -1,0 +1,31 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block docreadyjs %}
+    ajaxForm($("form#classifications-node-form"));
+{% endblock docreadyjs %}
+
+{% block content %}
+<div>
+	<form id="classifications-node-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        
+        
+		<div>
+            <div>
+                {{ form.comparison }} {{ form.clinical_significance }}        
+            </div>
+            <div>
+    		  <b>Last Saved:</b> {{ node.modified }}
+            </div>
+            <div>
+		      <b>Warning:</b> This node retrieves variants that have been classified in this database - this changes over time!
+            {% if out_of_date_message %}
+		      <p>{{ out_of_date_message }}</p>
+            {% endif %}
+		    </div>
+        </div>
+		<button id='classifications-node-save' class="btn btn-primary">save</button>
+        {{ form.media }}
+	</form>
+</div>
+{% endblock content %}

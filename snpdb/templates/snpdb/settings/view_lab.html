@@ -1,0 +1,96 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load avatar_tags %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load user_tags %}
+{% load ui_tabs_builder %}
+{% load lab_tags %}
+{% block title %}Lab: {{ lab }}{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block content %}
+     <div class="container">
+        <H3>{{ lab }}</H3>
+        {% ui_register_tab_embedded label="Lab Activity" tab_set="lab_tabs" %}
+            <div class="row">
+                <div class="col-md-6 col-lg-4 mt-4">
+                    {% lab_card lab lab_link=False %}
+                </div>
+            </div>
+            {% if is_member %}
+                <h4>Classification Activity Log</h4>
+
+                {% with classifications_activity=lab.classifications_activity_by_day %}
+                    {% if classifications_activity.exists %}
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Classifications {{ visibility }}</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                        {% for time_period, num_classifications in classifications_activity %}
+                            <tr>
+                                <td class="date">{{ num_classifications }}</td>
+                                <td><span class="timestamp">{% timestamp time_period time_ago=True %}</span></td>
+                            </tr>
+                        {% endfor %}
+                        </table>
+                    {% else %}
+                        No activity.
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
+        {% end_ui_register_tab_embedded %}
+        {% if is_member %}
+            {% ui_register_tab_embedded label="Lab Settings" tab_set="lab_tabs" %}
+                <div class="alert alert-info">Only administrators can modify these settings</div>
+                <h4>Lab Details</h4>
+                <form class='lab-settings-form' id="lab-settings-form" enctype="multipart/form-data" method="post" action="{{ form_url }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="" />
+                    {% crispy lab_form form_helper.horizontal_nested %}
+
+                    {% if group_initial_perm_form %}
+                        <h4>Groups</h4>
+                        <p>
+                            The settings below are how data is initially shared with your groups.
+                            You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
+                        </p>
+                        <label>Initial group permissions</label>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Group</th>
+                                    <th>Read</th>
+                                    <th>Write</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>{{ lab.group }}</td>
+                                    <td>{{ group_initial_perm_form.read }}</td>
+                                    <td>{{ group_initial_perm_form.write }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    {% endif %}
+
+                    {% settings_override form=settings_override_form override_level="Lab" override_source=override_source override_values=override_values %}
+                    {% if has_write_permission %}
+                        <input type="submit" class="btn btn-primary" value="Save">
+                    {% endif %}
+                </form>
+            {% end_ui_register_tab_embedded %}
+            {% if url_name_visible.analysis %}
+                {% ui_register_tab label="Node Counts" url="lab_settings_node_counts_tab" param=lab.pk tab_set="lab_tabs" url_check=True %}
+            {% endif %}
+        {% endif %}
+        {% ui_render_tabs tab_set="lab_tabs" %}
+
+    </div>
+{% endblock %}

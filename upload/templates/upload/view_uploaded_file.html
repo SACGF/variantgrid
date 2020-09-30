@@ -1,0 +1,16 @@
+{% extends menu_data_base %}
+{% load model_helpers %}
+
+{% block title %}View upload{% endblock %}
+
+{% block submenu_page_content %}
+
+	<div class="chunk borderless">
+        <h3>View Upload</h3>
+        <fieldset class="form-fields">
+	        {{ uploaded_file | as_p }}
+        </fieldset>
+	</div>
+
+
+{% endblock %}

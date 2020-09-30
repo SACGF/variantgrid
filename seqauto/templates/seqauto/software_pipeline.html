@@ -1,0 +1,59 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% block title %}Software Pipeline{% endblock %}
+{% block head %}
+{% load static %}
+<style>
+#error-exception {
+
+}
+
+.pipeline-box{
+    font-size: 16px;
+    color: #eeeeee;
+    background-color: #7d1416;
+    padding: 10px;
+    width:20%;
+}
+
+.pipeline-arrow{
+    font-size: 16px;
+    color: #7d1416;
+    background-color: #ffffff;
+    width:20%;
+}
+
+</style>
+{% endblock %}
+
+{% block submenu_page_content %}
+
+<div class='content-wrapper' align=center>    
+    {% load dag_tags %}
+    {% for dag_instance in dag_list %}
+
+        {% if dag_instance.is_root %}
+            <div class='pipeline-box'>
+            <p><b>{{ dag_instance.name }}</b></p>
+            <p>{{ dag_instance.description }}</p>
+            </div>
+
+            {% recursedict dag_instance.descendants_tree %}
+            {% loop %}
+                {% if key %}
+                <div class='pipeline-arrow'>
+                <img title='pipeline_arrow_down' alt='Down Arrow' src="{% static 'images/down_arrow.png' %}" />
+                </div>
+                <div class='pipeline-box'>
+                <p><b>{{ key.name }}</b></p>
+                <p>{{ key.description }}</p>
+                </div>
+                {% endif %}{% value %} 
+                
+            {% endloop %}
+            {% endrecursedict %}
+        {% endif %}
+        {% if dag_instance.is_leaf %}
+        {% endif %}
+    {% endfor %}
+</div>
+{% endblock %}     

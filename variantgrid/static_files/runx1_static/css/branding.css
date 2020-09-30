@@ -1,0 +1,19 @@
+.bg-theme {
+  background-color: white;
+}
+
+a.nav-link {
+  color: #666 !important;
+}
+a.nav-link:hover {
+  color: #000 !important;
+}
+a.nav-link.active {
+  color: #222 !important;
+}
+
+.navbar-brand {
+  background-image: url(/static/images/runx1-logo-standard.png);
+}
+
+/*# sourceMappingURL=branding.css.map */

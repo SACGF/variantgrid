@@ -1,0 +1,175 @@
+{% load static %}
+<div id="analysis-editor-and-grid">
+
+<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+{% if stand_alone %}
+<!-- Importing headers due to stand alone window -->
+<link href="{% static 'js/lib/jquery-ui-1.12.1.custom/jquery-ui.min.css' %}" rel="stylesheet">
+<link href="{% static 'js/lib/jquery-ui-1.12.1.custom/jquery-ui.theme.css' %}" rel="stylesheet">
+<!-- test me, this didn't used to include global.css -->
+<link href="{% static 'css/global.css' %}" rel="stylesheet">
+
+<link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
+<script type="text/javascript" src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/jquery-ui.min.js' %}"></script>
+<!-- layout must be after jquery-ui or resize doesn't work -->
+<script type="text/javascript" src="{% static 'js/lib/jquery-3.3.1/jquery.layout-1.4.4.js' %}"></script>
+<script src="{% static 'js/lib/jquery.blockUI.js' %}"></script>
+{% include "analysis/analysis_includes.html" %}
+{% endif %}
+
+<style type="text/css">
+	html, body, #analysis-editor-and-grid, #grid-and-editor-container {
+		height: 100%;
+		min-height: 100%;
+		margin: 0;
+		padding: 0;
+	}
+</style>
+<script>
+	var GRID = "grid";
+	var EDITOR = "editor";
+	var COMPONENTS_REQUIRED = [EDITOR, GRID];
+	var inFormOrLink;
+	var grid_and_editor_registry = {}; // Stores by unique_code (node_id_variant_id)
+
+	function hasRequiredComponents(data) {
+		var has_required_components = true;		
+		for (var i=0 ; i<COMPONENTS_REQUIRED.length ; ++i) {
+			var component = COMPONENTS_REQUIRED[i];
+			has_required_components &= component in data;
+		}
+		return has_required_components;
+	}
+
+	// Grids and editors load separately, we can make registers here so that 
+	// we can call them when both are triggered.
+	function registerComponent(unique_code, name, exec_function) {
+		if (!exec_function) {
+			exec_function = function() { }; // Do nothing
+		}
+		var data = grid_and_editor_registry[unique_code];
+		if (!data) {
+			data = {};
+			grid_and_editor_registry[unique_code] = data;
+		}
+
+		var funcs = data[name];
+		if (!funcs) {
+			funcs = [];
+			data[name] = funcs
+		}
+		//console.log("Registering code: " + unique_code + " name: " + name);
+		funcs.push(exec_function);
+
+		if (hasRequiredComponents(data)) {
+			for (k in data) {
+				var funcs = data[k];
+				for (var i=0 ; i<funcs.length ; ++i) {
+					var func = funcs[i];
+					func();
+				}
+			}
+			delete grid_and_editor_registry[unique_code];
+		}
+	}
+	
+
+	$(document).ready(function() {
+		layout_analysis_editor_and_grid();
+
+		$('a').on('click', function() { inFormOrLink = true; });
+		$('form').on('submit', function() { inFormOrLink = true; });
+		
+		$(window).on("beforeunload", function() { 
+			if (!inFormOrLink) {
+				getAnalysisWindow().secondWindowClosing();
+			}
+		});
+
+	});
+</script>
+<div id="grid-and-editor-container">
+	<div id="node-editor-container" class="ui-layout-north">
+		<div style='display: none' class='cancel-node-loading'>
+			<button>Cancel</button> - Cancel loading node.
+		</div> 
+		
+		<div class="node-editor" id="no-editor">
+		</div>
+	</div>
+	<div class="ui-layout-center">
+		<div id="error-container">
+		</div>
+		<div id="node-data-container">
+		</div>
+	</div>
+</div>
+
+</div>
+
+<div id='overlay-container' style='display: none'>
+    <!-- Style needs to be in here so when we shift into DOM it stays with overlay until removed in base editor everythingLoaded callback -->
+    <style>
+    #overlay-container {
+        z-index: 10000;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        margin: auto;
+        background-color: #ffffff;
+    }
+    
+    #loading-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        border: 2px solid #888888;
+        opacity: 1.0;
+        padding: 50px;
+        transform: translate(-50%, -50%);
+    }
+    
+    #animation-container {
+        float: left;
+    }
+    
+    #loading-message-container {
+        padding-left: 20px;
+        width: 80px;
+        height: 180px;
+        float: right;
+        text-align: center;
+    }
+    
+    
+    #inner-loading-message {
+        position: absolute;
+        top: 50%;
+        transform: translate(0, -50%);
+    }
+    
+    #inner-loading-message span {
+        margin-bottom: 20px;
+    }
+    
+    #node-load-cancel {
+        display: none;
+    }
+    
+    </style>
+
+    <div id='loading-overlay'>
+        <div id='animation-container'></div>
+        <div id='loading-message-container'>
+            <div id='inner-loading-message'>
+                <span>Loading...</span>
+                <p id='node-load-cancel'>
+                <button>Cancel Load</button>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

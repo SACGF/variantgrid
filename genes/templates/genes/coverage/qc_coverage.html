@@ -1,0 +1,95 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load seqauto_graph_tags %}
+{% load crispy_forms_field %}
+{% block title %}Gene Coverage{% endblock title %}
+{% block submenu %}{% menu_bar_sequencing %}{% endblock %}
+{% block head %}
+    <style>
+    #link-and-graph-container {
+        height: 100%;
+        width: 100%;
+    }
+
+    #graph-links {
+        float: left;
+        width: 50%;
+    }
+
+    div.loading {
+        background: url({% static 'icons/loading.gif' %}) no-repeat center center;
+        width: 16px;
+        height: 16px;
+        float: left;
+    }
+
+    #plotly-graph-container {
+        float: right;
+        width: 50%;
+    }
+    </style>
+
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+    <script>
+    $(document).ready(() => {
+        var gcContainer = $("#qc-gene-coverage-graph-container");
+        const GENOME_BUILD = "{{ genome_build.name }}";
+
+        function load_graph(url) {
+            var loading_icon = $('<label>').attr({class : 'loading', style: 'margin-right:10px;'});
+            gcContainer.html(loading_icon);
+            gcContainer.load(url);
+        }
+
+        function load_gene_list(geneListId) {
+            load_graph(Urls.qc_gene_list_coverage_graphs(GENOME_BUILD, geneListId));
+        }
+
+        $('#id_gene_symbol').change(function() {
+            var geneSymbol = $(this).val();
+            if (geneSymbol) {
+                load_graph(Urls.gene_symbol_coverage_collection_graphs(GENOME_BUILD, geneSymbol));
+            } else {
+                gcContainer.empty();
+            }
+        });
+
+        $('#id_gene_list').change(function() {
+            var geneListId = $(this).val();
+            if (geneListId) {
+                load_gene_list(geneListId);
+            } else {
+                gcContainer.empty();
+            }
+        });
+
+        {% if gene_list_id %}
+            load_gene_list({{ gene_list_id }});
+        {% endif %}
+    });
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <h3>QC Coverage</h3>
+        {% load genome_build_tags %}
+        {% genome_build_url_arg user 'genome_build_qc_coverage' genome_build %}
+
+        <form id="new-gene-list-form" method="post">
+            {% csrf_token %}
+            {% labelled label="Gene" value_css="gene" %}{{ gene_symbol_form.gene_symbol }} {{ gene_symbol_form.media }}{% endlabelled %}
+            {% labelled label="Gene List" %}{{ gene_list_form.gene_list }}{% endlabelled %}
+            {% labelled label="Enter Genes" %}
+                <div id='gene-list-form-container'>
+                {% crispy_field custom_gene_list_form.custom_gene_list_text %}
+                </div>
+            {% endlabelled %}
+            <button id='custom-genes-button' class="btn btn-primary">Use Custom Genes</button>
+        </form>
+
+        <div id='qc-gene-coverage-graph-container'></div>
+    </div>
+{% endblock content %}

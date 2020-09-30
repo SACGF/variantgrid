@@ -1,0 +1,28 @@
+<script>
+$(document).ready(function() {
+    var sequencingRunQCTabUrl = "{% url 'view_sequencing_run_stats_tab' sample.sequencing_run.pk %}";
+    $("#sequencing-run-qc").load(sequencingRunQCTabUrl);
+
+{% if qc %}
+    $("#qc-exec-summary").load("{% url 'view_qc_exec_summary_tab' qc.pk %}");
+    $("#qc-gene-coverage").load("{% url 'view_qc_gene_coverage_collection_tab' qc.pk %}");
+{% endif %}
+
+});
+</script>
+
+<h3>{{ sample.sequencing_run }}</h3>
+<div id='sequencing-run-qc'>
+
+</div>
+
+
+<h3>Sample QC</h3>
+<div id='qc-exec-summary'>
+
+</div>
+
+<h3>Gene Coverage</h3>
+<div id='qc-gene-coverage'>
+
+</div>

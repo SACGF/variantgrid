@@ -1,0 +1,76 @@
+{% extends "django_messages/base.html" %} 
+{% load i18n %} 
+
+{% block content %}
+    <div class="container">
+        <h3>{% trans "Inbox" %}</h3>
+        {% if message_list %}
+            <script>
+            function deleteSelectedMessages() {
+                var selectedMessages = [];
+                $("input.message-checkbox:checked").each(function() {
+                    selectedMessages.push($(this).attr("message_id"));
+                });
+                if (selectedMessages) {
+                    var data = 'message_ids=' + JSON.stringify(selectedMessages);;
+
+                    $.ajax({
+                        type: "POST",
+                        data: data,
+                        url: "{% url 'messages_bulk_delete' %}",
+                        success: function(data) {
+                            window.location.reload();
+                        }
+                    });
+                }
+            }
+
+            $(document).ready(function() {
+                $("#select-all-checkbox").click(function() {
+                    var checked = $(this).is(":checked");
+                    $("input.message-checkbox").each(function() {
+                        $(this).prop('checked', checked);
+                    });
+                });
+            });
+        </script>
+
+        <div id='message-inbox'>
+            <div id='bulk-actions' class="text-right">
+                <a class="btn btn-outline-danger mb-2" href="javascript:deleteSelectedMessages()">Delete Selected Messages</a>
+            </div>
+
+            <table class="messages table">
+                <thead>
+                    <tr><th>{% trans "Sender" %}</th><th>{% trans "Subject" %}</th><th>{% trans "Received" %}</th><th>{% trans "Action" %}</th>
+                        <th>
+                            <label class="form-check-label form-check-inline">
+                                <input id='select-all-checkbox' type='checkbox' class="form-check mr-2"/>
+                                Select All
+                            </label>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+            {% for message in message_list %}
+                <tr>
+                    <td>{{ message.sender }}</td>
+                    <td>
+                        {% if message.new %}<strong>{% endif %}
+                        {% if message.replied %}<em>{% endif %}
+                        <a href="{{message.get_absolute_url }}">{{ message.subject }}</a>
+                        {% if message.replied %}</em>{% endif %}
+                        {% if message.new %}</strong>{% endif %}</td>
+                    <td>{{ message.sent_at|date:_("DATETIME_FORMAT") }}</td>
+                    <td><a href="{% url 'messages_delete' message.id %}">{% trans "delete" %}</a></td>
+                    <td><input message_id='{{ message.id }}' class='message-checkbox' type='checkbox' />
+                </tr>
+            {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>{% trans "No messages." %}</p>
+        {% endif %}
+    </div>
+{% endblock %}

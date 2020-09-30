@@ -1,0 +1,41 @@
+{% extends menu_annotation_base %}
+
+{% block title %}Version Diffs{% endblock title %}
+
+{% block css %}
+table.version-diff-table {
+    text-align: right;
+}
+{% endblock css %}
+
+{% block submenu_page_content %}
+    <div class="chunk borderless">
+	{% load help_tags %}
+	{% page_help page_id='annotation/version_diffs_help' title="Version Diffs"%}
+
+    {% for name, versions in version_levels %}
+    <div id='{{ name }}-diff'>
+        <h3>{{ name }}</h3>
+        {% if versions.num == 0 %}
+            No gene level annotation found. 
+        {% elif versions.num == 1 %}
+            Only one level of gene level annotation: {{ versions.version }}.
+        {% elif versions.num == 2 %}
+            {% if versions.diff %}
+                <p>{{ versions.diff }}
+                <a href="{% url 'view_version_diff' versions.diff.pk %}">Examine {{ name }} version diff</a>
+                </p>
+                <table class='version-diff-table'>
+                <tr><th>New Entries         <td>{{ versions.diff.num_added }}       <td>({{ versions.diff.percent_added|floatformat }}%) 
+                <tr><th>Deleted Entries     <td>{{ versions.diff.num_removed }}     <td>({{ versions.diff.percent_removed|floatformat }}%)
+                <tr><th>Info Changed        <td>{{ versions.diff.num_modified }}    <td>({{ versions.diff.percent_modified|floatformat }}%)
+                <tr><th>Unchanged           <td>{{ versions.diff.num_unchanged }}   <td>({{ versions.diff.percent_unchanged|floatformat }}%)
+                </table>
+            {% else %}
+                Version diff hasn't been calculated for <b>{{ versions.previous }}/{{ versions.version }}</b>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock submenu_page_content %}

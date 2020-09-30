@@ -1,0 +1,71 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+
+{% block title %}Gold Coverage Summary for {{ enrichment_kit }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+{% endblock %}
+
+{% block jshead %}
+    gridExtraFilters = {};
+    function showAll() {
+        $("#gold").prop("checked", false);
+        gridExtraFilters = {};
+        filterGrid();
+    }
+
+    function initFunc(grid, pagerId) {
+        $("#variant-classification-grid-filter-container").hide();
+        grid[0].p.postData["extra_filters"] = getExtraFilters;
+    }
+    
+    function filterGrid() {
+        $("#EnrichmentKitGeneCoverage-grid").trigger("reloadGrid");
+    }
+
+    function getExtraFilters() {
+        var extraFilters = '';
+        if (gridExtraFilters) {
+            extraFilters = JSON.stringify(gridExtraFilters);
+        }
+        return extraFilters;
+    }
+        
+{% endblock %}
+
+{% block jsdocumentready %}
+    jQuery.extend($.fn.fmatter , {
+        viewSequencingRunLink : function(sequencingRun) {
+            var url = Urls.view_sequencing_run(sequencingRun);
+            return "<a class='grid-link' target='_blank' href='" + url + "'>" + geneSymbol + "</div></a>";
+        }
+    });
+
+    $("input#gold-only").change(function() {
+        gridExtraFilters['gold_only'] = $(this).is(":checked");
+        filterGrid();
+    });
+
+{% endblock %}
+
+{% block submenu_page_content %}
+
+    <div>
+    <h3>Coverage for {{ enrichment_kit }} / {{ gene_symbol }}</h3>
+    </div>
+
+    <p>
+    <div><b>EnrichmentKit:</b> <a href="{% url 'view_enrichment_kit' enrichment_kit.pk %}">{{ enrichment_kit }}</a></div>
+    <div><b>Gene:</b> <a href="{% url 'view_gene_symbol' gene_symbol %}">{{ gene_symbol }}</a></div>
+    </p>
+
+    <p>
+    <b>Gold Only</b> <input id='gold-only' type='checkbox' />
+    </p>
+    
+    <div>
+    {% load jqgrid_tags %}
+    {% jqgrid 'enrichment_kit_gene_coverage_grid' 'EnrichmentKitGeneCoverage' search=False enrichment_kit_id=enrichment_kit.pk gene_symbol=gene_symbol download_grid_json_as_csv=True init_func='initFunc' %}
+    </div>
+
+{% endblock %}

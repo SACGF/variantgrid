@@ -1,0 +1,249 @@
+{% load static %}
+{% load js_tags %}
+{% if vsi.has_observations %}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+    <script src="{% static 'js/include_jqgrid.js' %}"></script>
+
+    <div id='locus' class="chunk borderless">
+        <h3>Locus</h3>
+        <p>
+        Reference - Homozygous reference calls are only reported in samples uploaded in multi-sample VCF files, when another sample has a variant at this locus.<br>
+        Variants - HOM_REF for a variants means the depth/quality was below the zygosity calling threshold. These may be somatic or artifacts.
+        </p>
+
+        <table class="table">
+            <thead>
+            <tr><th>Allele</th>
+                <th>Total</th>
+                <th>Hom Ref</th>
+                <th>Het</th>
+                <th>Hom</th>
+                {% if vsi.has_unknown_zygosity %}
+                    <th>Unknown</th>
+                {% endif %}
+            </thead>
+        {% for _, row in vsi.locus_counts_df.iterrows %}
+            <tr><td><a class='hover-link' href="{% url 'view_variant' row.variant_id %}">{{ row.variant }}</a> {% if row.description %}({{ row.description }}){% endif %}</td>
+                <td>{{ row.Total }}</td>
+                <td>{{ row.HOM_REF }}</td>
+                <td>{{ row.HET }}</td>
+                <td>{{ row.HOM_ALT }}</td>
+
+                {% if vsi.has_unknown_zygosity %}
+                <td>{{ row.Unknown }}</td>
+                {% endif %}
+
+        {% endfor %}
+        </table>
+    </div>
+
+    <h3>Samples</h3>
+
+    {% if vsi.has_hidden_samples %}
+        <p>Searching {{ vsi.num_samples }} samples (you can see {{ vsi.num_user_samples }}).
+    {% else %}
+        <p>Searching {{ vsi.num_samples }} samples.
+    {% endif %}
+
+	{% if vsi.hidden_samples_details.num_invisible_observations %}
+	<div>
+		<img src="{% static 'icons/unknown_sample.png' %}" /><b>You cannot see {{ vsi.hidden_samples_details.num_invisible_observations }} samples</b>. 
+		<p>
+		You only have permission to view {{ vsi.hidden_samples_details.num_visible_observations }} out of {{ vsi.hidden_samples_details.num_observations }} total observations in the database.
+        </p>
+	</div>
+	{% endif %}
+
+	{% if not vsi.hidden_samples_details or vsi.hidden_samples_details.num_visible_observations %}
+
+	   <div id="genotype-grid-container">
+           <table id="genotype-grid"></table>	       
+           <div id="genotype-grid-pager"></div> 
+	   </div>
+       <script>
+        var visible_rows = {{ visible_rows | jsonify }};
+        var ZYGOSITY_DICT = {   'O' : 'HOM_ALT',
+                                'E' : 'HET',
+                                'R' : 'HOM_REF',
+                                'U' : 'Unknown Zygosity',
+        };
+
+        function sampleFormatFieldFormatter(formatField) {
+            var formatFieldString = formatField;
+            if (formatFieldString == '-1' || formatFieldString === null) {
+                formatFieldString = "?";
+            }
+            return formatFieldString;
+        }
+
+        function getTermLinks(term_type, term_list) {
+            var links = '';
+            if (term_list) {
+                var terms = term_list.split('|');
+                for (var i=0 ; i<terms.length ; ++i) {
+                    var term = terms[i];
+                    links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'>" + term + "</span>";
+                }
+            }
+            return links;
+        }
+
+        function plotSampleAlleleFrequencies(visible_rows) {
+            let x = [];
+            let af = [];
+            let labels = [];
+            for (let i=0 ; i<visible_rows.length ; ++i) {
+                let row = visible_rows[i];
+                let x_jitter = (Math.random() - 0.5) * 0.1;
+                x.push(x_jitter);
+                af.push(row.allele_frequency);
+                let sampleDescription = "Sample: (" + row.sample + ")";
+                let sampleName = row.sample__name;
+                if (sampleName) {
+                    sampleDescription += " " + sampleName;
+                }
+                sampleDescription += " DP=" + row.read_depth;
+                labels.push(sampleDescription);
+            }
+            
+            let data = {
+                name: "Allele Frequency",
+                type: 'scatter',
+                mode: 'markers',
+                x: x,
+                y: af,
+                text: labels,
+            };
+            let layout = defaultLayout("{{ variant }} Allele Frequency");
+            let xaxis = layout.xaxis || {};
+            xaxis.zeroline = false;
+            xaxis.showgrid = false;
+            layout.xaxis = xaxis;
+            let yaxis = layout.yaxis || {};
+            yaxis.range = [0, 105];
+            yaxis.showgrid = false;
+            yaxis.zeroline = false;
+            layout.yaxis = yaxis;
+            Plotly.newPlot('sample-allele-frequency-scatter', [data], layout);
+
+            // Need to clamp 100 so that histo fits in 10 bins
+            let clamped_af = [];
+            for (let i=0; i<af.length; ++i) {
+                let val = af[i];
+                if (val >= 100) {
+                    val = 99;
+                }
+                clamped_af.push(val)
+            }
+            let histo_data = {
+                name: "Allele Frequency",
+                type: 'histogram',
+                x: clamped_af,
+                autobinx: false,
+                histnorm: "count",
+                xbins: {start: 0, size: 10, end: 110}
+            };
+            layout = defaultLayout("{{ variant }} Allele Frequency Histogram");
+            layout.xaxis = {
+                autotick: true,
+                range: [0, 100]
+            };
+            layout.yaxis = {showline: false, zeroline: false, showticklabels: false};
+            Plotly.newPlot('sample-allele-frequency-histogram', [histo_data], layout);
+
+        }
+
+
+        $(document).ready(function() {
+            jQuery.extend($.fn.fmatter , {
+                viewSampleLink : function(sampleName, options, rowObject) {
+                    var url = Urls.view_sample(rowObject["sample"]);
+                    return "<a href='" + url + "'>" + sampleName + "</a>";
+                },
+                viewZygosity : function(zygosity, options, rowObject) {
+                    return ZYGOSITY_DICT[zygosity] || zygosity;
+                },
+                phenotypeFormatter : function(phenotype_terms) {
+                    return getTermLinks('hpo', phenotype_terms);
+                },
+                omimFormatter : function(omim_terms) {
+                    return getTermLinks('omim', omim_terms);
+                },
+                sampleFormatFieldFormatter : sampleFormatFieldFormatter,
+            });
+
+            jQuery("#genotype-grid").jqGrid({
+                datatype: "local",
+                data: visible_rows,
+                colModel:[{name:'sample', index: 'sample', hidden: true},
+                          {name:'sample__name', index:'sample__name', label: 'Sample Name', formatter: 'viewSampleLink'},
+                          {name:'zygosity',index:'zygosity', label: 'Zygosity', formatter: 'viewZygosity'},
+                          {name:'sample__samplefromsequencingsample__sequencing_sample__enrichment_kit',index:'sample__samplefromsequencingsample__sequencing_sample__enrichment_kit', label: 'EnrichmentKit'},
+                          {name:'patient_phenotype',index:'patient_phenotype', label: 'Patient Phenotype', classes: 'no-word-wrap', formatter: 'phenotypeFormatter'},
+                          {name:'patient_omim',index:'patient_omim', label: 'Patient OMIM', classes: 'no-word-wrap', formatter: 'omimFormatter'},
+                          {name:'sample__vcf__name',index:'sample__vcf__name', label: 'VCF'},
+                          {name:'allele_frequency',index:'allele_frequency', label: 'Allele Frequency', sorttype: 'float', formatter: 'sampleFormatFieldFormatter'},
+                          {name:'allele_depth',index:'allele_depth', label: 'Allele Depth', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},
+                          {name:'read_depth',index:'read_depth', label: 'Read Depth', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},
+                          {name:'phred_likelihood',index:'phred_likelihood', label: 'Phred Likelihood', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},
+                ],
+                caption: "Variant Genotypes",
+                height: 'auto',
+                autowidth: true,
+                rowNum: 20,
+                pager: 'genotype-grid-pager',
+            });
+
+            plotSampleAlleleFrequencies(visible_rows);
+        });
+    
+        </script>
+	{% endif %}
+
+    <div id="allele-frequency-graphs-container">
+        <div id='sample-allele-frequency-scatter' class="left"></div>
+        <div id='sample-allele-frequency-histogram' class="left"></div>
+        <div class="clear"></div>
+    </div>
+
+    {% if vsi.has_phenotype_match_graphs %}
+    {% comment %} A lot of patient phenotype code is duplicated from patients.html, TODO: maybe consolidate it? {% endcomment %}
+    <h3>Phenotypes/OMIM</h3>
+    <p>Requires that samples have been matched to patients, and patient phenotype information has been entered.
+    <style>
+    .matches-graph {
+        float: left;
+    }
+
+    .grid-term-link {
+        padding: 1px;
+        margin: 2px;
+        display: inline-block;
+    }
+    
+    td.no-word-wrap {
+        white-space: normal !important;
+    }
+    </style>
+    
+    {% load patient_graph_tags %}
+    {% patient_phenotypes_graph patient_ids=vsi.patient_ids %}
+    {% patient_omim_graph patient_ids=vsi.patient_ids %}
+    <div class='clear'></div>
+    {% endif %}
+
+
+{% else %}
+    <h3>Samples</h3>
+
+    <p>
+	No results found
+	
+    {% if vsi.has_hidden_samples %}
+        (searched {{ vsi.num_samples }} samples, of which you can see {{ vsi.num_user_samples }}).
+    {% else %}
+        (searched {{ vsi.num_samples }} samples).
+    {% endif %}
+	</p>
+{% endif %}

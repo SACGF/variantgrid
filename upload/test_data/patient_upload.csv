@@ -1,0 +1,4 @@
+Patient Name/Code (required),Date of Birth (required) (DD-MM-YYYY),Date of Death (DD-MM-YYYY),Sex (F/M/Unknown),Patient Description,Physical sample Name,Physical sample Reference id,Physical sample Description,Physical sample Collected by,Physical sample Collection date,Physical sample Received date,Physical sample Mutation type (Germline/Somatic),Physical sample Nucleic acid source (DNA/RNA),BAM file path
+BALM-1,13/07/2015,13/07/2015,Unknown,PB B-cell ALL cell line,BALM-1_expX,Book 3 pg1000,,Justine,13/07/2015,13/07/2015,Germline,RNA,/home/wendy/Desktop/Justine/Run15_data/Cell line BAM files
+K562,14/07/2015,14/07/2015,Unknown,CML cell line,K562_expX,Book 3 pg1001,,Justine,14/07/2015,14/07/2015,Germline,RNA,/home/wendy/Desktop/Justine/Run15_data/Cell line BAM files
+KCL22,15/07/2015,15/07/2015,Unknown,CML cell line,KCL22_expX,Book 3 pg1002,,Justine,15/07/2015,15/07/2015,Germline,RNA,/home/wendy/Desktop/Justine/Run15_data/Cell line BAM files

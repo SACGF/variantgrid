@@ -1,0 +1,8 @@
+{% load text_tags %}
+
+<div>
+{% for node in nodes %}
+	<a name="node-description-{{ node.pk }}"></a>
+	{% render_node_text node %}
+{% endfor %}
+</div>

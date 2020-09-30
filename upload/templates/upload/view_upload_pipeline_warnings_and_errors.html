@@ -1,0 +1,64 @@
+{% extends menu_data_base %}
+{% load static %}
+
+{% block title %}Import Warnings and Errors{% endblock %}
+{% block head %}
+<script>
+</script>
+<style>
+</style>
+{% endblock %}
+{% block submenu_page_content %}
+
+    <a href="{% url 'view_upload_pipeline' upload_pipeline.pk %}">Back to upload pipeline.</a>
+
+    {% if skipped_contigs.vcfskippedcontig_set.exists %}
+        <h3>Skipped Contigs</h3>
+        
+        <p>We could not process the following contigs as we don't have the appropriate annotations. We currently support:
+
+        {% for build_name, data in contigs_import.items %}
+            <P>
+                <b>Build:</b> {{ build_name }} <b>Contigs:</b> {{ data.contigs }}
+            </p> 
+        {% endfor %}
+
+        <table>
+        <tr><th>Contig <th># skipped
+        {% for skipped_contig in skipped_contigs.vcfskippedcontig_set.all %}
+            <tr><td>{{ skipped_contig.contig }} <td> {{ skipped_contig.num_skipped }}
+        {% endfor %}
+        </table>
+    {% endif %}
+
+    {% if vcf_skipped_gvcf_non_var_blocks %}
+        <h3>Skipped gVCF non-var block records</h3>
+        <div>
+        <p>
+        VariantGrid does not support gVCF-specific information, and we <b>skipped {{ vcf_skipped_gvcf_non_var_blocks.num_skipped }} non-var block records.</b>
+        
+        <p>
+        A problem with normal VCF files is knowing whether the lack of a variant entry is due to the sample having no mutation (reference base at that locus), or no coverage over that position.  
+
+        <p>
+        gVCF fix this issue by storing read information for all sites, not just variant calls. We don't currently make use of this information, and the amount of data is very large, so we don't store it. 
+
+        <p>
+        For more information about gVCFs, please see: <a href='https://gatkforums.broadinstitute.org/gatk/discussion/4017/what-is-a-gvcf-and-how-is-it-different-from-a-regular-vcf'>What is a GVCF and how is it different from a 'regular' VCF?</a>.
+        </div>
+    {% endif %}
+        
+
+    {% if modified_imported_variants %}
+    <div>
+        <h3>Modified Imported Variants</h3>
+        <p>We <a target='_blank' href="https://genome.sph.umich.edu/wiki/Vt#Normalization">Decompose and Normalise variants using VT</a> during import, so variants from different VCF files have a consistent representation.  
+        
+        {% load jqgrid_tags %}
+        {% jqgrid 'upload_pipeline_modified_variants_grid' name='Modified Imported Variant' search=False upload_pipeline_id=upload_pipeline.pk %}
+    </div>
+    {% endif %}
+
+
+
+{% endblock %}

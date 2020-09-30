@@ -1,0 +1,81 @@
+{% extends menu_patients_base %}
+
+{% block title %}Sort Cohort{% endblock %}
+
+{% block head %}
+<style>
+	ul#cohort-samples-sortable {
+		list-style: none;
+	}
+
+	div#cohort-samples-widget {
+		padding-top: 10px;
+	}
+
+	#cohort-samples-widget li
+	{
+		width: 300px;
+		margin: 0;
+		padding: 5px;
+		margin-right: 10px;
+		border: 1px solid #eee;
+	}
+	
+	li.selected-column {
+		border: 1px solid red !important;
+	}
+
+	li.cohort-sample {
+		font-weight: bold;
+	}
+	
+</style>
+
+<script>
+	// .sortable('serialize') doesn't work with multiple underscores
+	function serialize_cohort_samples(select) {
+		var ids = [];
+		$('.cohort-sample', select).each(function() { ids.push($(this).attr("id")) });
+		return ids.toString();
+	}
+</script>
+{% endblock %}
+
+{% block jsdocumentready %}
+	console.log($("#cohort-samples-sortable"));
+	$("#cohort-samples-sortable").sortable({
+	    items: "li.cohort-sample",
+	}).bind("sortupdate", function(event, ui) {
+	        var cohort_samples = serialize_cohort_samples("#cohort-samples-sortable");
+
+	        $.ajax({
+	            type: "POST",
+	            data: 'cohort_samples=' + cohort_samples,
+	            url: "{{ request.path }}"
+	        });
+	}).disableSelection();
+{% endblock %}
+
+{% block submenu_page_content %}
+
+<div>
+	<a href="{% url 'view_cohort' cohort.pk %}">Back to cohort {{ cohort.name }}</a>
+
+	<h3>Sort Cohort: {{ cohort.name }}</h3>
+
+	<div>
+		<p>Drag and drop to change ordering. 
+	</div>
+
+	<div id="cohort-samples-widget">
+		<ul id="cohort-samples-sortable">
+		    {% for cohort_sample in cohort_samples %}
+			    <li class="cohort-sample cursor-move" id="{{ cohort_sample.pk }}" sample_id="{{ cohort_sample.pk }}">
+			    	{{ cohort_sample.sample }}
+			    </li>
+		    {% endfor %}
+		</ul>
+	</div>
+</div>
+
+{% endblock %}

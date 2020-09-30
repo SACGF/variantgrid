@@ -1,0 +1,12 @@
+<!-- Needs plotly and plotly_helpers included -->
+{% load js_tags %}
+<script>
+$(document).ready(function() {
+    var enrichment_kits_over_time = {{ enrichment_kits_over_time | jsonify }};
+    var enrichment_kit_labels = {{ enrichment_kit_labels | jsonify }};
+    var title = "{{ title }}";
+
+    showStackedBar('enrichment_kits-by-time-{{ uuid }}', title, enrichment_kits_over_time, enrichment_kit_labels)
+});
+</script>
+<div id='enrichment_kits-by-time-{{ uuid }}'></div>

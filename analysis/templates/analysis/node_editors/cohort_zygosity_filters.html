@@ -1,0 +1,91 @@
+<style>
+table.zygosity-filter-table {
+	text-align: center;
+	border-collapse: collapse;
+	border-spacing: 0px;
+}
+
+table.zygosity-filter-table tr.top-header th {
+	border-left: 1px solid black;
+	border-right: 1px solid black;
+	padding-left: 5px;
+	padding-right: 5px;
+	margin: 0px;
+}
+
+</style>
+<script>
+function checkIfAllChecked(toggle, array) {
+	var numChecked = 0;
+	array.each(function() { numChecked += $(this).is(":checked"); });
+	var allChecked = numChecked == array.length;
+	$(toggle).prop('checked', allChecked);
+}
+
+function checkboxSetup(addClickHandler) {
+	$(".toggle-row").each(function() {
+		var rowInputs = $("input[type=checkbox][class!='toggle-row']", $(this).parents("tr"));
+		checkIfAllChecked(this, rowInputs);
+		
+		if (addClickHandler) {
+			$(this).click(function() {
+				rowInputs.prop('checked', $(this).is(":checked"));
+			});
+		}
+	});
+
+	$(".toggle-column").each(function() {
+		var columnName = $(this).attr("column_name");
+		var columnInputs = $("input[type=checkbox]", "td." + columnName);
+		checkIfAllChecked(this, columnInputs);
+
+		if (addClickHandler) {
+			$(this).click(function() {
+				columnInputs.prop('checked', $(this).is(":checked"));
+			});
+		}
+	});
+}
+
+$(document).ready(function() {
+	checkboxSetup(true);
+	
+	$("input[type=checkbox]", "table.zygosity-filter-table").click(function() {
+		checkboxSetup(false);
+	});
+});
+</script>
+
+<table class='zygosity-filter-table'>
+<tr class="top-header">
+	<td></td>
+    <th>Show In Grid</th>
+	<th>Ref</th>
+	<th>Het</th>
+	<th>Hom</th>
+	<th>No Zygosity call in sample</th>
+	<td><i>Toggle Row</i></td>
+{% for form in formset %}
+	<tr class='cohort-node-zygosity-filter'>
+	{% for field in form.hidden_fields %}
+		{{ field }}
+	{% endfor %}
+		<th> {{ form.cohort_sample }}
+        <td class="show_in_grid">   {{ form.show_in_grid }}
+		<td class="zygosity_ref">	{{ form.zygosity_ref }}
+		<td class="zygosity_het"> 	{{ form.zygosity_het }}
+		<td class="zygosity_hom">	{{ form.zygosity_hom }}
+		<td class="zygosity_none">	{{ form.zygosity_none }}
+		<td><input type="checkbox" class="toggle-row"></td>
+	</tr>
+{% endfor %}
+	<tr>
+	<td><i>Toggle Column</i></td>
+    <th><input type="checkbox" class="toggle-column" column_name="show_in_grid"></th>
+	<th><input type="checkbox" class="toggle-column" column_name="zygosity_ref"></th>
+	<th><input type="checkbox" class="toggle-column" column_name="zygosity_het"></th>
+	<th><input type="checkbox" class="toggle-column" column_name="zygosity_hom"></th>
+	<th><input type="checkbox" class="toggle-column" column_name="zygosity_none"></th>
+	<td></td>
+	</tr>
+</table>

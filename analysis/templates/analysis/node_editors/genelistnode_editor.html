@@ -1,0 +1,107 @@
+{% extends "analysis/node_editors/grid_editor_gene_coverage_tab.html" %}
+{% load static %}
+{% block docreadyjs %}
+    {{ block.super }}
+
+    var geneListForm = $('#node-gene-list-form');
+    ajaxForm(geneListForm);
+    accordionForm(geneListForm);
+
+    // Keep two checkboxes in sync
+    function mirrorCheckbox(checkbox, otherCheckbox) {
+        var checked = $(checkbox).is(":checked");
+        otherCheckbox.prop('checked', checked);
+    }
+    mirrorCheckbox($("#id_exclude"), $("#mirror-exclude")); // set initial value
+    $("#id_exclude").change(function() { mirrorCheckbox(this, $("#mirror-exclude")); });
+    $("#mirror-exclude").change(function() { mirrorCheckbox(this, $("#id_exclude")); });
+
+{% endblock docreadyjs %}
+
+{% block content %}
+{% if not has_sample_qc_gene_lists %}
+<link href="{% static 'css/companies.css' %}" rel="stylesheet">
+<style>
+#sample-qc-gene-list {
+    display: none;
+}
+
+#pathology-test-gene-list {
+{% if not pathology_test_category %}
+    display: none;
+{% endif %}
+}
+
+.gene-list-icon {
+    float: left;
+}
+
+#unmatched-genes-warning {
+    width: 500px;
+    padding: 20px;
+    margin: 10px;
+}
+
+</style>
+{% endif %}
+
+<div>
+	<form id="node-gene-list-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+		<div id="accordion-container">
+			<ul class="accordion">
+                <li>
+                <h3>Named Gene Lists</h3>
+                <div>
+                    <div class='gene-list-icon icon48'></div>
+                    <div><b>Gene List:</b> {{ form.gene_list }}</div>
+                    <div><b>Exclude:</b> {{ form.exclude }} (filter OUT these genes)</div>
+                    <div class='clear'></div>
+
+                </div>
+                </li>
+                <li>
+                <h3>Custom Gene List</h3>
+                    <div id='custom-gene-list-form'>
+                        <div>{{ form.custom_gene_list_text }}</div>
+                        <div><b>Exclude:</b> <input id='mirror-exclude' type='checkbox'> (filter OUT these genes)</div>
+
+                    </div>
+                </li>
+                <li id='sample-qc-gene-list'>
+                <h3>Sample QC Gene List</h3>
+                <div>Sample: {{ form.sample  }}
+                </div>
+                </li>
+                <li id='pathology-test-gene-list'>
+                <h3>{{ pathology_test_category.name }}</h3>
+                <div>
+                    <div>
+                        <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div> {{ form.pathology_test_gene_list }}<a class="cross-link" id="pathology-test-gene-list-link"></a>
+                        <div class='clear'></div>
+                    </div>
+                </div>
+                </li>
+			</ul>
+		</div>
+        <div>
+		{% for gene_list in gene_lists %}
+            {% if gene_list.warning %}
+		        <div id='unmatched-genes-warning' class='warning'>{{ gene_list }}: {{ gene_list.warning }} (see genes tab)</div>
+            {%  endif %}
+		{% endfor %}
+		</div>
+
+        {% comment %}Analysis template "add output node" checkbox{% endcomment %}
+        {% if form.output_node  %}
+            <p>{{ form.output_node.label }}{{ form.output_node }}</p>
+        {% endif %}
+		<button id="gene-list-button" class="btn btn-primary">save</button>
+		{{ form.media }}
+	</form>
+</div>
+{% endblock content %}

@@ -1,0 +1,589 @@
+#render ul {
+    padding-left:1em;
+}
+#render ul li {
+    list-style-type:none;
+}
+#render h5 {
+    display:inline;
+}
+
+.otherLibraries {
+    display:inline;
+}
+
+.selected {
+	color:rgb(189,11,11) !important;
+}
+
+.noselect {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.window, .label { 
+    z-index:24;
+	cursor:pointer;
+}
+
+.default-node-container {
+    background-color:white;
+    text-align:center;
+	box-shadow: 2px 2px 19px;
+   -o-box-shadow: 2px 2px 19px;
+   -webkit-box-shadow: 2px 2px 19px;
+   -moz-box-shadow: 2px 2px 19px;
+}
+
+path, ._jsPlumb_endpoint { cursor:pointer; }
+
+/* z index stuff. windows are at z-index 24. */
+
+._jsPlumb_connector { z-index:18; }
+._jsPlumb_endpoint { z-index:19; }
+._jsPlumb_overlay { z-index:20; }
+
+._jsPlumb_connector._jsPlumb_hover {
+    z-index:21 !important;
+}
+
+._jsPlumb_endpoint._jsPlumb_hover {
+    z-index:22 !important;
+}
+
+._jsPlumb_overlay._jsPlumb_hover {
+    z-index:23 !important;
+}
+
+
+span.attach-label {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 22px;
+	height: 22px;
+	text-align: center;
+	color: white;
+	font-weight: bold;
+	font-size: 24px;
+	pointer-events: none;
+}
+
+
+span.detach-label {
+	position: absolute;
+	top: -5px;
+	left: 0px;
+	width: 18px;
+	height: 18px;
+	text-align: center;
+	color: white;
+	font-weight: bold;
+	font-size: 24px;
+	cursor: pointer;
+}
+
+button.add-analysis-variable-button {
+	background-color: #fcbe67;
+	border: 2px solid #fcbe67;
+}
+
+.node-field-locked {
+	background-color: #fcbe67;
+	border: 2px solid #fcbe67;
+}
+
+.analysis-variable-node {
+	border: 3px solid #fcbe67;
+	height: 100%;
+}
+
+.analysis-variable {
+	background-color: #fcbe67;
+	font-size: .7em;
+}
+
+#av-example-add-button {
+	padding: 0px;
+}
+
+#analysis-variables-help {
+	width: 300px;
+	padding-right: 10px;
+}
+
+#analysis-template-save {
+	border: 3px solid gray;
+	margin-right: 5px;
+	height: 100%;
+}
+
+#analysis-template-form {
+	margin: 5px;
+}
+
+/* Icons in select */
+#id_node_types-button {
+    padding: 0.1em;
+}
+
+/* select with custom icons */
+.ui-selectmenu-menu .ui-menu.customicons .ui-menu-item-wrapper {
+  padding: 0.1em 0 0.1em 3em;
+}
+.ui-selectmenu-menu .ui-menu.customicons .ui-menu-item .ui-icon {
+  height: 24px;
+  width: 24px;
+  top: 0.1em;
+}
+
+ul.customicons .ui-icon {
+    background-size: 24px 24px;
+}
+
+.ui-icon.AlleleFrequencyNode { 
+    background-image: url(/static/images/node_icons/variant_allele_frequency.png);
+}
+
+
+.ui-icon.PedigreeNode {
+    background-image: url(/static/images/node_icons/pedigree.png);
+}
+
+.ui-icon.TrioNode { 
+    background-image: url(/static/images/node_icons/trio.png);
+}
+
+.ui-icon.FilterNode { 
+    background-image: url(/static/images/node_icons/filter.png);
+}
+
+.ui-icon.IntersectionNode { 
+    background-image: url(/static/images/node_icons/intersection.png);
+}
+
+.ui-icon.GeneListNode { 
+    background-image: url(/static/images/node_icons/filter_list.png);
+}
+
+.ui-icon.AnalysisNode { 
+    background-image: url(/static/images/node_icons/analysis_node.png);
+}
+
+.ui-icon.CohortNode { 
+    background-image: url(/static/images/node_icons/cohort.png);
+}
+
+.ui-icon.ExpressionNode { 
+    background-image: url(/static/images/node_icons/expression.png);
+}
+
+.ui-icon.SelectedInParentNode {
+    background-image: url(/static/images/node_icons/checklist_icon.png);
+}
+
+.ui-icon.PopulationNode { 
+    background-image: url(/static/images/node_icons/population_node.png);
+}
+
+.ui-icon.PhenotypeNode { 
+    background-image: url(/static/images/node_icons/phenotype_node.png);
+}
+
+.ui-icon.ZygosityNode { 
+    background-image: url(/static/images/node_icons/punnet_square.png);
+}
+
+.ui-icon.DamageNode { 
+    background-image: url(/static/images/node_icons/damage_node.png);
+}
+
+.ui-icon.TissueNode { 
+    background-image: url(/static/images/node_icons/tissue_node.jpg);
+}
+
+.ui-icon.ClassificationsNode { 
+    background-image: url(/static/images/diagnose_icon.png);
+}
+
+.ui-icon.SampleNode { 
+    background-image: url(/static/images/node_icons/sample_icon_24.png);
+}
+
+.ui-icon.BuiltInFilterNode { 
+    background-image: url(/static/images/node_icons/built_in_filter_icon_24.png);
+}
+
+.ui-icon.AllVariantsNode { 
+    background-image: url(/static/icons/database-1-1.png);
+}
+
+.ui-icon.VennNode { 
+    background-image: url(/static/images/node_icons/venn_icon_24.png);
+}
+
+.ui-icon.TagNode { 
+    background-image: url(/static/icons/tags_colored.png);
+}
+
+
+.ui-icon.MergeNode { 
+    background-image: url(/static/images/node_icons/merge.png);
+}
+
+
+/* */
+.AlleleFrequencyNode { 
+    background-image: url(/static/images/node_icons/variant_allele_frequency.png);
+    width: 50px;
+    height: 40px;
+    background-size: 50px 40px;
+}
+
+
+.AllVariantsNode { 
+    background-image: url(/static/icons/database-1-1.png);
+}
+
+.PedigreeNode { 
+	background-image: url(/static/images/node_icons/pedigree.png);
+}
+
+.TrioNode { 
+    background-image: url(/static/images/node_icons/trio.png);
+    background-size: 30px 25px;
+    background-position: bottom;
+}
+
+.TrioNode.mother-affected { 
+    background-image: url(/static/images/node_icons/trio_mother_affected.png);
+}
+
+.TrioNode.father-affected { 
+    background-image: url(/static/images/node_icons/trio_father_affected.png);
+}
+
+.TrioNode.mother-affected.father-affected { 
+    background-image: url(/static/images/node_icons/trio_mother_affected_father_affected.png);
+}
+
+.FilterNode { 
+	background-image: url(/static/images/node_icons/filter.png);
+}
+
+.IntersectionNode { 
+	background-image: url(/static/images/node_icons/intersection.png);
+}
+
+.GeneListNode { 
+	background-image: url(/static/images/node_icons/filter_list.png);
+}
+
+.AnalysisNode { 
+	background-image: url(/static/images/node_icons/analysis_node.png);
+}
+
+.CohortNode { 
+    width: 70px;
+    height: 70px;
+    background-size: 70px 70px;
+	background-image: url(/static/images/node_icons/cohort.png);
+}
+
+.ExpressionNode { 
+	background-image: url(/static/images/node_icons/expression.png);
+}
+
+
+.SelectedInParentNode {
+	width: 40px;
+	height: 40px;
+	background-size: 40px 40px;
+
+	background-image: url(/static/images/node_icons/checklist_icon.png);
+}
+
+.PopulationNode { 
+	background-image: url(/static/images/node_icons/population_node.png);
+}
+
+.PhenotypeNode { 
+	background-image: url(/static/images/node_icons/phenotype_node.png);
+	width: 50px;
+	height: 60px;
+	background-size: 50px 60px;
+}
+
+
+.ZygosityNode { 
+	background-image: url(/static/images/node_icons/punnet_square_30_perc_opacity.png);
+	width: 53px;
+	height: 39px;
+	background-size: 53px 39px;
+}
+
+.DamageNode { 
+	background-image: url(/static/images/node_icons/damage_node.png);
+}
+
+.TissueNode { 
+	background-image: url(/static/images/node_icons/tissue_node.jpg);
+}
+
+.ClassificationsNode { 
+    background-image: url(/static/images/diagnose_icon.png);
+}
+
+
+#analysis-toolbar {
+	vertical-align: middle;
+}
+
+#analysis-toolbar div {
+	float: left;
+	clear: none;
+}
+
+.toolbar-buttons {
+	float: right;
+	height: 20px;
+}
+
+.toolbar-button {
+	display: block;
+	float: left;
+	width: 16px;
+	height: 16px;
+	margin: 2px;
+}
+
+#add-node-button {
+	background-image: url(/static/icons/add-icon.png);
+}
+
+#copy-node-button {
+	background-image: url(/static/icons/copy.png);
+}
+
+#del-node-button {
+	background-image: url(/static/icons/delete-icon.png);
+}
+
+#settings-button {
+	background-image: url(/static/icons/settings-icon.png);
+}
+
+#view-tags-button {
+	background-image: url(/static/icons/tags_colored.png);
+	width: 22px;
+	height: 19px;
+}
+
+#dual-screen-button {
+	background-image: url(/static/icons/multiple_monitors.png);
+}
+
+
+#input-samples-button {
+    background-image: url(/static/icons/samples_icon_small.png);
+    width: 21px;
+    height: 19px;
+}
+
+
+#base-node-editor {
+	width: 200px;
+}
+
+.default-node-container {
+	border: 1px dotted gray;
+}
+
+.node-editor-description #node-name {
+	font-weight: bold;
+}
+ 
+.ui-selected.default-node-container {
+	border: 1px solid red;
+}
+
+.ui-selected .sample-node {
+	stroke: #ff0000;
+}
+
+#node-size-slider {
+	width: 100px;
+}
+
+.ui-jqgrid-titlebar {
+	display: none;
+}
+
+.tag-counter {
+	padding: 1px;
+	margin-left: 5px;
+	border: 1px solid black;
+	border-radius: 5px;
+	background-color: #ffffff;
+}
+
+.tag-button {
+	margin: 5px;
+	padding: 5px;
+}
+
+tr.jqgrow {
+	background-image: None;
+}
+
+table.grid tr.ui-state-highlight {
+	background-image: None;
+}
+
+input.narrow {
+	width: 60px;
+}
+
+div.node-color-overlay {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	pointer-events: none;
+	width: 100%;
+	height: 100%;
+}
+
+.variable-node .node-color-overlay {
+	background-color: #fcbe6755;
+}
+
+.output-node .node-color-overlay {
+	background-color: #0E9A0055;
+}
+
+
+div.node-overlay {
+	color: black; 
+	pointer-events: none;
+}
+
+div.count-overlay {
+	z-index: 40;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	pointer-events: none;
+}
+
+span.node-counts {
+	bottom: 0px;
+	right: 0px;
+	position: absolute;
+}
+
+.node-counts .clickable-count {
+	pointer-events: auto;
+}
+
+.node-counts .node-counts-selected  {
+	border: 1px solid red;
+}
+
+span.gene-list-security {
+	bottom: 0px;
+	position: absolute;
+    width: 20px;
+    height: 20px;
+    background-size: 20px 20px;
+	background-image: url(/static/icons/lock.gif);
+	pointer-events: auto;
+}
+
+.autocomplete-light-widget {
+	z-order: 9999999;
+}
+
+.node-count {
+	clear: both;
+	display: none;
+}
+
+.grid-tag .user-tag-colored {
+    margin: 2px;
+    padding: 2px;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.add-variant-tag {
+    width: 16px;
+    height: 16px;
+    background-size: 16px 16px;
+    background-image: url(/static/icons/add-icon.png);
+    display: inline-block;
+    cursor: pointer;
+}
+
+
+@keyframes redpulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 100, 100, 0.4); }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 100, 100, 0); }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 100, 100, 0); }
+}
+
+.red-pulse {
+    animation: redpulse 2s;
+}
+
+#analysis-outer-container {
+	padding: 0px;
+}
+
+#right-panel {
+	height: 100%;
+}
+
+.no-close .ui-dialog-titlebar-close {
+  display: none;
+}
+
+#node-count-legend {
+	position: absolute;
+	left: 0px;
+	bottom: 0px;
+	cursor: default;
+}
+
+.legend-row {
+	margin: 5px;
+}
+
+.legend-color-box {
+   width: 20px;
+   height: 20px;
+   float: left;
+   margin-right: 5px;
+}
+
+.legend-label {
+   float: left;
+}
+
+.editor-loading {
+   height: 100px;
+}
+
+#content {
+   padding: 0px;
+}
+
+#footer, #footer-bottom {
+	display: none;
+}

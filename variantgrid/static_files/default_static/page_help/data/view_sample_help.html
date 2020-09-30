@@ -1,0 +1,28 @@
+<h4>VCF sample name</h4>
+
+The name from the VCF, this cannot be changed. Sample name is initially set to this but can be changed.
+
+<h4>BAM file path</h4>
+
+The path to a BAM file, used with <b>IGV integration</b> (Settings -> IGV Integration) to automatically load bams with IGV links.
+
+<h4>Variants Type</h4>
+
+<p>
+Variants type can be 1 of 4 values:
+</p>
+
+<ul>
+    <li>Unknown</li>
+    <li>Germline</li>
+    <li>Mixed (single Sample)</li>
+    <li>Somatic only (Tumor minus normal)</li>
+</ul>
+
+<p>
+When a VCF is imported, we look at the "source" field in the header. If it contains  "freeBayes" it is set to "Mixed". If it contains "combine_caller_data" (tumor-normal pipeline) then it's set to "Somatic only". Otherwise it's left as "unknown"
+</p>
+
+<p>
+Mutational signatures are calculated for <b>Somatic only</b> samples, and some analysis templates only appear for certain variant types.
+</p>

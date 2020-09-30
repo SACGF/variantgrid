@@ -1,0 +1,8 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block formatter %}
+   		viewQCLink : function(qcId) {
+			var url = Urls.view_qc(qcId);
+	    	return "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
+		}
+{% endblock formatter %}

@@ -1,0 +1,33 @@
+<style>
+#delete-vcf-container {
+	display: none;
+	padding: 5px;
+}
+</style>
+<script>
+$(document).ready(function() {
+    $('#id_vcf').change(function() {
+        let vcfId = $(this).val();
+        if (vcfId) {
+            window.location = Urls.view_vcf(vcfId);
+        }
+    });
+});
+
+</script>
+
+<form id="vcf-form">
+    {% csrf_token %}
+    <div class="horizontal-fields">
+    {{ form.as_p }}
+    {{ form.media }}
+    </div>
+</form>
+
+
+<div>
+{% load jqgrid_tags %}
+{% user_data_grid_filter 'vcf' 'VCFs' %}
+
+{% jqgrid 'vcfs_grid' 'vcf' search=False delete=True template_name='snpdb/grids/vcfs_grid.html' %}
+</div>

@@ -1,0 +1,56 @@
+{% load user_tags %}
+{% load js_tags %}
+{% load english_tags %}
+{% load ui_utils %}
+
+<div class="card lab-card">
+    <div class="card-header">
+        <div class="font-weight-bold">
+        {% if url_name_visible.view_organization and org_link %}
+            <a class="hover-link" href="{% url 'view_organization' org.pk %}">{{ org }}</a>
+        {% else %}
+            {{ org }}
+        {% endif %}
+        </div>
+        <div>
+        {% if lab_link and url_name_visible.view_lab %}
+            <a class="hover-link" href="{% url 'view_lab' lab.pk %}">{{ lab }}</a>
+        {% else %}
+            {{ lab }}
+        {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% labelled id_prefix=lab.group_name id="city" label="City" hint="tiny" %}{{ lab.city }}{% endlabelled %}
+        {% labelled id_prefix=lab.group_name id="users" label="Users" hint="tiny" %}{% count lab.active_users.count singular="1 user" plural="users" %}{% endlabelled %}
+
+        <ul class="list-group mb-3">
+            {% for lab_user in lab.lab_users %}
+                {% if lab_user.role == 'head' or is_member %}
+                    {% user lab_user.user show_avatar=True show_email=is_member show_last_login=is_member display='list-group-item' role=lab_user.role %}
+                {% endif %}
+            {% endfor %}
+        </ul>
+
+        {% if lab.total_classifications %}
+            {% if shared_classifications %}
+                {% labelled hint="tiny" id_prefix=lab.group_name id="shared" label="Shared Classifications" %}
+                    {{ lab.total_shared_classifications }}
+                    {% if user.is_superuser and lab.total_unshared_classifications %}
+                        <span class="admin-only">({{ lab.total_unshared_classifications }} unshared)</span>
+                    {% endif %}
+                {% endlabelled %}
+            {% else %}
+                {% labelled hint="tiny" id_prefix=lab.group_name id="shared" label="Classifications" %}
+                {{ lab.total_classifications}} ({{ lab.total_shared_classifications }} shared)
+                {% endlabelled %}
+            {% endif %}
+            {% labelled hint="tiny" label="First Record" %}{% timestamp lab.classifications_by_created.first.created time_ago=True %}{% endlabelled %}
+            {% labelled hint="tiny" label="Last Updated" %}{% timestamp lab.classifications_by_modified.first.modified time_ago=True %}{% endlabelled %}
+            {% labelled hint="tiny" label="Last New Record" %}{% timestamp lab.classifications_by_created.last.created time_ago=True %}{% endlabelled %}
+            {% labelled hint="tiny" label="Avg/Week" %}{{ lab.classifications_per_week | floatformat:1 }}{% endlabelled %}
+        {% else %}
+            {% labelled hint="tiny" id_prefix=lab.group_name id="shared" label="Classifications" %}None{% endlabelled %}
+        {% endif%}
+    </div>
+</div>

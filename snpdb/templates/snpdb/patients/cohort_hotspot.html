@@ -1,0 +1,67 @@
+{% extends menu_patients_base %}
+{% load static %}
+
+{% block title %}{{ cohort.name }}{% endblock %}
+{% block head %}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+	<style>
+		#cohort-hotspot-graph {
+		    width: 100%;
+	    	height: 480px;
+	    	text-align: center;
+		}
+		
+		#right-panel {
+			margin-left: 200px;
+	    	//float: right;
+	    	text-align: left;
+		}
+		
+		#gene_list {
+			float: left;
+			width: 200px;
+		}
+		
+	</style>
+{% endblock %}
+{% block jshead %}
+	function load_hotspot_graph(transcriptId) {
+		let graphSelector = $('#cohort-hotspot-graph');
+		graphSelector.empty();
+		graphSelector.addClass('generated-graph graph-loading');
+        var url = Urls.cohort_hotspot_graph({{ cohort.pk }}, transcriptId);
+        graphSelector.load(url);
+	}
+{% endblock %}
+{% block jsdocumentready %}
+    $("button#view-cohort-hotspot").button();
+
+    $("#gene-and-transcript-form").submit(function(e){
+        e.preventDefault();
+        var transcriptId = $("#id_transcript").val();
+        if (transcriptId) {
+            load_hotspot_graph(transcriptId);
+        }
+    });
+
+{% endblock %}
+
+{% block submenu_page_content %}
+	<a href="{% url 'view_cohort' cohort.pk %}">Back to cohort {{ cohort.name }}</a>
+	<div id="cohort-analysis">
+		<h3>Cohort: {{ cohort.name }}</h3>
+		{% if cohort.import_status == 'S' %}
+    		<form id="gene-and-transcript-form">
+                {{ form.as_p }}
+                {{ form.media }}
+                <button id='view-cohort-hotspot'>Show Hotspots</button>
+	       </form>
+			<div id='cohort-hotspot-graph'>
+				Search for a gene to load hotspot graph.
+			</div>
+		{% else %}
+			You have not saved this cohort, you shouldn't be able to see this page.
+		{% endif %}
+	</div>
+
+{% endblock %}

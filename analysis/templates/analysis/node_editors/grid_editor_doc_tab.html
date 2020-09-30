@@ -1,0 +1,58 @@
+<script>
+$(document).ready(function() {
+    // Exit Node name edit on enter
+    $('#id_name').keypress(function(e) {
+      if(e.keyCode == 13) {
+        $(this).blur();
+      }
+    });
+    
+    var nodeDocForm = $("form#node-doc-form");
+    var options = {
+        target: $("#node-doc"),
+        success: function() {
+            retrieveAndUpdateNodeAppearances([{{ node.pk }}]);
+        },
+    };
+    nodeDocForm.ajaxForm(options);
+    $("#id_name", nodeDocForm).on('input', function() {
+        $("#id_auto_node_name", nodeDocForm).prop("checked", false);
+    });
+    $("#id_auto_node_name", nodeDocForm).change(function() {
+        if ($(this).is(":checked")) {
+            var autoNodeName = $("#id_auto_name", nodeDocForm).val()
+            $("#id_name", nodeDocForm).val(autoNodeName);
+        }
+    });
+    
+});
+</script>
+<div id="node-doc">
+    <form id="node-doc-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+        <div>
+            <div>
+                <b>Name:</b> {{ form.name }} {{ form.auto_node_name }} Auto Node Name.
+            </div>
+            <div>
+                <label>{{ form.output_node.label }}</label>
+                {{ form.output_node }}
+            </div>
+        {% if form.hide_node_and_descendants_upon_template_configuration_error %}
+            <div>
+                <label>{{ form.hide_node_and_descendants_upon_template_configuration_error.label }}</label>
+                {{ form.hide_node_and_descendants_upon_template_configuration_error }}
+            </div>
+        {% endif %}
+            <button id='node-doc-save' class="btn btn-primary">save</button>
+        </div>
+    </form>
+
+    <b>Node wiki:</b>
+    {% load wiki_tags %}
+    {% wiki_editor node.nodewiki class_name='analysis.models.NodeWiki' unique_keyword='node_id' unique_value=node.pk %}
+
+</div>

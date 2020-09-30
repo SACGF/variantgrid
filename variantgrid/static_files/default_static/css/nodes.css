@@ -1,0 +1,27 @@
+// Moved this into own file as we need this in different project (for patient_samplenodes)
+
+.sample-node {
+	stroke: #808080;
+}
+
+.window {
+	border: none; 
+	width: 60px;
+	height: 45px;
+	position:absolute; 
+	color: #aaa;
+	font-family:serif;
+	font-style:italic;
+	font-size: 0.8em;
+	background-repeat:no-repeat;
+	background-size: 60px 45px;        
+	/* Don't allow big text to overflow the node... */
+	padding: 0px;
+	stroke: #808080;
+}
+
+.window .node-name {
+	margin: 0px;
+	top: 0px;
+	font-weight: bold;
+}

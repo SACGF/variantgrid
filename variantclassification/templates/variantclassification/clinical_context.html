@@ -1,0 +1,45 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load classification_tags %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% block title %}Clinical Context{% endblock %}
+{% block head %}
+    <script>
+    $(document).ready(() => {
+        Flags.instance.init({userId: '{{user.id}}'});
+    });
+    </script>
+{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+
+{% block content %}
+    <div class="container">
+        <h3>Clinical Context</h3>
+        <div class="card">
+            <div class="card-header"><h5>{{ cc.name }}</h5></div>
+            <div class="card-body">
+                {% labelled label="Status" %}{{ cc.get_status_display }}{% endlabelled %}
+                {% labelled label="Flags" %}<div class="flags" data-flags="{{cc.flag_collection_safe.id}}">...</div>{% endlabelled %}
+                {% labelled label="Allele" %}<a class="hover-link" href="{% url 'view_allele' cc.allele.id %}">{{ cc.allele }}</a>{% endlabelled %}
+                <!-- TODO convert into timeago -->
+                {% labelled label="Last Calculated" %}{{ date }} {{ timezone }}{% endlabelled %}
+                {% labelled label="Last Trigger" %}{{ trigger }}{% endlabelled %}
+                {% labelled label="Last Status Change" %}{{ old_status }} -> {{ new_status }}{% endlabelled %}
+                {% labelled label="Last Considered Classifications" %}
+                    Note that classifications that are not shared at a high enough level or withdrawn are not included here:<br/>
+                    {{ record_error }}
+                    {% for vcm in records %}
+                    <a class="hover-link" href="{% url 'view_variant_classification' vcm.id_str %}">{{ vcm.variant_classification.friendly_label }}</a> @ {{ vcm.modified }}<br/>
+                    {% endfor %}
+                {% endlabelled %}
+                {% labelled label="Currently Associated Classifications" %}
+                    {% for classification in cc.variant_classifications_associated_qs %}
+                        {% classification_quick classification %}<br/>
+                    {% endfor %}
+                {% endlabelled %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

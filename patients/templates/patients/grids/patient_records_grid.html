@@ -1,0 +1,8 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block formatter %}
+            viewPatientRecordsLink : function(patientRecordsId) {
+                var url = Urls.view_patient_records(patientRecordsId);
+                return "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
+            }
+{% endblock formatter %}

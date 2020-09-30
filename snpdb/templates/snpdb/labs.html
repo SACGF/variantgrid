@@ -1,0 +1,108 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% load static %}
+{% block title %}Labs{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<style>
+
+    .leaflet-container {  /* map thumbnail */
+        margin-top: 50px;
+        width:  310px;
+        height: 310px;
+    }
+
+    .graph-switch {
+        position: relative;
+        top: -10px;
+        text-align: center;
+    }
+
+    .per-org {
+        display: none;
+    }
+    .lab-card {
+        height: 100%;
+    }
+
+</style>
+<script>
+    var PATHOGENIC_COLORS = [   '#777777', // other
+                                '#00aa00', // Benign
+                                '#aaeeaa', // Likely benign
+                                '#ffd92a', // VUS
+                                '#eeaaaa', // Likely pathogenic
+                                '#ee3333', // pathogenic
+                                ];
+
+    {%  if show_unclassified %}
+        PATHOGENIC_COLORS.push('#1f77b4'); // Unclassified
+    {%  endif %}
+
+    function plotClassifications(selector, vc_data, title, width, height) {
+        for (var i=0 ; i<vc_data.length ; ++i) {
+            vc_data[i]["marker"] = {color : PATHOGENIC_COLORS[i]};
+        }
+        var layout = defaultLayout(title, width, height);
+        layout["barmode"] = 'stack';
+        Plotly.newPlot(selector, vc_data, layout);
+    }
+
+    function showOrg() {
+        $(".per-org").show();
+        $(".per-state").hide();
+    }
+
+    function showState() {
+        $(".per-org").hide();
+        $(".per-state").show();
+    }
+
+    $(document).ready(() => {
+        {% if vc_org_data %}
+            var vc_org_data = {{ vc_org_data | jsonify }};
+            plotClassifications('org-classifications-graph', vc_org_data, 'Classifications per organisation', 600, 380);
+        {% endif %}
+
+        {% if vc_state_data %}
+            var vc_state_data = {{ vc_state_data | jsonify }};
+            plotClassifications('state-classifications-graph', vc_state_data, 'Classifications per state', 600, 380);
+        {% endif %}
+    });
+</script>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h3>Lab Submissions</h3>
+        <div class="row">
+            <div class="col-lg-8">
+                <div id='org-classifications-graph' class="per-org"></div>
+                <div id='state-classifications-graph' class="per-state"></div>
+                <div class="graph-switch">
+                    <a class="per-state hover-link" href="javascript:showOrg();">Show by organisation</a></span>
+                    <a class="per-org hover-link" href="javascript:showState();">Show by state</a></span>
+                </div>
+            </div>
+            <div class="col-lg-4">
+              {% load lab_location_tags %}
+              {% lab_locations labs=labs involved_only=False center_lat=-33 center_long=133.7751 zoom_level=3 %}
+            </div>
+        </div>
+
+        <div class="row equal">
+        {% for org, labs in organization_labs.items %}
+            {% for lab in labs %}
+                <div class="col-md-6 col-lg-4 mt-4">
+                {% lab_card lab %}
+                </div>
+            {% endfor %}
+        {% endfor %}
+        </div>
+    </div>
+{% endblock %}

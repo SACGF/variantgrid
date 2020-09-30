@@ -1,0 +1,47 @@
+{% extends "analysis/node_data/base_node_data.html" %}
+{% block content %}
+<style>
+.aligner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.base-label {
+    font-weight: bold;    
+}
+</style>
+<div id='dataframe-container'>
+{% load text_tags %} 
+
+{% if ti_tv_ratio %}
+    <table>
+    <tr><th title='A/G and C/T changes'>Transitions <td>{{ ti }}
+    <tr><th title='All other changes'>Transversions <td>{{ tv }}
+    <tr><th>Ti/Tv <td>{{ ti_tv_ratio | floatformat:2 }}
+    </table>
+{% endif %}
+
+<h3>Counts</h3>
+<div class='aligner'>
+    <div class='base-label'>Alt Base</div>
+    <div>
+    <div class='base-label'>Ref Base</div>
+    {% render_dataframe counts_df %}
+    </div>
+</div>
+
+{% if other_df.any.any %}
+<h3>{{ conversion_description }}</h3>
+<div class='aligner'>
+    <div class='base-label'>Alt Base</div>
+    <div>
+    <div class='base-label'>Ref Base</div>
+    {% render_dataframe other_df significant_figures %}
+    </div>
+</div>
+{% endif %}
+
+</div>
+{% endblock content %}
+

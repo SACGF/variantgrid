@@ -1,0 +1,117 @@
+{% extends menu_data_base %}
+
+{% block title %}{{ accession }}{% endblock title %}
+
+{% block jshead %}
+{{ block.super }}
+function showJSON(genomeBuild) {
+    $("#" + genomeBuild + "-json").show();
+    $("#show-" + genomeBuild + "-link").hide();
+}
+
+{% endblock jshead %}
+
+
+{% block submenu_page_content %}
+<div class="chunk borderless">
+    <h3>Transcript Version {{ accession }}</h3> 
+    
+    <p>
+    Back to <a class="hover-link" href="{% url 'view_transcript' transcript.pk %}">{{ transcript }}</a> ({{ version_count }} versions)
+    </p>
+    
+    {% load help_tags %}
+    {% if transcript.annotation_consortium == 'R' %}
+        {% page_help user 'genes/transcript_version_refseq' 'RefSeq transcript versions' %}
+    {% endif %}
+    {% if transcript.annotation_consortium == 'E' %}
+        {% page_help user 'genes/transcript_version_ensembl' 'Ensembl transcript versions' %}
+    {% endif %}
+
+    {% if transcripts_by_build %}
+        <div class="chunk">
+        <table class="styled">
+            <thead>
+            <tr>
+                <th>Genome Build</th>
+                <th>Gene</th>
+                <th>BioType</th>
+                <th>Coordinates</th>
+                <th>Length</th>
+                <th>JSON</th>
+                {% if user.is_staff %}
+                    <th>Import filename</th>
+                {% endif %}
+                <th>External Link</th>
+            </tr>
+            </thead>
+        {% for genome_build_id, transcript_version in transcripts_by_build.items %}
+            <tr>
+                <td>{{ genome_build_id }}</td>
+                <td><a class="hover-link" href="{% url 'view_gene' transcript_version.gene.pk %}">{{ transcript_version.gene }}</a></td>
+                <td>{{ transcript_version.biotype }}</td>
+                {% if transcript_version.data %}
+                    <td>{{ transcript_version.coordinates }}</td>
+                    <td>{{ transcript_version.length }}</td>
+                    <td><a class="hover-link" id='show-{{ genome_build_id }}-link' href="javascript:showJSON('{{ genome_build_id }}')">show</a></td>
+                {% else %}
+                    <td> N/A</td>
+                    <td> N/A</td>
+                    <td> <code>{}</code></td>
+                {% endif %}
+                {% if user.is_staff %}
+                    <td>{{ transcript_version.import_source }}</td>
+                {% endif %}
+                <td><a class="hover-link" target="_blank" href="{{ transcript_version.get_external_url }}">
+                        {{ transcript.get_annotation_consortium_display }} page.
+                    </a>
+                </td>
+            </tr>
+            <tr class='hidden' id='{{ genome_build_id }}-json'>
+                <td colspan="4">
+    <pre>
+    {{ transcript_version.data|pprint }}
+    </pre>
+                </td>
+            </tr>
+        {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <div class="error-box">We don't have any data for this transcript version on file.</div>
+    {% endif %}
+
+    {% if differences %}
+        <h3>Potential Differences</h3>
+        
+        <ul class="messages">
+            <li class="warning">
+                Transcripts differ between genome versions, which may affect HGVS coordinates between builds
+            </li>
+        </ul>        
+        
+        <div class="chunk">
+        {% for builds, diff in differences %}
+            
+            <table class="styled">
+                <thead>
+                <tr>
+                    <th>
+                    <th>{{ builds.0 }}
+                    <th>{{ builds.1 }}
+                </tr>
+                </thead>
+                {% for d, vals in diff.items %}
+                <tr>
+                    <th>{{ d }}
+                    <td>{{ vals.0 }}
+                    <td>{{ vals.1 }}
+                </tr>
+                {% endfor %}
+            </table>
+        {% endfor %}
+        </div>
+    {% endif %}
+
+</div>
+{% endblock submenu_page_content %}

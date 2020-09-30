@@ -1,0 +1,13 @@
+{% extends "analysis/tags/base_related_analyses.html" %}
+{% block create_analyses %}
+{% if cohort.import_status == "S" %}
+    <ul>
+        <li><a href="{% url 'cohort_hotspot' cohort.pk %}">View gene hotspots for this cohort</a></li>
+        <li><a href="{% url 'cohort_gene_counts' cohort.pk %}">View gene damage counts for this cohort</a></li>
+    </ul>
+
+    {% load related_analyses_tags %}
+    {% analysis_templates_tag cohort=cohort %}
+
+{% endif %}
+{% endblock create_analyses %}

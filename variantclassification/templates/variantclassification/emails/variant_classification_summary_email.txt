@@ -1,0 +1,17 @@
+{% load static %}
+{% load classification_tags %}
+{% load english_tags %}
+{% load menu_tags %}
+Hello Shariant User,
+
+You can login to Shariant here {% absolute_url 'classifications' %}
+
+Below is a summary of your {% count data.lab_summaries 'lab' 'labs' %}:
+{% for lab_summary in data.lab_summaries %}
+** {{ lab_summary.lab.organization.name }} / {{ lab_summary.lab.name }} **
+{% if lab_summary.last_imported_new_ago %}Last uploaded a new classification {{ lab_summary.last_imported_new_ago }} ago.{% else %}Has not yet uploaded its first classifications.{% endif %}
+{% count lab_summary.flagged_variants_count '1 classification requires' 'classifications require' %} attention.
+{% for discordance_report in lab_summary.discordance_reports %}Involved in Discordance ({{ discordance_report.id }}).{% endfor %}
+{% endfor %}
+
+Thanks from the Shariant team.

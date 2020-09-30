@@ -1,0 +1,19 @@
+
+Variant Ensembl Predictor calculates effects for each transcript
+
+Select the different transcripts to see the annotations for each transcript.
+
+A single "representative" transcript annotation is chosen (via <a href="https://asia.ensembl.org/info/docs/tools/vep/script/vep_other.html#pick">VEP pick</a>) - this is what is used in an analysis and shown in the grid.
+
+This is chosen via:
+
+<ol>
+<li>Canonical status of transcript
+<li><a href="https://asia.ensembl.org/Help/Glossary?id=521">APPRIS isoform annotation</a>
+<li><a href="https://asia.ensembl.org/Help/Glossary?id=492">Transcript support level</a>
+<li>Biotype of transcript ("protein_coding" preferred)
+<li>CCDS status of transcript
+<li>consequence rank according to <a href="https://asia.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences">this table</a>
+<li>Translated, transcript or feature length (longer preferred)
+<li>MANE transcript status
+</ol>

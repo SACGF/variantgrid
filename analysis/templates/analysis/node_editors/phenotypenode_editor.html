@@ -1,0 +1,192 @@
+{% extends "analysis/node_editors/grid_editor_gene_tab.html" %}
+{% load static %}
+{% load js_tags %}
+{% block style %}
+{% load jqgrid_tags %}
+
+#gene-lists-container {
+    width: 100%;
+    height: 100%;
+}
+
+#hpo-genes-container {
+    float: left;
+    margin-right: 10px;
+}
+
+#mim-genes-container {
+    float: left;
+}
+
+{% endblock style %}
+{% block docreadyjs %}
+	var phenotypeNodeForm = $("form#phenotype-node");
+    accordionForm(phenotypeNodeForm);
+    ajaxForm(phenotypeNodeForm);
+{% endblock docreadyjs %}
+
+{% block inlinejs %}
+    {{ block.super }}
+
+    function addDownloadLink(grid, pagerId, url) {
+        var download_grid = function() {
+                window.location = url;
+        };
+
+        grid.jqGrid('navButtonAdd', pagerId, {
+                    caption : "Download",
+                    buttonicon : "ui-icon-arrowthickstop-1-s",
+                    onClickButton : download_grid,
+                    position : "first",
+                    title : "Export",
+                    cursor : "pointer"
+        });
+    }
+
+	function hpo_genes_grid_init_func(grid, pagerId, kwargs) {
+        const GENOME_BUILD_NAME = "{{ node.analysis.genome_build.name }}";
+        var hpo_id = kwargs['hpo_id'];
+	    if (hpo_id) {
+		    var url = Urls.hpo_genes_grid({hpo_id: hpo_id, genome_build_name: GENOME_BUILD_NAME, op: "download"});
+		    addDownloadLink(grid, pagerId, url);
+		}
+	}
+
+    function mim_genes_grid_init_func(grid, pagerId, kwargs) {
+        const GENOME_BUILD_NAME = "{{ node.analysis.genome_build.name }}";
+        var mim_morbid_id = kwargs['mim_morbid_id'];
+        if (mim_morbid_id) {
+		    var url = Urls.mim_genes_grid({mim_morbid_id: mim_morbid_id, genome_build_name: GENOME_BUILD_NAME, op: "download"});
+            addDownloadLink(grid, pagerId, url);
+        }
+    }
+
+    function patient_hpo_genes_grid_init_func(grid, pagerId, kwargs) {
+        const GENOME_BUILD_NAME = "{{ node.analysis.genome_build.name }}";
+        var patient_id = kwargs['patient_id'];
+        if (patient_id) {
+		    var url = Urls.patient_hpo_genes_grid({patient_id: patient_id, genome_build_name: GENOME_BUILD_NAME, op: "download"});
+            addDownloadLink(grid, pagerId, url);
+        }
+    }
+
+    function patient_mim_genes_grid_init_func(grid, pagerId, kwargs) {
+        const GENOME_BUILD_NAME = "{{ node.analysis.genome_build.name }}";
+        var patient_id = kwargs['patient_id'];
+        if (patient_id) {
+            const URL = Urls.patient_mim_genes_grid({patient_id: patient_id, genome_build_name: GENOME_BUILD_NAME, op: 'download'});
+            addDownloadLink(grid, pagerId, URL);
+        }
+    }
+{% endblock inlinejs%}
+
+{% block gene_list_grid %}
+
+{% if node.use_patient and not node.patient %}
+    No patient set
+{% else %}
+<div id='hpo-genes-container'>
+{% if node.use_patient %}
+    <b>Patient HPO:</b>
+    {% jqgrid 'patient_hpo_genes_grid' 'patient-hpo-genes' init_func='patient_hpo_genes_grid_init_func' search=False patient_id=node.patient.pk genome_build_name=node.analysis.genome_build.name %}
+{% else %}
+    <b>HPO:</b>
+    {% if node.phenotypenodehpo_set.exists %}
+        {% for pnh in node.phenotypenodehpo_set.all %} 
+        	<div class='hpo'>{{ pnh.hpo_synonym }}</div>
+        	{% jqgrid 'hpo_genes_grid' pnh.hpo_synonym.hpo_id init_func='hpo_genes_grid_init_func' search=False hpo_id=pnh.hpo_synonym.hpo_id genome_build_name=node.analysis.genome_build.name %}
+    	{% endfor %}
+    {% else %}
+    	None set
+    {% endif %}
+{% endif %}
+</div>
+
+<div id='mim-genes-container'>
+{% if node.use_patient %}
+    <b>Patient OMIM:</b>
+    {% jqgrid 'patient_mim_genes_grid' 'patient-mim-genes' init_func='patient_mim_genes_grid_init_func' search=False patient_id=node.patient.pk genome_build_name=node.analysis.genome_build.name %}
+{% else %}
+    <b>OMIM:</b>
+    {% if node.phenotypenodeomim_set.exists %}
+        {% for pno in node.phenotypenodeomim_set.all %} 
+            <div class='omim'>{{ pno.mim_morbid_alias }}</div>
+            {% jqgrid 'mim_genes_grid' 'mim-gene-list' init_func='mim_genes_grid_init_func' search=False mim_morbid_id=pno.mim_morbid_alias.mim_morbid_id genome_build_name=node.analysis.genome_build.name %}
+        {% endfor %}
+    {% else %}
+        None set.
+    {% endif %}
+{% endif %}
+</div>
+<div class='clear'></div>
+{% endif %}
+{% endblock gene_list_grid %}
+
+{% block content %}
+<style>
+	#id_percent {
+		width: 100px;
+	}
+</style>
+<div>
+	<form id="phenotype-node" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+		<ul class="accordion">
+            <li>
+                <h3>Custom Fields</h3>
+                <table>
+                <tr>
+                <th class='hpo'>Phenotype:</th>
+                <td class='hpo'> {{ form.hpo_synonym }}</td>
+                <td id='phenotypes-list'>
+                </td>
+                <tr>
+                <th class='omim'>OMIM:</th>
+                <td class='omim'> {{ form.mim_morbid_alias }}</td>
+                <td id='omim-list'>
+                </td>
+                <tr><th>Free Text:</th><td> {{ form.text_phenotype }}</td><td><i>Matches at least one word to RefSeq Gene Summary, Ensembl Phenotypes, OMIM Phenotypes, UniProtKB Function (case insensitive)</i></td>
+                </table>
+            </li>
+			<li>
+	        <h3>From Patient</h3>
+	        <div>
+				Patient: {{ form.patient }}
+		        {% if node.patient %}
+		        	<div id='patient-details'>
+					{% if patient_phenotypes %}
+						<p>
+						<b>Phenotypes:</b>
+						{% for pp in patient_phenotypes %}
+							{{ pp }}
+						{% endfor %}
+						</p>
+					{% else %}
+						This patient has no phenotype set.
+					{% endif %}
+					{% if patient_mim %}
+						<p>
+						<b>OMIM:</b>
+						{% for mim in patient_mim %}
+							{{ mim.description }}
+						{% endfor %}
+						</p>
+					{% else %}
+						This patient has no OMIM set.
+					{% endif %}
+					</div>
+		        {% endif %}
+	        </div>
+	        </li>
+		</ul>
+
+		<button id='phenotype-save' class="btn btn-primary">save</button>
+    {{ form.media }} 
+	</form>
+</div>
+
+{% endblock content %}

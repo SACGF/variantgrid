@@ -1,0 +1,102 @@
+{% load static %}
+<div id="permissions-embedded-page">
+<script>
+function openDelete() {
+   $("#delete-confirm-box").slideDown();
+}
+
+$(document).ready(function() {
+    $("button#delete-object").click(function() {
+        let delete_obj_url = "{% url 'group_permissions_object_delete' class_name instance.pk %}"; 
+        $.ajax({
+            type: "POST",
+            url: delete_obj_url,
+            success: function(data) {
+                window.location = "{{ delete_redirect_url }}";
+            },
+            error: function(data) {
+                let errorMessageUl = createMessage("error", data.responseText);
+                $("#delete-container").empty().append(errorMessageUl);
+            }
+        });    
+
+    });
+
+    $("button", "#permissions-embedded-page").button({ iconPosition: { iconPositon: "beginning" }});
+    
+    $("button#no-delete").click(function() {
+       $("#delete-confirm-box").slideUp();
+    });
+
+    let options = {
+        target: '#permissions-embedded-page'
+    };
+    $('form#group-permission-form').ajaxForm(options); 
+});
+</script>
+
+
+<div id="permissions">
+    <h3>Permissions</h3>
+
+    {% if instance != permission_obj %}
+        <ul>
+        <li class='warning'>
+            <p>
+                This <b>{{name}}</b> uses permissions from <b>{{perm_obj_name}}</b>
+            </p>
+
+            <p>
+                The permissions below are for
+                <a target="_blank" href='{{ permission_obj.get_absolute_url }}'>
+                    {{permission_obj}}
+                </a>
+            </p>
+        </li>
+        </ul>
+    {% endif %}
+
+    <form id="group-permission-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    <table class="table">
+    <tr>
+        <th>Group
+        <th>Read
+        <th>Write
+    </tr>
+        
+    {% for form in permission_forms %}
+    <tr>
+        <td>{{ form.group }}
+        <td>{{ form.read }}
+        <td>{{ form.write }}
+    </tr>
+    {% endfor %}
+    
+    <tr><td colspan=3><button class="btn btn-primary" id='save-permissions'>Save Permissions</button>
+    </table>
+    {% include "messages/messages.html" %}
+    </form>
+</div>
+
+
+ <div>
+    <div><a href="{% url 'bulk_group_permissions' class_name %}">Bulk change permissions...</a></div>
+    <div id="delete-container">
+        <a href="javascript:openDelete()">Delete </a>
+        <div id='delete-confirm-box' style="display: none">
+             <p>Are you sture you want to delete this {{ name }}?
+             <div class="btn-toolbar">
+                 <button id='delete-object' class="btn btn-danger" type='button'>
+                     Delete {{ name }}
+                 </button>
+                 <button id='no-delete' type='button' class="btn btn-secondary">
+                     </span>Cancel
+                 </button>
+             </div>
+        </div>
+    </div>
+ </div>
+
+
+</div>

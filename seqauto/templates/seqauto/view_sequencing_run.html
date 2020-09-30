@@ -1,0 +1,442 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% load model_helpers %}
+{% load help_tags %}
+{% block title %}{{ sequencing_run.name }}{% endblock %}
+{% block head %}
+	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+	<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+	<script src="{% static 'js/generated_graphs.js' %}"></script>
+	
+	<style>
+		input#id_path {
+			width: 800px;		
+		}
+		
+		#experiment-info-text {
+		  margin-bottom: 20px;
+		}
+		
+		#sequencing-run-details th {
+		  text-align: right;
+		}
+		
+		#sequencing-run-form {
+		  margin: 20px;
+		}
+		
+		#deleted-path {
+		  color: #ff0000;
+		}
+
+        #sequencing-run-text {
+            font-size: 2em;
+        }
+
+        .sequencer {
+            float: left;
+            margin: 5px;
+        }
+
+        .sequencer-icon {
+            width: 64px;
+            height: 64px;
+            background-size: 64px 64px;
+        }
+        
+        .HiSeq2500 {
+            background-image: url({% static 'icons/sequencers/hiseq_icon.png' %})
+        }
+        
+        .NextSeq {
+            background-image: url({% static 'icons/sequencers/nextseq_icon.png' %})
+        }
+        
+        .MiSeq {
+            background-image: url({% static 'icons/sequencers/miseq_icon.png' %})
+        }
+
+        .vcf-icon {
+            width: 24px;
+            height: 24px;
+            background-size: 24px 24px;
+            background-image: url({% static 'icons/vcf_64.png' %});
+            float: left;
+        }
+
+        .patient-icon {
+            width: 24px;
+            height: 24px;
+            background-size: 24px 24px;
+            background-image: url({% static 'icons/patient-icon-png-3.png' %});
+            float: left;
+        }
+
+        .gold-standard {
+            color: gold;
+        }
+
+        .grid-link-icon {
+            display: inline-block;
+        }
+
+</style>
+
+		
+	</style>
+	
+{% endblock %}
+
+{% block jshead %}
+    var DELETE_URL = "{% url 'cached_generated_file_delete' %}";
+
+    {% if illumina_qc %}
+    var INDEX_QC_POLL_URL = "{% url 'index_metrics_qc_graph' illumina_qc.pk %}";
+    {% else %}
+    var INDEX_QC_POLL_URL = null;
+    {% endif %}
+
+	function loadIndexMetricsGraph() {
+		var graph_selector = $('#generated-graph-index-qc');
+		clearGraph(graph_selector);
+		poll_graph_status(graph_selector, INDEX_QC_POLL_URL, DELETE_URL);
+	}
+
+	function reloadExperimentName() {
+        $.ajax({
+            type: "POST",
+            url: '{% url 'reload_experiment_name' sequencing_run.pk %}',
+            success: function(data) {
+                // Reload page (re-opening tab)
+                var sequencing_run_tab_url = '{% url 'view_sequencing_run_tab' sequencing_run.pk 3 %}'
+                window.location = sequencing_run_tab_url;
+            }
+        });
+    }	
+	
+{% endblock %}
+
+
+{% block jsdocumentready %}
+    var tab_id = {{ tab_id }};
+    console.log("tab_id = " + tab_id);
+    var tabParams = {active : tab_id};
+	$("#sequencing-run-tabs").tabs(tabParams);
+
+    {% if show_stats %}
+        loadIndexMetricsGraph();
+	{% endif %}
+	
+    $('#reload-experiment-name').click(reloadExperimentName);
+
+    {% if data_out_of_date_from_current_sample_sheet %}
+    function assignDataToCurrentSampleSheet(operation) {
+        $.ajax({
+            type: "POST",
+            url: '{% url 'assign_data_to_current_sample_sheet' sequencing_run.pk %}',
+            success: function(data) {
+                // Reload page (re-opening tab)
+                var sequencing_run_tab_url = '{% url 'view_sequencing_run_tab' sequencing_run.pk 4 %}'
+                window.location = sequencing_run_tab_url;
+            }
+        });
+    }   
+
+    $("#assign-data-to-current-spreadsheet").click(assignDataToCurrentSampleSheet);
+    {% endif %}
+
+{% endblock %}
+
+{% block submenu_page_content %}
+
+    <div title='{{ sequencing_run.sequencer }}' class='sequencer'>
+        <div class='sequencer-icon {{ sequencing_run.sequencer.sequencer_model.css_class }}'>
+        </div>
+        {{ sequencing_run.sequencer.name }}
+    </div>
+    <div id='sequencing-run-text'>{{ sequencing_run }}</div>
+
+	<table id='sequencing-run-details'>
+    <tr><th>Path:
+    <td>
+        {% if sequencing_run.data_state == 'D' %}
+            <span id='deleted-path'>{{ sequencing_run.path }}</span> (This directory has been deleted)
+        {% else %}
+            {{ sequencing_run.path }}
+        {% endif %}
+    </td>
+    <tr><th>BaseCall Data:</th> <td>{{ sequencing_run.has_basecalls|yesno:"Exists,Deleted" }}</td>
+    {% if sequencing_run.enrichment_kit %}
+    <tr><th>Enrichment Kit:</th>
+    <td><a href="{% url 'view_enrichment_kit' sequencing_run.enrichment_kit.pk %}">{{ sequencing_run.enrichment_kit }}</a>
+        {% if sequencing_run.gold_standard %}
+            - (<div class="grid-link-icon gold-standard-icon"></div> <span class='gold-standard'>Gold Standard Run</span>)
+        {% endif %}
+    </td>
+    {% endif %}
+    {% if vcf %}
+        <tr><th>VCF:<td>
+        {% if can_view_vcf %} 
+        <a href="{% url 'view_vcf' vcf.pk %}"><div class='vcf-icon'></div>{{ vcf }}</a>
+        {% else %}
+        <div title="You don't have permission to view this VCF" class='vcf-icon'></div>{{ vcf }}
+        {% endif %}
+    {% endif %}
+	</table>
+
+	<div id="sequencing-run-tabs">
+		<ul>
+	    	<li><a href="{% url 'view_sequencing_run_stats_tab' sequencing_run.pk %}">Run Stats</a></li>
+            <li><a href="#wiki">Wiki{% if sequencing_run.sequencingrunwiki %}*{% endif %}</a></li>
+            <li><a href="#barcodes">Barcodes</a></li>
+	    	<li><a href="#samples">Samples</a></li>
+		{% if sequencing_run.experiment %}
+	    	<li><a href="#experiment">{{ sequencing_run.experiment }}</a></li>
+		{% endif %}
+            <li><a href="#data">Data</a></li>
+        {% if sequencing_run.sequencingrunmodification_set.exists %}
+            <li><a href="#modifications">Modifications</a></li>
+        {% endif %}
+        {% if user.is_superuser %}
+            <li><a href="#admin">Admin</a></li>
+        {% endif %}
+
+	  	</ul>
+        <div id="wiki">
+            {% load wiki_tags %}
+            {% wiki_editor sequencing_run.sequencingrunwiki class_name='seqauto.models.SequencingRunWiki' unique_keyword='sequencing_run_id' unique_value=sequencing_run.pk %}
+        </div>
+		<div id="samples">
+
+            {% page_help user 'seqauto/sequencing_run_samples_help' 'Sequencing Run Samples' %}
+		
+            <table>		      
+            <tr><th>Name <th>Sample <th>Patient
+            {% if has_sequencing_sample_data %}
+                <th>Data
+            {% endif %}  
+            
+            {% for ss in sequencing_samples %}
+                <tr>
+                <td>{{ ss.sample_name }}
+                <td>{% if ss.samplefromsequencingsample %}
+                    <a href="{% url 'view_sample' ss.samplefromsequencingsample.sample.pk %}">View Sample</a>
+                    {% endif %}
+                </td>
+                <td>{% if ss.samplefromsequencingsample.sample.patient %}
+                    <a href="{% url 'view_patient' ss.samplefromsequencingsample.sample.patient.pk %}"><div class='patient-icon'></div>{{ ss.samplefromsequencingsample.sample.patient }}</a>
+                    {% endif %}
+                </td>
+                {% if has_sequencing_sample_data %}
+                <td>
+                    {% for ssd in ss.sequencingsampledata_set.all %}
+                        <b>{{ ssd.column }}: </b> {{ ssd.value }}
+                    {% endfor %}
+                </td>
+                {% endif %}
+                
+                </tr>
+            {% endfor %}
+            </table>		
+		
+        </div>
+        <div id="barcodes">
+
+		{% if sample_sheet %}
+			{% if user.is_superuser %}
+			<h3>SampleSheet</h3>
+			<table class='model-table'>
+			<tr><th>Date:		<td> {{ sample_sheet.date }}
+			<tr><th>Hash:		<td> {{ sample_sheet.hash }}
+			</table>
+			{% endif %}
+	
+			<h3>Samples</h3>
+			<table>
+			<tr><th>Name <th>VCF <th>Number <th>Lane <th>Barcode <th>Enrichment Kit</tr>
+			
+			{% for ss in sample_sheet.sequencingsample_set.all %}
+				<tr>
+				<td>{{ ss.sample_name }}
+				<td>{{ ss.sample_project }}
+				<td>{{ ss.sample_number }}
+				<td>{{ ss.lane }}
+				<td>{{ ss.barcode }}
+				<td>{{ ss.enrichment_kit }}
+				</tr>
+			{% endfor %}
+			</table>
+	
+			{% if illumina_qc %}
+				{% if show_stats %}
+				{% load humanize %}
+				<div id='generated-graph-index-qc'></div>
+			
+				<table>
+				<tr><th>Name <th>Index <th>Reads</tr>
+				
+				{% for ss in illumina_qc.illuminaindexqc_set.all %}
+					<tr>
+					<td>{{ ss.name }}
+					<td>{{ ss.index }}
+					<td>{{ ss.reads |intcomma }}
+					</tr>
+				{% endfor %}
+				</table>
+				{% endif %}
+			{% endif %}
+	
+		{% else %}
+			No sample sheet found in sequencing run directory!
+		{% endif %}
+		</div>
+
+		{% if sequencing_run.experiment %}
+		<div id='experiment'>
+            <div id='experiment-info-text'>
+                <p>ExperimentID (
+                <a href="{% url 'view_experiment' sequencing_run.experiment.pk %}">{{ sequencing_run.experiment }}</a>) was read from RunParameters.xml (or if missing, RunInfo.xml) in the Sequencing Run directory labelled <b>Path</b> above.
+                <p>Change by modifying the files manually then <button id='reload-experiment-name'>reload experiment name</button>.
+            </div>
+		</div>
+		{% endif %}
+
+        <div id='data'>
+            <h3>Made from this data</h3>
+            {% if sample_sheet.samplesheetcombinedvcffile_set.exists %}
+                <ul><b>Combined VCF files</b> 
+                {% for combo_vcf in sample_sheet.samplesheetcombinedvcffile_set.all %}
+                    <li><a href="{% url 'view_combo_vcf_file' combo_vcf.pk %}">{{ combo_vcf }}</a>
+                {% endfor %}
+                </ul>        
+            {% endif %}
+    
+            <ul>        
+            {% for ss in sample_sheet.sequencingsample_set.all %}
+                <li><b>Sample:</b> {{ ss }}
+                <ul>
+                {% for unaligned_reads in ss.unalignedreads_set.all %}
+                    <li class='seqauto-record unaligned-reads'><a href="{% url 'view_unaligned_reads' unaligned_reads.pk %}">{{ unaligned_reads }}</a>
+                    <ul>
+                    {% for bam_file in unaligned_reads.bamfile_set.all %}
+                        <li class='seqauto-record bam-file data-state-{{ bam_file.data_state }}'><a href="{% url 'view_bam_file' bam_file.pk %}">{{ bam_file }}</a>
+    
+                        <ul>
+                        {% for vcf_file in bam_file.vcffile_set.all %} 
+                            <li class='seqauto-record vcf-file data-state-{{ vcf_file.data_state }}'><a href="{% url 'view_vcf_file' vcf_file.pk %}">{{ vcf_file }}</a>
+    
+                            <ul>
+                            {% for qc in vcf_file.qc_set.all %} 
+                                <li class='seqauto-record qc data-state-{{ qc.data_state }}'><a href="{% url 'view_qc' qc.pk %}">{{ qc }}</a>
+                            {% endfor %}
+                            </ul>
+                        {% endfor %}
+                        </ul>
+                    {% endfor %}
+                    </ul>
+                    </li>
+                {% endfor %}
+                </ul>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+
+
+        {% if sequencing_run.sequencingrunmodification_set.exists %}
+        <div id='modifications'>
+            <table>
+                <tr><th>User <th>Created <th>Message
+            {% for srm in sequencing_run.sequencingrunmodification_set.all %}
+                <tr>
+                <td>{{ srm.user }}
+                <td>{{ srm.created }}
+                <td>{{ srm.message }}       
+            {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+
+
+    {% if user.is_superuser %}
+        <div id='admin'>
+            <h3>SequencingRun Admin</h3>
+
+            <script>
+            function openDelete() {
+               $("#delete-confirm-box").slideDown();
+            }
+            
+            $(document).ready(function() {
+                $("button#delete-object").click(function() {
+                    var delete_obj_url = "{% url 'delete_sequencing_run' sequencing_run.pk %}"; 
+                    $.ajax({
+                        type: "POST",
+                        url: delete_obj_url,
+                        success: function(data) {
+                            window.location = "/";
+                        }
+                    });    
+            
+                });
+            
+                $("button").button({ iconPosition: { iconPositon: "beginning" }});
+                
+                $("button#no-delete").click(function() {
+                   $("#delete-confirm-box").slideUp();
+                });
+                
+                $("#sequencing-run-form-save").button();
+                
+            });
+            </script>
+            <div>
+                <form method="post" id='sequencing-run-form'>
+                    {% csrf_token %}
+                    <div><b>Bad:</b> {{ sequencing_run_form.bad }} - Bad runs aren't counted in statistics (eg QC box-plots)</div>
+                    <div><b>Hidden:</b> {{ sequencing_run_form.hidden }} - Hide run from sequencing runs grid</div>
+                    <input id='sequencing-run-form-save' type="submit" value='save' />
+                </form>
+            </div>
+             <div>
+                 <a href="javascript:openDelete()">Delete </a>
+                 <div id='delete-confirm-box' style="display: none">
+                     <p>Are you sture you want to delete {{ sequencing_run }}
+                     <div>
+                         <button id='delete-object' class="ui-button ui-widget ui-corner-all" type='button'>
+                             <span class="ui-icon ui-icon-trash"></span>Delete {{ sequencing_run }}
+                         </button>
+                         <button id='no-delete' type='button'>
+                             <span class="ui-icon ui-icon-cancel"></span>No
+                         </button>
+                     </div>
+                 </div>
+             </div>
+            
+            {% if data_out_of_date_from_current_sample_sheet %}
+            <div>
+            <p>
+            It appears your SampleSheet has meaningfully changed (changed/added/removed sample names).
+            
+            <p>
+            We can't tell whether this would make basecalling different, and makes everything downstream out of date.
+            
+            <p>
+            If you are sure that it's ok to re-link everything to the current sample sheet, hit the button below: 
+            
+            <p>
+            <button id='assign-data-to-current-spreadsheet'>Assign Data to most recent SampleSheet</button>
+            
+            <p>
+            Otherwise, we reccomend you <a href="javascript:openDelete()">Delete </a> this SequencingRun. If data is there, it will re-generated next disk scan.
+            </div>
+            {% endif %}
+
+
+        </div>
+    {% endif %}
+	</div>
+
+
+
+{% endblock %}

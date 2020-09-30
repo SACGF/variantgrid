@@ -1,0 +1,121 @@
+{
+  "analysis": {
+    "model": "analysis.Analysis",
+    "pk": 182,
+    "fields": {
+      "analysis_type": "S",
+      "name": "Singleton analysis of NM_000051.3(ATM):c.7271T>G",
+      "description": "",
+      "show_igv_links": true,
+      "analysis_panel_fraction": 0.25,
+      "lock_input_sources": true,
+      "template_type": "S",
+      "genome_build": "GRCh37"
+    }
+  },
+  "nodes": [
+    {
+      "model": "analysis.IntersectionNode",
+      "pk": 2515,
+      "fields": {
+        "id": 2515,
+        "analysis": 182,
+        "name": "",
+        "x": 140,
+        "y": 139,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "genomic_intervals_collection": null,
+        "genomic_interval": null,
+        "hgvs_name": "NM_000051.3(ATM):c.7271T>G",
+        "hgvs_variant": null,
+        "left": 0,
+        "right": 0,
+        "accordion_panel": 2,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.SampleNode",
+      "pk": 2513,
+      "fields": {
+        "id": 2513,
+        "analysis": 182,
+        "name": "hiseq_sample3\n\n(HOM_ALT,HET)",
+        "x": 140,
+        "y": 18,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "sample": 61,
+        "min_ad": 0,
+        "min_dp": 0,
+        "min_gq": 0,
+        "max_pl": null,
+        "zygosity_ref": false,
+        "zygosity_het": true,
+        "zygosity_hom": true,
+        "zygosity_unk": false,
+        "restrict_to_qc_gene_list": false,
+        "analysisvariable_set": [
+          {
+            "id": 230,
+            "field": "sample",
+            "class_name": "snpdb.Sample",
+            "node": 2513
+          }
+        ],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.TagNode",
+      "pk": 2514,
+      "fields": {
+        "id": 2514,
+        "analysis": 182,
+        "name": "Tagged Variants",
+        "x": 59,
+        "y": 13,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": false,
+        "errors": null,
+        "shadow_color": null,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    }
+  ],
+  "edges": [
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2208,
+      "fields": {
+        "parent": 2513,
+        "child": 2515
+      }
+    }
+  ]
+}

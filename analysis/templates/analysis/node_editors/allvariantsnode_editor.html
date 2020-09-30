@@ -1,0 +1,24 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block docreadyjs %}
+    ajaxForm($("form#all-variants-form"));
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<div>
+	<form id="all-variants-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {{ form.as_p }}
+		<div>
+		  <b>Last Saved:</b> {{ node.modified }} 
+        </div>
+	{% if out_of_date_message %}
+		<div>
+		  <b>Warning:</b> This node retrieves all variants in the database - this can change! {{ out_of_date_message }} 
+		</div>
+	{% endif %}
+		<button id='all-variants-save' class="btn btn-primary">save</button>
+	</form>
+</div>
+{% endblock content %}

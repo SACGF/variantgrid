@@ -1,0 +1,30 @@
+<p>
+Configure the parameters here to generate a re-usable export URL that can be periodically called to download shared classifications.<br/>
+If you wish to download a few classifications for personal reviewing, you may be better served by the download links on the 
+<a href="/variantclassification/classifications" class="hover-link">classifications page</a>.
+</p>
+<p>
+    If you are going to copy the URL in your browser to download periodically, choose "Web Browser".<br/>
+    If this is for copying into some a program that will automatically download, choose "API".
+</p>
+<p>
+The following classifications will not be downloaded (except when using the CSV format)<br/>
+<ul>
+    <li>Classifications that are matching or failed to match a variant
+    <li>Classifications with outstanding matching warning or transcript version flags
+    <li>Classifications attached to variants that have liftover warning flags (if the liftover warning is for the same transcript as the classification)
+    <li>Classifications that could not be lifted over to the desired genome build</li>
+</ul>
+</p>
+<p>
+Pick a genome build, regardless of which build the classification was uploaded as it will be lifted over to your desired build.
+</p>
+<p>
+You can choose to exclude entire organisations, or only certain labs within an organisation. If you are uploading classifications to this
+environment and only wish to download other labs classifications, these options will let you do that.<br/>
+</p>
+<p>
+Lastly, choose a file format that your system can easily handle<br/>
+Some formats will contain only a summary of data e.g. MVL and VCF<br/>
+Some formats will have one record per classification e.g. CSV, JSON while others might group on variant/transcript e.g. MVL<br/>
+</p>

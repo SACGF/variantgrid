@@ -1,0 +1,42 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% block title %}Analysis templates{% endblock title %}
+
+{% block jsdocumentready %}
+	jQuery.extend($.fn.fmatter , {
+	    analysisLink : function(cellvalue, options, rowObject) {
+            let analysisId = rowObject.id;
+    		let analysisLink = linkFormatter(cellvalue, options, rowObject);
+		    return "<span>" + analysisLink + "</span>";
+		}
+	});
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+    {% block page_menu_help %}
+    {% endblock page_menu_help %}
+
+    <div id="analysis-template-form-container">
+      <form id="analysis-template-form" method="post">
+        {% csrf_token %}
+        <fieldset class="form-fields small">
+            <legend>Create Template</legend>
+            <div class="pair">
+                <label>Unique Name</label>
+                <div>{{ create_analysis_template_form.name }}{{ create_analysis_template_form.name.errors }}</div>
+            </div>
+            <div class="buttons">
+                <button id='create-analysis-template' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create New Template</button>
+            </div>
+        </fieldset>
+      </form>
+    </div>
+
+    {% load jqgrid_tags %}
+    {% user_data_grid_filter 'analysis_templates' 'Analysis Templates' %}
+    {% jqgrid 'analysis_templates_grid' 'analysis_templates' search=False delete=True %}
+
+
+{% endblock submenu_page_content %}
+

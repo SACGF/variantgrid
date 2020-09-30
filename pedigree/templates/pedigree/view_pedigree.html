@@ -1,0 +1,112 @@
+{% extends menu_patients_base %}
+{% load related_data_tags %}
+{% load related_analyses_tags %}
+
+{% block title %}Pedigree: {{ pedigree.name }}{% endblock title %}
+
+{% block css %}
+	table {
+		border-collapse: collapse;
+	}
+	
+	table#pedigree-inheritance-table td, table#pedigree-inheritance-table th {
+		border: 1px solid black;
+		padding: 5px;
+	}
+
+{% endblock css %}
+
+{% block jshead %}
+	function task_complete(result) {
+		$('#task-info').html("Your Pedigree has been processed successfully.");
+	}
+
+	function task_complete_failure(result) {
+		$('#task-info').html("Error processing Pedigree: " + result);
+	}
+
+	function poll_pedigree_task(celery_task) {
+		$('#launch-task').hide();
+		var task_info = $('#task-info');
+		var loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
+		task_info.html(loading_icon);
+		task_info.append("Pedigree Inheritance task is running...");
+		
+		$('#task-info').show();
+
+		poll_task_status(celery_task, task_complete, task_complete_failure);
+	}
+	
+	POLL_FREQUENCY = 1000;
+	
+	function poll_task_status(celery_task, success, failure) {
+		var POLL_URL = Urls.job_state(celery_task);
+		$.getJSON(POLL_URL, function(data) {
+			if (data.status == "SUCCESS") {
+				success(data["result"]);
+			} else if (data.status == 'FAILURE') {
+				failure(data["result"]);
+			} else {
+				this_func = function() { poll_task_status(celery_task, success, failure); };
+				window.setTimeout(this_func, POLL_FREQUENCY);
+			}
+		});
+	}
+	
+    function cohortChange() {
+        let cohortSelect = $("#id_cohort");
+        let cohortId = cohortSelect.find(":selected").val();
+        setCrossLink($("#cohort-link"), Urls.view_cohort, cohortId);
+    }
+        
+	
+{% endblock jshead %}
+
+{% block jsdocumentready %}
+    $("#pedigree-tabs").tabs();
+    let crossLink = $("<a/>", {class: "cross-link", id: "cohort-link"}).html("View Cohort");
+    $("#id_cohort").after(crossLink).change(cohortChange);
+    cohortChange();
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+<div id="pedigree-tabs">
+    <ul>
+        <li><a href="#details">Details</a></li>
+        {% if has_write_permission %}
+        <li><a href="{% url 'group_permissions' 'pedigree.models.Pedigree' pedigree.pk %}">Sharing / Permissions</a></li>
+        {% endif %}
+    </ul>
+    <div id="details">
+	<form method="post" action="">
+		{% csrf_token %}
+		<div id="pedigree">
+		<h3>Pedigree: {{ pedigree.name }}</h3>
+				<table>
+				{{ pedigree_form.as_table }}
+				</table>
+		</div>
+		
+		<p>
+		<b>Ped file:</b><a href="{% url 'view_ped_file' pedigree.ped_file_family.ped_file.pk %}">{{ pedigree.ped_file_family.ped_file }}</a>
+
+        {{ formset.management_form }}
+        {{ formset.non_form_errors }}
+        <table>
+            {% for form in formset %}
+            <tr>
+                <td>{{ form.ped_file_record }}
+                <td>{{ form.cohort_sample }}
+            {% endfor %}
+        </table>
+        <button id='save-pedigree' class="btn btn-primary">save</button
+		</p>
+	</form>
+    </div>
+</div>
+
+    {% related_data_for_pedigree pedigree %}
+    {% related_analyses_for_pedigree pedigree %}
+
+{% endblock submenu_page_content %}

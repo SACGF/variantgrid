@@ -1,0 +1,39 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block title %}QC Data{% endblock %}
+{% block submenu %}{% menu_bar_sequencing %}{% endblock %}
+
+{% block head %}
+<style>
+	.grid-container {
+		margin-top: 10px;
+		margin-bottom: 10px;
+	}
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="container-table">
+        <h3>QC Data</h3>
+
+        {% load jqgrid_tags %}
+
+        <div class='grid-container'>
+        {% jqgrid 'illumina_flowcell_qc_grid' name='IlluminaFlowcellQC' search=False delete=False %}
+        </div>
+
+        <div class='grid-container'>
+        {% jqgrid 'fastqc_grid' name='FastQC' search=False delete=False %}
+        </div>
+
+        <div class='grid-container'>
+        {% jqgrid 'flagstats_grid' name='Flagstats' search=False delete=False %}
+        </div>
+
+        <div class='grid-container'>
+        {% jqgrid 'qc_exec_summary_grid' name='QCExecSummary' search=False delete=False %}
+        </div>
+    </div>
+
+{% endblock %}

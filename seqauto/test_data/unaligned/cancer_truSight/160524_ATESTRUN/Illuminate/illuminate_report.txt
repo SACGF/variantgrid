@@ -1,0 +1,115 @@
+Name:   160128_NB501009_0016_AHT2J3BGXX
+Run ID: 160128_NB501009_0016_AHT2J3BGXX
+General Config:
+Model: 
+Run Folder Name: 160128_NB501009_0016_AHT2J3BGXX
+Read Config:    Read 1: 151 cycles     Read 2: 8 cycles (Index)    Read 3: 8 cycles (Index)    Read 4: 151 cycles 
+Flowcell Layout:
+        Tiles: 12
+        Lanes: 4
+        Surfaces: 2
+        Swaths: 3
+
+
+TILE METRICS
+------------
+  Mean Cluster Density: 184454
+  Mean PF Cluster Density: 169215
+  Total Clusters: 486709723
+  Total PF Clusters: 446518418
+  Percentage of Clusters PF: 92.742243
+  Aligned to PhiX: 1.331144
+  Read - PHASING / PRE-PHASING:
+    1 - 0.000438 / 0.001428
+    2 - 0.000000 / 0.000000
+    3 - 0.000000 / 0.000000
+    4 - 0.001826 / 0.001939
+
+QUALITY METRICS
+---------------
+[InteropQualityMetrics] Info: Q-score binning was used with 7 bins and these remapped scores: [2, 14, 21, 27, 32, 36, 40]
+Read 1: 87.901112 
+Read 2: 87.864762 (Index)
+Read 3: 86.679805 
+
+INDEXING METRICS
+----------------
+index_str          project_str  name_str               
+CTCTCTAC+ATAGAGAG  default      hiseq_sample3          47771692
+GCTACGCT+ATAGAGAG  default      hiseq_sample4       34924230
+Name: clusters, dtype: int64
+
+ERROR METRICS
+-------------
+(sum of all types of errors across all reads)
+four_err          0.000000
+one_err           0.000000
+perfect           0.000000
+rate         188066.708215
+three_err         0.000000
+two_err           0.000000
+dtype: float64
+
+CORRECTED INTENSITY
+-------------------
+
+Sample from lane/cycle/tile start:                  avg_corint_A  avg_corint_C  avg_corint_G  avg_corint_T  \
+cycle lane tile                                                            
+1     1    11101          6567          5495          1164          4675   
+           11102          6367          5131          1124          4377   
+           11103          6252          5028          1137          4246   
+           11104          6216          4877          1116          4257   
+           11105          6212          4927          1138          4099   
+
+                  avg_corint_called_A  avg_corint_called_C  \
+cycle lane tile                                              
+1     1    11101                 6567                 5495   
+           11102                 6367                 5131   
+           11103                 6252                 5028   
+           11104                 6216                 4877   
+           11105                 6212                 4927   
+
+                  avg_corint_called_G  avg_corint_called_T  avg_intensity  \
+cycle lane tile                                                             
+1     1    11101                 1164                 4675              0   
+           11102                 1124                 4377              0   
+           11103                 1137                 4246              0   
+           11104                 1116                 4257              0   
+           11105                 1138                 4099              0   
+
+                   num_calls_A   num_calls_C   num_calls_G   num_calls_T  \
+cycle lane tile                                                            
+1     1    11101  1.486834e-40  2.068877e-40  3.459806e-40  8.098104e-41   
+           11102  1.494653e-40  2.118735e-40  3.554057e-40  8.323152e-41   
+           11103  1.503509e-40  2.132216e-40  3.582532e-40  8.339688e-41   
+           11104  1.504686e-40  2.150040e-40  3.617760e-40  8.387892e-41   
+           11105  1.501631e-40  2.135102e-40  3.622441e-40  8.344452e-41   
+
+                   num_nocalls  signoise_ratio  
+cycle lane tile                                 
+1     1    11101  1.121039e-44               0  
+           11102  2.522337e-44               0  
+           11103  0.000000e+00               0  
+           11104  6.726233e-44               0  
+           11105  2.298129e-43               0  
+
+EXTRACTION METRICS
+------------------
+   cycle                   datetime    fwhm_A    fwhm_C  fwhm_G  fwhm_T  \
+0      1 2016-01-28 02:43:10.964957  2.748447  2.544986       0       0   
+1      1 2016-01-28 02:43:11.453985  2.742753  2.568489       0       0   
+2      1 2016-01-28 02:43:11.622995  2.597768  2.416772       0       0   
+3      1 2016-01-28 02:43:11.993016  2.804750  2.567774       0       0   
+4      1 2016-01-28 02:43:12.038019  2.721545  2.430763       0       0   
+
+   intensity_A  intensity_C  intensity_G  intensity_T  lane   tile  
+0         5449         3870            0            0     1  11301  
+1         6359         4449            0            0     3  11501  
+2         6082         4384            0            0     1  11201  
+3         6764         4133            0            0     3  11401  
+4         6775         4952            0            0     1  11101  
+
+CONTROL METRICS
+---------------
+CONTROL METRICS: File not found
+

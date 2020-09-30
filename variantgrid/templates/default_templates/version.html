@@ -1,0 +1,17 @@
+{% extends "uicore/page/base.html" %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block title %}Settings{% endblock %}
+
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        <h3>VariantGrid Version</h3>
+
+        <form class="mt-4">
+            {% labelled id="git-last-modified" label="Git Modified Date" %}{% timestamp git_last_modified time_ago=True %}{% endlabelled %}
+            {% labelled id="git-hash" label="Git Hash" value_css="text-monospace"%}{{ git_hash }}{% endlabelled %}
+        </form>
+    </div>
+{% endblock content %}

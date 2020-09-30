@@ -1,0 +1,34 @@
+{% load leaflet_tags %}
+{% leaflet_js %}
+{% leaflet_css %}
+{% load static %}
+
+<div>
+<script type="text/javascript">
+  function map_init_basic(map, options) {
+    var mapId = map._container.id;
+    window.leafletMaps = window.leafletMaps || {};
+    window.leafletMaps[mapId] = map;
+    var Esri_NatGeoWorldMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', {
+	attribution: 'Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC',
+	maxZoom: 16
+    }).addTo(map);
+    map.setView([{{ center_lat }}, {{ center_long }}], {{ zoom_level }});
+  {% for lab in labs %}
+    var MyIcon = new L.Icon({
+      iconUrl: "{% static 'icons/maps/marker-icon-blue.png' %}",
+      shadowUrl: "{% static 'icons/maps/marker-shadow.png' %}",
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    });
+    var marker = L.marker([{{ lab.lat }}, {{ lab.long }}], {icon: MyIcon});
+    marker.bindPopup("<h3>{{ lab.organization }}</h3><p><a href='{{ lab.url }}' alt='{{ lab.name }}'>{{ lab.name }}</a>, {{ lab.labproject.leader }}</p><p>{{ lab.city }}, {{ lab.country }}</p>").addTo(map);
+  {% endfor %}
+
+  }
+</script>
+
+{% leaflet_map "Locations-Map" callback="map_init_basic" %}
+</div>

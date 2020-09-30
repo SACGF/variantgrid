@@ -1,0 +1,26 @@
+TILE METRICS
+------------
+  Mean Cluster Density: 1445550
+  Mean PF Cluster Density: 1307309
+  Total Clusters: 35155097
+  Total PF Clusters: 31793238
+  Percentage of Clusters PF: 90.437065
+  Aligned to PhiX: 0.729484
+  Read - PHASING / PRE-PHASING:
+    1 - 0.000709 / 0.000214
+    2 - 0.000000 / 0.000000
+    3 - 0.000000 / 0.000000
+    4 - 0.001120 / 0.000423
+
+QUALITY METRICS
+---------------
+Read 1: 92.582755 
+Read 2: 96.880185 (Index)
+Read 3: 88.527423 
+
+INDEXING METRICS
+----------------
+index_str          project_str     name_str          
+CGTACTAG+GCGATCTA  default      miseq_sample1         20742414
+CTCTCTAC+ATAGAGAG  default      miseq_sample2          47771692
+Name: clusters, dtype: int64

@@ -1,0 +1,75 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% block title %}Variant Classification Activity{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        #classification-activity td.timestamp {
+            width: 100px;
+        }
+        #classification-activity td.id {
+            width: 180px;
+        }
+        #classification-activity td.user {
+            width: 180px;
+        }
+        .key-change {
+            color: #555555;
+        }
+        .key {
+            font-weight: bold;
+        }
+        .change-arrow {
+            font-weight: bold;
+            color: #999999;
+        }
+        .resolution {
+            color: #555555;
+            font-weight: bold;
+        }
+        .none {
+            color: #222222;
+            font-style: italic;
+        }
+        .user {
+            display: flex;
+            align-content: center;
+        }
+        #classification-activity td {
+            word-break: break-word;
+            font-size: 10pt;
+        }
+    </style>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+    <h3>Classification Activity</h3>
+    {% page_help_embedded title='Classification Activity' %}
+        <p>
+        This page shows changes that have been performed on a classification (or classifications) evidence and flags.<br/>
+        The oldest changes are shown at the top and the newest at the bottom.<br/>
+            The changes show the raw key names and raw values, they may appear more human friendly on the web form.</p>
+        <p>
+        The icon that precedes the user icon indicates what method was used:
+        <ul style="list-group">
+            {% if can_create_classifications %}
+            <li class="list-group-item"><div class="submission-source variantgrid mr-2"></div><b>Variantgrid</b> This classification was created through the web interface,
+            and some values were auto-populated from annotations.</li>
+            <li class="list-group-item"><div class="submission-source consensus mr-2"></div><b>Copy Consensus</b> When the classification was created through the web interface,
+            the user elected to "copy consensus", copying values from other classifications for the variant's allele. (Older classifications
+            might mark copy consensus as just "form").</li>
+            {% endif %}
+            <li class="list-group-item"><div class="submission-source form mr-2"></div><b>Form</b> The user edited the form data through the web interface.</li>
+            <li class="list-group-item"><div class="submission-source api mr-2"></div><b>API</b> The changes were uploaded from another system.</li>
+            <li class="list-group-item"><div class="submission-source flag-source mr-2"></div><b>Flag</b> The action was against a flag, not classification data.</li>
+        </ul>
+        Hovering over a value in the Date column will give you the full date of when the action occurred.<br/>
+        A blank value in the Record or Who column implies it's the same as the value above it.
+        </p>
+    {% end_page_help_embedded %}
+    {% variant_classification_changes changes %}
+    {% if last_date %}<br/><a class="btn btn-outline-primary" href="{% url 'activity_dated' last_date %}">Load Older</a>{% endif %}
+    </div>
+{% endblock %}

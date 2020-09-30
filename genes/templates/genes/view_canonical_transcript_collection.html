@@ -1,0 +1,44 @@
+{% extends menu_genes_base %}
+{% load jqgrid_tags %}
+
+{% block submenu_page_content %}
+
+    <h2>Canonical Transcripts: {{ canonical_transcript_collection }}</h2>
+
+    <div>
+        <b>EnrichmentKit:</b>
+        {% if canonical_transcript_collection.enrichmentkit_set.exists %}
+            Used by the following kits:
+            <ul>
+            {% for enrichment_kit in canonical_transcript_collection.enrichmentkit_set.all %}
+                <li><a href="{% url 'view_enrichment_kit' enrichment_kit.pk %}">{{ enrichment_kit }}</a>
+            {% endfor %}
+            </ul>
+        {% else %}
+            No enrichment kits have been set to use this canonical transcript collection.
+        {% endif %}
+    </div>
+    {% if is_system_default %}
+    <div>
+        <b>System Default:</b> This canonical transcript collection is used for kits without their own canonical transcripts set. 
+    </div>
+    {% endif %}
+
+    <p>
+    {% if summary %}
+        This canonical transcript collection has been used for the following gene coverage:
+        <ul>
+        {% for kit, count in summary.items %}
+            <li> {{ kit|default_if_none:'Uploaded/No kit' }}: {{ count }}
+        {% endfor %}
+        </ul>
+    {% else %}    
+        This canonical transcript collection has not been used for any gene coverage
+    {% endif %}
+    </p>
+
+    <div>
+    {% jqgrid 'canonical_transcript_collection_grid' 'CanonicalTranscripts' search=True pk=canonical_transcript_collection.pk %}
+    </div>
+
+{% endblock submenu_page_content %}

@@ -1,0 +1,153 @@
+{% load js_tags %}
+<div id='analysis-settings-node-counts-tab'>
+{% include "uicore/messages/messages.html" %}
+<style>
+    .sort_placeholder {height: 15px; border: red 3px solid;}
+    .list_placeholder { font-weight: bolder; }
+    .columns-list { border: #aaaaaa 2px solid; margin: 5px; float: left; border-radius: 4px; }
+    .columns-list ul {
+        height: 100%;
+        list-style: none;
+    }
+    
+    div#node-counts-widget {
+        padding-top: 10px;
+        display: flex;
+        flex-flow: row wrap;
+    }
+
+    #node-counts-widget li
+    {
+        width: 300px;
+        margin: 0;
+        padding: 5px;
+        margin-right: 10px;
+        border: 1px solid #eee;
+    }
+
+    li.user-column .column-name {
+        font-weight: bold;
+    }
+
+    .column-name:after {
+        content: ': ';
+    }
+
+    .node-count-name {
+        width: 100%;
+    }
+
+    .legend-row {
+        margin: 5px;
+    }
+    
+    .legend-color-box {
+       width: 20px;
+       height: 20px;
+       float: left;
+       margin-right: 5px;
+    }
+    
+    .legend-label {
+       float: left;
+    }
+
+    {% load user_tag_color_tags %}
+    {% render_node_count_colors_css %}
+
+</style>
+<script>
+	DIV_TO_RELOAD = '#analysis-settings-node-counts-tab';
+	var IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
+    var nodeCountsChanged = false;
+
+	function setupNodeCountsWidget() {
+        $("#my_filters_sortable").sortable({
+            items: "li.node-count-filter",
+            placeholder: "sort_placeholder",
+            connectWith: '#available_filters_sortable',
+        }).bind("sortupdate", function(event, ui) {
+            nodeCountsChanged = true;
+        }).disableSelection();
+        
+        
+        $("#available_filters_sortable").sortable({
+            items: "li.node-count-filter",
+            placeholder: "sort_placeholder",
+            connectWith: '#my_filters_sortable',
+        }).disableSelection();
+	}
+
+    function serialize_columns() {
+        let node_count_ids = [];
+        $("li.node-count-filter", "#my_filters_sortable").each(function() {
+            let nodeCountId = $(this).attr("node_count_id");
+            node_count_ids.push(nodeCountId);
+        });
+        return node_count_ids.toString();
+    }
+
+	$(document).ready(function() {
+        let successFunc = null;
+	    {% if new_analysis_settings %}
+        ANALYSIS_SETTINGS = {{ new_analysis_settings | jsonify }}; // This will be new ones upon page reload
+        successFunc = function(data) {
+            // When this is called, it's using the old analysis settings. 
+            if (IN_ANALYSIS) {
+                // This is from before the page reload - ie old settings.
+                let my_current_analysis_settings = {{ new_analysis_settings | jsonify }};
+                changeAnalysisSettings(my_current_analysis_settings);
+            }
+        }
+        {% endif %}
+
+		let options	= {
+			target: DIV_TO_RELOAD,
+			success: successFunc,
+		};
+		let nodeCountsForm = $('form#analysis-node-counts-form');
+		nodeCountsForm.submit(function() {
+            if (nodeCountsChanged) {
+                var nodeCountInput = $("<input/>", {type : "hidden",
+                                                    name : "node_counts",
+                                                    value: serialize_columns()});
+
+                nodeCountInput.appendTo(nodeCountsForm);
+            }
+		});
+		nodeCountsForm.ajaxForm(options); 
+		setupNodeCountsWidget();
+	});
+</script>
+<form id="analysis-node-counts-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+
+    <div class="container no-gutters">
+        <div class="row">
+            <div class="col col-md-5">
+                <h5>My Node Counts</h5>
+                <ul class="list-group" id="my_filters_sortable">
+                    {% for nc in my_node_counts_list %}
+                        <li class="list-group-item node-count-filter cursor-move {{ nc.css_classes }}" id="{{ nc.pk }}" node_count_id="{{ nc.pk }}"><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>{{ nc.description | safe  }}</div><div class='clear'></div></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="col col-md-5">
+                <h5>Available Node Counts</h5>
+                <ul class="list-group" id="available_filters_sortable">
+                    {% for nc in available_node_counts_list %}
+                        <li class="list-group-item node-count-filter cursor-move {{ nc.css_classes }}" id="{{ nc.pk }}" node_count_id="{{ nc.pk }}"><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>{{ nc.description | safe  }}</div><div class='clear'></div></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+{% if has_write_permission %}
+  <div>
+      <button class="btn btn-primary" id='save-node-counts' type="submit">Save</button>
+  </div>
+{% endif %}
+</form>
+
+</div>

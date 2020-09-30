@@ -1,0 +1,27 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load avatar_tags %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block head %}
+    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+    <script>
+        window.ANALYSIS_SETTINGS = {
+            show_igv_links : true,
+            igv_data : {{ igv_data | jsonify }}
+        };
+    </script>
+{% endblock %}
+
+{% block title %}View Variant{% endblock %}
+{% block submenu %}{% menu_bar_data %}{% endblock submenu %}
+
+{% block content %}
+	{% include "variantopedia/variant_details.html" %}
+    <div id="error-dialog" class="no-close" title="Error">
+    </div>
+{% endblock content %}

@@ -1,0 +1,111 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load static %}
+{% load js_tags %}
+{% load crispy_forms_tags %}
+{% block title %}QC Overview{% endblock %}
+{% block submenu %}{% menu_bar_sequencing %}{% endblock %}
+
+{% block head %}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+    {% load seqauto_graph_tags %}
+    <style>
+        #link-and-graph-container {
+            height: 100%;
+            width: 100%;
+        }
+
+        #graph-links {
+            float: left;
+            width: 50%;
+        }
+
+        #plotly-graph-container {
+            float: right;
+            width: 50%;
+        }
+    </style>
+
+    <script>
+        function showGraph(elementId, title, data) {
+            var labels = [];
+            var values = [];
+            for(var i=0 ; i<data.length ; ++i) {
+                labels.push(data[i][0]);
+                values.push(data[i][1]);
+            }
+
+            var data = [{
+              labels: labels,
+              values: values,
+              type: 'pie'
+            }];
+
+            width = 500;
+            height = width;
+
+            var layout = {
+                title: title,
+                width: width,
+                height: height,
+            };
+
+            $("#" + elementId).empty();
+            Plotly.newPlot(elementId, data, layout);
+        }
+
+        $(document).ready(function() {
+            var sequencingRunInfo = {{ sequencing_run_info | jsonify }};
+            var sequencingSampleInfo = {{ sequencing_sample_info | jsonify }};
+
+            showGraph('sequencing-run-model', 'Sequencer Model', sequencingRunInfo['sequencer_model']);
+            showGraph('sequencing-run-sequencer', 'Sequencer', sequencingRunInfo['sequencer']);
+
+            showGraph('samples-model', 'Sequencer Model', sequencingSampleInfo['sequencer_model']);
+            showGraph('samples-sequencer', 'Sequencer', sequencingSampleInfo['sequencer']);
+            showGraph('samples-enrichment_kit', 'EnrichmentKit', sequencingSampleInfo['enrichment_kit']);
+        });
+    </script>
+
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+    <a href="{% url 'sequencing_stats_data' %}">View Sequencing Stats Data</a>
+
+    {% if num_sequencing_runs %}
+        <div id='link-and-graph-container'>
+            <div id='graph-links'>
+                <table class="table">
+                    <tr>
+                        <td>{% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Year' "year" %}</td>
+                        <td>{% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Month' "month_offset" %}</td>
+                    </tr>
+                </table>
+
+                <h3>{{ num_sequencing_runs }} Sequencing Runs</h3>
+                <table class="table">
+                    <tr>
+                        <td><div id='sequencing-run-model'></div></td>
+                        <td><div id='sequencing-run-sequencer'></div></td>
+                    </tr>
+                </table>
+
+                <h3>{{ num_samples }} Samples</h3>
+
+                <table class="table">
+                    <tr>
+                        <td><div id='samples-model'></div></td>
+                        <td><div id='samples-sequencer'></div></td>
+                        <td><div id='samples-enrichment_kit'></div></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        {% else %}
+            <div class="alert alert-dark">No sequencing runs to show.</div>
+        {% endif %}
+    </div>
+{% endblock %}

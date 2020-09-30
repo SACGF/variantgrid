@@ -1,0 +1,22 @@
+{% load karyomapping_tags %}
+
+<table>
+<tr><th>Trio ID:
+    <td><a href="{% url 'view_trio' trio.pk %}">{{ trio.pk }}
+<tr><th>Name:
+    <td>{{ trio.name }}
+<tr><th>Cohort:
+    <td><a href="{% url 'view_cohort' trio.cohort.pk %}">{{ trio.cohort }}</a>
+<tr><th>Mother:
+    <td><a href="{% url 'view_sample' trio.mother.sample.pk %}">{{ trio.mother_details }}</a>
+<tr><th>Father:
+    <td><a href="{% url 'view_sample' trio.father.sample.pk %}">{{ trio.father_details }}</a>
+<tr><th>Proband:
+    <td><a href="{% url 'view_sample' trio.proband.sample.pk %}">{{ trio.proband }}</a>
+
+{% if trio.genomekaryomappingcounts  %}
+    <tr><th>Whole sample counts ({{ trio.genomekaryomappingcounts.trio.genome_build.name }})
+        <td>{% genome_karyomapping_counts_summary trio.genomekaryomappingcounts %}
+{% endif %}
+</table>
+

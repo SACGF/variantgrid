@@ -1,0 +1,1281 @@
+{
+  "analysis": {
+    "model": "analysis.Analysis",
+    "pk": 188,
+    "fields": {
+      "analysis_type": "T",
+      "name": "Trio inheritance",
+      "description": null,
+      "show_igv_links": true,
+      "analysis_panel_fraction": 0.41829004329004327,
+      "lock_input_sources": false,
+      "template_type": "S",
+      "genome_build": "GRCh37"
+    }
+  },
+  "nodes": [
+    {
+      "model": "analysis.TrioNode",
+      "pk": 2602,
+      "fields": {
+        "id": 2602,
+        "analysis": 188,
+        "name": "Proband Het",
+        "inheritance": "P",
+        "x": 512,
+        "y": 11,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 3.651171922683716,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [
+          {
+            "id": 244,
+            "field": "trio",
+            "class_name": "snpdb.Trio",
+            "node": 2602
+          }
+        ],
+        "nodeallelefrequencyfilter": {
+          "group_operation": "Y",
+          "nodeallelefrequencyrange_set": []
+        },
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.GeneListNode",
+      "pk": 2627,
+      "fields": {
+        "id": 2627,
+        "analysis": 188,
+        "name": "",
+        "x": 310,
+        "y": 497,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.09746575355529785,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "pathology_test_gene_list": null,
+        "sample": 1,
+        "has_gene_coverage": null,
+        "custom_text_gene_list": null,
+        "exclude": false,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "genelistnodegenelist_set": []
+      }
+    },
+    {
+      "model": "analysis.PopulationNode",
+      "pk": 2616,
+      "fields": {
+        "id": 2616,
+        "analysis": 188,
+        "name": "<= 1%",
+        "x": 360,
+        "y": 257,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.5978202819824219,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "percent": 1.0,
+        "group_operation": "Y",
+        "gnomad_af": true,
+        "gnomad_popmax_af": false,
+        "gnomad_hom_alt_max": null,
+        "af_1kg": true,
+        "af_uk10k": true,
+        "topmed_af": false,
+        "zygosity": "A",
+        "use_internal_counts": false,
+        "max_samples": null,
+        "internal_percent": 1.0,
+        "keep_internally_classified_pathogenic": true,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "populationnodegnomadpopulation_set": []
+      }
+    },
+    {
+      "model": "analysis.TrioNode",
+      "pk": 2607,
+      "fields": {
+        "id": 2607,
+        "analysis": 188,
+        "name": "Recessive",
+        "inheritance": "R",
+        "x": 60,
+        "y": 13,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.8537564277648926,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [
+          {
+            "id": 240,
+            "field": "trio",
+            "class_name": "snpdb.Trio",
+            "node": 2607
+          }
+        ],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.PopulationNode",
+      "pk": 2615,
+      "fields": {
+        "id": 2615,
+        "analysis": 188,
+        "name": "<= 0.01%",
+        "x": 210,
+        "y": 379,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.4964251518249512,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "percent": 0.01,
+        "group_operation": "Y",
+        "gnomad_af": true,
+        "gnomad_popmax_af": false,
+        "gnomad_hom_alt_max": null,
+        "af_1kg": true,
+        "af_uk10k": true,
+        "topmed_af": false,
+        "zygosity": "A",
+        "use_internal_counts": false,
+        "max_samples": null,
+        "internal_percent": 0.01,
+        "keep_internally_classified_pathogenic": true,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "populationnodegnomadpopulation_set": []
+      }
+    },
+    {
+      "model": "analysis.DamageNode",
+      "pk": 2620,
+      "fields": {
+        "id": 2620,
+        "analysis": 188,
+        "name": "",
+        "x": 210,
+        "y": 499,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.4378361701965332,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "impact_min": "M",
+        "always_keep_splice_variants_regardless_of_impact": true,
+        "cadd_score_min": null,
+        "revel_score_min": null,
+        "allow_null": false,
+        "remove_low_complexity_regions": false,
+        "accordion_panel": 0,
+        "min_damage_predictions": null,
+        "sift_prediction": null,
+        "polyphen2_prediction": null,
+        "mutation_assessor_prediction": null,
+        "mutation_taster_prediction": null,
+        "fathmm_prediction": null,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.DamageNode",
+      "pk": 2618,
+      "fields": {
+        "id": 2618,
+        "analysis": 188,
+        "name": "",
+        "x": 370,
+        "y": 387,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.6999566555023193,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "impact_min": "M",
+        "always_keep_splice_variants_regardless_of_impact": true,
+        "cadd_score_min": null,
+        "revel_score_min": null,
+        "allow_null": false,
+        "remove_low_complexity_regions": false,
+        "accordion_panel": 0,
+        "min_damage_predictions": null,
+        "sift_prediction": null,
+        "polyphen2_prediction": null,
+        "mutation_assessor_prediction": null,
+        "mutation_taster_prediction": null,
+        "fathmm_prediction": null,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.TrioNode",
+      "pk": 2605,
+      "fields": {
+        "id": 2605,
+        "analysis": 188,
+        "name": "Denovo",
+        "inheritance": "N",
+        "x": 210,
+        "y": 139,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 3.8752381801605225,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [
+          {
+            "id": 241,
+            "field": "trio",
+            "class_name": "snpdb.Trio",
+            "node": 2605
+          }
+        ],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.PhenotypeNode",
+      "pk": 2624,
+      "fields": {
+        "id": 2624,
+        "analysis": 188,
+        "name": "HSS2008 patient phenotypes",
+        "x": 110,
+        "y": 493,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.3508658409118652,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "text_phenotype": null,
+        "patient": 9,
+        "accordion_panel": 1,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "phenotypenodehpo_set": [],
+        "phenotypenodeomim_set": []
+      }
+    },
+    {
+      "model": "analysis.PhenotypeNode",
+      "pk": 2631,
+      "fields": {
+        "id": 2631,
+        "analysis": 188,
+        "name": "HSS2008 patient phenotypes",
+        "x": 420,
+        "y": 507,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.06312227249145508,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "text_phenotype": null,
+        "patient": 9,
+        "accordion_panel": 1,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "phenotypenodehpo_set": [],
+        "phenotypenodeomim_set": []
+      }
+    },
+    {
+      "model": "analysis.PhenotypeNode",
+      "pk": 2626,
+      "fields": {
+        "id": 2626,
+        "analysis": 188,
+        "name": "HSS2008 patient phenotypes",
+        "x": 260,
+        "y": 619,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.5474274158477783,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "text_phenotype": null,
+        "patient": 9,
+        "accordion_panel": 1,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "phenotypenodehpo_set": [],
+        "phenotypenodeomim_set": []
+      }
+    },
+    {
+      "model": "analysis.GeneListNode",
+      "pk": 2625,
+      "fields": {
+        "id": 2625,
+        "analysis": 188,
+        "name": "",
+        "x": 160,
+        "y": 619,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.12065863609313965,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "pathology_test_gene_list": null,
+        "sample": 1,
+        "has_gene_coverage": null,
+        "custom_text_gene_list": null,
+        "exclude": false,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "genelistnodegenelist_set": []
+      }
+    },
+    {
+      "model": "analysis.IntersectionNode",
+      "pk": 2611,
+      "fields": {
+        "id": 2611,
+        "analysis": 188,
+        "name": "",
+        "x": 360,
+        "y": 137,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.1958303451538086,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "genomic_intervals_collection": null,
+        "genomic_interval": null,
+        "hgvs_name": null,
+        "hgvs_variant": null,
+        "left": 0,
+        "right": 0,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.GeneListNode",
+      "pk": 2630,
+      "fields": {
+        "id": 2630,
+        "analysis": 188,
+        "name": "",
+        "x": 320,
+        "y": 507,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.05470776557922363,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "pathology_test_gene_list": null,
+        "sample": 1,
+        "has_gene_coverage": null,
+        "custom_text_gene_list": null,
+        "exclude": false,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "genelistnodegenelist_set": []
+      }
+    },
+    {
+      "model": "analysis.DamageNode",
+      "pk": 2621,
+      "fields": {
+        "id": 2621,
+        "analysis": 188,
+        "name": "",
+        "x": 360,
+        "y": 377,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.662405252456665,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "impact_min": "M",
+        "always_keep_splice_variants_regardless_of_impact": true,
+        "cadd_score_min": null,
+        "revel_score_min": null,
+        "allow_null": false,
+        "remove_low_complexity_regions": false,
+        "accordion_panel": 0,
+        "min_damage_predictions": null,
+        "sift_prediction": null,
+        "polyphen2_prediction": null,
+        "mutation_assessor_prediction": null,
+        "mutation_taster_prediction": null,
+        "fathmm_prediction": null,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.DamageNode",
+      "pk": 2622,
+      "fields": {
+        "id": 2622,
+        "analysis": 188,
+        "name": "",
+        "x": 509,
+        "y": 355,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 2.5158679485321045,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "impact_min": "M",
+        "always_keep_splice_variants_regardless_of_impact": true,
+        "cadd_score_min": null,
+        "revel_score_min": null,
+        "allow_null": false,
+        "remove_low_complexity_regions": false,
+        "accordion_panel": 0,
+        "min_damage_predictions": null,
+        "sift_prediction": null,
+        "polyphen2_prediction": null,
+        "mutation_assessor_prediction": null,
+        "mutation_taster_prediction": null,
+        "fathmm_prediction": null,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.GeneListNode",
+      "pk": 2633,
+      "fields": {
+        "id": 2633,
+        "analysis": 188,
+        "name": "",
+        "x": 459,
+        "y": 595,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.0903627872467041,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "pathology_test_gene_list": null,
+        "sample": 1,
+        "has_gene_coverage": null,
+        "custom_text_gene_list": null,
+        "exclude": false,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "genelistnodegenelist_set": []
+      }
+    },
+    {
+      "model": "analysis.IntersectionNode",
+      "pk": 2610,
+      "fields": {
+        "id": 2610,
+        "analysis": 188,
+        "name": "",
+        "x": 210,
+        "y": 259,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.18905282020568848,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "genomic_intervals_collection": null,
+        "genomic_interval": null,
+        "hgvs_name": null,
+        "hgvs_variant": null,
+        "left": 0,
+        "right": 0,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.TrioNode",
+      "pk": 2603,
+      "fields": {
+        "id": 2603,
+        "analysis": 188,
+        "name": "X-Linked Recessive",
+        "inheritance": "X",
+        "x": 370,
+        "y": 27,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": true,
+        "visible": true,
+        "errors": null,
+        "shadow_color": "#ee0000",
+        "load_seconds": 0.746589183807373,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [
+          {
+            "id": 239,
+            "field": "trio",
+            "class_name": "snpdb.Trio",
+            "node": 2603
+          }
+        ],
+        "nodeallelefrequencyfilter": {
+          "group_operation": "Y",
+          "nodeallelefrequencyrange_set": []
+        },
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.IntersectionNode",
+      "pk": 2612,
+      "fields": {
+        "id": 2612,
+        "analysis": 188,
+        "name": "",
+        "x": 509,
+        "y": 115,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.13926172256469727,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "genomic_intervals_collection": null,
+        "genomic_interval": null,
+        "hgvs_name": null,
+        "hgvs_variant": null,
+        "left": 0,
+        "right": 0,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.GeneListNode",
+      "pk": 2623,
+      "fields": {
+        "id": 2623,
+        "analysis": 188,
+        "name": "",
+        "x": 10,
+        "y": 493,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.10111355781555176,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "pathology_test_gene_list": null,
+        "sample": 1,
+        "has_gene_coverage": null,
+        "custom_text_gene_list": null,
+        "exclude": false,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "genelistnodegenelist_set": []
+      }
+    },
+    {
+      "model": "analysis.PopulationNode",
+      "pk": 2614,
+      "fields": {
+        "id": 2614,
+        "analysis": 188,
+        "name": "<= 1%",
+        "x": 60,
+        "y": 253,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.4184503555297852,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "percent": 1.0,
+        "group_operation": "Y",
+        "gnomad_af": true,
+        "gnomad_popmax_af": false,
+        "gnomad_hom_alt_max": null,
+        "af_1kg": true,
+        "af_uk10k": true,
+        "topmed_af": false,
+        "zygosity": "A",
+        "use_internal_counts": false,
+        "max_samples": null,
+        "internal_percent": 1.0,
+        "keep_internally_classified_pathogenic": true,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "populationnodegnomadpopulation_set": []
+      }
+    },
+    {
+      "model": "analysis.IntersectionNode",
+      "pk": 2609,
+      "fields": {
+        "id": 2609,
+        "analysis": 188,
+        "name": "",
+        "x": 60,
+        "y": 133,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.19271421432495117,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "genomic_intervals_collection": null,
+        "genomic_interval": null,
+        "hgvs_name": null,
+        "hgvs_variant": null,
+        "left": 0,
+        "right": 0,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.TagNode",
+      "pk": 2604,
+      "fields": {
+        "id": 2604,
+        "analysis": 188,
+        "name": "Tagged Variants",
+        "x": 20,
+        "y": 41,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": false,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.06598901748657227,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.TrioNode",
+      "pk": 2606,
+      "fields": {
+        "id": 2606,
+        "analysis": 188,
+        "name": "Dominant",
+        "inheritance": "D",
+        "x": 360,
+        "y": 17,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": true,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 3.976508617401123,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [
+          {
+            "id": 242,
+            "field": "trio",
+            "class_name": "snpdb.Trio",
+            "node": 2606
+          }
+        ],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.TrioNode",
+      "pk": 2629,
+      "fields": {
+        "id": 2629,
+        "analysis": 188,
+        "name": "C. Het\n (non strict)",
+        "inheritance": "C",
+        "require_zygosity": false,
+        "x": 509,
+        "y": 475,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 2.642134189605713,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysisvariable_set": [
+          {
+            "id": 243,
+            "field": "trio",
+            "class_name": "snpdb.Trio",
+            "node": 2629
+          }
+        ],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.PopulationNode",
+      "pk": 2617,
+      "fields": {
+        "id": 2617,
+        "analysis": 188,
+        "name": "<= 1%",
+        "x": 509,
+        "y": 235,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 3.114497423171997,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "percent": 1.0,
+        "group_operation": "Y",
+        "gnomad_af": true,
+        "gnomad_popmax_af": false,
+        "gnomad_hom_alt_max": null,
+        "af_1kg": true,
+        "af_uk10k": true,
+        "topmed_af": false,
+        "zygosity": "A",
+        "use_internal_counts": false,
+        "max_samples": null,
+        "internal_percent": 1.0,
+        "keep_internally_classified_pathogenic": true,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "populationnodegnomadpopulation_set": []
+      }
+    },
+    {
+      "model": "analysis.DamageNode",
+      "pk": 2619,
+      "fields": {
+        "id": 2619,
+        "analysis": 188,
+        "name": "",
+        "x": 60,
+        "y": 373,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.9838387966156006,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "impact_min": "M",
+        "always_keep_splice_variants_regardless_of_impact": true,
+        "cadd_score_min": null,
+        "revel_score_min": null,
+        "allow_null": false,
+        "remove_low_complexity_regions": false,
+        "accordion_panel": 0,
+        "min_damage_predictions": null,
+        "sift_prediction": null,
+        "polyphen2_prediction": null,
+        "mutation_assessor_prediction": null,
+        "mutation_taster_prediction": null,
+        "fathmm_prediction": null,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.IntersectionNode",
+      "pk": 2608,
+      "fields": {
+        "id": 2608,
+        "analysis": 188,
+        "name": "",
+        "x": 370,
+        "y": 147,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.07571983337402344,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "genomic_intervals_collection": null,
+        "genomic_interval": null,
+        "hgvs_name": null,
+        "hgvs_variant": null,
+        "left": 0,
+        "right": 0,
+        "accordion_panel": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.PhenotypeNode",
+      "pk": 2632,
+      "fields": {
+        "id": 2632,
+        "analysis": 188,
+        "name": "HSS2008 patient phenotypes",
+        "x": 559,
+        "y": 595,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 2.5913808345794678,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "text_phenotype": null,
+        "patient": 9,
+        "accordion_panel": 1,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "phenotypenodehpo_set": [],
+        "phenotypenodeomim_set": []
+      }
+    },
+    {
+      "model": "analysis.PhenotypeNode",
+      "pk": 2628,
+      "fields": {
+        "id": 2628,
+        "analysis": 188,
+        "name": "HSS2008 patient phenotypes",
+        "x": 410,
+        "y": 497,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 1.586268424987793,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "text_phenotype": null,
+        "patient": 9,
+        "accordion_panel": 1,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "phenotypenodehpo_set": [],
+        "phenotypenodeomim_set": []
+      }
+    },
+    {
+      "model": "analysis.PopulationNode",
+      "pk": 2613,
+      "fields": {
+        "id": 2613,
+        "analysis": 188,
+        "name": "<= 1%",
+        "x": 370,
+        "y": 267,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.5437667369842529,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "percent": 1.0,
+        "group_operation": "Y",
+        "gnomad_af": true,
+        "gnomad_popmax_af": false,
+        "gnomad_hom_alt_max": null,
+        "af_1kg": true,
+        "af_uk10k": true,
+        "topmed_af": false,
+        "zygosity": "A",
+        "use_internal_counts": false,
+        "max_samples": null,
+        "internal_percent": 1.0,
+        "keep_internally_classified_pathogenic": true,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "populationnodegnomadpopulation_set": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2277,
+      "fields": {
+        "parent": 2607,
+        "child": 2609
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2278,
+      "fields": {
+        "parent": 2609,
+        "child": 2614
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2279,
+      "fields": {
+        "parent": 2614,
+        "child": 2619
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2280,
+      "fields": {
+        "parent": 2619,
+        "child": 2623
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2281,
+      "fields": {
+        "parent": 2619,
+        "child": 2624
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2282,
+      "fields": {
+        "parent": 2605,
+        "child": 2610
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2283,
+      "fields": {
+        "parent": 2610,
+        "child": 2615
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2284,
+      "fields": {
+        "parent": 2615,
+        "child": 2620
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2285,
+      "fields": {
+        "parent": 2620,
+        "child": 2625
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2286,
+      "fields": {
+        "parent": 2620,
+        "child": 2626
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2287,
+      "fields": {
+        "parent": 2606,
+        "child": 2611
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2288,
+      "fields": {
+        "parent": 2611,
+        "child": 2616
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2289,
+      "fields": {
+        "parent": 2616,
+        "child": 2621
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2290,
+      "fields": {
+        "parent": 2621,
+        "child": 2627
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2291,
+      "fields": {
+        "parent": 2621,
+        "child": 2628
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2292,
+      "fields": {
+        "parent": 2612,
+        "child": 2617
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2293,
+      "fields": {
+        "parent": 2617,
+        "child": 2622
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2294,
+      "fields": {
+        "parent": 2622,
+        "child": 2629
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2295,
+      "fields": {
+        "parent": 2629,
+        "child": 2633
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2296,
+      "fields": {
+        "parent": 2629,
+        "child": 2632
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2297,
+      "fields": {
+        "parent": 2603,
+        "child": 2608
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2298,
+      "fields": {
+        "parent": 2608,
+        "child": 2613
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2299,
+      "fields": {
+        "parent": 2613,
+        "child": 2618
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2300,
+      "fields": {
+        "parent": 2618,
+        "child": 2630
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2301,
+      "fields": {
+        "parent": 2618,
+        "child": 2631
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2302,
+      "fields": {
+        "parent": 2602,
+        "child": 2612
+      }
+    }
+  ]
+}

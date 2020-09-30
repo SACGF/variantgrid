@@ -1,0 +1,65 @@
+{% load static %}
+{% load model_helpers %}
+<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+<script src="{% static 'js/generated_graphs.js' %}"></script>
+<script>
+	var DELETE_URL = "{% url 'cached_generated_file_delete' %}";
+	var BASE_QC_POLL_URL = "{% url 'sequencing_run_qc_graph' sequencing_run.pk 'QC_COMPARE_TYPE' %}";
+	var BASE_QC_JSON_GRAPH_URL = "{% url 'sequencing_run_qc_json_graph' sequencing_run.pk 'QC_COMPARE_TYPE' %}";
+
+	function loadSequencingRunQCGraph() {
+	    const SEQUENCING_RUN_ID = "{{ sequencing_run.pk }}";
+		const graph_selector = $('#generated-graph-qc', "#run-stats");
+		const compare_against = $('#id_compare_against', "#run-stats").val();
+		const graph_type = $('#id_graph_type', "#run-stats").val();
+
+		clearGraph(graph_selector);
+		const columnSelect = $("select#id_column").parent();
+		if (graph_type == 'B') {
+			columnSelect.hide();
+			const POLL_URL = Urls.sequencing_run_qc_graph(SEQUENCING_RUN_ID, compare_against);
+			poll_graph_status(graph_selector, POLL_URL, Urls.cached_generated_file_delete());
+		} else if (graph_type == 'A') {
+			columnSelect.show();
+			const JSON_GRAPH_URL = Urls.sequencing_run_qc_json_graph(SEQUENCING_RUN_ID, compare_against);
+			graph_selector.load(JSON_GRAPH_URL, function() { graph_selector.removeClass("graph-loading"); });
+		}
+	}
+
+$(document).ready(function() {
+	{% if show_stats %}
+		loadSequencingRunQCGraph();
+		
+		$('#id_compare_against', "#run-stats").change(loadSequencingRunQCGraph);
+		$('#id_graph_type', "#run-stats").change(loadSequencingRunQCGraph);
+
+	{% endif %}
+});
+</script>
+<div id="run-stats">
+{% if show_stats %}
+	{{ graph_form.as_p }}
+	<div id='generated-graph-qc' class='generated-graph'></div>
+	<table class='model-table'>
+		<tr><th>Mean Cluster Density:		<td>{{ illumina_qc.mean_cluster_density }}
+		<tr><th>Mean PF Cluster Density:	<td>{{ illumina_qc.mean_pf_cluster_density }}
+		<tr><th>Total Clusters:				<td>{{ illumina_qc.total_clusters }}
+		<tr><th>Total PF Clusters:			<td>{{ illumina_qc.total_pf_clusters }}
+		<tr><th>Percentage of Clusters PF:	<td>{{ illumina_qc.percentage_of_clusters_pf }}
+		<tr><th>Aligned To PhiX:			<td>{{ illumina_qc.aligned_to_phix }}
+		{% if read_q30s %}
+		<tr><th>R1 Q30:			<td>{{ read_q30s.R1 | floatformat }}
+		<tr><th>R2 Q30:			<td>{{ read_q30s.R2 | floatformat }}
+		{% endif %}
+		</tr>
+	</table>
+{% else %}
+	{% if sequencing_run.can_generate_qc %}
+		{% load record_data_state_tags %}
+		{% record_data_state_helper illumina_qc %}
+	{% else %}
+	    Can't generate QC for this SequencingRun due to missing metrics files.
+	{% endif %} 
+{% endif %}
+</div>

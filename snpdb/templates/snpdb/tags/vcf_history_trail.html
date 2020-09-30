@@ -1,0 +1,78 @@
+{% load static %}
+<style>
+.vcf-history-trail {
+    height: 45px;
+}
+
+.vcf-history-trail > * {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.centre-flex {
+    align-items: center;
+    display: flex;    
+}
+
+.web-upload {
+    background-image: url({% static 'icons/web_upload.png' %});
+    margin: 5px 5px 0px 5px;
+}
+
+.breadcrumb {
+    margin: 5px;
+    font-size: 1.1em;
+}
+
+.centre-text {
+    text-align: center;
+}
+
+</style>
+<div class='vcf-history-trail centre-flex'>
+{% if sequencing_run %} 
+{% if url_name_visible.view_sequencing_run %}
+<a class='centre-flex sequencing-run-link' href="{% url 'view_sequencing_run' sequencing_run.pk %}">
+{% endif %}
+    <div title='{{ sequencing_run.sequencer }}' class='sequencer centre-text'>
+        <div class='sequencer-icon icon32 {{ sequencing_run.sequencer.sequencer_model.css_class }}'></div>
+        <span class='sequencer-name-text'>{{ sequencing_run.sequencer.name }}</span>
+    </div>
+    <div class='left'>{{ sequencing_run }}</div>
+{% if url_name_visible.view_sequencing_run %}              
+</a>
+{% endif %}
+{% else %}
+    {# Some old data is uploaded without a UploadedVCF #}
+    {% if url_name_visible.view_upload_pipeline and vcf.uploadedvcf.uploaded_file.uploadpipeline %}
+        <a class='centre-flex' href="{% url 'view_upload_pipeline' vcf.uploadedvcf.uploaded_file.uploadpipeline.pk %}">
+    {% endif %}
+        <div class='centre-text'>
+            <div title='Web Upload' class='web-upload icon24'></div>
+            <span class='sequencer-name-text'>Web Upload</span>
+        </div>
+    {% if url_name_visible.view_upload_pipeline %}              
+        </a>
+    {% endif %}
+{% endif %}
+
+<span class='breadcrumb left'>
+&gt;
+</span>
+
+{% if can_view_vcf %} 
+<a class='centre-flex' href="{% url 'view_vcf' vcf.pk %}">
+    <div title='VCF' class='vcf-icon icon32 left'></div>
+    {% if not sequencing_run %}
+    <div class='vcf-history-trail-link-text left'>{{ vcf.name }}</div>
+    {% endif %}
+</a>
+{% else %}
+<div title="You don't have permission to view this VCF" class='vcf-icon icon32 left'></div>
+{% if not sequencing_run %}
+<div class='vcf-history-trail-link-text left'>{{ vcf.name }}</div>
+{% endif %}
+{% endif %}
+
+<div class='clear'></div>
+</div>

@@ -1,0 +1,108 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% load js_tags %}
+{% block title %}Patient Term Approvals{% endblock %}
+
+{% block head %}
+<script src="{% static 'js/patient_phenotype.js' %}"></script>
+{% endblock head %}
+
+{% block css %}
+table#unapproved-patients-table {
+    border-collapse: collapse;
+}
+
+tr.unapproved-patient {
+    border: 2px solid grey;
+}
+
+.patient-description-cell {
+    display: none;
+}
+{% endblock css %}
+
+{% block jsdocumentready %}
+	for (var p in patient_results) {
+		var patientSelector = $(".unapproved-patient[patient_id=" + p + "]");
+		var resultSelector = $(".results", patientSelector);
+		var phenotypeMatches = patient_results[p];
+		var phenotypeText = $("textarea.phenotype", patientSelector).val();
+		displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches)
+	}
+	
+	function greyOut(selector) {
+        // Grey out the div as per http://stackoverflow.com/a/14461824/4846002
+        selector.fadeTo('slow', .6);
+        selector.append('<div style="position: absolute;top:0;left:0;width: 100%;height:100%;z-index:2;opacity:0.4;filter: alpha(opacity = 50)"></div>');
+        var stopPropFn = function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        };
+        selector.bind("keydown", stopPropFn).bind("keypress", stopPropFn).bind("paste", stopPropFn);
+	}
+	
+	$("button.accept-phenotype").click(function() {
+        var parentContainer = $(this).parents(".unapproved-patient")
+        greyOut(parentContainer);
+
+		var patientId = $(this).attr("patient_id");
+        var data = 'patient_id=' + patientId;
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: "{% url 'approve_patient_term' %}",
+            success: function(phenotypeMatches) {
+                parentContainer.fadeOut();
+            }, 
+        });
+	});
+	
+{% endblock jsdocumentready %}
+{% block submenu_page_content %}
+
+<h3>Phenotype Match Approval</h3>
+
+{% if patients %}
+<p>
+	<script>
+		var patient_results = {{ patient_results | jsonify }};
+	</script>
+	
+	<p>
+	{% if show_approved %}
+	   Showing <b>all</b> patients. <a href="{% url 'patient_term_approvals' %}">Show only unapproved patients</a> 
+	{% else %}
+       Showing <b>unapproved</b> patients. <a href="{% url 'bulk_patient_term' %}">Show all patients</a> 
+	{% endif %}
+	
+	<table id='unapproved-patients-table'>
+	{% for patient in patients %}
+		<tr class='unapproved-patient' patient_id={{ patient.pk }}>
+			<td class='patient'>
+				<a href="{% url 'view_patient' patient.pk %}">{{ patient }}</a>
+			<td class='patient-description-cell'>
+				<textarea class='phenotype' rows="10" cols="80">{{ patient.phenotype }}</textarea>
+			<td>
+			<div class='results'></div>
+			<td>
+			{% if not patient.patient_text_phenotype.approved_by %}
+			<button class='accept-phenotype' patient_id={{ patient.pk }} class="btn btn-primary">Accept</button>
+			{% endif %}
+	{% endfor %}
+	</table>
+	
+	{% if remaining_patients %}
+        <p>
+        {% if show_approved %}
+            <a href="{% url 'bulk_patient_term_offset' max_patient_id %}">Load next page</a>
+        {% else %}
+            <a href="{% url 'patient_term_approvals_offset' max_patient_id %}">Load next page</a>
+    	{% endif %}
+    	</p>
+	{% endif %}
+</p>
+{% else %}
+	No patients remaining.
+{% endif %}
+
+{% endblock submenu_page_content %}

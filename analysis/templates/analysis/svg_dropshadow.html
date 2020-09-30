@@ -1,0 +1,13 @@
+<svg id="svg-dropshadow-template">
+	<!-- From http://xn--dahlstrm-t4a.net/svg/filters/arrow-with-dropshadow.svg -->
+	<defs xmlns="http://www.w3.org/2000/svg">
+		<filter id="dropshadow" height="130%">
+			<feOffset in="SourceGraphic" dx="3" dy="3" result="offset2" />
+	        <feGaussianBlur in="offset2" stdDeviation="3"  result="blur2"/>		
+			<feMerge> 
+	            <feMergeNode in="blur2" />
+				<feMergeNode in="SourceGraphic"/> 
+			</feMerge>
+		</filter>
+	</defs>	
+</svg>

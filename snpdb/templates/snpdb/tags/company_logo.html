@@ -1,0 +1,5 @@
+{% if company_css_class %}
+{% load static %}
+<link href="{% static 'css/companies.css' %}" rel="stylesheet">
+<div class='{{ company_css_class }}'></div>
+{% endif %}

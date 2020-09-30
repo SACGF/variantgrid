@@ -1,0 +1,6 @@
+<div>
+	{% load jqgrid_tags %}
+	{% user_data_grid_filter 'VCFFiles' 'VCFFiles' group_data=False incomplete_data=True %}
+
+	{% jqgrid 'vcf_file_grid' 'VCFFiles' False None 'seqauto/grids/vcf_file_grid.html' delete=False %}
+</div>

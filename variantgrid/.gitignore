@@ -1,0 +1,4 @@
+/sitestatic/
+settings/django_secret_key.txt
+settings/google_api_key.txt
+/static_files/default_static/css/.sass-cache/

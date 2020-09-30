@@ -1,0 +1,45 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block style %}
+.create-analysis-link {
+    float: right;
+}
+
+{% endblock %}
+
+{% block jshead %}
+	function ownData(rowObject) {
+		var user = "{{ request.user }}";
+		return user == rowObject.vcf__user__username;
+	}
+{% endblock %}
+
+
+{% block formatter %}
+	viewSampleLink : function(sampleId, options, rowObject) {
+		var sample_selector = "";
+		if (ownData(rowObject)) {
+			sample_selector = "<input type='checkbox' class='sample-select' sample_id=" + sampleId + ">";
+		}
+
+		var view_details_link = linkFormatter(sampleId, options, rowObject);
+
+    	return "<div class='sample_id-container'>" + sample_selector + view_details_link + "</div>";
+	},
+    viewImportStatus : function(importStatus) {
+        if (importStatus == 'Annotation Required') { 
+            importStatus = "<a href='{% url "variant_annotation_runs" %}'>" + importStatus + "</a>";
+        }
+        return importStatus;
+    },
+    viewMutationalSignature : function(mutSigSummary, options, rowObject) {
+        var mutSigLink = '';
+        var mutationalSignatureId = rowObject.mutationalsignature__id;
+        if (mutationalSignatureId) {
+            let url = Urls.view_mutational_signature(mutationalSignatureId);
+            mutSigLink = "<a class='grid-link' href='" + url + "'>" + mutSigSummary + "</a>";
+        }
+        return mutSigLink;
+    }
+
+{% endblock %}

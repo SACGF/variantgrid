@@ -1,0 +1,27 @@
+<div id="patient-contact">
+    <script type="text/javascript">
+        var targetParent = $("#patient-contact").parent();
+    
+        $(document).ready(function() {
+            var options = {
+                target: targetParent,
+            };
+            $('form#patient-contact-form').ajaxForm(options);
+        });
+    </script>
+    <form id="patient-contact-form" method="post" action="{% url 'view_patient_contact_tab' patient.pk %}">
+        {% csrf_token %}
+    
+        <table>
+            {{ form.as_table }}
+            <tr><td>
+            {% if has_write_permission %}
+                <button id='save-patient-contact-details' class="btn btn-primary">save</button>
+            {% else %}
+                You can view but not modify this patient.
+            {% endif %}
+            </tr>
+        </table>
+        {% include "messages/messages.html" %}
+    </form>
+</div>

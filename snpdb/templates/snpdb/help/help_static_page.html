@@ -1,0 +1,26 @@
+{% extends menu_help_base %}
+
+{% block jshead %}
+    // There are 2 versions of this function, here and internal page.
+    function helpPage(pageName) {
+        window.location = Urls.help_static_page(pageName);
+    } 
+{% endblock %}
+
+{% block css %}
+#static-content, iframe {
+	width: 100%;
+	height: 100%;
+}
+{% endblock %}
+
+{% block submenu_page_content %}
+	<div id="static-content">
+
+	<iframe src="/static/help/{{ page_name }}" %}" frameBorder="0">
+	</iframe>
+	
+
+	</div>
+	
+{% endblock %}

@@ -1,0 +1,15 @@
+<p>
+An allele is a genetic change independent of a genome builds. Variants from different builds link to the same allele.
+</p>
+
+<p>
+Variant classifications are compared across alleles, so clinical significance differences can be detected regardless of what build it was originally classified against. Classifying a variant will create an allele, and linked variants for all genome builds supported by the server. 
+</p>
+
+<p>
+Alleles generally have 1 (and only 1) ClinGen Allele ID, from the <a href="http://reg.clinicalgenome.org">ClinGen Allele Registry</a>, which we use to perform liftover between builds.
+</p>
+
+<p>
+If ClinGen fails, we use <a href="https://www.ncbi.nlm.nih.gov/genome/tools/remap/docs/whatis">NCBI remap</a>. The liftover tool used to create a variant is stored as the "Conversion Tool".
+</p>

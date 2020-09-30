@@ -1,0 +1,27 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block docreadyjs %}
+    var alleleFrequencyForm = $("form#allele-frequency-node-form");
+    ajaxForm(alleleFrequencyForm);
+{% endblock docreadyjs %}
+
+{% block content %}
+<div>
+    <form id="allele-frequency-node-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+        <div>
+            <b>Sample:</b> {{ form.sample }}
+            <div>
+            {% load allele_frequency_tags %}
+            {% allele_frequency_controls node %}
+            </div>
+    
+            <button id='allele-frequency-node-save' class="btn btn-primary">save</button>
+        </div>
+        {{ form.media }}
+    </form>
+</div>
+{% endblock content %}

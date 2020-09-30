@@ -1,0 +1,8 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block formatter %}
+   		viewSeqAutoRunsLink : function(seqAutoRunId) {
+			const URL = Urls.view_seqauto_run(seqAutoRunId);
+	    	return "<a class='seqauto-run-link' href='" + URL + "'> View Seqauto Run " + seqAutoRunId + "</a>";
+		},
+{% endblock formatter %}

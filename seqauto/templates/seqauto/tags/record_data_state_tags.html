@@ -1,0 +1,54 @@
+{% if record.data_state != 'C' %}
+	<style>
+	#pbs-help {
+		margin-top: 10px;
+	}
+	</style>
+	
+	{{ pbs.get_file_type_display }} not complete, current state: <b>{{ record.get_data_state_display }}</b>
+
+    <div>
+    <b>Path:</b> <code>{{ record.path }}</code>
+    </div>
+
+    {% if record.data_state == 'E' and record.error_exception %}
+    <div id='error-exception'>
+        <p>
+        Error Message:<br>
+        <pre>
+        {{ record.error_exception }}
+        </pre>
+	</div>
+	{% endif %}
+	
+	<div id='pbs-help'>
+	{% if record.data_state == 'E' %}
+	
+	   {% if pbs %}
+    	<p>
+    	    PBS Job <b>{{ pbs.job_id }}</b> returned status of {{ pbs.return_code }}
+            {% if pbs_out %}
+        	<p>
+        	Error Message:<br>
+        	<pre>
+        	{{ pbs_out }}
+        	</pre>
+            {% endif %}
+        </p>
+        {% endif %}
+	
+	{% elif record.data_state == 'N' %}
+	
+	Job not submitted. Please talk to your administrator and have them submit the following script:
+	
+	<code>{{ pbs.path }}</code>
+	
+	{% elif record.data_state == 'R' %}
+	
+	PBS Job <b>{{ pbs.job_id }}</b> is running.
+	
+	TODO: Look up status...
+	
+	{% endif %}
+	</div>
+{% endif %}

@@ -1,0 +1,75 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% load record_data_state_tags %}
+{% block title %}{{ fastq.id }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+<style>
+	.fastq-path {
+		width: 400px;
+		word-wrap: break-word
+	}
+</style>
+{% endblock %}
+
+{% block jsdocumentready %}
+{% endblock %}
+
+{% block submenu_page_content %}
+
+	<div>
+	<img class="vcenter" src="{% static 'icons/bases_64.png' %}" /><b>{{ unaligned_reads }}</b>
+	</div>
+
+
+	{% for read in fastqs %}
+		<h2>Read {{ read.read_id }}</h2>
+		<table>
+		<tr><th>Name: <td><div class='fastq-path'>{{ read.fastq.name }}</div>
+		<tr><th>Data State: <td>{{ read.fastq.get_data_state_display }}
+		</table>
+
+		{% if read.fastq.data_state == 'C' %}
+			<h3>FastQC</h3>
+			{% if read.fastqc.data_state == 'C' %}
+				<table class='model-table'>
+					<tr><th>Total Sequences:	<td>{{ read.fastqc.total_sequences }}
+					<tr><th>Filtered:			<td>{{ read.fastqc.filtered_sequences }}
+					<tr><th>GC:					<td>{{ read.fastqc.gc }}
+					</tr>
+				</table>
+			{% endif %}
+			{% record_data_state_helper read.fastqc %} 
+		{% endif %}
+		{% record_data_state_helper read.fastq %} 
+
+	{% endfor %}
+
+	<div>
+		<h3>Input Data</h3>
+		<ul>
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' unaligned_reads.sequencing_run.pk %}">{{ unaligned_reads.sequencing_run }}</a> - {{ unaligned_reads.sequencing_run.sequencer }}  
+		</ul>
+
+		<h3>Made from this data</h3>
+		<ul>		
+			{% for bam_file in unaligned_reads.bamfile_set.all %}
+				<li class='seqauto-record bam-file data-state-{{ bam_file.data_state }}'><a href="{% url 'view_bam_file' bam_file.pk %}">{{ bam_file }}</a>
+				<ul>
+				{% for vcf_file in bam_file.vcffile_set.all %} 
+					<li class='seqauto-record vcf-file data-state-{{ vcf_file.data_state }}'><a href="{% url 'view_vcf_file' vcf_file.pk %}">{{ vcf_file }}</a>
+
+					<ul>
+					{% for qc in vcf_file.qc_set.all %} 
+						<li class='seqauto-record qc data-state-{{ qc.data_state }}'><a href="{% url 'view_qc' qc.pk %}">{{ qc }}</a>
+					{% endfor %}
+					</ul>
+				{% endfor %}
+				</ul>
+
+			{% endfor %}
+		</ul>
+	</div>
+
+
+{% endblock %}

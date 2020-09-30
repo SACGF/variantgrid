@@ -1,0 +1,43 @@
+<!-- Needs plotly and plotly_helpers included -->
+{% load js_tags %}
+<script>
+// This is in plotly_helpers - delete when cache expired...
+function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
+    var data = {
+        x: x,
+        y: y,
+        type: 'bar',
+	    orientation: 'h',
+    };
+    
+    if (color) {
+        data["marker"] = {color: color};
+    }
+    var layout = defaultLayout(title, width, height);
+    if (margin) {
+        layout["margin"] = margin;
+  	    layout["xaxis"] = {autotick: true};
+  	}
+    Plotly.newPlot(selector, [data], layout);
+}
+
+$(document).ready(function() {
+    var labels = {{ labels | jsonify }};
+    var counts = {{ counts | jsonify }};
+    var title = "{{ title | safe }}";
+    var color = "{{ color }}";
+    var graph_width = {{ graph_width }};
+    var graph_height = {{ graph_height }};
+    var selector = 'patient-match-graph-{{ uuid }}';
+    plotHBarArrays(selector, title, counts, labels, graph_width, graph_height, color, {l:200});
+    
+    {% if click_handler %}
+        var myPlot = document.getElementById(selector);
+        if (myPlot) {
+            myPlot.on('plotly_click', {{ click_handler | safe }});
+        }
+    {% endif %}
+    
+});
+</script>
+<div id='patient-match-graph-{{ uuid }}' class='matches-graph'></div>

@@ -1,0 +1,28 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% block title %}Analysis Template: {{ analysis_template  }}{% endblock title %}
+
+{% block submenu_page_content %}
+
+    <h3>{{ analysis_template  }}</h3>
+
+    <div>
+    <a href="{% url 'analysis' analysis_template.analysis.pk %}">Open analysis</a>
+    </div>
+
+    <p>
+    {%  if analysis_template.analysistemplateversion_set.exists %}
+        <table>
+        {% for atv in analysis_template.analysistemplateversion_set.all %}
+            <tr>
+                <td>{{ atv }}</td>
+            </tr>
+        {% endfor %}
+
+        </table>
+    {% else %}
+       This analysis has no saved template versions.
+    {% endif %}
+    </p>
+
+{% endblock submenu_page_content %}

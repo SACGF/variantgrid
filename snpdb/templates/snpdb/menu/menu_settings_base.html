@@ -1,0 +1,10 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+
+{% block submenu %}
+    {% menu_bar_settings %}
+{% endblock %}
+
+{% block content %}
+    <div class="container-table">{% block submenu_page_content %}{% endblock %}</div>
+{% endblock content %}

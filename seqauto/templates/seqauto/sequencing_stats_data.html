@@ -1,0 +1,40 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+
+{% block title %}QC Data{% endblock %}
+
+{% block head %}
+<style>
+	.grid-container {
+		margin-top: 10px;
+		margin-bottom: 10px;
+	}
+</style>
+{% endblock %}
+
+{% block submenu_page_content %}
+
+<h3>Sequencing Stats Data</h3>
+
+{% if has_sequencing_samples %}
+{% load jqgrid_tags %}
+
+<div class='grid-container'>
+{% jqgrid 'sequencing_samples_grid' name='Sequencing Samples' search=False delete=False %}
+</div>
+
+<div class='grid-container'>
+{% jqgrid 'sequencing_samples_historical_grid' name='All Sequencing Samples' search=False delete=False time_frame='all' %}
+</div>
+
+
+<div class='grid-container'>
+{% jqgrid 'sequencing_samples_historical_grid' name='Sequencing Samples By Year' search=False delete=False time_frame='year' %}
+</div>
+
+<div class='grid-container'>
+{% jqgrid 'sequencing_samples_historical_grid' name='Sequencing Samples By Month' search=False delete=False time_frame='month_offset' %}
+</div>
+{% else %}
+    <p>No sequencing runs to show.</p> 
+{% endif %}
+{% endblock %}

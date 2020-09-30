@@ -1,0 +1,27 @@
+{% extends "analysis/node_data/base_node_data.html" %}
+{% load js_tags %}
+
+{% block docreadyjs %}
+	var errors = {{ errors|jsonify }};
+	on_error_function(errors);
+
+    {% if node_id %}
+    var node_view_url = "{% url 'node_view' node_id version_id extra_filters %}";
+    load_node_editor(node_view_url);
+    {% endif %}
+
+{% endblock docreadyjs %}
+
+{% block content %}
+<div id='dataframe-container'>
+{% load text_tags %} 
+
+{% if status == 'N' %}
+This node was cancelled during loading.
+{% else %}
+Node errors:
+{% endif %} 
+
+</div>
+{% endblock content %}
+

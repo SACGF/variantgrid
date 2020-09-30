@@ -1,0 +1,46 @@
+{% if tab_builder.tabs_required %}
+    {% if mode == 'accordion' %}
+        <div class="accordion round-indicator indicator-plus-before" id="{{ id }}">
+            {% for tab in tab_builder.tabs %}
+                <div class="card">
+                    <div class="card-header hover-link" data-toggle="collapse" data-target="#{{ tab.tab_id }}" aria-expanded="true">
+                        {{ tab.label }}
+                    </div>
+                    <div id="{{ tab.tab_id }}" class="collapse {% if forloop.first %}show{% endif %}" data-parent="#{{ id }}">
+                  <div class="card-body">
+                      {{ tab.content }}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="{{ css }}" id="{{ id }}">
+            <ul class="nav nav-tabs mb-4" role="tablist">
+                {% for tab in tab_builder.tabs %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if forloop.first %}show active{% endif %}"
+                           id="{{ tab.tab_id }}-tab"
+                           href="#{{ tab.tab_id }}-content"
+                           {% if tab.resolved_url %}
+                            data-toggle="tab" role="tab" data-href="{{ tab.resolved_url }}">{{ tab.label }}</a>
+                            {% else %}
+                            data-toggle="tab" role="tab" {% if tab.url %}data-href="{% if tab.param %}{% url tab.url tab.param %}{% else %}{% url tab.url %}{% endif %}"{% endif %}>{{ tab.label }}</a>
+                            {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+
+            <div class="tab-content no-gutters">
+                {% for tab in tab_builder.tabs %}
+                    <div id="{{ tab.tab_id }}-content" class="tab-pane {% if forloop.first %}show active{% endif %}" role="tabpanel">{{ tab.content }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+{% else %}{% comment %}Could be 0 or 1 tabs{% endcomment %}
+    {% for tab in tab_builder.tabs %}
+        <h4>{{ tab.label }}</h4>
+        {{ tab.content }}
+    {% endfor %}
+{% endif %}

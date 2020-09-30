@@ -1,0 +1,45 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% block title %}Patient Record Imports{% endblock title %}
+
+{% block css %}
+{{ block.super }}
+#patient-header {
+    margin-bottom: 10px; 
+}
+
+#column-descriptions {
+    margin: 10px;
+}
+{% endblock css %}
+
+{% block submenu_page_content %}
+<div>
+    <div id='patient-header'>
+        <h3>Import Patient Record Details</h3>
+        <div>
+            Go to the <a class="hover-link" href="{% url 'upload' %}">upload</a> page to import new patient records.<br>
+            <a class="hover-link" href="{% url 'patient_record_imports' %}">Previous patient records imports</a>
+        </div>
+    </div>
+    <div>
+        <img width=24px height=24px src="{% static 'icons/report_icon.jpg' %}" />
+        <b>Patient CSV templates:</b>&nbsp;
+        <a class="hover-link" href="{% url 'example_upload_csv_all' %}">All samples</a>,
+        <a class="hover-link" href="{% url 'example_upload_csv_no_patients' %}">Samples without patients</a>
+    </div>
+
+    <div id='column-descriptions'>
+        <table>
+            <tr><th>Column <th>Type <th> Description
+        {% for column, type, description in column_descriptions %}
+            <tr>
+                <td>{{ column }}
+                <td>{{ type }}
+                <td>{{ description }}
+            </tr>
+        {% endfor %}
+        </table>
+    </div>
+</div>
+{% endblock submenu_page_content %}

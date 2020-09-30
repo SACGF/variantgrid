@@ -1,0 +1,15 @@
+<script>
+
+$(document).ready(function() {
+    var url = "{% url 'group_permissions' class_name sample.pk %}";
+    $("#group-permission-form-outer").load(url);
+});
+
+</script>
+
+<div>
+
+    <div id='group-permission-form-outer'>
+    </div>
+
+</div>

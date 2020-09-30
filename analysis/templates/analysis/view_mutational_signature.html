@@ -1,0 +1,99 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% load js_tags %}
+
+{% block title %}Mutational Signature{% endblock title %}
+
+{% block head %}
+{{ block.super }}
+<style>
+#mutational-signatures-data {
+    width: 100%;
+}
+</style>
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<script>
+var labels = {{ labels | jsonify }};
+var bootstrap = {{ sorted_bootstrap_transposed | jsonify }};
+
+var mutation_types = {{ mutation_types | jsonify }};
+var mutation_type_counts = {{ mutation_type_counts | jsonify }};
+
+function plotMutationalSignatures(width, height) {
+    var data = getBoxDataFromLabelsMatrix(labels, bootstrap);
+    var layout = defaultLayout("Mutational Signatures", width, height);
+    layout["showlegend"] = false;
+    Plotly.newPlot("bootstrap-data-graph", data, layout);
+}
+
+function plotDataFit(width, height) {
+    plotBarArrays("data-fit-graph", "Mutation Counts", mutation_types, mutation_type_counts, width, height);
+}
+
+
+
+</script>
+{% endblock head %}
+
+{% block jsdocumentready %}
+
+var width = $("#mutational-signatures-data").width() * .9;
+plotMutationalSignatures(width, width * .25);
+plotDataFit(width, width * .25);
+
+
+$("#show-mut-sig-info").change(function() {
+    var mutSigInfo = $(".mut-sig-info");
+    if ($(this).is(":checked")) {
+        mutSigInfo.show();
+    } else {
+        mutSigInfo.hide();
+    }
+});
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+
+<h3>Mutational Signature for {{ mutational_signature.sample.name }}</h3>
+
+<table>
+<tr><th>Sample <td><a href="{% url 'view_sample' mutational_signature.sample.pk %}">{{ mutational_signature.sample }}</a>
+<tr><th>Summary<td> {{ mutational_signature }}
+<tr><th># snps<td> {{ mutational_signature.num_snps }}
+<tr><th>Iterations <td> {{ mutational_signature.calculator.num_iterations }}
+<tr><th>Sampling Fraction <td> {{ mutational_signature.calculator.sampling_fraction }}
+<tr><th>Minimisation Strategy <td> {{ mutational_signature.calculator.get_minimisation_strategy_display }}
+</table>
+
+<div id='mutational-signatures-data'>
+    <div id='bootstrap-data-graph'></div>
+
+    <div id='data-fit-graph'></div>
+
+    <div id='residues-graph'></div>
+
+    <input id='show-mut-sig-info' type="checkbox" checked> Show signature information
+    <table>
+    <tr><th>Signature <th>Mean <th>Std
+        <th class='mut-sig-info'>Cancer Types
+        <th class='mut-sig-info'>Proposed aetiology
+        <th class='mut-sig-info'>Additional Features
+        <th class='mut-sig-info'>Comments
+    {% for signature, mean, std, info in sorted_data %}
+    <tr><th>{{ signature }}
+        <td>{{ mean }}
+        <td>{{ std }}
+        <td class='mut-sig-info'>{{ info.cancer_types }}
+        <td class='mut-sig-info'>{{ info.proposed_aetiology }}
+        <td class='mut-sig-info'>{{ info.additional_mutational_features }}
+        <td class='mut-sig-info'>{{ info.comments }}
+    {% endfor %}
+    </table>
+
+</div>
+
+
+
+{% endblock submenu_page_content %}

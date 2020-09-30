@@ -1,0 +1,19 @@
+.bg-theme {
+  background-color: #ddd;
+}
+
+.navbar-brand {
+  background-image: url(/static/images/vg_logo2.png);
+}
+
+a.nav-link {
+  color: #666 !important;
+}
+a.nav-link:hover {
+  color: #000 !important;
+}
+a.nav-link.active {
+  color: #222 !important;
+}
+
+/*# sourceMappingURL=branding.css.map */

@@ -1,0 +1,38 @@
+{% if errors or warnings %}
+<style>
+button.vcf-import-info-accept {
+    margin-left: 50px;
+}
+</style>
+<script>
+$(document).ready(function() {
+    $("button.vcf-import-info-accept").button().click(function() {
+        let vii_id = $(this).attr("vcf-import-info");
+        $.ajax({
+            type: "POST",
+            url: Urls.accept_vcf_import_info_tag(vii_id),
+            success: function(data) {
+                $("#vcf-import-info-" + vii_id).fadeOut();
+            }
+        });
+    });
+});
+</script>
+<div id="vcf-import-info">
+	<div>{{ examine_error_instructions }}</div>
+    <ul class="messages">
+        {% for vii in errors %}
+            <li id="vcf-import-info-{{ vii.pk }}" class="import-message error">{{ vii }}
+                <button type="button" class="vcf-import-info-accept" vcf-import-info="{{ vii.pk }}">OK</button>
+            </li>
+        {% endfor  %}
+
+        {% for vii in warnings %}
+            <li id="vcf-import-info-{{ vii.pk }}" class="import-message warning">{{ vii }}
+                <button type="button" class="vcf-import-info-accept" vcf-import-info="{{ vii.pk }}">OK</button>
+            </li>
+        {% endfor  %}
+    </ul>
+
+</div>
+{% endif %}

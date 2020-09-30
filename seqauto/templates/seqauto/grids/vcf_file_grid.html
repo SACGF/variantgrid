@@ -1,0 +1,8 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block formatter %}
+   		viewVCFFileLink : function(vcfFileId) {
+			let url = Urls.view_vcf_file(vcfFileId);
+	    	return "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
+		}
+{% endblock %}

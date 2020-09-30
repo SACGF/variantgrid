@@ -1,0 +1,77 @@
+{% extends "analysis/node_data/base_node_data.html" %}
+
+{% block javascript %}
+jQuery.extend($.fn.fmatter , {
+    createFilterChildLink : function(columnValue, a, rowData) {
+        let value = columnValue;
+        if (createFilterChildLinks) {
+            value = "<a href='javascript:createFilterChild(\"{{ grid_column_name }}\", \"" + rowData.ID + "\");'>" + columnValue + "</a>";
+        }
+        return value;
+	},
+});
+
+function download_dataframe_grid() {
+	window.location = "{% url 'node_column_summary_grid' node_id=node_id version_id=version_id extra_filters=extra_filters variant_column=grid_column_name significant_figures=significant_figures op='download' %}";
+}
+
+
+function setupDataFrameGrid(config_url, nodeId, versionId, on_load_function, on_error_function) {
+	$(function () {
+    	$.getJSON(config_url, function(data) {
+			errors = data["errors"]
+    		if (errors) {
+				on_error_function(errors);
+    		} else {
+				var pagerId = '#dataframe-pager-' + nodeId;
+				data["pager"] = pagerId;
+                window.createFilterChildLinks = data.create_filter_child_links;
+	
+			    var grid = $("#dataframe-grid-" + nodeId)
+			    grid.jqGrid(data).navGrid(pagerId,
+	                	{add: false, edit: false, del: false, view: false, search:false},
+			       		{}, // edit options
+			        	{}, // add options
+			       	 	{}, // del options 
+			        	{ multipleSearch:true, closeOnEscape:true }, // search options 
+			        	{} // view options 
+		        	).jqGrid(
+			            'navButtonAdd', pagerId, {
+			            caption : "Download",
+			            buttonicon : "ui-icon-arrowthickstop-1-s",
+			            onClickButton : download_dataframe_grid,
+			            position : "first",
+			            title : "Export",
+			            cursor : "pointer"
+			        });
+	
+				on_load_function();
+			}
+	    });
+	});
+}
+{% endblock javascript %}
+
+{% block docreadyjs %}
+		var grid_url = "{% url 'node_column_summary_grid' node_id=node_id version_id=version_id extra_filters=extra_filters variant_column=grid_column_name significant_figures=significant_figures op='config' %}";
+		var myGridLoadSuccess = function() {
+			$(".loading-message").hide();
+		};
+		setupDataFrameGrid(grid_url, {{ node_id }}, {{ version_id }}, myGridLoadSuccess, on_error_function);
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<div id='dataframe-container'>
+
+	<div class="loading-message">Loading column summary....</div>
+
+	<div id='node-dataframe-grid' class='node-data'>
+	<table id='dataframe-grid-{{ node_id }}' class='grid'>
+	</table>
+	<div id='dataframe-pager-{{ node_id }}'></div>
+	</div>
+
+</div>
+{% endblock content %}
+

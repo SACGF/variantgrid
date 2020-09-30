@@ -1,0 +1,46 @@
+{% if node.valid %}
+    <script>
+    $(document).ready(function() {
+        $('pre code.sql').each(function(i, block) {
+            hljs.highlightBlock(block);
+        });
+
+        $('input#show-grid-columns').click(function() {
+            var checked = $(this).prop('checked');
+            var min_sql = $('#min-sql');
+            var grid_sql = $('#grid-sql');
+            if (checked) {
+                min_sql.hide();
+                grid_sql.show();
+            } else {
+                grid_sql.hide();
+                min_sql.show();
+            }
+        });
+    });
+    </script>
+    {%  if node_sql or grid_sql %}
+    <span>
+        Show columns <input id='show-grid-columns' type='checkbox' />
+    </span>
+
+    <div id="min-sql">
+        <pre>
+        <code class='sql'>
+{{ node_sql }}
+        </code>
+        </pre>
+    </div>
+    <div id="grid-sql" style='display: none'>
+        <pre>
+        <code class='sql'>
+{{ grid_sql }}
+        </code>
+        </pre>
+    </div>
+    {%  else %}
+        Could not generate SQL
+    {%  endif %}
+{% else %}
+    The node has errors.
+{% endif %}

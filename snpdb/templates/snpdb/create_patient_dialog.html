@@ -1,0 +1,111 @@
+<!-- create_patient_dialog.html -->
+{% load static %}
+{% load help_tags %}
+<script>
+
+function setupCreatePatientDialog() {
+    var dWidth = $(window).width() * 0.8;
+    var dHeight = $(window).height() * 0.8;
+    
+    var dialog = $("#new-patient-dialog").dialog({
+        autoOpen: false,
+        height: dHeight,
+        width: dWidth,
+        modal: true,
+        buttons: {
+            Cancel: function() {
+                dialog.dialog("close");
+            }
+        },
+        close: function() {
+            // form reset
+        }
+    });
+
+    var form = dialog.find("form");
+    form.ajaxForm({
+        success: function(data) {
+            setAutocompleteValue(window.activePatientSelect, data.patient_id, data.__str__);
+            dialog.dialog("close");
+        },
+        error: function(data) {
+            console.log("error");
+            console.log(data);
+        },
+    });
+
+    
+    return dialog;
+}
+
+function addCreatePatientButton(dialog, patientSelect, sampleName) {
+    var form = dialog.find("form");
+    var createPatientButton = $("<div/>")
+        .addClass("click-to-add-button left")
+        .attr("title", "Create new patient...");
+ 
+    createPatientButton.click(function() {
+        form.resetForm();
+        $("#set-to-sample-name-link", form).remove();
+
+        var lastName = $("#id_last_name", form);
+        var setToSampleNameLink = $("<a>")
+            .attr("id", "set-to-sample-name-link")
+            .attr("href", "#")
+            .text("Set from sample ('" + sampleName + "')");
+        setToSampleNameLink.click(function() {
+            lastName.val(sampleName);
+        });
+        let linkContainer = $("<div/>");
+        linkContainer.append(setToSampleNameLink);
+        lastName.before(linkContainer);
+
+        window.activePatientSelect = patientSelect;
+        dialog.dialog("open");
+    });
+    
+    var parent = patientSelect.parent();
+    parent.children().addClass("left")
+    parent.append(createPatientButton);
+    parent.append($("<div/>").addClass("clear"));
+    
+}
+</script>
+<div id="new-patient-dialog" title="New Patient">
+    <h3>Create New Patient</h3>
+    <form id="patient-form" method="post" action="{% url 'create_patient' %}">
+        {% csrf_token %}
+        <div>
+			<table class="left">
+			<tr><td><label>{{ patient_form.first_name.label }}</label>
+    			<td><label>{{ patient_form.last_name.label }}</label>
+    			<td><label>{{ patient_form.family_code.label }}</label>
+			<tr><td>{{ patient_form.first_name }}
+			    <td>{{ patient_form.last_name }}
+                <td>{{ patient_form.family_code }}
+            <tr><td><label>{{ patient_form.date_of_birth.label }}</label>
+                <td><label>{{ patient_form.date_of_death.label }}</label>
+                <td><label>{{ patient_form.sex.label }}</label>
+            <tr><td>{{ patient_form.date_of_birth }}
+                <td>{{ patient_form.date_of_death }}
+                <td>{{ patient_form.sex }}
+            <tr><td></td>
+                <td><label>{{ patient_form.affected.label }}</label>
+                <td><label>{{ patient_form.consanguineous.label }}</label>
+            <tr><td></td>
+                <td>{{ patient_form.affected }}
+                <td>{{ patient_form.consanguineous }}
+            <tr><td><label>{{ patient_form.phenotype.label }}</label>
+                <td colspan="2">{{ patient_form.phenotype }}
+            </table>
+            <div class="left">
+                <h3>Population</h3>
+                {% page_help user 'patients/patient_population_help' 'Patient Population' %}
+                {{ patient_form.population }}
+            </div>
+            <div class="clear"></div>
+        </div>
+        <button id="create-patient" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create Patient</button>
+    </form>
+</div>
+<!-- end create_patient_dialog.html -->

@@ -1,0 +1,36 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% block title %}Variant Diffs{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script>
+    let records = {{ records_json | jsonify }};
+
+    EKeys.load().then(keys => {
+        $(function() {
+            let diff = new Diff(
+                records,
+                $('#diff'),
+                keys,
+                {
+                    userId: '{{user.id}}'
+                }
+            );
+            diff.render();
+        });
+    });
+    
+</script>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        {% load ui_help %}
+        {% page_help 'variantclassification/diff_help' 'Classification Diff' %}
+    </div>
+    <div class="container-fluid">
+        <div id="diff"></div>
+    </div>
+{% endblock content %}

@@ -1,0 +1,36 @@
+{% load js_tags %}
+<div id='analysis-settings-template-run-tab'>
+<style>
+</style>
+
+    <div>
+        Generated from:
+        <a href="{% url 'analysis' analysis_template_run.template_version.template.analysis.pk %}">
+            {{ analysis_template_run.template_version }}
+        </a>
+    </div>
+
+    <div>
+    {% for node, analysis_variables_list in node_variables.items %}
+        <fieldset class="form-fields">
+            <legend>{{ node }}</legend>
+            {% for av in analysis_variables_list %}
+                <p>
+                    <label title="{{ av.class_name }}">{{ av.field }}</label>
+                    {% if av.analysistemplaterunargument.error %}
+                        <span class="error">
+                            {{ av.analysistemplaterunargument.error }}
+                        </span>
+                    {% else %}
+                        <span>
+                            {{ av.analysistemplaterunargument.value }}
+                        </span>
+                    {% endif %}
+                </p>
+            {% endfor %}
+
+        </fieldset>
+    {% endfor %}
+    </div>
+
+</div>

@@ -1,0 +1,8 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block formatter %}
+   		viewUnalignedReadsLink : function(unalignedReadsId) {
+			var URL = Urls.view_unaligned_reads(unalignedReadsId);
+	    	return "<a class='grid-link' href='" + URL + "'><div class='grid-link-icon view-details-link'></div></a>";
+		}
+{% endblock %}

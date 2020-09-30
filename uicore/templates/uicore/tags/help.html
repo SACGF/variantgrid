@@ -1,0 +1,19 @@
+{% if page_title %}<h3>{{ page_title }}</h3>{% endif %}
+{% if page_help_html %}
+    <div class="accordion indicator-plus-before round-indicator mb-4">
+        <div class="card">
+            <div class="card-header collapsed" id="heading-{{ page_id }}" data-toggle="collapse" data-target="#help-{{ page_id }}" >
+                <a class="card-title">{{ help_page_title }} <i class="far fa-question-circle"></i></a>
+            </div>
+
+            <div id="help-{{ page_id }}" class="collapse" aria-labelledby="heading-{{ page_id }}">
+                <div class="card-body">
+                    {{ page_help_html | safe }}
+                </div>
+                <div class="card-footer text-muted">
+                    <div class="help-footer"><a href="{{help_url}}" target="_blank" class="hover-link external-link">Click here for full product documentation.</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}

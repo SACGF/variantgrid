@@ -1,0 +1,52 @@
+{% extends "snpdb/tags/related_data.html" %}
+{% block related_data %}
+{{ block.super }}
+{% load related_data_tags %}
+
+<div id="samples">
+    <h3>Samples for patient:</h3>
+    {% if samples %}
+        <table>
+            <tr>
+            <th>ID
+            <th>Sample Name
+            <th>VCF
+            <th>VCF date
+            <th>Tissue
+            </tr>           
+        {% for sample in samples %}
+            <tr> 
+            <td><a href="{% url 'view_sample' sample.pk %}">{{ sample.pk }}</a>
+            <td>{{ sample.name }}
+            <td><a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
+            <td>{{ sample.vcf.date }}
+            <td>{{ sample.tissue }}
+            </tr>
+        {% endfor %}
+        </table>
+    {% else %}
+    <p>There are no samples linked to this patient</p>
+    {% endif %}
+</div>
+
+{% if sapath_enabled %}
+<div>
+    {% if sapath_link %}
+        <h3>Linked Test Request</h3>
+        <table>
+        <tr><th>SA Path Request <th>Date <th>User
+        <tr>
+            <td><a href="{% url 'view_sapathology_request' sapath_link.sapathology_request_gene_list.sapathology_request.pk %}">{{ sapath_link.sapathology_request_gene_list.sapathology_request }}</a> (<b>For test:</b> {{sapath_link.sapathology_request_gene_list}})
+            <td>{{ sapath_link.last_modified }}
+            <td>{{ sapath_link.user }}
+        </table>
+    {% else %}
+        <p>There are no SA Path Request Forms linked to this case.</p> 
+    {% endif %}
+</div>
+{% endif %}
+
+
+{% related_data_for_samples samples show_sample_info=True %}
+{% endblock related_data %}
+

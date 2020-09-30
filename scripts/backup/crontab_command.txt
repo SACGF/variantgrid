@@ -1,0 +1,4 @@
+﻿0 1 * * * /data/backup/scripts/backup_pg.sh local_pg.env > /data/backup/scripts/backup.log
+0 4 * * 7 /data/backup/scripts/dump_pg.sh local_pg.env > /data/backup/scripts/dump.log
+0 1 * * * /usr/bin/find /data/backup/db_file_backup/ -type f -mtime +30 -print0 | xargs -r0 rm --
+0 1 * * * /usr/bin/find /data/backup/db_file_backup/ -empty -type d -delete

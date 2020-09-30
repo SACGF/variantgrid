@@ -1,0 +1,54 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load js_tags %}
+{% block docreadyjs %}
+	var SET_OPERATION_SELECT = "select#id_set_operation";
+	var VENN_WIDGET_ID = "#vennnode-{{ node.pk }}";
+{% autoescape off %}
+    // Need to autoescape as it contains angle brackets
+    var VENN_CHOICES = {{ venn_choices | jsonify }};
+    var initial_choice = "{{ node.set_operation }}";
+{% endautoescape %}
+    var vennChoice = initial_choice; // store for capture
+
+	function get_venn_flag_from_set_operation(val) {
+		for (var i=0 ; i<VENN_CHOICES.length ; ++i) {
+			if (VENN_CHOICES[i] == val) {
+				return i;
+			}
+		}
+	}
+
+	function venn_callback(vennFlag) {
+		// Make dropdown reflect venn widget
+		vennChoice = VENN_CHOICES[vennFlag];
+		$(SET_OPERATION_SELECT).val(vennChoice);
+	}
+	
+	venn2(VENN_WIDGET_ID, 200, 100);
+	vennAddToggleCallbacks(VENN_WIDGET_ID, venn_callback);
+	var venn_flag = get_venn_flag_from_set_operation(initial_choice)
+	venn_select(VENN_WIDGET_ID, venn_flag);
+
+	// Make venn reflect dropdown changes
+	$(SET_OPERATION_SELECT).change(function() {
+		vennChoice = $(this).val();
+		var vennFlag = get_venn_flag_from_set_operation(vennChoice);
+		venn_select(VENN_WIDGET_ID, vennFlag);
+	});
+
+    var vennForm = $("form#venn-form");
+    ajaxForm(vennForm);
+{% endblock docreadyjs %}
+
+{% block content %}
+<div>
+	<div id="vennnode-{{ node.pk }}"></div>
+	<form id='venn-form' method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        <div>
+          <b>A:</b>{{a_name}} {{ form.set_operation }} <b>B:</b>{{b_name}}
+        </div>
+        <button id='venn-save' class="btn btn-primary">save</button>
+	</form>
+</div>
+{% endblock content %}

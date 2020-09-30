@@ -1,0 +1,14 @@
+{% load tz %}
+
+<div id="modifications">
+    <table>
+    <tr><th>User <th> Date <th> Description <th> Origin
+    {% for pm in patient_modifications %}
+    <tr><td>{{ pm.user }}
+        <td>{{ pm.date | localtime }}
+        <td>{{ pm.description }}
+        <td>{{ pm.get_origin_display }}
+        <!-- link to import? -->
+    {% endfor %}
+    </table>
+</div>

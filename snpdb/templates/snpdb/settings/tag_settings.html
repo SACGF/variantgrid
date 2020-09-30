@@ -1,0 +1,116 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load avatar_tags %}
+{% load crispy_forms_tags %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Settings{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block head %}
+    <link href="{% static 'css/colorPicker.css' %}" rel="stylesheet"></link>
+    <script type="text/javascript" src="{% static 'js/lib/jquery.xcolor.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/lib/jquery.colorPicker.min.js' %}"></script>
+    <script>
+        // From https://jsfiddle.net/salman/f9Re3/
+        function invertColor(hexTripletColor) {
+            var color = hexTripletColor;
+            color = color.substring(1); // remove #
+            color = parseInt(color, 16); // convert to integer
+            color = 0xFFFFFF ^ color; // invert three bytes
+            color = color.toString(16); // convert to hex
+            color = ("000000" + color).slice(-6); // pad with leading zeros
+            color = "#" + color; // prepend #
+            return color;
+        }
+
+        $(document).ready(() => {
+            // Only allow alphanumeric entry
+            $('#id_tag').keypress(function(e){
+                var code = e.which;
+                if (code == 13) $("#tag-form").submit(); // enter
+                if (code == 8) return true; // backspace
+                var txt = String.fromCharCode(code);
+                return !!txt.match(/^[0-9A-Za-z]+$/);
+            });
+
+            var picker = $('.tag-colorpicker').colorPicker();
+            picker.change(function() {
+                var SET_TAG_COLORS_URL = "{% url 'set_user_tag_color' %}";
+                var tagId = this.attributes['tag_id'].value;
+                var rgb = this.value;
+
+                var changeTagColor = function() {
+                  var t = $(".user-tag-colored", ".tagged-" + tagId);
+                  var manualStyle = "background-color: " + rgb + " !important;";
+                  manualStyle += "color: " + invertColor(rgb) + " !important;";
+                  t.attr("style", manualStyle);
+                };
+
+                var data = 'tag=' + tagId + '&rgb=' + rgb;
+                $.ajax({
+                    type: "POST",
+                    data: data,
+                    success: changeTagColor,
+                    url: SET_TAG_COLORS_URL,
+                });
+            });
+        });
+	</script>
+
+    <style>
+        .grid-tag .user-tag-colored {
+            padding: 4px;
+            border-radius: 2px;
+            font-weight: bold;
+        }
+
+        {% load user_tag_color_tags %}
+        {% render_rgb_css 'tagged-' user_tag_styles %}
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+
+        {% page_help page_id='settings/tags_help' title='Tags' %}
+        <div class="card">
+            <div class="card-header">Create Tag</div>
+            <div class="card-body">
+                <p>
+                Tag names must be alphanumeric (no spaces or special characters)
+                </p>
+                <form method="post">
+                    {% crispy form %}
+                </form>
+            </div>
+        </div>
+
+        <h3>Tag Colors</h3>
+        <p>
+        Click the colored box on the right to change background color
+        </p>
+
+        <div class="row">
+            <div class="col-md-6 offset-md-3">
+                <table class="table">
+                    <thead>
+                       <tr>
+                           <th>Tag</th>
+                           <th>Color</th>
+                       </tr>
+                   </thead>
+                {% for tag_id, rgb in user_tag_colors.items %}
+                    <tr>
+                        <td><span class='grid-tag tagged-{{ tag_id }}'><span class='user-tag-colored'> {{ tag_id }}</span></span></td>
+                        <td><input class="tag-colorpicker" tag_id='{{ tag_id }}' name='tag-{{ tag_id }}-colorpicker' type="text" value="{{ rgb }}"/></td>
+                    </tr>
+                {% endfor %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

@@ -1,0 +1,214 @@
+{% load static %}
+{% load js_tags %}
+<style>
+{% block style %}
+{% endblock style %}
+</style>
+{% comment %}
+<!--
+If we want to use jqgrid cdn, works for half
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/free-jqgrid@4.15.5/css/ui.jqgrid.min.css">
+<script src="https://cdn.jsdelivr.net/npm/free-jqgrid@4.15.5/js/jquery.jqgrid.min.js"></script>
+-->
+{% endcomment %}
+<script src="{% static 'js/include_jqgrid.js' %}"></script>
+<script src="{% static 'js/json2csv.js' %}"></script>
+
+{% block include_scripts %}
+{% endblock include_scripts %} 
+<script>
+	{% block jshead %}
+	{% endblock jshead %} 
+    // From https://stackoverflow.com/a/10335710
+    jQuery.fn.center = function () {
+        this.css("position","absolute");
+        this.css("top", ( $(window).height() - this.height() ) / 2+$(window).scrollTop() + "px");
+        this.css("left", ( $(window).width() - this.width() ) / 2+$(window).scrollLeft() + "px");
+        return this;
+    }
+
+
+	// FIXME: Duplicated in grid.js
+	function setRowChangeCallbacks{{ unique_code }}(grid, gridName) {
+		$(".ui-pg-selbox").change(function() {
+			var gridRows = $(this).val();
+			var data = 'grid_name=' + gridName + '&grid_rows=' + gridRows;
+			$.ajax({
+			    type: "POST",
+			    data: data,
+			    url: '{% url 'set_user_row_config' %}',
+			});
+		});
+	}
+
+
+    function downloadGridJSONAsCSV{{ unique_code }}(grid) {
+        // Because the grid is paged, make a new copy of the grid to retrieve everything
+        var origParams = grid.jqGrid('getGridParam');
+        var name = origParams.caption;
+        var params = {
+            caption: "grid_data",
+            datatype: "json",
+            url: origParams.url,
+            colModel: origParams.colModel,
+            colNames: origParams.colNames,
+            rowNum: -1, // all rows
+            sortname: origParams.sortname,
+            sortorder: origParams.sortorder,
+        };
+
+        var fakeGrid = $("<table />");
+        params.gridComplete = function() {
+            var gridRowData = fakeGrid.getRowData();
+            var csv = JSON2CSV(gridRowData, true, true);
+            var downloadLink = document.createElement("a");
+            var blob = new Blob(["\ufeff", csv], {type : 'text/csv'});
+            var url = URL.createObjectURL(blob);
+            downloadLink.href = url;
+            downloadLink.download = params.caption + ".csv";
+            
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        };
+        
+        fakeGrid.jqGrid(params);
+    }
+
+
+	function setupJQGrid{{ unique_code }}() {
+		$(function () {
+	    	$.getJSON("{{ jqgrid_config_url }}", function(data) {
+			    var grid = $("#{{ grid_id }}");
+				var pagerId = '#{{ pager_id }}';
+			    data["pager"] = pagerId;
+
+			{% if grid_complete %}
+				var grid_complete = {{ grid_complete | safe }};
+				data["gridComplete"] = grid_complete;
+			{% endif %}
+
+			{% block set_grid_data %}
+                {% if jqgrid_config_get_parameters_func %}
+                    var jqgrid_config_get_parameters_func = {{ jqgrid_config_get_parameters_func | safe }};
+                    data["url"] += "?" + jqgrid_config_get_parameters_func();
+                {% endif %}
+			{% endblock %}
+
+                // height: auto screws up on firefox
+                if (typeof(data["height"]) === "undefined" || data["height"] === "auto") {
+                    data["height"] = null;
+                }
+
+			    grid.jqGrid(data)
+	            	.navGrid(pagerId,
+	                	{add: false, edit: false, del: {{ delete | jsonify }}, view: false, search: false },
+			       		{}, // edit options
+			        	{}, // add options
+			       	 	{
+			       	 	    afterShowForm: function(form) {
+			       	 	        form.closest('div.ui-jqdialog').center();
+                            }
+                        }, // del options
+			        	{ multipleSearch:true, closeOnEscape:true }, // search options 
+			        	{ jqModal:false, closeOnEscape:true} // view options 
+		        	);
+
+				setRowChangeCallbacks{{ unique_code }}(grid, data["caption"])
+				
+			{% if init_func %}
+				var init_func = {{ init_func | safe }};
+                var init_kwargs = {{ init_kwargs | jsonify }};
+				init_func(grid, pagerId, init_kwargs);
+			{% endif %}
+
+			{% if search %}
+		        // Make search always appear
+				var searchOptions = {multipleSearch:true,overlay:false,drag:false};
+		        grid.searchGrid(searchOptions);
+				// find the div which contain the searching dialog
+				var searchDialog = $("#searchmodfbox_"+grid[0].id);    
+			    searchDialog.addClass("ui-jqgrid ui-widget ui-widget-content ui-corner-all");
+			    searchDialog.css({position:"relative", "z-index":"auto", "float":"left"})    
+			    var gbox = $("#{{ gbox_id }}");
+			    gbox.before(searchDialog);
+			    gbox.css({clear:"left"});
+				// Hide close button
+				searchDialog.find(".ui-jqdialog-titlebar-close").hide();
+				searchDialog.find(".ui-jqdialog-titlebar").hide();
+			{% endif %}
+
+            {% if download_grid_json_as_csv %}
+                var downloadGridJSONAsCSV = function() {
+                    downloadGridJSONAsCSV{{ unique_code }}(grid);
+                };
+
+                grid.jqGrid('navButtonAdd', pagerId, {
+                            caption : "Download CSV",
+                            buttonicon : "ui-icon-arrowthickstop-1-s",
+                            onClickButton : downloadGridJSONAsCSV,
+                            position : "first",
+                            title : "Export",
+                            cursor : "pointer"
+                });
+            {% else %}
+				var base_grid_export_url = data["grid_export_url"];
+				if (base_grid_export_url) {
+                    var exportGrid = function() {
+                        grid_export_url = base_grid_export_url;
+                        {% if modify_export_url %}
+                        var modify_export_url = {{ modify_export_url | safe }};
+                        grid_export_url = modify_export_url(grid_export_url); 
+                        {% endif %}
+                        window.location = grid_export_url;
+                    };
+				
+					var exportParams = {caption : "Download",
+				            			buttonicon : "ui-icon-arrowthickstop-1-s",
+				            			onClickButton : exportGrid,
+				            			position : "first",
+				            			title : "Export",
+				            			cursor : "pointer"}
+					grid.jqGrid('navButtonAdd', pagerId, exportParams);
+				}
+			{% endif %}
+		    });
+		});
+	}
+
+	function linkFormatter(cellvalue, options, rowObject) {
+        let kwargs = options.colModel.formatter_kwargs;
+        let css_classes = ["icon24", "left", "margin-r-5"];
+        if (kwargs.icon_css_class) {
+            css_classes.push(kwargs.icon_css_class);
+        } else {
+            css_classes.push("view-details-link");
+        }
+        let css_class = css_classes.join(" ");
+        let urlObject = cellvalue;
+        if (kwargs.url_object_column) {
+            urlObject = rowObject[kwargs.url_object_column];
+        }
+        let url = Urls[kwargs.url_name](urlObject);
+        return "<a class='grid-link' href='" + url + "'><div class='" + css_class + "'></div><div class='display-text'>" + cellvalue + "</div></a>";
+    }
+
+    function timestampFormat(pk, a, rowData) {
+        let text = convertTimestamp(pk);
+        return $('<div>', {class: 'timestamp', text: text}).prop('outerHTML');
+    }
+
+	$(document).ready(function() {
+		jQuery.extend($.fn.fmatter , {
+		    linkFormatter: linkFormatter,
+            timestampFormat: timestampFormat,
+{% block formatter %}
+{% endblock formatter %} 
+		});
+		setupJQGrid{{ unique_code }}();
+	});
+</script>
+<div class='jqgrid-container'>
+	<table id="{{ grid_id }}"></table>
+	<div id="{{ pager_id }}"></div>	
+</div>

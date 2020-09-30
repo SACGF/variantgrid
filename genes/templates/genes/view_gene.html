@@ -1,0 +1,94 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_field %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load static %}
+{% load js_tags %}
+{% load datatable_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+
+{% block title %}{{ gene }}{% endblock title %}
+
+{% block head %}
+    <script>
+        function showTranscripts() {
+            $("#show-transcripts-link").hide();
+            $("#transcripts").slideDown();
+        }
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <h3>{{ gene }}</h3>
+        {% page_help page_id='genes/view_gene_help' title='View Gene' show_title=False %}
+
+        {% with external_url=gene.get_external_url %}
+            {% if external_url %}
+                <a class="hover-link external-link d-block mb-2" href="{{ external_url }}">View {{ gene.identifier }} on {{ gene.get_annotation_consortium_display }}</a>
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <div class="col-12 col-lg-6" id="gene-versions">
+                <div class="card">
+                    <div class="card-header">Gene ID Versions</div>
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th></th>
+                                {% for genome_build_id in genome_build_ids %}
+                                    <th>{{ genome_build_id }}</th>
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for version_data in gene_versions %}
+                                <tr>
+                                    {% for d in version_data %}
+                                        {% if forloop.first %}
+                                            <td>{{ gene.identifier }}.{{ d }}</td>
+                                        {% else %}
+                                            <td>
+                                                {% if d %}
+                                                    <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6 mt-4 mt-lg-0" id="transcripts">
+                <div class="card">
+                    <div class="card-header">Transcripts</div>
+                    <div class="card-body card-body-list">
+                        <ul class="list-group">
+                            {% for identifier, versions_biotype in transcripts.items %}
+                                <li class="list-group-item">
+                                    <a class="hover-link" href="{% url 'view_transcript' identifier %}">{{ identifier }}
+                                        {% if versions_biotype.1 %}
+                                            ({{ versions_biotype.1 }})
+                                        {% endif %}
+                                    </a>
+                                    {% for version in versions_biotype.0 %}
+                                        {% if version %}
+                                            <a class="d-inline-block mx-2 hover-link" href="{% url 'view_transcript_version' identifier version %}">v.{{ version }}</a>
+                                        {% endif %}
+                                    {% endfor %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}

@@ -1,0 +1,241 @@
+{% extends "registration/abstract_login.html" %}
+{% load static %}
+{% block head %}
+{{ block.super }}
+<meta name="description" content="VariantGrid: SA Pathology"/>
+<script> 
+var $buoop = {
+    required:{e:16,f:60,o:53,s:11,c:66},insecure:false,api:2019.11,reminder:0,no_permanent_hide: true,
+    text:'Your browser {brow_name} <b>will not work on this site</b>.<br/>Please <a{up_but}>click here</a> for details on getting an up to date browser.'
+};
+function $buo_f(){ 
+ var e = document.createElement("script"); 
+ e.src = "//browser-update.org/update.min.js"; 
+ document.body.appendChild(e);
+};
+try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
+catch(e){window.attachEvent("onload", $buo_f)}
+</script>
+<style>
+
+.white-row {
+    width: 100%;
+    background-color: #ffffff;
+    height: 460px;
+}
+
+.navy-row {
+    color: #ffffff;
+    width: 100%;
+    background-color: #054f94;
+}
+
+.light-blue-row {
+    background-color: #00aedb;
+    color: #ffffff;
+    width: 100%;
+    height: 460px;
+}
+
+.left-col {
+    float: left;
+    width: 60%;
+}
+
+
+.right-col {
+    float: right;
+    width: 40%;
+}
+
+#vg-mission {
+    width: 90%;
+}
+
+#bottom-logos {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.ccb-logo {
+    background-image: url('/static/images/Centre-for-Cancer-Biology-Logo.png');
+    width: 193px;
+    height: 150px;
+    background-size: 193px 150px;
+}
+
+.sapath-logo {
+    margin-top: 25px;
+    background-image: url('/static/images/sapath_logo_from_pdf.png');
+    width: 320px;
+    height: 100px;
+    background-size: 320px 100px; /* 480px 150px; */
+}
+
+.sa-health-logo {
+    background-image: url('/static/images/sa_health.png');
+    width: 200px;
+    height: 195px;
+    background-size: 200px 195px;
+
+}
+
+.acrf-logo {
+    background-image: url('/static/images/1.acrf_logo_vertical_aqua.jpg');
+    width: 193px;
+    height: 150px;
+    background-size: 193px 150px;
+}
+
+.unisa-logo {
+    background-image: url('/static/images/unisa-1.png');
+    width: 193px;
+    height: 150px;
+    background-size: 193px 150px;
+}
+
+/* This file is overwritten in sapathology_testvm_static - if you change this, change that!  */
+#site-name:before {
+    content: "VariantGrid";
+}
+
+:root {
+  --main-fg-color: black;
+  --main-bg-color: #FFFFFF;
+}
+
+.main-title-theme-background-color {
+  background-color: var(--main-bg-color);
+}
+
+.main-title-theme-primary-text-color {
+  color: var(--main-fg-color);
+}
+
+.main-title-theme-secondary-background-color {
+  background-color: #054f94;
+}
+
+.main-title-theme-secondary-text-color {
+  color: var(--main-bg-color);
+}
+
+#big-site-logo {
+    width: 500px;
+    height: 156px;
+    background-repeat: no-repeat;
+    background-size: 500px 156px;
+    background-image: url("/static/images/sapath_logo_from_pdf.png");
+}
+
+body {
+   font-family: 'Raleway',serif;
+   font-size: 14px;
+}
+
+body.external {
+   font-size: 18pt;
+}
+
+body.external h1 {
+    font-size: 60pt;
+}
+
+body.external h2 {
+    font-size: 40pt;
+}
+
+body.external h3 {
+    font-size: 24pt;
+}
+
+a {
+    color: inherit;
+}
+
+
+#vg-help-container {
+    float: right;
+    margin-right: 20px;
+}
+
+
+.documentation-link {
+    color: #ffffff;
+    font-size: 20px;
+    float: none;
+    display: table-cell;
+    vertical-align: middle;
+    height:50px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+#header {
+    background-color: #054f94;
+    color: #ffffff;
+}
+
+body.external #footer {
+    background-color: #2B3939;
+    color: #ffffff;
+    padding: 30px;
+    text-align: center;
+}
+
+
+/* logged in top left logo */
+#menuContainer #menu-logo {
+    margin: 4px 4px 0px 4px;
+    width: 132px;
+    height: 42px;
+    background-repeat:no-repeat;
+    background-size: 132px 42px;
+    background-image: url("/static/images/sapath_logo_from_pdf.png");
+}
+
+#top-menu-container {
+    padding-top: 10px;
+}
+
+
+.submenu a, #top-menu a {
+    color: #22529E;
+}
+
+#email-icon {
+    background-image: url(/static/icons/email19_black.png);
+}
+</style>
+{% endblock %}
+{% block jsdocumentready %}
+{{ block.super }}
+
+{% endblock %}
+{% block content %}
+{{ block.super }}
+
+    <div class='white-row flex-center-container'>
+        <div class='left-col flex-center-container'>
+            <div id='vg-mission'>
+                <h1>VariantGrid</h1>
+                <p>TAU: SA Pathology Next-Gen Sequencing</p>
+            </div>
+        </div>
+        <div id='vg-analysis-box' class='right-col'>
+            <img src="{% static 'images/frontpage/vg-nodes_small.png' %}" />
+        </div>
+        <div class='clear'></div>
+    </div>
+
+
+    <div id='bottom-logos' class='flex-center-container'>
+        <div class="flex-grow flex-center-container"><div class='logo ccb-logo'></div></div>
+        <div class="flex-grow flex-center-container"><div class='logo sapath-logo'></div></div>
+        <div class="flex-grow flex-center-container"><div class='logo sa-health-logo'></div></div>
+        <div class="flex-grow flex-center-container"><div class='logo acrf-logo'></div></div>
+        <div class="flex-grow flex-center-container"><div class='logo unisa-logo'></div></div>
+    </div>    
+
+{% endblock %}
+

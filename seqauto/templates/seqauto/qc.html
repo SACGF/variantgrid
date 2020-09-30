@@ -1,0 +1,6 @@
+<div>
+	{% load jqgrid_tags %}
+	{% user_data_grid_filter 'QC' 'QC' group_data=False incomplete_data=True %}
+
+	{% jqgrid 'qc_grid' 'QC' False None 'seqauto/grids/qc_grid.html' delete=False %}
+</div>

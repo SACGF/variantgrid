@@ -1,0 +1,210 @@
+{% extends "snpdb/base.html" %}
+{% comment %}Should get to work on extends "uicore/page/base.html"{% endcomment %}
+{% load static %}
+{% load analysis_node_tags %}
+{% load js_tags %}
+{% load user_tag_color_tags %}
+
+{% block head %}
+<script src="{% static 'js/lib/jquery.jsPlumb-1.4.1-all-min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/d3.v2.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/multidraggable.js' %}"></script>
+
+{% include "analysis/analysis_includes.html" %}
+
+<script type="text/javascript" src="{% static 'js/samplenode.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/analysis_nodes.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/analysis.js' %}"></script>
+
+<link rel="stylesheet" href="{% static 'css/nodes.css' %}">
+<link rel="stylesheet" href="{% static 'css/analysis_nodes.css' %}">
+<style type="text/css">
+    html, body {
+        height: 100%;
+        min-height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    #analysis-toolbar {
+        padding: 5px;
+    }
+
+    .ui-layout-pane {
+        padding: 2px;
+        border: 0px;
+    }
+
+    #analysis-template-name {
+        font-size: 2em;
+    }
+
+    #analysis-template-version label {
+        font-weight: bold;
+    }
+
+	{% render_rgb_css 'node-count-' node_count_colors %}
+    {% render_node_count_colors_css %}
+</style>
+{% render_tag_styles_and_formatter %}
+<script>
+    // noinspection JSAnnotator
+    const ANALYSIS_ID = {{ analysis.pk }};
+    // noinspection JSAnnotator
+    const ANALYSIS_TAGS_NODE_ID = {{ analysis_tags_node.pk }};
+    // noinspection JSAnnotator
+	const NODE_HELP = {{ node_help | jsonify }};
+	ANALYSIS_SETTINGS = {{ analysis_settings | jsonify }};
+
+	var panelResizeTimeout;
+	var panelResizeUpdateDelay = 150;
+	messagePoller = new AnalysisMessagePoller(Urls.nodes_status(ANALYSIS_ID));
+
+	var secondWindow; // set to window in dual screen mode
+	var saveSettingsOnResize = true;
+
+    variantTags = {% render_variant_tags_dict analysis %};
+    selectedVariants = {% render_node_variant_dict analysis %};
+    analysisNodeVariables = {}; // { node_id: fields: Set()}
+
+	function loadInitialGridEditor() {
+	    let loadFinishedFunc = analysisSettings;
+	{% if analysis.is_valid %}
+		loadFinishedFunc = function() {
+			loadNodeData();
+			let activeNodeId = 0;
+		{% if active_node_id %}
+			activeNodeId = {{ active_node_id }};
+		{% else %}
+			let nodes = $(".window", "#analysis");
+			if (nodes.length == 1) {
+				activeNodeId = nodes[0].getAttribute("node_id")
+			}
+		{% endif %}
+			let node = getNode(activeNodeId);
+			node.click();
+		}
+	{% endif %}
+
+		$("#right-panel").load(Urls.analysis_editor_and_grid(ANALYSIS_ID), loadFinishedFunc);
+	}
+
+
+	$(document).ready(function() {
+        let showAnalysisVariables = Boolean("{{ analysis.template_type|default_if_none:'' }}");
+        let initialAnalysisPanelWidth = {{ analysis.analysis_panel_fraction }} * window.innerWidth;
+        let initialGridAndEditorWidth = window.innerWidth - initialAnalysisPanelWidth;
+        // noinspection JSAnnotator
+        const nodeDataArray = {% render_nodes_array nodes %};
+        // noinspection JSAnnotator
+        const nodeConnections = {% render_nodes_connections_array nodes %};
+        const analysisVariablesArray = {{ analysis_variables | jsonify }};
+
+        setupNodeTypeSelect();
+        setupErrorHandlers();
+
+		layout_analysis_panels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections);
+		loadInitialGridEditor();
+		setLockedAnalysisWarningToolTip();
+        setNumVariantTags(false);
+        {% if analysis.analysistemplate %}
+        setupAnalysisTemplateTopBar({{ analysis.analysistemplate.pk }});
+        addInitialAnalysisVariables(analysisVariablesArray);
+        {% endif %}
+
+		$(document).bind('keydown', function(event) {
+			const DELETE_KEY = 46;
+		    if (event.keyCode == DELETE_KEY){
+		    	// Don't delete nodes when anything else is in focus (eg text editor etc)
+		    	var focus = $(":focus");
+		    	if (focus.length == 0) {
+					deleteActiveNodes();
+				}
+		    }
+		});
+	});
+
+</script>
+{% endblock head %}
+
+{% block content %}
+    <div id="analysis-outer-container" class="ui-layout-center">
+    {% if analysis.analysistemplate %}
+        <div id="analysis-variables" class="hidden ui-layout-north">
+            <div id="analysis-template-info" class="left">
+                <div id="analysis-template-name">Template: {{ analysis.analysistemplate }}</div>
+                <div id="analysis-template-version">
+                    <div>
+                        <label class="label" for="id_analysis_name_template">Analysis name pattern:</label>
+                        <input id="id_analysis_name_template" name="analysis_name_template"
+                               value="{{ analysis.analysistemplate.active.analysis_name_template }}" />
+                    </div>
+
+                    <div>
+                        <label>Latest Version:</label> <span id="latest-template-version">{{ analysis.analysistemplate.latest_version }}</span>
+                        <button id="analysis-template-save-version" class="btn btn-outline-primary">save version</button>
+                        <span>
+                            <a href="{%  url 'analysis_templates_list' analysis.analysistemplate.pk %}" target="_blank">View saved templates</a>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div id='insert-analysis-variables-before-here'></div>
+            <div id='analysis-variables-help' class="left">
+                <b>Analysis Variables</b> - these fields are set from external data when creating an analysis
+                <div><b>Add:</b>Click <span id="av-example-add-button"></span> inside a node.</div>
+                <div><b>Remove:</b>Click the <span class="analysis-variable" id="av-example-button">variable</span> in this window.</div>
+            </div>
+            <div class="clear"></div>
+        </div>
+    {% endif %}
+        <div id="analysis-and-toolbar-container" class="ui-layout-center noselect">
+            <div id="analysis-toolbar" class="ui-layout-north">
+                <div id="node-types">{{ node_classes_form.node_types }}</div>
+                <div id="toolbar-buttons">
+
+            {% if analysis.lock_input_sources %}
+                <img id='lock-input-sources-warning-icon' class="toolbar-button" src="{% static 'icons/warning.png' %}" />
+                <div id='lock-input-sources-warning-tooltip' style='display: none'>
+                    <ul style='background-color: #FEBC00;'>
+                        <li>This analysis is locked - you cannot create new input source nodes.
+                    </ul>
+                </div>
+            {% endif %}
+
+                <a id="add-node-button" class="toolbar-button" href="javascript:addNode()" title="Add node"></a>
+                <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"></a>
+                <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"></a>
+                <a id="settings-button" class="toolbar-button" href="javascript:analysisSettings()" title="Analysis Settings"></a>
+                <a href="javascript:viewTags()" class='left no-link-style' title="Tags">
+                    <span id="view-tags-button" class="toolbar-button"></span>
+                    <span id="number-of-tags"></span>
+                </a>
+                <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"></a>
+                {% if ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED %}
+                <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
+                {% endif %}
+                </div>
+            </div>
+
+            <div id="analysis-container" class="ui-layout-center">
+                <div>
+                    {% include "analysis/svg_dropshadow.html" %}
+                </div>
+                <div id="overscroll" class='overlay'>
+                    <div id="analysis"></div>
+                </div>
+
+                <div id='node-count-legend' title='Modify node counts in analysis settings (cog icon)'>
+                </div>
+            </div>
+        </div>
+        <div id="right-panel" class="ui-layout-east">
+            <div>&nbsp;</div>
+        </div>
+    </div>
+
+    <div id="error-dialog" class="no-close" title="Javascript Error">
+    </div>
+{% endblock content %}

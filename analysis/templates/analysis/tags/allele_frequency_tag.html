@@ -1,0 +1,124 @@
+<style>
+    .af-slider {
+        width: 50%;
+        margin: 0px 10px 0px 10px;
+    }
+    
+    .slider-label {
+        width: 35px;
+    }
+
+    #af-tool-container {
+        margin-bottom: 5px;
+    }
+</style>
+<script type="text/ignored_template" data-template="slider">
+    <div class='slider-container'>
+        <div class='slider-min slider-label label left'></div>
+        <div class='af-slider left'></div>
+        <div class='slider-max slider-label label left'></div>
+        <input value="-" title="Delete AF range" class="delete-slider" type="button">
+        <div class='clear'></div>
+    </div>
+</script>
+<script>
+    function setInitialAlleleFrequencyFilter(allele_frequency) {
+        $("#view-allele-frequency-filter-link").hide();
+        $("#allele-frequency-filter").show();
+        
+        var groupOperation = allele_frequency["group_operation"];
+        if (groupOperation) {
+            $("#slider-group-operation").val(groupOperation);
+        }
+        var sliderList = allele_frequency["nodeallelefrequencyrange_set"];
+        
+        for (var i=0 ; i<sliderList.length ; ++i) {
+            var sliderData = sliderList[i];
+            addSlider(sliderData.min, sliderData.max);
+        }
+    }
+
+
+    function viewAlleleFrequencyFilter() {
+        $("#view-allele-frequency-filter-link").fadeOut();
+        addSlider();
+        $("#allele-frequency-filter").slideDown();
+    }
+
+    function afSetSliderMinMaxLabels(slider, minVal, maxVal) {
+        var container = $(slider).parent();
+        $(".slider-min", container).text(minVal);
+        $(".slider-max", container).text(maxVal);
+    }
+
+    function createSlider(value1, value2) {
+        value1 = getValue(value1, 0);
+        value2 = getValue(value2, 100);
+    
+        var sliderTemplate = $('script[data-template="slider"]').html();
+        var sliderContainer = $(sliderTemplate);
+        var slider = $(".af-slider", sliderContainer);
+
+        slider.slider({
+            range: true,
+            min: 0,
+            max: 100,
+            values: [ value1, value2 ],
+            slide: function(event, ui) {
+                afSetSliderMinMaxLabels(this, ui.values[0], ui.values[1]);
+            }
+        });
+        // initial labels
+        afSetSliderMinMaxLabels(slider, slider.slider('values', 0), slider.slider('values', 1));
+
+        $(".delete-slider", sliderContainer).click(function() {
+            sliderContainer.remove();
+        });
+
+        return sliderContainer;
+    }
+
+
+    function addSlider(value1, value2) {
+        var sliderContainer = createSlider(value1, value2);
+        $("#allele-frequency-filter").append(sliderContainer);
+        return $(".af-slider", sliderContainer);
+    }
+
+
+    function getAlleleFrequencyValues() {
+        var sliderList = [];
+        $(".af-slider").each(function() {
+            var sMin = $(this).slider('values', 0);
+            var sMax = $(this).slider('values', 1);
+            sliderList.push([sMin, sMax]);
+        });
+        
+        return {
+            "group_operation" : $("#slider-group-operation").val(),
+            "sliders" : sliderList,
+        };
+    }
+
+    $(document).ready(function() {
+        $("#add-slider").click(function(event) {
+            addSlider();
+        });
+        
+        {% if allele_frequency %}
+        var initialAlleleFrequency = {{ allele_frequency|safe }};
+        setInitialAlleleFrequencyFilter(initialAlleleFrequency);
+        {% endif %}
+    });
+</script>
+<div id='allele-frequency-filter' class='hidden'>
+    <div id='af-tool-container'>
+        <b>Allele Frequency</b>
+        <select id='slider-group-operation'>
+            <option value="L">all</option>
+            <option value="Y" selected="selected">any</option>
+        </select>
+        <input id='add-slider' value="+" title="Add AF range" class="ui-add" type="button">
+    </div>
+</div>
+

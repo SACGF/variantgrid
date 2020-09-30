@@ -1,0 +1,19 @@
+{% extends menu_data_base %}
+
+{% block title %}{{ gene }}{% endblock title %}
+
+{% block submenu_page_content %}
+    {% load help_tags %}
+    {% page_help user 'variantopedia/view_gene_annotation_history_help' %}
+
+	<div>
+        <h3>{{ gene }} Annotation History</h3>
+	</div>
+	
+	<div>
+        {% load model_fields_version_diff_tags %}
+        {% model_fields_version_diff gene_annotation_dicts_by_version versions %}
+	</div>
+
+
+{% endblock submenu_page_content %}

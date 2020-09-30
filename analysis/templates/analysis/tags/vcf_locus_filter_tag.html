@@ -1,0 +1,53 @@
+<div class='vcf-locus-filter-tag'>
+    <script>
+        function loadBaseURL(func, pk) {
+            var container = $("#vcf-locus-filter-container");
+            if (pk) {
+                const URL = func({{ node.pk }}, pk);
+                container.load(URL);
+            } else {
+                container.html("No input selected");
+            }
+        }
+
+        function loadVCFLocusFilter(vcfId) {
+            loadBaseURL(Urls.vcf_locus_filters, vcfId);
+        }
+
+        function loadSampleVCFLocusFilter(sampleId) {
+            loadBaseURL(Urls.sample_vcf_locus_filters, sampleId);
+        }
+
+        function loadCohortVCFLocusFilter(cohortId) {
+            loadBaseURL(Urls.cohort_vcf_locus_filters, cohortId);
+        }
+
+        function loadPedigreeVCFLocusFilter(pedigreeId) {
+            loadBaseURL(Urls.pedigree_vcf_locus_filters, pedigreeId);
+        }
+
+        function getVCFLocusFilters() {
+            var plf_table = $("#vcf-filter-table");
+            var checkedFilters = {};
+            $("input[type=checkbox]", plf_table).each(function() {
+                if ($(this).is(":checked")) {
+                    var name = $(this).attr("name");
+                    if (name) {
+                        checkedFilters[name] = true;
+                    }
+                }
+            });
+            return checkedFilters;
+        }
+
+        {% if vcf %}
+        $(document).ready(function() {
+            loadVCFLocusFilter({{ vcf.pk }});
+        });        
+        {% endif %}
+        
+    </script>
+
+    <div id='vcf-locus-filter-container'>
+    </div>
+</div>

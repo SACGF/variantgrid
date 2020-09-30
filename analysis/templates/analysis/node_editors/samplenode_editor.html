@@ -1,0 +1,185 @@
+{% extends base_template %}
+{% block style %}
+    {{ block.super }}
+
+    #restrict-to-qc-gene-listmessage {
+        color: #118811;
+    }
+    
+    #view-allele-frequency-filter-link {
+        margin-left: 10px;
+    }
+{% endblock style %}
+
+{% block inlinejs %}
+    {{ block.super }}
+    
+    function getSampleId() {
+    {% if node.analysis.lock_input_sources %}
+        var sampleId = "{{ sample.pk }}";
+    {% else %}
+        var sampleId = $("#id_sample").find(":selected").val();
+    {% endif %}
+        return sampleId;
+    }
+
+    function setSampleLink() {
+        var sampleId = getSampleId();
+        setCrossLink($("#sample-link"), Urls.view_sample, sampleId);
+    }
+{% endblock inlinejs %}
+
+{% block docreadyjs %}
+    {{ block.super }}
+
+    var sampleForm = $("form#sample-form");
+    ajaxForm(sampleForm);
+
+	function resetGenotypeEditors() {
+		$(".no-genotype-row").hide();
+		$(".genotype-row").show();
+	}
+
+	function changeSample() {
+        var sampleId = getSampleId();
+        setSampleLink();
+        loadSampleVCFLocusFilter(sampleId);
+        resetGenotypeEditors();
+	}
+
+	setSampleLink();
+	$("select#id_sample").change(changeSample);
+	$("#slider-group-operation").hide(); // SampleNode doesnt use this
+{% endblock docreadyjs %}
+
+
+{% block node_editor_tab_links_second %}
+    {{ block.super }}
+
+    {% if sample.patient %}
+            <li id='patient-tab'><a href="#node-patient">Patient</a></li>
+    {% endif %}
+{% endblock node_editor_tab_links_second %}
+
+{% block node_filter_info %}
+    {{ block.super }}
+
+    {% if sample.qc_gene_list and node.restrict_to_qc_gene_list %}
+        <div>
+        <span id='restrict-to-qc-gene-listmessage'>Sample restricted to QC GeneList ({{ sample.qc_gene_list }}) (see Genes tab for details)</span>
+        </div>
+    {% endif %}
+
+{% endblock node_filter_info %}
+
+{% block node_editor_tabs_second %}
+    {{ block.super }}
+
+	{% if sample.patient %}
+		<div id="node-patient">
+			<p>
+			<b>Patient: </b>{{ sample.patient }} <a target='_blank' href="{% url 'view_patient' sample.patient.pk %}">Edit Patient</a>
+			</p>
+			{% if sample.patient.patientphenotype_set.all %}
+				<p>
+				<b>Phenotypes:</b>
+				{% for pp in sample.patient.patientphenotype_set.all %}
+					{{ pp.hpo }}
+				{% endfor %}
+				</p>
+			{% endif %}
+			{% if sample.patient.patientmim_set.all %}
+				<p>
+				<b>OMIM:</b>
+				{% for mim in sample.patient.patientmim_set.all %}
+					{{ mim.mim_morbid_alias.description }}
+				{% endfor %}
+				</p>
+			{% endif %}
+			</p>
+		</div>
+	{% endif %}
+{% endblock node_editor_tabs_second %}
+
+{% block content %}
+<style>
+table.zygosity-table {
+	text-align: center;
+	border-collapse: collapse;
+	border-spacing: 0px;
+}
+
+table.zygosity-table tr.top-header th {
+	border-left: 1px solid black;
+	border-right: 1px solid black;
+	padding-left: 5px;
+	padding-right: 5px;
+	margin: 0px;
+}
+
+</style>
+
+<div>
+	<form id="sample-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+    <div>
+		<b>Sample:</b>
+		
+		{% if node.analysis.lock_input_sources %}
+            {{ sample }}
+        {% else %}
+            {{ form.sample }}
+		{% endif %}
+		
+		<a class="cross-link" id="sample-link" target='_blank'>View Sample</a></td>
+        {% if sample.qc_gene_list and form.restrict_to_qc_gene_list %}
+        <div>
+            <span id='qc-gene-list'> <b>Restrict to Sample QC Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
+        </div>
+        {% endif %}
+        <div>
+            {% load vcf_locus_filter_tags %}
+            {% vcf_locus_filter node sample.vcf %}
+        </div>
+    {% if has_genotype %}
+        <div class='genotype-row'>
+            <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }}
+            <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }}
+            <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }}
+            <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }}
+        </div>
+        <div class='genotype-row'>
+            <table class='zygosity-table left' style='text-align: center'>
+                <tr class='top-header'>
+                    <th>Ref
+                    <th>Het
+                    <th>Hom
+                    <th>?
+                <tr><td> {{ form.zygosity_ref }}
+                    <td> {{ form.zygosity_het }}
+                    <td> {{ form.zygosity_hom }}
+                    <td> {{ form.zygosity_unk }}
+            </table>
+            <a id='view-allele-frequency-filter-link' class='left' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+            <div class='clear'></div>
+        </div>
+        {% load allele_frequency_tags %}
+        {% allele_frequency_controls node %}
+    {% else %}
+        <div class='no-genotype-row'>
+            <b>Note:</b>VCF had no sample/genotype columns, so no sample information will appear in the grid.
+        </div>
+    {% endif %}
+    	</div>
+        {% comment %}Analysis template "add output node" checkbox{% endcomment %}
+        {% if form.output_node  %}
+            <p>{{ form.output_node.label }}{{ form.output_node }}</p>
+        {% endif %}
+    	<button id='sample-save' class="btn btn-primary">save</button>
+	    {{ form.media }}
+	</form>
+</div>
+{% endblock content %}

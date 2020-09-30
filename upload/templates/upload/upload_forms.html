@@ -1,0 +1,39 @@
+{% load static %}
+<div id="upload-tab-{{ file_type }}-wrapper">
+	<script src="{% static 'js/lib/jquery.blockUI.js' %}"></script>
+	<script> 
+		$(document).ready(function() {
+			close_existing_grid();
+			var options	= {
+				target: '#upload-tab-{{ file_type }}-wrapper',
+				beforeSubmit: function() {
+					$.blockUI({ message: 'Uploading file...' });
+				},
+				success: function() { $.unblockUI(); },
+			};
+				
+		    $('form#upload-{{ file_type }}-form').ajaxForm(options); 
+			$('#upload-{{ file_type }}-history-wrapper').load("{% url 'upload_history' file_type %}");
+			
+			$("input#id_uploaded_file").change(function(data) {
+				base_name = $(this).val().replace(/^.*[\\/]/, "");
+				name_input = $("input#id_name");
+				name_input.val(base_name);
+			});
+			
+		});
+	</script>
+
+	<h3>Upload {{ file_type }}</h3>
+	
+	<form class='upload-form' id="upload-{{ file_type }}-form" enctype="multipart/form-data" method="post" action="{{ form_url }}">
+	    {% csrf_token %}
+
+		{% for form in forms %}
+			{{ form.as_p }}
+		{% endfor %}
+		<p><input type="submit" value="Upload" /></p>
+	</form>
+
+	<div id="upload-{{ file_type }}-history-wrapper"></div>
+</div>

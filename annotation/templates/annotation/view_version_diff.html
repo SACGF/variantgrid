@@ -1,0 +1,33 @@
+{% extends menu_annotation_base %}
+{% load static %}
+{% block title %}Version Diff{% endblock title %}
+{% block head %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endblock head %}
+
+{% block submenu_page_content %}
+	{% load help_tags %}
+	{% load version_diff_graph_tags %}
+	{% page_help user 'annotation/version_diff_help' %}
+
+    <a href="{% url 'version_diffs' %}">Back to Version Diffs</a>
+
+    <h2>Version Diffs</h2>
+    <p>{{ diff }}</p>
+
+    {% if cols_change_count %}
+        <table>
+        <tr><th>Name <th>Changed
+        {% for vgc, change_count in cols_change_count %}
+            <tr><td>{{ vgc.grid_column_name }} <td>{{ change_count }}
+        {% endfor %}
+        </table>
+    {% endif %}
+
+
+    {% for vgc, diff_df in cols_from_to %}
+        {% version_diff_column_from_to_graph vgc.grid_column_name diff_df %}
+    {% endfor %}
+
+{% endblock submenu_page_content %}

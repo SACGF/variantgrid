@@ -1,0 +1,35 @@
+{% extends "analysis/node_data/base_node_data.html" %}
+{% load static %}
+{% block top %}
+	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+	<script src="{% static 'js/generated_graphs.js' %}"></script>
+{% endblock top %}
+
+{% block css %}
+	div#node-generated-graph {
+	    border: 1px solid #ccc;
+	    width: 800px;
+	    height: 600px;
+	    overflow: hidden;
+	}
+
+{% endblock css %}
+
+{% block docreadyjs %}
+	var graph_selector = $('#node-generated-graph');
+	var poll_url = "{{ poll_url }}";
+	var delete_url = "{% url 'cached_generated_file_delete' %}";
+
+	poll_graph_status(graph_selector, poll_url, delete_url);
+{% endblock docreadyjs %}
+
+{% block content %}
+
+<div>
+{% load text_tags %}
+
+	<div id='node-generated-graph' class='graph-loading'></div>
+
+</div>
+{% endblock content %}
+

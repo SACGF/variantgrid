@@ -1,0 +1,33 @@
+{% load static %}
+<script src="{% static 'js/generated_graphs.js' %}"></script>
+<style>
+    .generated-graph, .generated-graph img {
+        width: 640px;
+        height: 480px;
+        text-align: center;
+    }
+</style>
+<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+
+<script>
+$(document).ready(function() {
+    const delete_url = "{% url 'cached_generated_file_delete' %}";
+
+    poll_graph_status($("#chrom-density-graph"), "{% url 'chrom_density_graph' sample.id 'jet' %}", delete_url);
+
+    {% if sample.has_genotype %}
+        poll_graph_status($('#homozygosity-graph'), "{% url 'homozygosity_graph' sample.id 'jet' %}", delete_url);
+        poll_graph_status($('#allele-frequency-histogram-graph'), "{% url 'sample_allele_frequency_histogram_graph' sample.id 10 %}", delete_url);
+    {%  endif %}
+
+});
+</script>
+
+<div>
+    <div id='chrom-density-graph' class='generated-graph graph-loading'></div>
+
+    {% if sample.has_genotype %}
+    <div id='homozygosity-graph' class='generated-graph graph-loading'></div>
+    <div id='allele-frequency-histogram-graph' class='generated-graph graph-loading'></div>
+    {% endif %}
+</div>

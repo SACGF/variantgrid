@@ -1,0 +1,35 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% load model_tags %}
+{% load related_data_tags %}
+{% load related_analyses_tags %}
+
+{% block title %}Trio {{ trio }}{% endblock %}
+
+{% block jsdocumentready %}
+    $("#trio-tabs").tabs();
+
+{% endblock %}
+
+{% block submenu_page_content %}
+
+    <div id="trio-tabs">
+        <ul>
+            <li><a id='details-tab' href="#details">Details</a></li>
+            {% if has_write_permission %}
+            <li><a href="{% url 'group_permissions' 'snpdb.models.Trio' trio.pk %}">Sharing / Permissions</a></li>
+            {% endif %}
+        </ul>
+        <div id="details">
+            {% trio_table trio %}
+        </div>
+    </div>
+
+    <div id='related-data-container'>
+    {% related_data_for_trio trio %}
+    {% related_analyses_for_trio trio %}
+    </div>
+
+{% endblock %}
+
+

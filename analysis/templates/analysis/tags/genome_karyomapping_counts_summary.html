@@ -1,0 +1,14 @@
+<div>
+    <script>
+        function showCollapsedCounts() {
+            $("table.collapsed-counts").show();
+        }
+    </script>
+    {{ genome_karyomapping_counts.relatedness_summary }} <a href="javascript:showCollapsedCounts()">more</a>
+    <table class="hidden collapsed-counts">
+        {% for name, count in collapsed_counts.items %}
+            <tr><th>{{ name }}
+                <td>{{ count }}
+        {% endfor %}
+    </table>
+</div>

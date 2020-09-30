@@ -1,0 +1,13 @@
+{% extends "django_messages/base.html" %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block content %}
+    <div class="container">
+        <h3>{% trans "Compose Message"%}</h3>
+        <form action="" method="post">
+            {% crispy form form_helper.horizontal %}
+            <input class="btn btn-primary" type="submit" value="{% trans "Send" %}"X>
+        </form>
+    </div>
+{% endblock %}

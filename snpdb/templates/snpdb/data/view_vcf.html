@@ -1,0 +1,451 @@
+{% extends menu_data_base %}
+{% load static %}
+{% load related_data_tags %}
+{% load related_analyses_tags %}
+{% load vcf_import_info_tags %}
+{% load js_tags %}
+
+{% block title %}{{ vcf.name }}{% endblock %}
+{% block head %}
+<style type="text/css">
+input#bam_pattern {
+    width: 300px;
+}
+
+table#sample-formset input[type="text"] {
+    width: 150px;
+}
+
+#bulk-set-form-container {
+    display: none;
+}
+
+#bulk-set-form-container {
+    border: 1px solid black;
+    margin: 10px;
+}
+
+.vcf-history-trail-link-text {
+    display: none;
+}
+
+.vcf-button {
+    float: left;
+    height: 44px;
+}
+
+
+.sub-cohort-button-component {
+    float: left;
+}
+
+#sample-list-top-links>div {
+    line-height: 24px;
+    margin-right: 20px;
+}
+
+#sample-list-top-links img {
+    vertical-align: middle;
+}
+
+</style>
+{% endblock %}
+
+{% block jshead %}
+    function showBulkSet() {
+        $("#show-bulk-set-link").remove();
+        $("div#bulk-set-form-container").slideDown('slow');
+    }
+    
+    function setBamPath() {
+        var bamPattern = $("input#bam_pattern").val();
+        $("tr.sample-row").each(function() {
+            var nameTD = $("td.sample-name", this);
+            var name = $("input", nameTD).val();
+            var data = {"name" : name};
+            var bfp = format(bamPattern, data);
+            var bamTD = $("td.bam_file_path", this);
+            $("input", bamTD).val(bfp);
+        });
+
+    }
+
+{% if vcf.import_status == 'S' and vcf.cohort %}
+    function subCohortClick() {
+       var sampleIdList = [];
+        $("input:checked", "#sample-formset").each(function() {
+            var sampleId = $(this).attr("sample_id");
+            sampleIdList.push(sampleId);
+        });
+
+        var data = 'sample_id_list=' + encodeURIComponent(JSON.stringify(sampleIdList));
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: "{% url 'create_sub_cohort' vcf.cohort.pk %}",
+            success: function(data) {
+                var cohortId = data["cohort_id"];
+                window.location = Urls.view_cohort(cohortId);
+            },
+        });
+    }
+{% endif %}
+
+    function initSubCohort() {
+        var subCohortButton = $("#sub-cohort-button");
+        subCohortButton.button({disabled: true});
+        {% if vcf.import_status == 'S' and vcf.cohort %}
+        subCohortButton.click(subCohortClick);
+        $(".sample-select").change(setupSubCohortButton);
+        setupSubCohortButton();
+        {% endif %}
+    }
+
+    function setupSubCohortButton() {
+        var numSelectedSamples = $("input:checked", "#sample-formset").length;
+        var buttonEnabled = numSelectedSamples > 1;
+        $("#sub-cohort-button").button( "option", "disabled", !buttonEnabled );
+    }
+
+
+    function addCreateProjectButtonAndForm() {
+        var createProjectButton = $("<div/>")
+            .addClass("click-to-add-button left")
+            .attr("title", "Create new project...");
+
+        var dialog, form;
+        var allFields = $("input", "#new-project-dialog");
+
+        function createNewProject() {
+            allFields.removeClass("ui-state-error");
+            var valid = true;
+            var name = $("#name", form);
+            var nameVal = name.val().trim(); 
+            if (!nameVal) {
+                name.addClass("ui-state-error");
+                valid = false;
+            }
+                
+            name.addClass("ui-state-error");
+            
+            if (valid) {
+                var postData = {
+                    name: nameVal,
+                    description: $("#description", form).val().trim()
+                };
+            
+                $.ajax({
+                    type: "POST",
+                    url: "{% url 'api_project_create' %}",
+                    data: JSON.stringify(postData),
+                    headers: {
+                          'Accept': 'application/json',
+                          'Content-Type': 'application/json'
+                    },
+                    success: function(data) {
+                        var name = data.name;
+                        if (data.description) {
+                            name += " (" + data.description + ")";
+                        } 
+                        var option = $('<option>', {value: data.name, text: name, selected: 'selected'});
+                        $("select#id_project").append(option);   
+                        dialog.dialog("close");
+                    },
+                    error: function(data) {
+                        var errorMessage = data.responseJSON.name[0];
+                        $(".error-messages", dialog).html(errorMessage);
+                        console.log(data);
+                    }
+                });
+            }
+            return valid;
+        }
+
+        dialog = $("#new-project-dialog").dialog({
+          autoOpen: false,
+          height: 400,
+          width: 350,
+          modal: true,
+          buttons: {
+            "Create new project": createNewProject,
+            Cancel: function() {
+              dialog.dialog("close");
+            }
+          },
+          close: function() {
+            form[0].reset();
+            allFields.removeClass( "ui-state-error" );
+            $(".error-messages", "#new-project-dialog").empty();
+          }
+        });
+
+        form = dialog.find( "form" ).on( "submit", function( event ) {
+          event.preventDefault();
+          console.log("dialog submit");
+          createNewProject();
+        });
+     
+        createProjectButton.click(function() {
+          dialog.dialog("open");
+        });
+        
+        $("select#id_project").addClass("left").after(createProjectButton);
+    }
+
+    function showVCFHeader() {
+        $("#show-vcf-header").hide();
+        $("#vcf-header").show();
+    }
+
+    function hideVCFHeader() {
+        $("#show-vcf-header").show();
+        $("#vcf-header").hide();
+    }
+
+{% endblock %}
+
+{% block jsdocumentready %}
+    $("div#bulk-set-form-container").hide();
+
+    $("#set-bam-path-button").click(setBamPath);
+
+    $("button#vcf-submit-button").click(function() {
+        $("form#vcf-form").submit();
+    });
+
+    initSubCohort();
+    $("#vcf-tabs").tabs();
+    
+    addCreateProjectButtonAndForm();
+
+    var dialog = setupCreatePatientDialog();
+    
+    $(".sample-patient > select", "form#vcf-form").each(function() {
+        var parentRow = $(this).parents("tr");
+        var sampleNameCell = $(".sample-name", parentRow);
+        var sampleName = $("input", sampleNameCell).val();
+        addCreatePatientButton(dialog, $(this), sampleName);
+    });
+    
+{% endblock %}
+
+
+{% block submenu_page_content %}
+<div id="vcf">
+
+{% load vcf_history_trail_tags %}
+{% vcf_history_trail vcf %}
+
+<div id="vcf-tabs">
+    <ul>
+        <li><a href="#details">Details</a></li>
+        <li><a href="#vcf-info">VCF Info</a></li>
+        {% if has_write_permission %}
+        <li><a href="{% url 'group_permissions' 'snpdb.models.VCF' vcf.pk %}">Sharing / Permissions</a></li>
+        {% endif %}
+    </ul>
+    <div id="details">
+    <form method="post" id='vcf-form'>
+        {% csrf_token %}
+        <table>
+                {{ vcf_form.as_table }}
+
+                {% if vcf.vcffromsequencingrun.sequencing_run %}
+                <tr>
+                <th>SequencingRun:
+                <td>
+                {% if url_name_visible.view_sequencing_run %}              
+                    <a href="{% url 'view_sequencing_run' vcf.vcffromsequencingrun.sequencing_run.pk %}">{{ vcf.vcffromsequencingrun.sequencing_run }}</a> - Auto uploaded from {{ vcf.uploadedvcf.backendvcf.vcf }}
+                {% else %}
+                    {{ vcf.vcffromsequencingrun.sequencing_run }} - Auto uploaded from {{ vcf.uploadedvcf.backendvcf.vcf }}
+                {% endif %}
+                </tr>
+                {% endif %}
+
+        {% if vcf.uploadedvcf.uploaded_file and can_download_vcf %}
+            {% if vcf.uploadedvcf.uploaded_file.exists %}
+                <tr>
+                <th>Download</th>
+                <td><div class="left margin-r-5"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Uploaded VCF</a> ({{ vcf.uploadedvcf.uploaded_file.uploaded_file.size|filesizeformat }})</div>
+                    <!-- <div class="left margin-r-5"><a href=""><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF</a></div> -->
+                </td>
+                </tr>
+            {% endif %}
+        {% endif %}
+        </table>
+
+        <div id="samples">
+            <h3>Samples</h3>
+
+            <div id='sample-list-top-links'>
+                <div class="left">                
+                    <a href="{% url 'get_patient_upload_csv_for_vcf' vcf.pk %}"><img width=24px height=24px src="{% static 'icons/report_icon.jpg' %}" /> Patient record upload CSV template.</a>
+                </div>
+                <div class="left">
+                    <a id="show-bulk-set-link" href="javascript:showBulkSet()">Bulk Set Bam files</a>
+                </div>
+                <div class="clear"></div>
+            </div>
+            <div id="bulk-set-form-container">
+                <b>Bulk Set Fields</b>
+                <form id='bulk-set-form'>
+                    <table>
+                    <tr>
+                    <th>BAM path</th>
+                    <td><input id='bam_pattern' type='text' value='/data/{name}.bam'></input>
+                    <td><button id='set-bam-path-button' type='button'>Set Bam Path</button>
+                    </table>
+                </form>
+            </div>
+
+            {{ samples_form.management_form }}
+            <table id='sample-formset'>
+            <tr>
+                <th>Sample
+                {% if vcf.import_status == 'S' %}
+                    <th>Variants
+                    {% if vcf.vcffiltercollection %}
+                    (passed)
+                    {% endif %}
+                {% endif %}
+                <th>VCF Sample Name
+                <th>Name
+                <th>Patient
+                <th>Specimen
+                <th>BAM path
+            </tr>
+            {% for form in samples_form %}
+                <tr class="sample-row"> 
+                {{ form.id }}
+                <td>
+                    <input class='sample-select' sample_id='{{ form.id.value }}' type='checkbox' />
+                    <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
+                    {% if vcf.import_status == 'S' %}
+                        <td>
+                        {% with ss=sample_stats|get_item:form.instance.pk %}
+                            {% if ss %}
+                                {{ ss }}
+                                {% with sspf=sample_stats_passing_filter|get_item:form.instance.pk %}
+                                    {% if sspf %}
+                                        ({{ sspf }})
+                                    {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                <td class="vcf-sample-name">{{ form.vcf_sample_name }}{{ form.vcf_sample_name.errors }}
+                <td class="sample-name">{{ form.name }}{{ form.name.errors }}
+                <td class="sample-patient">{{ form.patient }}{{ form.patient.errors }}
+                <td>{{ form.specimen }}{{ form.specimen.errors }}
+                <td class="bam_file_path">{{ form.bam_file_path }}{{ form.bam_file_path.errors }}
+                </tr>
+                
+            {% endfor %}
+            {{ samples_form.media }}
+            </table>
+        </div>
+
+        <p>
+        {% if has_write_permission %}
+            <button id="vcf-submit-button" class="btn btn-primary">Update VCF</button></p>
+        {% else %}
+            You can view but not modify this data.
+        {% endif %}
+
+        {% if vcf.import_status == 'S' and vcf.cohort %}
+            <button id='sub-cohort-button' class="btn btn-outline-primary">
+              <img id="cohort-icon" class="sub-cohort-button-component" src="{% static 'images/node_icons/cohort.png' %}" width="28" height="28" />
+              <div class='sub-cohort-button-component'> Create cohort from selected samples</div>
+            </button>
+
+            {% load cohort_trio_wizard_tag %}
+            {% cohort_trio_wizard vcf.cohort %}
+        {% endif %}
+        <div class='clear'></div>
+        
+        {% include "messages/messages.html" %}
+        {% vcf_import_info vcf 'Please see "View upload processing" in VCF info tab.' %}
+
+        </p>
+
+    </form>
+    </div>
+    <div id="vcf-info">
+        <fieldset class="form-fields">
+            {% if vcf.uploadedvcf.uploaded_file.uploadpipeline %}
+                {% if url_name_visible.view_upload_pipeline %}
+                <p>
+                    <label>Processing</label>
+                    <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.uploaded_file.uploadpipeline.pk %}">View upload processing</a></span>
+                </p>
+                {% endif %}
+                {% if vcf.uploadedvcf.vcf_importer %}
+                <p>
+                    <label>Importer Version</label>
+                    <span>{{ vcf.uploadedvcf.vcf_importer }}</span>
+                </p>
+                {% endif %}
+            {% endif %}
+            {% if vcf.source %}
+                <p>
+                <label>Source</label>
+                <span>{{ vcf.source }}</span>
+                </p>
+            {% endif %}
+            <p>
+                <label>Format</label>
+                <span>
+                    {% if vcf.ref_depth_field and vcf.alt_depth_field %}
+                        ref_depth: {{ vcf.ref_depth_field }}, alt_depth: {{ vcf.alt_depth_field }},
+                    {% else %}
+                        allele_depth: {{ vcf.allele_depth_field }},
+                    {% endif %}
+                    read_depth = {{ vcf.read_depth_field }}, genotype_quality = {{ vcf.genotype_quality_field }}, phred_likelihood = {{ vcf.phred_likelihood_field }}
+                </span>
+            </p>
+            <p>
+                <label>Header</label>
+                <span>
+                    <a id='show-vcf-header' href="javascript:showVCFHeader()">Show VCF header...</a>
+                </span>
+                <div id='vcf-header' style='display: none'>
+                    <div><a href="javascript:hideVCFHeader()">Hide VCF header...</a></div>
+                    <pre>{{ vcf.header }}</pre>
+                </div>
+            </p>
+        </fieldset>
+    </div>
+</div>
+
+    {% if vcf.import_status == 'S' and vcf.cohort %}
+        {% related_data_for_cohort vcf.cohort %}
+        {% related_analyses_for_cohort vcf.cohort %}
+    {% endif %}
+
+</div>
+
+
+<div id="new-project-dialog" title="New project">
+  <p class="validateTips">Name is required.</p>
+
+  <form>
+    <table>
+    <tr>
+      <th><label for="name">Name</label>
+      <td><input type="text" name="name" id="name" class="text ui-widget-content ui-corner-all">
+    <tr>
+      <th><label for="description">Description</label>
+      <td><input type="text" name="description" id="description" class="text ui-widget-content ui-corner-all">
+            <!-- Allow form submission with keyboard without duplicating the dialog button -->
+            <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+    </table>
+    <div class="error-messages"></div>
+  </form>
+</div>
+
+<!-- create_patient_dialog -->
+{% include "snpdb/create_patient_dialog.html" %}
+
+{% endblock %}

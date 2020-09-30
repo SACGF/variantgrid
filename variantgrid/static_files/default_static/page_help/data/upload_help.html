@@ -1,0 +1,64 @@
+<div>
+<style>
+#upload-help-table {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+#upload-help-table th {
+    text-align: left;
+}
+</style>
+
+File types are matched according to their <b>file extension</b> as per below:
+
+<table id='upload-help-table'>
+<tr>
+    <th>
+    <th>Extensions
+    <th>Details
+
+<tr>
+    <th>Genotype VCF
+    <td>.vcf
+    <td>See specification at <a href="http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41">4.1 format</a>. Allele Depth is read from "AD" then "DP" INFO fields, Phred likelihoods from 'PL' then 'GQ'. This is standard GATK (AD/PL), and Torrent Formats (DP/GQ)
+
+<tr>
+    <th>Bed File
+    <td>.bed, .broadPeak, .narrowPeak
+    <td><a href="https://genome.ucsc.edu/FAQ/FAQformat.html#format1">bed spec</a>, <a href="https://genome.ucsc.edu/FAQ/FAQformat.html#format13">broadPeak spec</a>, <a href="https://genome.ucsc.edu/FAQ/FAQformat.html#format12">narrowPeak spec</a>. Either "chr1" or "1" chromosomes OK.
+
+<tr>	
+    <th>CuffDiff
+    <td>.diff
+    <td><a href="http://cole-trapnell-lab.github.io/cufflinks/cuffdiff/#differential-expression-tests">CuffDiff</a> gene or transcript expression data.
+
+<tr>
+    <th>Gene List
+    <td>.tsv, .csv, .txt
+    <td>This can be either Gene Symbols (GAPDH) or Ensembl Transcript IDs (start with "ENST")
+
+<tr>
+    <th>Gene Coverage
+    <td>.txt
+    <td>Must have columns: <i>'Gene/Exon', 'Min Coverage', 'Mean Coverage', 'Standard Deviation Coverage', '% bases >20x', '% bases &lt;10x', '% bases @ 0x', 'Estimated Sensitivity of Detection'</i>
+
+<tr>
+    <th>Patient Records
+    <td>.csv
+    <td>See <a href="/patients/help/import_patient_records_details">import patient records details</a>. Sample Patient Upload CSV <a href="/patients/example_upload_csv/empty"><img width=24px height=24px src="/static/icons/report_icon.jpg" /></a>.
+
+<tr>
+    <th>Ped
+    <td>.ped
+    <td><a href="http://www.helsinki.fi/~tsjuntun/autogscan/pedigreefile.html">PED/Linkage</a> file format.
+</table>
+
+
+<P>
+GZipped files are supported: They must end in .gz, which will be removed and the extension matched as above.
+
+<P>
+
+
+</div>

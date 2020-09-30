@@ -1,0 +1,29 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% block title %}Patient Term Matches{% endblock title %}
+{% block head %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endblock head %}
+
+{% block submenu_page_content %}
+    {% load patient_graph_tags %}
+    {% load jqgrid_tags %}
+
+    <div id='patient-header'>
+        <h1>Patient Term Matches</h1>
+        <div>
+            <a href="{% url 'patients' %}">Back to Patients</a>
+        </div>
+    </div>
+    <div>
+        <h2>Human Phenotype Ontology</h2>
+        {% patient_phenotypes_graph max_records=40 graph_width=1024 graph_height=768 %}
+    
+        <h2>OMIM</h2>
+        {% patient_omim_graph max_records=40 graph_width=1024 graph_height=768 %}
+    
+        <h2>Genes</h2>
+        {% patient_genes_graph max_records=40 graph_width=1024 graph_height=768 %}
+    </div>
+{% endblock submenu_page_content %}

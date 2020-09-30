@@ -1,0 +1,52 @@
+{% load js_tags %}
+$(document).ready(function() {
+    let tableId = '{{table_id}}';
+    let tableDom = $(`#${tableId}`);
+    let lengthKey = `datatable_length_${tableId}`;
+    lengthValue = parseInt(localStorage.getItem(lengthKey)) || 10;
+
+    tableDom.DataTable({
+        {% if responsive %}
+        responsive: {
+            details: {
+                type: 'column',
+                target: 'td.dt-preview',
+                renderer: TableFormat.detailRenderer
+            }
+        },
+        {% endif %}
+        processing: true,
+        serverSide: true,
+        pageLength: lengthValue,
+        dom: '<"top">rt<"bottom"ilp><"clear">',
+        {% if sort_order %}
+        order: {{ sort_order | jsonify }},
+        {% endif %}
+        {% if hide_filter_count %}
+        language: {
+            infoFiltered: ""
+        },
+        {% endif %}
+        ajax: {
+            url: '{% url url %}',
+            {% if data %}data: {{ data | safe }},{% endif %}
+        },
+        bFilter: false,
+        columnDefs: [
+            {% for rc in rich_columns %}{
+            {% if rc.client_renderer %}render: {{rc.client_renderer | safe }}, {% endif %}
+            data: '{{ rc.name }}',
+            orderable: {% if rc.orderable %}true{%else%}false{%endif%},
+            className: '{{ rc.css_classes }}',
+            targets: {{ forloop.counter0 }}
+    },{% endfor %}
+        ]
+    });
+    tableDom.on( 'error.dt', function ( e, settings, techNote, message ) {
+        Rollbar.warning("DataTables error " + message);
+        console.log( 'An error has been reported by DataTables: ', message );
+    });
+    $(`select[name=${tableId}_length]`).change(function() {
+        localStorage.setItem(lengthKey, $(this).val());
+    });
+});

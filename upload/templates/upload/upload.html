@@ -1,0 +1,324 @@
+{% extends menu_data_base %}
+{% load static %}
+{% load js_tags %}
+
+{% block title %}Upload file{% endblock %}
+
+{% block head %}
+<script type="text/javascript" src="{% static 'js/lib/d3.v2.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/samplenode.js' %}"></script>
+<link href="{% static 'css/nodes.css' %}" rel="stylesheet">
+<style>
+{% if not user.is_superuser %}
+td.upload-user {
+    display: none;
+}
+{% endif %}
+
+/* Stop input growing down outside of button and receiving clicks */ 
+span.fileinput-button input {
+	height: 100%;
+}
+
+.field-name {
+	font-weight: bold;
+}
+
+.fileupload-buttonbar button.start {
+	display: none;
+}
+
+form#fileupload .fileupload-progress {
+	display: none;
+}
+
+#fileupload {
+	word-wrap: break-word;
+}
+
+#fileupload p.name {
+	width: 240px;
+}
+
+#instructions-headline {
+	margin-top: 40px;
+	margin-bottom: 40px;
+	font-size: 1.5em;
+	color: #A9A9A9;
+	border: 1px dashed #A9A9A9;
+	padding: 10px;
+}
+
+#id_time_filter_value {
+	width: 50px;
+    min-width: 50px;
+}
+#id_time_filter_method {
+    width: 100px;
+    min-width: 100px;
+    margin-left: 8px;
+}
+.horizontal-fields {
+    margin-bottom: 16px;
+}
+
+.uploaded-file-details {
+    float: left;
+    margin: 0px 5px 0px 5px;
+}
+
+.uploaded-file-details .name {
+    font-size: 1.5em;
+}
+
+form#fileupload table {
+    width: 90%;
+}
+
+form#fileupload tr {
+    margin: 5px 0px 5px 0px;
+}
+
+.file_type_icon {
+    float: left;
+    width: 40px;
+    height: 40px;
+    background-size: 40px 40px;
+}
+
+
+.file-type-A {
+    background-image: url({% static 'icons/mdb_icon.png' %})
+}
+
+
+.file-type-B {
+    background-image: url({% static 'images/node_icons/intersection.png' %})
+}
+
+.file-type-L {
+    width: 40px;
+    height: 45px;
+    background-size: 40px 45px;
+    background-image: url({% static 'icons/ncbi_logo.png' %})
+}
+
+.file-type-C {
+    background-image: url({% static 'images/node_icons/expression.png' %})
+}
+
+.file-type-D {
+    background-image: url({% static 'icons/excel_icon.png' %})
+}
+
+.file-type-G {
+    background-image: url({% static 'images/node_icons/filter_list.png' %})
+}
+
+.file-type-R {
+    background-image: url({% static 'icons/patient-icon-png-3.png' %})
+
+}
+
+.file-type-I {
+    background-image: url({% static 'icons/liftover.png' %})
+}
+
+.file-type-P {
+    background-image: url({% static 'images/node_icons/pedigree.png' %})
+}
+
+.file-type-V {
+    background-image: url({% static 'icons/vcf_64.png' %})
+}
+
+.file-type-O {
+    background-image: url({% static 'icons/gene_coverage.png' %})
+}
+
+
+.file-type-S {
+    background-image: url({% static 'images/diagnose_icon.png' %})    
+}
+
+.file-type-Y {
+    background-image: url({% static 'icons/manual_variant_entry.png' %})    
+}
+
+img.thumbnail {
+    width: 16px;
+    height: 16px;
+}
+
+</style>
+
+<script>
+	window.fileupload_ready = function() {
+		var $form = $('#fileupload');
+	{% if existing_files %}
+		var existingFiles = {{ existing_files | jsonify }};
+		$form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
+	{% endif %}
+
+    {%  if not upload_enabled %}
+        $(".fileinput-button").button("disable");
+        $(document).bind('drop dragover', function (e) {
+            e.preventDefault();
+        });
+    {%  endif %}
+
+		$form.fileupload({ success : update_uploads });
+	};
+
+	var UPDATE_TIME = 1000;
+
+	function update_uploads() {
+		// console.log("update_uploads()");
+		$.ajax({
+		    url: "{% url 'upload_poll' %}",
+            dataType: 'json',
+		    success: process_upload_status,
+            error: function(jqXHR, textStatus, errorThrown) {
+                checkLoggedIn(null, function() {
+                    showReloadPageErrorDialog($("#error-dialog"), "You have been logged out.");
+                });
+            }
+		});
+	}
+
+	function process_upload_status(uploaded_file_dicts) {
+		var needsUpdate = false;
+		for (var i=0 ; i<uploaded_file_dicts.length ; ++i) {
+			var ufd = uploaded_file_dicts[i];
+			update_upload_status(ufd);
+			var status = ufd['processing_status'];
+			if (!(status == 'S' || status == 'E')) {
+				needsUpdate = true;			
+			}
+		}
+		if (needsUpdate) {
+			setTimeout(update_uploads, UPDATE_TIME);
+		}
+	}
+
+
+    function createSample(name, sex, deceased) {
+        var nodeData = {name : name, attributes: {'class' : 'window', style: 'left: 50px'}};
+        var sample_node = createSampleNode(nodeData);
+        var patientDict = {name: name, sex : sex, deceased: deceased};
+        sample_node.each(function() { this.updateState({patient: patientDict}); });
+        return sample_node;
+    }
+
+
+    function vcf_upload_data(nameDiv, upload_data) {
+        var MAX_SAMPLES = 10;
+    
+        var ftDiv = $(".file-type", nameDiv);
+        var importStatus = upload_data["import_status"];
+        var samples = upload_data["samples"];
+        var samplesDiv = $('<div/>');
+        if (samples.length > MAX_SAMPLES) {
+            // var sampleNode = createSample("samples", 'M', false);
+            var sampleNode = $("<span>samples</span>") ;
+            samplesDiv.append(sampleNode);
+            samplesDiv.append(" x" + samples.length);
+        } else {
+            for (var i=0 ; i<samples.length ; ++i) {
+                var sample = samples[i];
+                // var sampleNode = createSample(sample["name"], 'M', false);
+                var sampleNode = $("<span>" + sample["name"] + "</span>");
+                samplesDiv.append(sampleNode);
+            }        
+        }
+        ftDiv.append(samplesDiv);
+
+    }
+
+
+    function draw_upload_data(nameDiv, file_type_code, upload_data) {
+        var funcs = {"V" : vcf_upload_data,};
+        var func = funcs[file_type_code];
+        if (func) {
+            func(nameDiv, upload_data)
+        }
+    }
+
+	function update_upload_status(upload_status) {
+		var uploaded_file_id = upload_status['uploaded_file_id'];
+		var nameTd = $("td.upload-name[uploaded_file_id=" + uploaded_file_id + "]");
+
+		// Thumbnail
+		var thumbnail = $("img.thumbnail", nameTd.parents("tr"));
+		thumbnail.attr("src", upload_status["status_image"]);
+		
+		var fileTypeDiv = $(".file-type", nameTd);
+		fileTypeDiv.empty();
+		var fileType = upload_status["file_type"];
+		var fileLink = fileType;
+		var processingStatus = upload_status["processing_status"];
+		if ((processingStatus == 'S' || processingStatus == 'T') && upload_status["data_url"]) {
+			fileLink = '<a href="' + upload_status["data_url"] + '">' + fileType + '</a>';
+		}
+		fileTypeDiv.append(fileLink);
+
+        var upload_data = upload_status["upload_data"];
+        var file_type_code = upload_status["file_type_code"];
+        //draw_upload_data(nameTd, file_type_code, upload_data);
+
+        var userTd = $("td.upload-user[uploaded_file_id=" + uploaded_file_id + "]");
+        userTd.html(upload_status.user);
+
+        var dateTd = $("td.upload-date[uploaded_file_id=" + uploaded_file_id + "]");
+        dateTd.html(upload_status.time_since);
+	}
+
+
+	$(document).ready(function() {
+		var tabs = $("#tabs");
+		tabs.tabs();
+		tabs.bind('tabsselect', function(event, ui) {
+   			$(".ui-tabs-panel", this).empty();
+		});
+		setTimeout(update_uploads, UPDATE_TIME);
+	});
+</script>
+{% endblock %}
+
+{% block submenu_page_content %}
+<div class="chunk borderless">
+	{% load ui_help %}
+	{% page_help page_id='data/upload_help' title='Upload' %}
+
+    {%  if upload_enabled %}
+	<div id="instructions-headline">
+		Drag and drop VCF, bed, GeneList, .PED (pedigree files) etc files to upload.
+	</div>
+    {%  else %}
+	<ul class="messages">
+        <li class="warning">Upload has been disabled</li>
+	</ul>
+    {% endif %}
+
+	<form id="time_sort_form" method="post">
+	    {% csrf_token %}
+		<div class="horizontal-fields">
+            <label>Show last</label>
+			{{ form.time_filter_value }}{{ form.time_filter_value.errors }}
+			{{ form.time_filter_method }}{{ form.time_filter_method.errors }}
+			<label>Show internal</label>{{ form.show_all }}{{ form.show_all.errors }}
+			<button class="jq">Show</button>
+		</div>
+	</form>
+
+	<div id="jfu-container">
+			{% load jfutags %}
+			{% jfu 'upload/jfu_upload_form.html' %}
+	</div>
+
+    <div id="error-dialog">
+    </div>
+
+{% include "analysis/svg_dropshadow.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% block title %}{{ experiment }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+{% endblock %}
+
+{% block jsdocumentready %}
+{% endblock %}
+
+{% block submenu_page_content %}
+    <h2>
+    Experiment: {{ experiment }}
+    </h2>
+
+    {% if experiment.sequencingrun_set.exists %}
+        <ul><b>Sequencing Runs:</b>
+        {% for sr in experiment.sequencingrun_set.all %}
+            <li><a href="{% url 'view_sequencing_run' sr.pk %}">{{ sr }}</a></li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        No sequencing runs for this experiment.
+    {% endif %}
+
+{% endblock %}

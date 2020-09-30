@@ -1,0 +1,9 @@
+<table id="{{ table_id }}" style="width:100%" class="table stripe {{  class_name }}">
+    <thead>
+        <tr>
+            {% for rc in rich_columns %}
+                <th class="{{ rc.css_classes }}">{{ rc.label }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+</table>

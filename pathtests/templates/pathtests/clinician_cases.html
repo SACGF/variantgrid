@@ -1,0 +1,121 @@
+{% extends menu_patients_base %}
+{% block title %}VariantGrid Cases{% endblock title %}
+{% load tz %}
+{% load static %}
+
+{% block css %}
+{{ block.super }}
+
+.episode-status {
+    padding: 3px;
+    border: 2px solid grey;
+}
+
+.closed-episode .episode-status {
+    background-color: #aaaaaa;
+}
+
+#filters-text {
+    color: #aaaaaa;
+}
+
+.closed-episode {
+    display: None;
+}
+
+.requirement-icon {
+    float: left;
+    width: 16px;
+    height: 16px;
+    background-size: 16px 16px;
+}
+
+.missing-icon {
+    background-image: url({% static 'icons/cross.png' %})
+}
+
+.request-icon {
+    background-image: url({% static 'icons/typewriter.jpeg' %})
+}
+
+.consent-icon {
+    background-image: url({% static 'images/node_icons/checklist_icon.png' %})
+}
+
+.sample-icon {
+    background-image: url({% static 'icons/test_tube.png' %})
+}
+
+{% endblock css %}
+
+{% block jshead %}
+{{ block.super }}
+function showAll() {
+    $(".case-row").show();
+}
+
+function hideClosed() {
+    $(".closed-episode").hide();
+}
+{% endblock jshead %}
+{% block submenu_page_content %}
+<h3>{{ title }}</h3>
+<p>
+Last updated from HELIX: {{ last_checked }} ({{ last_checked|timesince }}) 
+
+{% if not is_clinician %}
+    {% if single_lead_scientist and user != single_lead_scientist %}
+        <div>
+            <script>
+            $(document).ready(function() {
+                $("#follow-lead-scientist").click(function() {
+                    var data = 'checked=' + $(this).is(":checked");;
+                    $.ajax({
+                        type: "POST",
+                        data: data,
+                        url: '{% url 'follow_scientist' single_lead_scientist.pk %}'
+                    });
+                });
+            });
+            </script>
+            <input id='follow-lead-scientist' type='checkbox' {% if is_following %}checked{% endif %} /> Follow this Lead Scientist
+        </div>
+    {% endif %}
+{% endif %}
+
+<p><span id='filters-text'>Filters:</span> <a href='javascript:showAll()'>All</a> <a href='javascript:hideClosed()'>Open</a> 
+
+{% if cases_qs.exists %}
+<table>
+        <tr>
+            <th>Code
+            <th>Status
+            <th>Workflow Status
+            <th>Patient
+            <th>Lead scientist
+            <th>Result Required Date
+            <th>Report Date
+
+    {% for case in cases_qs %}
+        {% if case.is_open  %}
+        <tr class='case-row open-episode'>
+        {% else %}
+        <tr class='case-row closed-episode'>
+        {% endif %}
+            {% if user.clinician %}
+            <td>{{ case.external_pk }}
+            {% else %}
+            <td><a href="{% url 'view_case' case.pk %}">{{ case.external_pk|default_if_none:case.pk }}</a>
+            {% endif %}
+            <td>{{ case.get_status_display }}
+            <td>{{ case.get_workflow_status_display }}
+            <td>{{ case.patient }}
+            <td>{{ case.lead_scientist }}
+            <td>{{ case.result_required_date }}
+            <td>{{ case.report_date }}
+    {% endfor %}
+
+{% else %}
+    No cases 
+{% endif %}
+{% endblock submenu_page_content %}

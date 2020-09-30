@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="375px" height="312px" viewBox="0 0 375 312" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 54.1 (76490) - https://sketchapp.com -->
+    <title>missing_37</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <linearGradient x1="22.7708333%" y1="17.9212%" x2="87.0458056%" y2="83.8561253%" id="linearGradient-1">
+            <stop stop-color="#CECECE" stop-opacity="0.5" offset="0%"></stop>
+            <stop stop-color="#737373" stop-opacity="0.5" offset="42.5084539%"></stop>
+            <stop stop-color="#212121" stop-opacity="0.5" offset="45.6003801%"></stop>
+            <stop stop-color="#A4A4A4" stop-opacity="0.5" offset="48.2838022%"></stop>
+            <stop stop-color="#7E7E7E" stop-opacity="0.5" offset="100%"></stop>
+        </linearGradient>
+        <rect id="path-2" x="0" y="25" width="375" height="312" rx="32"></rect>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="missing_37" transform="translate(0.000000, -25.000000)">
+            <g id="Rectangle">
+                <use fill="#FFFFFF" xlink:href="#path-2"></use>
+                <rect stroke="#323232" stroke-width="12" stroke-linejoin="square" fill="url(#linearGradient-1)" x="6" y="31" width="363" height="300" rx="32"></rect>
+            </g>
+            <g id="37" transform="translate(19.000000, 37.000000)" fill="#1B1B1B" font-family="PTMono-Bold, PT Mono" font-size="160" font-weight="bold">
+                <text>
+                    <tspan x="-2" y="136">37</tspan>
+                </text>
+                <text id="38">
+                    <tspan x="147" y="269">38</tspan>
+                </text>
+            </g>
+            <text id="≠" font-family="PTMono-Regular, PT Mono" font-size="200" font-weight="normal" fill="#000000">
+                <tspan x="214" y="177">≠</tspan>
+            </text>
+        </g>
+    </g>
+</svg>

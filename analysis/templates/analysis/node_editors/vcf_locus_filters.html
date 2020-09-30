@@ -1,0 +1,74 @@
+{% if vcf %}
+{% load js_tags %}
+<div id='vcf-locus-filters'>
+<script>
+    var vlf_descriptions = {{ vlf_descriptions | jsonify }};
+    
+    function checkShowingAll() {
+        var vlf_table = $("#vcf-filter-table");
+        var anyChecked = $("input[type=checkbox]", vlf_table).is(":checked");
+        if (anyChecked) {
+            $("#showing-all-filters").hide();
+        } else {
+            $("#showing-all-filters").show();
+        }
+    }    
+    
+    function showVCFFilters(show) {
+        $("#no-filters").hide();
+        $("#vcf-filters").show();
+        checkShowingAll();
+    }
+
+    function hideVCFFilters(show) {
+        $("#no-filters").show();
+        $("#vcf-filters").hide();
+    }
+    
+    $(document).ready(function() {
+        {% if has_filters_set %}
+            showVCFFilters();
+        {% else %}
+            hideVCFFilters();
+        {% endif %}
+
+        var vlf_table = $("#vcf-filter-table");
+        $("input[type=checkbox]", vlf_table).each(function() {
+            var name = $(this).attr("name");
+            var description = vlf_descriptions[name];
+            var row = $(this).closest("tr");
+            $("<td></td>").text(description).appendTo(row);
+        });
+        
+        $("#vcf-filters-all").change(function() {
+            var checked_value = $(this).is(":checked");
+        
+            $("input[type=checkbox]", vlf_table).each(function() {
+                $(this).prop('checked', checked_value);
+            });
+        });
+
+        // Put this after all filters check
+        $("input[type=checkbox]", vlf_table).change(checkShowingAll);
+    });
+    
+</script>
+<div>
+{% if has_filters %}
+<div id='no-filters'><b>VCF Filters:</b> Showing all variants <a href='javascript:showVCFFilters()'>Select filters</a> </div>
+<div id='vcf-filters'>
+    <b>VCF Filters:</b>
+    <span id='showing-all-filters'>Showing all variants <a href='javascript:hideVCFFilters()'>Hide filters</a></span>
+    <form>
+    <table id='vcf-filter-table'>
+    <tr><td><td><input id='vcf-filters-all' type='checkbox' /><td> (De)Select All. No filters shows all results.  
+    {{ vlf_form.as_table }}
+    </table>
+    </form>
+</div>
+{% else %}
+    <b>VCF Filters:</b> No filters, showing all variants.
+{% endif %}
+</div>
+</div>
+{% endif %}

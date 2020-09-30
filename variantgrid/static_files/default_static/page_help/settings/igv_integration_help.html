@@ -1,0 +1,16 @@
+<p>
+See <a href="javascript:openExternalHelpUrl('settings/igv_integration.html')">IGV Integration Help</a>
+</p>
+
+<p>
+Bam files are often on a shared drive such as <code>/data/bams/sample1.bam</code>, which may be accessed differently across workstations.
+
+For this reason, we allow users to alter the prefix of BAM files before sending them to IGV.
+
+<p>
+<b>Example:</b>
+<p>
+Alice's lab uses a web server that shares the server's <code>/data/bams</code> directory as <code>http://igv-server:8080/bams</code>.
+
+<p>
+Bob uses Windows file sharing. He could either replace <code>/data</code> with <code>\\server-name\data</code> or map it to his <code>E:/</code> drive and use that.

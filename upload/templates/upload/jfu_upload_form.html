@@ -1,0 +1,119 @@
+{% extends 'jfu/upload_form.html' %}
+{% load static %}
+
+{% block JS_INIT %}
+        function handleFileUploadFail(e, data) {
+            checkLoggedIn(null, function() {
+                showReloadPageErrorDialog($("#error-dialog"), "You have been logged out.");
+            });
+        }
+
+        var fileUpload = $('#fileupload').fileupload({
+            {% block JS_OPTS %}
+          	autoUpload: true,
+			//sequentialUploads: true,
+
+            {% endblock %}
+        }).on('fileuploadfail', handleFileUploadFail);
+        
+        // Use this to do anything to modify upload (eg populate previous uploads)
+        if (window.fileupload_ready) {
+        	window.fileupload_ready();
+        }
+        
+        
+{% endblock %}
+
+{% block JS_DOWNLOAD_TEMPLATE_PREVIEW %}
+{% comment %}
+No link for the thumbnail
+{% endcomment %}
+
+<td>
+    <span class="preview">
+        {{ JQ_OPEN }} if (file.status_image) { {{ JQ_CLOSE }}
+            <img class="thumbnail" src="{{ JQ_OPEN }}=file.status_image{{ JQ_CLOSE }}">
+        {{ JQ_OPEN }} } {{ JQ_CLOSE }}
+    </span>
+</td>
+{% endblock %}
+
+{% block JS_DOWNLOAD_TEMPLATE_DOWNLOAD %}
+	{% comment %}
+	Don't have data-gallery
+	{% endcomment %}
+    <td class="upload-name" uploaded_file_id="{{ JQ_OPEN }}=file.uploaded_file_id{{ JQ_CLOSE }}">
+        <div title="{{ JQ_OPEN }}=file.file_type{{ JQ_CLOSE }}" class='file_type_icon file-type-{{ JQ_OPEN }}=file.file_type_code{{ JQ_CLOSE }}'></div>
+        <div class="uploaded-file-details">
+            <div class="name" file_type="{{ JQ_OPEN }}=file.file_type{{ JQ_CLOSE }}">
+                {{ JQ_OPEN }} if (file.url) { {{ JQ_CLOSE }}
+                    <a href="{{ JQ_OPEN }}=file.url{{ JQ_CLOSE }}"
+                     title="View upload processing of '{{ JQ_OPEN }}=file.name{{ JQ_CLOSE }}'">
+                     {{ JQ_OPEN }}=file.name{{ JQ_CLOSE }}
+                    </a>
+                {{ JQ_OPEN }} } else { {{ JQ_CLOSE }}
+                    <span>{{ JQ_OPEN }}=file.name{{ JQ_CLOSE }}</span>
+                {{ JQ_OPEN }} } {{ JQ_CLOSE }}
+            </div>
+            <div class="file-type">
+                {{ JQ_OPEN }} if (file.processing_status == 'S' && file.data_url) { {{ JQ_CLOSE }}
+                <a href="{{ JQ_OPEN }}=file.data_url{{ JQ_CLOSE }}">{{ JQ_OPEN }}=file.file_type{{ JQ_CLOSE }}</a>
+                {{ JQ_OPEN }} } else { {{ JQ_CLOSE }}
+                    {{ JQ_OPEN }}=file.file_type{{ JQ_CLOSE }}
+                {{ JQ_OPEN }} } {{ JQ_CLOSE }}
+            </div>
+        </div>
+
+        {% block JS_DOWNLOAD_TEMPLATE_ERROR %}
+            {{ JQ_OPEN }} if (file.error) { {{ JQ_CLOSE }}
+                <div><span class="label label-danger">Error</span> {{ JQ_OPEN }}=file.error{{ JQ_CLOSE }}</div>
+            {{ JQ_OPEN }} } {{ JQ_CLOSE }}
+        {% endblock %}
+
+    </td>
+    <td class="upload-user" uploaded_file_id="{{ JQ_OPEN }}=file.uploaded_file_id{{ JQ_CLOSE }}">
+        {{ JQ_OPEN }}=file.user{{ JQ_CLOSE }}
+    </td>
+    <td class="upload-date" uploaded_file_id="{{ JQ_OPEN }}=file.uploaded_file_id{{ JQ_CLOSE }}">
+        {{ JQ_OPEN }}=file.time_since{{ JQ_CLOSE }}
+    </td>
+{% endblock %}
+
+
+{% block JS_JQUERY %}
+    {% comment %}
+ 	JQuery already included
+    {% endcomment %}
+{% endblock %}
+
+
+
+
+{% block JS_BOOTSTRAP %}
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+{% endblock %}
+{% block CSS_BOOTSTRAP %}
+    {% comment %}
+    only support for bootstrap 3
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" />
+    {% endcomment %}
+    <style>
+        .fade:not(.show) {
+            opacity: 1 !important;
+        }
+        .btn {
+            margin-right: 10px;
+        }
+    </style>
+{% endblock %}
+
+
+{% block JS_JQUERY_FILEUPLOAD_UI %}
+{% comment %}
+ The File Upload user interface plugin.
+ dlawrence - Also added jquery UI to get that to work
+{% endcomment %}
+<script src="{% static 'js/jquery.fileupload-ui.js' %}"></script>
+<script src="{% static 'js/jquery.fileupload-jquery-ui.js' %}"></script>
+{% endblock %}
+

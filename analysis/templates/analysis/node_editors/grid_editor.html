@@ -1,0 +1,49 @@
+{% extends "analysis/node_editors/base_editor.html" %}
+
+{% block inlinejs %}
+	function createSelectedChild() {
+		var CREATE_SELECTED_CHILD_URL = "{% url 'create_selected_child' node.id %}";
+		$.ajax({
+		    type: "POST",
+		    url: CREATE_SELECTED_CHILD_URL,
+		    success: getAnalysisWindow().addConnectedNode,
+		});
+	}
+	
+	function revealSelectedTab(nodeId, focus) {
+		var aWin = getAnalysisWindow();
+		var variants = aWin.selectedVariants[nodeId];
+		if (variants && Object.keys(variants).length > 0) { 
+			var stab = $("#selected-tab");
+			stab.show();
+			if (focus) {
+				$("#node-editor-tabs").tabs("option", "active", stab.index());
+			}
+		}
+	}
+	
+	function getVariantIdForRow(row) {
+	   // We run a formatter (grid.js detailsLink) on ID column, so this is a bit complicated 
+        var container = $(".variant_id-container", row);
+        return container.attr("variant_id");
+	}
+	
+{% endblock inlinejs %}
+
+{% block griddocreadyjs %}
+	revealSelectedTab({{ node.id }})
+{% endblock griddocreadyjs %}
+
+{% block node_editor_tab_links_end %}
+	    	<li id='selected-tab' style='display: none'><a href="#node-selected">Selected</a></li>
+{% endblock node_editor_tab_links_end %}
+
+{% block node_editor_tabs_end %}
+		<div id="node-selected">
+			<div>
+			<a href='javascript:createSelectedChild()'>Filter to selected variants</a> 
+			</div>
+
+		</div>
+{% endblock node_editor_tabs_end %}
+

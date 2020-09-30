@@ -1,0 +1,5 @@
+{% if not invalid %}
+    <a {% if external %}target="_blank"{% endif %} id="{{ id }}" class="nav-link {% if active %}active{% endif %}" href="{{ url }}">{% if admin_only %}<i class="fas fa-key"></i>{% endif %}{{ title }}{% if external %} <i class="fas fa-external-link-alt"></i>{% endif %}
+    {% if badge_count %}<span class="badge badge-danger">{{ badge_count }}{% endif %}
+    </a>
+{% endif %}

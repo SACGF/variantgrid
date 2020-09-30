@@ -1,0 +1,12 @@
+GenomicIntervals file comes from uploading a <a href="https://genome.ucsc.edu/FAQ/FAQformat.html#format1">Bed File</a>,
+which is flattened and merged (overlapping intervals are combined) using BedTools.
+
+<h4>Genome Build</h4>
+
+We attempt to automatically detect the genome build via:
+
+<ul>
+    <li>track header line, contains a recognised build name or alias in the "db", "genome", "genome_build" or "genomeBuild" fields</li>
+    <li>detect from filename (contains ONLY ONE recognised build name or alias in the filename, eg "intervals_grch37.bed")</li>
+    <li>If the user only has 1 genome build in their User Settings</li>
+</ul>

@@ -1,0 +1,492 @@
+table.diff {
+    background-color:white;
+    width: inherit;
+    th, td {
+        padding: 4px 6px 4px 6px;
+    }
+    tbody td:not(.filler), thead th:not(:first-of-type) {
+        border-left: 1px dashed lightgrey;
+    }
+    thead {
+        th:first-of-type {
+            z-index: 101;
+            left: 0;
+        }
+        th {
+            position: sticky;
+            z-index: 100;
+            top: -36px;
+            background-color: white;
+            padding-top: 6px;
+            padding-bottom: 4px;
+            max-width: 260px;
+            min-width: 260px;
+            width: 260px;
+            word-break: break-all;
+        }
+    }
+    tbody {
+        background-color: white;
+        tr.empty:not(.criteria) {
+            // hide keys that have no values as they're going to increase in number
+            display: none;
+        }
+        th {
+            position: sticky;
+            left: 0;
+            z-index: 100;
+            background-color: white;
+            text-align: right;
+            &.citation-row {
+                font-weight:normal;
+                text-align:left;
+                .show-abstract-link {
+                    display: inline-block;
+                }
+            }
+            .citation {
+                display: inline;
+                .title {
+                    display: inline-block;
+                }
+            }
+        }
+        td, th {
+            max-width: 260px;
+            min-width: 260px;
+            width: 260px;
+            word-break: break-all;
+        }
+        tr.textarea td {
+            word-break: normal;
+        }
+        .group th {
+            font-weight: bold;
+        }
+        tr.row.note, tr.option-row th {
+            th {
+                color: gray;
+            }
+            th, td {
+                font-size: smaller;
+            }
+        }
+        tr.option-row, tr.citation-row {
+            td {
+                text-align: center;
+            }
+        }
+        tr {
+            background-color:white;
+            &.differences {
+                background-color: #f4dddd;
+            }
+            &.blanks {
+                background-color: #f6f6f8;
+            }
+        }
+        tr {
+            td {
+                position: relative;
+            }
+            /*
+            .explained:after {
+                content: "\f05a";
+                font-family: "FontAwesome";
+                opacity: 0.5;
+                margin-left: 8px;
+                position: absolute;
+                right: 6px;
+                bottom: 4px;
+            }
+             */
+            .explain-icon {
+                position: absolute;
+                right: 0px;
+                top: 0.4rem;
+            }
+        }
+    }
+}
+
+.share-dialog {
+    .share-level-selection {
+        margin-top: 4px;
+        display: flex;
+        padding: 16px 8px 16px 8px;
+        border: 1px solid lightgray;
+        border-radius: 8px;
+        cursor: pointer;
+        img {
+            margin-left: 12px;
+            margin-right: 12px;   
+        }
+        .check-icon {
+            width: 16px;
+            height: 16px;
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: 16px;
+        }
+        &.included {
+            opacity: 0.5;   
+            background-color: #ededf2;
+            cursor: not-allowed;
+            .check-icon {
+                background-image: url('../icons/tick.svg');
+            }
+        }
+        &.current {
+            background-color: #bdbdf2;
+            .check-icon {
+                background-image: url('../icons/tick.svg');
+            }
+        }
+        &.newly-included {
+            background-color: #ddddff;
+            .check-icon {
+                background-image: url('../icons/tick.svg');
+            }
+        }
+        &.not-included:hover {
+            background-color: #ccccff;
+        }
+    }
+}
+
+.custom-scientific {
+    display: inline-flex;
+    flex-grow: 1;
+    align-items: center;
+    input {
+        flex-grow: 1;
+    }
+    input::placeholder {
+        font-size: smaller;
+        position: relative;
+        bottom: 1px;
+    }
+    .notation {
+        margin-left: 6px;
+        color: gray;
+        font-size: smaller;
+        font-family: monospace;
+        width: 65px;
+    }
+    .immutable {
+        width: inherit !important;
+    }
+}
+
+.submission-source {
+    display: inline-block;
+    width: 18px !important;
+    height: 16px !important;
+    background-position: center center;
+    background-size: 16px 16px !important;
+    background-repeat: no-repeat;
+    position: relative;
+    padding: 2px;
+    margin-right: 2px;
+    opacity: 0.5;
+    &.api {
+        background-image: url('../icons/submission_sources/api.svg');
+    }
+    &.consensus {
+        background-image: url('../icons/submission_sources/consensus.svg');
+    }
+    &.form {
+        background-image: url('../icons/submission_sources/form.svg');
+    }
+    &.variantgrid {
+        background-image: url('../icons/submission_sources/variantgrid.svg');
+    }
+    &.flag-source {
+        background-image: url('../icons/flags/flag.svg');
+    }
+}
+
+.not-met {
+    color: #AAAAAA !important;
+}
+
+.override {
+    cursor: help;
+    &:after {
+        content: '*';
+        color: #888;
+    }
+}
+
+.classification-table {
+
+    tbody tr {
+        height: 39px; // give a minimum height so flags don't always stretch the row
+        font-size: 12px;
+    }
+
+    td.dt-gene_symbol, td.gene_symbol {
+        width: 60px;
+    }
+
+    td.dt-clinical_significance, td.cs {
+        width: 125px;
+    }
+
+    td.allele_origin {
+        width: 90px;
+    }
+
+    td.dt-condition, td.condition {
+        min-width: 200px;
+        max-width: 200px;
+        word-break: break-word;
+    }
+
+    td.dt-lab, td.lab {
+        width: 150px;
+    }
+
+    td.dt-created, td.created {
+        font-size: 12px;
+        width: 140px;
+        min-width: 100px;
+    }
+
+    td.dt-id, td.id {
+        width: 200px;
+        min-width: 150px;
+        word-break: break-word;
+        img {
+            display: inline;
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+        }
+        .search-result {
+            color: #444444;
+            margin-top: 4px;
+            .match {
+                font-weight: bold;
+            }
+        }
+    }
+
+    td.dt-c_hgvs, td.hgvs {
+        .genome-build {
+            font-size: 12px;
+        }
+        min-width: 150px;
+        max-width: 150px;
+        word-break: break-all;
+    }
+
+    td.dt-user, td.user {
+        font-size: 10px;
+        color: #666666;
+    }
+
+    td.dt-flags {
+        width: 110px;
+        min-width: 110px;
+    }
+
+    td .flags {
+        padding: 2px;
+    }
+
+    td .flags .flag {
+        width: 16px;
+        height: 16px;
+        background-size: 16px 16px;
+    }
+}
+
+#vc-form .accordion {
+    border-bottom: 1px solid rgba(0,0,0,.1);
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+    .card:last-of-type > * {
+        border-bottom: none;
+    }
+}
+
+#vc-extras {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+    height: 100%;
+    width: 610px;
+
+    .card {
+        width: 300px;
+    }
+
+    #vcform-summary {
+        .card-header {
+            background-color: #ece;
+        }
+        .card-body {
+            background-color: #fdf;
+        }
+    }
+
+    #vcform-errors {
+        .card-header {
+            background-color: #dcc;
+        }
+        .list-group-item {
+            background-color: #ffebeb;
+        }
+    }
+
+    #vcform-flags {
+        .card-header {
+            background-color: #ccc;
+        }
+        .card-body {
+            background-color: #ddd;
+        }
+    }
+
+    #vcform-publish {
+        .card-header {
+            background-color: #cdc;
+        }
+        .list-group-item:not(.list-group-item-success) {
+            background-color: #dfd;
+        }
+    }
+
+    #vcform-help {
+        .card-header {
+            background-color: #ccd;
+        }
+        .card-body {
+            min-height: 200px;
+            background-color: #eef;
+        }
+    }
+
+    font-size: small;
+    line-height: 1.3; // reduced from 1.5
+    .share-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 4px;
+    }
+    .description {
+        color: #444;
+        white-space: pre-wrap;
+        line-height: 1.6;
+        p {
+            margin-block-start: 0;
+            margin-bottom: 0;
+            margin-block-end: 0;
+            & + p {
+                margin-top: 0.75rem;
+            }
+        }
+    }
+    .row + .row {
+        margin-top: 6px;
+    }
+    .card-header {
+        padding: 4px 4px 4px 8px !important;
+    }
+
+    .card-body:not(.no-padding):not(.card-body-list) {
+        padding: 10px !important;
+    }
+    .list-group-item {
+        padding: 8px !important;
+    }
+}
+
+// ACMG table
+.summary-crit {
+    font-family: monospace;
+    table {
+        width: 100%;
+
+        .row-header {
+            text-align: right;
+            padding-right: 4px;
+        }
+
+        .col-header {
+            text-align: center;
+        }
+
+        td {
+            border: 1px solid #ccc;
+            text-align: center;
+            height: 2rem;
+            width: 12.5%;
+
+            &.B-cell {
+                background-color: #ccccff;
+            }
+
+            &.P-cell {
+                background-color: #ffcccc;
+            }
+
+            &.blank-cell {
+                background-color: #eee;
+            }
+
+            &.rejected-cell {
+                background-color: #ddd;
+            }
+
+            .met {
+                font-weight: bold;
+            }
+
+            .possible, .not-met {
+                color: #888888;
+                font-size: small;
+            }
+
+            span + span {
+                margin-left: 4px;
+            }
+        }
+
+        tr {
+            cursor: pointer;
+        }
+
+        tr:hover th.row-header {
+            color: blue;
+            text-decoration: underline;
+        }
+    }
+    .table-5-note {
+        font-size: small;
+        color: grey;
+        cursor: help;
+    }
+    .calculated-result {
+        margin-top: 8px;
+    }
+    .weights {
+        margin-top: 8px;
+        font-size: smaller;
+    }
+}
+tr.template-download {
+    opacity: 1 !important;
+    .toggle {
+        display: none;
+    }
+}
+.fileupload-buttonbar {
+    .start, .cancel, .delete, .toggle {
+        display: none;
+    }
+    .btn {
+        margin-left: 8px;
+    }
+}

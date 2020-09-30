@@ -1,0 +1,84 @@
+<base target="_parent" />
+
+
+<h1 class="western" align="center">Somatic Variant Calling
+	Pipeline</h1>
+<p class="western"><br/>
+
+</p>
+<h2 class="western">Introduction</h2>
+
+<p class="western" align="left">All
+sequencing data from our collaborators was re-run through a single
+pipeline to ensure consistency.<br/>
+<br/>
+We used the b37 (hg19)
+reference from the <a href="https://software.broadinstitute.org/gatk/download/bundle" target="_blank">GATK resource bundle</a>.
+<br/>
+
+<h2 class="western">Pipeline Workflow</h2>
+<p class="western" align="center"><img src="/static/images/bwa-gatk-freebayes-workflow.png" name="somatic-pipeline-workflow" align="center" width="371" height="759" border="0"/>
+<br/>
+<p class="western"><a href="https://bitbucket.org/snippets/markaarmstrong/7ebypA">Help options</a> for the Somatic Pipeline
+using default parameters.
+</p>
+<p class="western"><a href="https://github.com/SACGF/bwa_gatk_freebayes-pipeline">Github Repository</a> for the BWA GATK FreeBayes Somatic Pipeline
+</p>
+
+<br/>
+
+<h2 class="western">Methods</h2>
+
+<p class="western">Reads were mapped to the b37+ decoy genome using
+<a href="http://bio-bwa.sourceforge.net/bwa.shtml">BWA-MEM v0.7.12-r1044</a>
+</br>
+using default parameters.
+</p>
+<p class="western">Duplicates were marked according to Picard
+criteria using <a href="http://lomereiter.github.io/sambamba/">sambamba version 0.6.5.</a>
+</p>
+<p class="western">Bams were further processed by the <a href="https://software.broadinstitute.org/gatk/">GATK v3.8-0-ge9d806836</a> base quality score recalibration step.
+</p>
+<p class="western">
+<a href="https://github.com/ekg/FreeBayes">FreeBayes v1.2.0</a> was used to make calls on somatic variations in the
+sequencing https://github.com/ekg/FreeBayes</a>
+Call regions were limited to exome capture regions defined in a bed
+file called sacgf_combined_call_regions.v2.bed. This file was created
+by combining all of the call region bed files used for exome research
+at our facility.</p>
+<p class="western">Generated
+VCFs were further filtered using <a href="https://samtools.github.io/bcftools/bcftools.html">BCFtools v1.5-32</a>, following default
+parameters.</p>
+<p class="western"><br/>
+<br/>
+
+</p>
+<h2 class="western">Default parameters used for FreeBayes</h2>
+<p><b>FreeBayes_call_param</b>:</p>
+<p>
+'--pooled-discrete'</p>
+ <p>
+ '--pooled-continuous --no-population-priors '</p>
+ <p>
+ '--min-alternate-fraction 0.01 --min-alternate-count 1 '</p>
+ <p>
+ '--no-mnps --no-complex '</p>
+ <p>
+ '--binomial-obs-priors-off --allele-balance-priors-off '</p>
+ <p>
+ '--min-mapping-quality 20 --min-base-quality 20 '</p>
+ <p>
+ '--reference-quality 60,60 '</p>
+ <p><br/>
+
+</p>
+<h2 class="western">Default parameters used for BCFtools</h2>
+<p class="western">These were optimized to keep variants of low frequency (e.g. 0.01) in high depth (e.g. &gt; 300X)
+data):</br> ‘SAF &gt; 0 &amp; SAR &gt; 0 &amp; RPR &gt; 0 &amp; RPL &gt;
+0’</p>
+<p>
+'-i
+SAF &gt; 0 &amp; SAR &gt; 0 &amp; RPR &gt; 0 &amp; RPL &gt; 0'</p>
+<p>
+<p class="western">
+<a href="https://samtools.github.io/bcftools/bcftools.html#filter">BCFtools filter details</a>

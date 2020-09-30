@@ -1,0 +1,224 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block docreadyjs %}
+    function setupCohortCount(cohortId) {
+        if (cohortId) {
+            $.ajax({
+                url: Urls.cohort_sample_count(cohortId),
+                success: constrainFormForCohortCount,
+                error: function(data) {
+                    // ??
+                },
+                suppressErrors: true,
+            });
+        } else {
+            $(".num_samples").text("No samples");
+        }
+    }
+
+        
+    function constrainFormForCohortCount(sample_count) {
+		$(".num_samples").text(sample_count);
+
+		var minimum_count_select = $("#id_minimum_count");
+		var maximum_count_select = $("#id_maximum_count");
+		
+		if (sample_count) {
+			var minimum_count = Math.min(minimum_count_select.val(), sample_count);
+			minimum_count_select.val(minimum_count);
+			var maximum_count = maximum_count_select.val() || sample_count;
+			maximum_count_select.val(maximum_count);
+			minimum_count_select.attr("max", sample_count);
+			maximum_count_select.attr("max", sample_count);
+		} else {
+			maximum_count_select.val(null);
+		}
+
+	}
+	
+	function getCohortId() {
+	   return $("#id_cohort").find(":selected").val();
+	}
+	
+
+    function changeCohort() {
+        cohortFormSetup()
+        var cohortId = getCohortId();
+        loadCohortVCFLocusFilter(cohortId);
+    }
+
+	function cohortFormSetup() {
+        var cohortId = getCohortId();
+		setupCohortCount(cohortId);
+		setCohortLink(cohortId);
+		loadPerSampleZygosityForm(cohortId);
+	}
+
+	function setCohortLink(cohortId) {
+		setCrossLink($("#cohort-link"), Urls.view_cohort, cohortId);
+	}
+
+
+	function loadPerSampleZygosityForm(cohortId) {
+	    // We need to stop people saving form with old cohort zygosity there
+	    var cohortSaveButton = $("button#cohort-save").button();
+	    cohortSaveButton.button('disable');
+		var container = $("#per-sample-zygosity-container");
+		if (cohortId) {
+			let url = Urls.cohort_zygosity_filters({{ node.pk }}, cohortId);
+			$.ajax(url, {
+                suppressErrors: true,
+                success: function(html) {
+                    container.html(html);
+                },
+                error: function(response, status, xhr) {
+                    container.html("Error loading zygosity for cohort (perhaps re-save node?)");
+                },
+                complete: function() {
+                    $("button#cohort-save").button('enable');                
+                }
+			});
+		} else {
+			container.html("No cohort selected");
+		}
+	}
+
+	function getPerSampleZygosity() {
+		var per_sample_zygosity = [];
+		var form_id=0;
+		$("tr.cohort-node-zygosity-filter").each(function() {
+			var css_id_start = "#id_cohortnodezygosityfilter_set-" + form_id + "-";
+			var data = {id : $(css_id_start + "id", this).val(),
+						collection : $(css_id_start + "collection", this).val(),
+			};
+
+			var SAMPLE_FIELDS = ["show_in_grid", "zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_none"]
+			for (var i=0 ; i<SAMPLE_FIELDS.length ; ++i ) {		
+				var zyg = SAMPLE_FIELDS[i];
+				var css_id = css_id_start + zyg;
+				data[zyg] = $(css_id_start + zyg).is(":checked");
+			}
+
+			per_sample_zygosity.push(data);
+			++form_id;
+		});
+		return per_sample_zygosity;
+	}
+
+    function beforeSerializeFunc() {
+        $("input#id_per_sample_zygosity").val(JSON.stringify(getPerSampleZygosity()));
+    }
+
+	$("button#cohort-save").button();
+	$("#id_cohort").change(changeCohort);
+
+	$("#id_minimum_count").change(function() {
+		var currentMax = $("#id_maximum_count").val();
+		if (currentMax) {
+			var maximum_count = Math.max(currentMax, $(this).val());
+			$("#id_maximum_count").val(maximum_count);
+		}
+	});
+	
+	$("#id_maximum_count").change(function() {
+		var minimum_count = Math.min($("#id_minimum_count").val(), $(this).val());
+		$("#id_minimum_count").val(minimum_count);
+	});
+
+    var cohortForm = $('form#cohort-form');
+	cohortFormSetup();
+    ajaxForm(cohortForm, beforeSerializeFunc);
+    accordionForm(cohortForm);
+
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<style>
+	#accordion-container {
+		width: 100% !important;
+	}
+</style>
+<div>
+	<form id="cohort-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+		<div>
+            <div>
+                <b>Cohort:</b> {{ form.cohort }} <a class="cross-link" id="cohort-link">View Cohort</a>
+            </div>
+            <div>
+                {% load vcf_locus_filter_tags %}
+                {% vcf_locus_filter node node.cohort.vcf %}
+            </div>
+            <div class='genotype-row'>
+                <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}
+                <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}
+                <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}
+                <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }} {{ form.max_pl_op }}
+            </div>
+            <div>
+                <a id='view-allele-frequency-filter-link' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+                {% load allele_frequency_tags %}
+                {% allele_frequency_controls node %}
+            </div>
+		</div>
+
+		<div id="accordion-container">
+			<ul class="accordion">
+                <li>
+                <h3>Counts</h3>
+                <div>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th>Min</th>
+                            <th>Max</th>
+                        </tr>
+                        <tr>
+                            <th>Any zygosity</th>
+                            <td>{{ form.minimum_count }}</td>
+                            <td>{{ form.maximum_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+                        </tr>
+                        <tr>
+                            <th>Ref</th>
+                            <td>{{ form.min_ref_count }}</td>
+                            <td>{{ form.max_ref_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+                        </tr>
+                        <tr>
+                            <th>Het</th>
+                            <td>{{ form.min_het_count }}</td>
+                            <td>{{ form.max_het_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+                        </tr>
+                        <tr>
+                            <th>Hom Alt</th>
+                            <td>{{ form.min_hom_count }}</td>
+                            <td>{{ form.max_hom_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+                        </tr>
+                    </table>
+                </div>
+                </li>
+				<li>
+		        <h3>Simple Zygosity</h3>
+		        <div>
+                    <div>
+                    <b>Genotype:</b> {{ form.zygosity }} for {{ form.zygosity_op }} samples.
+                    </div>
+		        </div>
+		        </li>
+		        <li>
+		        <h3>Per Sample Zygosity</h3>
+		        <div id='per-sample-zygosity-container'>
+		        </div>
+		        </li>
+			</ul>
+		</div>
+
+		<button id='cohort-save'>save</button>
+    {{ form.media }}
+	</form>
+</div>
+{% endblock content %}

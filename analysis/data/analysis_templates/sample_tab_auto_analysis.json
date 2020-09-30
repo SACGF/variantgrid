@@ -1,0 +1,196 @@
+{
+  "analysis": {
+    "model": "analysis.Analysis",
+    "pk": 213,
+    "fields": {
+      "analysis_type": null,
+      "name": "Sample tab auto analysis",
+      "description": null,
+      "show_igv_links": true,
+      "analysis_panel_fraction": 0.25,
+      "lock_input_sources": false,
+      "template_type": "T",
+      "genome_build": "GRCh37"
+    }
+  },
+  "nodes": [
+    {
+      "model": "analysis.TagNode",
+      "pk": 3086,
+      "fields": {
+        "id": 3086,
+        "analysis": 213,
+        "name": "Tagged Variants",
+        "x": 21,
+        "y": 15,
+        "auto_node_name": true,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": false,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.04529833793640137,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "analysis_wide": true,
+        "tag": null,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.BuiltInFilterNode",
+      "pk": 3088,
+      "fields": {
+        "id": 3088,
+        "analysis": 213,
+        "name": "Classified Pathogenic",
+        "x": 158,
+        "y": 188,
+        "auto_node_name": true,
+        "output_node": true,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.07474827766418457,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "built_in_filter": "P",
+        "min_clinvar_stars": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.BuiltInFilterNode",
+      "pk": 3089,
+      "fields": {
+        "id": 3089,
+        "analysis": 213,
+        "name": "ClinVar",
+        "x": 31,
+        "y": 191,
+        "auto_node_name": true,
+        "output_node": true,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.06931281089782715,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "built_in_filter": "C",
+        "min_clinvar_stars": 0,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.SampleNode",
+      "pk": 3087,
+      "fields": {
+        "id": 3087,
+        "analysis": 213,
+        "name": "All variants",
+        "x": 84,
+        "y": 40,
+        "auto_node_name": false,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.09695291519165039,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "sample": 62,
+        "min_ad": 0,
+        "min_dp": 0,
+        "min_gq": 0,
+        "max_pl": null,
+        "zygosity_ref": false,
+        "zygosity_het": true,
+        "zygosity_hom": true,
+        "zygosity_unk": false,
+        "restrict_to_qc_gene_list": false,
+        "analysisvariable_set": [
+          {
+            "id": 310,
+            "field": "sample",
+            "class_name": "snpdb.Sample"
+          }
+        ],
+        "nodeallelefrequencyfilter": {
+          "group_operation": "Y",
+          "nodeallelefrequencyrange_set": []
+        },
+        "nodewiki": null
+      }
+    },
+    {
+      "model": "analysis.GeneListNode",
+      "pk": 3135,
+      "fields": {
+        "id": 3135,
+        "analysis": 213,
+        "name": "Sample GOI",
+        "x": 261,
+        "y": 189,
+        "auto_node_name": false,
+        "output_node": false,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.05648541450500488,
+        "parents_should_cache": false,
+        "analysis_update_uuid": null,
+        "status": "R",
+        "pathology_test_gene_list": null,
+        "sample": 62,
+        "has_gene_coverage": null,
+        "custom_text_gene_list": null,
+        "exclude": false,
+        "accordion_panel": 2,
+        "analysisvariable_set": [],
+        "nodeallelefrequencyfilter": null,
+        "nodewiki": null,
+        "genelistnodegenelist_set": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2693,
+      "fields": {
+        "parent": 3087,
+        "child": 3135
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2664,
+      "fields": {
+        "parent": 3087,
+        "child": 3089
+      }
+    },
+    {
+      "model": "analysis.analysisedge",
+      "pk": 2665,
+      "fields": {
+        "parent": 3087,
+        "child": 3088
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+Welcome to {{ site.name }} {{ first_name }} {{ last_name }},
+
+Your new account is almost ready to go.
+You should soon receive an email from {{ accounts_email }} with a link to set your password.
+If you do not receive that email, please check your spam folder.
+
+Once that's complete you can login to {{ site.name }} at any time.
+
+See you soon -
+{{ site.name }} Team

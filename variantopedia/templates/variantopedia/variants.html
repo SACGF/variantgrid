@@ -1,0 +1,119 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% block title %}Variants{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block head %}
+    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+    <script>
+        gridExtraFilters = {};
+
+        function getBams() {
+            return [];
+        }
+
+        window.ANALYSIS_SETTINGS = {
+            show_igv_links : true,
+            igv_data : [],
+            open_variant_details_in_new_window: true,
+        };
+
+        function getExtraFilters() {
+            var extraFilters = '';
+            if (gridExtraFilters) {
+                extraFilters = JSON.stringify(gridExtraFilters);
+            }
+            return extraFilters;
+        }
+
+        function exportAllVariantsGrid(grid, mode) {
+            var gridParam = grid.jqGrid('getGridParam', 'postData') || {};
+            gridParam['rows'] = 0; // no pagination
+            gridParam['export_type'] = 'csv';
+            for (k in gridParam) {
+                var v = gridParam[k];
+                if (typeof(v) == 'function') {
+                    gridParam[k] = v();
+                }
+            }
+
+            var querystring = EncodeQueryData(gridParam);
+            var url = "{% url 'all_variants_grid' op='download' %}" + "?" + querystring;
+            window.location = url;
+        }
+
+        function initFunc(grid, pagerId) {
+            grid[0].p.postData["extra_filters"] = getExtraFilters;
+
+            grid.jqGrid(
+                'navButtonAdd', pagerId, {
+                caption : "CSV",
+                buttonicon : "ui-icon-arrowthickstop-1-s",
+                onClickButton : function() {
+                    exportAllVariantsGrid(grid, 'csv');
+                },
+                position : "first",
+                title : "Download as CSV",
+                cursor : "pointer"
+            });
+        }
+
+        function showAll() {
+            $("#min_count").val(0);
+
+            gridExtraFilters = {};
+            $("#all-variants-filter-description").hide();
+            filterGrid();
+        }
+
+        function filterGrid() {
+            $("#all-variants-grid").trigger("reloadGrid");
+        }
+
+        function updateMinCount() {
+            let minCount = $("#min_count").val();
+            if (minCount.trim() != '') {
+                gridExtraFilters["min_count"] = minCount;
+                $("#all-variants-filter").text("Minimum count of " + minCount);
+                $("#all-variants-filter-description").show();
+                filterGrid();
+            }
+        }
+
+        $(document).ready(() => {
+
+            $("#filter-button").click(function() {
+                updateMinCount();
+            })
+        });
+        jQuery.extend($.fn.fmatter, {
+            'detailsLink' : detailsLink,
+        });
+    </script>
+    <style>
+        {% load user_tag_color_tags %}
+        {% render_node_count_colors_css %}
+    </style>
+{% endblock head %}
+{% block content %}
+    <div class="container-table">
+        <h3>Variants</h3>
+            <div class="container">
+                {% labelled label="Minimum Count" %}
+                    <div class="input-group">
+                        <input id='min_count' type='number' name='min_count' style='max-width: 200px' class="form-control" data-enter="#filter-button" />
+                        <span class="input-group-append">
+                            <button class="btn btn-primary" id='filter-button'>Filter</button>
+                        </span>
+                    </div>
+                    <p id='all-variants-filter-description' class='hidden mt-2'>
+                        Filtering to <span id='all-variants-filter'></span>. <a href='javascript:showAll()'>Show All</a>
+                    </p>
+                {% endlabelled %}
+
+            </div>
+        {% load jqgrid_tags %}
+        {% jqgrid 'all_variants_grid' 'all-variants' search=True delete=False init_func='initFunc' %}
+    </div>
+{% endblock %}

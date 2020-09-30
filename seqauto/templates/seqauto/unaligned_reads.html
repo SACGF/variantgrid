@@ -1,0 +1,6 @@
+<div>
+	{% load jqgrid_tags %}
+	{% user_data_grid_filter 'UnalignedReads' 'UnalignedReads' group_data=False incomplete_data=True %}
+
+	{% jqgrid 'unaligned_reads_grid' 'UnalignedReads' False None 'seqauto/grids/unaligned_reads_grid.html' delete=False %}
+</div>

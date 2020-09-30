@@ -1,0 +1,54 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_tabs_builder %}
+{% block title %}Sequencing Data{% endblock %}
+{% block submenu %}{% menu_bar_sequencing %}{% endblock %}
+
+{% block head %}
+    <script>
+        function close_existing_grid() {
+            if (typeof grid != 'undefined') {
+                grid.jqGrid('GridUnload');
+                delete grid;
+            }
+            if (typeof reloadGridTimeout != 'undefined') {
+                clearTimeout(reloadGridTimeout);
+                delete reloadGridTimeout;
+            }
+        }
+    </script>
+
+    <style>
+        img.vcenter {
+            vertical-align:middle
+        }
+    </style>
+
+{% endblock head %}
+{% block content %}
+
+    <div class="container">
+        {% page_help page_id='seqauto/sequencing_data_help' title='Sequencing Data' %}
+
+        <ul>
+            <li>
+            {% if last_success_datetime %}
+                Last successful update finished: {{ last_success_datetime|timesince }} ago.
+            {% else %}
+                Sequencing data drive has not yet been scanned.
+            {% endif %}
+            <a class="hover-link" href="{% url 'seqauto_runs' %}">Manage disk scans</a>
+        </ul>
+    </div>
+
+     {% ui_register_tab tab_set="sequencing-tabs" label="Experiments" url="experiments" %}
+    {% ui_register_tab tab_set="sequencing-tabs" label="Sequencing Runs" url="sequencing_runs" %}
+    {% ui_register_tab tab_set="sequencing-tabs" label="Unaligned Reads (FastQs)" url="unaligned_reads" %}
+    {% ui_register_tab tab_set="sequencing-tabs" label="BAM" url="bam_files" %}
+    {% ui_register_tab tab_set="sequencing-tabs" label="VCF" url="vcf_files" %}
+    {% ui_register_tab tab_set="sequencing-tabs" label="QC" url="qcs" %}
+
+    {% ui_render_tabs tab_set="sequencing-tabs" css="container" %}
+
+{% endblock content %}

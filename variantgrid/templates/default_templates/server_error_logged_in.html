@@ -1,0 +1,16 @@
+{% extends menu_data_base %}
+{% block submenu_page_content %}
+
+<P>
+<b>{{ message }}</b>
+</p>
+
+{% if exception %} 
+<p>
+<i>
+{{ exception }}
+</i>
+</p>
+{% endif %}
+
+{% endblock %}

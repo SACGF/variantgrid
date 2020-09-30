@@ -1,0 +1,19 @@
+.bg-theme {
+  background-color: #f7f9fc;
+}
+
+a.nav-link {
+  color: #666 !important;
+}
+a.nav-link:hover {
+  color: #000 !important;
+}
+a.nav-link.active {
+  color: #222 !important;
+}
+
+.navbar-brand {
+  background-image: url(/static/images/sapath_logo_from_pdf.png);
+}
+
+/*# sourceMappingURL=branding.css.map */

@@ -1,0 +1,91 @@
+{% extends "analysis/node_data/base_node_data.html" %}
+{% load js_tags %}
+{% block javascript %}
+
+var nodeId = {{ node_id }};
+
+function selectVariant() {
+	var variantId = $(this).attr("variant_id");
+	var checked = $(this).is(":checked");
+
+	var data = 'variant_id=' + variantId + '&checked=' + checked;
+	$.ajax({
+	    type: "POST",
+	    data: data,
+	    url: '{% url 'set_variant_selected' node_id %}',
+	    success: function() {
+			var aWin = getAnalysisWindow();
+    		var variants = aWin.selectedVariants[nodeId] || {};
+	    	aWin.selectedVariants[nodeId] = variants;
+	    	if (checked) {
+				variants[variantId] = 1;
+				revealSelectedTab(nodeId, true); // Could need to turn on...
+	    	} else {
+	    		delete variants[variantId];
+	    	}
+			checkAndMarkDirtyNodes(aWin);
+	    }
+	});
+}
+
+
+function gridComplete() {
+	var aWin = getAnalysisWindow();
+	var variants = aWin.selectedVariants[nodeId];
+	if (variants) {
+		$("input.variant-select").each(function() {
+			var variantId = $(this).attr("variant_id");
+			if (variantId in variants) {
+				$(this).prop('checked', true);
+			}
+		});
+	}
+	
+	$("input.variant-select").click(selectVariant);
+	var unique_code = "{{ node_id }}_{{ version_id }}";
+	registerComponent(unique_code, GRID);
+}
+
+
+function getBams() {
+    var SAMPLE_BAMS = {{ bams_dict | jsonify }};
+    var bams = [];
+    for (var k in SAMPLE_BAMS) {
+        var v = SAMPLE_BAMS[k];
+        bams.push(v);
+    } 
+    return bams;
+}
+
+
+{% endblock javascript %}
+
+{% block docreadyjs %}
+		var node_view_url = "{% url 'node_view' node_id version_id extra_filters %}";
+		load_node_editor(node_view_url);
+
+		// Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back 
+		var grid_url = "{% url 'node_grid_config' node_id version_id extra_filters %}";
+		var unique_code = "{{ node_id }}_{{ version_id }}";
+		setupGrid(grid_url, {{ node_id }}, {{ version_id }}, unique_code, gridComplete, gridLoadError, on_error_function);
+{% endblock docreadyjs %}
+
+{% block content %}
+<div id="{{ node_id }}_{{ version_id }}">
+	<div id='node-data-grid' class='node-data'>
+	<table id='grid-{{ node_id }}' class='grid'>
+	</table>
+	<div id='pager-{{ node_id }}'></div>
+	</div>
+	<div id='node-data-summary' class='node-data' style='display: none'>
+		Please select a column above and click "view"
+	</div>
+	<div id='node-data-docs' class='node-data' style='display: none'>
+	</div>
+	<div id='node-data-graphs' class='node-data' style='display: none'>
+		Please configure a graph above and click "view"
+	</div>
+</div>
+
+{% endblock content %}
+

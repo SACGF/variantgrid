@@ -1,0 +1,191 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load settings_tags %}
+{% load variant_transcript_select_tags %}
+
+{% block docreadyjs %}
+    var tagNodeForm = $("form#tag-node-form");
+    ajaxForm(tagNodeForm);
+	var tagSelect = $("select#id_tag");
+
+	// Set dropdown options to have tag colors
+	$("option", tagSelect).each(function() {
+		if (this.value) {
+			$(this).addClass("tagged-" + this.value);
+		}
+	});
+
+    
+    {% if not node.visible %}
+        var addAnalysisVariantClassification = function(variantString, variantClassificationId, clinicalSignificance) {
+            var description = variantString + " - " + clinicalSignificance;
+            var url = Urls.view_variant_classification(variantClassificationId);
+            var link = $("<a />").attr({href : url, "target" : "_blank"}).text(description);
+            var ec = $("<div />");
+            ec.append(link);
+            $("#existing-classifications").append(ec);
+            
+            $("#existing-classifications").show(); // hidden by default
+            return link[0];
+        };
+    
+        // In top tags link button
+        {% if node.analysis.analysisvariantclassification_set.exists %}
+            {% for avc in node.analysis.analysisvariantclassification_set.all %}
+                var variantString = "{{ avc.variant_classification.variant|safe }}";
+                var variantClassificationId = {{ avc.variant_classification.pk }};
+                var clinicalSignificance = "{{ avc.variant_classification.get_clinical_significance_display|default_if_none:"Unclassified" }}";
+                addAnalysisVariantClassification(variantString, variantClassificationId, clinicalSignificance);
+            {% endfor %}
+        {% endif %} 
+        
+        {% if requires_classification_data %}
+            var getSampleId = function(parentTr) {
+                var singleSample = $(".single-sample", parentTr);
+                var sampleId = singleSample.attr("sample_id");
+                if (!sampleId) {
+                    var sampleForm = $(".sample-form", parentTr);
+                    sampleId = $("select", sampleForm).val();
+                }
+                return sampleId;
+            };
+
+            var getTranscriptId = function(parentTr) {
+                var singleTranscript = $(".single-transcript", parentTr);
+                var transcriptId = singleTranscript.attr("transcript_id");
+                if (!transcriptId) {
+                    var transcriptForm = $(".transcript-form", parentTr);
+                    var transcriptId = $('[type="radio"]:checked', transcriptForm).val();
+                }
+                return transcriptId;
+            };
+
+        
+            var checkRowCanClassify = function() {
+                var parentTr = $(this).parents("tr.variant-tag-row");
+                var transcriptId = getTranscriptId(parentTr);
+                var sampleId = getSampleId(parentTr);
+
+                var button = $("button.classification-button", parentTr); 
+                if (transcriptId && sampleId) {
+                    button.show();
+                } else {
+                    button.hide();
+                }
+            };
+
+            var setClassificationButtonsInitialVisibility = function() {
+                // calling on variant-string as it's always there (just uses parent)
+                $(".variant-string", "tr.variant-tag-row").each(checkRowCanClassify);
+            };
+            
+
+            setClassificationButtonsInitialVisibility();
+            $('input[type=radio]', "tr.variant-tag-row").change(checkRowCanClassify);
+            $("select[name=sample]", "tr.variant-tag-row").change(checkRowCanClassify);
+
+        	$("button.classification-button").click(function() {
+        	   // disable the button after its clicked so you can't click on it twice
+        	   $(this).button('disable').text('Classifying...');
+                var parentTr = $(this).parents("tr.variant-tag-row");
+        	    var variantTagId = parentTr.attr("variantTagId");
+                var transcriptId = getTranscriptId(parentTr);
+                var sampleId = getSampleId(parentTr);
+
+                var url;
+                if (transcriptId && transcriptId != '(intergenic)') {
+                    url = Urls.create_classification_with_transcript_from_variant_tag(ANALYSIS_ID, sampleId, variantTagId, transcriptId);
+                } else {
+                    url = Urls.create_classification_from_variant_tag(ANALYSIS_ID, sampleId, variantTagId);
+                }
+
+                $.ajax({
+                    type: "POST",
+                    url: url,
+                    success: function(data) {
+                        var variantClassificationId = data.variant_classification_id;
+                        var variantString = $(".variant-string", parentTr).text();
+                        var variantId = parentTr.attr("variantId");
+                        var tagId = parentTr.attr("tagId");
+                        var link = addAnalysisVariantClassification(variantString, variantClassificationId, "Unclassified");
+                        link.click();
+                        parentTr.remove();
+                        removeVariantTag(variantId, tagId);
+                    }
+                });
+        	});
+        {% elif not node.analysis.analysisvariantclassification_set.exists %}
+            $("#node-editor-tabs").tabs({"disabled" : [1]});
+        {% endif %}
+    {% endif %}
+	
+{% endblock docreadyjs %}
+
+{% block node_editor_not_visible_tab_links %}
+    <li><a id='tab-link-requires-classification' href="#requires-classification">Classification</a></li>
+{% endblock node_editor_not_visible_tab_links %}
+
+
+{% block content %}
+<div>
+	<form id="tag-node-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+        <div>
+    		{% if node.visible %}
+    		<b>Analysis wide:</b> {{ form.analysis_wide }}
+    		{% else %}
+    		<b>All tags for analysis</b> 
+    		{% endif %}
+        </div>
+		<div>
+    		<b>Tag:</b> {{ form.tag }}
+		</div>
+        <button id='tag-node-save' class="btn btn-primary">save</button>
+        {{ form.media }}
+	</form>
+</div>
+{% endblock content %}
+
+{% block node_editor_not_visible_tab %}
+<div id='requires-classification'>
+    <p>
+    Classify variants tagged with 
+    <span class="tagged-{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}"><span class="user-tag-colored">{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}</span></span>:
+
+    {% if requires_classification_data %}
+        <table id='requires-classification-table'>
+            <tr><th>Variant <th>Transcript <th>Sample <td>
+        {% for variant_tag, variant_summary, single_transcript_label, single_transcript_id, vts, single_sample, sample_form in requires_classification_data %}
+            <tr class='variant-tag-row' variantTagId="{{ variant_tag.pk }}" variantId="{{ variant_tag.variant.pk }}" tagId="{{ variant_tag.tag.pk }}">
+            <td><span class='variant-string'>{{ variant_tag.variant }}</span>
+            {% if single_transcript_id %}
+                <td><span class='single-transcript' transcript_id="{{ single_transcript_id }}">{{ single_transcript_label }}</span>
+            {% else %}
+                <td>
+                <form class='transcript-form'>
+                    {% variant_transcript_select transcript_select_jquery='.select-transcript-container' vts=vts %}
+                    <span class='transcript-select-container'>{{ transcript_form.transcript }}</span>
+                </form>
+            {% endif %}
+            {% if single_sample %}
+                <td><span class='single-sample' sample_id="{{ single_sample.pk }}">{{ single_sample }}</span>
+            {% else %}
+                <td>
+                <form class='sample-form'>
+                    <span class='sample-select-container'>{{ sample_form.sample }}</span>
+                </form>
+            {% endif %}
+            <td><button class="classification-button hidden btn btn-primary">Classify</button>
+        {% endfor %}
+        </table>
+    {% endif %}
+    
+    <div id='existing-classifications' class='hidden'>
+        <h3>Classifications created from this Analysis</h3>
+    </div>
+    
+    </p> 
+</div>
+{% endblock node_editor_not_visible_tab %}

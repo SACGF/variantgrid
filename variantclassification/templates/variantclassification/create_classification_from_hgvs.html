@@ -1,0 +1,109 @@
+{% extends menu_classifications_base %}
+{% load static %}
+{% load help_tags %}
+{% load js_tags %}
+
+{% block title %}Variant Classification{% endblock %}
+{% block head %}
+<style type="text/css">
+    .pair img {
+        margin-top: -6px;
+    }
+</style>
+{% endblock %}
+{% block jshead %}
+{{ block.super }}
+function allowNoSample() {
+    clearAutocompleteChoice("#id_sample");
+    $("#no-sample-link").hide();
+    $("#no-sample-text").show();
+    $("button#create-variant-classification").button('enable');
+}
+
+{% endblock %}
+
+{% block jsdocumentready %}
+var createClassificationButton = $("button#create-variant-classification");
+createClassificationButton.button();
+
+function restrictSamples() {
+{% if initially_require_sample %}
+    createClassificationButton.button('disable');
+    $("#no-sample-link").show();
+{% endif %}
+}
+
+restrictSamples();
+
+{% endblock %}
+
+{% block submenu_page_content %}
+
+    <h3>Create Classification</h3>
+
+    {% include "messages/messages.html" %}
+
+    <div class="chunk borderless">
+    {% page_help user 'genes/unmatched_hgvs_help' 'Unmatched HGVS Help' %}
+    </div>
+
+    <form action="{% url 'create_variant_classification' %}" class="classification-form" method="POST">
+        {% csrf_token %}
+        <input type='hidden' name="genome_build_name" value="{{ genome_build.pk }}" />
+        <input type='hidden' name="evidence_json" value="{{ evidence_json }}" />
+        <input type='hidden' name="refseq_transcript_accession" value="{{ refseq_transcript_accession }}" />
+        <input type='hidden' name="ensembl_transcript_accession" value="{{ ensembl_transcript_accession }}" />
+        <input type='hidden' name="sample_id" />
+
+        <fieldset class="form-fields">
+            <div class="pair">
+                <label>HGVS</label>
+                {{ hgvs_string }}
+            </div>
+            <div class="pair">
+                <label>Transcript</label>
+                {{ ensembl_transcript_accession }}
+                {{ refseq_transcript_accession }}
+            </div>
+            <div class="pair">
+                <label>Genome build</label>
+                {{ genome_build }}
+            </div>
+
+            <div class="pair">
+                <label>Sample</label>
+                <div class='value'>
+                {{ sample_autocomplete_form.sample }}
+                {{ sample_autocomplete_form.media }}
+                <div id='no-sample-link' class='hidden'>
+                    <a href="javascript:allowNoSample()">My sample isn't here</a>
+                </div>
+                <div id='no-sample-text' class='hidden'>
+                    <p>Please find or upload the sample if you have it, as it allows us to link classifications together, and auto-fill fields.
+                    <p>Please remember to set the SampleID field in the classification form manually.
+                </div>
+                </div>
+            </div>
+
+            <div class="pair">
+                <label>For lab</label>
+                {% if lab %}
+                <div class='value'>{{ lab.name }}</div>
+                {% endif %}
+                {% if lab_error %}
+                <div class='error'>{{ lab_error }}<br/><a href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
+                {% endif %}
+            </div>
+            {% if lab_error %}
+                <br/>
+                <div>Please fix all errors before creating a classificaiton.</div>
+            {% else %}
+            <div class="buttons">
+            <button id='create-variant-classification'>Create Classification</button>
+            </div>
+            {% endif %}
+
+        </fieldset>
+    </form>
+
+{% endblock %}

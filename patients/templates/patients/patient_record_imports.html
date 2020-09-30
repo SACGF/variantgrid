@@ -1,0 +1,34 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% block title %}Patient Record Imports{% endblock title %}
+
+{% block css %}
+{{ block.super }}
+#patient-header {
+    margin-bottom: 10px; 
+}
+{% endblock css %}
+
+{% block submenu_page_content %}
+    <div class="chunk borderless">
+        <div id='patient-header'>
+            <h3>Previous Patient Record Imports</h3>
+
+            <div>
+            Go to the <a class="hover-link" href="{% url 'upload' %}">upload</a> page to import new patient records.<br>
+            </div>
+            <div>
+                <img width=24px height=24px src="{% static 'icons/report_icon.jpg' %}" />
+                <b>Patient CSV templates:</b>&nbsp;
+                <a class="hover-link" href="{% url 'example_upload_csv_all' %}">All samples</a>,
+                <a class="hover-link" href="{% url 'example_upload_csv_no_patients' %}">Samples without patients</a>
+            </div>
+        </div>
+        <div>
+            {% load jqgrid_tags %}
+            {% jqgrid 'patient_records_grid' 'patient-records' False None 'patients/grids/patient_records_grid.html' %}
+        </div>
+    </div>
+{% endblock submenu_page_content %}
+
+

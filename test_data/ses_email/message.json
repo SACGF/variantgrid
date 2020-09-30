@@ -1,0 +1,12 @@
+{
+   "Subject": {
+       "Data": "Test email sent using the AWS CLI",
+       "Charset": "UTF-8"
+   },
+   "Body": {
+       "Html": {
+           "Data": "This message body contains HTML formatting. It can, for example, contain links like this one: <a class=\"ulink\" href=\"http://docs.aws.amazon.com/ses/latest/DeveloperGuide\" target=\"_blank\">Amazon SES Developer Guide</a>.",
+           "Charset": "UTF-8"
+       }
+   }
+}

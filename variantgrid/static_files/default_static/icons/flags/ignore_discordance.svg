@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="23px" height="26px" viewBox="0 0 23 26" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 54.1 (76490) - https://sketchapp.com -->
+    <title>Untitled 2</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <path d="M2,13 L21.5,13" id="path-1"></path>
+        <filter x="-15.0%" y="-50.0%" width="127.5%" height="300.0%" filterUnits="objectBoundingBox" id="filter-2">
+            <feMorphology radius="1" operator="dilate" in="SourceAlpha" result="shadowSpreadOuter1"></feMorphology>
+            <feOffset dx="0" dy="1" in="shadowSpreadOuter1" result="shadowOffsetOuter1"></feOffset>
+            <feMorphology radius="1" operator="erode" in="SourceAlpha" result="shadowInner"></feMorphology>
+            <feOffset dx="0" dy="1" in="shadowInner" result="shadowInner"></feOffset>
+            <feComposite in="shadowOffsetOuter1" in2="shadowInner" operator="out" result="shadowOffsetOuter1"></feComposite>
+            <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="discordance" fill="#000000" fill-rule="nonzero">
+            <path d="M11.633,25.213 C11.592,25.213 11.549,25.195 11.52,25.162 L6.87,20.533 C6.825,20.486 6.809,20.416 6.835,20.355 C6.858,20.293 6.923,20.251 6.987,20.251 L9.936,20.251 L9.936,11.454 L3.242,4.766 L1.197,6.809 C1.15,6.857 1.078,6.873 1.016,6.848 C0.957,6.82 0.918,6.758 0.918,6.695 L0.924,0.177 C0.924,0.087 0.998,0.013 1.086,0.013 L7.609,1.37216627e-15 C7.675,1.37216627e-15 7.734,0.041 7.759,0.1 C7.784,0.166 7.771,0.235 7.726,0.284 L5.652,2.354 L11.588,8.292 L17.529,2.351 L15.484,0.302 C15.437,0.253 15.423,0.187 15.449,0.124 C15.476,0.062 15.535,0.024 15.601,0.024 L22.115,0.03 C22.205,0.03 22.277,0.1 22.277,0.192 L22.295,6.712 C22.295,6.778 22.252,6.841 22.191,6.864 C22.13,6.889 22.058,6.876 22.011,6.829 L19.939,4.757 L13.363,11.337 L13.363,20.253 L16.273,20.253 C16.337,20.253 16.396,20.294 16.423,20.357 C16.45,20.418 16.435,20.488 16.386,20.535 L11.751,25.164 C11.717,25.195 11.678,25.213 11.633,25.213 Z" id="Path"></path>
+        </g>
+        <g id="Line" stroke-linecap="square">
+            <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+            <use stroke="#C83232" stroke-width="2" xlink:href="#path-1"></use>
+        </g>
+    </g>
+</svg>

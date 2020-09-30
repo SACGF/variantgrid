@@ -1,0 +1,68 @@
+{% extends "snpdb/tags/related_data.html" %}
+{% block related_data %}
+{{ block.super }}
+{% load related_data_tags %}
+
+{% if pathology_tests_enabled %}
+<div id="pathology-test-orders">
+    <h3>Pathology Test Orders for case:</h3>
+    {% if pathology_test_orders.exists %}
+        <table>
+            <tr>
+            <th>ID
+            <th>Pathology Test
+            <th>User
+            <th>Last Modified
+            <th>Experiment
+            <th>Sequencing Run
+
+            </tr>           
+        {% for test_order in pathology_test_orders %}
+            <tr> 
+            <td><a href="{% url 'view_pathology_test_order' test_order.pk %}">{{ test_order }}</a>
+            <td>
+                {% if test_order.pathology_test_version %}
+                    <a href="{% url 'view_pathology_test_version' test_order.pathology_test_version.pk %}">{{ test_order.pathology_test_version }}</a>
+                {% endif %}
+            <td>{{ test_order.user }}
+            <td>{{ test_order.last_modified }}
+            <td>{{ test_order.experiment }}
+            <td>{{ test_order.sequencing_run }}
+            </tr>
+        {% endfor %}
+        </table>
+    {% else %}
+    <p>There are no test orders linked to this case</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<div id="samples">
+    <h3>Samples for patient:</h3>
+    {% if samples %}
+        <table>
+            <tr>
+            <th>ID
+            <th>Sample Name
+            <th>VCF
+            <th>VCF date
+            <th>Tissue
+            </tr>           
+        {% for sample in samples %}
+            <tr> 
+            <td><a href="{% url 'view_sample' sample.pk %}">{{ sample.pk }}</a>
+            <td>{{ sample.name }}
+            <td><a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
+            <td>{{ sample.vcf.date }}
+            <td>{{ sample.tissue }}
+            </tr>
+        {% endfor %}
+        </table>
+    {% else %}
+    <p>There are no samples linked to this patient</p>
+    {% endif %}
+</div>
+
+{% related_data_for_samples samples show_sample_info=True %}
+{% endblock related_data %}
+

@@ -1,0 +1,33 @@
+{% load static %}
+<div id='analysis-input-samples'>
+    <h3>Samples used in analysis</h3>
+    
+    {% if node_inputs %}
+        <table>
+        <tr>
+            <th>Node
+            <th>Name
+            <th>Cohort / Pedigree / Trio
+            <th>Samples
+    {% for ni in node_inputs %}
+        <tr>
+            <td>{{ ni.class }}
+            <td>{{ ni.name }}
+            <td>{% if ni.trio %}
+                    <b>Trio: </b><a target="_blank" href="{{ ni.trio.get_absolute_url }}">{{ ni.trio }}</a>
+                {% elif ni.pedigree %}
+                    <b>Pedigree: </b><a target="_blank" href="{{ ni.pedigree.get_absolute_url }}">{{ ni.pedigree }}</a>
+                {% elif ni.cohort %}
+                    <b>Cohort: </b><a target="_blank" href="{{ ni.cohort.get_absolute_url }}">{{ ni.cohort }}</a>
+                {% endif %}
+            <td>
+                <ul>
+                {% for s in ni.samples %}
+                <li><a target="_blank" href="{{ s.get_absolute_url }}">{{ s.name }}</a>
+                {% endfor %}
+                </ul>
+                
+    {% endfor %}
+    {% endif %}
+    
+</div>

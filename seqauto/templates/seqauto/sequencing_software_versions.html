@@ -1,0 +1,85 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load jqgrid_tags %}
+{% block title %}Sequencing/Software Versions{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+
+{% block head %}
+    <style>
+        .grid-container {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+
+    {% if request.user.is_staff %}
+        <script>
+            $(document).ready(() => {
+                function get_pk_icon_link(urlFunc) {
+                    return function(pk) {
+                        return "<a class='grid-link' href='" + urlFunc(pk) + "'><div class='grid-link-icon view-details-link'></div></a>";
+                    }
+                }
+
+                function get_pk_link(urlFunc) {
+                    return function(pk) {
+                        return "<a class='grid-link' href='" + urlFunc(pk) + "'><div>" + pk + "</div></a>";
+                    }
+                }
+
+                jQuery.extend($.fn.fmatter , {
+                    'view_sequencer' : get_pk_link(Urls.view_sequencer),
+                    'view_library' : get_pk_link(Urls.view_library),
+                    'view_assay' : get_pk_icon_link(Urls.view_assay),
+                    'view_variant_caller' : get_pk_icon_link(Urls.view_variant_caller),
+                    'view_aligner' : get_pk_icon_link(Urls.view_aligner),
+                    'view_variant_calling_pipeline' : get_pk_icon_link(Urls.view_variant_calling_pipeline),
+                });
+            });
+        </script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+    <h3>Sequencing / Software Versions</h3>
+
+    {% if not request.user.is_staff %}
+        <p>
+        Only Staff/Admin users can add/remove pipeline versions.
+
+    {% endif %}
+
+    <h3>Wet Lab</h3>
+
+    <div class='grid-container'>
+    {% jqgrid 'library_grid' name='Libraries' search=False delete=False %}
+    </div>
+
+    <div class='grid-container'>
+    {% jqgrid 'sequencer_grid' name='Sequencers' search=False delete=False %}
+    </div>
+
+    <div class='grid-container'>
+    {% jqgrid 'assay_grid' name='Assays' search=False delete=False %}
+    </div>
+
+    <h3>Software</h3>
+
+    <div class='grid-container'>
+    {% jqgrid 'aligner_grid' name='Aligners' search=False delete=False %}
+    </div>
+
+    <div class='grid-container'>
+    {% jqgrid 'variant_caller_grid' name='Variant Callers' search=False delete=False %}
+    </div>
+
+    <div class='grid-container'>
+    {% jqgrid 'variant_calling_pipeline_grid' name='Variant Calling Pipelines' search=False delete=False %}
+    </div>
+
+    </div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load js_tags %}
+{% block docreadyjs %}
+	function set_select_names(select, expression_id) {
+		var expression_samples = {{ expression_samples | jsonify }};
+		var arr = expression_samples[expression_id];
+
+		select.find("option").each(function() {
+			var sample = $(this).attr('value');
+			$(this).text(arr[sample]);
+		});
+	}
+
+	function setupForms() {
+		var comparisonType = $("#id_comparison_type").find(":selected").val();
+		var ev = $("span.expression-value", "#expressionnode_form"); 
+		var de = $("span.differential-expression", "#expressionnode_form");
+		
+		if (comparisonType == 'd') {
+			ev.hide();
+			de.show();
+		} else {
+			de.hide();
+			
+			var expressionFile = $("#id_expression_file").find(":selected").val();
+			if (expressionFile != null && expressionFile != '') {
+				var select = ev.find("select#id_sample");
+				set_select_names(select, expressionFile);
+			}
+			ev.show();
+		}
+	}
+
+	$("#id_comparison_type").change(function() {
+		setupForms();
+	});
+	$("#id_expression_file").change(function() {
+		setupForms();
+	});
+
+	
+	setupForms();
+	
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<div>
+	<form id="expressionnode_form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+		<table>
+		<tr>
+		<td><b>Expression:</b> {{ form.expression_file }}</td>
+		</tr>
+		<tr>
+		<td><b>Type:</b> {{ form.comparison_type }}</td>
+		</tr>
+		<tr>
+		<td>
+		<span class='differential-expression'>{{ form.direction }}</span>
+		<span class='expression-value'>{{ form.sample }}</span>
+		{{ form.comparison_op }}
+		{{ form.value }} <span id="significant-wrapper" class='differential-expression'>{{ form.significant }} Significant</span></td>
+		</tr>
+		<tr>
+		<td><button id='expression-save' class="btn btn-primary">save</button>
+		</tr>
+		</table>
+		{% for hidden in form.hidden_fields %}
+			{{ hidden }}
+		{% endfor %}
+	</form>
+</div>
+{% endblock content %}

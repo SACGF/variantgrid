@@ -1,0 +1,37 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+
+{% block submenu %}
+    {% menu_bar_sequencing %}
+{% endblock %}
+{% block title %}SeqAuto Runs{% endblock %}
+
+{% block content %}
+    <div class="container">
+        {% load ui_help %}
+        {% page_help 'seqauto/seqauto_runs_help' title="Server Disk Scans" %}
+
+        <ul>
+        <li>
+        {% if last_success_datetime %}
+            Last successful update finished: {{ last_success_datetime|timesince }} ago.
+        {% else %}
+            Sequencing data drive has not yet been scanned. 
+        {% endif %}
+        {% if enable_button %}
+            <li>
+              <form id="manual-seqauto-run" method="post">
+                {% csrf_token %}
+                <button class="btn btn-outline-secondary" id='seqauto-scan' type='submit'>Scan Disk for Sequencing Data</button>
+              </form>
+        {% endif %}
+        </ul>
+
+        <div id='seqauto-run-history'>
+            {% load jqgrid_tags %}
+            {% jqgrid 'seqauto_runs_grid' 'seqauto-runs-grid' template_name='seqauto/grids/seqauto_runs_grid.html' search=False delete=False %}
+        </div>
+
+    </div>
+
+{% endblock %}

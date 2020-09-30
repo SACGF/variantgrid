@@ -1,0 +1,44 @@
+{% extends menu_data_base %}
+{% load static %}
+{% block title %}{{ expression_file.name }}{% endblock title %}
+{% block head %}
+	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+	<script src="{% static 'js/generated_graphs.js' %}"></script>
+	<style>
+		#expression-graph, #expression-graph img {
+		    width: 400px;
+	    	height: 300px;
+	    	text-align: center;
+		}
+	</style>
+{% endblock head %}
+
+{% block jsdocumentready %}
+
+	var graph_selector = $('#expression-graph');
+	{% if expression_file.import_status == 'S' %}
+		var poll_url = "{% url 'expression_graph' expression_file.id %}";
+		var delete_url = "{% url 'cached_generated_file_delete' %}";
+
+		poll_graph_status(graph_selector, poll_url, delete_url);
+	{% else %}
+		graph_selector.removeAttr('id');
+		graph_selector.removeClass();
+		graph_selector.html("Expression file has not finished importing.");
+	{% endif %}
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+
+	<div id="expression_file">
+		<h3>Expression: {{ expression_file.name }}</h3>
+
+		<div id='expression-graph' class='generated-graph graph-loading'></div>
+
+		<table>
+		{{ expression_file_form.as_table }}
+		</table>
+	</div>
+
+{% endblock submenu_page_content %}

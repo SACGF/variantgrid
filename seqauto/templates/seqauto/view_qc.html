@@ -1,0 +1,58 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% load jqgrid_tags %}
+{% load help_tags %}
+
+{% block title %}{{ qc }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
+<style>
+.qc-column-name {
+	text-align: right;
+}
+</style>
+{% endblock %}
+
+{% block jsdocumentready %}
+	$("#qc-tabs").tabs();
+{% endblock %}
+
+{% block submenu_page_content %}
+
+	<h2>{{ qc }}</h2>
+
+{% if qc.data_state == 'C' %}
+	<div id="qc-tabs">
+		<ul>
+	    	<li><a href="{% url 'view_qc_exec_summary_tab' qc.pk %}">Exec Summary</a></li>
+            {% if qc_gene_list %}
+            <li><a href="{% url 'view_qc_gene_list_tab' qc.pk %}">Genes of Interest</a></li>
+            {% endif %}
+			{% if gene_coverage %}
+	    	<li><a href="{% url 'view_qc_gene_coverage_collection_tab' qc.pk %}">Gene Coverage</a></li>
+			{% endif %}
+	    	<li><a href="#qc-details">Details</a></li>
+	  	</ul>
+		<div id="qc-details">
+			<form>
+				{{ form.as_p }}
+			</form>
+		</div>
+	<div>
+{% else %}
+
+	{% load record_data_state_tags %}
+	{% record_data_state_helper qc %}
+	
+{% endif %}	
+	
+		<h3>Input</h3>
+		<ul>
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' qc.bam_file.unaligned_reads.sequencing_run.pk %}">{{ qc.bam_file.unaligned_reads.sequencing_run }}</a></li>  
+		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' qc.bam_file.unaligned_reads.pk %}">{{ qc.bam_file.unaligned_reads }}</a></li>
+		<li>Bam: <a href="{% url 'view_bam_file' qc.bam_file.pk %}">{{ qc.bam_file }}</a></li>
+		<li>VCF: <a href="{% url 'view_vcf_file' qc.vcf_file.pk %}">{{ qc.vcf_file }}</a></li>
+		</ul>
+	</div>
+
+{% endblock %}

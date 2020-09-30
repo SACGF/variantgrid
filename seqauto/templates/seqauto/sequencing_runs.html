@@ -1,0 +1,89 @@
+{% load ui_help %}
+{% load ui_utils %}
+{% load crispy_forms_field %}
+
+<script>
+    gridExtraFilters = {};
+
+    function showAll() {
+        clearAutoCompletes();
+        gridExtraFilters = {};
+        filterGrid();
+    }
+
+    function clearAutoCompletes(leave_autocomplete_term_type) {
+        // Clear the autcompletes (temp disabling change handlers)
+        var AUTOCOMPLETE_IDS = {
+            'enrichment_kit' : 'id_enrichment_kit',
+        };
+
+        ignoreAutcompleteChangeEvent = true;
+        for (var t in AUTOCOMPLETE_IDS) {
+            if (t == leave_autocomplete_term_type) {
+                continue; // leave this one
+            }
+            var autocomplete_id = AUTOCOMPLETE_IDS[t];
+            clearAutocompleteChoice("#" + autocomplete_id);
+        }
+        ignoreAutcompleteChangeEvent = false;
+    }
+
+    // This is called when refreshing the grid
+    function getExtraFilters() {
+        var extraFilters = '';
+        if (gridExtraFilters) {
+            extraFilters = JSON.stringify(gridExtraFilters);
+        }
+        return extraFilters;
+    }
+
+    function initFunc(grid, pagerId) {
+        grid[0].p.postData["extra_filters"] = getExtraFilters;
+    }
+
+    function filterGrid() {
+        var descriptionContainer = $("#sequencing-runs-filter-description");
+        if (!$.isEmptyObject(gridExtraFilters)) {
+            var descriptions = [];
+            if (gridExtraFilters["enrichment_kit_id"]) {
+                descriptions.push("Enrichment Kit");
+            }
+            if (descriptions) {
+                $("#sequencing-runs-filter").html(descriptions.join(" "));
+                descriptionContainer.show();
+            }
+        } else {
+            descriptionContainer.hide();
+        }
+
+        $("#SequencingRuns-grid").trigger("reloadGrid");
+    }
+
+    $(document).ready(function() {
+        $('#id_enrichment_kit').change(function() {
+            gridExtraFilters["enrichment_kit_id"] = $(this).val();
+            filterGrid();
+        });
+    });
+</script>
+
+<div>
+    {% page_help page_id='seqauto/sequencing_runs_help' title='Sequencing Runs' show_title=False %}
+
+    <div>    
+        <form>
+            {% labelled label="Enrichment Kit" %}
+                {{ enrichment_kit_form.enrichment_kit }}
+                {{ enrichment_kit_form.media }}
+            {% endlabelled %}
+        </form>
+        <div id='sequencing-runs-filter-description' class='hidden'>
+            Filtering to <span id='sequencing-runs-filter'></span>. <a href='javascript:showAll()'>Show All</a>
+        </div>
+    </div>
+
+	{% load jqgrid_tags %}
+    {% user_data_grid_filter 'SequencingRuns' 'SequencingRuns' group_data=False incomplete_data=True hidden_data=True %}
+
+	{% jqgrid 'sequencing_run_grid' 'SequencingRuns' False None 'seqauto/grids/sequencing_run_grid.html' delete=False init_func='initFunc' %}
+</div>

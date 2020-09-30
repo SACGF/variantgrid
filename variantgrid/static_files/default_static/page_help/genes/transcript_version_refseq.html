@@ -1,0 +1,31 @@
+From <a href="https://www.ncbi.nlm.nih.gov/books/NBK50679/#RefSeqFAQ.what_causes_the_version_number">RefSeq FAQ</a>
+
+<style>
+.refseq-question {
+    color: #59331f;
+}
+</style>
+
+<div>
+<h4 class='refseq-question'>What causes the version number of a RefSeq record to change?</h4>
+
+<blockquote>
+    A version number change (e.g., NM_111111.1 -> NM_111111.2) occurs to a RefSeq record when there is any update to the sequence of that record. Sequence updates include the alteration, addition, or removal of nucleotides or amino acids from a record. Please note that other alterations such as updates to annotation or associated publications will not trigger a version number change. Also, nucleotide (NM_, XM_) and protein (NP_, XP) records for the same transcript may not have the same version number after an update. For example, an update to the 5’ UTR of a RefSeq nucleotide record would cause a version number change for the updated nucleotide record but not for the corresponding protein record. Conversely, a change in the annotated start site of the coding sequence without a change in the underlying nucleotide sequence would cause a version number update for the NP_ but not for the NM_.
+</blockquote>
+
+</div>
+
+<div>
+<h4 class='refseq-question'>What updates to RefSeq records need a simple version number change and which require a new accession number?</h4>
+<blockquote>
+    <p>The following cases require a simple version change:</p>
+
+    <ul>
+        <li>the RefSeq record is updated to make minor corrections (e.g., fix mismatches or indels)
+        <li>the RefSeq record is updated by an end extension or trim in the UTRs but does not add or remove exons or change any splice sites
+        <li>the RefSeq record is updated by an end extension or trim in the 5’ or 3’ end of the coding sequence and/or UTRs and DOES add or remove terminal exons. In this case, the replaced or updated RefSeq must be completely contained within the other version (i.e., no addition or removal of internal exons or changes to any splice sites).
+    </ul>
+
+    <p>All other cases require the old record to be suppressed rather than updated, and a new record with a new accession number to be created. In addition, RefSeqGene records cannot be updated when the exon definition or protein length is changed.</p>
+</blockquote>
+</div>

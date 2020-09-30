@@ -1,0 +1,113 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load static %}
+{% block docreadyjs %}
+    var trioForm = $("#trio-form");
+
+    function getTrioId() {
+       return $("#id_trio", trioForm).find(":selected").val();
+    }
+
+    function displayTrioInfo(data) {
+        var trioInfo = $("#trio-info");
+        var SAMPLE_FIELDS = ["mother", "father", "proband"];
+        var AFFECTED_FIELDS = ["mother_affected", "father_affected"];
+        
+        for (var i=0 ; i<SAMPLE_FIELDS.length ; ++i) {
+            var f = SAMPLE_FIELDS[i];
+            var value = data[f];
+            $("." + f, trioInfo).text(value);
+        }
+
+        for (var af=0 ; af<AFFECTED_FIELDS.length ; ++af) {
+            var affected = AFFECTED_FIELDS[af];
+            var affectedText = data[affected]? "affected" : "unaffected";
+            $("." + affected, trioInfo).text(affectedText);
+        }
+        
+        trioInfo.show();
+        var one_affected = data.mother_affected || data.father_affected;
+        setDominantSelectAvailable(one_affected);
+        loadCohortVCFLocusFilter(data.cohort);
+    }
+
+    function changeTrio() {
+        $("#trio-info").hide();
+        var trioId = getTrioId();
+        if (trioId) {
+            $.ajax({
+                url: Urls.api_view_trio(trioId),
+                success: displayTrioInfo,
+            });
+        }
+    }
+    $("#id_trio").change(changeTrio);
+
+    function setDominantSelectAvailable(one_affected) {
+        var inheritance_select = $("#id_inheritance", trioForm);
+        var dominant_option = $("option[value=D]", inheritance_select);
+        if (!one_affected) {
+            dominant_option.removeAttr("selected");
+        }
+        dominant_option.attr("disabled", !one_affected);
+    }
+
+    changeTrio();
+
+    ajaxForm(trioForm);
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<div>
+	<form id="trio-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+		<div>
+            <div>
+                <b>Trio:</b> {{ form.trio }}{{ form.trio.errors }}
+            </div>
+            <div id='trio-info'>
+                <table>
+                <tr>
+                    <th>Mother:
+                    <td><span class='mother'></span> (<span class='affected mother_affected'></span>)
+                </tr>
+                <tr>
+                    <th>Father:
+                    <td><span class='father'></span> (<span class='affected father_affected'></span>)
+                </tr>
+                <tr>
+                    <th>Proband:
+                    <td><span class='proband'></span>
+                </tr>
+                </table>
+            </div>
+            <div>
+    		  <b>Inheritance:</b> {{ form.inheritance }}{{ form.inheritance.errors }}
+              <b>Require Parent Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+            </div>
+            <div>
+                {% load vcf_locus_filter_tags %}
+                {% vcf_locus_filter node node.trio.cohort.vcf %}
+            </div>
+            <div class='genotype-row'>
+                <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}
+                <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}
+                <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}
+                <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }} {{ form.max_pl_op }}
+            </div>
+            <div>
+                <a id='view-allele-frequency-filter-link' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+                {% load allele_frequency_tags %}
+                {% allele_frequency_controls node %}
+            </div>
+    		<div>
+    		  <button id='trio-save' class="btn btn-primary">save</button>
+    		</div>
+		</div>
+    {{ form.media }} 
+	</form>
+</div>
+{% endblock content %}

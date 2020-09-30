@@ -1,0 +1,48 @@
+{% load ui_help %}
+{% load crispy_forms_field %}
+{% load js_tags %}
+
+{% if override_source %}
+    <h4>Settings</h4>
+    {% page_help page_id='settings/user_settings_help' title='Settings' show_title=False %}
+    <p>
+        Default values are searched for in the following until a value is found: Lab, Organisation then Global.<br>
+        Leave "{{ override_level }} override" blank to accept the default value, or override it with your own value.
+    </p>
+    <div class="form-group row">
+        <div class="col-3"></div>
+        <div class="col-4 override-header override-value">Default value</div>
+        <div class="col-5 override-header">{{ override_level }} override</div>
+    </div>
+{% endif %}
+
+{% for field in form %}
+    <div class="form-group row user-overrides">
+        {{ field.errors }}
+        <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0">{{ field.label_tag }}</label>
+        <div class="col-6 col-md-4">
+        {% if override_source %}
+            {% if override_source|get_item:field.name %}
+                <div class="readonly">
+                    <span class="override-source">{{ override_source|get_item:field.name }}:</span> {{ override_values|get_item:field.name|format_preference }}
+                </div>
+            {% else %}
+                <div class="readonly">&nbsp;</div>
+            {% endif %}
+        {% endif %}
+        </div>
+        <div class="col-6 col-md-5">
+        {% if field|is_select %}
+            {% crispy_field field %}
+        {% else %}
+            {{ field }}
+        {% endif %}
+        {% if field.help_text %}
+        <p class="help">{{ field.help_text|safe }}</p>
+        {% endif %}
+        </div>
+    </div>
+{% endfor %}
+<div>
+    You will be shown data for your default genome build. If you have selected multiple builds, you can select between them.
+</div>

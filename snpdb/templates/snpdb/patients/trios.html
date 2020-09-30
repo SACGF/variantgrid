@@ -1,0 +1,15 @@
+{% extends menu_patients_base %}
+{% load static %}
+
+{% block title %}Trios{% endblock %}
+{% block submenu_page_content %}
+    <H3>Trios</H3>
+    <p>Create Trios <a href="{% url 'data' %}" class="hover-link">from VCFs</a> or on the <a href="{% url 'cohorts' %}" class="hover-link">cohorts page.</a></p>
+    <div>
+        <div id="search">
+        <div id="trio-grid-filter-container"></div>
+	</div>
+
+	{% load jqgrid_tags %}
+	{% jqgrid 'trio_grid' 'cohort' search=True gbox_id='trio-grid-filter-container' delete=True %}
+{% endblock %}

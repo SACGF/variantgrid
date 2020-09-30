@@ -1,0 +1,112 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% load model_tags %}
+{% block title %}Karyomapping{% endblock title %}
+
+{% block css %}
+{{ block.super }}
+#double-helix-container { 
+    width: 100%;
+    text-align: center;
+}
+{% endblock css %}
+
+{% block jshead %}
+    {{ block.super }}
+    
+    function createDoubleHelixLoader(container) {
+        var canvasAttributes = {class : 'node-load-animation'};
+        var canvas = $("<canvas />", canvasAttributes);
+        canvas.attr({ width: 50, height: 180 });
+        canvas.css('opacity', 0.35);
+        canvas.DoubleHelix({fps: 20, spinSpeed: 4});
+        container.append(canvas);
+    }
+    
+    function openKaryomapGene(pk) {
+        var container = $("#karyomap-gene-container");
+        container.empty();
+
+        var doubleHelixContainer = $("<div id='double-helix-container' />");
+        container.append(doubleHelixContainer);
+        createDoubleHelixLoader(doubleHelixContainer);
+        
+        container.load(Urls.view_karyomapping_gene(pk), function() {
+            doubleHelixContainer.remove();
+        });
+    }
+    
+{% endblock jshead %}
+{% block jsdocumentready %}
+    {{ block.super }}
+
+    $("#karyomapping-tabs").tabs();
+
+    {% if created_karyomapping_gene %}
+    openKaryomapGene("{{ created_karyomapping_gene.pk }}");
+    {% endif %}
+    
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+<script type="text/javascript" src="{% static 'js/lib/double-helix.jquery.js' %}"></script>
+<div id='karyomapping-tabs'>
+    <ul>
+        <li><a href="#details">Karyomapping</a></li>
+        {% if has_write_permission %}
+        <li><a href="{% url 'group_permissions' 'analysis.models.KaryomappingAnalysis' karyomapping_analysis.pk %}">Sharing / Permissions</a></li>
+        {% endif %}
+    </ul>
+    <div id="details">
+        {% trio_table karyomapping_analysis.trio %}
+    </div>
+</div>
+
+<div>
+    <h3>Karyomap Gene Region</h3>
+    <form method="post" id='gene-form'>
+        {% csrf_token %}
+        <table>
+        <tr>
+            <th>Gene: <td> {{ gene_form.gene }}{{ gene_form.gene.errors }}
+            <th>Upstream: <td> {{ gene_form.upstream_kb }}{{ gene_form.upstream_kb.errors }} (KB)
+            <th>Downstream: <td> {{ gene_form.downstream_kb }}{{ gene_form.downstream_kb.errors }} (KB)
+        {% if has_write_permission %}
+            <td><button id="karyomap-gene-button" class="btn btn-primary">Karyomap Gene</button>
+        {% endif %}
+        </tr> 
+        </table>
+
+        {% if form.non_field_errors %}
+            <ul class='messages'>
+            {% for error in form.non_field_errors %}
+                <li class="error">{{ error|escape }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+
+
+        {% if not has_write_permission %}
+            You can view but not modify this data.
+        {% endif %}
+        {% include "messages/messages.html" %}
+        {{ gene_form.media }}
+    </form>
+</div>
+
+<div>
+{% if karyomapping_analysis.karyomappinggene_set.exists %}
+    <h3>Previous Karyomap Gene Regions</h3>
+    <table>
+    {% for kag in karyomapping_analysis.karyomappinggene_set.all %}
+        <tr><td><a href="javascript:openKaryomapGene('{{ kag.pk }}')">View</a> {{ kag.gene }} (Up: {{ kag.upstream_kb }}, Down: {{ kag.downstream_kb }})
+    {% endfor %}
+    </table>
+{% endif %}
+</div>
+
+<div id='karyomap-gene-container'>
+</div>
+
+
+{% endblock submenu_page_content %}

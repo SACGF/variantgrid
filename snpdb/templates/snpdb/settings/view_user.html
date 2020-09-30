@@ -1,0 +1,17 @@
+{% extends menu_settings_base %}
+
+{% block title %}{{ user }} user page.{% endblock %}
+
+{% block submenu_page_content %}
+	<div>
+		<table>
+		<tr><th>Username: </th> <td> {{ user }}
+        <tr><th>Email: </th> <td> {{ user.email }}		
+        <tr><th>Phone #: </th> <td> {{ user_contact.phone_number }}
+        </table>
+        
+        <a href="{% url 'messages_compose_to' recipient=user.pk %}">Write internal message</a>
+        
+	</div>
+
+{% endblock %}

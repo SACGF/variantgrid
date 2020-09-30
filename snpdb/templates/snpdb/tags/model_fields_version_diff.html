@@ -1,0 +1,130 @@
+{% load js_tags %}
+<style>
+#version-comparison {
+    width: 100%;
+}
+
+#select-messages {
+    display: none;
+}
+
+.legend-color-box {
+    float: left;
+    width: 20px;
+    height: 20px;
+}
+
+.legend-text {
+    float : left;
+    font-weight: bold;
+    margin-right: 20px;
+}
+
+</style>
+<script>
+    function getFieldDiffClass(a_val, b_val) {
+        var fieldDiffClass = null;
+        if (a_val != b_val) {
+            if (!a_val) {
+                if (b_val) {
+                    fieldDiffClass = "addition";
+                }
+            } else if (!b_val) {
+                if (a_val) {
+                    fieldDiffClass = "deletion";
+                }
+            } else {
+                fieldDiffClass = "modification";
+            }
+        }
+        return fieldDiffClass;
+    }
+    
+    function create_select_from_tuples(selector, list_of_tuples) {
+        var sel = $('<select>').appendTo(selector);
+        $(list_of_tuples).each(function() {
+            sel.append($("<option>").attr('value', this[0]).text(this[1]));
+        });
+        return sel;
+    }
+
+    
+</script>
+
+<script>
+    var models_by_version = {{ model_dicts_by_version | jsonify }};
+    var modelVersionIds = Object.keys(models_by_version).map(Number);
+    var versions = {{ versions | jsonify }};
+
+    function showModelDiff(aId, bId) {
+        var table = $("#version-comparison");
+        $("tr.field-row", table).remove();
+
+        // test if they're the same...
+        var sm = $("#select-messages");
+        if (aId == bId) {
+            sm.text("Can't diff the same versions.");
+            sm.show();
+            return;
+        } else {
+            sm.hide();
+        }
+
+        var a = models_by_version[aId];
+        var b = models_by_version[bId];
+
+        var model_fields = Object.keys(a).sort();
+        for (var i=0 ; i<model_fields.length ; ++i ) {
+            var f = model_fields[i];
+            var a_val = a[f];
+            var b_val = b[f];
+            var fieldDiffClass = getFieldDiffClass(a_val, b_val);
+            var row = $("<tr>", {"id" : f + "-row", class: "field-row " + fieldDiffClass})
+            row.append($("<th>", {"class" : "field-name"}).text(f));
+            row.append($("<td>", {"id" : f + "-" + aId}).text(a_val));
+            row.append($("<td>", {"id" : f + "-" + bId}).text(b_val));
+            table.append(row);
+        }
+    }
+
+    
+    function add_selects() {
+        var a_sel = create_select_from_tuples($("#a-version-header"), versions);
+        var b_sel = create_select_from_tuples($("#b-version-header"), versions);
+
+        var selectChanged = function() {
+            showModelDiff(a_sel.val(), b_sel.val());
+        };
+
+        var firstId = Math.min.apply(null, modelVersionIds);
+        var lastId = Math.max.apply(null, modelVersionIds);
+        
+        a_sel.val(firstId);
+        b_sel.val(lastId);
+        
+        a_sel.change(selectChanged);
+        b_sel.change(selectChanged);
+        selectChanged();
+    
+    }
+
+
+	$(document).ready(function() {
+        add_selects();
+	});
+</script>
+
+<div>
+    <div class='legend-color-box addition'></div> <div class="legend-text"> Addition.</div>
+    <div class='legend-color-box deletion'></div> <div class="legend-text"> Deletion.</div>
+    <div class='legend-color-box modification'></div> <div class="legend-text"> Modification.</div>
+    <div class='clear'></div>
+</div>
+
+
+<table id='version-comparison'>
+    <tr><td><th id='a-version-header'>
+            <th id='b-version-header'>
+</table>
+<div id="select-messages">
+</div>

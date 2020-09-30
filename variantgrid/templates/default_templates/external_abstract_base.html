@@ -1,0 +1,76 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+{% load static %}
+{% load i18n %}
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600" rel="stylesheet">
+    <link href="{% static 'js/lib/jquery-ui-1.12.1.custom/jquery-ui.min.css' %}" rel="stylesheet">
+    <script type="text/javascript" src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/lib/jquery-ui.min.js' %}"></script>
+    <!-- layout must be after jquery-ui or resize doesn't work -->
+    <script type="text/javascript" src="{% static 'js/lib/jquery-3.3.1/jquery.layout-1.4.4.js' %}"></script>
+	<link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
+	<script type="text/javascript">
+		$(document).ready(function () {
+        {% block jsdocumentready %}
+            $("button").button();
+        {% endblock %}
+		});
+	</script>
+    <link href="{% static 'css/global.css' %}" rel="stylesheet">
+    <style type="text/css">
+    #outer-container {
+        height: 100%;
+        flex-direction: column;
+    }
+
+    #login-table {
+        margin-top: 10px;
+    }
+    </style>
+    {% block styles %}{% endblock %}
+    <!-- head block -->
+    {% block head %}{% endblock %}
+    <!-- /head block -->
+    <link href="{% static 'css/branding.css' %}" rel="stylesheet">
+</head>
+
+<body class='external'>
+<div id='outer-container' class='display-flex'>
+    <div id="header" class='flex-none'>
+        {% block header_content %}
+        <a href='/' title="Return to {{ site_name }} homepage" class='no-link-style'>
+            <div id='menu-logo' class='left'></div>
+        </a>
+        <div class='right'>
+            <div id='vg-login-container' class='left'>
+                <section class="login-form">
+                        {% block login_form %}
+                        {% endblock %}
+                </section>
+            </div>
+            <div id='vg-help-container' class='right'>
+                <a class='documentation-link' href="{% url 'external_help' %}?page=about.html"> About</a>
+                <a class='documentation-link' href="{% url 'external_help' %}?page=terms.html"> T&amp;C's</a>
+            </div>
+            <div class='clear'></div>
+        </div>
+        <div class='clear'></div>
+        {% endblock %}
+    </div>
+
+    <div id="content" class='flex-1'>
+        {% block content %}{% endblock %}
+    </div>
+
+    <div id="footer" class='flex-none'>
+        {% block footer %}
+        <hr />
+        {% endblock %}
+    </div>
+</div>
+</body>
+
+</html>

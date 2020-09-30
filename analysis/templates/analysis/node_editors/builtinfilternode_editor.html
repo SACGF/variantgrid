@@ -1,0 +1,80 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{%  block inlinejs %}
+    {{ block.super }}
+
+    function setupClinVarStars(bifForm) {
+        let bifSelect = $("#id_built_in_filter", bifForm);
+        let starsContainer = $("#django-starfield-min_clinvar_stars");
+
+        // We need to add a zero radio input, because it doesn't save to DB when none are selected.
+        let inputZero = $("<input/>", {id:"min_clinvar_stars-zero", name:"min_clinvar_stars", type:"radio", value:"0"})
+        starsContainer.append(inputZero);
+
+        // Make a "clear" link - to be able to have zero stars
+        var clearLink = $("<a/>", {id: "zero-stars-link", href: "javascript:clearStars()"}).text("Show all (set to zero stars)");
+        starsContainer.after(clearLink);
+
+        function checkSelectedStars() {
+            let numStars = getStarsRadioInputs().filter(":checked").val();
+            if (numStars) {
+                clearLink.show();
+            } else {
+                $("#zero-stars-link").hide();
+            }
+        }
+
+        getStarsRadioInputs().change(checkSelectedStars);
+        checkSelectedStars();
+
+
+        function checkClinVarStarsVisibility() {
+            if (bifSelect.val() == 'C') {
+                $("label[for=id_min_clinvar_stars]").show();
+                starsContainer.show();
+            } else {
+                $("label[for=id_min_clinvar_stars]").hide();
+                starsContainer.hide();
+            }
+        }
+
+        bifSelect.change(checkClinVarStarsVisibility);
+        checkClinVarStarsVisibility();
+    }
+
+    function getStarsRadioInputs() {
+        let starsContainer = $("#django-starfield-min_clinvar_stars");
+        return $('input[type="radio"]', starsContainer);
+    }
+
+    function clearStars() {
+        $("#zero-stars-link").hide();
+        getStarsRadioInputs().prop('checked', false);
+        $("#min_clinvar_stars-zero").prop("checked", "checked");
+    }
+
+{%  endblock inlinejs %}
+
+{% block docreadyjs %}
+    let bifForm = $("form#built-in-filter");
+    ajaxForm(bifForm);
+
+    setupClinVarStars(bifForm);
+{% endblock docreadyjs %}
+
+{% block content %}
+<style>
+	#id_percent {
+		width: 100px;
+	}
+</style>
+<div>
+	<form id="built-in-filter" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {{  form.as_p }}
+		<button id='built-in-filter-save' class="btn btn-primary">save</button>
+        {{ form.media }}
+	</form>
+</div>
+
+{% endblock content %}

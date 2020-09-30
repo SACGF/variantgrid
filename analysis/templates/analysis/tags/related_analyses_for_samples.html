@@ -1,0 +1,27 @@
+{% extends "analysis/tags/base_related_analyses.html" %}
+
+{% block create_analyses %}
+    {% for sample in samples %}
+        {% if sample.import_status == 'S' %}
+            {% load related_analyses_tags %}
+            {% analysis_templates_tag sample_somatic=sample.is_somatic sample_gene_list=sample.qc_gene_list sample=sample %}
+        {% else %}
+            This sample has import_status of <b>{{ sample.get_import_status_display }}</b> - it can not be analysed.
+        {% endif %}
+    {% endfor %}
+{% endblock create_analyses %}
+
+{% block end_of_template %}
+    {% if sample_mutational_signatures %}
+    <h3>Mutational signatures</h3>
+    <div>
+        <table>
+            <tr><th>Sample <th>Signature
+            {% for mutational_signature in sample_mutational_signatures %}
+            <tr><td>{{ mutational_signature.sample.name }}
+                <td><a href="{% url 'view_mutational_signature' pk=mutational_signature.pk %} ">{{ mutational_signature }}</a>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+{% endblock end_of_template %}

@@ -1,0 +1,49 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% load static %}
+{% block title %}Variant Classification Export{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <meta http-equiv="refresh" content="1;url={% url 'variant_classification_export_api' %}?{{ query_string | query_unquote}}" />
+    <style>
+    #downloading-in {
+        font-weight: bold;
+    }
+    </style>
+    <script>
+        $(document).ready(() => {
+            window.setTimeout(() => {
+                $('#downloading-in').text('Now');
+            },1000);
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+<div class="container">
+    <h3>Downloading Classifications</h3>
+    <div class="card">
+        <div class="card-header">Download Parameters</div>
+        <div class="card-body">
+            {% labelled label="Query String" %}{{ query_string | query_unquote }}{% endlabelled %}
+            {% labelled label="Genome Build" %}{{ build }}{% endlabelled %}
+            {% labelled label="Share Level" %}{{ share_level }}{% endlabelled %}
+            {% labelled label="Selection" %}{{ include_details }}{% endlabelled %}
+            {% labelled label="Format" %}{{ format }}{% endlabelled %}
+            {% if the_rest %}
+                {% for key, value in the_rest.items %}
+                    {% labelled label=key %}{{ value }}{% endlabelled %}
+                {% endfor %}
+            {% endif %}
+        </div>
+        <div class="card-footer">
+            Downloading <span id="downloading-in">Shortly</span>.
+            If your download doesn't start <a class="hover-link" href="{% url 'variant_classification_export_api' %}?{{ query_string }}">Click Here</a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

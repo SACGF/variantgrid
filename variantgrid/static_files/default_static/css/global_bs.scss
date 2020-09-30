@@ -1,0 +1,533 @@
+// THIS FILE IS AN ALTERNATIVE TO global.scss
+// Pages that have been converted properly to bootstrap should only use this
+// Pages that have been thrown into bootstrap without conversion should use this and global_legacy.scss
+// Pages that haven't been converted at all (let's update them soon) can use global.scss
+
+// Headings
+h3:not(.popover-header), h4:not(.popover-header) {
+    margin-bottom: 16px; // provide a bit more space under headings
+}
+h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-header) {
+    margin-top: 28px; // more spacing for a page divided into several h3s
+}
+
+/// FORMS
+
+/// AUTOSELECTS
+
+// Make the heights of autocomplete standard input height
+.select2-selection.form-control {
+    height: 33px !important;
+    padding: 4px 0 0 0 !important;
+    border-color: #ced4da !important;
+}
+// adjust the expand/collapse arrow location accordingly
+.form-control .select2-selection__arrow {
+    top: 5px !important;
+}
+
+/// GENERAL FORMS
+
+// make the labels look different enough from plain text
+label {
+    color: #555;
+    font-weight: 500;
+}
+
+/// REGULAR TABLES
+
+/* be able to show alerts in tables without them making the row giant */
+.table .alert {
+  margin-bottom: 1px;
+  height: 20px;
+  line-height: 16px;
+  padding:0px 15px 3px 15px;
+}
+
+/// DATATABLES
+
+// When showing just a preview
+// used by event-log (and whatever other datatable wants to have extra data)
+
+// don't need to bold everything
+.table th {
+    font-weight: 500;
+}
+// Rebranding of Bootstrap
+.card-header {
+    background-color: #e4e4e4;
+    font-weight: 500;
+    a {
+        color: #444488;
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
+
+// not sure if we want to give all cards the pyprus background
+// but stops the screen from being too white..
+/*
+.card-body {
+    background-color: #f5fff5;
+    .list-group-item {
+        background-color: #f5fff5;
+    }
+}
+*/
+
+td.dt-preview {
+    font-family: monospace;
+    font-size: 12px;
+    overflow-x: hidden;
+    color: #222288;
+    cursor: pointer;
+    &:hover {
+        text-decoration: underline;
+        text-decoration-style: dotted;
+        text-decoration-color: gray;
+    }
+}
+
+// when we expand on that preview to show more details
+table.dataTable {
+    .dt-detail {
+        font-size: 12px;
+        white-space: pre-wrap;
+        color: #444444;
+        font-family: monospace;
+    }
+    tr.child {
+        td.child {
+            padding-top: 0;
+            padding-bottom: 16px;
+            fieldset.form-fields {
+                padding-top: 0;
+                & > * {
+                    & > label {
+                        width: 100px;
+                    }
+
+                    > *:nth-child(2) {
+                        width: calc(100% - 100px);
+                    }
+                }
+            }
+        }
+    }
+}
+table.dataTable td.dataTables_empty {
+    font-size: 16px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+}
+
+.variant-coordinate {
+    word-break: break-all;
+}
+
+// TIME AGO
+/*
+time.ago:after {
+    content: ' ago';
+    font-size: smaller;
+    color: #444444;
+}
+time.future:after {
+    content: ' from now' !important;
+}
+ */
+
+span.select2-container {
+    min-width: 100% !important;
+    width: 100% !important;
+}
+
+// filter icons
+// this is often cut off on the page
+//.filter-row {
+//    position: relative;
+//}
+//.filter-row::before {
+//    /*
+//    content: 'f0b0';
+//    font-family: 'FontAwesome';
+//    font-size: 14pt;
+//    display: inline-block;
+//    font-style: normal;
+//    font-variant: normal;
+//    text-rendering: auto;
+//    -webkit-font-smoothing: antialiased;
+//     */
+//    font-family: 'FontAwesome';
+//    content: "\f0b0";
+//    position: absolute;
+//    bottom: 20px;
+//    left: -8px;
+//    // float: left;
+//}
+.no-padding {
+    padding: 0 0 0 0 !important;
+}
+.card-body-list {
+    padding: 0 0 0 0 !important;
+    .list-group {
+        border: none;
+        border-radius: 0 !important;
+        .list-group-item {
+            border-left: none !important;
+            border-right: none !important;
+            &:first-child {
+                border-top: none !important;
+            }
+            &:last-child {
+                border-bottom: none !important;
+            }
+        }
+    }
+}
+
+// making jqgrid work nice, hope to deprecate it in favour of DataTables, but that's a lot of work
+.ui-jqgrid > .ui-jqgrid-pager {
+    height: 38px !important;
+}
+
+hr {
+    width: 100%;
+}
+
+// give labels pointers
+label.form-check-label, label[for] {
+    cursor: pointer;
+}
+// reboot gives labels a bottom margin, it makes everything not align, not sure what the deal with it is
+label {
+    margin-bottom: 0;
+}
+
+// tables
+table.table {
+    font-size: 12px;
+}
+
+// used when making an inline form with custom widget e.g. autoselect
+.inline-custom {
+    width: 200px;
+}
+
+// make list group links look every so subtly look like links
+a.list-group-item-action {
+    color: #444488 !important;
+    // regardless of if there's an href (there might be a click handler)
+    cursor: pointer;
+}
+
+// Variant classification form
+.not-met {
+    color: #AAAAAA !important;
+}
+.override {
+    cursor: help;
+    &:after {
+        content: '*';
+        color: #bbbbbb;
+    }
+}
+
+.note.empty {
+    opacity: 0.5
+}
+.explain.empty {
+    opacity: 0
+}
+.note, .explain {
+    cursor: pointer;
+    padding-right: 4px;
+}
+#vc-form {
+    width: 555px;
+    .no-results {
+        display: none;
+    }
+    .btn-toolbar {
+        width: 100%;
+        display: flex;
+        & > * {
+            margin: 4px;
+            flex-grow:1;
+            flex-shrink:1;
+            width: 30%;
+        }
+    }
+    .card-body {
+        background-color: rgb(245,255,245);
+    }
+}
+#vc-extras {
+    position: fixed;
+    min-width: 200px;
+    max-width: 800px;
+    left: 760px;
+    top: 62px;
+}
+.btn-disabled-wrapper {
+    display: inline-block;
+    & > * {
+        width: 100%;
+    }
+}
+.btn-toolbar {
+    *.btn:not(:first-child) {
+        margin-left: 10px;
+    }
+}
+// Undo this bootstrap so drop downs don't get cut off on classification form
+.accordion>.card {
+    overflow:inherit;
+}
+
+// sometimes the link is an onclick need to show pointer
+a {
+    cursor: pointer;
+}
+.external-link::after {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'FontAwesome';
+    content: "\f35d";
+    opacity: 0.4;
+    margin-left: 4px;
+}
+
+.modal-header nav .breadcrumb {
+    background-color: transparent;
+    margin: 0;
+    padding: 0;
+}
+
+table.sticky-header thead th {
+    background-color:white;
+    position: sticky !important;
+    // top: 48px;
+    top: -36px;
+    z-index: 1;
+}
+
+.container-table {
+    max-width: 1700px;
+    width: 100%;
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+a.list-group-item-action.list-group-item-light {
+    color: #8888aa !important;
+}
+.list-group-item-action {
+    cursor: pointer;
+}
+
+/* accordion styles */
+.accordion {
+	.card-header {
+		cursor: pointer;
+		position: relative;
+	}
+
+	&.indicator-plus {
+		.card-header {
+			&:after {
+				font-family: 'FontAwesome';
+				content: "\f078";
+				// float: left;
+				position: absolute;
+				right: 1rem;
+				top: 0.5rem;
+			}
+			&.collapsed {
+				&:after {
+					content: "\f077";
+				}
+			}
+		}
+	}
+	&.indicator-plus-before {
+		&.round-indicator {
+			.card-header {
+				&:before {
+					font-family: 'FontAwesome';
+					font-size: 12pt;
+					content: "\f077";
+					// float: left;
+					position: absolute;
+					right: 1rem;
+					top: .5rem;
+					// margin-right: 10px;
+					color: #88b;
+				}
+				&.collapsed {
+					&:before {
+						content: "\f078";
+						color: #88b;
+					}
+				}
+			}
+		}
+		.card-header {
+			&:before {
+				font-family: 'FontAwesome';
+				content: "\f068";
+				// float: left;
+				position: absolute;
+				right: 1rem;
+				top: 0.5rem;
+			}
+			&.collapsed {
+				&:before {
+					content: "\f067";
+				}
+			}
+		}
+	}
+
+	&.indicator-chevron {
+		.card-header {
+			&:after {
+				font-family: 'FontAwesome';
+				content: "\f078";
+				// float: right;
+				position: absolute;
+				right: 1rem;
+				top: 0.5rem;
+			}
+			&.collapsed {
+				&:after {
+					content: "\f077";
+				}
+			}
+		}
+	}
+
+	&.background-none {
+		[class^="card"] {
+			background: transparent;
+		}
+	}
+
+	&.border-0 {
+		.card {
+			border: 0;
+		}
+	}
+}
+
+/* for classifications */
+.genome-build {
+    font-size: 8px;
+    margin-right: 4px;
+}
+
+.share-level-LAB, .share-level-INSTITUTION {
+    opacity: 0.4;
+}
+
+span.cs {
+    display: inline-block;
+    padding: 2px 4px 2px 4px;
+    border: 1px solid gray;
+    border-radius: 4px;
+}
+
+
+span.cs-b { background-color: #ccccff }
+span.cs-lb { background-color: #ddddff }
+span.cs-vus { background-color: #dddddd }
+span.cs-vus_a { background-color: #dddddd }
+span.cs-vus_b { background-color: #dddddd }
+span.cs-vus_c { background-color: #dddddd }
+span.cs-lp { background-color: #ffdddd }
+span.cs-p { background-color: #ffcccc }
+span.cs- { background-color: #f0f0f0 }
+
+/* share icons */
+label .tiny-icon {
+	width: 12px;
+	height: 12px;
+	margin-right: 4px;
+}
+
+
+/* for setting non repeating backgound image */
+div.background-image {
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+}
+
+// placeholder values
+.no-value {
+    color: #BBBBBB !important;
+    font-style: italic;
+    border-color: #dddddd !important;
+}
+.zero-value {
+    color: #AAAAAA;
+}
+
+// still used by wiki (not yet compatible with bootstrap's d-none
+.hidden { display: none }
+
+.hover-detail {
+    color: #446;
+    text-decoration: none;
+    cursor: help;
+}
+.hover-link, nav ol.breadcrumb .breadcrumb-item a {
+	color: #44a;
+    text-decoration: none;
+	cursor: pointer;
+	&:hover {
+		text-display: underline;
+	}
+}
+
+// note also need to make the element inline-block or block etc
+.readonly {
+    color: #444444;
+    border: 1px solid #dddddd;
+    border-radius: 4px;
+    min-height: 34px;
+    padding-left: 8px;
+    padding-top:6px;
+    background-color: #fafafa;
+    cursor:not-allowed;
+
+    .override-source {
+      text-transform: lowercase;
+      font-weight: bold;
+      font-family: monospace;
+      font-size: small;
+      color: #aaa;
+    }
+}
+
+table.as_table {
+  th {
+    width: 50%;
+    text-align: right;
+    border: none;
+  }
+  td {
+    width: 50%;
+    text-align: left !important;
+    border: none;
+  }
+}
+
+.tooltip {
+  pointer-events: none;
+}

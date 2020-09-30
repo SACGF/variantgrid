@@ -1,0 +1,72 @@
+{% extends menu_patients_base %}
+{% load static %}
+{% block title %}Gene Counts{% endblock %}
+
+{% block head %}
+<style>
+div.loading {
+    background: url({% static 'icons/loading.gif' %}) no-repeat center center;
+    width: 16px;
+    height: 16px;
+    float: left;
+}
+</style>
+<script>
+
+$(document).ready(function() {
+    var gcContainer = $("#cohort-gene-counts-graph-container");
+
+    function load_graph(url) {
+        var loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
+        gcContainer.html(loading_icon);
+        gcContainer.load(url);
+    }
+
+    function load_gene_list(geneListId) {
+        const geneCountType = $("#id_gene_count_type").val();
+        load_graph(Urls.cohort_gene_counts_matrix({{ cohort.pk }}, geneCountType, geneListId));
+    }
+
+    $('#id_gene_list').change(function() {
+        var geneListId = $(this).val();
+        if (geneListId) {
+            load_gene_list(geneListId);
+        } else {
+            gcContainer.empty();
+        }
+    });
+    
+    {% if gene_list_id %}
+        load_gene_list({{ gene_list_id }});
+    {% endif %}
+    
+    $("button#custom-genes-button").button();
+});
+</script>
+{% endblock %}
+
+{% block submenu_page_content %}
+
+    <a href="{% url 'view_cohort' cohort.pk %}">Back to cohort {{ cohort.name }}</a>
+
+    <table>
+    {{ gene_count_type_choice_form }}
+    <tr>
+        <th>Gene List
+        <td>{{ gene_list_form.gene_list }}{{ gene_list_form.media }}
+    <tr><th>Enter Genes
+        <td>
+        <div id='gene-list-form-container'>
+            <form id="new-gene-list-form" method="post">
+                {% csrf_token %}
+                {{ custom_gene_list_form.custom_gene_list_text }}
+                <button id='custom-genes-button'>Use Custom Genes</button>
+            </form>
+        </div>
+    </table>
+
+    <div id='cohort-gene-counts-graph-container'>
+    
+    </div>
+
+{% endblock %}

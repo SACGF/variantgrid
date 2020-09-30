@@ -1,0 +1,46 @@
+{% if kit_coverage_rows %}
+<script>
+function showMissingGenes(code) {
+    var missingGenesContainer = $("#missing-genes-container");
+    $(".missing-genes", missingGenesContainer).hide();
+    $("#" + code, missingGenesContainer).show();
+}
+</script>
+
+<h3>Enrichment Kit coverage</h3>
+<table>
+<tr>
+    <th>Pathology Test Version
+    {% for ek in enrichment_kits_names %}
+    <th>{{ ek }} 
+    {% endfor %}
+{% for ptv, kit_data in kit_coverage_rows %}
+<tr>
+    <td> {{ ptv }}
+    {% for enrichment_kit, missing, genes in kit_data %}
+        <td>
+        {% if missing == 0 %}
+            Covered
+        {% else %}
+            <a href="javascript:showMissingGenes('{{ptv.pk}}_{{enrichment_kit.pk}}')">Missing {{ missing }} genes</a>
+        {% endif %}
+    {% endfor %}
+        
+{% endfor %}
+</table>
+
+
+<div id="missing-genes-container">
+{% for ptv, kit_data in kit_coverage_rows %}
+    {% for enrichment_kit, missing, genes in kit_data %}
+        <div id='{{ptv.pk}}_{{enrichment_kit.pk}}' class='hidden missing-genes'>
+            <div>
+                <b>{{ ptv }}</b> contains {{ missing }} genes not in <b>{{ enrichment_kit }}</b>
+            </div>
+            {{ genes }}
+        </div>
+    {% endfor %}
+{% endfor %}
+</div>
+
+{% endif %}

@@ -1,0 +1,40 @@
+{% extends menu_pathtests_base %}
+{% load static %}
+{% block title %}Test Orders{% endblock title %}
+
+{% block jsdocumentready %}
+
+jQuery.extend($.fn.fmatter , {
+        viewPathologyOrderLink : function(cellvalue, options, rowObject) {
+            const VIEW_PATHOLOGY_TEST_ORDER_URL = Urls.view_pathology_test_order(rowObject.id);
+            var viewLink = "<a class='grid-link' href=" + VIEW_PATHOLOGY_TEST_ORDER_URL + "><div class='grid-link-icon view-details-link'></div></a>";
+            return "<span>" + viewLink + "</span>";
+        }
+});
+
+{% if external_test_order_form %}
+$('#id_external_pk').change(function() {
+    var externalPK = $(this).val();
+    window.location = Urls.view_external_pathology_test_order(externalPK);
+});
+{% endif %}
+
+{% endblock jsdocumentready %}
+{% block submenu_page_content %}
+
+    {% load ui_help %}
+    {% page_help 'pathtests/pathology_tests_help' 'Pathology Tests' %}
+
+    Last updated from HELIX: {{ last_checked }} ({{ last_checked|timesince }})
+
+    {% if external_test_order_form %}
+    <form>
+    <b>Jump to test order: </b> {{ external_test_order_form.external_pk }} {{ external_test_order_form.media }}
+    </form>
+    {% endif %}
+
+    {% load jqgrid_tags %}
+    {% jqgrid 'pathology_test_orders_grid' 'pathology_test_orders' False None 'jqgrid/jqgrid.html' download_grid_json_as_csv=True %}
+    
+    
+{% endblock submenu_page_content %}

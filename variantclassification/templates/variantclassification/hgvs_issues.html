@@ -1,0 +1,56 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% block title %}HGVS issues{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script>
+    $(document).ready(() => {
+        Flags.instance.init({userId: '{{user.id}}'});
+    });
+</script>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h3>All Allele/HGVS Issues Filter</h3>
+
+        <a class="btn btn-outline-primary" href="{% url 'hgvs_issues_download' %}"><i class="fas fa-file-csv"></i> Download HGVS Issues</a>
+
+        {% comment %}
+        <!-- flags filter needs to be restyled -->
+        <div id="flags-filter" data-filter="{{ filter_flags }}"></div>
+        {% endcomment %}
+
+        <h3>Allele Issues</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                <th>ID</th>
+                <th>ClinGen Allele ID</th>
+                <th>GRCh37</th>
+                <th>GRCh38</th>
+                <th>Classification Count</th>
+                <th>Flags</th>
+            </thead>
+            <tbody>
+            {% for allele in alleles %}
+                <tr>
+                    <td><a class="hover-link" href="{% url 'view_allele' allele.id %}">{{ allele.id }}</a></td>
+                    <td>{% if allele.clingen_allele %}{{ allele.clingen_allele }}{% else %}<span class="error-value">MISSING</span>{% endif %}</td>
+                    <td class="variant-coordinate">{{ allele.grch37 | default_if_none:"-" }}</td>
+                    <td class="variant-coordinate">{{ allele.grch38 | default_if_none:"-" }}</td>
+                    <td>{{ allele | variant_classification_count }}
+                    <td data-flags="{{allele.flag_collection.id}}">...</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <h3>Classification HGVS Issues</h3>
+        Classifications with variant matching in progress, failed or variant matching warnings appear here
+    </div>
+    <div class="container-table">
+        {% variant_classification_table classifications show_variant_link=True show_clinical_context=False %}
+    </div>
+{% endblock %}

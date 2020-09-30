@@ -1,0 +1,16 @@
+<!-- Needs plotly and plotly_helpers included -->
+{% load js_tags %}
+<script>
+$(document).ready(function() {
+    var x = {{ x | jsonify }};
+    var y = {{ y | jsonify }};
+    var z = {{ z | jsonify }};
+    var labels = {{ labels | jsonify }};
+    
+    var elementId = "version-diff-graph-{{ uuid }}";
+    showHeatMap(elementId, "{{ title }}", x, y, z, labels);
+    
+
+});
+</script>
+<div id='version-diff-graph-{{ uuid }}'></div>

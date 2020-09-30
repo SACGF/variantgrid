@@ -1,0 +1,64 @@
+{% extends menu_genes_base %}
+{% load static %}
+{% block title %}Genes{% endblock title %}
+
+{% block jshead %}
+function showForm() {
+    var box = $("#show-form-container");
+    box.empty();
+    $("div#new-gene-list-form-container").slideDown('slow');
+}
+{% endblock jshead %}
+
+{% block jsdocumentready %}
+$('#id_gene_list').change(function() {
+    var geneListId = $("#id_gene_list").val();
+    window.location = Urls.view_gene_list(geneListId);
+});
+
+var options = {
+    target: '#new-gene-list-form-container',
+    success: function(data) {
+        let geneListId = data['gene_list_id'];
+        window.location = Urls.view_gene_list(geneListId);
+    },
+};
+$('form#new-gene-list-form').ajaxForm(options); 
+
+{% if not form.errors %}
+    $("div#new-gene-list-form-container").hide();
+{% endif %}
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+    {% load help_tags %}
+    {% page_help page_id='gene_lists/gene_lists_help' title='Gene Lists' %}
+
+    <div class="horizontal-fields">
+        <p>
+            <label>Jump to gene list</label>
+            <span>{{ gene_list_form.gene_list }} {{ gene_list_form.media }}</span>
+        </p>
+    </div>
+
+    <div id="show-form-container">
+        <a class='hover-link' id="show-form-link" href="javascript:showForm()">New GeneList</a>
+    </div>
+    <div id="new-gene-list-form-container">
+      <form id="new-gene-list-form" method="post" action="{% url 'create_custom_gene_list' %}">
+        {% csrf_token %}
+          <fieldset class="form-fields small">
+              <legend>Create</legend>
+              {{ create_gene_list_form.as_p }}
+              {% include "messages/messages.html" %}
+              <button id='submit-button' class="btn btn-primary">Create GeneList</button>
+          </fieldset>
+      </form>
+    </div>
+
+    {% include "genes/gene_lists_tab.html" %}
+
+{% endblock submenu_page_content %}
+
+

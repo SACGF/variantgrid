@@ -1,0 +1,63 @@
+{% if page_help_html %}
+<style>
+	#page-help-{{ page_id }} {
+		border: 1px solid #c2c2c2;
+		border-radius: 10px;
+		margin: 10px 0 10px 0;
+		background-color: #EFEFEF;
+	}
+</style>
+
+<script type="text/javascript">
+	$(document).ready(function() {
+		let helpContainer = $("#page-help-{{ page_id }}");
+		let content = $(".page-help-content", helpContainer);
+        let shown = false;
+
+        function togglePageHelp() {
+            shown = !shown;
+            if (shown) {
+                openPageHelp();
+            } else {
+                closePageHelp();
+            }
+        }
+		function openPageHelp() {
+            helpContainer.removeClass('collapsed');
+            helpContainer.addClass('expanded');
+			content.slideDown();
+		}
+		function closePageHelp() {
+			content.slideUp({done: ()=> {
+    			helpContainer.removeClass('expanded');
+                helpContainer.addClass('collapsed');
+			}});
+		}
+
+		{% if not page_help_html %}
+			helpContainer.hide();
+		{% endif %}
+
+        let pageHelp = $('#page-help');
+        pageHelp.show();
+        pageHelp.click(openPageHelp);
+
+		$(".page-help-menu-bar", helpContainer).click(togglePageHelp);
+	});
+</script>
+{% endif %}
+{% if page_title %}<h3>{{ page_title }}</h3>{% endif %}
+{% if page_help_html %}
+    <div class='page-help collapsed' id='page-help-{{ page_id }}'>
+        <div class='page-help-menu-bar' title='Click to toggle help'>
+            <div class='ui-widget page-help-logo'>?</div>
+            <div class='toggle-icon'></div>
+            <div class='page-help-title' class='right'>{{ help_page_title }}</div>
+        </div>
+
+        <div class='page-help-content' style="display:none">
+        {{ page_help_html | safe }}
+        <div class="help-footer">Click <a href="{{help_url}}" target="_blank" class="hover-link">here</a> for full product documentation.</div>
+        </div>
+    </div>
+{% endif %}

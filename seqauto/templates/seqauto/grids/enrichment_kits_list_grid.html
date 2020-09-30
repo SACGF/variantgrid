@@ -1,0 +1,10 @@
+{% extends "jqgrid/jqgrid.html" %}
+
+{% block formatter %}
+        viewEnrichmentKit : function(pk, options, rowObject) {
+            if (pk) {
+    			let url = Urls.view_enrichment_kit(pk);
+    	    	return "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
+    	    }
+		}
+{% endblock formatter %}

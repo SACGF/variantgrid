@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="static scss" pattern="file[variantgrid]:variantgrid/static_files//*.scss" />
+</component>

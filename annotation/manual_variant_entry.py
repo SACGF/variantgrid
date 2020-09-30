@@ -1,0 +1,79 @@
+from django.conf import settings
+from django.core.exceptions import PermissionDenied
+import os
+
+from annotation.models.models import ManualVariantEntryCollection, ManualVariantEntry
+from annotation.tasks.process_manual_variants_task import ManualVariantsPostInsertTask
+from library.django_utils.django_file_utils import get_import_processing_dir
+from library.utils import full_class_name
+from library.vcf_utils import write_vcf_from_tuples
+from snpdb.models import Variant
+from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_enums import ImportSource
+from upload.models import UploadPipeline, UploadedFile, UploadStep, \
+    UploadedManualVariantEntryCollection
+from upload.models_enums import UploadedFileTypes, UploadStepTaskType, \
+    VCFPipelineStage, UploadStepOrigin
+from upload.upload_processing import process_upload_pipeline
+
+
+class CreateManualVariantForbidden(PermissionDenied):
+    pass
+
+
+def check_can_create_variants(user):
+    can_create = settings.UPLOAD_ENABLED and settings.VARIANT_MANUAL_CREATE
+    can_create &= user.is_superuser or settings.VARIANT_MANUAL_CREATE_BY_NON_ADMIN
+    if not can_create:
+        raise CreateManualVariantForbidden()
+
+
+def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
+    check_can_create_variants(user)
+    mvec = ManualVariantEntryCollection.objects.create(user=user,
+                                                       genome_build=genome_build)
+    variants_list = []
+    for i, line in enumerate(variants_text.split('\n')):
+        line = line.strip()
+        kwargs = {"manual_variant_entry_collection": mvec,
+                  "line_number": i + 1,
+                  "entry_text": line}
+
+        if variant_tuple := Variant.get_tuple_from_string(line, mvec.genome_build):
+            variants_list.append(variant_tuple)
+        else:
+            kwargs["error_message"] = f"Couldn't convert '{line}' to tuple"
+
+        ManualVariantEntry.objects.create(**kwargs)
+
+    # Because we need to normalise / insert etc, it's easier just to write a VCF
+    # and run through upload pipeline
+    working_dir = get_import_processing_dir(mvec.pk, "manual_variants")
+    vcf_filename = os.path.join(working_dir, "manual_variant_entry.vcf")
+    write_vcf_from_tuples(vcf_filename, variants_list)
+    uploaded_file = UploadedFile.objects.create(path=vcf_filename,
+                                                import_source=ImportSource.WEB,
+                                                name='Manual Variant Entry',
+                                                user=user,
+                                                file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
+                                                visible=False)
+
+    UploadedManualVariantEntryCollection.objects.create(uploaded_file=uploaded_file,
+                                                        collection=mvec)
+    upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+    add_manual_variant_upload_steps(upload_pipeline)
+    process_upload_pipeline(upload_pipeline)
+    return mvec
+
+
+def add_manual_variant_upload_steps(upload_pipeline):
+
+    mv_post_insert_clazz = ManualVariantsPostInsertTask
+    class_name = full_class_name(mv_post_insert_clazz)
+    UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                              name="ManualVariantsPostInsertTask",
+                              origin=UploadStepOrigin.USER_ADDITION,
+                              sort_order=10,
+                              task_type=UploadStepTaskType.CELERY,
+                              pipeline_stage_dependency=VCFPipelineStage.DATA_INSERTION,
+                              script=class_name)

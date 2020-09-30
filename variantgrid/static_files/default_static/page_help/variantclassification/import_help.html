@@ -1,0 +1,53 @@
+<p>
+    The import page is to help power users understand how the import API works for creating automated uploads. It is not intended for general use.<br/>
+    You can use the form to provide an example record, and then see at the bottom left what JSON that maps to.<br/>
+    Clicking the Run button uploads the data to the server and shows the response.<br/>
+    If test mode and delete were off, after you Run a link to the newly created (or just updated) record will appear.
+</p>
+<p>
+    <b>Test Mode</b> The test mode checkbox means whatever you do will not have an effect on the database.
+    Note that some of the return codes will be different when you do this, e.g. the id will be null instead of a valid value.
+</p>
+<p>
+    <b>Lab</b> Which lab is this record uploaded as, selection will be limited to the ones the current user is associated with.
+</p>
+<p>
+    <b>Lab Record ID</b> The id to be associated to this record, should be unique within the lab for new records, or the same
+    as an existing record for an update.<br/>
+    It will default to a new ID on page load, but won't change automatically after that.
+</p>
+<p>
+    <b>Delete</b> If checked the delete flag will be sent up, should not be sent up on new record ids.
+</p>
+<p>
+    <b>Publish Level</b> What share level this data should be sent up as. Note this will only take effect if there are
+    no validation errors.
+</p>
+<p>
+    <b>c.hgvs</b> & <b>genome build</b> The basic details for matching a coordinate. Note that the API does allow for
+    variant coordinate instead of c.hgvs, but c.hgvs is preferred.
+</p>
+<p>
+    <b>Clinical Significance</b>, <b>Zygosity</b> Mandatory fields for a record - will only accept certain values.
+</p>
+<p>
+    <b>key x</b>, <b>value x</b> For providing values for any key found in the list of evidence keys.<br/>
+    e.g.
+<span style="font-family:monospace">
+    <span style="display:inline-block;padding:4px;border:1px solid gray;border-radius:2px">gene_symbol</span>&nbsp;
+    <span style="display:inline-block;padding:4px;border:1px solid gray;border-radius:2px">PTEN</span></span><br/>
+    All values will be sent up as strings, though the API will automatically convert strings to numbers, booleans and lists
+    when appropriate.
+</p>
+<p>
+    <b>Extra Data</b> there is a text field for appending arbitrary JSON to the request.<br/>
+    This will allow you to upload extra bits of data such as notes and explain, e.g.<br/>
+    <pre style="font-family:monospace;white-space:pre-wrap">{
+    "allele_origin": {
+        "value":"germline",
+        "note":"I think this is germline",
+        "explain":"Our lab uses the following criteria to determine allele_origin"
+    },
+    "gnomad_af": 0.0002
+}</pre>
+</p>

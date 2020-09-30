@@ -1,0 +1,1 @@
+<p {% if css_class %}class="{{ css_class }}"{% endif %}><label for="{{id}}" {% if title %}title="{{ title }}" class="hover-detail"{% endif %}>{{ label }}</label><span id="{{ id }}" {% if span_class %}class="{{ span_class }}"{% endif %}>{{ value | default_if_none:'<span class="no-value">-</span>' }}</span></p>

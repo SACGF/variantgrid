@@ -1,0 +1,288 @@
+{% if variant_data %}
+    {% load static %}
+    {% load js_tags %}
+    {% comment %}
+    Define a JS function "hotspot_graph_click_func(text, transcript_accession, protein_position)" to get callbacks from plotly clicks
+    {% endcomment %}
+    <div class="hotspot-graph" id="hotspot-graph-{{ uuid }}"></div>
+    {% if has_graph_filter_toolbar %}
+    <style>
+        .slider-container {
+            height: 30px;
+        }
+
+        .gnomad-af-slider {
+            margin-left: 15px;
+            width: 400px;
+        }
+
+        .gnomad-af-slider label {
+          position: absolute;
+          width: 20px;
+          margin-top: 15px;
+          margin-left: -10px;
+          text-align: center;
+        }
+    </style>
+    <div class="slider-container">
+        <label class="left" for="hotspot-graph-af-slider-{{ uuid }}">Graph gnomAD max %: </label>
+        <div class="left gnomad-af-slider" id="hotspot-graph-af-slider-{{ uuid }}"></div>
+        <div class="clear"></div>
+    </div>
+    {% endif %}
+    <script>
+    _ = function() {
+        const GNOMAD_PERCENT = [0.1, 1, 5, 100];
+        let molecularConsequenceColors = {{ molecular_consequence_colors | jsonify }};
+        let numAminoAcids = {{ transcript_version.num_amino_acids }};
+        let domains = {{ domains | jsonify }};
+        let variantData = {{ variant_data | jsonify }};
+
+        function drawTranscriptModel(selector, gnomADMaxPercent) {
+            const DEFAULT_COLORS = [
+                '#d62728',  // brick red
+                '#2ca02c',  // cooked asparagus green
+                '#1f77b4',  // muted blue
+                '#ff7f0e',  // safety orange
+                '#e377c2',  // raspberry yogurt pink
+                '#bcbd22',  // curry yellow-green
+                '#17becf',  // blue-teal
+                '#9467bd',  // muted purple
+                '#8c564b'   // chestnut brown
+            ];
+
+            let titleText = "{{ title }}";
+            if (gnomADMaxPercent != 100) {
+                titleText += "\ngnomAD max " + gnomADMaxPercent + "%";
+            }
+            let gnomadAFMax = gnomADMaxPercent / 100.0;
+            let consequences = Object.keys(molecularConsequenceColors).sort();
+            let yMax = 5; // show minimum so gene diagram doesn't get too fat
+            let variantsByConsequence = {};
+            for (let i = 0; i < consequences.length; ++i) {
+                variantsByConsequence[consequences[i]] = {x: [], y: [], text: []};
+            }
+
+            for (let i = 0; i < variantData.length; ++i) {
+                let vd = variantData[i];
+                let text = vd[0];
+                let x = vd[1];
+                let consequence = vd[2];
+                let gnomadAf = vd[3];
+                let numSamples = vd[4];
+                let vbc = variantsByConsequence[consequence];
+
+                if (gnomadAf && gnomadAf > gnomadAFMax) {
+                    continue;
+                }
+
+                vbc["x"].push(x);
+                vbc["y"].push(numSamples);
+                vbc["text"].push(text);
+            }
+
+            const BAR_WIDTH = 1.5;
+            let data = [];
+            // variantData is unique per allele, but there may be different alleles that have the same protein position
+            // and consequence on the graph. The bar is by default stacked so this will push it up but we need to put
+            // the lollypop on top after working out how high it is.
+            let mergedXData = {};
+
+            for (let i = 0; i < consequences.length; ++i) {
+                let consequence = consequences[i];
+                let v = variantsByConsequence[consequence];
+                let color = molecularConsequenceColors[consequence];
+
+                let barTrace = {
+                    x: v.x,
+                    y: v.y,
+                    width: Array.from({length: v.y.length}).map(x => BAR_WIDTH),
+                    hoverinfo: 'skip',
+                    name: consequence,
+                    type: 'bar',
+                    marker: {
+                        color: color
+                    }
+                };
+                data.push(barTrace);
+
+                for (let j = 0; j < v.x.length; ++j) {
+                    let x = v.x[j];
+                    let mergedData = mergedXData[x] || {count: 0, text: {}, last_consequence: null};
+                    mergedData.count += v.y[j];
+                    mergedData.text[v.text[j]] = 1;
+                    mergedData.last_consequence = consequence;
+                    mergedXData[x] = mergedData;
+                }
+            }
+
+            // Lollypop head
+            let consequenceLollypops = {};
+            for (const [ x, mergedData ] of Object.entries(mergedXData)) {
+                let lpData = consequenceLollypops[mergedData.last_consequence] || {x: [], y: [], text: []};
+                lpData.x.push(x);
+                lpData.y.push(mergedData.count);
+                lpData.text.push(Object.keys(mergedData.text).join(" "));
+                consequenceLollypops[mergedData.last_consequence] = lpData;
+            }
+
+            for ([consequence, lpData] of Object.entries(consequenceLollypops)) {
+                let color = molecularConsequenceColors[consequence];
+                let scatterTrace = {
+                    x: lpData.x,
+                    y: lpData.y,
+                    text: lpData.text,
+                    name: consequence,
+                    showlegend: false,
+                    mode: 'markers',
+                    type: 'scatter',
+                    marker: {
+                        color: color,
+                        size: BAR_WIDTH * 5
+                    }
+                };
+                data.push(scatterTrace);
+                yMax = Math.max(yMax, ...lpData.y);
+            }
+
+
+            let geneThickness = yMax / 5;
+            let domainThickness = geneThickness * 1.2;
+            let geneYTop = 0;
+            let geneYBottom = geneYTop - geneThickness;
+            let domainPadding = (domainThickness - geneThickness) / 2;
+            let domainYTop = geneYTop + domainPadding;
+            let domainYBottom = geneYBottom - domainPadding;
+
+            // Need to give domains consistent colors
+            let colorIndex = 0;
+            let domainColors = {};
+
+            let shapes = [
+                {
+                    type: "rect",
+                    x0: 0,
+                    y0: geneYTop,
+                    x1: numAminoAcids + 1, // Ends "on" that AA so need to go to next one to cover it.
+                    y1: geneYBottom,
+                    fillcolor: "#b0b0b0",
+                }
+            ];
+
+            /* Fonts are specified in font-size units so we have to scale them ourselves
+               and abbreviate or not show if they overflow the protein domain shape */
+            const MIN_CHARS = 2;
+            let graphSize = $("#" + selector).width();
+            let fontScale = graphSize / (numAminoAcids + 1);
+            let fontSize = 10;
+            let fontWidth = fontSize / fontScale;
+
+            let annotations = [];
+            for (let i = 0; i < domains.length; ++i) {
+                let d = domains[i];
+                let domainName = d[0];
+                let domainStart = d[2];
+                let domainEnd = d[3] + 1; // Ends "on" that AA so need to go to next one to cover it.
+                let domainColor = domainColors[domainName];
+                if (typeof (domainColor) == 'undefined') {
+                    domainColor = DEFAULT_COLORS[colorIndex];
+                    colorIndex++;
+                    domainColors[domainName] = domainColor;
+                }
+                let domainShape = {
+                    type: "rect",
+                    x0: domainStart,
+                    y0: domainYTop,
+                    x1: domainEnd,
+                    y1: domainYBottom,
+                    fillcolor: domainColor,
+                };
+                shapes.push(domainShape);
+                let domainWidth = domainEnd - domainStart;
+                let domainMaxChars = domainWidth / fontWidth;
+                let domainText = "";
+                if (domainMaxChars >= MIN_CHARS) {
+                    domainText = domainName;
+                    if (domainText.length > domainMaxChars) {
+                        domainText = domainText.substring(0, domainMaxChars - 1) + ".";
+                    }
+                }
+                let annotation = {
+                    showarrow: false,
+                    x: domainStart + (domainEnd - domainStart) / 2,
+                    y: domainYBottom + domainThickness / 2,
+                    text: "<b>" + domainText + "</b>",
+                    font: {
+                        color: "white",
+                        size: fontSize
+                    },
+                    xanchor: "center",
+                };
+                annotations.push(annotation);
+            }
+            let layout = {
+                barmode: 'stack',
+                title: {
+                    text: titleText
+                },
+                showlegend: true,
+                xaxis: {
+                    title: "Amino acid",
+                    range: [0, numAminoAcids + 1],
+                    showgrid: false
+                },
+                yaxis: {
+                    title: "{{ y_title }}",
+                    range: [domainYBottom, yMax + 2],
+                    nticks: 5,
+                    showgrid: false
+                },
+                shapes: shapes,
+                annotations: annotations,
+            };
+
+            Plotly.newPlot(selector, data, layout);
+
+            let myPlot = document.getElementById(selector);
+            myPlot.on('plotly_click', function (data) {
+                let hotspot_graph_click_func = $(myPlot).attr("hotspot_graph_click_func");
+                if (typeof (hotspot_graph_click_func) != 'undefined') {
+                    let barClicked = data.points[0];
+                    let i = barClicked.data.x.indexOf(barClicked.x);
+                    let text = barClicked.data.text[i];
+                    eval(hotspot_graph_click_func + "('{{ transcript_version.pk }}', text, barClicked.x);");
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            let sliderDiv = $("#hotspot-graph-af-slider-{{ uuid }}");
+            function drawMyTranscriptModel() {
+                let gnomADMaxPercent = 100;
+                if ($(sliderDiv).length) {
+                    let value = $(sliderDiv).slider("value");
+                    gnomADMaxPercent = GNOMAD_PERCENT[value];
+                }
+                drawTranscriptModel("hotspot-graph-{{ uuid }}", gnomADMaxPercent);
+            }
+
+            let gnomadMax = GNOMAD_PERCENT.length - 1;
+            sliderDiv.slider({
+                min: 0, max: gnomadMax, step: 1, value: gnomadMax,
+                change: drawMyTranscriptModel
+            }).each(function() {
+                // From: https://stackoverflow.com/a/16877678/295724
+                var opt = $(this).data().uiSlider.options;
+                var vals = opt.max - opt.min;
+                for (var i = 0; i <= vals; i++) {
+                    var label = GNOMAD_PERCENT[i] + "%";
+                    var el = $('<label>' + label + '</label>').css('left', (i/vals*100) + '%');
+                    sliderDiv.append(el);
+                }
+            });
+
+            drawMyTranscriptModel();
+        });
+    }();
+    </script>
+{% endif %}

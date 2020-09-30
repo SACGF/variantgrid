@@ -1,0 +1,53 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+
+{% block docreadyjs %}
+	function setPedigreeLink() {
+		var pedigreeId = $("#id_pedigree").find(":selected").val();
+		setCrossLink($("#pedigree-link"), Urls.view_pedigree, pedigreeId);
+        loadPedigreeVCFLocusFilter(pedigreeId);		
+	}
+
+	setPedigreeLink();
+	$("select#id_pedigree").change(setPedigreeLink);
+    ajaxForm($("form#pedigree-form"));
+
+{% endblock docreadyjs %}
+
+{% block content %}
+<div>
+	<form id="pedigree-form" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+		<div>
+		  <b>Pedigree:</b> {{ form.pedigree }}<a class="cross-link" id="pedigree-link">View Pedigree</a>
+        </div>
+        <div>
+            {% load vcf_locus_filter_tags %}
+            {% vcf_locus_filter node node.pedigree.cohort.vcf %}
+        </div>
+        <div class='genotype-row'>
+            <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}
+            <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}
+            <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}
+            <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }} {{ form.max_pl_op }}
+        </div>
+        <div>
+            <a id='view-allele-frequency-filter-link' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+            {% load allele_frequency_tags %}
+            {% allele_frequency_controls node %}
+        </div>
+        <div>
+    		<span>
+        		<b>Inheritance:</b> {{ form.inheritance_model }}
+        	</span>
+            <span>
+                <b>Require All Zygosity Calls:</b> {{ form.require_zygosity }}
+            </span>
+		</div>
+		<button id='pedigree-save' class="btn btn-primary">save</button>
+		{{ form.media }}
+	</form>
+</div>
+{% endblock content %}

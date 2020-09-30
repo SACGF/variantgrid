@@ -1,0 +1,1 @@
+aws ses send-email --from discordance@shariant.org.au --destination file://destination.json --message file://message.json

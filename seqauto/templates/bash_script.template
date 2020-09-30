@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -e
+
+echo Running on host `hostname`
+echo Time is `date`
+
+export PYTHONPATH="${PYTHONPATH}:{{ pythonpath }}"
+export PATH="${PATH}:{{ path }}"
+export USERNAME=$(whoami)
+export SCRATCH_DIR="{{ scratch_base_dir }}/${USERNAME}/{{ name }}"
+
+echo Working directory is ${SCRATCH_DIR}
+mkdir -p ${SCRATCH_DIR}
+cd ${SCRATCH_DIR}
+
+{% autoescape off %}
+{{ command }}
+exit_code=$?
+{% endautoescape %}
+
+{% if job_script_complete %}
+{{ job_script_complete }} --job_script_id={{ job_script_pk }} --return_code=$exit_code
+{% endif %}
+

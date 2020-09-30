@@ -1,0 +1,30 @@
+li.seqauto-record {
+	padding: 0.3em 0 0.9em 1.5em;
+	text-indent: 0.7em;
+	font-weight:bold;
+	list-style:none;
+	background-repeat:no-repeat;
+}
+
+li.unaligned-reads {
+	background-image:url(/static/icons/bases_32.png);
+}
+
+li.bam-file {
+	background-image:url(/static/icons/bam_32.jpg);
+}
+
+li.vcf-file {
+	background-image:url(/static/icons/vcf_32.png);
+}
+
+li.qc {
+	background-image:url(/static/icons/reports.png);
+}
+
+li.data-state-N {
+	padding: 0.1em 0 0.9em 1.5em;
+	text-indent: 0.05em;
+	background-image:url(/static/icons/loading.gif);
+}
+

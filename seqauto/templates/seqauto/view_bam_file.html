@@ -1,0 +1,64 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+{% load record_data_state_tags %}
+{% block title %}{{ bam_file }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+{% endblock %}
+
+{% block jsdocumentready %}
+{% endblock %}
+
+{% block submenu_page_content %}
+
+	<div>
+	<img class='vcenter' src="{% static 'icons/bam_64.jpg' %}" /> <b>{{ bam_file }}</b>
+	</div>
+
+	{% if bam_file.data_state == 'C' %}
+		<form>
+			{{ form.as_p }}
+		</form>
+	
+		{% if flagstats %}
+			<h3>Flagstats</h3>
+	
+			{% if flagstats.data_state == 'C' %}
+				<table class='model-table'>
+					<tr><th>Total:				<td>{{ flagstats.total }}
+					<tr><th>Read1:				<td>{{ flagstats.read1 }}
+					<tr><th>Read2:				<td>{{ flagstats.read2 }}
+					<tr><th>Mapped:				<td>{{ flagstats.mapped }} ({{ flagstats.mapped_percent | floatformat }}%)
+					<tr><th>Properly Paired:	<td>{{ flagstats.properly_paired }} ({{ flagstats.properly_paired_percent | floatformat }}%)
+					</tr>
+				</table>
+			{% endif %}
+			{% record_data_state_helper flagstats %}
+	
+		{% endif %}
+	{% endif %}
+	{% record_data_state_helper bam_file %} 
+
+	<div>
+		<h3>Input</h3>
+		<ul>
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' bam_file.unaligned_reads.sequencing_run.pk %}">{{ bam_file.unaligned_reads.sequencing_run }}</a></li>  
+		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' bam_file.unaligned_reads.pk %}">{{ bam_file.unaligned_reads }}</a></li>
+		</ul>
+
+		<h3>Made from this data</h3>
+		<ul>
+			{% for vcf_file in bam_file.vcffile_set.all %} 
+				<li class='seqauto-record vcf-file data-state-{{ vcf_file.data_state }}'><a href="{% url 'view_vcf_file' vcf_file.pk %}">{{ vcf_file }}</a>
+
+				<ul>
+				{% for qc in vcf_file.qc_set.all %} 
+					<li class='seqauto-record qc data-state-{{ vcf_file.data_state }}'><a href="{% url 'view_qc' qc.pk %}">{{ qc }}</a>
+				{% endfor %}
+				</ul>
+			{% endfor %}
+		</ul>
+
+	</div>
+
+{% endblock %}

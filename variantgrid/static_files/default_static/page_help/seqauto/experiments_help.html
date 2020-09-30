@@ -1,0 +1,22 @@
+<p>
+Experiments are codes used to match patient and wetlab details with sequencing runs.
+
+<p>
+The grid below shows codes created from:
+<ul>
+<li><b>SequencingRun</b> Read from an XML file in the flowcell directory.
+</ul>
+
+<p>
+An experiment may be sequenced multiple times (technical replicates). In this case there will be multiple entries in the SequencingRuns column.
+A SequencingRun can only have one experiment.
+
+<h4>Name Matching</h4>
+<p>
+Experiment names are automatically cleaned (UPPERCASED, spaces and dashes converted to underscore, "rpt" removed from the end so replicates match).
+
+<p>
+The cleaned names must match to link everything correctly.
+
+To modify a SequencingRun, click the experiment tab on a run and follow the instructions.  
+<p>

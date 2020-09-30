@@ -1,0 +1,2266 @@
+<div class='gene-grid-tag'>
+{% load static %}
+{% load js_tags %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<link href="{% static 'css/companies.css' %}" rel="stylesheet">
+<link href="{% static 'css/pathology_tests.css' %}" rel="stylesheet">
+<style>
+table#gene-grid {
+    border-collapse: collapse;
+    margin-bottom: 50px;
+} 
+
+table#gene-grid td, table#gene-grid th {
+    width: 200px;
+    text-align: center;
+}
+
+table#gene-grid td.sub-column, table#gene-grid th.sub-column {
+    width: 50px;
+}
+
+table#gene-grid thead th {
+    padding: 5px;
+}
+
+table#gene-grid tbody th, table#gene-grid tbody td {
+    padding: 0px 1px 0px 1px;
+}
+
+table#gene-grid tr {
+    border-bottom: 1px solid #ccc;
+}
+
+.gene-grid-control-box > div {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.gene-grid-control-box label {
+    word-break: break-word;
+}
+
+.icon-container {
+    margin: auto;
+    display: inline-block;
+}
+
+.click-to-add-button {
+    margin: auto;
+}
+
+.copy-button {
+    background-image: url({% static 'icons/copy.png' %});
+    cursor: pointer;
+    height: 16px;
+    width: 16px;
+}
+
+
+.delete-button {
+    background-image: url({% static 'icons/delete-icon.png' %});
+    cursor: pointer;
+    height: 16px;
+    width: 16px;
+}
+
+.loading {
+    background-image: url({% static 'images/spinner.gif' %});
+    height: 16px;
+    width: 16px;
+    background-repeat: no-repeat;
+    margin: auto;
+}
+
+.gene-coverage-tooltip {
+    min-width: 600px;
+    min-height: 320px;
+    text-align: center;
+}
+
+.field-plot {
+    float: left;
+}
+
+.panel-app-icon {
+    width: 60px;
+    height: 40px;
+    background-size: 60px 40px;
+    background-image: url({% static 'images/panel_app.png' %});
+}
+
+.enrichment-kit-icon {
+    background-image: url({% static 'icons/sequencing_capture.png' %});
+}
+
+.locked-icon {
+    background-image: url({% static 'icons/lock.gif' %});
+}
+
+.clingen-icon {
+    background-image: url({% static 'images/clingen.jpeg' %});
+}
+
+.gene-icons-container {
+    width: 40%;
+}
+
+.hpo-icon {
+    width: 35px;
+    height: 55px;
+    background-size: 35px 55px;
+    background-image: url({% static 'icons/HPO-logo-stacked-black.png' %});
+}
+
+.omim-icon {
+    width: 55px;
+    height: 40px;
+    background-size: 55px 40px;
+    background-image: url({% static 'icons/omim.png' %});
+}
+
+.gene-container {
+    height: 25px;
+}
+
+.disease-name {
+}
+
+table#gene-grid .clingen {
+    width: 400px;
+}
+
+.evidence {
+    width: 10px;
+    height: 10px;
+    margin: 2px;
+    display: inline-block;
+}
+
+.HighEvidence {
+    background-color: rgb(63, 173, 70);
+}
+
+.ModerateEvidence {
+    background-color: rgb(240, 173, 78);
+}
+
+.LowEvidence {
+    background-color: rgb(217, 83, 79);
+}
+
+.evidence-tooltip {
+    max-width: auto;
+    max-height: auto;
+}
+
+.no-labels label {
+    display: none;
+}
+
+tr.gene-type-alias {
+    background-color: #FEBC00;
+}
+
+tr.gene-type-unmatched {
+    background-color: #F0C9DD;
+}
+
+// gene-grid table can add/remove "color-coverage" class to enable coloring
+table#gene-grid.color-coverage td.sub-column.coverage-full {
+    background-color: #e6ffe6;
+}
+
+table#gene-grid.color-coverage td.sub-column.coverage-low {
+    background-color: #fff2e6;
+}
+
+table#gene-grid.color-coverage td.sub-column.coverage-none {
+    background-color: #ffe6e6;
+}
+
+</style>
+<script>
+/* evidenceColumns/enrichmentKits/pathologyTestVersions/geneLists are the 1
+   true source of column order. Whenever we add a row, make sure columns are
+   set via createRowColumns() */
+let evidenceColumns = [];
+let enrichmentKits = [];
+let geneAnnotationReleases = []
+let pathologyTestVersions = [];
+let geneLists = [];
+let pathologyTestVersionDataById = {};
+let geneListIdByPathologyTestVersionId = {};
+let geneListGenesById = {}; // saved on the server (any diff is addition/subtraction)
+let geneListDataById = {};
+let enrichmentKitNamesById = {};
+let customTextGeneListId = 0;
+
+/* Batch Requests
+
+If coverage data is not there, call requestEnrichmentKitCoverage:
+    * add to genes required
+    * set/reset timer
+    
+Once timer has timed out (ie no more requests)
+    * Go through genes in kit that have no value (not already has a request)
+    * Set value for each gene in requests with the job - and copy those to array
+    * Launch a request job sending array
+    * When request returns - fill in data, and remove the request  
+*/
+
+const BATCH_RETRIEVE_INTERVAL = 100; // just has to be larger than loop between adding requests
+let goldCoverageTimer;
+let goldCoverageRequestId = 0;
+let goldCoverageGenesByEnrichmentKitId = {}; // values = { genes : coverage data }
+let goldCoverageGenesRequestsByEnrichmentKitId = {}; // values = { genes : request job }
+
+let geneInfoTimer;
+let geneInfoRequestId = 0;
+let geneInfoData = {}; // values = { genes : coverage data }
+let geneInfoRequests = {}; // values = { genes : request job }
+
+let symbolGeneIdentifierTimer;
+let symbolGeneIdentifierRequestId = 0;
+let symbolGeneIdentifiersByReleaseId = {}; // values = { genes : list of gene identifiers }
+let symbolGeneIdentifierRequestsByReleaseId = {}; // values = { genes : request job }
+
+
+const EVIDENCE_COLUMN_INFO = {
+    "clingen": {
+        "icon": "clingen-icon",
+        "initFunc": clinGenCellInit,
+    },
+    "panelapp": {
+        "icon": "panel-app-icon",
+        "initFunc": panelAppCellInit,
+    },
+};
+
+const ENRICHMENT_KIT_COLUMNS = {{ ENRICHMENT_KIT_COLUMNS | jsonify }};
+const ENRICHMENT_KIT_COLUMN_TOOL_TIPS = {{ ENRICHMENT_KIT_COLUMN_TOOL_TIPS | jsonify }};
+const ENRICHMENT_KIT_COLUMN_LABELS = {{ ENRICHMENT_KIT_COLUMN_LABELS | jsonify }};
+const ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS = {{ ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS | jsonify }};
+const COVERAGE_BOXPLOT_WIDTH = 300;
+const COVERAGE_BOXPLOT_HEIGHT = 300;
+const KEEP_CELL_CLASS = "keep-cell";
+
+// skip unsaved custom text gene lists 
+function getSavedGeneLists() {
+    let actualGeneListIds = [];
+    for (let i=0 ; i<geneLists.length ; ++i) {
+        let geneListId = geneLists[i];
+        let data = geneListDataById[geneListId];
+        let pk = data["pk"];
+        if (pk) {
+            actualGeneListIds.push(geneListId);
+        }
+    }
+    return actualGeneListIds;
+}
+
+function updateUrl() {
+    let updateUrlCallback = {{ update_url_callback|default:'null'|safe }};
+
+    if (updateUrlCallback) {
+        const COLUMN_DATA_BY_PREFIX = {
+            "evidence": evidenceColumns,
+            "enrichment-kit": enrichmentKits,
+            "pathology-test-version": pathologyTestVersions,
+            "gene-list": getSavedGeneLists(),
+        };
+
+        let allColumns = [];
+        for (let columnPrefix in COLUMN_DATA_BY_PREFIX) {
+            let columnData = COLUMN_DATA_BY_PREFIX[columnPrefix];
+            for (let i=0 ; i<columnData.length ; ++i) {
+                let columnPk = columnData[i];
+                let columnCode = columnPrefix + "-" + columnPk;
+                allColumns.push(columnCode);
+            }
+        }
+        let allColumnsStr = allColumns.join("/");
+        updateUrlCallback(allColumnsStr);
+    }
+}
+
+
+function addInitialColumn(columnName) {
+    const COLUMN_LOADERS_BY_PREFIX = {
+        "evidence": addEvidenceColumn,
+        "enrichment-kit": addAndRetrieveEnrichmentKitColumnIfNotExists,
+        "gene-annotation-release": addAndRetrieveGeneAnnotationReleaseColumnIfNotExists,
+        "pathology-test-version": addAndRetrievePathologyTestVersionColumnIfNotExists,
+        "gene-list": addAndRetrieveGeneListColumnIfNotExists,
+    };
+
+    for (let columnPrefix in COLUMN_LOADERS_BY_PREFIX) {
+        if (columnName.startsWith(columnPrefix)) {
+            let columnLoader = COLUMN_LOADERS_BY_PREFIX[columnPrefix];
+            let columnPk = columnName.substr(columnPrefix.length + 1);
+            columnLoader(columnPk);
+            return;    
+        }
+    }
+    console.log("addInitialColumn: warning - couldn't load columnName: " + columnName);
+}
+
+
+function addGeneSymbol(geneSymbol) {
+    let gmTable = $("table#gene-grid");
+    let tbody = gmTable.children('tbody');
+    addGeneRows(tbody, 0, '', [geneSymbol]);
+}
+
+function geneAnnotationCallBack(gene_id, callBackFunc) {
+    $.ajax({
+        type: "GET",
+        url: Urls.api_view_gene_id(gene_id),
+        success: callBackFunc
+    });
+}
+
+
+function addAndRetrieveGeneListColumnIfNotExists(geneListId, selectElement, addEmptyGeneLists) {
+    if (geneLists.indexOf(geneListId) > -1) {
+        return;
+    }
+    return getGeneListColumn(geneListId, selectElement, addEmptyGeneLists);
+}
+
+
+function getGeneListIconClass(category) {
+    return (category && category.icon_css_class) || "gene-list-icon"; 
+}
+
+
+function removeColumn(className) {
+    let gmTable = $("table#gene-grid");
+    $("." + className, gmTable).remove();
+}
+
+
+function getGeneListColumn(geneListId, selectElement, addEmptyGeneLists) {
+    addEmptyGeneLists = getValue(addEmptyGeneLists, true);
+    const className = 'gene-list-' + geneListId;
+    removeColumn(className); // Remove any existing if this is a reload
+
+    $.ajax({
+        type: "GET",
+        url: Urls.api_view_gene_list(geneListId),
+        success: function(data) {
+            let geneListId = data["pk"];
+            let className = 'gene-list-' + geneListId;
+            
+            if (geneLists.indexOf(geneListId) > -1) {
+                return; // check in case 2x requests happened to run
+            }
+            if (!addEmptyGeneLists && data.genelistgenesymbol_set.length == 0) {
+                return; // don't display empty
+            }
+            geneLists.push(geneListId);
+
+            let saveGeneListFunc = function(callbackFunc) {
+                saveGeneList(geneListId, className, callbackFunc);
+            };
+
+            let closeButtonFunc = function() {
+                let gmTable = $("table#gene-grid");
+                let tbody = gmTable.children('tbody');
+                removeColumn(className);
+                removeItemFromArray(geneListId, geneLists);
+                gcEmptyRows(tbody);
+                updateUrl();
+                
+                if (selectElement) { // Clear if provided - so we can re-select
+                    $(selectElement).empty();
+                }
+                
+            {% if close_button_callback %}
+                let closeButtonCallback = {{ close_button_callback|safe }};
+                closeButtonCallback(geneListId);
+            {% endif %}
+            };
+
+            populateGeneColumn(geneListId, data, className, saveGeneListFunc, closeButtonFunc);
+        },
+    });
+}
+
+
+function copyGeneList(geneListId) {
+    // Create a fake API response which we'll pass to create new column
+    let genelistgenesymbol_set = [];
+    let genes = Array.from(getGenesInGeneListColumn(geneListId));
+    for (let i=0 ; i<genes.length ; ++i) {
+        let geneSymbol = genes[i];
+        genelistgenesymbol_set.push({"original_name": geneSymbol, "gene_symbol": geneSymbol});
+    }
+    
+    let geneListData = geneListDataById[geneListId];
+    let name = geneListData.name || 'unnamed gene list';
+    let data = {'name': 'copy of ' + name,
+                'can_write': true,
+                'genelistgenesymbol_set': genelistgenesymbol_set,
+    };
+    handleCustomGeneListResponse(data);
+}
+
+
+function populateGeneColumn(geneListId, data, className, saveGeneListFunc, closeButtonFunc, geneClickHandler) {
+    geneListDataById[geneListId] = data;
+
+    let columnName = data["name"];
+    let geneListGenes = data["genelistgenesymbol_set"];
+    let can_write = data["can_write"];
+    let iconLink = data["absolute_url"];
+    let iconClass = getGeneListIconClass(data["category"]);
+    let extraIcons = data["extra_icons"];
+
+    let gmTable = $("table#gene-grid");
+    let thead = gmTable.children('thead');
+    let tbody = gmTable.children('tbody');
+    
+    let copyButtonFunc = function() {
+        copyGeneList(geneListId);
+    };
+
+    addColumnHeader(thead, className, columnName, copyButtonFunc, closeButtonFunc);
+    let iconContainerDiv = addColumnIcon(thead, className, iconClass, iconLink);
+    if (extraIcons) {
+        for (let i=0 ; i<extraIcons.length ; ++i) {
+            let extraIcon = extraIcons[i];
+            let iconDiv = $("<div />").attr("title", extraIcon["title"]);
+            iconDiv.addClass("column-icon");
+            iconDiv.addClass(extraIcon["css_class"]);
+            iconContainerDiv.append(iconDiv);
+        }
+    }
+    if (can_write) {
+        if (saveGeneListFunc) { 
+            let saveButton = $("<button>save</button>").button().addClass("save-genelist");
+            saveButton.hide();
+            iconContainerDiv.append(saveButton);
+            
+            let saveGeneListCallback;
+            {% if save_gene_list_callback %}
+                saveGeneListCallback = {{ save_gene_list_callback|safe }}; 
+            {% endif %}
+
+            saveButton.click(function() {
+                saveGeneListFunc(saveGeneListCallback);
+            });
+
+        }
+    } else {
+        let lockIcon = $("<div />").addClass("column-icon locked-icon");
+        lockIcon.attr("title", "You do do not have permission to modify this gene list");
+        iconContainerDiv.append(lockIcon);
+    }
+
+    let ret = getGeneSetAndDataListFromGeneListGenes(geneListGenes);
+    geneListGenesById[geneListId] = ret.genesSet;
+    addGeneDataRows(tbody, geneListId, className, ret.geneDataList, geneClickHandler);
+    updateUrl();
+}
+
+
+function getGeneSetAndDataListFromGeneListGenes(geneListGenes) {
+    // geneDataList - data to pass to addGeneDataRows (uniq 'gene' fields)
+    let genesSet = new Set();
+    let geneDataList = [];
+    let add = function(gene, type, matched_gene, match_info) {
+        if (!genesSet.has(gene)) {
+            geneDataList.push({ "gene": gene,
+                                "type": type,
+                                "matched_gene": matched_gene,
+                                "match_info": match_info});
+        }
+    };
+    
+    for (let i=0 ; i<geneListGenes.length ; ++i) {
+        let glg = geneListGenes[i];
+        if (glg.gene_symbol) {
+            add(glg.gene_symbol, "gene");
+            if (glg.gene_symbol_alias) {
+                add(glg.original_name, "alias", glg.gene_symbol, glg.gene_symbol_alias);
+            }
+            genesSet.add(glg.gene_symbol);
+        } else {
+            add(glg.original_name, "unmatched");
+        }
+        genesSet.add(glg.original_name);
+    }
+    return {'genesSet' : genesSet,
+            'geneDataList' : geneDataList};
+}
+
+
+function addAndRetrieveEnrichmentKitColumnIfNotExists(enrichmentKitId, selectElement) {
+    if (enrichmentKits.indexOf(enrichmentKitId) > -1) {
+        return;
+    }
+
+    $.ajax({
+        type: "GET",
+        url: Urls.api_view_enrichment_kit_summary(enrichmentKitId),
+        success: function(data) {
+            if (enrichmentKits.indexOf(enrichmentKitId) > -1) { // in case 2x callbacks were run
+                return;
+            }
+            enrichmentKits.push(enrichmentKitId);
+            addEnrichmentKitColumn(enrichmentKitId, data, selectElement);
+        }
+    });
+}
+
+
+function addAndRetrieveGeneAnnotationReleaseColumnIfNotExists(releaseId, selectElement) {
+    if (geneAnnotationReleases.indexOf(releaseId) > -1) {
+        return;
+    }
+
+    $.ajax({
+        type: "GET",
+        url: Urls.api_gene_annotation_release(releaseId),
+        success: function(data) {
+            if (geneAnnotationReleases.indexOf(releaseId) > -1) { // in case 2x callbacks were run
+                return;
+            }
+            geneAnnotationReleases.push(releaseId);
+            addGeneAnnotationReleaseColumn(releaseId, data, selectElement);
+        }
+    });
+}
+
+
+function getNumberOfColumns(headerRow) {
+    let ekCols = enrichmentKits.length;
+    if (!headerRow) {
+        ekCols *= ENRICHMENT_KIT_COLUMNS.length;
+    }
+
+    return evidenceColumns.length + geneAnnotationReleases.length + ekCols + pathologyTestVersions.length + geneLists.length;
+}
+
+
+function createRowColumns(tr, headerRow) {
+    let geneSymbol = tr.attr("gene");
+    let columns = [{"txType": "th", "class": "gene-label"}]; // gene label
+    
+    // the columns "class" is used to uniquely identify the column in the row
+    // You can use "extraClasses" to ensure a column has a (non-unique) class 
+
+    let geneType = tr.attr("type");
+    if (!geneType || geneType === 'gene') {
+        columns = columns.concat(getGeneRowColumns(geneSymbol, headerRow));
+    } else {
+        let colspan = getNumberOfColumns(headerRow);
+        let initFunc;
+        if (geneType === 'alias') {
+            initFunc = function(cell, geneSymbol) {
+                // add href to real gene
+                let matchedGene = tr.attr("matched_gene");
+                let matchInfo = tr.attr("match_info");
+                let aliasLink = $("<a />").attr("href", "#gene-row-" + matchedGene).text(matchedGene);
+                let aliasMessage = $("<span />").append("Matched ").append(aliasLink).append(": " + matchInfo);
+                cell.append(aliasMessage);
+            };
+        } else if (geneType === 'unmatched') {
+            initFunc = function(cell, geneSymbol) {
+                cell.text('Could not match gene symbol');
+            };
+        }
+        let singleMessageColumn = { "txType": "td",
+                                    "class": "gene-type-message",
+                                    "colspan": colspan,
+                                    "initFunc": initFunc};
+        columns.push(singleMessageColumn);
+    }
+    
+    createRowColumnsFromData(tr, geneSymbol, columns)
+}
+
+
+function getGeneRowColumns(geneSymbol, headerRow) {
+    let columns = [];
+    for (let i=0 ; i<evidenceColumns.length ; ++i) {
+        let evidenceType = evidenceColumns[i];
+        let eci = EVIDENCE_COLUMN_INFO[evidenceType];
+        columns.push({"txType": 'td', "class": evidenceType, "initFunc": eci["initFunc"],});
+    }
+
+    for (let i=0 ; i<geneAnnotationReleases.length ; ++i) {
+        let releaseId = geneAnnotationReleases[i];
+        let geneIdList = null;
+        let symbolGeneIdentifiers = symbolGeneIdentifiersByReleaseId[releaseId];
+        if (symbolGeneIdentifiers) {
+            geneIdList = symbolGeneIdentifiers[geneSymbol];
+        }
+
+        let geneAnnotationReleaseClass = "gene-annotation-release-" + releaseId;
+        let columnData = {
+            "txType": 'td',
+            "class": geneAnnotationReleaseClass,
+        };
+        (function() { // capture
+            let myGeneIdList = geneIdList;
+            let myReleaseId = releaseId;
+
+            if (geneIdList) {
+                columnData["initFunc"] = function(cell, geneSymbol) {
+                    setGeneAnnotationReleaseCell(cell, myGeneIdList)
+                };
+            } else {
+                columnData["initFunc"] = function(cell, geneSymbol) {
+                    let coverageDiv = $("<div />").addClass("loading");
+                    cell.append(coverageDiv);
+
+                    requestGeneIdentifiersForRelease(geneSymbol, myReleaseId);
+                };
+            }
+        })();
+        columns.push(columnData);
+    }
+
+    for (let i=0 ; i<enrichmentKits.length ; ++i) {
+        let enrichmentKitId = enrichmentKits[i];
+        let enrichmentKitClass = "enrichment-kit-" + enrichmentKitId;
+
+        // For enrichment Kits, we have multiple columns ENRICHMENT_KIT_COLUMNS
+        // but only in the body - the headers are just 1 column
+        let enrichmentKitColumnClasses = [];
+        if (headerRow) {
+            enrichmentKitColumnClasses = [enrichmentKitClass];
+        } else {
+            for (let c=0 ; c<ENRICHMENT_KIT_COLUMNS.length ; c++) {
+                let ekc = ENRICHMENT_KIT_COLUMNS[c];
+                enrichmentKitColumnClasses.push(enrichmentKitClass + "-" + ekc); 
+            }
+        }
+
+        let coverageData = null;
+        let goldCoverageGenes = goldCoverageGenesByEnrichmentKitId[enrichmentKitId];
+        if (goldCoverageGenes) {
+            coverageData = goldCoverageGenes[geneSymbol];
+        }
+
+        let loadingColumn = Math.floor(enrichmentKitColumnClasses.length/2);
+        for (let c=0 ; c<enrichmentKitColumnClasses.length ; c++) {
+            let columnClass = enrichmentKitColumnClasses[c];
+            let columnData = {
+                "txType": 'td',
+                "class": columnClass,
+            };
+            columnData['extraClasses'] = [enrichmentKitClass, "sub-column"];
+            (function() { // capture
+                let myEnrichmentKitId = enrichmentKitId;
+                let mySubColumn = ENRICHMENT_KIT_COLUMNS[c];
+                let subColumnToolTip = ENRICHMENT_KIT_COLUMN_TOOL_TIPS[c];
+                let myCoverageData = coverageData;
+                
+                if (coverageData) {
+                    columnData["initFunc"] = function(cell, geneSymbol) {
+                        setEnrichmentKitCoverageCell(cell, mySubColumn, subColumnToolTip, myCoverageData)
+                    };
+                } else {
+                    if (c === loadingColumn) { // Only need 1 for set of cols
+                        columnData["initFunc"] = function(cell, geneSymbol) {
+                            let coverageDiv = $("<div />").addClass("loading");
+                            cell.append(coverageDiv);
+                            
+                            requestEnrichmentKitCoverage(geneSymbol, myEnrichmentKitId);
+                        };
+                    }
+                }
+            })();
+            columns.push(columnData);
+        }
+    }
+
+    for (let i=0 ; i<pathologyTestVersions.length ; ++i) {
+        (function() {
+            let pathologyTestVersionId = pathologyTestVersions[i]; // inside anon func to capture this
+            let geneListId = geneListIdByPathologyTestVersionId[pathologyTestVersionId];
+            let className = 'pathology-test-version-' + pathologyTestVersionId;
+            
+            let columnData = {
+                "txType": 'td',
+                "class": className,
+            };
+            if (canWriteGeneList(geneListId)) {
+                columnData["hoverHandler"] = function(container) {
+                    emptyGeneHoverHandler(container, pathologyTestVersionId, className, geneSymbol, addGeneToPathologyTest);
+                };
+                columnData["hoverLeaveHandler"] = function(container) {
+                    $(".click-to-add-button", container).remove();
+                };
+            }
+
+            columns.push(columnData);
+        })();
+    }
+
+
+    for (let i=0 ; i<geneLists.length ; ++i) {
+        (function() {
+            let geneListId = geneLists[i]; // inside anon func to capture this
+            let geneListClass = 'gene-list-' + geneListId;
+            
+            let columnData = {
+                "txType": 'td',
+                "class": geneListClass,
+            };
+            if (canWriteGeneList(geneListId)) {
+                columnData["hoverHandler"] = function(container) {
+                    emptyGeneHoverHandler(container, geneListId, geneListClass, geneSymbol, addGeneToGeneList);
+                };
+                columnData["hoverLeaveHandler"] = function(container) {
+                    $(".click-to-add-button", container).remove();
+                };
+            }
+
+            columns.push(columnData);
+        })();
+    }
+
+    return columns;
+}
+
+
+function createRowColumnsFromData(tr, geneSymbol, columns) {
+    let prevCell = null;
+    for (let i=0 ; i<columns.length ; ++i) {
+        let cData = columns[i];
+        let className = cData["class"];
+        let existingCell = $("." + className, tr);
+        
+        if (existingCell.length) {
+            prevCell = existingCell;
+        } else {
+            let extraClasses = cData["extraClasses"];
+            let txType = cData["txType"];
+
+            let cell = $("<" + txType + " />");
+            cell.addClass(className);
+            if (extraClasses) {
+                for (let c=0 ; c<extraClasses.length ; ++c) {
+                    ec = extraClasses[c];
+                    cell.addClass(ec);
+                }
+            }
+            
+            // Only call init func on gene cell
+            if (geneSymbol) {
+                let initFunc = cData["initFunc"];
+                let hoverHandler = cData["hoverHandler"];
+                let hoverLeaveHandler = cData["hoverLeaveHandler"];
+
+                if (initFunc) {
+                    initFunc(cell, geneSymbol);
+                }
+                if (hoverHandler) {
+                    let geneContainer = $("<div />").addClass("gene-container");
+                    (function() { // to capture loop variables
+                        let delay= 200, setTimeoutConst;
+                        let myHandler = hoverHandler;
+                        let myLeaveHandler = hoverLeaveHandler;
+                        let myGeneContainer = geneContainer;
+                        
+                        geneContainer.hover(function() {
+                            setTimeoutConst = setTimeout(function() {
+                                myHandler(myGeneContainer);
+                            }, delay);
+                        }, function() {
+                            clearTimeout(setTimeoutConst);
+                            myLeaveHandler(myGeneContainer);
+                        });
+                    })();
+                    cell.append(geneContainer);
+                }
+            }
+            
+            if (prevCell) {
+                prevCell.after(cell);
+            } else {
+                tr.append(cell);
+            }
+            prevCell = cell;
+        }
+        if (cData.colspan) {
+            prevCell.attr("colspan", cData.colspan);
+        }
+    }
+}
+
+
+function canWriteGeneList(geneListId) {
+    let canWrite = false;
+    let glData = geneListDataById[geneListId];
+    if (glData) {
+        canWrite = glData["can_write"];
+    }
+    return canWrite;
+}
+
+
+function getCell(geneSymbol, className) {
+    let selector = "td." + className;
+    return getGeneRowSelector(geneSymbol, selector);
+}
+
+function getGeneRowSelector(geneSymbol, selector) {
+    let gmTable = $("table#gene-grid");
+    let tbody = gmTable.children('tbody');
+    let tr = $("tr[gene='" + geneSymbol + "']", tbody);
+    return $(selector, tr);
+}
+
+
+function setCell(tr, geneListClass, value) {
+    let col = $("." + geneListClass, tr);
+
+    // Copy old classes across
+    let colClasses = col.attr("class");
+    value.attr("class", colClasses);
+
+    col.replaceWith(value);
+}
+
+function setCellText(tr, geneListClass, value) {
+    let col = $("." + geneListClass, tr);
+    col.text(value);
+}
+
+function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
+    evidenceDiv.attr("title", ""); // need to add empty for tooltip to show
+    evidenceDiv.tooltip({
+        tooltipClass: 'evidence-tooltip', 
+        content: function() {
+            let container = $("<div />");
+            let geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
+            container.append(geneTitle); 
+            let modeOfInheritance = evidence["ModeOfInheritance"];
+            if (modeOfInheritance) {
+                mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
+                container.append(mohDiv);
+            }
+            let penetrance = evidence["Penetrance"];
+            if (penetrance) {
+                penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
+                container.append(penetranceDiv);
+            }
+
+            let evidences = evidence["Evidences"];
+            if (evidences) {
+                container.append($("<h3 />").text("Sources"));
+                evidencesUl = $("<ul />");
+                for (let i=0 ; i<evidences.length ; ++i) {
+                    evidencesUl.append($("<li />").text(evidences[i]));
+                }
+                container.append(evidencesUl);
+            }
+
+            let phenotypes = evidence["Phenotypes"];
+            if (phenotypes) {
+                container.append($("<h3 />").text("Phenotypes"));
+                phenotypesUl = $("<ul />");
+                for (let i=0 ; i<phenotypes.length ; ++i) {
+                    phenotypesUl.append($("<li />").text(phenotypes[i]));
+                }
+                container.append(phenotypesUl);
+            }
+            return container;                       
+        },
+    });
+}
+
+/// Note: This is passed through PanelApp JSON
+function addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer) {
+    let evidenceByGene = geneListDataById[geneListId]["gene_evidence"];
+    if (evidenceByGene) {
+        let evidence = evidenceByGene[geneSymbol];
+        addGeneEvidence(geneSymbol, evidence, geneContainer);
+    }
+}
+
+function addGeneEvidence(geneSymbol, evidence, geneContainer) {
+    let evidenceDiv = $("<div />").addClass("evidence");
+    let confidence = evidence["LevelOfConfidence"];
+    addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv);
+    if (confidence) {
+        // evidenceDiv.text(confidence[0]); // for colorblind??
+        evidenceDiv.addClass(confidence);
+    }
+    geneContainer.append(evidenceDiv);
+}
+
+function setCellGene(tr, geneListId, geneListClass, geneSymbol, geneClickHandler) {
+    if (!geneClickHandler) {
+        geneClickHandler = geneListGeneClickHandler; // default 
+    }
+
+    let cell = $("." + geneListClass, tr);
+    cell.empty();
+    cell.addClass(KEEP_CELL_CLASS);
+    let geneContainer = $("<span />").addClass("gene-container");
+    addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer);
+    
+    geneContainer.append($("<span />").addClass("gene-symbol").text(geneSymbol));
+    if (canWriteGeneList(geneListId)) {
+        geneContainer.click(function(event) {
+            geneClickHandler(cell, geneListId, geneListClass, geneSymbol);
+        });
+    }
+    cell.append(geneContainer);
+    return geneContainer;
+}
+
+
+function setColspan(element, colspan) {
+    if (colspan && colspan != 1) {
+        element.attr('colspan', colspan);
+    } 
+}
+
+
+function addColumnHeader(thead, className, columnName, copyButtonFunc, closeButtonFunc, colspan) {
+    // Column Name
+    let th = $("<th>" + columnName + "</th>");
+    setColspan(th, colspan);
+
+    if (closeButtonFunc) {
+        let closeButton = $("<div />", {"class": "delete-button right"});
+        closeButton.attr("title", "close").click(closeButtonFunc);
+        th.append(closeButton);
+    }
+
+    if (copyButtonFunc) {
+        let copyButton = $("<div />", {"class": "copy-button right"});
+        copyButton.attr("title", "copy").click(copyButtonFunc);
+        th.append(copyButton);
+    }
+
+    let tr = $("tr#column-names", thead);
+    createRowColumns(tr, true);
+    let subColumnsTr = $("tr#column-subcolumns", thead);
+    createRowColumns(subColumnsTr);
+
+    setCell(tr, className, th);
+}
+
+function addColumnIcon(thead, className, columnIconClass, iconLink, colspan) {
+    let iconsTr = $("tr#column-icons", thead);
+    let iconTh = $("<th />");
+    setColspan(iconTh, colspan);
+    
+    let iconContainerDiv = $("<div />").addClass("icon-container");
+    let iconDiv = $("<div />");
+    iconDiv.addClass("column-icon");
+    iconDiv.addClass(columnIconClass);
+    let el = iconDiv;
+    if (iconLink) {
+        el = $("<a />").attr("href", iconLink);
+        el.append(iconDiv);
+    }
+    iconContainerDiv.append(el);
+    iconTh.append(iconContainerDiv);
+    
+    createRowColumns(iconsTr, true);
+    setCell(iconsTr, className, iconTh);
+    
+    return iconContainerDiv;
+}
+
+
+function addSubColumns(thead, enrichmentKitId) {
+    let tr = $("tr#column-subcolumns", thead);
+
+    let enrichmentKitClass = "enrichment-kit-" + enrichmentKitId;
+    for (let c=0 ; c<ENRICHMENT_KIT_COLUMNS.length ; c++) {
+        let columnName = ENRICHMENT_KIT_COLUMNS[c];
+        let columnLabel = ENRICHMENT_KIT_COLUMN_LABELS[c];
+        let toolTip = ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS[c];
+        let th = $("<th>" + columnLabel + "</th>");
+        th.addClass("sub-column");
+        if (toolTip) {
+            th.attr("title", toolTip);
+        }
+        className = enrichmentKitClass + "-" + columnName;
+        setCell(tr, className, th);
+    }
+}
+
+
+function gcEmptyRows(tbody) { 
+    $("tr:not(:has(td." + KEEP_CELL_CLASS + "))", tbody).remove();    
+}
+
+
+function getGeneInfo(geneIconContainer, geneSymbol) {
+    // GeneInfo shows whether genes belong in special gene lists (eg pseudogene/triplet repeats)
+    {% if has_gene_info %}
+    
+    let geneInfo = geneInfoData[geneSymbol];
+    if (geneInfo) {
+        setGeneInfo(geneIconContainer, geneInfo);
+    } else {
+        clearTimeout(geneInfoTimer);
+        
+        if (!(geneSymbol in geneInfoRequests)) {
+            geneInfoRequests[geneSymbol] = null;
+        }
+        geneInfoTimer = setTimeout(batchRetrieveGeneInfo, BATCH_RETRIEVE_INTERVAL);
+    
+    }
+    {% endif %}
+}
+
+
+
+function batchRetrieveGeneInfo() {
+    let geneSymbols = [];
+    for (let geneSymbol in geneInfoRequests) {
+        let req = geneInfoRequests[geneSymbol];
+        if (!req) {
+            geneSymbols.push(geneSymbol);
+        }
+    }
+
+    if (geneSymbols.length) {      
+        geneInfoRequestId++;
+        for (let i=0 ; i<geneSymbols.length; ++i) {
+            let geneSymbol = geneSymbols[i];
+            geneInfoRequests[geneSymbol] = geneInfoRequestId;
+        }
+        // Lots of genes (could exceed url limits) so use POST
+        let data = 'gene_symbols_json=' + encodeURIComponent(JSON.stringify(geneSymbols));
+
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: Urls.api_batch_gene_info(),
+            success: function(data) {
+                handleBatchRetrieveGeneInfo(geneInfoRequests, geneSymbols, data);                    
+            }
+        });
+    }
+}
+
+function setGeneInfo(geneIconContainer, data) {
+    if (data.length) {
+        geneIconContainer.empty(); // remove nbsp
+    }
+
+    for (let i=0 ; i<data.length ; ++i) {
+        let geneInfo = data[i];
+        let iconDiv = $("<div />");
+        iconDiv.addClass("gene-icon");
+        iconDiv.addClass(geneInfo.icon_css_class);
+        iconDiv.attr('title', geneInfo.name);
+        geneIconContainer.append(iconDiv);
+    }
+}
+
+
+function handleBatchRetrieveGeneInfo(requests, geneSymbols, data) {
+    // Not all genes requested will be returned. No data = no info
+
+    // Put the data into the cache
+    for (let i=0 ; i<geneSymbols.length; ++i) {
+        let geneSymbol = geneSymbols[i];
+        let returnedData = data[geneSymbol] || {};
+        geneInfoData[geneSymbol] = returnedData;
+        delete geneInfoRequests[geneSymbol];
+        let geneIconContainer = getGeneRowSelector(geneSymbol, ".gene-icons-container");
+        setGeneInfo(geneIconContainer, returnedData);
+    }
+}
+
+
+function addGeneRows(tbody, geneListId, geneListClass, genes, geneClickHandler) {
+    let geneDataList = [];
+    for (let i=0 ; i<genes.length ; ++i) {
+        let geneSymbol = genes[i];
+        let geneData = {"type": "gene",
+                        "gene": geneSymbol};
+        geneDataList.push(geneData)
+    }
+    
+    addGeneDataRows(tbody, geneListId, geneListClass, geneDataList, geneClickHandler);
+}
+
+
+function addGeneDataRows(tbody, geneListId, geneListClass, geneDataList, geneClickHandler) {
+    // Adds rows for new genes
+    // Pass geneListId=0 to not add anything
+    // geneDataList needs to have unique 'gene' entries
+    geneDataList.sort(dynamicSort("gene", false));
+    
+    let existingRows = $("tr", tbody);
+    let rowIndex = 0;
+    let lastRow = null;
+    let tr;
+    geneLoop:
+    for (let i=0 ; i<geneDataList.length ; ++i) {
+        let geneData = geneDataList[i];
+        let gene = geneData['gene'];
+        let rowType = geneData['type'];
+
+        let addCellClickHandler = geneListId && rowType === "gene";
+
+        while ( rowIndex<existingRows.length ) {
+            tr = $(existingRows[rowIndex]);
+            let rowGene = tr.attr("gene");
+            if (gene < rowGene) {
+                //console.log(gene + " < " + rowGene);
+                break;
+            }
+            rowIndex++;
+            lastRow = tr;
+            createRowColumns(tr);
+            if (gene === rowGene) {
+                if (addCellClickHandler) {
+                    setCellGene(tr, geneListId, geneListClass, gene, geneClickHandler);
+                }
+                continue geneLoop;
+            }
+        }
+        tr = $("<tr />", geneData).attr("id", "gene-row-" + gene);
+        tr.addClass("gene-type-" + rowType);
+
+        createRowColumns(tr);
+        let geneLabel = $(".gene-label", tr);
+        let geneLabelDiv = $("<div />").addClass("gene-label-container").addClass("left");
+        let geneIconsDiv = $("<div />").html("&nbsp;");
+        geneIconsDiv.addClass("gene-icons-container").addClass("left");
+        geneLabel.append(geneIconsDiv);
+
+        if (rowType === 'gene') {
+            getGeneInfo(geneIconsDiv, gene);
+            const URL = Urls.view_gene_symbol(gene);
+            let geneLink = $("<a />").text(gene).attr({"class": 'hover-link', "href": URL, "target": "_blank"});
+            geneLabelDiv.append(geneLink);
+    
+            if (addCellClickHandler) {
+                setCellGene(tr, geneListId, geneListClass, gene, geneClickHandler);
+            }
+        } else {
+            geneLabelDiv.text(gene);
+        }
+        geneLabel.append(geneLabelDiv);
+
+        
+        if (lastRow) {
+            lastRow.after(tr);
+        } else {
+            tbody.prepend(tr);
+        }
+        lastRow = tr;
+    }
+    
+    // Any remaining
+    for ( ; rowIndex<existingRows.length ; rowIndex++ ) {
+        tr = $(existingRows[rowIndex]);
+        createRowColumns(tr);
+    }
+}
+
+
+function round(num) {
+    return parseFloat(Math.round(num * 100) / 100).toFixed(2);
+}
+
+function addEvidenceColumn(evidenceType) {
+    let gmTable = $("table#gene-grid");
+    let thead = gmTable.children('thead');
+    let tbody = gmTable.children('tbody');
+
+    let eci = EVIDENCE_COLUMN_INFO[evidenceType];
+    let iconClass= eci["icon"];
+
+    let className = evidenceType;
+    addColumnHeader(thead, className, "");
+    addColumnIcon(thead, className, iconClass);
+
+    $("tr", tbody).each(function() {
+        let tr = $(this);
+        createRowColumns(tr);
+    });
+}
+
+
+function addEnrichmentKitColumn(enrichmentKitId, data, selectElement) {
+    let gmTable = $("table#gene-grid");
+    let thead = gmTable.children('thead');
+    let tbody = gmTable.children('tbody');
+
+    let enrichmentKitName = data['__str__'];
+    enrichmentKitNamesById[enrichmentKitId] = enrichmentKitName;
+    
+    let className = "enrichment-kit-" + enrichmentKitId;
+
+    let closeButtonFunc = function() {
+        $("." + className, gmTable).remove();
+        removeItemFromArray(enrichmentKitId, enrichmentKits);
+        // updateUrl();
+        
+        if (selectElement) { // Clear if provided - so we can re-select
+            $(selectElement).empty();
+        }
+    };
+    
+    let numEnrichmentKitColumns = ENRICHMENT_KIT_COLUMNS.length;
+    addColumnHeader(thead, className, enrichmentKitName, null, closeButtonFunc, numEnrichmentKitColumns);
+    let enrichmentKitLink = Urls.view_enrichment_kit(enrichmentKitId);
+    addColumnIcon(thead, className, "enrichment-kit-icon", enrichmentKitLink, numEnrichmentKitColumns);
+    addSubColumns(thead, enrichmentKitId);
+
+    $("tr", tbody).each(function() {
+        createRowColumns($(this));
+    });
+}
+
+
+function requestEnrichmentKitCoverage(geneSymbol, enrichmentKitId) {
+    /* 
+        Add to genes required, and re-set timeout to call batchRetrieveGoldCoverage
+    */
+    clearTimeout(goldCoverageTimer);
+    
+    let kitRequests = goldCoverageGenesRequestsByEnrichmentKitId[enrichmentKitId] || {};
+    if (!(geneSymbol in kitRequests)) {
+        kitRequests[geneSymbol] = null;
+    }
+    goldCoverageGenesRequestsByEnrichmentKitId[enrichmentKitId] = kitRequests;
+    goldCoverageTimer = setTimeout(batchRetrieveGoldCoverage, BATCH_RETRIEVE_INTERVAL);
+}
+
+
+function getEnrichmentKitSubColumnCell(enrichmentKitId, geneSymbol, subColumn) {
+    let enrichmentKitClass = "enrichment-kit-" + enrichmentKitId;
+    let klass = enrichmentKitClass + "-" + subColumn;
+    return getCell(geneSymbol, klass);
+}
+
+
+function setEnrichmentKitCoverageCells(enrichmentKitId, geneSymbol, coverageData) {
+    for (let c=0 ; c<ENRICHMENT_KIT_COLUMNS.length ; ++c) {
+        let subColumn = ENRICHMENT_KIT_COLUMNS[c];
+        let subColumnToolTip = ENRICHMENT_KIT_COLUMN_TOOL_TIPS[c];
+        let cell = getEnrichmentKitSubColumnCell(enrichmentKitId, geneSymbol, subColumn);
+        setEnrichmentKitCoverageCell(cell, subColumn, subColumnToolTip, coverageData);
+    }
+}
+
+
+function setEnrichmentKitCoverageCell(cell, subColumn, subColumnToolTip, coverageData) {
+    let depth_20x_5th_percentile = coverageData["depth_20x_5th_percentile"];
+    let coverage;
+    if (depth_20x_5th_percentile == 100) {
+        coverage = "full";
+    } else if (depth_20x_5th_percentile > 0) {
+        coverage = "low";
+    } else {
+        coverage = "none";
+    }
+
+    let value = coverageData[subColumn];
+    let formattedData = '-';
+    if (typeof(value) !== 'undefined') {
+        formattedData = round(value, 2);
+    }
+    cell.text(formattedData);
+    cell.addClass("coverage-" + coverage);
+    if (subColumnToolTip) {
+        let value = coverageData[subColumnToolTip];
+        if (value) {
+            cell.attr("title", value);
+        }
+    }
+}
+
+
+function batchRetrieveGoldCoverage() {
+    for (let enrichmentKitId in goldCoverageGenesRequestsByEnrichmentKitId) {
+        let goldCoverageGenesRequests = goldCoverageGenesRequestsByEnrichmentKitId[enrichmentKitId];
+        batchRetrieveEnrichmentKitGoldCoverage(enrichmentKitId, goldCoverageGenesRequests);
+    }
+}
+
+
+function batchRetrieveEnrichmentKitGoldCoverage(enrichmentKitId, goldCoverageGenesRequests) {
+    let geneSymbols = [];
+    for (let geneSymbol in goldCoverageGenesRequests) {
+        let req = goldCoverageGenesRequests[geneSymbol];
+        if (!req) {
+            geneSymbols.push(geneSymbol);
+        }
+    }
+
+    if (geneSymbols.length) {      
+        goldCoverageRequestId++;
+        for (let i=0 ; i<geneSymbols.length; ++i) {
+            let geneSymbol = geneSymbols[i];
+            goldCoverageGenesRequests[geneSymbol] = goldCoverageRequestId;
+        }
+        // Lots of genes (could exceed url limits) so use POST
+        let data = 'gene_symbols_json=' + encodeURIComponent(JSON.stringify(geneSymbols));
+
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: Urls.api_batch_enrichment_kit_gene_gold_coverage_summary(enrichmentKitId),
+            success: function(data) {
+                handleBatchRetrieveGoldCoverage(enrichmentKitId, goldCoverageGenesRequests, geneSymbols, data);                    
+            }
+        });
+    }
+}
+
+
+function handleBatchRetrieveGoldCoverage(enrichmentKitId, goldCoverageGenesRequests, geneSymbols, data) {
+    // Not all genes requested will be returned. No data = no coverage
+    let returnedGeneData = {};
+    for (let i=0 ; i<data.length; ++i) {
+        let coverageData = data[i];
+        // Response can be a matched gene or unmatched, which will just have the gene_symbol
+        let geneSymbol;
+        let gene = coverageData.gene;
+        if (gene) {
+            geneSymbol = gene.gene_symbol;
+        } else {
+            geneSymbol = coverageData.gene_symbol;
+        }
+        returnedGeneData[geneSymbol] = coverageData;
+    }
+
+    // Put the data into the cache
+    let goldCoverageGenes = goldCoverageGenesByEnrichmentKitId[enrichmentKitId];
+    if (!goldCoverageGenes) {
+        goldCoverageGenes = {};
+        goldCoverageGenesByEnrichmentKitId[enrichmentKitId] = goldCoverageGenes;
+    }
+
+    for (let i=0 ; i<geneSymbols.length; ++i) {
+        let geneSymbol = geneSymbols[i];
+        let returnedData = returnedGeneData[geneSymbol] || {};
+        goldCoverageGenes[geneSymbol] = returnedData;
+        delete goldCoverageGenesRequests[geneSymbol];
+        setEnrichmentKitCoverageCells(enrichmentKitId, geneSymbol, returnedData);
+    }
+}
+
+
+function getTdGene(td) {
+    return td.parent("tr").attr("gene");
+}
+
+
+function addGeneAnnotationReleaseColumn(releaseId, data, selectElement) {
+    let gmTable = $("table#gene-grid");
+    let thead = gmTable.children('thead');
+    let tbody = gmTable.children('tbody');
+
+    let geneAnnotationReleaseName = data["__str__"];
+    let className = "gene-annotation-release-" + releaseId;
+
+    let closeButtonFunc = function() {
+        $("." + className, gmTable).remove();
+        removeItemFromArray(releaseId, geneAnnotationReleases);
+        // updateUrl();
+
+        if (selectElement) { // Clear if provided - so we can re-select
+            $(selectElement).empty();
+        }
+    };
+    addColumnHeader(thead, className, geneAnnotationReleaseName, null, closeButtonFunc);
+    addColumnIcon(thead, className, "gene-annotation-release-icon");
+
+    $("tr", tbody).each(function() {
+        createRowColumns($(this));
+    });
+}
+
+
+function setGeneAnnotationReleaseCell(cell, geneIdList) {
+    if (geneIdList.length) {
+        $(cell).empty();
+        for (let i = 0; i < geneIdList.length ; ++i) {
+            let geneId = geneIdList[i];
+            let geneUrl = $("<a/>").text(geneId).attr("href", Urls.view_gene(geneId));
+            geneUrl.appendTo(cell);
+        }
+    } else {
+        cell.text("-");
+    }
+}
+
+
+function requestGeneIdentifiersForRelease(geneSymbol, releaseId) {
+    /*
+        Add to genes required, and re-set timeout to call batchRetrieveGoldCoverage
+    */
+    clearTimeout(symbolGeneIdentifierTimer);
+
+    let geneIdRequests = symbolGeneIdentifiersByReleaseId[releaseId] || {};
+    if (!(geneSymbol in geneIdRequests)) {
+        geneIdRequests[geneSymbol] = null; // add to dictionary
+    }
+    symbolGeneIdentifiersByReleaseId[releaseId] = geneIdRequests;
+    symbolGeneIdentifierTimer = setTimeout(batchRetrieveGeneIdentifiers, BATCH_RETRIEVE_INTERVAL);
+}
+
+function batchRetrieveGeneIdentifiers() {
+    for (let releaseId in symbolGeneIdentifiersByReleaseId) {
+        let geneIdRequests = symbolGeneIdentifiersByReleaseId[releaseId];
+        batchRetrieveGeneIdentifiersForRelease(releaseId, geneIdRequests);
+    }
+}
+
+
+function batchRetrieveGeneIdentifiersForRelease(releaseId, geneIdRequests) {
+    let geneSymbols = [];
+    for (let geneSymbol in geneIdRequests) {
+        let req = geneIdRequests[geneSymbol];
+        if (!req) {
+            geneSymbols.push(geneSymbol);
+        }
+    }
+
+    if (geneSymbols.length) {
+        symbolGeneIdentifierRequestId++;
+        for (let i=0 ; i<geneSymbols.length; ++i) {
+            let geneSymbol = geneSymbols[i];
+            geneIdRequests[geneSymbol] = symbolGeneIdentifierRequestId;
+        }
+        // Lots of genes (could exceed url limits) so use POST
+        let data = 'gene_symbols_json=' + encodeURIComponent(JSON.stringify(geneSymbols));
+
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: Urls.api_batch_gene_identifiers_for_release(releaseId),
+            success: function(data) {
+                handleBatchRetrieveGeneIdentifiersForRelease(releaseId, geneIdRequests, geneSymbols, data);
+            }
+        });
+    }
+}
+
+
+function handleBatchRetrieveGeneIdentifiersForRelease(releaseId, geneIdRequests, geneSymbols, returnedGeneIdentifiers) {
+    // Put the data into the cache
+    let symbolGeneIdentifiers = symbolGeneIdentifierRequestsByReleaseId[releaseId];
+    if (!symbolGeneIdentifiers) {
+        symbolGeneIdentifiers = {};
+        symbolGeneIdentifierRequestsByReleaseId[releaseId] = symbolGeneIdentifiers;
+    }
+
+    let releaseClass = "gene-annotation-release-" + releaseId;
+
+    for (let i=0 ; i<geneSymbols.length; ++i) {
+        let geneSymbol = geneSymbols[i];
+        let geneIdsList = returnedGeneIdentifiers[geneSymbol] || [];
+        symbolGeneIdentifiers[geneSymbol] = geneIdsList;
+        delete geneIdRequests[geneSymbol];
+
+        let cell = getCell(geneSymbol, releaseClass);
+        setGeneAnnotationReleaseCell(cell, geneIdsList);
+    }
+}
+
+
+
+
+function getGenesInGeneListColumn(geneListId) {
+    let className = 'gene-list-' + geneListId;
+    let serverGenesSet = geneListGenesById[geneListId];
+    let modifications = getGeneListModifications(className);
+    let genes = new Set([...serverGenesSet, ...modifications.add]);
+    let deletionsSet = new Set(modifications.delete);
+    return new Set(
+        [...genes].filter(x => !deletionsSet.has(x))
+    );
+}
+
+
+function getGeneListModifications(className) {
+    let additions = [];
+    let deletions = [];
+    $(".addition." + className).each(function() {
+        additions.push(getTdGene($(this)));
+    });
+    $(".deletion." + className).each(function() {
+        deletions.push(getTdGene($(this)));
+    });
+    return {"add": additions, "delete": deletions};
+}
+
+
+function saveGeneList(geneListId, className, callbackFunc) {
+    let modifications = getGeneListModifications(className);
+    let data = 'modifications=' + encodeURIComponent(JSON.stringify(modifications));
+    
+    $.ajax({
+        type: "POST",
+        url: Urls.api_modify_gene_list(geneListId),
+        data: data,
+        success: function(data) {
+            // console.log("API success: ");
+            // console.log(data);
+            removeColumn(className);
+            removeItemFromArray(geneListId, geneLists);
+            getGeneListColumn(geneListId); // reloads column
+
+            if (callbackFunc) {
+                callbackFunc(geneListId);
+            }
+        },
+        error: function(data) {
+            // TODO???
+        }
+    });
+}
+
+
+function modifiedGeneList(geneListId, geneListClass) {
+    let modifications = $(".addition." + geneListClass + ",.deletion." + geneListClass);
+    let saveButton = $("button.save-genelist", "." + geneListClass); 
+    if (modifications.length) {
+        saveButton.show();
+    } else {
+        saveButton.hide();
+    }
+}
+
+
+function geneListGeneClickHandler(cell, geneListId, geneListClass, geneSymbol) {
+    let innerSpan = $(".gene-container", cell);
+    function removeClickHandler() {
+        // Delete and create a new one (will have empty click handler etc)
+        let tr = cell.parent("tr");
+        cell.remove();
+        createRowColumns(tr);
+
+        let td = $("td." + geneListClass, tr); 
+        let geneListGenes = geneListGenesById[geneListId];
+        if (geneListGenes.has(geneSymbol)) {
+            td.addClass("deletion");
+        } else {
+            td.removeClass("addition");
+        }
+        modifiedGeneList(geneListId, geneListClass);
+    }
+    deleteItemClickHandler(cell, innerSpan, removeClickHandler);
+}
+
+
+function addGeneToGeneList(geneContainer, geneListId, geneListClass, geneSymbol) {
+    let td = geneContainer.parent("td");
+    let tr = td.parent("tr");
+    setCellGene(tr, geneListId, geneListClass, geneSymbol);
+    let geneListGenes = geneListGenesById[geneListId];
+    if (!geneListGenes.has(geneSymbol)) {
+        td.addClass("addition");
+    } else {
+        td.removeClass("deletion");
+    }
+    modifiedGeneList(geneListId, geneListClass);
+}
+
+
+function emptyGeneHoverHandler(geneContainer, recordId, className, gene, addFunc) {
+    //geneContainer.empty();
+    let addButton = $("<div />").addClass("click-to-add-button");
+    addButton.attr("title", "Add " + gene);
+    addButton.hide();
+    addButton.fadeIn(100);
+    addButton.click(function() {
+        addFunc(geneContainer, recordId, className, gene);
+    });
+    geneContainer.prepend(addButton);
+}
+
+
+function clinGenCellInit(cell, gene_symbol) {
+    let clinGenDiv = $("<div />").addClass("loading");
+    cell.append(clinGenDiv);
+    // make API call and when done - replace with this
+    $.ajax({
+        type: "GET",
+        url: Urls.api_view_gene_disease_validity(gene_symbol),
+        success: function(diseaseValidityList) {
+            let newDiv = $("<div />");
+            if (diseaseValidityList) {
+                for (let i=0 ; i<diseaseValidityList.length ; ++i) {
+                    let diseaseValidity = diseaseValidityList[i];
+                    let classification = diseaseValidity["classification"];
+                    let date = diseaseValidity["date"];
+                    let gene_validity_summary_url = diseaseValidity["gene_validity_summary_url"];
+                    let mondo = diseaseValidity["mondo"];
+                    let diseaseName = mondo["name"];
+                    let diseaseDescription = mondo["description"];
+                    let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ":");
+                    diseaseSpan.attr("title", diseaseDescription);
+                    let dvSpan = $("<span />").addClass("disease-validity");
+                    dvSpan.append(diseaseSpan);
+                    let a = $("<a />").attr("href", gene_validity_summary_url);
+                    let classificationSpan = $("<span />")
+                        .addClass("disease-classification")
+                        .text(classification)
+                        .attr("title", date);
+                    a.append(classificationSpan);
+                    dvSpan.append(a);
+                    dvSpan.append(". ");
+                    newDiv.append(dvSpan);
+                }
+            }
+            clinGenDiv.replaceWith(newDiv);
+        },
+        error: function() {
+            let newDiv = $("<div />").text("Failed...");          
+            clinGenDiv.replaceWith(newDiv);
+        }
+    });
+}
+
+function panelAppCellInit(cell, gene_symbol) {
+    let panelAppDiv = $("<div />").addClass("loading");
+    cell.append(panelAppDiv);
+    // make API call and when done - replace with this
+
+    $.ajax({
+        type: "GET",
+        url: Urls.api_panel_app_gene_evidence(gene_symbol),
+        success: function(panelAppEvidenceResultsList) {
+            let newDiv = $("<div />");           
+            if (panelAppEvidenceResultsList) {
+                for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
+                    let evidence = panelAppEvidenceResultsList[i];
+                    addGeneEvidence(gene_symbol, evidence, newDiv);
+                    
+                    let diseaseName = evidence["SpecificDiseaseName"];
+                    //let confidence = evidence["LevelOfConfidence"];
+                    let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
+                    newDiv.append(diseaseSpan);
+                }
+            }
+            panelAppDiv.replaceWith(newDiv);
+        },
+        error: function(qXHR, textStatus, errorThrown) {
+            let errorText = "Failed...";
+            if (qXHR.status == 404) {
+                errorText = "No found";
+            }
+            let newDiv = $("<div />").text(errorText);
+            panelAppDiv.replaceWith(newDiv);
+        }
+    });
+}
+
+
+////// Pathology test
+
+function addAndRetrievePathologyTestVersionColumnIfNotExists(pathologyTestVersionId, selectElement) {
+    if (pathologyTestVersions.indexOf(pathologyTestVersionId) > -1) {
+        return;
+    }
+
+    $.ajax({
+        type: "GET",
+        url: Urls.api_view_pathology_test_version(pathologyTestVersionId),
+        success: function(data) {
+            populatePathologyTestVersionColumn(data, selectElement);
+        },
+    });
+}
+
+
+function pathologyTestModifications(pathologytestgenemodificationrequest_set) {
+    let geneModifications = {};
+    for (let i=0 ; i<pathologytestgenemodificationrequest_set.length ; ++i) {
+        let mod = pathologytestgenemodificationrequest_set[i];
+        let geneSymbol = mod["gene"]["gene_symbol"];
+        let geneMods = geneModifications[geneSymbol] || {};
+        let outcome = mod["outcome"];
+        // Only show pendings as +/- 1
+        if (outcome == 'P') { 
+            let op = mod["operation"];
+            let ops = geneMods[op] || [];
+            ops.push(mod);
+            geneMods[op] = ops;
+            geneModifications[geneSymbol] = geneMods;
+        }
+    }
+    return geneModifications;
+}
+
+
+function getPathologyTestForGeneListId(geneListId) {
+    let backwardsDict = {};
+    for (let pathologyTestVersionId in geneListIdByPathologyTestVersionId) {
+        let geneListId = geneListIdByPathologyTestVersionId[pathologyTestVersionId];
+        backwardsDict[geneListId] = pathologyTestVersionId;
+    }
+    return backwardsDict[geneListId];
+    
+}
+
+
+function pathologyTestGeneClickHandler(cell, geneListId, className, geneSymbol) {
+    let geneContainer = $(".gene-container", cell);
+    function removeClickHandler() {
+        let pathologyTestVersionId = getPathologyTestForGeneListId(geneListId);
+        removeGeneFromPathologyTest(geneContainer, pathologyTestVersionId, className, geneSymbol);
+    }
+    deleteItemClickHandler(cell, geneContainer, removeClickHandler);
+}
+
+
+function populatePathologyTestVersionColumn(data, selectElement) {
+    let pathologyTestVersionId = data["id"];
+    if (pathologyTestVersions.indexOf(pathologyTestVersionId) > -1) { // in case 2x callbacks were run
+        return;
+    }
+    pathologyTestVersions.push(pathologyTestVersionId);
+    let modifications = pathologyTestModifications(data["pathologytestgenemodificationrequest_set"]);
+    data["modifications_by_gene"] = modifications;
+    pathologyTestVersionDataById[pathologyTestVersionId] = data;
+
+    let className = 'pathology-test-version-' + pathologyTestVersionId;
+    let saveGeneListFunc = function(callbackFunc) {
+        console.log("pathologytestversion saveGeneListFunc");
+    };
+
+    let closeButtonFunc = function() {
+        let gmTable = $("table#gene-grid");
+        let tbody = gmTable.children('tbody');
+        
+        removeColumn(className);
+        removeItemFromArray(pathologyTestVersionId, pathologyTestVersions);
+        gcEmptyRows(tbody);
+        updateUrl();
+
+        if (selectElement) { // Clear if provided - so we can re-select
+            $(selectElement).empty();
+        }
+    };
+
+    let geneListData = data["gene_list"];
+    geneListIdByPathologyTestVersionId[pathologyTestVersionId] = geneListData["pk"];
+    
+    // TODO: Bring down way to know if latest
+    let testIconClass = null;
+    let pathologyTestName = data["pathology_test"]["name"];
+    let testIconTitle = null;
+    if (data["is_active_test"]) {
+        testIconClass = "active-pathology-test";
+        testIconTitle = "This test is the most recent confirmed version of the " + pathologyTestName + " test";
+    } else {
+        testIconClass = "obsolete-pathology-test";
+        if (data["confirmed_date"]) {
+            testIconTitle = "This test is NOT the most recent confirmed version of the " + pathologyTestName + " test";
+        } else {
+            testIconTitle = "This test has not yet been confirmed!";
+        }
+    }
+
+    // Pathology Test overrides for gene list
+    geneListData["name"] = data["__str__"];
+    geneListData["can_write"] = true;
+    geneListData["extra_icons"] = [{"css_class": testIconClass, "title": testIconTitle}];
+    geneListData["absolute_url"] = Urls.view_pathology_test_version(pathologyTestVersionId);
+    let geneListId = geneListData["pk"];
+    populateGeneColumn(geneListId, geneListData, className, saveGeneListFunc, closeButtonFunc, pathologyTestGeneClickHandler);
+
+    if (modifications) {
+        populatePathologyTestModifications(className, modifications);
+    }
+}
+
+
+function createPathologyTestModificationElement(modifications, operation) {
+    let ops = modifications[operation];
+    let element = null;
+    if (ops) {
+        element = $("<span />").text(operation + ops.length);
+    }
+    return element;
+}
+
+function populatePathologyTestModifications(className, modifications) {
+    let gmTable = $("table#gene-grid");
+    let tbody = gmTable.children('tbody');
+
+    for (let geneSymbol in modifications) {
+        addGeneRows(tbody, 0, '', [geneSymbol], pathologyTestGeneClickHandler);
+        let geneMod = modifications[geneSymbol];
+        addPathologyTestModificationElements(className, geneSymbol, geneMod);
+    }
+}
+
+function addPathologyTestModificationElements(className, geneSymbol, geneMod) {
+    let cell = getCell(geneSymbol, className);
+    
+    // delete existing
+    $(".modifications-container", cell).remove();
+    let geneContainer = $(".gene-container", cell);
+    let modContainer = $("<span />").addClass("modifications-container");
+    if (geneContainer.text()) {
+        modContainer.append($("<span />").text(", "));
+    }
+
+    let addEl = createPathologyTestModificationElement(geneMod, "+");
+    let delEl = createPathologyTestModificationElement(geneMod, "-");
+
+    cell.addClass(KEEP_CELL_CLASS);
+    if (addEl) {
+        modContainer.append(addEl);
+        cell.addClass("addition");
+        if (delEl) {
+            modContainer.append(",");
+        }
+    }
+    if (delEl) {
+        modContainer.append(delEl);            
+        cell.addClass("deletion");
+    }
+    geneContainer.append(modContainer);
+}
+
+
+function changePathologyTestForm(selectElement) {
+    const pathTestName = $(selectElement).val();
+    $.ajax({
+        type: "GET",
+        url: Urls.api_view_latest_pathology_test_version(pathTestName),
+        success: function(data) {
+            populatePathologyTestVersionColumn(data, selectElement);
+        },
+    });
+}
+
+
+function createPathologyTestGeneModificationForm(container, headerText, submitFunc) {
+    let f = $("<form />");
+    function resetStuff() {
+        container.show();
+        f.remove();
+    }
+    let input = $("<input />").attr("placeholder", "reason / justification...");
+    let submitButton = $("<button />").button().html("save").click(function() {
+        resetStuff();
+        submitFunc(input.val());
+    }); 
+    let cancelButton = $("<button />").button().html("cancel").click(resetStuff); 
+
+    f.append($("<h3 />").text(headerText));
+    f.append(input);
+    f.append(submitButton);
+    f.append(cancelButton);
+
+    container.parent().append(f);
+    input.focus();
+    container.hide();
+}
+
+function modifyPathologyTestVersion(pathologyTestVersionId, geneSymbol, operation, comments, successFunc, errorFunc) {
+    let data = {'gene_symbol' : geneSymbol,
+                'operation' : operation,
+                'comments' : comments};
+    $.ajax({
+        type: "POST",
+        data: data,
+        url: Urls.modify_pathology_test_version(pathologyTestVersionId),
+        success: successFunc,
+        error: errorFunc,
+    });
+}
+
+
+function addGeneToPathologyTest(geneContainer, pathologyTestVersionId, className, geneSymbol) {
+    let geneListId = geneListIdByPathologyTestVersionId[pathologyTestVersionId];
+    let data = pathologyTestVersionDataById[pathologyTestVersionId];
+    let modifications = data["modifications_by_gene"];
+    let geneMod = modifications[geneSymbol] || {};
+    let ops = geneMod["+"] || [];
+    // TODO: Add proper editor where you can add comment
+    // quick way to say in other list?
+    // send to server
+    geneMod["+"] = ops;
+    modifications[geneSymbol] = geneMod;
+    ops.push({"foo": "bar"}); // add proper stuff
+    
+    function submitFunc(comments) {
+        let successFunc = function() {
+            console.log("Success!");
+            addPathologyTestModificationElements(className, geneSymbol, geneMod);
+        };
+        
+        let errorFunc = function() {
+            console.log("Error!");
+        };
+        modifyPathologyTestVersion(pathologyTestVersionId, geneSymbol, '+', comments, successFunc, errorFunc);
+    }
+    createPathologyTestGeneModificationForm(geneContainer, "Request gene addition", submitFunc);
+}
+
+
+function removeGeneFromPathologyTest(geneContainer, pathologyTestVersionId, className, geneSymbol) {
+    // TODO: refactor code shared w/add above
+    let data = pathologyTestVersionDataById[pathologyTestVersionId];
+    let modifications = data["modifications_by_gene"];
+    let geneMod = modifications[geneSymbol] || {};
+    let ops = geneMod["-"] || [];
+    // TODO: Add proper editor where you can add comment
+    // quick way to say in other list?
+    // send to server
+    geneMod["-"] = ops;
+    modifications[geneSymbol] = geneMod;
+    ops.push({"foo": "bar"}); // add proper stuff
+
+    function submitFunc(comments) {
+        let successFunc = function() {
+            console.log("Success!");
+            addPathologyTestModificationElements(className, geneSymbol, geneMod);
+        };
+        
+        let errorFunc = function() {
+            console.log("Error!");
+        };
+        modifyPathologyTestVersion(pathologyTestVersionId, geneSymbol, '-', comments, successFunc, errorFunc);
+    }
+    createPathologyTestGeneModificationForm(geneContainer, "Request gene removal", submitFunc);
+}
+
+
+function addCustomGeneList() {
+    let customGeneList = $("#custom-gene-list");
+    let name = $("#id_name", customGeneList).val().trim();
+    let geneListText = $("#id_custom_gene_list_text", customGeneList).val();
+    let enableSaveButton = $("#enable_save", customGeneList).val() === "true";
+    // only allow saving named custom lists
+    enableSaveButton &= Boolean(name);
+    let data = {"name": name, "gene_list_text": geneListText};
+
+    $.ajax({
+        type: "GET",
+        data: data,
+        url: Urls.api_text_to_gene_list(),
+        success: function(data) {
+            handleCustomGeneListResponse(data, enableSaveButton);
+        },
+    });
+}
+
+
+function handleCustomGeneListResponse(data, enableSaveButton) {
+    enableSaveButton = getValue(enableSaveButton, true);
+    ++customTextGeneListId;
+    let geneListId = "custom-text-gene-list-" + customTextGeneListId;
+    let className = 'gene-list-' + geneListId;
+    let gmTable = $("table#gene-grid");
+    let tbody = gmTable.children('tbody');
+    
+    if (geneLists.indexOf(geneListId) > -1) {
+        removeColumn(className);
+        removeItemFromArray(geneListId, geneLists);
+    } else {
+        geneLists.push(geneListId);
+    }
+
+    let saveGeneListFunc = null;
+    if (enableSaveButton) {
+        saveGeneListFunc = function(callbackFunc) {
+            let name = data["name"];
+            createCustomTextGeneList(name, geneListId, className, callbackFunc);
+        };
+    }
+
+    let closeButtonFunc = function() {
+        removeColumn(className);
+        removeItemFromArray(geneListId, geneLists);
+        gcEmptyRows(tbody);
+    };
+    
+    displayCustomGeneListMessages(data);
+    
+    populateGeneColumn(geneListId, data, className, saveGeneListFunc, closeButtonFunc);
+    // since this is a new unsaved gene list - make them all additions
+    geneListGenesById[geneListId] = new Set();
+    $(".keep-cell." + className, tbody).addClass("addition");         
+    modifiedGeneList(geneListId, className);
+}
+
+
+function addMessages(ul, klass, messages) {
+    for (let i=0 ; i<messages.length ; ++i) {
+        let m = messages[i];
+        ul.append($("<li class='" + klass + "' />").text(m));
+    }
+}
+
+
+function displayCustomGeneListMessages(data) {
+    let ul = $("#custom-genelist-messages");
+    ul.hide();
+    $("li", ul).remove();
+    let geneListGenes = data["genelistgenesymbol_set"];
+    let ret = getGeneSetAndDataListFromGeneListGenes(geneListGenes);
+    let unmatchedGenes = [];
+    let geneAliases = [];
+    for (let i=0 ; i<ret.geneDataList.length ; ++i) {
+        let gd = ret.geneDataList[i];
+        if (gd.type === "unmatched") {
+            unmatchedGenes.push("Unmatched gene: " + gd.gene);
+        } else if (gd.type === "alias") {
+            geneAliases.push(gd.gene + " matched as " + gd.matched_gene)
+        }
+    }
+
+    if (unmatchedGenes.length || geneAliases.length) {
+        addMessages(ul, 'error', unmatchedGenes);
+        addMessages(ul, 'warning', geneAliases);
+        ul.show();
+    }
+}
+
+
+function createCustomTextGeneList(name, geneListId, className, callbackFunc) {
+    let gene_symbols = [];
+    $(".addition." + className).each(function() {
+        gene_symbols.push(getTdGene($(this)));
+    });
+    let params = {"name": name,
+                  "gene_symbols": gene_symbols,
+                  "modification_info": "Created by GeneGrid custom text"};
+
+    $.ajax({
+        type: "POST",
+        headers: {
+            'Accept' : 'application/json',
+            'Content-Type' : 'application/json'
+        },
+        data: JSON.stringify(params),
+        url: Urls.api_create_gene_list(),
+        success: function(data) {
+            // Delete existing custom gene list column
+            removeColumn(className);
+            removeItemFromArray(geneListId, geneLists);
+
+            // Load newly created one from DB
+            geneListId = data["pk"];
+            getGeneListColumn(geneListId);
+            
+            if (callbackFunc) {
+                callbackFunc(geneListId);
+            }
+            
+        }
+    });
+
+}
+
+$(document).ready(function() {
+    $('select', ".category-gene-list-form").change(function() {
+        let geneListId = $(this).val();
+        if (geneListId) {
+            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
+        }
+    });
+    
+    $('select', ".pathology-test-form").change(function() {
+        changePathologyTestForm(this);
+    });
+    $('select', ".pathology-test-version-form").change(function() {
+        let pathologyTestVersionId = $(this).val();
+        if (pathologyTestVersionId) {
+            addAndRetrievePathologyTestVersionColumnIfNotExists(pathologyTestVersionId, this);
+        }
+    });
+    
+    
+    $('#id_enrichment_kit').change(function() {
+        let enrichmentKitId = $(this).val();
+        if (enrichmentKitId) {
+            addAndRetrieveEnrichmentKitColumnIfNotExists(enrichmentKitId, this);
+        }
+    });
+
+    $('#id_release').change(function() {
+        let realeaseId = $(this).val();
+        if (realeaseId) {
+            addAndRetrieveGeneAnnotationReleaseColumnIfNotExists(realeaseId, this);
+        }
+    });
+
+    $('#id_panel_app_panel').change(function() {
+        let PANEL_APP_PREFIX = "panel-app-";
+        let panel_app_panel_id = $(this).val();
+        if (panel_app_panel_id) {
+            let geneListId = PANEL_APP_PREFIX + panel_app_panel_id;
+            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
+        }
+    });
+    
+    
+    $('#id_hpo_synonym').change(function() {
+        let HPO_PREFIX = "hpo-synonym-";
+        let hpo_synonym_id = $(this).val();
+        if (hpo_synonym_id) {
+            let geneListId = HPO_PREFIX + hpo_synonym_id;
+            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
+        }
+    });
+    
+    
+    $('#id_mim_morbid_alias').change(function() {
+        let MIM_ALIAS_PREFIX = "mim-alias-";
+        let mim_alias_id = $(this).val();
+        if (mim_alias_id) {
+            let geneListId = MIM_ALIAS_PREFIX + mim_alias_id;
+            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
+        }
+    });
+    
+
+    $("input.evidence-checkbox").change(function() {
+        let evidenceType = $(this).attr("evidence_type");
+        
+        let index = evidenceColumns.indexOf(evidenceType);
+        if ($(this).is(":checked")) {
+            if (index == -1) {
+                evidenceColumns.push(evidenceType);
+                addEvidenceColumn(evidenceType);
+            } 
+        } else {
+            if (index > -1) {
+                removeItemFromArray(evidenceType, evidenceColumns);
+                removeColumn(evidenceType);
+            }
+        }
+    });
+
+    $("input.color-coverage-checkbox").change(function() {
+        let geneGrid = $("table#gene-grid");
+        let cssClass = "color-coverage";
+        if ($(this).is(":checked")) {
+            geneGrid.addClass(cssClass);
+        } else {
+            geneGrid.removeClass(cssClass);
+        }
+    });
+
+    
+    $("button", "#custom-gene-list").button().click(addCustomGeneList);
+
+    // Gene autocomplete select top left of gene grid
+    $('#id_gene_symbol').change(function() {
+        let geneSymbol = $(this).val();
+        if (geneSymbol) {
+            addGeneSymbol(geneSymbol);
+        }
+    });
+    
+    {% for column in initial_columns %}
+        addInitialColumn("{{ column }}");
+    {% endfor %}
+    
+    {% if init_callback %}
+        let initCallback = {{ init_callback|safe }};
+        initCallback();
+    {% endif %}
+    
+});
+</script>
+
+<div class="multi-columned">
+    <fieldset class="form-fields small gene-grid-control-box" id="data-columns-box">
+        <legend>Data columns</legend>
+        {% for dc in data_columns %}
+        <div>
+            <label>{{ dc.description }}</label>
+            <div>
+                <form id='data-columns-{{ dc.pk }}' class="no-labels {{ dc.form_css_class }}">
+                    {{ dc.form.as_p }}
+                    {% if forloop.first %}
+                        <!-- Just need 1 of these -->
+                        {{ dc.form.media }}
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+        <div>
+            <label for="clingen-evidence-checkbox"><div class="column-icon clingen-icon"></div></label>
+            <input id="clingen-evidence-checkbox" class='evidence-checkbox' type='checkbox' evidence_type="clingen" />
+        </div>
+        <div>
+            <label for="panelapp-evidence-checkbox"><div class="column-icon panel-app-icon"></div></label>
+            <input id="panelapp-evidence-checkbox" class='evidence-checkbox' type='checkbox' evidence_type="panelapp" />
+        </div>
+        <div>
+            <label for="color-coverage-checkbox"><div class="column-icon enrichment-kit-icon"></div> Color Coverage</label>
+            <input id="color-coverage-checkbox" class='color-coverage-checkbox' type='checkbox' checked="1" />
+        </div>
+    </fieldset>
+    <fieldset class="form-fields small" id="gene-grid-control-box" >
+        <legend>Gene Lists</legend>
+        {% for category in categories %}
+        <div>
+            <label>{{ category.description }}</label>
+            <div>
+                <form id='gene-list-category-{{ category.pk }}' class="no-labels {{ category.form_css_class }}">
+                    {{ category.form.as_p }}
+                    {% if forloop.first %}
+                        <!-- Just need 1 of these -->
+                        {{ category.form.media }}
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </fieldset>
+{% comment %}
+        <th>{{ category.description }}:
+        <td><div class='gene-list-icon {{ category.icon_css_class }}'></div>
+        <td>
+{% endcomment %}
+
+
+    <fieldset class="form-fields small" id="custom-gene-list">
+        <legend>Create Custom Gene List</legend>
+        <div id='custom-gene-list-help'></div>
+        {{ named_custom_gene_list_form.as_p }}
+        <input type='hidden' id="enable_save" value="true" />
+        <ul id='custom-genelist-messages' class='messages hidden'><b>Validation Messages:</b>
+        </ul>
+        <div class="buttons">
+            <button id='add-custom-gene-list'>Add Custom Gene List</button>
+        </div>
+    </fieldset>
+</div>
+
+{% load ui_help %}
+{% page_help page_id='genes/gene_grid_tag_help' title='Gene Grid' %}
+
+<table id='gene-grid' class="color-coverage">
+<thead>
+    <tr id='column-names'>
+        <th class='gene-label'>Gene</th>
+    </tr>
+    <tr id='column-icons'>
+        <th class='gene-label'><form>{{ gene_symbol_form.gene_symbol }}</form></th>
+    </tr>
+    <tr id='column-subcolumns'>
+        <th class='gene-label'></th>
+    </tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div> <!-- /gene-grid-tag -->
+
+

@@ -1,0 +1,24 @@
+<div id='wait-for-task'>
+{% load static %}
+<script>
+function reloadPage() {
+    console.log("reloadPage");
+    $("#wait-for-task").empty();
+    $("#wait-for-task").load("{{ url }}");
+};
+
+console.log("ready");
+setTimeout(reloadPage, {{ sleep_ms }});
+
+
+$(document).ready(function() {
+});
+</script>
+
+{% if async_result.result and not async_result.successful %}
+    The Job {{ async_result.id }} exited with status {{ async_result.status }}.
+{% else %}
+<img src="{% static 'images/spinner.gif' %}" />
+{% endif %}
+
+</div>

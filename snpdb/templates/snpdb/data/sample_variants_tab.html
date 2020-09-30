@@ -1,0 +1,53 @@
+{% load static %}
+<script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
+<div id='sample-variants-container'>
+    {% include "messages/messages.html" %}
+
+    {% if analysis %}
+        <script>
+        function gridLoadError() {
+            console.log("gridLoadError");
+        }
+
+        function on_error_function() {
+            console.log("on_error_function");
+        }
+
+        function showNodeGrid(nodeStatus) {
+            var nodeId = nodeStatus.id;
+            var version = nodeStatus.version;
+
+            var grid_url = Urls.node_grid_config(nodeId, version, "default");
+            var unique_code = "sample-variants-grid";  // ok to be constant on this page
+            function noOp() {};
+            setupGrid(grid_url, nodeId, version, unique_code, noOp, gridLoadError, on_error_function);
+        }
+
+        $(document).ready(function() {
+            var messagePoller = new AnalysisMessagePoller(Urls.nodes_status({{ analysis.pk }}));
+            var gridContainer = $("#node-data-grid");
+
+            $("#id_node").change(function() {
+                var nodeId = $(this).val();
+                gridContainer.empty();
+                if (nodeId) {
+                    $("<table/>").attr({
+                        id: 'grid-' + nodeId,
+                        class: 'grid'
+                    }).text("loading...").appendTo(gridContainer);
+                    $("<div/>").attr({id: 'pager-' + nodeId}).appendTo(gridContainer);
+                    messagePoller.observe_node(nodeId, "ready", showNodeGrid);
+                }
+            });
+            messagePoller.update_loop();
+        });
+        </script>
+        <h3>Analysis: {{ analysis }}</h3>
+        {{ output_node_form.as_p }}
+
+        <div id="sample-variants-grid">
+            <div id='node-data-grid' class='node-data'></div>
+        </div>
+    {% endif %}
+
+</div>

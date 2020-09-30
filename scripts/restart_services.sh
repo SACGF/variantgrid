@@ -1,0 +1,11 @@
+#!/bin/bash
+
+service gunicorn restart
+service celeryd_analysis_workers restart
+service celeryd_annotation_workers restart
+service celeryd_db_workers restart
+service celeryd_web_workers restart
+service celeryd_variant_id_single_worker restart 
+service celeryd_scheduling_single_worker restart
+service celeryd_seqauto_single_worker restart
+#service celeryd_beat restart

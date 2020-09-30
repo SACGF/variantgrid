@@ -1,0 +1,56 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load ui_tabs_builder %}
+{% block submenu %}
+    {% menu_bar_patients %}
+{% endblock %}
+{% block title %}Pedigrees{% endblock title %}
+{% block head %}
+    <script>
+        $(document).ready(function() {
+            $('button#new-pedigree').click(function () {
+                var cohortId = $("#id_cohort").find(":selected").val();
+                var pedFileFamilyId = $("#id_ped_file_family").find(":selected").val();
+
+                if (cohortId && pedFileFamilyId) {
+                    window.location = Urls.create_pedigree_from_cohort_and_ped_file_family(cohortId, pedFileFamilyId);
+                }
+            });
+        });
+	</script>
+{% endblock head %}
+
+{% block content %}
+    <div class="container">
+        {% load ui_help %}
+        {% page_help page_id='patients/pedigrees_help' title='Pedigree' %}
+
+        {% ui_register_tab_embedded tab_set="pedigree-tabs" label="New Pedigree" %}
+            <div id="new">
+                <form id="pedigree-form" method="post" action="">
+                    <p>Create a pedigree by mapping samples from a PED file to samples from a cohort.
+                    <p>The cohort must contain all samples - you may need to make a <a class="hover-link" href="{% url 'cohorts' %}">cohort</a> first.
+
+                    <div class="card">
+                        <div class="card-header">Create</div>
+                        <div class="card-body">
+                            {% crispy form form_helper.horizontal %}
+                            <button id='new-pedigree' class="btn btn-primary" type='button'><i class="fas fa-plus-circle"></i> Create</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab_embedded tab_set="pedigree-tabs" label="Search" %}
+            <div id="search">
+                <div id="pedigree-grid-filter-container"></div>
+            </div>
+        {% end_ui_register_tab_embedded %}
+        {% ui_render_tabs tab_set="pedigree-tabs" css="mb-2" %}
+
+        {% load jqgrid_tags %}
+        {% jqgrid 'pedigree_grid' 'pedigree' search=True delete=True gbox_id='pedigree-grid-filter-container' %}
+	</div>
+{% endblock content %}

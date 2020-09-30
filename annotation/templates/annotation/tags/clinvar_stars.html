@@ -1,0 +1,14 @@
+<style>
+.filled-star {
+    color: #fdb81e;
+}
+</style>
+<div class="clinvar-stars">
+    {%  for star in stars %}
+        {% if star %}
+            <span class="filled-star">&#x2605;</span>
+        {%  else %}
+            <span>&#x2605;</span>
+        {%  endif %}
+    {%  endfor %}
+</div>

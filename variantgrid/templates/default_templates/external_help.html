@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block head %}
+{{ block.super }}
+    <style>
+        iframe {
+            width: 100%;
+        }
+
+        .submenu ul {
+            padding: 0px 10px 0px 10px;
+        }
+
+        .submenu li {
+            padding: 1px 0px 1px 0px;
+            list-style-type: none;
+        }
+    </style>
+    <script src="/static/help/help_menu.js"></script>
+    <script>
+        var DEFAULT_PAGE = 'about.html';
+    
+        function getQueryParams() {
+            qs = document.location.search;
+            qs = qs.split('+').join(' ');
+        
+            var params = {},
+                tokens,
+                re = /[?&]?([^=]+)=([^&]*)/g;
+        
+            while (tokens = re.exec(qs)) {
+                params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
+            }
+        
+            return params;
+        }
+
+        // There are 2 copies of this function, here and internal page.
+        function helpPage(pageName) {
+            var static_iframe = $("iframe#static-iframe");
+            var static_iframe_url = "/static/help/" + pageName;
+            static_iframe.attr("src", static_iframe_url);
+        } 
+
+
+        $(document).ready(function() {
+            var menu = $('ul#help-side-menu');
+            var baseUrl = window.location.pathname + "?page=";
+            populateSideMenu(baseUrl, menu);
+
+            args = getQueryParams();
+            var pageName = args["page"] || DEFAULT_PAGE;
+            if (pageName) {
+                helpPage(pageName);
+            }
+        }); 
+    </script>
+{% endblock %}
+{% block content %}
+{{ block.super }}
+<div id='page-container' class='display-flex'>
+	<div class="submenu ui-widget-header flex-none">
+        <ul id='help-side-menu'>
+            <li><a target="_blank" href="{{ help_url }}">Help</a>
+        </ul>
+    </div>
+    <div id="submenu_page_content" class='flex-grow'>
+		<div id="static-content">
+	
+		<iframe id='static-iframe' scrolling="no" frameBorder="0" onload="this.height=this.contentDocument.body.scrollHeight +'px';">
+		</iframe>
+		</div>
+	</div>
+</div>
+{% endblock %}

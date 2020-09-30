@@ -1,0 +1,90 @@
+{% load static %}
+{% load js_tags %}
+<div class='wiki-tag'>
+<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+<!-- Editor's Dependecy Style -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.48.4/codemirror.min.css"
+  />
+  <!-- Editor's Style -->
+  <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+<script>
+function initWiki() {
+    var wikiId = $("#wiki-{{ uuid }}");
+    var wikiSaveButton = $(".wiki-save", wikiId).button();
+    
+    var events = {};
+    {% if has_write_permission %}
+    events['change'] = function() { wikiSaveButton.show(); };
+    {% endif %}
+    
+    var editor = new toastui.Editor({
+      el: document.querySelector('.editSection', wikiId),
+      initialEditType: 'markdown',
+      previewStyle: 'vertical',
+      initialValue: `{{ wiki.markdown|jsstring }}`, // ES6 template string as could be multi-line
+      initialEditType: 'wysiwyg',
+      height: '300px',
+      events: events,
+      usageStatistics: false,
+    });
+
+    $(".show-wiki-link", wikiId).hide();
+    $(".editSection", wikiId).show();
+
+    wikiSaveButton.click(function() {
+        var wikiContent = editor.getMarkdown();
+        var data = 'markdown=' + encodeURIComponent(wikiContent);
+        var saveMessage = $(".saving-message", wikiId);
+        wikiSaveButton.hide();
+        saveMessage.show();
+        
+        function showMessage(message) {
+            saveMessage.hide();
+            $(".saved-message", wikiId).html(message).fadeIn('fast').delay(2000).fadeOut('fast');
+        }
+        
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: "{% url 'wiki_save' class_name unique_keyword unique_value %}",
+            success: function(data)
+            {
+                // Should get back an empty response. If we get anything, it's a 302 so reload to go to login screen
+                if (data.length) {
+                    function loggedInHandler() {
+                        console.log("Warning expected 0 content response got back: " + data.length)
+                    }
+                    function loggedOutHandler() {
+                        saveMessage.empty();
+                        let message = createMessage("error", "You have been logged out and your wiki edit was NOT SAVED. Please copy/paste your change, reload this page, login, then re-enter your wiki entry.");
+                        saveMessage.append(message).get(0).scrollIntoView();
+                    }
+                    checkLoggedIn(loggedInHandler, loggedOutHandler);
+                } else {
+                    showMessage("Save Successful");
+                }
+            },
+            error: function(data) {
+                showMessage("Save Failed");
+            }
+        });
+    });
+}
+
+$(document).ready(function() {
+    {%  if wiki.pk %}
+        initWiki();
+    {% endif %}
+});
+</script>
+
+<div id='wiki-{{ uuid }}'>
+    <div class="hidden editSection"></div>
+    <span class='hidden saving-message'><img src="{% static 'images/spinner.gif' %}" /> Saving...</span>
+    <span class="hidden saved-message"></span>
+    <button class='btn btn-outline-primary hidden wiki-save'>save wiki</button>
+    <a class='btn btn-outline-primary show-wiki-link' href="javascript:initWiki()">Create wiki entry</a>
+</div>
+</div>

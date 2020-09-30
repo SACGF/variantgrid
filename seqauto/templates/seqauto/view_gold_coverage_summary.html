@@ -1,0 +1,46 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load static %}
+
+{% block title %}Gold Coverage Summary for {{ gold_reference.enrichment_kit }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
+{% endblock %}
+
+{% block jsdocumentready %}
+    const GOLD_KIT_ID = "{{ gold_reference.enrichment_kit.pk }}";
+
+    jQuery.extend($.fn.fmatter , {
+        viewGoldSummaryGeneLink : function(geneSymbol, options, rowObject) {
+            var url = Urls.view_enrichment_kit_gene_coverage(GOLD_KIT_ID, geneSymbol);
+            return "<a class='grid-link' target='_blank' href='" + url + "'>" + geneSymbol + "</a>";
+        }
+    });
+{% endblock %}
+
+{% block submenu_page_content %}
+
+    <div>
+    <h3>Gold Coverage for {{ gold_reference.enrichment_kit }}</h3> (created: {{ gold_reference.created }})
+    </div>
+
+    {% if gold_sequencing_samples_by_run %}
+    <p>
+        {% for sequencing_run, samples_list in gold_sequencing_samples_by_run.items %}
+        <div>
+            <a href="{% url 'view_sequencing_run' sequencing_run.pk %}">{{ sequencing_run }}</a>
+            <ul>
+                {% for ss in samples_list %}
+                <li>{{ ss }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </p>
+    {% endif %}
+
+    <div>
+    {% load jqgrid_tags %}
+    {% jqgrid 'gold_coverage_summary_grid' 'GoldCoverageSummaries' search=True pk=gold_reference.pk download_grid_json_as_csv=True %}
+    </div>
+
+{% endblock %}
