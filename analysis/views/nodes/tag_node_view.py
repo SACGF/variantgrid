@@ -9,7 +9,7 @@ from annotation.transcripts_annotation_selections import VariantTranscriptSelect
 from genes.hgvs import HGVSMatcher
 from snpdb.models.models import Tag
 from snpdb.models.models_vcf import Sample
-from variantclassification.models.variant_classification import VariantClassification
+from classification.models.variant_classification import VariantClassification
 
 
 class TagNodeView(NodeView):

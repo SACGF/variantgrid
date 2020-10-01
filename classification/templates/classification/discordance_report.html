@@ -1,0 +1,234 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load classification_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Discordance Report{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script>
+    function toggleUnable() {
+        $('#discordance-reasons').slideToggle();
+    }
+    function diff() {
+        window.open(`{% url 'variant_classification_diff' %}?clinical_context={{clinical_context.id}}`, '_blank');
+        return false;
+    }
+    function download() {
+        window.open(`{% url 'discordance_export' report.id %}`, '_self');
+        return false;
+    }
+    function reorgGroupings() {
+        {% if use_allele_links %}
+        window.location = `{% url 'view_allele' allele.id %}?edit_clinical_groupings=True`;
+        {% else %}
+        window.location = `{% url 'view_variant' preferred_variant.id %}?edit_clinical_groupings=True`;
+        {% endif %}
+    }
+    function confirmUnable() {
+        let reason = $(`input[name='continued_discordance_reason']:checked`).val();
+        if (!reason) {
+            window.alert('Please select the primary reason why concordance could not be reached.');
+            return false;
+        }
+        return true;
+    }
+    $(document).ready(() => {
+       Flags.instance.init({
+           userId: '{{user.id}}',
+           onClose: (params) => {
+               if (params.addedOrClosedFlag) {
+                   location.reload();
+               }
+           }
+       });
+    });
+</script>
+<style>
+    tr.excluded td, tr.excluded td span {
+        text-decoration: line-through;
+    }
+    tr.excluded td.reasons {
+        text-decoration: none !important;
+    }
+    td.reasons .important {
+        font-weight: bold;
+    }
+    .code {
+        min-width: 30px;
+        text-align: right;
+
+        display: inline-block;
+        font-family: monospace;
+    }
+    .code::after {
+        content: ')';
+        opacity: 0.5;
+        position: relative;
+        bottom: 1px;
+    }
+    .code::before {
+        content: '(';
+        opacity: 0.5;
+        position: relative;
+        bottom: 1px;
+    }
+</style>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h3>Discordance Report</h3>
+
+        {% page_help page_id='classification/discordance_report_help' title='Start Resolving' show_title=False %}
+
+         <div class="card">
+            <div class="card-header">
+                <h5>Discordance</h5>
+            </div>
+             <div class="card-body">
+                 {% labelled label="Resolution" %}{{ report.resolution_text }}{% endlabelled %}
+                 {% labelled label="Allele" %}<a class="hover-link" href="{% url 'view_allele' allele.id %}">{{ allele.clingen_allele }}</a>{% endlabelled %}
+                 {% for va in allele.variant_alleles %}
+                     {% labelled label=va.genome_build %}
+                        <a class="hover-link variant-coordinate" href="{% url 'view_variant' va.variant_id %}">{{ va.variant }}</a>
+                     {% endlabelled %}
+                {% endfor %}
+                {% labelled label="Variant Interpreted in Context of" %}{{ clinical_context }}{% endlabelled %}
+                {% labelled label="Opened At" value_css="timestamp" %}{% timestamp report.report_started_date %}{% endlabelled %}
+                {% labelled label="Closed At" %}
+                    {% if report.report_completed_date %}{% timestamp report.report_completed_date %}
+                    {% else %}<span class="no-value">-</span>
+                    {% endif %}
+                {% endlabelled %}
+                {% if report.report_closed_by %}
+                    {% labelled label="Closed by" %}
+                        <span class="username">{{ report.report_closed_by.username }}</span>
+                    {% endlabelled %}
+                {% endif %}
+                {% labelled label="Initial Trigger for Discordance" %}{{ report.cause_text | default:"Unknown" }}{% endlabelled %}
+
+                {% if report.continued_discordance_reason %}
+                    {% labelled label="Reason for Continued Discordance" %}{{ report.get_continued_discordance_reason_display }}{% endlabelled %}
+                {% endif %}
+                {% if report.resolution == 'D' %}
+                    {% labelled label="Continued Discordance Notes" %}
+                        <span class="textarea-readonly">{{ report.continued_discordance_text }}</span>
+                    {% endlabelled %}
+                {% endif %}
+             </div>
+        </div>
+    </div>
+
+    <div class="container-table mt-4">
+        <h4>Discordance Summary Table</h4>
+        <table class="table classification-table" style="font-size:small">
+            <thead><tr>
+                <th>ID</th>
+                <th>HGVS</th>
+                <th>Condition</th>
+                <th>Opening<br/>Curated Date / Significance</th>
+                <th>{% if report.report_completed_date %}Closing{% else %}Current{% endif %}<br/>Curated Date / Significance</th>
+                <th>Reviews &amp; Re-classifications</th>
+                {% if ongoing %}
+                <th>Flags</th>
+                {% endif %}
+            </tr></thead>
+            <tbody>
+            {% for row in rows %}
+                {% variant_classification_discordance_row row=row show_flags=ongoing %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% comment %}
+    <!-- as all the long descriptions currently matched the short descriptions this provided no value -->
+    <div class="chunk borderless legend">
+        Legend<br/>
+        {% for action in all_actions %}
+            <span class="code">{{ action.code }}</span> {{ action.long_description }}<br/>
+        {% endfor %}
+    </div>
+    {% endcomment %}
+
+    {% if provide_reopen %}
+
+        <div class="container">
+            <h4>Actions</h4>
+            <div class="btn-toolbar">
+                <button class="btn btn-outline-primary" onclick="diff()">Show Diffs</button>
+                <button class="btn btn-outline-primary" onclick="download()">Download as CSV</button>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reopen" />
+                    <button class="btn btn-outline-primary">Re-open Discordance</button>
+                </form>
+            </div>
+        </div>
+
+    {% elif report.resolution is empty %}
+
+        <div class="container">
+            <h4>Actions</h4>
+            <div class="btn-toolbar">
+                <button type="button" class="btn btn-outline-primary" onclick="diff()">Show Diffs</button>
+                <button type="button" class="btn btn-outline-primary" onclick="download()">Download as CSV</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="reorgGroupings()">Reorganise Clinical Groupings</button>
+                <button type="button" class="btn btn-outline-danger" onclick="toggleUnable()">Unable to Resolve Discordance</button>
+            </div>
+            <div id="discordance-reasons" style="display:none">
+                <form onsubmit="return confirmUnable()" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="close" />
+                    <div class="card mt-4">
+                        <div class="card-header">Continued Discordance</div>
+                        <div class="card-body">
+                            <p>Only mark the report as "Unable to Resolve Discordance" after all other attempts to reach concordance have failed.</p>
+                            Please select the primary reason why concordance could not be reached:
+                            {% for reason in continued_discordance_reasons %}
+                            <div class="form-check">
+                                <label class="form-check-label" for="reason-{{ reason.key }}">
+                                    <input class="form-check-input" type="radio" name="continued_discordance_reason" id="reason-{{ reason.key }}" value="{{ reason.key }}"/>
+                                    {{ reason.label }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                            <textarea class="form-control mt-2" name="continued_discordance_text" placeholder="Please enter any additional notes here."></textarea>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-danger">Confirm Unable to Resolve Discordance</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    {% endif %}
+
+    <div class="container mt-4">
+        <h4>All Discordance Reports for this Clinical Grouping</h4>
+        <table class="table">
+            <thead>
+                <tr><th>Opened At</th><th>Closed At</th><th>Resolution</th></tr>
+            </thead>
+            <tbody>
+            {% for old_report in all_reports %}
+                <tr>
+                    <td class="timestamp">
+                        {% if old_report.pk == report.pk %}
+                        {% timestamp old_report.report_started_date %}
+                        {% elif old_report.pk %}
+                        <a class="hover-link" href="{% url 'discordance_report' old_report.pk %}">{% timestamp old_report.report_started_date %}</a>
+                        {% endif %}
+                    </td>
+                    <td class="timestamp">{% timestamp old_report.report_completed_date %}</td>
+                    <td>{{ old_report.resolution_text }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock content %}

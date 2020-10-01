@@ -32,7 +32,7 @@ from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import Sample
-from variantclassification.models.variant_classification import VariantClassification
+from classification.models.variant_classification import VariantClassification
 
 
 class AllVariantsNodeView(NodeView):

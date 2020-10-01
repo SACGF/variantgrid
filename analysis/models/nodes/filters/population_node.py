@@ -13,8 +13,8 @@ from annotation import population_frequency
 from annotation.models.models import VariantAnnotation
 from patients.models_enums import SimpleZygosity, GnomADPopulation
 from snpdb.models import Sample, VariantZygosityCountCollection
-from variantclassification.enums import ClinicalSignificance
-from variantclassification.models.variant_classification import VariantClassification
+from classification.enums import ClinicalSignificance
+from classification.models.variant_classification import VariantClassification
 
 
 class PopulationNode(AnalysisNode):

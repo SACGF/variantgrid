@@ -9,8 +9,8 @@ import logging
 from annotation.models.damage_enums import PathogenicityImpact
 from library.database_utils import get_queryset_select_from_where_parts, dictfetchall
 from snpdb.models.models_enums import BuiltInFilters
-from variantclassification.enums import ClinicalSignificance
-from variantclassification.models import VariantClassification, GenomeBuild
+from classification.enums import ClinicalSignificance
+from classification.models import VariantClassification, GenomeBuild
 
 # Add the necessary fields to qs to create join:
 REQUIRED_FIELDS = [
@@ -21,8 +21,8 @@ REQUIRED_FIELDS = [
 
 CLASSIFICATION_COUNT_SQL = """
 select 1
-from variantclassification_variantclassification
-where variantclassification_variantclassification.variant_id in (
+from classification_variantclassification
+where classification_variantclassification.variant_id in (
     select snpdb_variantallele.variant_id
     from snpdb_variantallele
     where allele_id in (
@@ -40,14 +40,14 @@ COUNTS = {
     BuiltInFilters.IMPACT_HIGH_OR_MODERATE: "sum(case when %(annotation_variantannotation)s.impact in ('H', 'M') then 1 else 0 end)",
     BuiltInFilters.COSMIC: "sum(case when %(annotation_variantannotation)s.cosmic_id is not null then 1 else 0 end)",
     BuiltInFilters.CLASSIFIED: f"sum(case when exists ({CLASSIFICATION_COUNT_SQL}) then 1 else 0 end)",
-    BuiltInFilters.CLASSIFIED_PATHOGENIC: f"sum(case when exists ({CLASSIFICATION_COUNT_SQL} AND variantclassification_variantclassification.clinical_significance in ('4', '5')) then 1 else 0 end)"
+    BuiltInFilters.CLASSIFIED_PATHOGENIC: f"sum(case when exists ({CLASSIFICATION_COUNT_SQL} AND classification_variantclassification.clinical_significance in ('4', '5')) then 1 else 0 end)"
 }
 
 
 SELECT_INTERNALLY_CLASSIFIED_SQL = """
-select string_agg(coalesce(variantclassification_variantclassification.clinical_significance, 'U'), '|')
-from variantclassification_variantclassification
-where variantclassification_variantclassification.variant_id in (
+select string_agg(coalesce(classification_variantclassification.clinical_significance, 'U'), '|')
+from classification_variantclassification
+where classification_variantclassification.variant_id in (
     select snpdb_variantallele.variant_id
     from snpdb_variantallele
     where
@@ -58,9 +58,9 @@ where variantclassification_variantclassification.variant_id in (
 """
 
 SELECT_MAX_INTERNAL_CLASSIFICATION = """
-select max(coalesce(variantclassification_variantclassification.clinical_significance, '0'))
-from variantclassification_variantclassification
-where variantclassification_variantclassification.variant_id in (
+select max(coalesce(classification_variantclassification.clinical_significance, '0'))
+from classification_variantclassification
+where classification_variantclassification.variant_id in (
     select snpdb_variantallele.variant_id
     from snpdb_variantallele
     where

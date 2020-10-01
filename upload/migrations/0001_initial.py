@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         ('annotation', '0002_auto_20200929_1503'),
         ('snpdb', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('variantclassification', '0001_initial'),
+        ('classification', '0001_initial'),
         ('patients', '0001_initial'),
         ('seqauto', '0001_initial'),
         ('pedigree', '0001_initial'),
@@ -204,7 +204,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('uploaded_file', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to='upload.uploadedfile')),
-                ('variant_classification_import', models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, to='variantclassification.variantclassificationimport')),
+                ('variant_classification_import', models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, to='classification.variantclassificationimport')),
             ],
         ),
         migrations.CreateModel(

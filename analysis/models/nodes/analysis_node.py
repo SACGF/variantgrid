@@ -30,7 +30,7 @@ from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, ProcessingStatus
 from snpdb.variant_collection import write_sql_to_variant_collection
-from variantclassification.models import VariantClassification, post_delete
+from classification.models import VariantClassification, post_delete
 from variantgrid.celery import app
 
 

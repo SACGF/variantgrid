@@ -64,8 +64,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from upload.uploaded_file_type import retry_upload_pipeline
-from variantclassification.classification_stats import get_grouped_variant_classification_counts
-from variantclassification.views.variant_classification_datatables import VariantClassificationDatatableConfig
+from classification.classification_stats import get_grouped_variant_classification_counts
+from classification.views.variant_classification_datatables import VariantClassificationDatatableConfig
 
 
 @terms_required

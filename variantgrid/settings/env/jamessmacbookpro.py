@@ -163,7 +163,7 @@ VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW = True
 
 _SHARIANT_MODE = True
 if _SHARIANT_MODE:
-    LOGIN_REDIRECT_URL = '/variantclassification/dashboard'
+    LOGIN_REDIRECT_URL = '/classification/dashboard'
 
     MIMIC = "shariant"
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", f"{MIMIC}_static")

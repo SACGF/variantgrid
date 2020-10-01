@@ -3,8 +3,8 @@ from django.template import Library
 from operator import itemgetter
 
 from snpdb.models.models_enums import ImportStatus
-from variantclassification.models import VariantClassification
-from variantclassification.views.variant_classification_datatables import VariantClassificationDatatableConfig
+from classification.models import VariantClassification
+from classification.views.variant_classification_datatables import VariantClassificationDatatableConfig
 
 register = Library()
 

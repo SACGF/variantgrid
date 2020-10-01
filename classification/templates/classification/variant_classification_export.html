@@ -1,0 +1,370 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% load static %}
+{% block title %}Variant Classification Export{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script>
+    let baseUriApi = `{{ base_url | jsstring }}`;
+    let baseUriRedirect = `{{ base_url_redirect | jsstring }}`;
+    let paramString = '';
+    let errorString = null;
+    let lastFormat = null;
+    if (baseUriApi.indexOf('localhost') != -1) {
+        baseUriApi = '{% url 'variant_classification_export_api' %}';
+        baseUriRedirect = '{% url 'variant_classification_export_redirect' %}';
+    }
+    
+    function generateUrl() {
+        let params = {};
+        let inputError = null;
+        let format = $("input[name='format']:checked").val();
+        if (format != lastFormat) {
+            $('.custom-option').hide();
+            $(`.custom-option.${format}`).show('fast');
+            lastFormat = format;
+        }
+        let share_level = $("input[name='share_level']:checked").val();
+        params.share_level = share_level;
+        
+        let genomeBuild = $("input[name='genome_build']:checked").val();
+        params.build = genomeBuild;
+        
+        params.type = format;
+        
+        if (format === 'mvl') {
+            let conflictStrategy = $("input[name='conflict_strategy']:checked").val();
+            params.conflict_strategy=conflictStrategy;
+            for (let key of ['b', 'lb', 'vus', 'lp', 'p']) {
+                let full_key = `cs_${key}`;
+                let value = $(`#${full_key}`).val().trim();
+                if (value.length) {
+                    params[full_key] = value;
+                }
+            }
+            params.transcript_strategy = $("input[name='transcript_strategy']:checked").val();
+
+            let detailLevelChecked = $("input[name='mvl_detail']:checked")
+            if (detailLevelChecked.length) {
+                params.mvl_detail = detailLevelChecked.val();
+            }
+        } else if (format === 'vcf') {
+            let encoding = $("input[name='encoding']:checked").val();
+            params.encoding = encoding;
+        } else if (format === 'csv') {
+            let value_format = $("input[name='value_format']:checked").val();
+            params.value_format = value_format;
+        }
+        
+        let labSelectionMode = $("input[name='lab_selection_mode']:checked").val();
+        let selectedLabs = $("input[name='lab_selection']:checked");
+        if (selectedLabs.length) {
+            let labArray = selectedLabs.toArray().map(el => $(el).val());
+            let labArrayString = labArray.join(',');
+
+            params[labSelectionMode == 'exclude' ? 'exclude_labs' : 'include_labs'] = labArrayString;
+        } else if (labSelectionMode === 'include') {
+            inputError = 'You must include at least 1 lab';
+        }
+        
+        let selectedOrgs = $("input[name='org_selection']:checked");
+        if (selectedOrgs.length) {
+            let orgArray = selectedOrgs.toArray().map(el => $(el).val());
+            let orgArrayString = orgArray.join(',');
+            params.exclude_orgs = orgArrayString;
+        }
+
+        let paramParts = [];
+        for (let [key, value] of Object.entries(params)) {
+            paramParts.push(`${key}=${encodeURIComponent(value)}`);
+        }
+        paramString = '?' + paramParts.join('&');
+        let url = '';
+        let downloadMode = $("input[name='download_mode']:checked").val();
+        let target = null;
+        if (downloadMode == 'api') {
+            url = baseUriApi;
+        } else {
+            url = baseUriRedirect;
+            target = '_blank';
+        }
+        url += paramString;
+        let a = $('#export_url');
+        if (inputError) {
+            a.attr('href', null);
+            a.text(inputError);
+        } else {
+            a.attr('href', url);
+            a.attr('target', target);
+            a.text(url);
+        }
+    }
+    
+    $(document).ready(() => {
+        $('#export-fields input').change(() => {
+           this.generateUrl(); 
+        });
+        $('#export-fields input').keyup(() => {
+           this.generateUrl();
+        });
+        this.generateUrl();
+    });
+</script>
+<style>
+    #export_url {
+        word-break: break-all;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container" id="export-fields">
+    {% page_help page_id='classification/export_help' title='Classifications Export' %}
+    
+    <p>Please refer to the terms and conditions about proper use of the classifications download.</p>
+    <p>Once you have configured your download you can save and re-use the generated URL.</p>
+
+    {% labelled label="For downloading via" %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input checked="true" id="download_mode_browser" name="download_mode" value="browser" type="radio" class="form-check-input" />Web Browser
+            </label>
+        </div>
+        <div class="form-check">
+            <label class="form-check-label">
+                <input id="download_mode_api" name="download_mode" value="api" type="radio" class="form-check-input" />API
+            </label>
+        </div>
+    {% endlabelled %}
+
+    {% labelled label="Share levels" %}
+        {% if user.is_superuser %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="share_level_3rd_party" name="share_level" value="3rd_party" type="radio" class="form-check-input" />
+                    <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+                    Shared with 3rd Party Databases.
+                    <span style="color:gray">(admin only)</span>
+                </label>
+            </div>
+        {% endif %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input checked="true" id="share_level_public" name="share_level" value="public" type="radio" class="form-check-input" />
+                <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+                Shared with Application and 3rd Party Databases
+            </label>
+        </div>
+        <div class="form-check">
+            <label class="form-check-label">
+                <input id="share_level_any" name="share_level" value="any" type="radio" class="form-check-input" />
+                <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+                Any record I have access to (e.g. records shared at my lab).
+            </label>
+        </div>
+    {% endlabelled %}
+    {% labelled label="Genome build" %}
+        {% for genome_build in genome_builds %}
+            {% if genome_build.enabled %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="true"{% endif %} id="genome_build_{{ genome_build.name }}" type="radio" name="genome_build" value="{{ genome_build.name }}" />
+                        {{ genome_build.name }}
+                    </label>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endlabelled %}
+    {% labelled label="Organistion exclusion" %}
+        {% for org in orgs %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="org_selection_{{org.group_name}}" name="org_selection" value="{{org.group_name}}" type="checkbox" class="form-check-input" />
+                    {{ org.name }}
+                </label>
+            </div>
+        {% endfor %}
+    {% endlabelled %}
+    {% labelled label="Lab selection" %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input checked="true" id="lab_selection_mode_exclude" name="lab_selection_mode" value="exclude" type="radio" class="form-check-input" />
+                Exclude Selected Labs
+            </label>
+        </div>
+        <div class="form-check">
+            <label class="form-check-label">
+                <input id="lab_selection_mode_include" name="lab_selection_mode" value="include" type="radio" class="form-check-input" />
+                Include Only Selected Labs
+            </label>
+        </div>
+    {% endlabelled %}
+    {% labelled label="Labs" %}
+        {% for lab in labs %}
+            <div class="form-check-inline">
+                <label class="form-check-label" style="min-width: 200px">
+                    <input id="lab_selection_{{lab.group_name}}" name="lab_selection" value="{{lab.group_name}}" type="checkbox" class="form-check-input" />
+                    {{ lab.name }}
+                </label>
+            </div>
+        {% endfor %}
+    {% endlabelled %}
+    {% labelled label="Format" %}
+        {% for format in formats %}
+            {% if not format.admin_only or user.is_superuser %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input {% if format.id == default_format.id %}checked="true"{% endif %} id="format_{{ format.id }}" type="radio" name="format" value="{{ format.id }}" class="form-check-input" />
+                    {{ format.name }}{% if format.admin_only %} <span style="color:gray">(admin only)</span>{% endif %}
+                </label>
+            </div>
+            {% endif %}
+        {% endfor %}
+    {% endlabelled %}
+
+    <div class="custom-option clinvar">
+        {% labelled label="Clinvar XML" %}
+            The Clinvar XML export is a work in progress. It will also be managed by its own page in the near future.<br/>
+            Note you must restrict yourself to one lab for a ClinVar export.
+        {% endlabelled %}
+    </div>
+    <div class="custom-option keys">
+        {% labelled label="Evidence Keys Report" %}
+            This report provides a summary of how each evidence key is used.
+        {% endlabelled %}
+    </div>
+    <div class="custom-option csv">
+        {% labelled label="CSV grouping" %}
+            The CSV file will have one row per variant classification.<br/>
+            Unlike other formats, classifications with variant matching issues will be included at the bottom of the file.
+        {% endlabelled %}
+        {% labelled label="Value format" %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input checked="true" id="value_format_codes" type="radio" name="value_format" value="codes" class="form-check-input" />
+                    Use codes only
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="value_format_labels" type="radio" name="value_format" value="labels" class="form-check-input" />
+                    Use labels for headings and values (e.g. "Strand bias" instead of "strand_bias")
+                </label>
+            </div>
+        {% endlabelled %}
+    </div>
+    <div class="custom-option mvl">
+        {% labelled label="MVL grouping" %}
+            MVLs will have one row per transcript-variant combination.<br/>
+            If there are multiple classifications for a transcript-variant pair then the details of those will be in the report abstract section for that row.
+        {% endlabelled %}
+        {% labelled label="MVL conflict strategy" %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input checked="true" id="conflict_most_pathogenic" type="radio" name="conflict_strategy" value="most_pathogenic" class="form-check-input" />
+                    Most Pathogenic
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="conflict_most_benign" type="radio" name="conflict_strategy" value="most_benign" class="form-check-input" />
+                    Most Benign
+                </label>
+            </div>
+        {% endlabelled %}
+        {% labelled label="Transcript strategy" %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input checked="true" id="transcript_strategy_refseq" type="radio" name="transcript_strategy" value="refseq" class="form-check-input" />
+                    Only include RefSeq - Exclude Ensembl
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="transcript_strategy_all" type="radio" name="transcript_strategy" value="all" class="form-check-input" />
+                    Include RefSeq and Ensembl - WARNING Alissa cannot handle Ensembl transcripts
+                </label>
+            </div>
+        {% endlabelled %}
+        {% labelled label="Clinical significance labels" %}
+            MVL installations might have custom labels for clinical significance values.<br/>
+            If your system does not use the defaults below, you can override individual values.
+        {% endlabelled %}
+        {% labelled label="Benign" %}
+            <input class="form-control" id="cs_b" type="text" placeholder="BENIGN" />
+        {% endlabelled %}
+        {% labelled label="Likely Benign" %}
+            <input class="form-control" id="cs_lb" type="text" placeholder="LIKELY_BENIGN" />
+        {% endlabelled %}
+        {% labelled label="VUS, Risk Factor, Drug Response" %}
+            <input class="form-control" id="cs_vus" type="text" placeholder="VOUS" />
+        {% endlabelled %}
+        {% labelled label="Likely Pathogenic" %}
+            <input class="form-control" id="cs_lp" type="text" placeholder="LIKELY_PATHOGENIC" />
+        {% endlabelled %}
+        {% labelled label="Pathogenic" %}
+            <input class="form-control" id="cs_p" type="text" placeholder="PATHOGENIC" />
+        {% endlabelled %}
+        {% if user.is_superuser %}
+            {% labelled label="VCF detail level (admin only)" %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input checked="true" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
+                        Standard
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="mvl_detail_shell" type="radio" name="mvl_detail" value="shell" class="form-check-input" />
+                        Minimal (for testing)
+                    </label>
+                </div>
+            {% endlabelled %}
+        {% endif %}
+    </div>
+    <div class="custom-option json">
+        {% labelled label="JSON grouping" %}
+            The JSON file will have one object per variant classification.<br/>
+            Selecting different genome builds will not affect the JSON, it will include Shariant available data for each genome build in the allele section of the record.
+        {% endlabelled %}
+    </div>
+    <div class="custom-option vcf">
+        {% labelled label="VCF grouping" %}
+            The VCF will have one row per variant, but details of individual classifications will be included as INFO fields in that row.
+        {% endlabelled %}
+        {% labelled label="VCF encoding level" %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input checked="true" id="encoding_basic" type="radio" name="encoding" value="basic" class="form-check-input" />
+                    Basic (e.g. space -> underscore)
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="encoding_full" type="radio" name="encoding" value="full" class="form-check-input" />
+                    Full (e.g. space -> %20)
+                </label>
+            </div>
+        {% endlabelled %}
+    </div>
+    <div class="custom-option redcap">
+        {% labelled label="REDCap grouping" %}
+            The REDCap file will have one row for each distinct <b>redcap_record_id</b>. Records without a value for that will be excluded.
+        {% endlabelled %}
+        {% labelled label="REDCap data definition" %}
+            Click <a href="/classification/redcap_data_dictionary.csv">here to download the REDCap data definition</a>.
+        {% endlabelled %}
+    </div>
+    {% labelled label="Generated URL" %}
+        <a class="hover-link" id="export_url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
+    {% endlabelled %}
+</div>
+
+{% endblock %}

@@ -9,8 +9,8 @@ from library.utils import make_json_safe_in_place, batch_iterator
 from snpdb.models.models import Lab, Organization
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
-from variantclassification.models.evidence_key import EvidenceKeyMap
-from variantclassification.views.variant_classification_view import BulkInserter
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.views.variant_classification_view import BulkInserter
 
 
 def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
@@ -52,7 +52,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         meta = record.get('meta', {})
         record_id = meta.get('id')
 
-        source_url = shariant.url(f'variantclassification/variant_classification/{record_id}')
+        source_url = shariant.url(f'classification/variant_classification/{record_id}')
         data = record.get('data')
         data = sanitize_data(known_keys, data, source_url)
 
@@ -85,7 +85,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
     run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
     run.save()
     try:
-        response = requests.get(shariant.url('variantclassification/api/classifications/export'),
+        response = requests.get(shariant.url('classification/api/classifications/export'),
                                 auth=shariant.auth(),
                                 params=params,
                                 stream=True)

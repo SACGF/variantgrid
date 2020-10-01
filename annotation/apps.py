@@ -25,7 +25,7 @@ class AnnotationConfig(AppConfig):
             if GeneCountType.objects.filter(enabled=True, uses_variant_classifications=True).exists():
                 from annotation.signals import gene_counts_classification_withdraw_handler, \
                     gene_counts_classification_publish_handler
-                from variantclassification.models import VariantClassification, \
+                from classification.models import VariantClassification, \
                     variant_classification_withdraw_signal, variant_classification_post_publish_signal
 
                 variant_classification_withdraw_signal.connect(gene_counts_classification_withdraw_handler,

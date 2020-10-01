@@ -42,7 +42,7 @@ from upload.bed_file_processing import process_bed_file
 from upload.models_enums import UploadedFileTypes, VCFPipelineStage, \
     UploadStepTaskType, ExpressionType, TimeFilterMethod, VCFImportInfoSeverity, \
     UploadStepOrigin
-from variantclassification.models import VariantClassificationImport
+from classification.models import VariantClassificationImport
 from variantgrid.celery import app
 
 

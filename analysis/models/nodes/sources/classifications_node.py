@@ -4,9 +4,9 @@ from django.db import models
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from variantclassification.enums import ClinicalSignificance
-from variantclassification.enums.variant_classification_enums import ClinicalSignificanceComparison
-from variantclassification.models.variant_classification import VariantClassification
+from classification.enums import ClinicalSignificance
+from classification.enums.variant_classification_enums import ClinicalSignificanceComparison
+from classification.models.variant_classification import VariantClassification
 
 
 class ClassificationsNode(AnalysisNode):

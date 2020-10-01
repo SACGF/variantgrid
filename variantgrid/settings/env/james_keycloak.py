@@ -156,7 +156,7 @@ VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = False
 
 _SHARIANT_MODE = True
 if _SHARIANT_MODE:
-    LOGIN_REDIRECT_URL = '/variantclassification/dashboard'
+    LOGIN_REDIRECT_URL = '/classification/dashboard'
 
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
     SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")

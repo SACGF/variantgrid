@@ -251,8 +251,8 @@ class CustomColumnsCollectionListGrid(JqGridUserRowConfig):
 class AbstractVariantGrid(JqGridSQL):
     model = Variant
     INTERNAL_CLASSIFICATION_ALIASES_AND_SELECT = {
-        "internally_classified": "select string_agg(variantclassification_variantclassification.clinical_significance, '|') from variantclassification_variantclassification where variantclassification_variantclassification.variant_id = snpdb_variant.id",
-        "max_internal_classification": "select max(variantclassification_variantclassification.clinical_significance) from variantclassification_variantclassification where variantclassification_variantclassification.variant_id = snpdb_variant.id",
+        "internally_classified": "select string_agg(classification_variantclassification.clinical_significance, '|') from classification_variantclassification where classification_variantclassification.variant_id = snpdb_variant.id",
+        "max_internal_classification": "select max(classification_variantclassification.clinical_significance) from classification_variantclassification where classification_variantclassification.variant_id = snpdb_variant.id",
     }
 
     def column_in_queryset_fields(self, field):

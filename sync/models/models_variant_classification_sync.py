@@ -4,7 +4,7 @@ from django.db.models.query import QuerySet
 from django_extensions.db.models import TimeStampedModel
 
 from sync.models.models import SyncRun, SyncDestination
-from variantclassification.models.variant_classification import VariantClassificationModification
+from classification.models.variant_classification import VariantClassificationModification
 
 
 class VariantClassificationModificationSyncRecord(TimeStampedModel):

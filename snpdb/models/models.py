@@ -31,7 +31,7 @@ from typing import List, TypedDict
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
 from library.utils import import_class
-from variantclassification.enums.variant_classification_enums import ShareLevel
+from classification.enums.variant_classification_enums import ShareLevel
 
 
 class Tag(models.Model):

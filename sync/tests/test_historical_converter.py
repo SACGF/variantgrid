@@ -3,7 +3,7 @@ The switch from IVAT to VEP altered some EvidenceKeys
 
 The key changes happened in:
 
-variantclassification.migrations.0042_vep_ekeys.modifying_existing_keys
+classification.migrations.0042_vep_ekeys.modifying_existing_keys
 """
 from collections import namedtuple
 from django.contrib.auth.models import User
@@ -11,7 +11,7 @@ import unittest
 
 from annotation.models.models_enums import VariantClass
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
-from variantclassification.models.evidence_key import EvidenceKey, EvidenceCategory, EvidenceKeyValueType
+from classification.models.evidence_key import EvidenceKey, EvidenceCategory, EvidenceKeyValueType
 
 
 class Test(unittest.TestCase):

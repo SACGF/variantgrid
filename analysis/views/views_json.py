@@ -24,7 +24,7 @@ from analysis.views.analysis_permissions import get_analysis_or_404, get_node_su
 from genes.models import TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import Sample, Tag, BuiltInFilters
-from variantclassification.autopopulate_evidence_keys.autopopulate_evidence_keys import create_variant_classification_for_sample_and_variant_objects
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import create_variant_classification_for_sample_and_variant_objects
 
 
 @require_POST

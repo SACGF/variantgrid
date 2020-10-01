@@ -11,10 +11,10 @@ from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 from sync.models.models_variant_classification_sync import VariantClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
-from variantclassification.enums.variant_classification_enums import ShareLevel
-from variantclassification.models import EvidenceKeyMap
-from variantclassification.models.variant_classification import VariantClassificationModification
-from variantclassification.models.variant_classification_utils import VariantClassificationJsonParams
+from classification.enums.variant_classification_enums import ShareLevel
+from classification.models import EvidenceKeyMap
+from classification.models.variant_classification import VariantClassificationModification
+from classification.models.variant_classification_utils import VariantClassificationJsonParams
 
 SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary']
 
@@ -114,7 +114,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
                 auth = shariant.auth()
 
                 response = requests.post(
-                    shariant.url('variantclassification/api/classifications/v2/record/'),
+                    shariant.url('classification/api/classifications/v2/record/'),
                     auth=auth,
                     json=json_to_send
                 )

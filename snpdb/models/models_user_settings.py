@@ -369,7 +369,7 @@ class UserSettings:
 
     @property
     def classification_issue_count(self) -> int:
-        from variantclassification.models import VariantClassification
+        from classification.models import VariantClassification
         from flags.models import FlagCollection
         return FlagCollection.filter_for_open_flags(
             VariantClassification.filter_for_user(user=self.user)

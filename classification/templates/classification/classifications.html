@@ -1,0 +1,238 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load datatable_tags %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+
+{% block title %}Classifications{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<style>
+    #classify-container label, #gene-form-container label, #user-form-container label, #lab-form-container label {
+        display: none;
+    }
+    #flag-filter td {
+        text-align: center;
+        padding: 2px;
+    }
+</style>
+<script>
+    function filterGrid() {
+        $('#vc-datatable').DataTable().ajax.reload();
+    }
+
+    function checkIfAllChecked(toggle, array) {
+        var numChecked = 0;
+        array.each(function() { numChecked += $(this).is(":checked"); });
+        var allChecked = numChecked == array.length;
+        $(toggle).prop('checked', allChecked);
+    }
+
+    function showFlagFilter() {
+        $('#show-flag-filter-container').hide();
+
+        let flagFilter = $("#flag-filter");
+        let fIcons = $("tr#flag-icons", flagFilter);
+        let fCheckboxes = $("tr#flag-checkboxes", flagFilter);
+
+        let allFlagsIcon = $("<div>").addClass("flag");
+        allFlagsIcon.attr("title", "Any flag");
+        allFlagsIcon.appendTo(fIcons);
+        let anyFlagCheckbox = $("<input>").attr({"type" : "checkbox"}).change(function() {
+            let checkedOrNot = $(this).is(':checked');
+            // for all inputs with the attribute flagTypeId, set the checked value to any flag's checked value
+            $('input[flagTypeId]').prop('checked', checkedOrNot);
+            filterGrid();
+        });
+        allFlagsIcon.css('cursor','pointer').click(() => { anyFlagCheckbox.trigger('click'); });
+        let checkboxTD = $("<td>");
+        checkboxTD.append(anyFlagCheckbox);
+        fCheckboxes.append(checkboxTD);
+
+        let flagTypes = {{ flag_types | jsonify }};
+        for (let flagType of flagTypes) {
+            let flagIcon = $("<div>").addClass("flag").addClass("flag-" + flagType.id);
+            flagIcon.attr("title", flagType.label);
+            let iconTD = $("<td>");
+            iconTD.append(flagIcon);
+            fIcons.append(iconTD);
+
+            let flagCheckbox = $("<input>").attr({"type" : "checkbox", "flagTypeId" : flagType.id});
+            
+            iconTD.css('cursor','pointer').click(() => { flagCheckbox.trigger('click'); });
+            
+            flagCheckbox.addClass("flag-filter-checkbox");
+            flagCheckbox.change(function() {
+                checkIfAllChecked(anyFlagCheckbox, $('input[flagTypeId]'));
+                filterGrid();
+            });
+            checkboxTD = $("<td>");
+            checkboxTD.append(flagCheckbox);
+            fCheckboxes.append(checkboxTD);
+        }
+        
+        flagFilter.show();
+    }
+
+    function filterDefaultLab() {
+        {% if user_settings.default_lab %}
+            setAutocompleteValue('#id_lab', '{{ user_settings.default_lab.id }}', '{{ user_settings.default_lab.organization.name }} - {{ user_settings.default_lab.name }}');
+        {% endif %}
+    }
+
+    function filterDefaultUser() {
+        setAutocompleteValue('#id_user', '{{ user.id }}', '{{ user.username }}');
+    }
+
+    function classificationFilter(data, type) {
+        data.gene_symbol = blankToNull($('#id_gene_symbol').val());
+        data.lab = blankToNull($('#id_lab').val());
+        data.user = blankToNull($('#id_user').val());
+        data.allele_origin = blankToNull($('#origin-select').val());
+        data.id_filter = blankToNull($('#id_filter').val());
+        let flags = [];
+        $('input[flagtypeid]').each((index, dom) => {
+            let input = $(dom);
+            let isChecked = input.is(":checked");
+            if (isChecked) {
+                flags.push(input.attr("flagTypeId"));
+            }
+        });
+        if (flags.length) {
+            data.flags = JSON.stringify(flags);
+        }
+    }
+    function downloadAs(mode) {
+        let data = {};
+        classificationFilter(data);
+        let querystring = EncodeQueryData(data, true);
+		let url = null;
+		if (mode === 'redcap') {
+		  url = "{% url 'export_variant_classifications_grid_redcap' %}" + "?" + querystring;
+		} else {
+		  url = "{% url 'export_variant_classifications_grid' %}" + "?" + querystring;
+		}
+		window.location = url;
+		return false;
+    }
+
+    $(document).ready(() => {
+        $('#id_gene_symbol, #id_lab, #id_user').change(function() {
+            filterGrid();
+        });
+
+        debouncedFilterGrid = debounce(filterGrid);
+
+        $('#id_filter').keyup(function() {
+            debouncedFilterGrid();
+        });
+
+        EKeys.load().then(() => {
+            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='variant_classification_datatables' data='classificationFilter' %}
+
+            let vcDatatable = $('#vc-datatable');
+            vcDatatable.on('draw.dt', () => {
+                Flags.instance.init({userId: '{{user.id}}'});
+            });
+        });
+    });
+</script>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h3>Classification Listing</h3>
+        {% page_help_embedded title="Classification Listing" %}
+            {% if labs.count > 0 and can_create_classification %}
+            <p>
+            Create a new Variant Classification by entering a HGVS sequence in the box below, on the variant details page or inside an analysis by tagging it as RequiresClassification.
+            {% endif %}
+            <p>
+            Export the grid below by clicking the CSV or Redcap buttons on the bottom left of the grid.<br/>
+            The export will be using your default genome build.<br/>
+            <p>
+            You can import into REDCap using this  <a href="/classification/redcap_data_dictionary.csv">data definition</a>.<br/>
+            Records will only be included in REDCap downloads if they have a value for <b>redcap_record_id</b>.
+        {% end_page_help_embedded %}
+
+        {% if labs.count > 0 and can_create_classification %}
+        <form method="get" action="{% url 'search' %}">
+            <div class="card">
+                <div class="card-header">Create Classification</div>
+                <div class="card-body">
+                    {% crispy search_and_classify_form %}
+                </div>
+            </div>
+        </form>
+    {% endif %}
+    </div>
+    <div class="container-table">
+        <div class="row filter-row">
+            <div class="col-md-4 col-lg-2">
+                <br/>
+                {% crispy gene_form form_helper.horizontal_no_labels %}
+            </div>
+            <div class="col-md-4 col-lg-2">
+                {% if user_settings.default_lab %}
+                <a class="hover-link" onclick="filterDefaultLab()">Filter : {{ user_settings.default_lab.name }}</a>
+                {% else %}
+                &nbsp;
+                {% endif %}
+                {% crispy lab_form form_helper.horizontal_no_labels %}
+            </div>
+            {% if VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME %}
+            <div class="col-md-4 col-lg-2">
+                <a class="hover-link" onclick="filterDefaultUser()">Filter : My Classifications</a>
+                {% crispy user_form form_helper.horizontal_no_labels %}
+            </div>
+            {% endif %}
+            {% if VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN %}
+            <div class="col-md-4 col-lg-2">
+                <br/>
+                <select id="origin-select" class="form-control">
+                    <option hidden selected>Select Origin</option>
+                    <option value=""></option>
+                    <option value="germline">Germline</option>
+                    <option value="somatic">Somatic</option>
+                    <option value="other">Origin Other</option>
+                </select>
+            </div>
+            {% endif %}
+            {% if VARIANT_CLASSIFICATION_ID_FILTER %}
+            <div class="col-md-4 col-lg-2">
+                <br/>
+                <input type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
+            </div>
+            {% endif %}
+            <div class="col-md-4 col-lg-2">
+                <br/>
+                <div id='show-flag-filter-container' style="display:flex">
+                    <div class="flag"></div>
+                    <div>
+                        <a class='hover-link' id='show-flag-filter-link' href='javascript:showFlagFilter()'>Flag filter...</a>
+                    </div>
+                </div>
+                <div id="flag-filter" class='hidden'>
+                    <table>
+                        <tr id='flag-icons'>
+                        <tr id='flag-checkboxes'>
+                    </table>
+                    <div class="clear"></div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                {% datatable datatable_config 'vc-datatable' class_name='classification-table sticky-header' %}
+                <div>
+                Download as
+                    <a class='hover-link' href="javascript:downloadAs('csv')">CSV</a>,
+                    <a class='hover-link' href="javascript:downloadAs('redcap')">REDCap</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

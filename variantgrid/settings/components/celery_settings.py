@@ -133,8 +133,8 @@ CELERY_IMPORTS = (
     'upload.tasks.vcf.import_vcf_step_task',
     'upload.tasks.vcf.import_vcf_tasks',
     'upload.tasks.vcf.unknown_variants_task',
-    'variantclassification.tasks.classification_import_process_variants_task',
-    'variantclassification.tasks.classification_import_task',
+    'classification.tasks.classification_import_process_variants_task',
+    'classification.tasks.classification_import_task',
     'sync.tasks.sync_tasks'
 )
 

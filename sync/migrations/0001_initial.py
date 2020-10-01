@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('variantclassification', '0001_initial'),
+        ('classification', '0001_initial'),
     ]
 
     operations = [
@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
                 ('success', models.BooleanField(default=True)),
                 ('meta', models.JSONField(blank=True, default=None, null=True)),
                 ('run', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='sync.syncrun')),
-                ('variant_classification_modification', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='variantclassification.variantclassificationmodification')),
+                ('variant_classification_modification', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='classification.variantclassificationmodification')),
             ],
             options={
                 'get_latest_by': 'modified',

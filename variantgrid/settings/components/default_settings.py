@@ -538,6 +538,7 @@ INSTALLED_APPS = [
     'django_js_reverse',
     'django_starfield',
     'django_extensions',
+    'django_rename_app',
     'djgeojson',
     'easy_thumbnails',
     'guardian',
@@ -565,7 +566,7 @@ INSTALLED_APPS = [
     'uicore.apps.UiCoreConfig',
     'snpdb.apps.SnpdbConfig',
     'upload.apps.UploadConfig',
-    'variantclassification.apps.VariantclassificationConfig',
+    'classification.apps.VariantclassificationConfig',
     'variantopedia',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
@@ -657,7 +658,7 @@ LOGGING = {
 PUBLIC_PATHS = [
     r'^/accounts/.*',  # allow public access to all django registration views,
     r'^/oidc/.*',  # all oidc URLs
-    r'^/variantclassification/api/.*'  # REST framework used by command line tools
+    r'^/classification/api/.*'  # REST framework used by command line tools
 ]
 
 

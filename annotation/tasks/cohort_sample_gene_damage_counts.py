@@ -15,7 +15,7 @@ from library.log_utils import get_traceback
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import ProcessingStatus
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
-from variantclassification.models import VariantClassification
+from classification.models import VariantClassification
 from variantgrid.celery import app
 
 

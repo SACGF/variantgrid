@@ -1,0 +1,300 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% load static %}
+{% block title %}Variant Classification Import{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script>
+    let waitingForKeys = true;
+
+    function generateRequest() {
+        if (waitingForKeys) {
+            return;
+        }
+        let test = $('#test').prop('checked');
+        let lab = $('#lab').val();
+        let record_id = $('#record_id').val();
+        let delete_mode = $('#delete').prop('checked');
+        let publish = $('#publish').val();
+        let data = $('#data').val().trim();
+        if (data.length == 0) {
+            data = '{}';
+        }
+        let genome_build = $('#genome_build option:selected').val();
+        let c_hgvs = $('#c_hgvs').val();
+        let valid = lab && record_id;
+        let data_fields = $('.data-field');
+        let data_field_values = {};
+        for (let data_field of data_fields.toArray()) {
+            data_field = $(data_field);
+            let value = data_field.val();
+            if (value.length) {
+                data_field_values[data_field.attr('id')] = value;
+            }
+        }
+        let custom_field_values = {};
+        let custom_fields = $('.custom-value');
+        for (let custom_field of custom_fields.toArray()) {
+            custom_field = $(custom_field);
+            let dataIndex = custom_field.attr('data-index');
+            let custom_key = $(`#custom-key-${dataIndex}`);
+            let key = custom_key.val();
+            let value = custom_field.val();
+            if (value.length == 0) {
+                value = null;
+            }
+            if (key.length) {
+                custom_field_values[key] = value;
+            }
+        }
+
+        record_id = record_id || 'no_record_id';
+        lab = lab || 'no_org/no_lab';
+        
+        let envelope = {
+            "id": `${lab}/${record_id}`
+        };
+        if (test) {
+            envelope["test"] = true;   
+        }
+        if (delete_mode) {
+            envelope["delete"] = true;
+        } else {
+            try {
+                let special_values = {
+                    "c_hgvs": c_hgvs,
+                    "genome_build": genome_build
+                };
+                data = Object.assign({}, special_values, data_field_values, custom_field_values, JSON.parse(data));
+            } catch (e) {
+                data = {
+                    'invalid_json': e.message
+                };
+                valid = false;
+            }
+            envelope["data"] = data;
+            
+            if (publish) {
+                envelope["publish"] = publish;
+            }
+        }
+        let envelope_text = JSON.stringify(envelope, null, 4);
+        let previewDom =  $('#request_preview');
+        previewDom.text(envelope_text);
+        
+        if (!valid) {
+            previewDom.addClass('invalid');
+        } else {
+            previewDom.removeClass('invalid');
+        }
+        return [envelope_text, valid]
+    }
+    
+    function run() {
+        let [text, valid] = generateRequest();
+        if (!valid) {
+            alert('Please fix any errors.');
+            return;
+        }
+        $('#preview').LoadingOverlay('show');
+        $.ajax({
+            headers: {
+                'Accept' : 'application/json',
+                'Content-Type' : 'application/json'
+            },
+            url: 'api/classifications/v2/record/',
+            type: 'POST',
+            data: text,
+            error: (call, status, text) => {
+                $('#response_preview').text(text || `An error occurred ${status}`);
+            },
+            success: (record) => {
+                $('#response_preview').text(JSON.stringify(record, null, 4));
+                let link = null;
+                if (record.meta && record.meta.id) {
+                    let id = record.meta.id;
+                    link = `/classification/variant_classification/${id}`;
+                }
+                if (link) {
+                    $('#record-link-pair').show();
+                    $('#record-link').attr('href',link);
+                } else {
+                    $('#record-link-pair').hide();
+                }
+            },
+            complete: () => {
+                $('#preview').LoadingOverlay('hide');
+            }
+        });
+    }
+    
+    $(document).ready(() => {
+        let now = new Date();
+        $('#record_id').val('test_' + Math.floor(Date.now() / 1000));
+        $('#import-fields input, #import-fields select, #import-fields textarea').change(() => {
+           generateRequest(); 
+        }).click(() => {
+            generateRequest(); 
+        }).keyup(() => {
+            generateRequest();
+        });
+
+        EKeys.load().then(ekeys => {
+            $('.custom-key').each((index, ck) => {
+                let select = $(ck);
+                select.html(ekeys.keySelectOptions());
+                select.chosen({
+                    allow_single_deselect: true,
+                    width: '250px',
+                    placeholder_text_single: `Key`
+                }).change(() => {
+                    generateRequest();
+                });
+            });
+            $('.custom-value').keyup(() => {generateRequest()});
+
+            waitingForKeys = false;
+            generateRequest();
+        });
+
+        /*
+        EKeys.load().then(ekeys => {
+            $('.custom-key').each((index, ck) => {
+                let humanIndex = index+1;
+                let containerDiv  = $('<label>').appendTo(ck);
+                let keySelect = $('<select>', {id: `custom-key-${humanIndex}`, html: ekeys.keySelectOptions()}).appendTo(containerDiv);
+                keySelect.chosen({
+                    allow_single_deselect: true,
+                    width: '300px',
+                    placeholder_text_single: `Key ${humanIndex}`,
+                }).change(() => {
+                    generateRequest();
+                });
+                $('<input>', {id: `custom-value-${humanIndex}`, type:'text', placeholder:`value ${humanIndex}`, class:'custom-value', 'data-index':humanIndex}).keyup(() => {generateRequest()}).appendTo(ck);
+
+            });
+        });
+         */
+    });
+</script>
+<style>
+div.json {
+    height: 400px;
+    font-family: monospace;
+    border: 1px solid #dddddd;
+    padding: 8px;
+    white-space: pre;
+    font-size: 12px;
+    overflow-y: scroll;
+}
+.invalid {
+    color: gray;
+}
+#data {
+    width: 400px;
+    height: 160px;
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+    {% page_help page_id='classification/import_help' title='Classifications Import' %}
+
+    <p>The form below will help show you the content required for the import API.</p>
+
+    <form id="import-fields">
+        {% labelled label="Toggles" %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input type="checkbox" id="test" checked="true" class="form-check-input" />
+                    Test Mode
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input type="checkbox" id="delete" class="form-check-input" />
+                    Delete
+                </label>
+            </div>
+        {% endlabelled %}
+        {% labelled label="Lab" %}
+            <select id="lab" class="form-control">
+                {% for lab in labs %}
+                <option value="{{lab.group_name}}">{{lab.name}}</option>
+                {% endfor %}
+            </select>
+        {% endlabelled %}
+        {% labelled label="Lab Record ID" %}
+            <input type="text" id="record_id" class="form-control" />
+        {% endlabelled %}
+        {% labelled label="Publish Level" %}
+            <select id="publish" class="form-control">
+                <option selected value="lab">Lab</option>
+                <option value="institution">Institution</option>
+                <option value="logged_in_users">App users</option>
+                <option value="public">3rd Party Databases</option>
+            </select>
+        {% endlabelled %}
+        {% labelled label="c.hgvs" %}
+            <input id="c_hgvs" type="text" placeholder="transcript.ver(gene)c.xxxx" class="form-control" />
+        {% endlabelled %}
+        {% labelled label="Genome Build" %}
+            <select id="genome_build" class="form-control">
+                <option value="GRCh37">GRCh37</option>
+                <option value="GRCh38">GRCh38</option>
+            </select>
+        {% endlabelled %}
+        {% labelled label="Clinical Significance" %}
+            <input id="clinical_significance" type="text" placeholder="B, LB, VUS, LP, P, etc" class="form-control data-field"/>
+        {% endlabelled %}
+        {% labelled label="Zygosity" %}
+            <input id="zygosity" type="text" placeholder="heterozygous, homozygous, hemizygous, mosaic, etc" class="form-control data-field"/>
+        {% endlabelled %}
+        {% labelled label="Condition" %}
+            <input id="condition" type="text" class="form-control data-field"/>
+        {% endlabelled %}
+
+        <p>
+            See <a href="/classification/evidence_keys" class="hover-link" target="_blank">Evidence Keys</a> for valid values.
+        </p>
+
+        {% for index in 5|times %}
+            <div class="form-group row mb-3 md-mb-4">
+                <div class="col-12 col-md-3 align-self-center text-right">
+                    <select id="custom-key-{{ index }}" class="custom-key form-control"></select>
+                </div>
+                <div class="col-12 col-md-9">
+                    <input id="custom-value-{{ index }}" data-index="{{ index }}" class="custom-value form-control" />
+                </div>
+            </div>
+        {% endfor %}
+        {% labelled label="JSON custom data" %}
+            <textarea id="data" style="font-family:monospace" class="form-control w-100">{}</textarea>
+        {% endlabelled %}
+
+        <div id="record-link-pair" style="display:none">
+            {% labelled labe="Link to Record" %}
+                <a href="#" id="record-link" target="_blank">Click here</a>
+            {% endlabelled %}
+        </div>
+    </form>
+    <div class="row">
+        <div class="col-md-5">
+            <label>Request Preview</label>
+            <div id="request_preview" class="json"></div>
+        </div>
+        <div class="col-md-2 align-self-center">
+            <button class="btn btn-primary w-100" onclick="run()">&gt; Import &gt;</button>
+        </div>
+        <div class="col-md-5">
+            <label>Response</label>
+            <div id="response_preview" class="json"></div>
+        </div>
+    </div>
+
+</div>
+{% endblock content %}

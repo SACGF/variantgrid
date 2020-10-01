@@ -8,7 +8,7 @@ from genes.models import Gene
 from library.utils import rgb_invert
 from snpdb.models import Sample, Cohort, ShareLevel, GenomeBuild, Variant
 from snpdb.models.models_enums import ProcessingStatus
-from variantclassification.models import VariantClassification, VariantClassificationModification
+from classification.models import VariantClassification, VariantClassificationModification
 from variantgrid.celery import app
 
 

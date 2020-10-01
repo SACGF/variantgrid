@@ -644,7 +644,7 @@ const VCForm = (function() {
                 success: (record) => {
                     if (record.deleted) {
                         this.deleted = true;
-                        document.location.href = '/variantclassification/classifications';
+                        document.location.href = '../../../../classification/classifications';
                         return;
                     } else if (record.withdrawn !== this.record.withdrawn) {
                         // changing of withraw status required complete reload

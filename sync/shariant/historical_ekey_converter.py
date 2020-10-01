@@ -3,8 +3,8 @@ from django.contrib.auth.models import User
 import copy
 
 from library.utils import is_not_none
-from variantclassification.models.evidence_key import EvidenceKey, EvidenceKeyValueType
-from variantclassification.models.variant_classification import VariantClassification
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType
+from classification.models.variant_classification import VariantClassification
 
 
 class HistoricalEKeyConverter:
