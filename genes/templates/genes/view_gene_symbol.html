@@ -36,6 +36,9 @@
         .filter-message {
             margin-right: 10px;
         }
+        .gene-icon {
+            float: none;
+        }
 
         {% load user_tag_color_tags %}
         {% render_node_count_colors_css %}
@@ -158,7 +161,7 @@
                                   </a>
                                 </li>
                             {% else %}
-                                <a class="list-group-item list-group-action" href="{% url 'view_gene' gene_id %}">
+                                <a class="list-group-item list-group-item-action" href="{% url 'view_gene' gene_id %}">
                                     {{ annotation_consortium }} : {{ gene_id }}
                                 </a>
                             {% endif %}
@@ -166,7 +169,7 @@
                     {% endfor %}
                 {% endif %}
                 {% for alias_summary in aliases_out %}
-                    <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-action">
+                    <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action">
                         <i class="fas fa-arrow-circle-right"></i> {{ gene_symbol }} can be an alias for <b>{{ alias_summary.other_symbol }}</b> ({{ alias_summary.source }})
                     </a>
                 {% endfor %}
@@ -224,7 +227,7 @@
                                         {% labelled id=grid_column.id label=grid_column.description shorten_label=True %}{{ grid_column.value | safe}}{% endlabelled %}
                                     {% endfor %}
                                     {% if gene_infos.exists %}
-                                    <h4>Gene Info</h4>
+                                    <h5>Gene Info</h5>
                                     <div class='gene-info-container'>
                                         {% for gi in gene_infos %}
                                             <div class='gene-icon {{ gi.icon_css_class }}' title='{{ gi.name }}'></div>
