@@ -56,7 +56,8 @@ def render_labelled(parser, token):
                             hint=kwargs.get('hint'),
                             label_css=kwargs.get('label_css'),
                             value_css=kwargs.get('value_css'),
-                            row_css=kwargs.get('row_css')
+                            row_css=kwargs.get('row_css'),
+                            shorten_label=kwargs.get('shorten_label')
                             )
 
 
@@ -68,7 +69,8 @@ class LabelledValueTag(template.Node):
                  hint: FilterExpression = None,
                  label_css: FilterExpression = None,
                  value_css: FilterExpression = None,
-                 row_css: FilterExpression = None):
+                 row_css: FilterExpression = None,
+                 shorten_label: FilterExpression = None):
         self.id_prefix = id_prefix
         self.nodelist = nodelist
         self.value_id = value_id
@@ -77,6 +79,7 @@ class LabelledValueTag(template.Node):
         self.label_css = label_css
         self.value_css = value_css
         self.row_css = row_css
+        self.shorten_label = shorten_label
 
     id_regex = re.compile("id=[\"|'](.*?)[\"|']")
     big_zero = re.compile("^0([.]0+)?$")
@@ -88,6 +91,22 @@ class LabelledValueTag(template.Node):
         if prefix_id and value_id:
             complete_id = f"{prefix_id}-{value_id}"
         label = TagUtils.value_str(context, self.label, (value_id.replace('_', ' ') if value_id else ""))
+
+        popover = None
+
+        if TagUtils.value_bool(context, self.shorten_label):
+            first_fullstop = label.find('. ')
+            if first_fullstop != -1:
+                first_fullstop += 1
+
+            if first_fullstop == -1:
+                first_fullstop = label.find('</a>')
+                if first_fullstop != -1:
+                    first_fullstop += 4
+
+            if first_fullstop != -1:
+                popover = label
+                label = label[0:first_fullstop]
 
         hint = TagUtils.value_str(context, self.hint)
         label_css = ""
@@ -134,10 +153,12 @@ class LabelledValueTag(template.Node):
         elif LabelledValueTag.big_zero.match(output):
             output = f"<span class=\"zero-value\">{output}</span>"
 
-        content = f"""
-            <label {for_id} class="{label_css}">{label}</label>
-            <div {div_id} class="{value_css}">{output}</div>
-        """
+        label_tag = f'<label {for_id} class="{label_css}">{label}</label>'
+        if popover:
+            popover = popover.replace('"', '&quot;')
+            label_tag = f'<label {for_id} class="{label_css} hover-detail" data-toggle="popover" data-content="{popover}">{label}</label>'
+
+        content = f"""{label_tag}<div {div_id} class="{value_css}">{output}</div>"""
 
         if hint == "inline":
             return content
@@ -165,15 +186,27 @@ def severity_icon(severity: str) -> str:
 class TagUtils:
 
     @staticmethod
-    def value_str(context, value: Any, default: Any = None) -> Optional[str]:
+    def value(context, value: Any, default: Any = None) -> Optional[Any]:
         if isinstance(value, FilterExpression):
             resolved = value.resolve(context)
         else:
             resolved = value
-
         if resolved is None:
             resolved = default
-        else:
-            resolved = str(resolved)
-
         return resolved
+
+
+    @staticmethod
+    def value_str(context, value: Any, default: Any = None) -> Optional[str]:
+        val = TagUtils.value(context, value, default)
+        if val is not None:
+            return str(val)
+        return None
+
+
+    @staticmethod
+    def value_bool(context, value: Any, default: Any = None) -> Optional[bool]:
+        val = TagUtils.value(context, value, default)
+        if val is not None:
+            return bool(val)
+        return None
