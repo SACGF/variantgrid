@@ -1,5 +1,5 @@
 """
-    Auto-populate a VariantClassification object with evidence keys from
+    Auto-populate a Classification object with evidence keys from
     info we can get from VariantGrid DB
 """
 from typing import Optional
@@ -16,11 +16,11 @@ from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient 
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant, \
     AutopopulateData
 from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models import EvidenceKey, VariantClassification, VariantClassificationImport
-from classification.tasks.classification_import_process_variants_task import liftover_variant_classification_import
+from classification.models import EvidenceKey, Classification, ClassificationImport
+from classification.tasks.classification_import_process_variants_task import liftover_classification_import
 
 
-def create_variant_classification_for_sample_and_variant_objects(
+def create_classification_for_sample_and_variant_objects(
         user: User,
         sample: Sample,
         variant: Variant,
@@ -32,22 +32,22 @@ def create_variant_classification_for_sample_and_variant_objects(
     user_settings = UserSettings.get_for_user(user)
     # TODO - if you have > 1 labs then redirect to pick page.
     lab = user_settings.get_lab()
-    vc_import = VariantClassificationImport.objects.create(user=user, genome_build=genome_build)
+    vc_import = ClassificationImport.objects.create(user=user, genome_build=genome_build)
     kwargs = {"user": user,
               "lab": lab,
               "variant": variant,
               "sample": sample,
-              "variant_classification_import": vc_import,
+              "classification_import": vc_import,
               "populate_with_defaults": True}
 
-    variant_classification = VariantClassification.create(**kwargs)
-    variant_classification_auto_populate_fields(variant_classification, genome_build,
+    classification = Classification.create(**kwargs)
+    classification_auto_populate_fields(classification, genome_build,
                                                 refseq_transcript_accession=refseq_transcript_accession,
                                                 ensembl_transcript_accession=ensembl_transcript_accession,
                                                 annotation_version=annotation_version)
-    variant_classification.set_variant(variant)  # have to re-do this because we didn't have the transcript the first time around
-    liftover_variant_classification_import(vc_import, ImportSource.WEB)
-    return variant_classification
+    classification.set_variant(variant)  # have to re-do this because we didn't have the transcript the first time around
+    liftover_classification_import(vc_import, ImportSource.WEB)
+    return classification
 
 
 def generate_auto_populate_data(
@@ -84,8 +84,8 @@ def generate_auto_populate_data(
     return data
 
 
-def variant_classification_auto_populate_fields(
-        variant_classification: VariantClassification,
+def classification_auto_populate_fields(
+        classification: Classification,
         genome_build: GenomeBuild,
         refseq_transcript_accession: str = None,
         ensembl_transcript_accession: str = None,
@@ -97,16 +97,16 @@ def variant_classification_auto_populate_fields(
     """
 
     auto_data = generate_auto_populate_data(
-        variant=variant_classification.variant,
+        variant=classification.variant,
         genome_build=genome_build,
         refseq_transcript_accession=refseq_transcript_accession,
         ensembl_transcript_accession=ensembl_transcript_accession,
-        sample=variant_classification.sample,
+        sample=classification.sample,
         annotation_version=annotation_version
     )
-    variant_classification.annotation_version = auto_data.annotation_version
-    variant_classification.patch_value(auto_data.data,
-                                       user=variant_classification.user,
+    classification.annotation_version = auto_data.annotation_version
+    classification.patch_value(auto_data.data,
+                                       user=classification.user,
                                        source=SubmissionSource.VARIANT_GRID,
                                        leave_existing_values=leave_existing_values,
                                        save=save)

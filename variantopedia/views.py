@@ -12,7 +12,7 @@ from django.utils.timesince import timesince
 import re
 
 from analysis.models.nodes.analysis_node import Analysis
-from annotation.models import AnnotationRun, VariantClassificationModification, VariantClassification
+from annotation.models import AnnotationRun, ClassificationModification, Classification
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, ClinVar
 from celery.task.control import inspect  # @UnresolvedImport
 
@@ -321,7 +321,7 @@ def view_allele_from_variant(request, variant_id):
 
 def view_allele(request, pk):
     allele: Allele = get_object_or_404(Allele, pk=pk)
-    latest_classifications = VariantClassificationModification.latest_for_user(
+    latest_classifications = ClassificationModification.latest_for_user(
         user=request.user,
         allele=allele,
         published=True
@@ -376,7 +376,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     num_clinvar_citations = 0
     num_annotation_versions = AnnotationVersion.objects.filter(variant_annotation_version__variantannotation__variant=variant).count()
 
-    latest_classifications = VariantClassificationModification.latest_for_user(
+    latest_classifications = ClassificationModification.latest_for_user(
         user=request.user,
         variant=variant.equivalent_variants,
         published=True
@@ -429,7 +429,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
     context = {
         "annotation_version": annotation_version,
-        "can_create_classification": VariantClassification.can_create_via_web_form(request.user),
+        "can_create_classification": Classification.can_create_via_web_form(request.user),
         "classifications": latest_classifications,
         "clinvar": clinvar,
         "genes_canonical_transcripts": genes_canonical_transcripts,

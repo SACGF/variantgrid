@@ -200,18 +200,18 @@ URLS_NAME_REGISTER.update({ # Disable selected snpdb urls
     "tag_settings" : False,
     "igv_integration" : False,
     "sequencing_software_versions" : False,
-    "variant_classification_dashboard" : True,
+    "classification_dashboard" : True,
     "clinical_contexts": True,
 
-    "variant_classification_import_tool": True,
+    "classification_import_tool": True,
     "keycloak_admin" : True
 })
 """
 URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
-     "variant_classification_dashboard": True,
+     "classification_dashboard": True,
      "clinical_contexts": True,
      "hgvs_issues": True,
-     "variant_classification_import_tool": True,
+     "classification_import_tool": True,
      "keycloak_admin": True
 })
 

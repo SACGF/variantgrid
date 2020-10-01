@@ -2,7 +2,7 @@ from django.test import TestCase
 from classification.models import AttachmentFileType
 
 
-class TestVariantClassificationModels(TestCase):
+class TestClassificationModels(TestCase):
 
     def setUp(self):
         pass

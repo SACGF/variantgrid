@@ -62,7 +62,7 @@ app.conf.beat_schedule['variant-validation'] = {
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:
     app.conf.beat_schedule['discordance-emails-weekly'] = {
-        'task': 'classification.views.variant_classification_email_view.send_summary_emails',
+        'task': 'classification.views.classification_email_view.send_summary_emails',
         'schedule': crontab(hour=16, minute=0, day_of_week='fri')
     }
 

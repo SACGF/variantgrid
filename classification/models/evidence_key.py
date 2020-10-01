@@ -11,7 +11,7 @@ from library.cache import timed_cache
 from library.utils import empty_to_none
 from snpdb.models import VariantGridColumn, Lab
 from classification.enums import CriteriaEvaluation, SubmissionSource
-from classification.enums.variant_classification_enums import EvidenceCategory, \
+from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.json_serialize import strip_json
 
@@ -341,7 +341,7 @@ class EvidenceKeyMap:
 
         #update keys to have overridden values
         if lab:
-            merged = EvidenceKey.merge_config(lab.variant_classification_config, lab.organization.variant_classification_config)
+            merged = EvidenceKey.merge_config(lab.classification_config, lab.organization.classification_config)
             if 'namespaces' in merged:
                 self.namespaces = {None}.union(set(merged.pop('namespaces', [])))
 

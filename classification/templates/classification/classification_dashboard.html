@@ -1,0 +1,76 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load datatable_tags %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+
+{% block title %}Classification Issues{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script>
+    let mode = 'all';
+    function classificationFilter(data, type) {
+        data.issues = mode;
+        data.lab = blankToNull($('#id_lab').val());
+    }
+    function modeHighlight() {
+        $('.issue-select').css('font-weight', 'normal');
+        $(`.issue-select[name=${mode}]`).css('font-weight', 'bold');
+    }
+</script>
+{% endblock %}
+{% block jsdocumentready %}
+    $('#id_lab').change(function() {
+        $('#vc-datatable').DataTable().ajax.reload();
+    });
+
+    $('.issue-select').click(function() {
+        mode = $(this).attr('name');
+        modeHighlight();
+        $('#vc-datatable').DataTable().ajax.reload();
+    });
+    modeHighlight();
+
+    EKeys.load().then(() => {
+    {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %}
+    });
+    let vcDatatable = $('#vc-datatable');
+    vcDatatable.on('draw.dt', () => {
+        Flags.instance.init({userId: '{{user.id}}'});
+    });
+{% endblock %}
+
+{% block content %}
+    <div class="container" id="dashboard-links">
+        {% page_help page_id='classification/issues_help' title='Classification Issues' %}
+
+        Show records that :
+        <a class="hover-link issue-select" name='all'>Have any issue</a> |
+        <a class="hover-link issue-select" name='discussion'>Require discussion</a> |
+        <a class="hover-link issue-select" name='data'>Require a data fix</a> |
+        <a class="hover-link issue-select" name='withdrawn'>Have been withdrawn</a>
+        <br/><br/>
+        <a class="hover-link" href="{% url 'classification_dashboard_download' %}">Click here to download all issues requiring action</a>
+        <br/>
+
+        <p>For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
+            {% if user.is_superuser %}
+            <div class="admin-only row">
+                <div class="col-6">
+                    {% crispy lab_form form_helper.horizontal_no_labels %}
+                </div>
+                <div class="col-6">
+                    Email preview:
+                    <a href="{% url 'summary_email_html' %}" class="hover-link">HTML</a>,
+                    <a href="{% url 'summary_email_text' %}" class="hover-link">TEXT</a>
+                </div>
+            </div>
+            {% endif %}
+    </div>
+    <div class="container-table">
+        {% datatable datatable_config 'vc-datatable' class_name='classification-table sticky-header' %}
+    </div>
+{% endblock %}

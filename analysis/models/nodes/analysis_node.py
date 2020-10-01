@@ -30,7 +30,7 @@ from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, ProcessingStatus
 from snpdb.variant_collection import write_sql_to_variant_collection
-from classification.models import VariantClassification, post_delete
+from classification.models import Classification, post_delete
 from variantgrid.celery import app
 
 
@@ -987,6 +987,6 @@ class NodeAlleleFrequencyRange(models.Model):
         return ""
 
 
-class AnalysisVariantClassification(models.Model):
+class AnalysisClassification(models.Model):
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
-    variant_classification = models.ForeignKey(VariantClassification, on_delete=CASCADE)
+    classification = models.ForeignKey(Classification, on_delete=CASCADE)

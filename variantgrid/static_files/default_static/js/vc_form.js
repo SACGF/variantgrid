@@ -85,7 +85,7 @@ const VCForm = (function() {
         },
         
         csv() {
-            window.open(window.location.href + '/variant_classification.csv');
+            window.open(window.location.href + '/classification.csv');
             return false;
         },
         
@@ -392,7 +392,7 @@ const VCForm = (function() {
                     $('<span>', {class: 'timestamp', text: '---' }).appendTo(content);
                     $('<li>', {class: 'list-group-item', title: 'this record has not been shared at any level yet', 'data-toggle': 'tooltip'}).appendTo(publishUL);
                 } else {
-                    let href = `/variantclassification/variant_classification/${this.record.id}`;
+                    let href = `/classification/classification/${this.record.id}`;
                     if (!version.editable) {
                         href += `.${version.timestamp}`;
                     }
@@ -408,7 +408,7 @@ const VCForm = (function() {
 
             if (this.record.can_write_latest) {
                 this.generateLink(
-                    `/variantclassification/variant_classification/${this.record.id}/history`,
+                    `/classification/classification/${this.record.id}/history`,
                     '<i class="fas fa-history"></i> View change log', true
                 ).addClass('list-group-item').addClass('list-group-item-action').appendTo(publishUL);
             }
@@ -1001,7 +1001,7 @@ const VCForm = (function() {
 
             eKeys = _eKeys.configCopy(record.config);
             vcLinks = new VCLinks(eKeys);
-            vcform.url = Urls.variant_classification_api();
+            vcform.url = Urls.classification_api();
             vcform.genomeBuild = params.genomeBuild;
             
             this.otherClassificationsSummary = params.otherClassificationsSummary;
@@ -1956,7 +1956,7 @@ VCTable.identifier = (data, type, row) => {
     let record_id = `${lab_name} / ${lab_record_id}`;
 
     let link = $('<a>', {
-        href: Urls.view_variant_classification(id),
+        href: Urls.view_classification(id),
         class: 'hover-link',
         html: [
             icon,

@@ -14,7 +14,7 @@ from annotation.models.models import VariantAnnotation
 from patients.models_enums import SimpleZygosity, GnomADPopulation
 from snpdb.models import Sample, VariantZygosityCountCollection
 from classification.enums import ClinicalSignificance
-from classification.models.variant_classification import VariantClassification
+from classification.models.classification import Classification
 
 
 class PopulationNode(AnalysisNode):
@@ -100,8 +100,8 @@ class PopulationNode(AnalysisNode):
             or_q = [reduce(operator.and_, and_q)]
             if self.keep_internally_classified_pathogenic:
                 path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-                q_classified = VariantClassification.get_variant_q(self.analysis.user, self.analysis.genome_build,
-                                                                   clinical_significance_list=path_and_likely_path)
+                q_classified = Classification.get_variant_q(self.analysis.user, self.analysis.genome_build,
+                                                            clinical_significance_list=path_and_likely_path)
                 or_q.append(q_classified)
 
             q_node = reduce(operator.or_, or_q)

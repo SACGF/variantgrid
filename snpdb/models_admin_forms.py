@@ -18,13 +18,13 @@ def make_code_friendly(text: str) -> str:
 
 class LabAdmin(admin.ModelAdmin):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'variant_classification_config')
+    list_display = ('name', 'group_name', 'organization', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
-        ('Submissions', {'fields': ('variant_classification_config', 'upload_location',)})
+        ('Submissions', {'fields': ('classification_config', 'upload_location',)})
     )
 
     def get_form(self, request, obj=None, **kwargs):
@@ -66,11 +66,11 @@ class LabAdmin(admin.ModelAdmin):
 
 class OrganizationAdmin(admin.ModelAdmin):
 
-    list_display = ('name', 'group_name', 'variant_classification_config')
+    list_display = ('name', 'group_name', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'short_name', 'group_name', 'active')}),
-        ('Submissions', {'fields': ('variant_classification_config', 'classification_report_template')})
+        ('Submissions', {'fields': ('classification_config', 'classification_report_template')})
     )
 
     def fix_group_name(self, request, queryset):
@@ -103,7 +103,7 @@ class OrganizationAdmin(admin.ModelAdmin):
 # from being useful. Specifically if you try to add arbitrary properties
 # you get locked in the UI and can't continue to edit.
 
-# variant_classification_config_schema_preferred = {
+# classification_config_schema_preferred = {
 #     'type': 'object',
 #         'patternProperties': {
 #         "[a-zA-Z0-9_]+": {

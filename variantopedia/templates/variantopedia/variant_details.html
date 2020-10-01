@@ -292,7 +292,7 @@ $(document).ready(function() {
     <div id='classifications' class='container-table mt-4'>
         <h3>Classifications</h3>
         {% if classifications %}
-            {% variant_classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
+            {% classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
         {% else %}
             <p>No internal classifications.</p>
         {% endif %}

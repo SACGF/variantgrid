@@ -3,10 +3,10 @@ from typing import Tuple
 from django.contrib.auth.models import User
 
 from snpdb.models import Lab, Organization
-from classification.models import VariantClassification
+from classification.models import Classification
 
 
-class VariantClassificationTestUtils:
+class ClassificationTestUtils:
 
     @staticmethod
     def setUp():
@@ -44,7 +44,7 @@ class VariantClassificationTestUtils:
     def tearDown():
         Lab.objects.filter(group_name='instx/labby').delete()
         User.objects.filter(username__in=['joejoe', 'joejoe2']).delete()
-        VariantClassification.objects.all().delete()
+        Classification.objects.all().delete()
 
     @staticmethod
     def lab_and_user() -> Tuple[Lab, User]:

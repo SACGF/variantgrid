@@ -44,8 +44,8 @@
             let colors = [...PATHOGENIC_COLORS];
             colors.reverse();
             var classificationCounts = [{
-              values: {{ variant_classification_values | jsonify }},
-              labels: {{ variant_classification_labels | jsonify }},
+              values: {{ classification_values | jsonify }},
+              labels: {{ classification_labels | jsonify }},
               type: 'pie',
               sort : false,
               marker : {colors : colors},

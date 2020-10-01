@@ -44,10 +44,10 @@ def ensure_labs():
     for lab_data in lab_datas:
         org_id = lab_data.pop('organization')
         lab_data['organization'] = Organization.objects.get(group_name=org_id)
-        config = lab_data.pop('variant_classification_config')
+        config = lab_data.pop('classification_config')
         if config:
             config = json.loads(config)
-            lab_data['variant_classification_config'] = config
+            lab_data['classification_config'] = config
 
         lab, created = Lab.objects.get_or_create(group_name=lab_data['group_name'], defaults=lab_data)
         if not created:

@@ -41,10 +41,10 @@ class SyncRunAdmin(admin.ModelAdmin):
     list_filter = (ByDestinationFilter,)
 
 
-class VariantClassificationModificationSyncRecordAdmin(admin.ModelAdmin):
-    list_display = ('id', 'run', 'created', 'variant_classification_modification')
+class ClassificationModificationSyncRecordAdmin(admin.ModelAdmin):
+    list_display = ('id', 'run', 'created', 'classification_modification')
 
 
 admin.site.register(models.SyncDestination, SyncDestinationAdmin)
 admin.site.register(models.SyncRun, SyncRunAdmin)
-admin.site.register(models.VariantClassificationModificationSyncRecord, VariantClassificationModificationSyncRecordAdmin)
+admin.site.register(models.ClassificationModificationSyncRecord, ClassificationModificationSyncRecordAdmin)

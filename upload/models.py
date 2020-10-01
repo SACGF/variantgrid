@@ -42,7 +42,7 @@ from upload.bed_file_processing import process_bed_file
 from upload.models_enums import UploadedFileTypes, VCFPipelineStage, \
     UploadStepTaskType, ExpressionType, TimeFilterMethod, VCFImportInfoSeverity, \
     UploadStepOrigin
-from classification.models import VariantClassificationImport
+from classification.models import ClassificationImport
 from variantgrid.celery import app
 
 
@@ -225,7 +225,7 @@ class UploadPipeline(models.Model):
                 genome_build = uploaded_file.uploadedmanualvariantentrycollection.collection.genome_build
             except ObjectDoesNotExist:
                 try:
-                    genome_build = uploaded_file.uploadedvariantclassificationimport.variant_classification_import.genome_build
+                    genome_build = uploaded_file.uploadedvariantclassificationimport.classification_import.genome_build
                 except ObjectDoesNotExist:
                     pass
         elif file_type == UploadedFileTypes.LIFTOVER:
@@ -670,12 +670,12 @@ class UploadedManualVariantEntryCollection(models.Model):
         return self.collection
 
 
-class UploadedVariantClassificationImport(models.Model):
+class UploadedClassificationImport(models.Model):
     uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    variant_classification_import = models.OneToOneField(VariantClassificationImport, null=True, on_delete=CASCADE)
+    classification_import = models.OneToOneField(ClassificationImport, null=True, on_delete=CASCADE)
 
     def get_data(self):
-        return self.variant_classification_import
+        return self.classification_import
 
 
 class UploadedLiftover(models.Model):

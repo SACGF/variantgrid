@@ -18,7 +18,7 @@
     {% if not node.visible %}
         var addAnalysisVariantClassification = function(variantString, variantClassificationId, clinicalSignificance) {
             var description = variantString + " - " + clinicalSignificance;
-            var url = Urls.view_variant_classification(variantClassificationId);
+            var url = Urls.view_classification(variantClassificationId);
             var link = $("<a />").attr({href : url, "target" : "_blank"}).text(description);
             var ec = $("<div />");
             ec.append(link);
@@ -31,9 +31,9 @@
         // In top tags link button
         {% if node.analysis.analysisvariantclassification_set.exists %}
             {% for avc in node.analysis.analysisvariantclassification_set.all %}
-                var variantString = "{{ avc.variant_classification.variant|safe }}";
-                var variantClassificationId = {{ avc.variant_classification.pk }};
-                var clinicalSignificance = "{{ avc.variant_classification.get_clinical_significance_display|default_if_none:"Unclassified" }}";
+                var variantString = "{{ avc.classification.variant|safe }}";
+                var variantClassificationId = {{ avc.classification.pk }};
+                var clinicalSignificance = "{{ avc.classification.get_clinical_significance_display|default_if_none:"Unclassified" }}";
                 addAnalysisVariantClassification(variantString, variantClassificationId, clinicalSignificance);
             {% endfor %}
         {% endif %} 
@@ -102,7 +102,7 @@
                     type: "POST",
                     url: url,
                     success: function(data) {
-                        var variantClassificationId = data.variant_classification_id;
+                        var variantClassificationId = data.classification_id;
                         var variantString = $(".variant-string", parentTr).text();
                         var variantId = parentTr.attr("variantId");
                         var tagId = parentTr.attr("tagId");

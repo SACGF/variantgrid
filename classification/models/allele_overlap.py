@@ -10,9 +10,9 @@ from lazy import lazy
 from library.guardian_utils import admin_bot
 from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
 from classification.enums import SpecialEKeys
-from classification.models import VariantClassificationModification
+from classification.models import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext, CS_TO_NUMBER
-from classification.models.variant_classification import VariantClassification
+from classification.models.classification import Classification
 
 """
 Above values are assigned based on how big the differences are considered when it comes to discordance
@@ -35,7 +35,7 @@ class DiscordanceLevel(str, Enum):
 
 @total_ordering
 class AlleleOverlap:
-    def __init__(self, genome_build: GenomeBuild, allele: Allele, vcms: Collection[VariantClassificationModification], ccs: Collection[ClinicalContext]):
+    def __init__(self, genome_build: GenomeBuild, allele: Allele, vcms: Collection[ClassificationModification], ccs: Collection[ClinicalContext]):
         self.genome_build = genome_build
         self.allele = allele
         self.ccs = ccs
@@ -88,7 +88,7 @@ class AlleleOverlap:
         for vcm in self.vcms:
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and CS_TO_NUMBER.get(clin_sig):
-                labs.add(vcm.variant_classification.lab_id)
+                labs.add(vcm.classification.lab_id)
                 if len(labs) > 1:
                     return True
         return False
@@ -121,7 +121,7 @@ class AlleleOverlap:
         lab_ids = set(lab.id for lab in labs)
 
         # find the variant for ALL variant classifications, and keep a dict of variant id to classification id
-        classification_variant_ids_qs = VariantClassification.objects.exclude(withdrawn=True).values_list('id',
+        classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id',
                                                                                                           'variant')
         variant_to_vcids: Dict[int, List[int]] = defaultdict(list)
         for (classification_id, variant_id) in classification_variant_ids_qs:
@@ -144,14 +144,14 @@ class AlleleOverlap:
             all_relevant_vcids.extend(vcids)
 
         # find the last published classification modifications for the relevant variants
-        vcid_vc: Dict[int, VariantClassification] = dict()
-        for vc in VariantClassificationModification.latest_for_user(user=user, published=True) \
-                .filter(variant_classification_id__in=all_relevant_vcids) \
-                .select_related('variant_classification', 'variant_classification__clinical_context',
-                                'variant_classification__lab'):
-            vcid_vc[vc.variant_classification_id] = vc
+        vcid_vc: Dict[int, Classification] = dict()
+        for vc in ClassificationModification.latest_for_user(user=user, published=True) \
+                .filter(classification_id__in=all_relevant_vcids) \
+                .select_related('classification', 'classification__clinical_context',
+                                'classification__lab'):
+            vcid_vc[vc.classification_id] = vc
 
-        # lastly return a list of tuples of (Allele, VariantClassificationModification)
+        # lastly return a list of tuples of (Allele, ClassificationModification)
         allele_and_vcs: [AlleleOverlap] = list()
         for allele in allele_qs:
             vcids = allele_to_vcids[allele.id]
@@ -160,9 +160,9 @@ class AlleleOverlap:
                 valid_for_user = user.is_superuser
                 clinical_contexts = set()
                 for vc in vcs:
-                    if not valid_for_user and vc.variant_classification.lab_id in lab_ids:
+                    if not valid_for_user and vc.classification.lab_id in lab_ids:
                         valid_for_user = True
-                    cc = vc.variant_classification.clinical_context
+                    cc = vc.classification.clinical_context
                     if cc:  # the clinical context might still be resolving if right after an import
                         clinical_contexts.add(cc)
                 clinical_context_list = list(clinical_contexts)

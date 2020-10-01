@@ -5,13 +5,13 @@ import os
 
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.enums.file_attachments import AttachmentFileType
-from classification.models.variant_classification import VariantClassification
+from classification.models.classification import Classification
 
 
-class VariantClassificationAttachment(models.Model):
+class ClassificationAttachment(models.Model):
     UPLOAD_PATH = 'classification_attachments'  # in media root
 
-    variant_classification = models.ForeignKey(VariantClassification, on_delete=CASCADE)
+    classification = models.ForeignKey(Classification, on_delete=CASCADE)
     file = models.FileField(upload_to=UPLOAD_PATH,
                             storage=PrivateUploadStorage())
     file_type = models.CharField(max_length=1, choices=AttachmentFileType.CHOICES)
@@ -22,7 +22,7 @@ class VariantClassificationAttachment(models.Model):
         image_url = self.get_absolute_url()
 
         if self.file_type == AttachmentFileType.IMAGE:
-            thumb_url = reverse('view_variant_classification_file_attachment_thumbnail', kwargs={'pk': self.pk})
+            thumb_url = reverse('view_classification_file_attachment_thumbnail', kwargs={'pk': self.pk})
         else:
             thumb_url = None
 
@@ -36,9 +36,9 @@ class VariantClassificationAttachment(models.Model):
             'size': size,
             'url': image_url,
             'thumbnailUrl': thumb_url,  # If thumbnail set, JFU displays in gallery
-            'deleteUrl': reverse('variant_classification_file_delete', kwargs={'pk': self.pk}),
+            'deleteUrl': reverse('classification_file_delete', kwargs={'pk': self.pk}),
             'deleteType': 'POST',
         }
 
     def get_absolute_url(self):
-        return reverse('view_variant_classification_file_attachment', kwargs={'pk': self.pk})
+        return reverse('view_classification_file_attachment', kwargs={'pk': self.pk})

@@ -1,0 +1,54 @@
+{% load js_tags %}
+{% load user_tags %}
+<table id="classification-activity" class="table">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Record</th>
+            <th>Who</th>
+            <th>Change</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for change_group in changes %}
+        <tr>
+
+            <td class="timestamp">{% timestamp timestamp=change_group.date time_ago=True %}</td>
+            <td class="id">
+                {% ifchanged change_group.record_id %}
+                    {% if change_group.classification %}
+                <a class="hover-link" href="{% url 'view_classification' change_group.classification.id %}">{{ change_group.classification.friendly_label }}</a>
+                    {% if change_group.is_creation %}(new){% endif %}
+                    {% elif change_group.allele %}
+                    <a class="hover-link" href="{% url 'view_allele' change_group.allele.id %}">Allele {{ change_group.allele.id }}</a>
+                    {% endif %}
+                {% endifchanged %}
+            </td>
+            <td class="user">
+                {% ifchanged  change_group.record_id change_group.source change_group.user change_group.flag %}
+                    {% if change_group.flag %}
+                    <div class="submission-source flag flag-{{ change_group.flag.flag_type.id }}" title="{{ change_group.source_label }} ({{ change_group.flag.id }})"></div>
+                    {% else %}
+                    <div class="submission-source {{ change_group.source }}" title="{{ change_group.source_label }}"></div>
+                    {% endif %}
+                {% user change_group.user show_avatar=True display='inline' %}
+                {% endifchanged %}
+            </td>
+            <td>
+                {% for data_change in change_group.changes %}
+                    <div class="mini-change">
+                        <span class="key-change"><span class="key">{{ data_change.key }}</span>.{{ data_change.attribute }}</span>
+                        {% if not change_group.ignore_before %}&#160;{{ data_change.before | format_value }}
+                            <span class="change-arrow">&#160;->&#160;</span>
+                        {% else %}
+                            <span class="change-arrow">&#160;=&#160;</span>
+                        {% endif %}
+                        {% if data_change.resolution %}<span class="resolution">{{ data_change.resolution.label }}</span> {{ data_change.after }}
+                        {% else %}{{ data_change.after | format_value }}{% endif %}
+                    </div>
+                {%  endfor %}
+            </td>
+        </tr>
+    {%  endfor %}
+    </tbody>
+</table>

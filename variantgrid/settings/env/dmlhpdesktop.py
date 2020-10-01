@@ -103,8 +103,8 @@ if _SHARIANT_MODE:
                               "pedigree": False,
                               "seqauto": False})
 
-    URLS_NAME_REGISTER.update({"variant_classification_dashboard": True,
-                               "variant_classification_import_tool": True})
+    URLS_NAME_REGISTER.update({"classification_dashboard": True,
+                               "classification_import_tool": True})
 
 elif _SAPATHOLOGY_MODE:
     PATHOLOGY_TEST_EXTERNAL_CODE = "SAPOrderNumber"

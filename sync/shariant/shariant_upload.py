@@ -9,12 +9,12 @@ from library.oauth import OAuthConnector
 from library.utils import batch_iterator
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
-from sync.models.models_variant_classification_sync import VariantClassificationModificationSyncRecord
+from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
-from classification.enums.variant_classification_enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
-from classification.models.variant_classification import VariantClassificationModification
-from classification.models.variant_classification_utils import VariantClassificationJsonParams
+from classification.models.classification import ClassificationModification
+from classification.models.classification_utils import ClassificationJsonParams
 
 SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary']
 
@@ -36,11 +36,11 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
     user_mappings = mapping.get('users', {})
     historical_converter = HistoricalEKeyConverter()
 
-    def variant_classification_to_json(vcm: VariantClassificationModification) -> Dict:
-        raw_json = vcm.as_json(VariantClassificationJsonParams(current_user=admin_bot(), include_data=True, include_messages=False, strip_complicated=True, api_version=2))
+    def classification_to_json(vcm: ClassificationModification) -> Dict:
+        raw_json = vcm.as_json(ClassificationJsonParams(current_user=admin_bot(), include_data=True, include_messages=False, strip_complicated=True, api_version=2))
         formatted_json = {}
 
-        lab = vcm.variant_classification.lab
+        lab = vcm.classification.lab
         mapped_lab_name = lab_mappings.get(lab.group_name)
         if mapped_lab_name is True:
             mapped_lab_name = lab.group_name
@@ -49,7 +49,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         share_level = share_level_mappings.get(share_level, share_level)
 
         # might need to map the the lab group names if we don't map them all into shariant
-        formatted_json['id'] = mapped_lab_name + '/' + vcm.variant_classification.lab_record_id
+        formatted_json['id'] = mapped_lab_name + '/' + vcm.classification.lab_record_id
         data = raw_json.get('data')
         for dont_share in SHARIANT_PRIVATE_FIELDS:
             data.pop(dont_share, None)
@@ -70,32 +70,32 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
 
     # note that more mapping is done during the upload call
 
-    qs = VariantClassificationModification.objects.filter(
+    qs = ClassificationModification.objects.filter(
         is_last_published=True,
         share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
-        variant_classification__lab__group_name__in=lab_mappings.keys()
+        classification__lab__group_name__in=lab_mappings.keys()
     )
     # Originally I used filter/exclude dicts which were turned into queryset kwargs allowing
     # Arbitrary filtering, but this doesn't work on JSONB fields where
-    # qs.exclude(variant_classification__evidence__allele_origin__value='Somatic') returns 0 results
+    # qs.exclude(classification__evidence__allele_origin__value='Somatic') returns 0 results
     # Use 1 off special case code to handle this, with config like 'filters' : {"somatic" : false}
     # If you end up making more filters, perhaps consider adopting arbitrary filter construction
     # possibly by pulling code out of JQGrid
     if filters:
         somatic = filters.get("somatic", True)
         if not somatic:
-            q_allele_origin_null = Q(variant_classification__evidence__allele_origin__isnull=True)
-            q_not_somatic = ~Q(variant_classification__evidence__allele_origin__value='Somatic')
+            q_allele_origin_null = Q(classification__evidence__allele_origin__isnull=True)
+            q_not_somatic = ~Q(classification__evidence__allele_origin__value='Somatic')
             qs = qs.filter(q_allele_origin_null | q_not_somatic)
 
     if not full_sync:
-        qs = VariantClassificationModificationSyncRecord.filter_out_synced(
+        qs = ClassificationModificationSyncRecord.filter_out_synced(
             qs=qs,
             destination=sync_destination
         )
 
     """
-    Provide a QuerySet of VariantClassificationModifications
+    Provide a QuerySet of ClassificationModifications
     """
     rows_uploaded = 0
     run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
@@ -109,7 +109,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         try:
             for batch in batch_iterator(qs, batch_size=10):
 
-                json_to_send = {"records": [variant_classification_to_json(vcm) for vcm in batch]}
+                json_to_send = {"records": [classification_to_json(vcm) for vcm in batch]}
                 print(json.dumps(json_to_send))
                 auth = shariant.auth()
 
@@ -124,7 +124,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
 
                 for record, result in zip(batch, results):
                     rows_uploaded += 1
-                    VariantClassificationModificationSyncRecord.objects.create(run=run, variant_classification_modification=record, meta=result)
+                    ClassificationModificationSyncRecord.objects.create(run=run, classification_modification=record, meta=result)
 
             run.status = SyncStatus.SUCCESS
             run.save()

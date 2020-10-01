@@ -40,7 +40,7 @@
                     <td>{% if allele.clingen_allele %}{{ allele.clingen_allele }}{% else %}<span class="error-value">MISSING</span>{% endif %}</td>
                     <td class="variant-coordinate">{{ allele.grch37 | default_if_none:"-" }}</td>
                     <td class="variant-coordinate">{{ allele.grch38 | default_if_none:"-" }}</td>
-                    <td>{{ allele | variant_classification_count }}
+                    <td>{{ allele | classification_count }}
                     <td data-flags="{{allele.flag_collection.id}}">...</td>
                 </tr>
             {% endfor %}
@@ -51,6 +51,6 @@
         Classifications with variant matching in progress, failed or variant matching warnings appear here
     </div>
     <div class="container-table">
-        {% variant_classification_table classifications show_variant_link=True show_clinical_context=False %}
+        {% classification_table classifications show_variant_link=True show_clinical_context=False %}
     </div>
 {% endblock %}

@@ -153,7 +153,7 @@ def vcf_replace_data(old_vcf, new_vcf):
 
         old_sample.sampletag_set.update(sample=new_sample)
         # Don't need to do anything else here
-        old_sample.variantclassification_set.update(sample=new_sample)
+        old_sample.classification_set.update(sample=new_sample)
 
         for related_field in ["genelistnode_set", "samplenode_set", "zygositynode_set"]:
             related = getattr(old_sample, related_field)

@@ -31,11 +31,11 @@
                     Note that classifications that are not shared at a high enough level or withdrawn are not included here:<br/>
                     {{ record_error }}
                     {% for vcm in records %}
-                    <a class="hover-link" href="{% url 'view_variant_classification' vcm.id_str %}">{{ vcm.variant_classification.friendly_label }}</a> @ {{ vcm.modified }}<br/>
+                    <a class="hover-link" href="{% url 'view_classification' vcm.id_str %}">{{ vcm.classification.friendly_label }}</a> @ {{ vcm.modified }}<br/>
                     {% endfor %}
                 {% endlabelled %}
                 {% labelled label="Currently Associated Classifications" %}
-                    {% for classification in cc.variant_classifications_associated_qs %}
+                    {% for classification in cc.classifications_associated_qs %}
                         {% classification_quick classification %}<br/>
                     {% endfor %}
                 {% endlabelled %}

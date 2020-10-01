@@ -27,8 +27,8 @@ from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, D
     ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
-from classification.models.variant_classification import VariantClassificationModification, \
-    VariantClassification, CreateNoVariantClassificationForbidden
+from classification.models.classification import ClassificationModification, \
+    Classification, CreateNoClassificationForbidden
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
 
@@ -91,9 +91,9 @@ class ClassifyNoVariantHGVS(AbstractMetaVariant):
 
     def is_valid_for_user(self, user: User) -> bool:
         try:
-            VariantClassification.check_can_create_no_variant_classification_via_web_form(user)
+            Classification.check_can_create_no_classification_via_web_form(user)
             return True
-        except CreateNoVariantClassificationForbidden:
+        except CreateNoClassificationForbidden:
             return False
 
     def get_absolute_url(self):
@@ -392,7 +392,7 @@ def get_visible_variants(user: User, genome_build: GenomeBuild) -> VARIANT_SEARC
     annotation_version = AnnotationVersion.latest(genome_build)
     variant_qs = get_variant_queryset_for_annotation_version(annotation_version)
     if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not user.is_superuser:
-        variant_qs = variant_qs.filter(VariantClassification.get_variant_q(user, genome_build))
+        variant_qs = variant_qs.filter(Classification.get_variant_q(user, genome_build))
 
     return variant_qs
 
@@ -609,24 +609,24 @@ def search_external_pk(search_string: str, user: User, **kwargs):
     return results
 
 
-def search_classification(search_string: str, user: User, **kwargs) -> Iterable[VariantClassification]:
+def search_classification(search_string: str, user: User, **kwargs) -> Iterable[Classification]:
     """ Search for LabId which can be either:
         "vc1080" or "Molecular Genetics, Frome Road / vc1080" (as it appears in classification) """
 
-    filters = [Q(variant_classification__lab_record_id=search_string)]  # exact match
+    filters = [Q(classification__lab_record_id=search_string)]  # exact match
     slash_index = search_string.find("/")
     if slash_index > 0:
         lab_name = search_string[:slash_index].strip()
         lab_record_id = search_string[slash_index + 1:].strip()
         if lab_name and lab_record_id:
-            q_lab_name = Q(variant_classification__lab__name=lab_name)
-            q_lab_record = Q(variant_classification__lab_record_id=lab_record_id)
+            q_lab_name = Q(classification__lab__name=lab_name)
+            q_lab_record = Q(classification__lab_record_id=lab_record_id)
             filters.append(q_lab_name & q_lab_record)
     q_vcm = reduce(operator.or_, filters)
-    vcm_qs = VariantClassificationModification.filter_for_user(user)
-    vcm_ids = vcm_qs.filter(q_vcm, is_last_published=True).values('variant_classification')
-    # convert from modifications back to VariantClassification so absolute_url returns the editable link
-    return VariantClassification.objects.filter(pk__in=vcm_ids)
+    vcm_qs = ClassificationModification.filter_for_user(user)
+    vcm_ids = vcm_qs.filter(q_vcm, is_last_published=True).values('classification')
+    # convert from modifications back to Classification so absolute_url returns the editable link
+    return Classification.objects.filter(pk__in=vcm_ids)
 
 
 def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:

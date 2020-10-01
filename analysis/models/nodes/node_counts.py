@@ -10,7 +10,7 @@ from annotation.models.damage_enums import PathogenicityImpact
 from library.database_utils import get_queryset_select_from_where_parts, dictfetchall
 from snpdb.models.models_enums import BuiltInFilters
 from classification.enums import ClinicalSignificance
-from classification.models import VariantClassification, GenomeBuild
+from classification.models import Classification, GenomeBuild
 
 # Add the necessary fields to qs to create join:
 REQUIRED_FIELDS = [
@@ -21,8 +21,8 @@ REQUIRED_FIELDS = [
 
 CLASSIFICATION_COUNT_SQL = """
 select 1
-from classification_variantclassification
-where classification_variantclassification.variant_id in (
+from classification_classification
+where classification_classification.variant_id in (
     select snpdb_variantallele.variant_id
     from snpdb_variantallele
     where allele_id in (
@@ -40,14 +40,14 @@ COUNTS = {
     BuiltInFilters.IMPACT_HIGH_OR_MODERATE: "sum(case when %(annotation_variantannotation)s.impact in ('H', 'M') then 1 else 0 end)",
     BuiltInFilters.COSMIC: "sum(case when %(annotation_variantannotation)s.cosmic_id is not null then 1 else 0 end)",
     BuiltInFilters.CLASSIFIED: f"sum(case when exists ({CLASSIFICATION_COUNT_SQL}) then 1 else 0 end)",
-    BuiltInFilters.CLASSIFIED_PATHOGENIC: f"sum(case when exists ({CLASSIFICATION_COUNT_SQL} AND classification_variantclassification.clinical_significance in ('4', '5')) then 1 else 0 end)"
+    BuiltInFilters.CLASSIFIED_PATHOGENIC: f"sum(case when exists ({CLASSIFICATION_COUNT_SQL} AND classification_classification.clinical_significance in ('4', '5')) then 1 else 0 end)"
 }
 
 
 SELECT_INTERNALLY_CLASSIFIED_SQL = """
-select string_agg(coalesce(classification_variantclassification.clinical_significance, 'U'), '|')
-from classification_variantclassification
-where classification_variantclassification.variant_id in (
+select string_agg(coalesce(classification_classification.clinical_significance, 'U'), '|')
+from classification_classification
+where classification_classification.variant_id in (
     select snpdb_variantallele.variant_id
     from snpdb_variantallele
     where
@@ -58,9 +58,9 @@ where classification_variantclassification.variant_id in (
 """
 
 SELECT_MAX_INTERNAL_CLASSIFICATION = """
-select max(coalesce(classification_variantclassification.clinical_significance, '0'))
-from classification_variantclassification
-where classification_variantclassification.variant_id in (
+select max(coalesce(classification_classification.clinical_significance, '0'))
+from classification_classification
+where classification_classification.variant_id in (
     select snpdb_variantallele.variant_id
     from snpdb_variantallele
     where
@@ -85,7 +85,7 @@ def get_extra_filters_q(user: User, genome_build: GenomeBuild, extra_filters):
         clinical_significance_list = None
         if extra_filters == BuiltInFilters.CLASSIFIED_PATHOGENIC:
             clinical_significance_list = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-        q = VariantClassification.get_variant_q(user, genome_build, clinical_significance_list)
+        q = Classification.get_variant_q(user, genome_build, clinical_significance_list)
     elif extra_filters == BuiltInFilters.IMPACT_HIGH_OR_MODERATE:
         q = Q(variantannotation__impact__in=(PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE))
     elif extra_filters == BuiltInFilters.COSMIC:

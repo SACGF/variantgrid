@@ -8,7 +8,7 @@ from genes.models import Gene
 from library.utils import rgb_invert
 from snpdb.models import Sample, Cohort, ShareLevel, GenomeBuild, Variant
 from snpdb.models.models_enums import ProcessingStatus
-from classification.models import VariantClassification, VariantClassificationModification
+from classification.models import Classification, ClassificationModification
 from variantgrid.celery import app
 
 
@@ -34,37 +34,37 @@ class GeneCountType(models.Model):
     name = models.TextField(primary_key=True)
     celery_task_name = models.TextField(null=True)
     enabled = models.BooleanField(default=False)
-    uses_variant_classifications = models.BooleanField(default=False)
+    uses_classifications = models.BooleanField(default=False)
 
     @staticmethod
-    def handle_variant_classification_change(variant_classification):
-        sample = variant_classification.sample
+    def handle_classification_change(classification):
+        sample = classification.sample
         if sample:
-            gene_by_vav_id = GeneCountType.get_gene_by_variant_annotation_version(variant_classification)
-            for gene_count_type in GeneCountType.objects.filter(enabled=True, uses_variant_classifications=True):
+            gene_by_vav_id = GeneCountType.get_gene_by_variant_annotation_version(classification)
+            for gene_count_type in GeneCountType.objects.filter(enabled=True, uses_classifications=True):
                 # Search through all modifications (not just last published) - so you recount if ever counted
-                qs = gene_count_type.get_variant_classification_qs(last_published=False)
-                if qs.filter(pk=variant_classification.pk).exists():
-                    print(f"Need to recalculate {gene_count_type} - for {variant_classification}")
+                qs = gene_count_type.get_classification_qs(last_published=False)
+                if qs.filter(pk=classification.pk).exists():
+                    print(f"Need to recalculate {gene_count_type} - for {classification}")
                     for cgc in gene_count_type.cohortgenecounts_set.filter(cohort__cohortsample__sample=sample):
                         gene = gene_by_vav_id.get(cgc.variant_annotation_version.pk)
                         if gene:
                             cgc.launch_task(gene.pk)
 
     @staticmethod
-    def get_gene_by_variant_annotation_version(variant_classification):
+    def get_gene_by_variant_annotation_version(classification):
         gene_by_vav_id = {}
         for vav in VariantAnnotationVersion.objects.all():
-            variant_annotation = variant_classification.get_variant_annotation(vav)
+            variant_annotation = classification.get_variant_annotation(vav)
             if variant_annotation:
                 gene_by_vav_id[vav.pk] = variant_annotation.gene
         return gene_by_vav_id
 
     def _get_variant_q(self, genome_build: GenomeBuild):
         q_variant = None
-        if self.uses_variant_classifications:
-            vc_qs = self.get_variant_classification_qs()
-            q_variant = VariantClassification.get_variant_q_from_classification_qs(vc_qs, genome_build)
+        if self.uses_classifications:
+            vc_qs = self.get_classification_qs()
+            q_variant = Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
         return q_variant
 
     def get_variant_queryset(self, variant_annotation_version: VariantAnnotationVersion):
@@ -78,11 +78,11 @@ class GeneCountType(models.Model):
             qs = qs.filter(q_variant)
         return qs
 
-    def get_variant_classification_qs(self, last_published: bool = True):
+    def get_classification_qs(self, last_published: bool = True):
         """ @param last_published - set to False to look through historical modifications """
 
-        if not self.uses_variant_classifications:
-            raise ValueError(f"{self} does has uses_variant_classifications=False")
+        if not self.uses_classifications:
+            raise ValueError(f"{self} does has uses_classifications=False")
 
         if self.name == "RUNX1_classified_damage":
             kwargs = {"share_level__in": ShareLevel.same_and_higher(ShareLevel.ALL_USERS),
@@ -91,10 +91,10 @@ class GeneCountType(models.Model):
                       "published_evidence__specimen_id__value__icontains": 'ML'}
             if last_published:
                 kwargs["is_last_published"] = True
-            vcm_qs = VariantClassificationModification.objects.filter(**kwargs)
-            qs = VariantClassification.objects.filter(pk__in=vcm_qs.values('variant_classification'))
+            vcm_qs = ClassificationModification.objects.filter(**kwargs)
+            qs = Classification.objects.filter(pk__in=vcm_qs.values('classification'))
         else:
-            qs = VariantClassification.objects.none()
+            qs = Classification.objects.none()
         return qs
 
     def __str__(self):

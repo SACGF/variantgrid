@@ -69,7 +69,7 @@
         A blank value in the Record or Who column implies it's the same as the value above it.
         </p>
     {% end_page_help_embedded %}
-    {% variant_classification_changes changes %}
+    {% classification_changes changes %}
     {% if last_date %}<br/><a class="btn btn-outline-primary" href="{% url 'activity_dated' last_date %}">Load Older</a>{% endif %}
     </div>
 {% endblock %}

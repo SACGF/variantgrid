@@ -38,7 +38,7 @@ def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, genome_build: 
 
 def get_has_classifications_q(genome_build):
     va_build_qs = VariantAllele.objects.filter(genome_build=genome_build,
-                                               allele__variantallele__variant__variantclassification__isnull=False)
+                                               allele__variantallele__variant__classification__isnull=False)
     return Q(variantallele__in=va_build_qs)
 
 

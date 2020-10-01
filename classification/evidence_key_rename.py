@@ -30,15 +30,15 @@ class EvidenceKeyRenamer:
             data.pop(self.old_key)
 
     def _migrate_existing_evidence_key(self):
-        VariantClassification = self.apps.get_model("classification", "VariantClassification")
-        VariantClassificationModification = self.apps.get_model("classification", "VariantClassificationModification")
+        Classification = self.apps.get_model("classification", "Classification")
+        ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
         kwargs = {"evidence__%s__isnull" % self.old_key: False}
-        for vc in VariantClassification.objects.filter(**kwargs):
+        for vc in Classification.objects.filter(**kwargs):
             self._rename_in_dict(vc.evidence)
             vc.save(update_fields=["evidence"])
 
-        for vcm in VariantClassificationModification.objects.filter():
+        for vcm in ClassificationModification.objects.filter():
             self._rename_in_dict(vcm.published_evidence)
             self._rename_in_dict(vcm.delta)
 
@@ -97,16 +97,16 @@ class EvidenceSelectKeyRenamer:
                             blob['value'] = self.new_option
 
     def _migrate_data(self):
-        VariantClassification = self.apps.get_model("classification", "VariantClassification")
-        VariantClassificationModification = self.apps.get_model("classification",
-                                                                "VariantClassificationModification")
+        Classification = self.apps.get_model("classification", "Classification")
+        ClassificationModification = self.apps.get_model("classification",
+                                                                "ClassificationModification")
 
         kwargs = {"evidence__%s__isnull" % self.key: False}
-        for vc in VariantClassification.objects.filter(**kwargs):
+        for vc in Classification.objects.filter(**kwargs):
             self._update_in_dict(vc.evidence)
             vc.save(update_fields=["evidence"])
 
-        for vcm in VariantClassificationModification.objects.filter():
+        for vcm in ClassificationModification.objects.filter():
             self._update_in_dict(vcm.published_evidence)
             self._update_in_dict(vcm.delta)
 

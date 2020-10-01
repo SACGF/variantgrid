@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class VariantclassificationConfig(AppConfig):
+class ClassificationConfig(AppConfig):
     name = 'classification'

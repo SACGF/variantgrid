@@ -58,7 +58,7 @@ class CriteriaStrength:
 
 class EvidenceMixin:
     """
-    For methods common between VariantClassification and VariantClassificationModification
+    For methods common between Classification and ClassificationModification
     Specifically anything that simply needs there to be a dictionary of evidence
     """
 

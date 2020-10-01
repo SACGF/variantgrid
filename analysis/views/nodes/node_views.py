@@ -32,7 +32,7 @@ from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import Sample
-from classification.models.variant_classification import VariantClassification
+from classification.models.classification import Classification
 
 
 class AllVariantsNodeView(NodeView):
@@ -78,7 +78,7 @@ class ClassificationsNodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         modified = self.object.modified
-        count = VariantClassification.objects.filter(modified__gt=modified).count()
+        count = Classification.objects.filter(modified__gt=modified).count()
         if count:
             context["out_of_date_message"] = f"{count} new classifications since last save."
         return context

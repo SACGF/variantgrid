@@ -5,8 +5,8 @@ from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from classification.enums import ClinicalSignificance
-from classification.enums.variant_classification_enums import ClinicalSignificanceComparison
-from classification.models.variant_classification import VariantClassification
+from classification.enums.classification_enums import ClinicalSignificanceComparison
+from classification.models.classification import Classification
 
 
 class ClassificationsNode(AnalysisNode):
@@ -17,7 +17,7 @@ class ClassificationsNode(AnalysisNode):
 
     def _get_node_q(self) -> Optional[Q]:
         cs_list = ClinicalSignificanceComparison.get_clinical_significance_list(self.clinical_significance, self.comparison)
-        return VariantClassification.get_variant_q(self.analysis.user, self.analysis.genome_build, cs_list)
+        return Classification.get_variant_q(self.analysis.user, self.analysis.genome_build, cs_list)
 
     def get_node_name(self):
         return self.get_node_class_label()

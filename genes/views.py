@@ -40,8 +40,8 @@ from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 from snpdb.variant_queries import get_has_classifications_q, get_has_variant_tags, get_variant_queryset_for_gene_symbol
 from classification.enums import ShareLevel
-from classification.models import VariantClassificationModification, VariantClassification
-from classification.views.variant_classification_datatables import VariantClassificationDatatableConfig
+from classification.models import ClassificationModification, Classification
+from classification.views.classification_datatables import ClassificationDatatableConfig
 from variantopedia.variant_column_utils import get_gene_annotation_column_data
 
 
@@ -205,7 +205,7 @@ def view_gene_symbol(request, gene_symbol):
         "num_gene_annotation_versions": num_gene_annotation_versions,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
-        "datatable_config": VariantClassificationDatatableConfig(request)
+        "datatable_config": ClassificationDatatableConfig(request)
     }
     return render(request, "genes/view_gene_symbol.html", context)
 
@@ -582,16 +582,16 @@ class ClassificationsHotspotGraphView(HotspotGraphView):
     def _get_y_label(self) -> str:
         return "# classifications"
 
-    def _get_variant_classifications(self):
-        vcm_qs = VariantClassificationModification.latest_for_user(self.request.user, published=True)
-        return VariantClassification.objects.filter(variantclassificationmodification__in=vcm_qs)
+    def _get_classifications(self):
+        vcm_qs = ClassificationModification.latest_for_user(self.request.user, published=True)
+        return Classification.objects.filter(variantclassificationmodification__in=vcm_qs)
 
     def _get_values(self, transcript_version) -> Tuple[int, str, str, str, int]:
         """ :returns hgvs_p, pp, consequence, count, gnomad_af """
         qs = self._get_variant_queryset(transcript_version)
-        vc_qs = self._get_variant_classifications()
+        vc_qs = self._get_classifications()
         # Need to join through Allele so we get classifications through all genome builds
-        vc_column = "variantallele__allele__variantallele__variant__variantclassification"
+        vc_column = "variantallele__allele__variantallele__variant__classification"
         qs = qs.filter(**{vc_column + "__in": vc_qs})
         count_column = "classifications_count"
         qs = qs.values("variantallele__allele").annotate(**{count_column: Count(vc_column)})
@@ -648,10 +648,10 @@ class PublicRUNX1HotspotGraphView(ClassificationsHotspotGraphView):
         title = super()._get_title(transcript_version)
         return title + " (Germline)"
 
-    def _get_variant_classifications(self):
-        # Modified from RUNX1_classified_damage - GeneCountType.get_variant_classification_qs()
+    def _get_classifications(self):
+        # Modified from RUNX1_classified_damage - GeneCountType.get_classification_qs()
         kwargs = {"share_level__in": ShareLevel.same_and_higher(ShareLevel.ALL_USERS),
                   "published_evidence__allele_origin__value__in": ['germline', 'likely_germline'],
                   "is_last_published": True}
-        vcm_qs = VariantClassificationModification.objects.filter(**kwargs)
-        return VariantClassification.objects.filter(pk__in=vcm_qs.values('variant_classification'))
+        vcm_qs = ClassificationModification.objects.filter(**kwargs)
+        return Classification.objects.filter(pk__in=vcm_qs.values('classification'))

@@ -12,7 +12,7 @@ $(document).ready(function() {
     let tableDom = $('#vc-datatable');
     if (tableDom.length) {
         EKeys.load().then(() => {
-            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='variant_classification_datatables' data='classificationFilter' hide_filter_count=True %};
+            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
             let vcDatatable = $('#vc-datatable');
             vcDatatable.on('draw.dt', () => {
                 Flags.instance.init({userId: '{{user.id}}'});

@@ -110,7 +110,7 @@
                     </div>
                 </td>
                 <td style="padding:8px 0 4px 8px">
-                    <a href="{% url 'variant_classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link">Show Diffs</a><br/><br/>
+                    <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link">Show Diffs</a><br/><br/>
                     {%  for vcm in overlap.vcms %}
                         <div class="my-1">{% classification_quick vcm %}</div>
                     {%  endfor %}

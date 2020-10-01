@@ -1,16 +1,16 @@
 from rest_framework import serializers
 
 from snpdb.serializers import VariantSerializer
-from classification.models import VariantClassification
+from classification.models import Classification
 
 
-class VariantClassificationSerializer(serializers.ModelSerializer):
+class ClassificationSerializer(serializers.ModelSerializer):
     variant = VariantSerializer()
     clinical_significance = serializers.SerializerMethodField()
     lab = serializers.StringRelatedField()
 
     class Meta:
-        model = VariantClassification
+        model = Classification
         fields = '__all__'
 
     def get_clinical_significance(self, obj):

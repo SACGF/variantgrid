@@ -120,7 +120,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = Lab
         # fields = '__all__'
-        exclude = ("variant_classification_config", )
+        exclude = ("classification_config", )
         read_only = ("name", "external", "group_name", "organization", "upload_location")
         widgets = {
             "name": TextInput(),

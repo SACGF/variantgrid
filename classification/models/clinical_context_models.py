@@ -18,9 +18,9 @@ from snpdb.models import Variant
 from snpdb.models.models_variant import Allele
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
-from classification.models.flag_types import variant_classification_flag_types
-from classification.models.variant_classification import VariantClassification, \
-    VariantClassificationModification
+from classification.models.flag_types import classification_flag_types
+from classification.models.classification import Classification, \
+    ClassificationModification
 
 clinical_context_signal = django.dispatch.Signal(providing_args=["clinical_context", "status", "is_significance_change", "cause"])
 
@@ -57,7 +57,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         max_score = None
         has_vcs = False
 
-        for vcm in self.variant_classification_modifications:
+        for vcm in self.classification_modifications:
             has_vcs = True
             cs = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             # database jsonb requires string indexes only
@@ -78,7 +78,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     @lazy
     def relevant_classification_count(self) -> int:
-        return len([vcm for vcm in self.variant_classification_modifications if CS_TO_NUMBER.get(vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))])
+        return len([vcm for vcm in self.classification_modifications if CS_TO_NUMBER.get(vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))])
 
     def is_discordant(self):
         return self.status == ClinicalContextStatus.DISCORDANT
@@ -101,7 +101,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         self.last_evaluation = {
             "date": now().timestamp(),
             "trigger": cause,
-            "considers_vcms": [vcm.id_str for vcm in self.variant_classification_modifications],
+            "considers_vcms": [vcm.id_str for vcm in self.classification_modifications],
             "old_status": old_status,
             "new_status": new_status
         }
@@ -116,13 +116,13 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         if settings.DISCORDANCE_ENABLED:
             if new_status == ClinicalContextStatus.DISCORDANT:
                 self.flag_collection_safe.get_or_create_open_flag_of_type(
-                    flag_type=variant_classification_flag_types.clinical_context_discordance,
+                    flag_type=classification_flag_types.clinical_context_discordance,
                     reopen=True
                 )
 
             else:
                 self.flag_collection_safe.close_open_flags_of_type(
-                    flag_type=variant_classification_flag_types.clinical_context_discordance
+                    flag_type=classification_flag_types.clinical_context_discordance
                 )
 
             if is_significance_change and (old_status or new_status == ClinicalContextStatus.DISCORDANT):
@@ -132,7 +132,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
         else:
             self.flag_collection_safe.close_open_flags_of_type(
-                flag_type=variant_classification_flag_types.clinical_context_discordance,
+                flag_type=classification_flag_types.clinical_context_discordance,
                 comment='Discordance functionality has been disabled'
             )
 
@@ -154,16 +154,16 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return ClinicalContext.objects.filter(allele=variant.allele).order_by('created')
 
     @property
-    def variant_classifications_qs(self) -> QuerySet:
-        return VariantClassification.objects.filter(clinical_context=self, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
+    def classifications_qs(self) -> QuerySet:
+        return Classification.objects.filter(clinical_context=self, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
 
     @property
-    def variant_classifications_associated_qs(self) -> QuerySet:
-        return VariantClassification.objects.filter(clinical_context=self)
+    def classifications_associated_qs(self) -> QuerySet:
+        return Classification.objects.filter(clinical_context=self)
 
     @property
-    def variant_classification_modifications(self) -> List[VariantClassificationModification]:
-        vcms = [vcm for vcm in (vc.last_published_version for vc in self.variant_classifications_qs) if vcm is not None]
+    def classification_modifications(self) -> List[ClassificationModification]:
+        vcms = [vcm for vcm in (vc.last_published_version for vc in self.classifications_qs) if vcm is not None]
         return vcms
 
     def to_json(self) -> dict:

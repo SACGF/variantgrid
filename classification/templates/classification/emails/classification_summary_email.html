@@ -1,0 +1,44 @@
+{% load static %}
+{% load classification_tags %}
+{% load english_tags %}
+{% load menu_tags %}
+Hello Shariant User,
+<p style="color:#444">
+Quick Links :
+{% if data.has_issues %}
+    <a href="{% absolute_url 'classification_dashboard' %}">View Issues</a>
+    | <a href="{% absolute_url 'classification_dashboard_download' %}">Download Issues</a>
+{% else %}
+    <a href="{% absolute_url 'classifications' %}">Classifications</a>
+{% endif %}
+</p>
+<p>Below is a summary of your {% count data.lab_summaries 'lab' 'labs' %}:</p>
+{% for lab_summary in data.lab_summaries %}
+    <h4>{{ lab_summary.lab.organization.name }} / {{ lab_summary.lab.name }}</h4>
+    <ul>
+        {% if lab_summary.last_imported_new_ago %}
+            <li>Last uploaded a new classification {{ lab_summary.last_imported_new_ago }} ago</li>
+            {% if lab_summary.imported_30_days_count > 0 %}<li>In the last 30 days, {% count lab_summary.imported_30_days_count '1 new classification has' 'new classifications have' %} been uploaded</li>{% endif %}
+        {% else %}<li>Has not yet uploaded its first classifications</li>
+        {% endif %}
+
+        <li>
+            {% if lab_summary.flagged_variants_count %}
+            {% count lab_summary.flagged_variants_count '1 classification requires' 'classifications require' %} attention (see the quick links for details)
+            {% else %}
+            No classifications require attention
+            {% endif %}
+        </li>
+        {% if lab_summary.discordance_reports|length %}
+            <li>This lab is involved in {% count lab_summary.discordance_reports 'a discordance' 'discordances' %}:</li>
+            <ul>
+            {% for discordance_report in lab_summary.discordance_reports %}
+                <li><a href="{% absolute_url 'discordance_report' discordance_report.id %}">Discordance ({{ discordance_report.id }})</a></li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    </ul>
+{% endfor %}
+
+Thanks,<br/>
+The Shariant team.

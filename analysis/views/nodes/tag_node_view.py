@@ -9,7 +9,7 @@ from annotation.transcripts_annotation_selections import VariantTranscriptSelect
 from genes.hgvs import HGVSMatcher
 from snpdb.models.models import Tag
 from snpdb.models.models_vcf import Sample
-from classification.models.variant_classification import VariantClassification
+from classification.models.classification import Classification
 
 
 class TagNodeView(NodeView):
@@ -68,7 +68,7 @@ def _get_requires_classification_data(analysis, user):
         returns (variant_tag, variant_summary, single_transcript_label, single_transcript_id, variant_transcript_selections, single_sample, sample_form)
     """
     requires_classification_data = []
-    if VariantClassification.can_create_via_web_form(user):
+    if Classification.can_create_via_web_form(user):
         tag = Tag.objects.filter(pk=settings.TAG_REQUIRES_CLASSIFICATION).first()
         if tag:
             hgvs_matcher = HGVSMatcher(analysis.genome_build)

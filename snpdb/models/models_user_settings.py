@@ -369,10 +369,10 @@ class UserSettings:
 
     @property
     def classification_issue_count(self) -> int:
-        from classification.models import VariantClassification
+        from classification.models import Classification
         from flags.models import FlagCollection
         return FlagCollection.filter_for_open_flags(
-            VariantClassification.filter_for_user(user=self.user)
+            Classification.filter_for_user(user=self.user)
         ).order_by('-created').exclude(withdrawn=True).count()
 
     def __str__(self):

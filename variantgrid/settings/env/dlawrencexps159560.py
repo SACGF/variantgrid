@@ -101,8 +101,8 @@ elif _SHARIANT_MODE:
     VIEW_GENE_SHOW_HOTSPOT_GRAPH = False
     USER_SETTINGS_SHOW_GROUPS = False
 
-    URLS_NAME_REGISTER.update({"variant_classification_dashboard": True,
-                               "variant_classification_import_tool": True})
+    URLS_NAME_REGISTER.update({"classification_dashboard": True,
+                               "classification_import_tool": True})
 
 elif _RUNX1_MODE:
     RUNX1_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "runx1_static")

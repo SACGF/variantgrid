@@ -64,8 +64,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from upload.uploaded_file_type import retry_upload_pipeline
-from classification.classification_stats import get_grouped_variant_classification_counts
-from classification.views.variant_classification_datatables import VariantClassificationDatatableConfig
+from classification.classification_stats import get_grouped_classification_counts
+from classification.views.classification_datatables import ClassificationDatatableConfig
 
 
 @terms_required
@@ -318,7 +318,7 @@ def sample_variants_gene_detail(request, sample_id, gene_symbol):
     context = {'sample': sample,
                'sample_ids': [sample.pk],
                'gene_symbol': gene_symbol,
-               "datatable_config": VariantClassificationDatatableConfig(request)}
+               "datatable_config": ClassificationDatatableConfig(request)}
     return render(request, 'snpdb/data/sample_variants_gene_detail.html', context)
 
 
@@ -1183,20 +1183,20 @@ def labs(request):
     name_to_short_name = dict(short_names_qs.values_list("name", "short_name"))
 
     if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
-        org_field = "variant_classification__lab__organization__name"
-        state_field = "variant_classification__lab__state"
+        org_field = "classification__lab__organization__name"
+        state_field = "classification__lab__state"
         show_unclassified = False
     else:
         org_field = "lab__organization__name"
         state_field = "lab__state"
         show_unclassified = True
 
-    vc_org_data_json = get_grouped_variant_classification_counts(request.user,
+    vc_org_data_json = get_grouped_classification_counts(request.user,
                                                                  org_field,
                                                                  max_groups=15,
                                                                  field_labels=name_to_short_name,
                                                                  show_unclassified=show_unclassified)
-    vc_state_data_json = get_grouped_variant_classification_counts(request.user, state_field,
+    vc_state_data_json = get_grouped_classification_counts(request.user, state_field,
                                                                    max_groups=15, show_unclassified=show_unclassified)
     active_organizations = Organization.objects.filter(active=True).order_by('name')
     organization_labs = {}
@@ -1241,9 +1241,9 @@ def global_sample_gene_matrix(request):
         gene_list = GeneList.objects.get(pk=gene_list_id)
     else:
         gene_list = None
-        if gene_count_type.uses_variant_classifications is False:
+        if gene_count_type.uses_classifications is False:
             raise PermissionDenied("settings.PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID must be set "
-                                   "if GeneCountType.uses_variant_classifications is False")
+                                   "if GeneCountType.uses_classifications is False")
 
     if settings.PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES:
         sample_qs = Sample.objects.filter(import_status=ImportStatus.SUCCESS)
@@ -1252,9 +1252,9 @@ def global_sample_gene_matrix(request):
         read_perm = DjangoPermission.perm(Sample, DjangoPermission.READ)
         sample_qs = get_objects_for_group(public, read_perm, Sample)
 
-    if gene_count_type.uses_variant_classifications:
-        vc_qs = gene_count_type.get_variant_classification_qs()
-        sample_qs = sample_qs.filter(variantclassification__in=vc_qs)
+    if gene_count_type.uses_classifications:
+        vc_qs = gene_count_type.get_classification_qs()
+        sample_qs = sample_qs.filter(classification__in=vc_qs)
 
     genome_build_name = settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD
     if genome_build_name is None:

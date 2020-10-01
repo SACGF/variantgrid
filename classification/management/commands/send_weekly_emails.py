@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 
 from library.log_utils import report_exc_info
 from snpdb.models import UserSettings
-from classification.views.variant_classification_email_view import send_summary_email_to_user
+from classification.views.classification_email_view import send_summary_email_to_user
 
 
 class Command(BaseCommand):

@@ -1,0 +1,132 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load datatable_tags %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+
+{% block title %}Variant Classification Groups{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<script>
+    let vcform = new VCForm();
+
+    // note that we will want to get keys rather than bundle it into the page as it's an easy
+    // thing to cache
+    
+    EKeys.load().then(keys => {
+        $(document).ready(function() {
+            vcform.init(
+                {
+                    genomeBuild: "{{ genome_build.pk }}",
+                    citations: new Citations($('#citations')),
+                    filterBox: $('#vcform-filter-box'),
+                    clearFilterButton: $('#vcform-clear-filter'),
+                    summary: $('#vcform-summary .card-body'),
+                    content: $('#vcform-content'),
+                    links: $('#vcform-links .card-body'),
+                    help: $('#vcform-help .card-body'),
+                    critTable: $('#vcform-crit-table'),
+                    errors: $('#vcform-errors .card-body'),
+                    publishHistory: $('#vcform-publish .card-body'),
+                    shareButtons: $('#share-buttons'),
+                    otherClassificationsSummary: "{{ other_classifications_summary | default_if_none:'' }}",
+                    reportEnabled: {{ report_enabled | jsonify }},
+                    alwaysAsterix: {{ asterix_view | jsonify }},
+                    attachmentsEnabled: {{ attachments_enabled | jsonify }}
+                },
+                keys,
+                {{ record | jsonify }}
+            );
+            Flags.instance.init({userId: '{{user.id}}'});
+        });
+    });
+    window.fileupload_ready = function () {
+        $(document).ready(() => {
+            let $form = $('#fileupload');
+            {% if existing_files %}
+                let existingFiles = {{ existing_files | jsonify }};
+                $form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
+            {% endif %}
+        });
+    };
+    $(document).ready(() => {
+        {% if not record.can_write %}
+            $('#fileupload button').remove();
+            $('#fileupload input').remove();
+            $('#fileupload .progress').remove();
+            $('#fileupload .btn').remove();
+        {% endif %}
+    });
+</script>
+{% endblock %}
+{% block content %}
+
+    <div class="container-fluid position-relative">
+        <div id="vc-form">
+            <div id="vcform-filter-wrapper" class="inline-form"
+                 style="position:fixed; top:50px; z-index: 1000; width: 555px; padding-top: 20px; padding-bottom:2px; background-color:white">
+                <input id="vcform-filter-box" class="form-control" type="text" placeholder="filter" />
+                    <button class="btn btn-small btn-outline-secondary" type="button" id="vcform-clear-filter"
+                            style="position: absolute; right: 2px; top: 22px; z-index: 100; font-size:smaller; display: none"
+                        onclick="vcform.clearFilter()"
+                    ><i class="fas fa-times"></i> Clear Filter</button>
+            </div>
+            <div id="vcform-content" class="content accordion round-indicator indicator-plus-before" style="margin-top: 40px;"></div>
+            {% if record and attachments_enabled %}
+                <div class="d-none">
+                    <div id='upload-section' class="content">
+                        <div id="jfu-container">
+                            {% load jfutags %}
+                            {% jfu 'classification/classification_file_upload.html' 'classification_file_upload' classification_id=record.id %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            <div class="share-buttons" id="share-buttons"></div>
+
+            <h5 class="mt-4">Literature Citations</h5>
+            <div id="citations" class="citations"></div>
+        </div>
+        <div id="vc-extras">
+            <div id="vcform-summary" class="card m-2">
+                <div class="card-header">{{ record.lab_name }} / {{ record.lab_record_id }}</div>
+                <div class="card-body"></div>
+            </div>
+            <div id="vcform-flags" class="card m-2">
+                <div class="card-header">Flags</div>
+                <div class="card-body">
+                    <div class="flags" data-flags="{{ record.flag_collection }}"></div>
+                </div>
+            </div>
+
+            <div id="vcform-help" class="card m-2">
+                <div class="card-header"><span class="card-title">Help</span></div>
+                <div class="card-body">As you click on fields, this box will be updated with information about it.</div>
+            </div>
+
+            <div id="vcform-publish" class="publish-history card m-2">
+                <div class="card-header">Status</div>
+                <div class="card-body card-body-list"></div>
+            </div>
+
+            <div id="vcform-errors" class="errors card m-2">
+                <div class="card-header">Messages</div>
+                <div class="card-body card-body-list"></div>
+            </div>
+
+            <div id="vcform-links" class="vc-links card m-2">
+                <div class="card-header">Links</div>
+                <div class="card-body card-body-list"></div>
+            </div>
+
+            <div class="card m-2">
+                <div class="card-header">ACMG Criteria Summary</div>
+                <div class="card-body no-padding summary-crit" id="vcform-crit-table"></div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}

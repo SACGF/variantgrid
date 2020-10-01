@@ -395,7 +395,7 @@ ROLLBAR = {
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
-    #'code_version': get_git_hash(BASE_DIR)
+    'code_version': get_git_hash(BASE_DIR),
 }
 ROLLBAR_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
@@ -566,7 +566,7 @@ INSTALLED_APPS = [
     'uicore.apps.UiCoreConfig',
     'snpdb.apps.SnpdbConfig',
     'upload.apps.UploadConfig',
-    'classification.apps.VariantclassificationConfig',
+    'classification.apps.ClassificationConfig',
     'variantopedia',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
@@ -684,7 +684,7 @@ _URLS_NAME_REGISTER_DEFAULT = True
 # Keys are url names (eg 'view_sample' or 'node_edit')
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
-    "variant_classification_import_tool": False
+    "classification_import_tool": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 
@@ -699,11 +699,11 @@ TERMS_EXCLUDE_USERS_WITH_PERM = 'auth.can_skip_t&c'
 TERMS_BASE_TEMPLATE = 'base_tc.html'
 
 # Lock down menu
-URLS_NAME_REGISTER.update({"variant_classification_dashboard": False,
+URLS_NAME_REGISTER.update({"classification_dashboard": False,
                            "keycloak_admin": False,
                            "version_diffs": False,
                            "evidence_keys_logged_in": False,
-                           "variant_classification_import_upload": False})
+                           "classification_import_upload": False})
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
 VARIANT_DETAILS_SHOW_SAMPLES = True

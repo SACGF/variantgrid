@@ -15,11 +15,11 @@ from flags.models.models import FlagComment
 from classification.enums import ClinicalSignificanceComparison
 from classification.enums.discordance_enums import DiscordanceReportResolution, \
     ContinuedDiscordanceReason
-from classification.enums.variant_classification_enums import SpecialEKeys
+from classification.enums.classification_enums import SpecialEKeys
 from classification.models.clinical_context_models import ClinicalContext
-from classification.models.flag_types import variant_classification_flag_types
-from classification.models.variant_classification import VariantClassificationModification, \
-    VariantClassification
+from classification.models.flag_types import classification_flag_types
+from classification.models.classification import ClassificationModification, \
+    Classification
 
 
 class DiscordanceReport(TimeStampedModel):
@@ -84,14 +84,14 @@ class DiscordanceReport(TimeStampedModel):
             self.save()
 
         existing_vms = set()
-        for drc_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__variant_classification', flat=True):
+        for drc_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__classification', flat=True):
             existing_vms.add(drc_id)
 
-        for vcm_id in self.clinical_context.variant_classifications_qs.values_list('id', flat=True):
+        for vcm_id in self.clinical_context.classifications_qs.values_list('id', flat=True):
             if vcm_id in existing_vms:
                 existing_vms.remove(vcm_id)
             else:
-                vcm = VariantClassificationModification.objects.filter(is_last_published=True, variant_classification=vcm_id).get()
+                vcm = ClassificationModification.objects.filter(is_last_published=True, classification=vcm_id).get()
                 DiscordanceReportClassification(
                     report=self,
                     classification_original=vcm
@@ -121,7 +121,7 @@ class DiscordanceReport(TimeStampedModel):
 
                 DiscordanceReportClassification(
                     report=self,
-                    classification_original=VariantClassificationModification.objects.get(pk=last_id)
+                    classification_original=ClassificationModification.objects.get(pk=last_id)
                 ).save()
 
             # the report might even auto close itself if the change brought it into concordance
@@ -132,10 +132,10 @@ class DiscordanceReport(TimeStampedModel):
         existing_vms = {}
         for dr in DiscordanceReportClassification.objects.filter(report=self):
             if dr.clinical_context_final == self.clinical_context:
-                existing_vms[dr.classification_final.variant_classification.id] = dr.classification_final.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
+                existing_vms[dr.classification_final.classification.id] = dr.classification_final.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
 
-        for vcm in self.clinical_context.variant_classification_modifications:
-            vc_id = vcm.variant_classification.id
+        for vcm in self.clinical_context.classification_modifications:
+            vc_id = vcm.classification.id
             if vc_id not in existing_vms:
                 return True  # new classification, previous state is not relevant
             if existing_vms[vc_id] != vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
@@ -172,17 +172,17 @@ class DiscordanceReport(TimeStampedModel):
         # no report has been made
         return None
 
-    def actively_discordant_classification_ids(self) -> Set[VariantClassification]:
+    def actively_discordant_classification_ids(self) -> Set[Classification]:
         if not self.is_active:
             return set()
         classifications = set()
         for dr in DiscordanceReportClassification.objects.filter(report=self):
             if dr.clinical_context_effective == self.clinical_context and not dr.withdrawn_effective:
-                classifications.add(dr.classification_original.variant_classification.id)
+                classifications.add(dr.classification_original.classification.id)
         return classifications
 
-    def all_classification_modifications(self) -> List[VariantClassificationModification]:
-        vcms: List[VariantClassificationModification] = list()
+    def all_classification_modifications(self) -> List[ClassificationModification]:
+        vcms: List[ClassificationModification] = list()
         for dr in DiscordanceReportClassification.objects.filter(report=self):
             vcms.append(dr.classfication_effective)
         return vcms
@@ -260,20 +260,20 @@ class DiscordanceActionsLog:
 
 class DiscordanceReportClassification(TimeStampedModel):
     report = models.ForeignKey(DiscordanceReport, on_delete=CASCADE)
-    classification_original = models.ForeignKey(VariantClassificationModification, related_name='+', on_delete=CASCADE)
-    classification_final = models.ForeignKey(VariantClassificationModification, related_name='+', on_delete=CASCADE, null=True, blank=True)
+    classification_original = models.ForeignKey(ClassificationModification, related_name='+', on_delete=CASCADE)
+    classification_final = models.ForeignKey(ClassificationModification, related_name='+', on_delete=CASCADE, null=True, blank=True)
     clinical_context_final = models.ForeignKey(ClinicalContext, on_delete=PROTECT, null=True, blank=True)
     withdrawn_final = models.BooleanField(default=False)
 
     @lazy
-    def classfication_effective(self) -> VariantClassificationModification:
+    def classfication_effective(self) -> ClassificationModification:
         """
         The final state of the classification (or the current if the report is still open)
         """
         if self.classification_final:
             return self.classification_final
-        return VariantClassificationModification.objects.get(
-            variant_classification=self.classification_original.variant_classification,
+        return ClassificationModification.objects.get(
+            classification=self.classification_original.classification,
             is_last_published=True
         )
 
@@ -284,7 +284,7 @@ class DiscordanceReportClassification(TimeStampedModel):
         """
         if self.clinical_context_final:
             return self.clinical_context_final
-        return self.classification_original.variant_classification.clinical_context
+        return self.classification_original.classification.clinical_context
 
     @lazy
     def withdrawn_effective(self) -> bool:
@@ -293,7 +293,7 @@ class DiscordanceReportClassification(TimeStampedModel):
         """
         if self.classification_final:
             return self.withdrawn_final
-        return self.classification_original.variant_classification.withdrawn
+        return self.classification_original.classification.withdrawn
 
     def close(self):
         self.clinical_context_final = self.clinical_context_effective
@@ -313,7 +313,7 @@ class DiscordanceReportClassification(TimeStampedModel):
         # Need to revisit this, how long do we give for flags to be updated after the discordance report has been closed
         # Currently 1 day, should it be 1 month? (but only if the relevant flag was opened during the discordance period
         # e.g. a significance_change flag opened on day 1, and finally filled in on day 20)
-        flag_collection = self.classification_original.variant_classification.flag_collection_safe
+        flag_collection = self.classification_original.classification.flag_collection_safe
         start = self.report.created
         end = self.report.report_completed_date
 
@@ -331,8 +331,8 @@ class DiscordanceReportClassification(TimeStampedModel):
             # resolution__status=FlagStatus.CLOSED,
             # flag__resolution__status=FlagStatus.CLOSED,
             flag__flag_type__in=[
-                variant_classification_flag_types.internal_review,
-                variant_classification_flag_types.significance_change,
+                classification_flag_types.internal_review,
+                classification_flag_types.significance_change,
             ],
         ).order_by('created')
 
@@ -365,10 +365,10 @@ class DiscordanceReportClassification(TimeStampedModel):
                 continue
             processed_flag.add(flag.id)
 
-            if flag.flag_type == variant_classification_flag_types.internal_review and flag.resolution.status == FlagStatus.CLOSED:
+            if flag.flag_type == classification_flag_types.internal_review and flag.resolution.status == FlagStatus.CLOSED:
                 internal_reviewed = True  # maybe we should get more info
 
-            elif flag.flag_type == variant_classification_flag_types.significance_change:
+            elif flag.flag_type == classification_flag_types.significance_change:
                 resolution = flag.resolution
                 has_reclass_reason = True
                 if resolution and resolution.status == FlagStatus.CLOSED:

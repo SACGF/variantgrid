@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 import json
 
 # FIXME, move this out of classifications and into snpdb
-from classification.views.variant_classification_datatables import DatatableConfig
+from classification.views.classification_datatables import DatatableConfig
 
 register = template.Library()
 

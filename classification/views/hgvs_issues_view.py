@@ -19,15 +19,15 @@ from library.guardian_utils import is_superuser
 from library.utils import delimited_row
 from snpdb.models import VariantAllele
 from snpdb.models.models_variant import Allele
-from classification.models.flag_types import variant_classification_flag_types
-from classification.models.variant_classification import VariantClassification,\
-    VariantClassificationModification
+from classification.models.flag_types import classification_flag_types
+from classification.models.classification import Classification,\
+    ClassificationModification
 
 # Only consider alleles that have variant classifications
 # as there are way too many alleles to consider otherwise
 def _alleles_with_variants_qs() -> QuerySet:
     # find the variant for ALL variant classifications, and keep a dict of variant id to classification id
-    classification_variant_ids_qs = VariantClassification.objects.exclude(withdrawn=True).values_list('variant__id', flat=True)
+    classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('variant__id', flat=True)
     allele_ids = VariantAllele.objects.filter(variant_id__in=classification_variant_ids_qs).values_list('allele_id', flat=True)
     return Allele.objects.filter(id__in=allele_ids)
 
@@ -35,19 +35,19 @@ def _alleles_with_variants_qs() -> QuerySet:
 @user_passes_test(is_superuser)
 def view_hgvs_issues(request: HttpRequest) -> Response:
 
-    vcqs = VariantClassification.objects
+    vcqs = Classification.objects
     flagged_classifications = FlagCollection.filter_for_open_flags(
         qs=vcqs,
         flag_types=[
-            variant_classification_flag_types.matching_variant_flag,
-            variant_classification_flag_types.matching_variant_warning_flag,
-            variant_classification_flag_types.transcript_version_change_flag
+            classification_flag_types.matching_variant_flag,
+            classification_flag_types.matching_variant_warning_flag,
+            classification_flag_types.transcript_version_change_flag
         ]).filter(withdrawn=False)
 
-    flagged_vcms = VariantClassificationModification.objects.filter(
-        variant_classification__in=flagged_classifications,
+    flagged_vcms = ClassificationModification.objects.filter(
+        classification__in=flagged_classifications,
         is_last_published=True
-    ).select_related('variant_classification', 'variant_classification__lab')
+    ).select_related('classification', 'classification__lab')
 
     variant_alleles_qs = _alleles_with_variants_qs()
     alleles_qs = FlagCollection.filter_for_open_flags(qs=variant_alleles_qs)
@@ -64,9 +64,9 @@ def view_hgvs_issues(request: HttpRequest) -> Response:
         "classifications": flagged_vcms,
         "alleles": alleles_qs,
         "filter_flags": ' '.join([
-            variant_classification_flag_types.matching_variant_flag.id,
-            variant_classification_flag_types.matching_variant_warning_flag.id,
-            variant_classification_flag_types.transcript_version_change_flag.id,
+            classification_flag_types.matching_variant_flag.id,
+            classification_flag_types.matching_variant_warning_flag.id,
+            classification_flag_types.transcript_version_change_flag.id,
         ] +
         [ft.id for ft in FlagTypeContext.objects.get(pk='allele').flagtype_set.all()]
     )

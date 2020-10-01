@@ -8,12 +8,12 @@ from annotation.models.models import AnnotationVersion
 from library.guardian_utils import admin_bot
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
-from classification.enums.variant_classification_enums import EvidenceCategory, \
+from classification.enums.classification_enums import EvidenceCategory, \
     SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification
-from classification.models.variant_classification import VariantClassification, VariantClassificationImport
-from classification.models.variant_classification_patcher import patch_merge_age_units, patch_fuzzy_age
-from classification.variant_classification_import import process_variant_classification_import
+from classification.models.classification import Classification, ClassificationImport
+from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
+from classification.classification_import import process_classification_import
 
 
 class VariantMatchedFilter(admin.SimpleListFilter):
@@ -33,7 +33,7 @@ class VariantMatchedFilter(admin.SimpleListFilter):
         return queryset
 
 
-class VariantClassificationLabFilter(admin.SimpleListFilter):
+class ClassificationLabFilter(admin.SimpleListFilter):
     list_per_page = 200
     title = 'Lab Filter'
     parameter_name = 'lab'
@@ -48,7 +48,7 @@ class VariantClassificationLabFilter(admin.SimpleListFilter):
         return queryset
 
 
-class VariantClassificationOrgFilter(admin.SimpleListFilter):
+class ClassificationOrgFilter(admin.SimpleListFilter):
     list_per_page = 200
     title = 'Org Filter'
     parameter_name = 'org'
@@ -63,7 +63,7 @@ class VariantClassificationOrgFilter(admin.SimpleListFilter):
         return queryset
 
 
-class VariantClassificationShareLevelFilter(admin.SimpleListFilter):
+class ClassificationShareLevelFilter(admin.SimpleListFilter):
     list_per_page = 200
     title = 'Share Level Filter'
     parameter_name = 'share_level'
@@ -97,7 +97,7 @@ class ClinicalContextFilter(admin.SimpleListFilter):
         return queryset
 
 
-class VariantClassificationUserFilter(admin.SimpleListFilter):
+class ClassificationUserFilter(admin.SimpleListFilter):
     list_per_page = 200
     title = 'User Filter'
     parameter_name = 'user'
@@ -112,7 +112,7 @@ class VariantClassificationUserFilter(admin.SimpleListFilter):
         return queryset
 
 
-class VariantClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
+class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
     title = 'Imported Genome Build Filter'
     parameter_name = 'user'
     default_value = None
@@ -128,9 +128,9 @@ class VariantClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
         return queryset
 
 
-class VariantClassificationAdmin(admin.ModelAdmin):
+class ClassificationAdmin(admin.ModelAdmin):
     list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'imported_genome_build', 'withdrawn', 'chgvs_grch37', 'chgvs_grch38', 'user', 'created']
-    list_filter = (VariantClassificationOrgFilter, VariantClassificationLabFilter, VariantClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, VariantClassificationImportedGenomeBuildFilter, VariantClassificationUserFilter,)
+    list_filter = (ClassificationOrgFilter, ClassificationLabFilter, ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ClassificationUserFilter,)
     search_fields = ('id', 'lab_record_id')
 
     fieldsets = (
@@ -198,7 +198,7 @@ class VariantClassificationAdmin(admin.ModelAdmin):
             if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
                 patch_fuzzy_age(patch)
 
-        vc: VariantClassification
+        vc: Classification
         for vc in queryset:
             vc.patch_history(age_patches)
 
@@ -227,7 +227,7 @@ class VariantClassificationAdmin(admin.ModelAdmin):
         already_published = 0
         in_error = 0
         published = 0
-        vc: VariantClassification
+        vc: Classification
         for vc in queryset:
             if vc.share_level_enum >= share_level:
                 already_published += 1
@@ -259,11 +259,11 @@ class VariantClassificationAdmin(admin.ModelAdmin):
             try:
                 genome_build = vc.get_genome_build()
                 if not genome_build.pk in imports_by_genome:
-                    imports_by_genome[genome_build.pk] = VariantClassificationImport.objects.create(user=request.user,
+                    imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=request.user,
                                                                                                     genome_build=genome_build)
                 vc_import = imports_by_genome[genome_build.pk]
                 vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
-                vc.variant_classification_import = vc_import
+                vc.classification_import = vc_import
                 vc.save()
                 valid_record_count = valid_record_count + 1
 
@@ -271,7 +271,7 @@ class VariantClassificationAdmin(admin.ModelAdmin):
                 invalid_genome_build_count = invalid_genome_build_count + 1
 
         for vc_import in imports_by_genome.values():
-            process_variant_classification_import(vc_import, ImportSource.API)
+            process_classification_import(vc_import, ImportSource.API)
 
         if invalid_genome_build_count:
             self.message_user(request, f'Records with missing or invalid genome_builds : {invalid_genome_build_count}')
@@ -280,7 +280,7 @@ class VariantClassificationAdmin(admin.ModelAdmin):
     reattempt_variant_matching.short_description = 'Variant re-matching'
 
     def recalculate_cached_chgvs(self, request, queryset):
-        vc: VariantClassification
+        vc: Classification
         for vc in queryset:
             vc.update_cached_c_hgvs()
             vc.save()
@@ -301,7 +301,7 @@ class VariantClassificationAdmin(admin.ModelAdmin):
     email_discordance_notification.short_description = 'Send Discordance Notifications'
 
     def set_withdraw(self, request, queryset, withdraw: bool) -> int:
-        vc: VariantClassification
+        vc: Classification
         count = 0
         for vc in queryset:
             try:
@@ -337,7 +337,7 @@ class VariantClassificationAdmin(admin.ModelAdmin):
                withdraw_false]
 
     def get_form(self, request, obj=None, **kwargs):
-        return super(VariantClassificationAdmin, self).get_form(request, obj, widgets={
+        return super(ClassificationAdmin, self).get_form(request, obj, widgets={
             'lab_record_id': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 

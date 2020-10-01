@@ -31,7 +31,7 @@ from typing import List, TypedDict
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
 from library.utils import import_class
-from classification.enums.variant_classification_enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 
 
 class Tag(models.Model):
@@ -160,7 +160,7 @@ class Organization(models.Model):
     name = models.TextField()
     short_name = models.TextField(blank=False, null=True)  # Don't use for anything other than human labels
     group_name = models.TextField(blank=True, null=True, unique=True)
-    variant_classification_config = models.JSONField(null=True, blank=True)
+    classification_config = models.JSONField(null=True, blank=True)
     classification_report_template = models.TextField(null=True, blank=True)
     active = models.BooleanField(default=True, blank=True)
 
@@ -229,7 +229,7 @@ class Lab(models.Model):
     long = models.FloatField(null=True, blank=True)
 
     group_name = models.TextField(blank=True, null=True, unique=True)
-    variant_classification_config = models.JSONField(null=True, blank=True)
+    classification_config = models.JSONField(null=True, blank=True)
 
     # want every lab to have an organization, but not going to have them
     # at point of migration
@@ -275,7 +275,7 @@ class Lab(models.Model):
 
     @lazy
     def shared_classifications(self):
-        return self.variantclassification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).exclude(withdrawn=True)
+        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).exclude(withdrawn=True)
 
     @lazy
     def classifications(self):
@@ -283,7 +283,7 @@ class Lab(models.Model):
         if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
             qs = self.shared_classifications
         else:
-            qs = self.variantclassification_set.all()
+            qs = self.classification_set.all()
         return qs
 
     @lazy
@@ -297,7 +297,7 @@ class Lab(models.Model):
 
     @lazy
     def total_unshared_classifications(self):
-        all_classifications = self.variantclassification_set.exclude(withdrawn=True).count()
+        all_classifications = self.classification_set.exclude(withdrawn=True).count()
         return all_classifications - self.total_shared_classifications
 
     @lazy

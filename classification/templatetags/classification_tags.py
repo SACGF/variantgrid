@@ -14,16 +14,16 @@ from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
-from classification.enums.variant_classification_enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import BestHGVS
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceReportClassification
 from classification.models.evidence_key import EvidenceKey, \
     EvidenceKeyMap
-from classification.models.variant_classification import VariantClassificationModification, \
-    VariantClassification
-from classification.models.variant_classification_ref import VariantClassificationRef
+from classification.models.classification import ClassificationModification, \
+    Classification
+from classification.models.classification_ref import ClassificationRef
 from classification.templatetags.js_tags import jsonify
 
 register = Library()
@@ -40,8 +40,8 @@ def ekey(val, key: str = None):
     return pretty_val
 
 
-@register.inclusion_tag("classification/tags/variant_classification_history.html")
-def variant_classification_changes(changes):
+@register.inclusion_tag("classification/tags/classification_history.html")
+def classification_changes(changes):
     return {
         "changes": changes
     }
@@ -70,11 +70,11 @@ def clinical_context(cc: ClinicalContext, user: User):
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[VariantClassification, VariantClassificationModification]):
+def classification_quick(context, vc: Union[Classification, ClassificationModification]):
     user = context.request.user
     vcm = vc
-    if isinstance(vc, VariantClassification):
-        vcm = VariantClassificationModification.latest_for_user(user=user, variant_classification=vc, published=True, exclude_withdrawn=False).first()
+    if isinstance(vc, Classification):
+        vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
     return {"vcm": vcm}
 
 
@@ -90,8 +90,8 @@ class ClinicalGrouping:
         return len(self.vcms) > 1
 
 
-@register.inclusion_tag("classification/tags/variant_classification_table.html", takes_context=True)
-def variant_classification_table(
+@register.inclusion_tag("classification/tags/classification_table.html", takes_context=True)
+def classification_table(
         context,
         records,
         genome_build=None,
@@ -113,7 +113,7 @@ def variant_classification_table(
         records = list(records.all())
     mods = []
     for r in records:
-        if isinstance(r, VariantClassification):
+        if isinstance(r, Classification):
             r = r.last_published_version
         if r:
             mods.append(r)
@@ -123,7 +123,7 @@ def variant_classification_table(
         groupings = {}
         no_cc_grouping = ClinicalGrouping(cc=None)
         for vcm in mods:
-            cc = vcm.variant_classification.clinical_context
+            cc = vcm.classification.clinical_context
             if cc and vcm.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
                 grouping = groupings.get(cc.id)
                 if not grouping:
@@ -151,7 +151,7 @@ def variant_classification_table(
 
     cs_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-    def variant_classification_modification_sort_score(vcm: VariantClassificationModification):
+    def classification_modification_sort_score(vcm: ClassificationModification):
         cs = vcm.evidence.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         options = cs_key.matched_options(cs)
         if options:
@@ -161,7 +161,7 @@ def variant_classification_table(
 
     records.sort(key=clinical_group_sort_score)
     for record in records:
-        record.vcms.sort(key=variant_classification_modification_sort_score)
+        record.vcms.sort(key=classification_modification_sort_score)
 
     return {
         "records": records,
@@ -182,10 +182,10 @@ def hgvs(context, hgvs: BestHGVS, show_variant_link: bool = True):
     return {"hgvs": hgvs, "show_variant_link": show_variant_link}
 
 
-@register.inclusion_tag("classification/tags/variant_classification_row.html", takes_context=True)
-def variant_classification_row(
+@register.inclusion_tag("classification/tags/classification_row.html", takes_context=True)
+def classification_row(
         context,
-        record: Union[VariantClassification, VariantClassificationModification],
+        record: Union[Classification, ClassificationModification],
         genome_build: GenomeBuild,
         user: User = None,
         show_variant_link=False,
@@ -196,15 +196,15 @@ def variant_classification_row(
 
     vc = record
     vcm = None
-    if isinstance(record, VariantClassificationModification):
-        vc = record.variant_classification
+    if isinstance(record, ClassificationModification):
+        vc = record.classification
         vcm = record
     else:
         vcm = record.last_published_version
     icon = 'icons/share_level/' + vc.share_level_enum.key + '.png'
 
     try:
-        curated = VariantClassification.to_date(record.get(SpecialEKeys.CURATION_DATE, None))
+        curated = Classification.to_date(record.get(SpecialEKeys.CURATION_DATE, None))
     except ValueError:
         curated = None
 
@@ -239,9 +239,9 @@ def variant_classification_row(
     }
 
 
-@register.inclusion_tag("classification/tags/variant_classification.html")
-def variant_classification(classification, user):
-    ref = VariantClassificationRef.init_from_obj(user=user, obj=classification)
+@register.inclusion_tag("classification/tags/classification.html")
+def classification(classification, user):
+    ref = ClassificationRef.init_from_obj(user=user, obj=classification)
     record = ref.record
     return {
         "lab_name": record.lab.name,
@@ -259,18 +259,18 @@ def option_label(value):
 
 
 @register.filter
-def variant_classification_count(obj: Allele) -> int:
+def classification_count(obj: Allele) -> int:
     if isinstance(obj, Allele):
-        return VariantClassification.objects.filter(variant__in=obj.variants).count()
+        return Classification.objects.filter(variant__in=obj.variants).count()
     elif isinstance(obj, Variant):
-        return VariantClassification.objects.filter(variant=obj).count()
+        return Classification.objects.filter(variant=obj).count()
     else:
         return 0
 
 
-@register.inclusion_tag("classification/tags/variant_classification_discordance_row.html")
-def variant_classification_discordance_row(row: DiscordanceReportClassification, show_flags=False):
-    vc = row.classification_original.variant_classification
+@register.inclusion_tag("classification/tags/classification_discordance_row.html")
+def classification_discordance_row(row: DiscordanceReportClassification, show_flags=False):
+    vc = row.classification_original.classification
     icon = 'icons/share_level/' + vc.share_level_enum.key + '.png'
     return {
         "vc": vc,
@@ -288,7 +288,7 @@ def variant_classification_discordance_row(row: DiscordanceReportClassification,
 @register.inclusion_tag("classification/tags/variant_card.html", takes_context=True)
 def variant_card(context, allele: Allele, build: GenomeBuild):
     request = context.request
-    can_create_classification = VariantClassification.can_create_via_web_form(request.user)
+    can_create_classification = Classification.can_create_via_web_form(request.user)
     va: VariantAllele = allele.variant_alleles().filter(genome_build=build).first()
     liftover_error_qs = allele.liftovererror_set.filter(liftover__genome_build=build)
 

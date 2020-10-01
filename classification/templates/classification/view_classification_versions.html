@@ -1,0 +1,30 @@
+{% extends menu_classifications_base %}
+
+{% block title %}Genomic Variant Classification Versions{% endblock %}
+{% block head %}
+{% endblock %}
+
+{% block css %}
+{% endblock %}
+
+{% block jshead %}
+{% endblock %}
+
+
+{% block jsdocumentready %}
+
+{% endblock %}
+{% block submenu_page_content %}
+{% comment %} 
+	{% load help_tags %}
+	{% page_help user 'classification/view_genomic_classification_versions_help' %}
+{% endcomment %}
+
+<div id='view-genomic-variant-classification-versions-page'>
+    <div>
+        {% load model_fields_version_diff_tags %}
+        {% model_fields_version_diff gvc_by_version gvc_versions %}
+    </div>
+</div>
+
+{% endblock %}

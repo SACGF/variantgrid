@@ -11,9 +11,9 @@ clingen_post_save_handler = CachedWebResource.named_handler_factory(settings.CAC
                                                                     ClinGenValidityCurationsWebResourceTask)
 
 
-def gene_counts_classification_publish_handler(sender, variant_classification, **kwargs):
-    GeneCountType.handle_variant_classification_change(variant_classification)
+def gene_counts_classification_publish_handler(sender, classification, **kwargs):
+    GeneCountType.handle_classification_change(classification)
 
 
-def gene_counts_classification_withdraw_handler(sender, variant_classification, **kwargs):
-    GeneCountType.handle_variant_classification_change(variant_classification)
+def gene_counts_classification_withdraw_handler(sender, classification, **kwargs):
+    GeneCountType.handle_classification_change(classification)

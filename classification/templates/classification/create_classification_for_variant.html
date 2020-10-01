@@ -61,7 +61,7 @@
             pendingRefreshAutoPopulate = true;
         }
 
-        let url = "{% url 'variant_classification_auto_populate_api' %}";
+        let url = "{% url 'classification_auto_populate_api' %}";
         let patchDom = $('#auto-populate').LoadingOverlay('show');
 
         let data = {
@@ -185,7 +185,7 @@
     <a class="hover-link my-2" href="{% url 'view_variant' variant.pk %}">Back to variant page for {{ variant }}.</a>
     {% page_help 'classification/create_classification_for_variant_help' 'Transcript Choice' %}
 
-    <form action="{% url 'create_variant_classification' %}" class="classification-form" method="POST">
+    <form action="{% url 'create_classification' %}" class="classification-form" method="POST">
         {% csrf_token %}
         <input type='hidden' class='auto-pop-field' id='variant_id' name="variant_id" value="{{ variant.pk }}" />
         <input type='hidden' class='auto-pop-field' id='genome_build_name' name="genome_build_name" value="{{ variant.genome_build.pk }}" />

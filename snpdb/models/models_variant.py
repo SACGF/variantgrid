@@ -155,7 +155,7 @@ class Allele(FlagsMixin, models.Model):
             other_fc.flagwatch_set.update(flag_collection=self.flag_collection)
             existing_fc_cc_names = self.flag_collection.clinicalcontext_set.values_list("name", flat=True)
             other_fc.clinicalcontext_set.exclude(name__in=existing_fc_cc_names).update(flag_collection=self.flag_collection)
-            other_fc.variantclassification_set.update(flag_collection=self.flag_collection)
+            other_fc.classification_set.update(flag_collection=self.flag_collection)
             existing_allele_cc_names = self.clinicalcontext_set.values_list("name", flat=True)
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
             other_allele.variantallele_set.update(allele=self, conversion_tool=conversion_tool)

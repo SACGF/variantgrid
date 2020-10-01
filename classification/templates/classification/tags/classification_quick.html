@@ -1,15 +1,15 @@
 {% load classification_tags %}
 {% load static %}
-{% if vcm and vcm.variant_classification.id %}
+{% if vcm and vcm.classification.id %}
 <span class="share-level-{{ vcm.share_level_enum.name }} sig-level-{{ vcm.evidence.clinical_significance.value}}">
     {% clinical_significance vcm.evidence.clinical_significance.value %}
-    <a class="hover-link" href="{% url 'view_variant_classification' vcm.variant_classification.id %}">
+    <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">
         &nbsp;
     <img src="{% static vcm.share_level_enum.icon %}" width="12px" height="12px" style="margin-right:4px;" />
     {% if vcm.vc.withdrawn %}
-        <span style="text-decoration: line-through">{{vcm.variant_classification.lab.name}} / {{vcm.variant_classification.lab_record_id }}</span>
+        <span style="text-decoration: line-through">{{vcm.classification.lab.name}} / {{vcm.classification.lab_record_id }}</span>
     {% else %}
-    {{vcm.variant_classification.lab.name}} / {{vcm.variant_classification.lab_record_id }}
+    {{vcm.classification.lab.name}} / {{vcm.classification.lab_record_id }}
     {% endif %}
     </a>
 </span>

@@ -4,7 +4,7 @@ import copy
 
 from library.utils import is_not_none
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType
-from classification.models.variant_classification import VariantClassification
+from classification.models.classification import Classification
 
 
 class HistoricalEKeyConverter:
@@ -76,7 +76,7 @@ class HistoricalEKeyConverter:
             if to_key_and_converter:
                 (to_key, converter) = to_key_and_converter
                 if to_key:
-                    from_value = VariantClassification.get_optional_value_from(data, from_key)
+                    from_value = Classification.get_optional_value_from(data, from_key)
                     if from_value is None:
                         # no need to convert Nones, just move the key over
                         converted_data[to_key] = data.get(from_key)

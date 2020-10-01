@@ -47,7 +47,7 @@ restrictSamples();
     {% page_help user 'genes/unmatched_hgvs_help' 'Unmatched HGVS Help' %}
     </div>
 
-    <form action="{% url 'create_variant_classification' %}" class="classification-form" method="POST">
+    <form action="{% url 'create_classification' %}" class="classification-form" method="POST">
         {% csrf_token %}
         <input type='hidden' name="genome_build_name" value="{{ genome_build.pk }}" />
         <input type='hidden' name="evidence_json" value="{{ evidence_json }}" />

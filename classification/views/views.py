@@ -35,21 +35,21 @@ from snpdb.models import Variant, UserSettings, Sample, Allele, Lab
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
-    create_variant_classification_for_sample_and_variant_objects, generate_auto_populate_data
-from classification.classification_stats import get_grouped_variant_classification_counts, \
-    get_variant_classification_counts, get_criteria_counts
+    create_classification_for_sample_and_variant_objects, generate_auto_populate_data
+from classification.classification_stats import get_grouped_classification_counts, \
+    get_classification_counts, get_criteria_counts
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.forms import EvidenceKeyForm
-from classification.models import VariantClassificationAttachment, VariantClassification, \
-    VariantClassificationRef, VariantClassificationJsonParams, VariantClassificationConsensus
+from classification.models import ClassificationAttachment, Classification, \
+    ClassificationRef, ClassificationJsonParams, ClassificationConsensus
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.models.flag_types import variant_classification_flag_types
-from classification.models.variant_classification import VariantClassificationModification
-from classification.variant_classification_changes import VariantClassificationChanges
-from classification.views.variant_classification_datatables import VariantClassificationDatatableConfig
-from classification.views.variant_classification_export_csv import ExportFormatterCSV
-from classification.views.variant_classification_export_redcap import ExportFormatterRedcap
+from classification.models.flag_types import classification_flag_types
+from classification.models.classification import ClassificationModification
+from classification.classification_changes import ClassificationChanges
+from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_export_csv import ExportFormatterCSV
+from classification.views.classification_export_redcap import ExportFormatterRedcap
 from variantopedia.forms import SearchForm, SearchAndClassifyForm
 
 
@@ -57,7 +57,7 @@ from variantopedia.forms import SearchForm, SearchAndClassifyForm
 def activity(request, latest_timestamp: Optional[str] = None):
     if latest_timestamp:
         latest_timestamp = datetime.fromtimestamp( float(latest_timestamp) )
-    changes = VariantClassificationChanges.list_changes(latest_date=latest_timestamp)
+    changes = ClassificationChanges.list_changes(latest_date=latest_timestamp)
     last_date = changes[len(changes)-1].date.timestamp() if changes else None
     context = {
         'changes': changes,
@@ -79,17 +79,17 @@ def classifications(request):
     )
     search_and_classify_form.helper = helper
 
-    flag_types = FlagType.objects.filter(context=variant_classification_flag_types.variant_classification_flag_context)\
+    flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context)\
         .exclude(pk__in=[
-            'variant_classification_withdrawn',
-            'variant_classification_submitted',
-            'variant_classification_clinical_context_change']).order_by('label')
+            'classification_withdrawn',
+            'classification_submitted',
+            'classification_clinical_context_change']).order_by('label')
     flag_type_json = []
     for ft in flag_types:
         flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
 
     context = {
-        "can_create_classification": VariantClassification.can_create_via_web_form(request.user),
+        "can_create_classification": Classification.can_create_via_web_form(request.user),
         "flag_types": flag_type_json,
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
@@ -100,7 +100,7 @@ def classifications(request):
         "VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
         "VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
         "VARIANT_CLASSIFICATION_ID_FILTER": settings.VARIANT_CLASSIFICATION_ID_FILTER,
-        "datatable_config": VariantClassificationDatatableConfig(request),
+        "datatable_config": ClassificationDatatableConfig(request),
         "user_settings": user_settings,
     }
     return render(request, 'classification/classifications.html', context)
@@ -146,8 +146,8 @@ class AutopopulateView(APIView):
                     complete_values.append({'key': key, 'blob': value, 'source': name})
 
         if copy_from_id:
-            copy_from = VariantClassificationModification.objects.get(pk=copy_from_id)
-            consensus_patch = VariantClassificationConsensus(variant, request.user, copy_from=copy_from).consensus_patch
+            copy_from = ClassificationModification.objects.get(pk=copy_from_id)
+            consensus_patch = ClassificationConsensus(variant, request.user, copy_from=copy_from).consensus_patch
             for key, blob in consensus_patch.items():
                 if key not in used_keys:
                     used_keys.add(key)
@@ -167,8 +167,8 @@ class AutopopulateView(APIView):
         return rest_framework.response.Response(status=HTTP_200_OK, data={'data': complete_values})
 
 @require_POST
-def create_variant_classification(request):
-    if not VariantClassification.can_create_via_web_form(request.user):
+def create_classification(request):
+    if not Classification.can_create_via_web_form(request.user):
         raise PermissionDenied('User cannot create classifications via web form')
 
     variant_id = request.POST.get("variant_id")
@@ -184,7 +184,7 @@ def create_variant_classification(request):
     if variant_id:
         variant = get_object_or_404(Variant, pk=variant_id)
     else:
-        VariantClassification.check_can_create_no_variant_classification_via_web_form(request.user)
+        Classification.check_can_create_no_classification_via_web_form(request.user)
         variant = None
 
     if sample_id:
@@ -192,13 +192,13 @@ def create_variant_classification(request):
     else:
         sample = None
 
-    variant_classification = create_variant_classification_for_sample_and_variant_objects(request.user, sample,
+    classification = create_classification_for_sample_and_variant_objects(request.user, sample,
                                                                                           variant, genome_build,
                                                                                           refseq_transcript_accession=refseq_transcript_accession,
                                                                                           ensembl_transcript_accession=ensembl_transcript_accession)
     if evidence_json:
         evidence = json.loads(evidence_json)
-        variant_classification.patch_value(
+        classification.patch_value(
             patch=evidence,
             clear_all_fields=False,
             user=request.user,
@@ -207,12 +207,12 @@ def create_variant_classification(request):
             save=True,
             make_patch_fields_immutable=False)
 
-    variant_classification.publish_latest(request.user)
+    classification.publish_latest(request.user)
 
     if copy_from_id:
-        copy_from = VariantClassificationModification.objects.get(pk=copy_from_id)
-        consensus_patch = VariantClassificationConsensus(variant, request.user, copy_from=copy_from).consensus_patch
-        variant_classification.patch_value(
+        copy_from = ClassificationModification.objects.get(pk=copy_from_id)
+        consensus_patch = ClassificationConsensus(variant, request.user, copy_from=copy_from).consensus_patch
+        classification.patch_value(
             patch=consensus_patch,
             clear_all_fields=False,
             user=request.user,
@@ -220,35 +220,35 @@ def create_variant_classification(request):
             leave_existing_values=True,
             save=True,
             make_patch_fields_immutable=False)
-        variant_classification.publish_latest(request.user)
+        classification.publish_latest(request.user)
 
-    return redirect(variant_classification)
+    return redirect(classification)
 
 
-def variant_classification_history(request, record_id):
-    ref = VariantClassificationRef.init_from_str(request.user, str(record_id))
+def classification_history(request, record_id):
+    ref = ClassificationRef.init_from_str(request.user, str(record_id))
     ref.check_exists()
     #  changes page will show things before they were submitted and not hide values
     #  so need to restrict to people who've always had access to the record
     ref.check_security(must_be_writable=True)
 
-    changes = VariantClassificationChanges.list_changes(variant_classification=ref.record, limit=100)
+    changes = ClassificationChanges.list_changes(classification=ref.record, limit=100)
     context = {
         'changes': changes,
-        'can_create_classifications': VariantClassification.can_create_via_web_form(request.user)
+        'can_create_classifications': Classification.can_create_via_web_form(request.user)
     }
     return render(request, 'classification/activity.html', context)
 
 
-def view_variant_classification(request, record_id):
-    ref = VariantClassificationRef.init_from_str(request.user, str(record_id))
+def view_classification(request, record_id):
+    ref = ClassificationRef.init_from_str(request.user, str(record_id))
     ref.check_exists()
     ref.check_security()
 
-    existing_files = get_variant_classification_attachment_file_dicts(ref.record)
+    existing_files = get_classification_attachment_file_dicts(ref.record)
     other_classifications_summary = ref.record.get_other_classifications_summary_for_variant(request.user)
 
-    record = ref.as_json(VariantClassificationJsonParams(current_user=request.user,
+    record = ref.as_json(ClassificationJsonParams(current_user=request.user,
                                                          include_data=True,
                                                          include_lab_config=True))
 
@@ -260,7 +260,7 @@ def view_variant_classification(request, record_id):
     if genome_build is None:
         genome_build = GenomeBuild.default_build()
 
-    vc: VariantClassification = ref.record
+    vc: Classification = ref.record
 
     context = {'vc': vc,
                'record': record,
@@ -271,7 +271,7 @@ def view_variant_classification(request, record_id):
                'report_enabled': not not vc.lab.organization.classification_report_template,
                'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
                }
-    return render(request, 'classification/variant_classification.html', context)
+    return render(request, 'classification/classification.html', context)
 
 
 def view_classification_diff(request):
@@ -280,14 +280,14 @@ def view_classification_diff(request):
 
     if request.GET.get('history'):
         vc_id = int(request.GET.get('history'))
-        vc = VariantClassification.objects.get(pk=vc_id)
-        qs = VariantClassificationModification.objects.filter(variant_classification=vc, published=True)
-        qs = VariantClassificationModification.filter_for_user(request.user, qs).order_by('-created')
+        vc = Classification.objects.get(pk=vc_id)
+        qs = ClassificationModification.objects.filter(classification=vc, published=True)
+        qs = ClassificationModification.filter_for_user(request.user, qs).order_by('-created')
         records = list(qs.all())
         if request.GET.get('debug') != 'true' and len(records) > 1:
             consider = records
             records = []
-            last_record: Optional[VariantClassificationModification] = None
+            last_record: Optional[ClassificationModification] = None
             for record in consider:
                 if last_record is None or not last_record.is_significantly_equal(record):
                     last_record = record
@@ -302,30 +302,30 @@ def view_classification_diff(request):
 
     elif request.GET.get('clinical_context'):
         cc = ClinicalContext.objects.get(pk=request.GET.get('clinical_context'))
-        records = cc.variant_classification_modifications
+        records = cc.classification_modifications
 
     elif request.GET.get('variant_compare'):
-        ref = VariantClassificationRef.init_from_str(user=request.user, id_str=request.GET.get('variant_compare'))
-        compare_all = VariantClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
+        ref = ClassificationRef.init_from_str(user=request.user, id_str=request.GET.get('variant_compare'))
+        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
         # filter out variant we're comparing with, make it last in calculation
-        latest_others_for_variant = [vcm for vcm in compare_all if vcm.variant_classification.id != ref.record.id]
+        latest_others_for_variant = [vcm for vcm in compare_all if vcm.classification.id != ref.record.id]
         compare_all = [ref.modification] + latest_others_for_variant
         records = compare_all
 
     elif request.GET.get('variant'):
         variant_id = int(request.GET.get('variant'))
-        compare_all = VariantClassificationModification.latest_for_user(user=request.user, allele=Variant.objects.get(pk=variant_id).allele, published=True)
+        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Variant.objects.get(pk=variant_id).allele, published=True)
         records = compare_all
 
     elif request.GET.get('allele'):
         allele_id = int(request.GET.get('allele'))
-        compare_all = VariantClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True)
+        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True)
         records = compare_all
 
     # filter out any Nones inserted by filtering on user permission etc
     records = [record for record in records if record]
 
-    records_json = [vcm.as_json(VariantClassificationJsonParams(
+    records_json = [vcm.as_json(ClassificationJsonParams(
         current_user=request.user,
         include_data=True,
         hardcode_extra_data=extra_data.get(vcm.id),
@@ -335,10 +335,10 @@ def view_classification_diff(request):
     context = {
         'records_json': records_json
     }
-    return render(request, 'classification/variant_classification_diff.html', context)
+    return render(request, 'classification/classification_diff.html', context)
 
 
-def variant_classification_qs(request):
+def classification_qs(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="classifications.csv"'
 
@@ -346,28 +346,28 @@ def variant_classification_qs(request):
     if extra_filters:
         extra_filters = json.loads(extra_filters)
 
-    config = VariantClassificationDatatableConfig(request)
-    qs = VariantClassificationModification.latest_for_user(user=request.user, published=True)
+    config = ClassificationDatatableConfig(request)
+    qs = ClassificationModification.latest_for_user(user=request.user, published=True)
     qs = config.filter_queryset(qs)
     # TODO sort
 
     return qs
 
 
-def variant_classification_import_tool(request: HttpRequest) -> Response:
+def classification_import_tool(request: HttpRequest) -> Response:
     EKeyFormSet = formset_factory(EvidenceKeyForm, extra=3)
     context = {
         "labs": Lab.valid_labs_qs(request.user)
     }
-    return render(request, 'classification/variant_classification_import_tool.html', context)
+    return render(request, 'classification/classification_import_tool.html', context)
 
 
-def export_variant_classifications_grid(request):
+def export_classifications_grid(request):
     """
     CSV export of what is currently filtered into the classification grid
     """
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
-    qs = variant_classification_qs(request)
+    qs = classification_qs(request)
     report_event(
         name='variant classification download',
         request=request,
@@ -380,9 +380,9 @@ def export_variant_classifications_grid(request):
     return ExportFormatterCSV(user=request.user, genome_build=genome_build, qs=qs).export()
 
 
-def export_variant_classifications_grid_redcap(request):
+def export_classifications_grid_redcap(request):
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
-    qs = variant_classification_qs(request)
+    qs = classification_qs(request)
     report_event(
         name='variant classification download',
         request=request,
@@ -396,14 +396,14 @@ def export_variant_classifications_grid_redcap(request):
 
 
 @require_POST
-def variant_classification_file_upload(request, variant_classification_id):
+def classification_file_upload(request, classification_id):
     try:
-        variant_classification = get_object_or_404(VariantClassification, pk=variant_classification_id)
-        if not variant_classification.can_write(request.user):
+        classification = get_object_or_404(Classification, pk=classification_id)
+        if not classification.can_write(request.user):
             raise Exception('User can not edit this variant classification')
         uploaded_file = upload_receive(request)
 
-        vc_attachment = VariantClassificationAttachment(variant_classification=variant_classification,
+        vc_attachment = ClassificationAttachment(classification=classification,
                                                         file=uploaded_file)
         vc_attachment.save()
 
@@ -416,11 +416,11 @@ def variant_classification_file_upload(request, variant_classification_id):
 
 
 @require_POST
-def variant_classification_file_delete(request, pk):
+def classification_file_delete(request, pk):
     success = False
     try:
-        vc_attachment = VariantClassificationAttachment.objects.get(pk=pk)
-        if not vc_attachment.variant_classification.can_write(request.user):
+        vc_attachment = ClassificationAttachment.objects.get(pk=pk)
+        if not vc_attachment.classification.can_write(request.user):
             raise Exception('User can not edit this variant classification')
 
         rm_if_exists(vc_attachment.file.path)
@@ -428,26 +428,26 @@ def variant_classification_file_delete(request, pk):
             rm_if_exists(vc_attachment.thumbnail_path)
         vc_attachment.delete()
         success = True
-    except VariantClassificationAttachment.DoesNotExist:
+    except ClassificationAttachment.DoesNotExist:
         pass
 
     return JFUResponse(request, success)
 
 
-def get_variant_classification_attachment_file_dicts(variant_classification):
+def get_classification_attachment_file_dicts(classification):
     file_dicts = []
-    for vca in variant_classification.variantclassificationattachment_set.all():
+    for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
 
     file_dicts = list(reversed(file_dicts))  # JFU adds most recent at the end
     return file_dicts
 
 
-def view_variant_classification_file_attachment(request, pk, thumbnail=False):
+def view_classification_file_attachment(request, pk, thumbnail=False):
     """ This is not done via static files, so we add security later """
 
-    # TODO: Check security/access to VariantClassification
-    vc_attachment = get_object_or_404(VariantClassificationAttachment, pk=pk)
+    # TODO: Check security/access to Classification
+    vc_attachment = get_object_or_404(ClassificationAttachment, pk=pk)
 
     if thumbnail and vc_attachment.thumbnail_path:
         filename = vc_attachment.thumbnail_path
@@ -460,8 +460,8 @@ def view_variant_classification_file_attachment(request, pk, thumbnail=False):
     return HttpResponse(image_data, content_type=content_type)
 
 
-def view_variant_classification_file_attachment_thumbnail(request, pk):
-    return view_variant_classification_file_attachment(request, pk, thumbnail=True)
+def view_classification_file_attachment_thumbnail(request, pk):
+    return view_classification_file_attachment(request, pk, thumbnail=True)
 
 
 def _get_lab_and_error(user: User):
@@ -476,7 +476,7 @@ def _get_lab_and_error(user: User):
 
 
 def create_classification_for_variant(request, variant_id, transcript_id=None):
-    if not VariantClassification.can_create_via_web_form(request.user):
+    if not Classification.can_create_via_web_form(request.user):
         raise PermissionDenied('User cannot create classifications via web form')
 
     variant = Variant.objects.get(pk=variant_id)
@@ -493,7 +493,7 @@ def create_classification_for_variant(request, variant_id, transcript_id=None):
                                       add_other_annotation_consortium_transcripts=True)
     lab, lab_error = _get_lab_and_error(request.user)
 
-    consensus = VariantClassificationConsensus(variant, request.user)
+    consensus = ClassificationConsensus(variant, request.user)
 
     context = {'variant': variant,
                'variant_sample_autocomplete_form': variant_sample_autocomplete_form,
@@ -506,7 +506,7 @@ def create_classification_for_variant(request, variant_id, transcript_id=None):
 
 
 def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
-    VariantClassification.check_can_create_no_variant_classification_via_web_form(request.user)
+    Classification.check_can_create_no_classification_via_web_form(request.user)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     sample_autocomplete_form = SampleChoiceForm(genome_build=genome_build)
     sample_autocomplete_form.fields['sample'].required = False
@@ -580,15 +580,15 @@ def classification_graphs(request):
         show_unclassified = True
         visibility = f"Visible to user"
         evidence_field = "evidence"
-    variant_classification_counts = get_variant_classification_counts(request.user, show_unclassified=show_unclassified)
-    vc_gene_data = get_grouped_variant_classification_counts(request.user, evidence_field, evidence_key="gene_symbol", max_groups=15, show_unclassified=show_unclassified)
+    classification_counts = get_classification_counts(request.user, show_unclassified=show_unclassified)
+    vc_gene_data = get_grouped_classification_counts(request.user, evidence_field, evidence_key="gene_symbol", max_groups=15, show_unclassified=show_unclassified)
 
     acmg_by_significance = get_criteria_counts(request.user, evidence_field)
     context = {
         "visibility": visibility,
         "show_unclassified": show_unclassified,
-        "variant_classification_labels": list(variant_classification_counts.keys())[::-1],
-        "variant_classification_values": list(variant_classification_counts.values())[::-1],
+        "classification_labels": list(classification_counts.keys())[::-1],
+        "classification_values": list(classification_counts.values())[::-1],
         "vc_gene_data": vc_gene_data,
         "acmg_by_significance": acmg_by_significance,
     }

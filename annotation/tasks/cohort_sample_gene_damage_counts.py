@@ -15,7 +15,7 @@ from library.log_utils import get_traceback
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import ProcessingStatus
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
-from classification.models import VariantClassification
+from classification.models import Classification
 from variantgrid.celery import app
 
 
@@ -160,31 +160,31 @@ class CohortSampleGeneDamageCountTask(Task):
 class CohortSampleClassificationGeneDamageCountTask(CohortSampleGeneDamageCountTask):
     @classmethod
     def _get_gene_value_counts(cls, cohort_gene_counts, gene_values, variant_annotation_version, update_gene_id):
-        # There are way less VariantClassifications, and each has a sample, so handle this per-sample
+        # There are way less Classifications, and each has a sample, so handle this per-sample
         # As it's classified for this sample, we know the builds are the same (hence can use variant not allele)
-        vc_qs = cohort_gene_counts.gene_count_type.get_variant_classification_qs()
+        vc_qs = cohort_gene_counts.gene_count_type.get_classification_qs()
         if update_gene_id:
             gene = Gene.objects.get(pk=update_gene_id)
-            vc_qs = vc_qs.filter(VariantClassification.get_q_for_gene(gene))
+            vc_qs = vc_qs.filter(Classification.get_q_for_gene(gene))
 
         sample_gene_value_counts = defaultdict(lambda: defaultdict(Counter))
 
         cohort = cohort_gene_counts.cohort
         for sample in cohort.get_samples():
-            for variant_classification in vc_qs.filter(sample=sample):
-                ensembl_gene_id = variant_classification.get("ensembl_gene_id")
+            for classification in vc_qs.filter(sample=sample):
+                ensembl_gene_id = classification.get("ensembl_gene_id")
                 gene_id = None
                 if ensembl_gene_id:
                     gene_id, _ = GeneVersion.get_gene_id_and_version(ensembl_gene_id)
                 else:
-                    variant_annotation = variant_classification.get_variant_annotation(variant_annotation_version)
+                    variant_annotation = classification.get_variant_annotation(variant_annotation_version)
                     if variant_annotation:
                         gene_id = variant_annotation.gene_id
 
                 if gene_id:
                     g_value_counts = sample_gene_value_counts[sample.pk][gene_id]
                     has_category = False
-                    for molecular_consequence in variant_classification.get("molecular_consequence", []):
+                    for molecular_consequence in classification.get("molecular_consequence", []):
                         category = MolecularConsequenceColors.CONSEQUENCE_LOOKUPS.get(molecular_consequence)
                         if category:
                             gvc = gene_values[category]

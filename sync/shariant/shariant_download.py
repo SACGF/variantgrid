@@ -10,7 +10,7 @@ from snpdb.models.models import Lab, Organization
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.variant_classification_view import BulkInserter
+from classification.views.classification_view import BulkInserter
 
 
 def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
@@ -52,7 +52,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         meta = record.get('meta', {})
         record_id = meta.get('id')
 
-        source_url = shariant.url(f'classification/variant_classification/{record_id}')
+        source_url = shariant.url(f'classification/classification/{record_id}')
         data = record.get('data')
         data = sanitize_data(known_keys, data, source_url)
 

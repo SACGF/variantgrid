@@ -6,31 +6,31 @@ from typing import Dict, List, Optional
 
 from library.django_utils import get_field_counts
 from classification.enums import ClinicalSignificance
-from classification.enums.variant_classification_enums import CriteriaEvaluation
+from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
-from classification.models.variant_classification import VariantClassification, VariantClassificationModification
+from classification.models.classification import Classification, ClassificationModification
 import numpy as np
 
 
-def get_variant_classification_counts(user: User, show_unclassified=True) -> Dict[str, int]:
+def get_classification_counts(user: User, show_unclassified=True) -> Dict[str, int]:
     qs = get_visible_classifications_qs(user)
     field_counts = get_field_counts(qs, "clinical_significance")
 
     # Add all entries as empty so colors are in the right order in graph.
-    variant_classification_counts = {}
+    classification_counts = {}
     for cs, label in ClinicalSignificance.LABELS.items():
         if cs or show_unclassified:
-            variant_classification_counts[label] = 0
+            classification_counts[label] = 0
 
     for clinical_significance, clinical_significance_count in field_counts.items():
         clinical_significance_label = ClinicalSignificance.LABELS[clinical_significance]
-        variant_classification_counts[clinical_significance_label] = clinical_significance_count
-    return variant_classification_counts
+        classification_counts[clinical_significance_label] = clinical_significance_count
+    return classification_counts
 
 
 def get_visible_classifications_qs(user: User):
     if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
-        qs = VariantClassificationModification.latest_for_user(
+        qs = ClassificationModification.latest_for_user(
             user,
             published=True,
             exclude_withdrawn=True,
@@ -38,19 +38,19 @@ def get_visible_classifications_qs(user: User):
             clinical_significance__isnull=False
         )
     else:
-        qs = VariantClassification.filter_for_user(user)
+        qs = Classification.filter_for_user(user)
 
     return qs
 
 
-def get_grouped_variant_classification_counts(user: User,
+def get_grouped_classification_counts(user: User,
                                               field: str,
                                               evidence_key: Optional[str] = None,
                                               field_labels: Optional[Dict[str, str]] = None,
                                               max_groups=10,
                                               show_unclassified=True) -> List[Dict[str, Dict]]:
     """ :param user: User used to check visibility of classifications
-        :param field: the value we're extracting from evidence to group on (from VariantClassification)
+        :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
         :param field_labels: labels from dict (falls back on raw value if keys not present)
         mutually exclusive with evidence_key
@@ -65,23 +65,23 @@ def get_grouped_variant_classification_counts(user: User,
     values_qs = vc_qs.values_list("clinical_significance", field)
 
     counts = Counter()
-    variant_classification_counts = defaultdict(Counter)
+    classification_counts = defaultdict(Counter)
     for (clinical_significance, field) in values_qs:
         if evidence_key:
-            value = VariantClassification.get_optional_value_from(field, evidence_key)
+            value = Classification.get_optional_value_from(field, evidence_key)
         elif field_labels:
             value = field_labels.get(field, field)
         else:
             value = field
         counts[value] += 1
-        variant_classification_counts[clinical_significance][value] += 1
+        classification_counts[clinical_significance][value] += 1
 
     top_groups = [i[0] for i in counts.most_common(max_groups)]
 
     data = []
     for cs, clinical_significance_label in ClinicalSignificance.LABELS.items():
         if cs or show_unclassified:
-            counts = variant_classification_counts[cs]
+            counts = classification_counts[cs]
             y = [counts[i] for i in top_groups]
             data.append({"x": top_groups,
                          "y": y,
@@ -104,7 +104,7 @@ def get_criteria_counts(user: User, evidence_field: str) -> Dict[str, List[Dict]
         total_clinical_significance[clinical_significance] += 1
         met, not_met, not_set = acmg_met_not_met_by_significance[clinical_significance]
         for i, k in enumerate(acmg_labels):
-            value = VariantClassification.get_optional_value_from(evidence, k)
+            value = Classification.get_optional_value_from(evidence, k)
             if value:
                 if CriteriaEvaluation.is_met(value):
                     met[i] += 1

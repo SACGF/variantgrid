@@ -8,10 +8,10 @@ from library.log_utils import report_event
 from snpdb.models.models_user_settings import UserSettings
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, \
     DiscordanceReportResolution
-from classification.models import VariantClassificationModification, DiscordanceReportClassification
+from classification.models import ClassificationModification, DiscordanceReportClassification
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceActionsLog
-from classification.views.variant_classification_export_csv import ExportFormatterCSV
+from classification.views.classification_export_csv import ExportFormatterCSV
 
 
 def discordance_report_view(request: HttpRequest, report_id: int) -> HttpResponse:
@@ -70,12 +70,12 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
 def export_discordance_report(request: HttpRequest, report_id: int) -> HttpResponse:
     report = DiscordanceReport.objects.get(pk=report_id)
     dcs = DiscordanceReportClassification.objects.filter(report=report)
-    include: [VariantClassificationModification] = []
+    include: [ClassificationModification] = []
     for dc in dcs:
         if dc.clinical_context_effective == report.clinical_context and not dc.withdrawn_effective:
             include.append(dc.classfication_effective)
 
-    vcs_qs = VariantClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
+    vcs_qs = ClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
 
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     report_event(

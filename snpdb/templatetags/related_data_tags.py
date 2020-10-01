@@ -3,8 +3,8 @@ from django.template import Library
 from operator import itemgetter
 
 from snpdb.models.models_enums import ImportStatus
-from classification.models import VariantClassification
-from classification.views.variant_classification_datatables import VariantClassificationDatatableConfig
+from classification.models import Classification
+from classification.views.classification_datatables import ClassificationDatatableConfig
 
 register = Library()
 
@@ -14,11 +14,11 @@ def related_data_context(context, samples):
         "samples": samples,
         "user": context["user"]
     }
-    variant_classifications = VariantClassification.objects.filter(sample__in=samples)
-    if variant_classifications.exists():
-        tag_context["has_variant_classifications"] = True
+    classifications = Classification.objects.filter(sample__in=samples)
+    if classifications.exists():
+        tag_context["has_classifications"] = True
         tag_context["sample_ids_list"] = [s.pk for s in samples]
-        tag_context["datatable_config"] = VariantClassificationDatatableConfig(context["request"])
+        tag_context["datatable_config"] = ClassificationDatatableConfig(context["request"])
     return tag_context
 
 

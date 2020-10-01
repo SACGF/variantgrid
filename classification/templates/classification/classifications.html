@@ -111,9 +111,9 @@
         let querystring = EncodeQueryData(data, true);
 		let url = null;
 		if (mode === 'redcap') {
-		  url = "{% url 'export_variant_classifications_grid_redcap' %}" + "?" + querystring;
+		  url = "{% url 'export_classifications_grid_redcap' %}" + "?" + querystring;
 		} else {
-		  url = "{% url 'export_variant_classifications_grid' %}" + "?" + querystring;
+		  url = "{% url 'export_classifications_grid' %}" + "?" + querystring;
 		}
 		window.location = url;
 		return false;
@@ -131,7 +131,7 @@
         });
 
         EKeys.load().then(() => {
-            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='variant_classification_datatables' data='classificationFilter' %}
+            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' %}
 
             let vcDatatable = $('#vc-datatable');
             vcDatatable.on('draw.dt', () => {

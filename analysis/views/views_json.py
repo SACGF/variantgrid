@@ -9,7 +9,7 @@ import random
 
 from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, AnalysisTemplateVersion
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisVariantClassification, AnalysisEdge, NodeVersion
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisClassification, AnalysisEdge, NodeVersion
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
@@ -24,7 +24,7 @@ from analysis.views.analysis_permissions import get_analysis_or_404, get_node_su
 from genes.models import TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import Sample, Tag, BuiltInFilters
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import create_variant_classification_for_sample_and_variant_objects
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import create_classification_for_sample_and_variant_objects
 
 
 @require_POST
@@ -326,11 +326,11 @@ def create_classification_from_variant_tag(request, analysis_id, sample_id, vari
     else:
         genome_build = None
 
-    variant_classification = create_variant_classification_for_sample_and_variant_objects(request.user, sample,
+    classification = create_classification_for_sample_and_variant_objects(request.user, sample,
                                                                                           variant_tag.variant,
                                                                                           genome_build, **kwargs)
-    AnalysisVariantClassification.objects.create(analysis=analysis, variant_classification=variant_classification)
-    data = {"variant_classification_id": variant_classification.pk}
+    AnalysisClassification.objects.create(analysis=analysis, classification=classification)
+    data = {"classification_id": classification.pk}
     return JsonResponse(data)
 
 
