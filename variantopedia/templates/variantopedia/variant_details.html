@@ -331,8 +331,19 @@ $(document).ready(function() {
                     <label>Citations</label>
                     <div>
                         {% if num_clinvar_citations %}
-                            <a class='hover-link hide-citations' href='javascript:showCitations()'>View {{ num_clinvar_citations }} Literature Citations</a>
-                            <a class='hover-link show-citations' href='javascript:hideCitations()'>Hide {{ num_clinvar_citations }} Literature Citations</a>
+                            <a class='hover-link hide-citations' data-toggle="collapse" href='#clinvar-citations-container'>View {{ num_clinvar_citations }} Literature Citations</a>
+
+                            {% if num_clinvar_citations %}
+                                <div id='clinvar-citations-container' class="collapse">
+                                    <div id='clinvar-citations' class='show-citations'>
+                                        <img src="{% static 'images/spinner.gif' %}" /> Loading citations...
+                                    </div>
+                                    <script>
+                                        var clinvar_citations_url = "{% url 'clinvar_citations_tab' clinvar.pk %}";
+                                        $("#clinvar-citations").load(clinvar_citations_url);
+                                    </script>
+                                </div>
+                            {% endif %}
                         {% else %}
                             <span>No citations.</span>
                         {% endif %}
@@ -340,18 +351,6 @@ $(document).ready(function() {
                 </div>
             </div>
         </div>
-
-        {% if num_clinvar_citations %}
-        <div class='chunk borderless citations' id='clinvar-citations-container'>
-            <div id='clinvar-citations' class='show-citations'>
-                <img src="{% static 'images/spinner.gif' %}" /> Loading citations...
-            </div>
-            <script>
-            var clinvar_citations_url = "{% url 'clinvar_citations_tab' clinvar.pk %}";
-            $("#clinvar-citations").load(clinvar_citations_url);
-            </script>
-        </div>
-        {% endif %}
     
     {% else %}
         <div class="container-table my-4">
@@ -379,7 +378,7 @@ $(document).ready(function() {
     {% endif %}
     
     {% if variant_annotation.transcript_id %}
-        <div id="transcript" class="container-table">
+        <div id="transcript" class="container mt-4">
             {% page_help page_id="variantdetails/transcript_choice_help" title="Transcript Choice" %}
 
             <div class='select-transcript-container'></div>
@@ -544,51 +543,51 @@ $(document).ready(function() {
                                 {% labelled id="mastermind_count_1_cdna" label="MM variant article count" hint="tiny" %}{{ variant_annotation.mastermind_count_1_cdna }}{% endlabelled %}
                                 {% labelled id="mastermind_count_2_cdna_prot" label="MM variant/protein article count" hint="tiny" %}{{ variant_annotation.mastermind_count_2_cdna_prot }}{% endlabelled %}
                                 {% labelled id="mastermind_count_3_aa_change" label="MM AA article count" hint="tiny" %}{{ variant_annotation.mastermind_count_3_aa_change }}{% endlabelled %}
-                                {% labelled label="View in Mastermine" hint="tiny" %}
+                                {% labelled label="View in Mastermind" hint="tiny" %}
                                     <a target='_blank' class="hover-link" href='{{ variant_annotation.mastermind_url }}'>{{ variant_annotation.mastermind_mmid3 }}</a>
                                 {% endlabelled %}
                             {% else %}
-                                {% labelled label="Mastermine" hint="tiny" %}No local Mastermind entry<br><i>may be others on site</i>{% endlabelled %}
+                                {% labelled label="Mastermind" hint="tiny" %}No local Mastermind entry<br><i>may be others on site</i>{% endlabelled %}
                             {% endif %}
 
                         </div>
                     </div>
                 </div>
 
-                <div class="col-md-6 mt-4 has-gene-info" id="gene-info">
+                <div class="col-12 mt-4 has-gene-info" id="gene-info">
                     <div class="card">
                         <div class="card-header">Gene</div>
                         <div class="card-body">
-                            {% labelled id='hgnc_symbol' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='hgnc_name' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='gene_biotype' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='gene_family_tag' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='gene_family_description' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='refseq_gene_summary' hint="chunky" %}{% endlabelled %}
-                            {% labelled id='function_from_uniprotkb' hint="chunky" %}{% endlabelled %}
-                            {% labelled id='pathway_from_uniprotkb' hint="tiny" %}{% endlabelled %}
+                            {% labelled id='hgnc_symbol' %}{% endlabelled %}
+                            {% labelled id='hgnc_name' %}{% endlabelled %}
+                            {% labelled id='gene_biotype' %}{% endlabelled %}
+                            {% labelled id='gene_family_tag' %}{% endlabelled %}
+                            {% labelled id='gene_family_description'%}{% endlabelled %}
+                            {% labelled id='refseq_gene_summary' %}{% endlabelled %}
+                            {% labelled id='function_from_uniprotkb' %}{% endlabelled %}
+                            {% labelled id='pathway_from_uniprotkb' %}{% endlabelled %}
 
-                            {% labelled id='tissue_specificity_from_uniprotkb' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='phenotypes_from_ensembl' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='omim_phenotypes' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='omim_id' hint="tiny" %}{% endlabelled %}
+                            {% labelled id='tissue_specificity_from_uniprotkb' %}{% endlabelled %}
+                            {% labelled id='phenotypes_from_ensembl' %}{% endlabelled %}
+                            {% labelled id='omim_phenotypes' %}{% endlabelled %}
+                            {% labelled id='omim_id' %}{% endlabelled %}
 
                             <div id="extra-gene-info" class="collapse">
-                                {% labelled id='hgnc_id' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='in_cancer_gene_census' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='entrez_gene_id' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='uniprot_id' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='ucsc_id' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='enzyme_ids' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='ccds_ids' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='rgd_id' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='mgi_id' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='rvis_percentile' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='status' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='band' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='strand' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='percentage_gc_content' hint="tiny" %}{% endlabelled %}
-                                {% labelled id='transcript_count' hint="tiny" %}{% endlabelled %}
+                                {% labelled id='hgnc_id' %}{% endlabelled %}
+                                {% labelled id='in_cancer_gene_census' %}{% endlabelled %}
+                                {% labelled id='entrez_gene_id' %}{% endlabelled %}
+                                {% labelled id='uniprot_id' %}{% endlabelled %}
+                                {% labelled id='ucsc_id' %}{% endlabelled %}
+                                {% labelled id='enzyme_ids' %}{% endlabelled %}
+                                {% labelled id='ccds_ids' %}{% endlabelled %}
+                                {% labelled id='rgd_id' %}{% endlabelled %}
+                                {% labelled id='mgi_id' %}{% endlabelled %}
+                                {% labelled id='rvis_percentile' %}{% endlabelled %}
+                                {% labelled id='status' %}{% endlabelled %}
+                                {% labelled id='band' %}{% endlabelled %}
+                                {% labelled id='strand' %}{% endlabelled %}
+                                {% labelled id='percentage_gc_content' %}{% endlabelled %}
+                                {% labelled id='transcript_count' %}{% endlabelled %}
                             </div>
                         </div>
                         <div class="card-footer">
