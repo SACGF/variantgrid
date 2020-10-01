@@ -17,12 +17,13 @@
     <div class="card-header">
         Gene / Disease associations
     </div>
-    <div class="card-body">
-        <div class='column-icon clingen-icon'></div>
+    <div class="card-body card-body-list">
         <div>
-            <ul class='disease-validity'>
+            <ul class='list-group'>
                 {% for dvg in gene_symbol.genediseasevalidity_set.all %}
-                    <li><b>{{ dvg.disease_validity.mondo.name }}</b> {% if dvg.disease_validity.mondo.description %}({{ dvg.disease_validity.mondo.description }}){% endif %} - <a href='{{ dvg.disease_validity.validity_summary_url }}'>{{ dvg.disease_validity.get_classification_display }}. ({{ dvg.disease_validity.sop }}, {{ dvg.disease_validity.date }})</a>
+                    <a href='{{ dvg.disease_validity.validity_summary_url }}' class="list-group-item list-grou-action">
+                        <b>{{ dvg.disease_validity.mondo.name }}</b> {% if dvg.disease_validity.mondo.description %}({{ dvg.disease_validity.mondo.description }}){% endif %} - {{ dvg.disease_validity.get_classification_display }}. ({{ dvg.disease_validity.sop }}, {{ dvg.disease_validity.date }})
+                    </a>
                 {% endfor %}
             </ul>
         </div>

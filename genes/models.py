@@ -4,6 +4,7 @@ import os
 import re
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass
+from functools import total_ordering
 from typing import Tuple, Optional, Dict, List, Set
 
 from django.conf import settings
@@ -73,11 +74,15 @@ class HGNCGeneNames(models.Model):
 
 
 @dataclass
+@total_ordering
 class GeneSymbolAliasSummary:
     other_symbol: str
     other_symbol_in_database: bool  # true if we have a GeneSymbol object for this
     source: str
     my_symbol_is_main: bool  # true if the other symbol is an alias for this symbol, false if this symbol is an alias for the other
+
+    def __lt__(self, other):
+        return self.other_symbol < other.other_symbol
 
 
 class GeneSymbol(models.Model):

@@ -135,7 +135,7 @@
 {% endblock head %}
 {% block content %}
 	<div class="container">
-        <h3>{{ gene_symbol }}</h3>
+        <h3>Gene Symbol : {{ gene_symbol }}</h3>
         {% if show_annotation %}
             {% page_help_embedded page_id='genes/view_gene_symbol_help' title='View Gene Symbol' %}
                 <p>Columns in the grid are from your <a href="/snpdb/settings">User Settings</a>,
@@ -144,55 +144,59 @@
             {% end_page_help_embedded %}
         {% endif %}
 
-        {% if gene_symbol.aliases_to_for %}
-            <div class="card mb-4">
-                <div class="card-header">Aliases</div>
+        <div class="card mb-4">
+            <div class="card-header">Gene Symbol {{  gene_symbol }} could refer to</div>
+            <div class="card-body card-body-list">
+                <ul class="list-group">
+                {% if consortium_genes_and_aliases %}
+                    {% for annotation_consortium, genes_and_aliases in consortium_genes_and_aliases.items %}
+                        {% for gene_id, aliases in genes_and_aliases.items %}
+                            {% if aliases %}
+                                <li class="list-group-item">
+                                  {{ annotation_consortium }} : <a class="hover-link" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
+                                     (aka: {% for alias in aliases %}<a class="comma-sep" href="{% url 'view_gene_symbol' alias %}">{{ alias }}</a>{% endfor %})
+                                  </a>
+                                </li>
+                            {% else %}
+                                <a class="list-group-item list-group-action" href="{% url 'view_gene' gene_id %}">
+                                    {{ annotation_consortium }} : {{ gene_id }}
+                                </a>
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                {% endif %}
+                {% for alias_summary in aliases_out %}
+                    <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-action">
+                        <i class="fas fa-arrow-circle-right"></i> {{ gene_symbol }} can be an alias for <b>{{ alias_summary.other_symbol }}</b> ({{ alias_summary.source }})
+                    </a>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        {% if aliases_in %}
+            <div class="card">
+                <div class="card-header">Aliases to {{ gene_symbol }}</div>
                 <div class="card-body card-body-list">
                     <ul class="list-group">
-                    {% for alias_summary in gene_symbol.aliases_to_for %}
-                        {% if alias_summary.my_symbol_is_main %}
-                            {% if alias_summary.other_symbol_in_database %}
-                                <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action list-group-item-light">
-                                    <b>{{ alias_summary.other_symbol }}</b> is an alias of {{ gene_symbol }} ({{ alias_summary.source }})
-                                </a>
-                            {% else %}
-                                <li class="list-group-item  list-group-item-light"><b>{{ alias_summary.other_symbol }}</b> is an alias of {{ gene_symbol }} ({{ alias_summary.source }})</li>
-                            {% endif %}
-                        {% else %}
-                            <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action">
-                                <i class="fas fa-arrow-circle-right"></i> {{ gene_symbol }} is an alias for <b>{{ alias_summary.other_symbol }}</b> ({{ alias_summary.source }})
-                            </a>
-                        {% endif %}
-                    {% endfor %}
+                        <li class="list-group-item list-group-item-light">
+                            {% for alias_summary in aliases_in %}
+                                {% if not forloop.first %}<span>,&nbsp;</span>{% endif %}
+                                {% if alias_summary.other_symbol_in_database %}
+                                    <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" data-toggle="tooltip" title="{{ alias_summary.source }}">{{ alias_summary.other_symbol }}</a>
+                                {% else %}
+                                    <span class="hover-detail" data-toggle="tooltip" title="{{ alias_summary.source }}">{{ alias_summary.other_symbol }}</span>
+                                {% endif %}
+                            {% endfor %}
+                            {% if aliases|length == 1 %} is an alias {% else %} are aliases {% endif %} for {{ gene_symbol }}
+                        </li>
                     </ul>
                 </div>
             </div>
         {% endif %}
 
-        <div class="row">
-            {% if consortium_genes_and_aliases %}
-                {% for annotation_consortium, genes_and_aliases in consortium_genes_and_aliases.items %}
-                <div class="col-12 col-lg-6 {% if not forloop.first %}mt-4 mt-lg-0{% endif %}">
-                    <div class="card">
-                        <div class="card-header"><h5>{{ annotation_consortium }}</h5></div>
-                        <div class="card-body card-body-list">
-                            <ul class="list-group">
-                              {% for gene_id, aliases in genes_and_aliases.items %}
-                                  <li class="list-group-item">
-                                      <a class="hover-link" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
-                                        {% if aliases %} (aka: {% for alias in aliases %}<a class="comma-sep" href="{% url 'view_gene_symbol' alias %}">{{ alias }}</a>{% endfor %}){% endif %}
-                                      </a>
-                                  </li>
-                              {% endfor %}
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            {% endif %}
-        </div>
-
         {% if show_annotation %}
+            <h4>Gene Annotations</h4>
             {% if gene_annotation %}
                 <p>Gene Annotation Version: <a class="hover-link" href="{% url 'annotation_versions' %}">{{ gene_annotation.version }}</a>
                 {% if num_gene_annotation_versions > 1 %}
@@ -200,34 +204,41 @@
                 {% endif %}
             {% endif %}
 
-            <div id='gene-info' >
+            <div id='gene-info' class="mt-2">
                 {% if gene_annotation %}
-                <div class='short-summary'>
-                    <p>
-                        <b>{{ gene_annotation.hgnc_name }}:</b> {{ gene_annotation.refseq_gene_summary }}
-                    </p>
-                    <div id='summary-gene-icons-container'></div>
-                    <a class="hover-link" data-toggle="collapse" href="#full-gene-info">Show full summary...</a>
-                </div>
+                    <div class='short-summary'>
+                        <p>
+                            <b>{{ gene_annotation.hgnc_name }}:</b> {{ gene_annotation.refseq_gene_summary }}
+                        </p>
+                        <div id='summary-gene-icons-container'></div>
+                    </div>
+
+                    <div class="accordion indicator-plus-before round-indicator mb-4">
+                        <div class="card">
+                            <div class="card-header collapsed" data-toggle="collapse" data-target="#full-gene-info" >
+                                <a class="card-title">Full Annotation Summary</a>
+                            </div>
+                            <div id="full-gene-info" class="collapse" aria-labelledby="heading-{{ page_id }}">
+                                <div class="card-body">
+                                    {% for grid_column in gene_level_columns %}
+                                        {% labelled id=grid_column.id label=grid_column.description shorten_label=True %}{{ grid_column.value | safe}}{% endlabelled %}
+                                    {% endfor %}
+                                    {% if gene_infos.exists %}
+                                    <h4>Gene Info</h4>
+                                    <div class='gene-info-container'>
+                                        {% for gi in gene_infos %}
+                                            <div class='gene-icon {{ gi.icon_css_class }}' title='{{ gi.name }}'></div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 {% else %}
                     <!-- No annotation for this gene -->
                 {% endif %}
-
-                <div id='full-gene-info' class="collapse">
-                    {% for grid_column_name, description, data in gene_level_columns %}
-                        <p>
-                            {% labelled hint="tiny" id=grid_column_name label=description %}{{ data  }} {% endlabelled %}
-                        </p>
-                    {% endfor %}
-                    {% if gene_infos.exists %}
-                        <h4>Gene Info</h4>
-                        <div class='gene-info-container'>
-                            {% for gi in gene_infos %}
-                                <div class='gene-icon {{ gi.icon_css_class }}' title='{{ gi.name }}'></div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
             </div>
 
             {% load gene_disease_tags %}
@@ -266,9 +277,10 @@
         {% load citation_tags %}
         {% retrieve_cached_citations citations %}
         {% endif %}
-
+    </div>
+    <div class="container-table mt-4">
         <h4>Variant Classifications</h4>
-
+        <p>Filtering on gene symbols : {{ filter_aliases }}</p>
         {% if has_classified_variants %}
             <script>
 
@@ -320,7 +332,8 @@
             {% user_data_grid_filter 'gene_variant_tags' 'Analyses Variant Tags' %}
             {% jqgrid 'analyses_variant_tags_grid' 'gene_variant_tags' genome_build_name=genome_build.name search=False jqgrid_config_get_parameters_func='getGeneGridConfigUrl' init_func='geneGridInitFunc' %}
         {% endif %}
-
+    </div>
+    <div class="container">
         {% if show_annotation %}
             <h3>Variants</h3>
 
