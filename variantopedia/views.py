@@ -374,6 +374,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     clinvar = None
     genes_canonical_transcripts = None
     num_clinvar_citations = 0
+    clinvar_citations = None
     num_annotation_versions = AnnotationVersion.objects.filter(variant_annotation_version__variantannotation__variant=variant).count()
 
     latest_classifications = VariantClassificationModification.latest_for_user(
@@ -410,7 +411,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                 pass
 
             if clinvar:
-                num_clinvar_citations = clinvar.get_citations().count()
+                clinvar_citations = [{'idx':c.citation_id, 'db': c.get_citation_source_display()} for c in clinvar.get_citations()]
+                num_clinvar_citations = len(clinvar_citations)
         except:  # May not have been annotated?
             log_traceback()
 
@@ -437,6 +439,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "modified_normalised_variants": modified_normalised_variants,
         "num_annotation_versions": num_annotation_versions,
         "num_clinvar_citations": num_clinvar_citations,
+        "clinvar_citations": clinvar_citations,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
         "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
         "variant": variant,
