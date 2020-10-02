@@ -195,58 +195,58 @@
   background-image: url(/static/icons/flags/flag.svg);
   position: relative;
 }
-.flag.flag-variant_classification_suggestion {
+.flag.flag-classification_suggestion {
   background-image: url(/static/icons/flags/lightbulb.svg);
 }
-.flag.flag-variant_classification_pending_change {
+.flag.flag-classification_pending_change {
   background-image: url(/static/icons/flags/delayed_sync.svg);
 }
-.flag.flag-variant_classification_matching_variant {
+.flag.flag-classification_matching_variant {
   background-image: url(/static/icons/flags/analysis.svg);
 }
-.flag.flag-variant_classification_matching_variant.res-matching_failed {
+.flag.flag-classification_matching_variant.res-matching_failed {
   background-image: url(/static/icons/flags/not-found.svg);
 }
-.flag.flag-variant_classification_matching_variant_warning {
+.flag.flag-classification_matching_variant_warning {
   background-image: url(/static/icons/flags/matching-warning.svg);
 }
-.flag.flag-variant_classification_matching_variant_warning.res-vm_rejected {
+.flag.flag-classification_matching_variant_warning.res-vm_rejected {
   background-image: url(/static/icons/flags/matching-warning-failed.svg);
 }
-.flag.flag-variant_classification_unshared {
+.flag.flag-classification_unshared {
   background-image: url(/static/icons/flags/lock.svg);
 }
-.flag.flag-variant_classification_review, .flag.flag-clinical_context_expert_review {
+.flag.flag-classification_review, .flag.flag-clinical_context_expert_review {
   background-image: url(/static/icons/flags/checklist.svg);
 }
-.flag.flag-variant_classification_discordance_discussion {
+.flag.flag-classification_discordance_discussion {
   background-image: url(/static/icons/flags/conversation.svg);
 }
-.flag.flag-variant_classification_significance_change {
+.flag.flag-classification_significance_change {
   background-image: url(/static/icons/flags/exchange.svg);
 }
-.flag.flag-variant_classification_outstanding_edits {
+.flag.flag-classification_outstanding_edits {
   background-image: url(/static/icons/flags/outstanding_edits.svg);
 }
-.flag.flag-variant_classification_outstanding_edits.res-in_error {
+.flag.flag-classification_outstanding_edits.res-in_error {
   background-image: url(/static/icons/flags/outstanding_edits_error.svg);
 }
-.flag.flag-variant_classification_clinical_context_change {
+.flag.flag-classification_clinical_context_change {
   background-image: url(/static/icons/flags/move-down.svg);
 }
-.flag.flag-variant_classification_withdrawn {
+.flag.flag-classification_withdrawn {
   background-image: url(/static/icons/flags/trash.svg);
 }
-.flag.flag-variant_classification_discordant, .flag.flag-clinical_context_discordance {
+.flag.flag-classification_discordant, .flag.flag-clinical_context_discordance {
   background-image: url(/static/icons/flags/discordance.svg);
 }
 .flag.flag-clinical_context_impass {
   background-image: url(/static/icons/flags/hold.svg);
 }
-.flag.flag-variant_classification_submitted {
+.flag.flag-classification_submitted {
   background-image: url(/static/icons/flags/upload-button.svg);
 }
-.flag.flag-variant_classification_internal_review {
+.flag.flag-classification_internal_review {
   background-image: url(/static/icons/flags/work.svg);
 }
 .flag.flag-allele_missing_37 {
@@ -258,10 +258,10 @@
 .flag.flag-allele_37_not_38 {
   background-image: url(/static/icons/flags/builds_not_equal.svg);
 }
-.flag.flag-variant_classification_transcript_version_change {
+.flag.flag-classification_transcript_version_change {
   background-image: url(/static/icons/flags/transcript_ver_change.svg);
 }
-.flag.flag-variant_classification_transcript_version_change.res-tv_rejected {
+.flag.flag-classification_transcript_version_change.res-tv_rejected {
   background-image: url(/static/icons/flags/transcript_ver_change_rejected.svg);
 }
 .flag.flag-settings {
