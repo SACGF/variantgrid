@@ -4,6 +4,12 @@ from django.db import migrations
 
 def blat_keys(apps, schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
+
+    # don't override existing keys
+    # but still some installs on very old key set that will need to be manually updated
+    if EvidenceKey.objects.count() > 0:
+        return
+
     EvidenceKey.objects.all().delete()
     keys = [
         EvidenceKey(**{'key': '1000_genomes_af', 'mandatory': False, 'max_share_level': 'logged_in_users', 'order': 10, 'label': '1000 Genomes', 'sub_label': None, 'description': 'The MAF found for the variant in the 1000 Genomes general population.', 'examples': [], 'options': [], 'see': 'http://www.internationalgenome.org/1000-genomes-browsers', 'evidence_category': 'P', 'value_type': 'N', 'default_crit_evaluation': None, 'allow_custom_values': False, 'hide': False, 'immutable': False, 'copy_consensus': False, 'variantgrid_column_id': 'af_1kg', 'created': '2019-10-22 22:46:59.648385+00:00', 'modified': '2019-10-22 22:46:59.648425+00:00'}),
