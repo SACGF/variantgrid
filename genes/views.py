@@ -29,7 +29,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
-    PfamSequenceIdentifier
+    PfamSequenceIdentifier, GeneSymbolAliasSummary
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
@@ -186,6 +186,15 @@ def view_gene_symbol(request, gene_symbol):
     has_gene_coverage = GeneCoverage.get_for_symbol(genome_build, gene_symbol).exists()
     has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).exists()
 
+    aliases_out = [alias for alias in gene_symbol.aliases_to_for if not alias.my_symbol_is_main]
+    aliases_out.sort()
+
+    aliases_in = [alias for alias in gene_symbol.aliases_to_for if alias.my_symbol_is_main]
+    aliases_in.sort()
+
+    filter_aliases = [gs.symbol for gs in gene_symbol.traverse_aliases()]
+    filter_aliases.sort()
+
     context = {
         "consortium_genes_and_aliases": defaultdict_to_dict(consortium_genes_and_aliases),
         "citations": citations,
@@ -205,7 +214,10 @@ def view_gene_symbol(request, gene_symbol):
         "num_gene_annotation_versions": num_gene_annotation_versions,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
-        "datatable_config": ClassificationDatatableConfig(request)
+        "datatable_config": ClassificationDatatableConfig(request),
+        "aliases_out": aliases_out,
+        "aliases_in": aliases_in,
+        "filter_aliases": ', '.join(filter_aliases)
     }
     return render(request, "genes/view_gene_symbol.html", context)
 

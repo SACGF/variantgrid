@@ -20,8 +20,7 @@ fieldset.form-fields {
             <th>Gene
             <th>RefSeq
             <th>Ensembl
-            <th>HGVS c.
-            <th>HGVS p.
+            <th>HGVS
             <th>Molecular Consequence
             {% if show_all_transcript_details %}
             <th>Impact
@@ -45,15 +44,16 @@ fieldset.form-fields {
             <td>{%  if transcript_data.ensembl_transcript_accession %}
                     <a target="_blank" class="hover-link" href="{% url 'view_transcript_accession' transcript_data.ensembl_transcript_accession %}">{{ transcript_data.ensembl_transcript_accession }}</a>
                 {%  endif %}
-            <td>{{ transcript_data.hgvs_c| dash_if_empty }}
-            <td title="{{ transcript_data.hgvs_p }}">{{ transcript_data.hgvs_p | dash_if_empty | truncatechars:70 }}
+            <td>
+                {{ transcript_data.hgvs_c| dash_if_empty }}
+                <span class="d-block mt-1 text-secondary" title="{{ transcript_data.hgvs_p }}" data-toggle="tooltip">{{ transcript_data.hgvs_p | dash_if_empty | truncatechars:70 }}</span>
             <td>{{ transcript_data.consequence | format_computer_text }}
             {% if show_all_transcript_details %}
             <td>{{ transcript_data.impact }}
             {% endif %}
             <td><span class="pills">
-                {% if transcript_data.representative %}<span class="pill important" title="representative transcript (picked by VEP, changes per variant)">rep.</span>{% endif %}
-                {% if transcript_data.canonical %}<span class="pill" title="canonical transcript for gene (from {{ vts.get_annotation_consortium_display }})">can.</span>{% endif %}
+                {% if transcript_data.representative %}<span class="pill important" data-toggle="tooltip" title="representative transcript (picked by VEP, changes per variant)">rep.</span>{% endif %}
+                {% if transcript_data.canonical %}<span class="pill" data-toggle="tooltip" title="canonical transcript for gene (from {{ vts.get_annotation_consortium_display }})">can.</span>{% endif %}
             </span>
         </tr>
     {% endfor %}
