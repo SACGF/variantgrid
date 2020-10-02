@@ -1860,6 +1860,23 @@ let VCTable = (function() {
     return VCTable;
 })();
 
+VCTable.gene_symbol = (data, type, row) => {
+    let dom = $('<span>');
+    if (data) {
+        let gene_symbol = data.gene_symbol;
+        let filtered_for = data.filtered_for;
+
+        if (filtered_for && gene_symbol !== filtered_for) {
+            let message = `Filtering for ${filtered_for} and found ${gene_symbol} through aliases.<br/>Please confirm that this record is relevant to your desired gene.`;
+            dom.append($('<i>', {class:'fas fa-exclamation-triangle text-warning hover-detail', 'title':'Aliased Gene', 'data-content':message}));
+        }
+        dom.append(gene_symbol);
+    } else {
+        $('<span>', {class: 'no-value', text: '-'}).appendTo(dom);
+    }
+    return dom.prop('outerHTML');
+};
+
 VCTable.c_hgvs = (data, type, row) => {
     const MAX_C_HGVS_LEN = 100;
 

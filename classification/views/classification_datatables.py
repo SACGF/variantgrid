@@ -72,6 +72,14 @@ class ClassificationDatatableConfig(DatatableConfig):
             "search": id_filter
         }
 
+    def gene_symbol(self, row: Dict[str, Any]):
+        gene_symbol = row.get('published_evidence__gene_symbol__value')
+        filtered_for = self.get_query_param('gene_symbol')
+        data = {'gene_symbol': gene_symbol}
+        if filtered_for:
+            data['filtered_for'] = filtered_for
+        return data
+
     @lazy
     def genome_build_prefs(self) -> List[GenomeBuild]:
         user_settings = UserSettings.get_for_user(self.user)
@@ -95,7 +103,8 @@ class ClassificationDatatableConfig(DatatableConfig):
                 key='published_evidence__gene_symbol__value',
                 name='gene_symbol',
                 label='Gene Symbol',
-                client_renderer=f'VCTable.evidence_key.bind(null, "{ SpecialEKeys.GENE_SYMBOL }")',
+                client_renderer=f'VCTable.gene_symbol',
+                renderer=self.gene_symbol,
                 orderable=True
             ),
             RichColumn(

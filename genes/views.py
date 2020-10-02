@@ -130,11 +130,21 @@ def _get_mim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
 
 
 def view_gene_symbol(request, gene_symbol):
+    # determines if this gene symbol might ONLY be an alias
+    has_real_gene: bool = False
+
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
     for gene in gene_symbol.get_genes():
         aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
         aliases.update(gene.get_symbols().exclude(symbol=gene_symbol))
+
+    for gene_aliases in consortium_genes_and_aliases.values():
+        for aliases in gene_aliases.values():
+            if not aliases:
+                # we have a gene that doesn't have an alias
+                has_real_gene = True
+                break
 
     user_settings = UserSettings.get_for_user(request.user)
     genome_build = user_settings.default_genome_build
@@ -217,6 +227,7 @@ def view_gene_symbol(request, gene_symbol):
         "datatable_config": ClassificationDatatableConfig(request),
         "aliases_out": aliases_out,
         "aliases_in": aliases_in,
+        "has_real_gene": has_real_gene,
         "filter_aliases": ', '.join(filter_aliases)
     }
     return render(request, "genes/view_gene_symbol.html", context)
