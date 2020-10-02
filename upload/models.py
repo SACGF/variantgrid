@@ -225,7 +225,7 @@ class UploadPipeline(models.Model):
                 genome_build = uploaded_file.uploadedmanualvariantentrycollection.collection.genome_build
             except ObjectDoesNotExist:
                 try:
-                    genome_build = uploaded_file.uploadedvariantclassificationimport.classification_import.genome_build
+                    genome_build = uploaded_file.uploadedclassificationimport.classification_import.genome_build
                 except ObjectDoesNotExist:
                     pass
         elif file_type == UploadedFileTypes.LIFTOVER:

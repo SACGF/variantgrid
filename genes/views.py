@@ -607,7 +607,7 @@ class ClassificationsHotspotGraphView(HotspotGraphView):
 
     def _get_classifications(self):
         vcm_qs = ClassificationModification.latest_for_user(self.request.user, published=True)
-        return Classification.objects.filter(variantclassificationmodification__in=vcm_qs)
+        return Classification.objects.filter(classificationmodification__in=vcm_qs)
 
     def _get_values(self, transcript_version) -> Tuple[int, str, str, str, int]:
         """ :returns hgvs_p, pp, consequence, count, gnomad_af """

@@ -20,7 +20,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         any were normalised during import process """
 
     def process_items(self, upload_step: UploadStep):
-        vc_import = upload_step.uploaded_file.uploadedvariantclassificationimport.classification_import
+        vc_import = upload_step.uploaded_file.uploadedclassificationimport.classification_import
         genome_build = vc_import.genome_build
 
         self.link_inserted_variants(genome_build, vc_import, upload_step)
