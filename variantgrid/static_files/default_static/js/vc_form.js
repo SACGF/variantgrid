@@ -740,7 +740,7 @@ const VCForm = (function() {
             let variantElement = null;
             let alleleVariantData = this.alleleVariantData();
             if (alleleVariantData.variant_id) {
-                let href = '/variantdetails/view_allele_from_variant/' + alleleVariantData.variant_id;
+                let href = Urls.view_allele_from_variant(alleleVariantData.variant_id);
                 variantElement = $('<a>', {class:'hover-link', text: variantText, href:href});
             } else {
                 variantElement = $('<span>', {text: variantText});
