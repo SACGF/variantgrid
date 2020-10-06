@@ -62,17 +62,19 @@
            <div id="genotype-grid-pager"></div> 
 	   </div>
        <script>
-        var visible_rows = {{ visible_rows | jsonify }};
-        var ZYGOSITY_DICT = {   'O' : 'HOM_ALT',
+        const visible_rows = {{ visible_rows | jsonify }};
+        const ZYGOSITY_DICT = { 'O' : 'HOM_ALT',
                                 'E' : 'HET',
                                 'R' : 'HOM_REF',
                                 'U' : 'Unknown Zygosity',
         };
 
         function sampleFormatFieldFormatter(formatField) {
-            var formatFieldString = formatField;
-            if (formatFieldString == '-1' || formatFieldString === null) {
-                formatFieldString = "?";
+            let formatFieldString = formatField;
+            // Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
+            // empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
+            if (formatFieldString == '-1' || formatFieldString == '-2147483648' || formatFieldString === null) {
+                formatFieldString = ".";
             }
             return formatFieldString;
         }
