@@ -4,7 +4,7 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-from typing import Any, List, Optional, Dict, Iterable, Mapping, Union
+from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set
 import re
 
 from library.cache import timed_cache
@@ -566,10 +566,12 @@ class VCDataCell:
         return self.e_key == other.e_key and \
             self.raw == other.raw
 
-    def diff(self, dest: Optional['VCDataCell']) -> Dict[str, Any]:
+    def diff(self, dest: Optional['VCDataCell'], ignore_if_omitted: Optional[Set[str]] = None) -> Dict[str, Any]:
         """
         Given two dictionaries, returns only the entries that have changed
         :param dest: Another dict
+        :param ignore_omitted: If a key name is in here, and if a value is in dest, but not in self, don't make any mention of it,
+        otherwise it will be set to None.
         :return: The differences
         """
         diff_dict = {}
@@ -591,7 +593,10 @@ class VCDataCell:
 
         for key, value in dest.items():
             if key not in source:
-                diff_dict[key] = None
+                if ignore_if_omitted and key in ignore_if_omitted:
+                    pass
+                else:
+                    diff_dict[key] = None
 
         return diff_dict
 
