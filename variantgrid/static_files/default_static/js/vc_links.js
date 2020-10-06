@@ -135,7 +135,7 @@ let VCLinks = (function() {
             } else {
                 return new VCLink({
                     text: 'ClinGen KB',
-                    href: 'https://search.clinicalgenome',
+                    href: 'https://search.clinicalgenome.org',
                     missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label
                 });
             }
