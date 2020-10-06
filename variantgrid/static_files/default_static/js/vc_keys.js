@@ -41,39 +41,39 @@ let EKey = (function() {
         },
     
         prettyValue: function(val) {
-            var isBlank = false;
-            var isValidValue = true;
-            var freeText = false;
+            let isBlank = false;
+            let isValidValue = true;
+            let freeText = false;
             if (typeof(val) === 'undefined') {
                 val = null;
             }
 
-            if (this.value_type === 'S' || this.value_type === 'C') {
-                var matchingOpt = this.matchingOption(val);
-                if (matchingOpt) {
-                    val = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
-                    isValidValue = true;
-                } else if (val === null) {
-                    // no special option for blank for this select
-                    // show empty
+            // note only M should ever have Multiplevalues but considering data types have been changed on occasion
+            // treat all drop downs like they could receive an array (it can be up to server validation to mark issues
+            // in that case)
+            if (this.value_type === 'S' || this.value_type === 'C' || this.value_type === 'M') {
+                if (val === null) {
+                    // check for special blank option
                     isBlank = true;
-                } else {
-                    isValidValue = !!this.allow_custom_values;
-                }
-            } else if (this.value_type == 'M') {
-                if (Array.isArray(val)) {
-                    var formattedValues = [];
-                    for (v of val) {
-                        var matchingOpt = this.matchingOption(v);
-                        if (matchingOpt) {
-                            v = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
-                        } else {
-                            isValidValue = !!this.allow_custom_values;
-                        }
-                        formattedValues.push(v);
+                    let matchingOpt = this.matchingOption(val);
+                    if (matchingOpt) {
+                        val = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
                     }
-                    val = formattedValues.join(', ');
+                } else if (!Array.isArray(val)) {
+                    val = [val];
                 }
+                let formattedValues = [];
+                for (let v of val) {
+                    let matchingOpt = this.matchingOption(v);
+                    if (matchingOpt) {
+                        v = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
+                    } else {
+                        isValidValue = !!this.allow_custom_values;
+                    }
+                    formattedValues.push(v);
+                }
+                val = formattedValues.join(', ');
+
             } else if (val === null) {
                 return {val: null, isBlank: true};
             } else if (this.value_type === 'B') {

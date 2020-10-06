@@ -6,7 +6,7 @@
 const VCForm = (function() {
 
     // need a wrapper as disabled elements don't have tool tips
-    function disableButton(button) {
+    const disableButton = button => {
         let wrapper = $('<div>', {class: 'btn-disabled-wrapper', style:'position:relative; cursor: not-allowed'});
         button.attr('click', null);
         button.attr("disabled", true);
@@ -19,7 +19,7 @@ const VCForm = (function() {
         wrapper.append(bonusWrapper);
 
         return wrapper;
-    }
+    };
 
     /* private methods */
     function emptyToNull(val) {
@@ -170,7 +170,7 @@ const VCForm = (function() {
         
         trash() {
             if (this.record.withdrawn) {
-                confirmed = window.prompt('Are you sure you wish to un-withdraw this record? Please type "unwithdraw" to confirm');
+                let confirmed = window.prompt('Are you sure you wish to un-withdraw this record? Please type "unwithdraw" to confirm');
                 if (confirmed) {
                     this.undeleteRequest = true;
                     this.dataUpdated();
@@ -318,7 +318,6 @@ const VCForm = (function() {
         },
         
         updateLinks() {
-
             jLinks.empty();
             let linkData = {};
             for (let key of VCLinks.ALL_KEYS) {
@@ -404,7 +403,6 @@ const VCForm = (function() {
                     }
                 }
             }
-
 
             if (this.record.can_write_latest) {
                 this.generateLink(
@@ -511,7 +509,7 @@ const VCForm = (function() {
             if (typeof(key) !== 'string') {
                 key = key.key;
             }
-            messages = this.messages.filter(message => message.key === key);
+            let messages = this.messages.filter(message => message.key === key);
             for (let severity of ['error', 'warning', 'info']) {
                 if (messages.find(m => m.severity === severity)) { return severity; }
             }
@@ -965,12 +963,18 @@ const VCForm = (function() {
                 noteDom.attr('data-toggle', 'popover');
                 noteDom.attr('title', 'Note');
                 noteDom.popover({trigger:'hover'});
-                noteDom.addClass('full');
+                noteDom.removeClass('far');
+                noteDom.addClass('fas');
+                noteDom.removeClass('d-none');
             } else {
                 noteDom.attr('data-toggle', null);
                 noteDom.attr('title', null);
                 noteDom.popover('dispose');
-                noteDom.removeClass('full');
+                noteDom.removeClass('fas');
+                noteDom.addClass('far');
+                if (!this.record.can_write) {
+                    noteDom.addClass('d-none');
+                }
             }
         },
         
@@ -1383,19 +1387,28 @@ const VCForm = (function() {
             let hasExplain = !!explain;
 
             let widgetDiv = $('<div>', {class: "col-7"});
-            let noteDiv = $('<span>', {id: `note-${key}`, class: `note ${hasNote ? 'full' : 'empty'}`,
-                html: '<i class="far fa-comment-alt"></i>',
-                // title: 'Note',
-                click: () => {vcform.promptNote(key)}
+
+            let noteDiv = $('<i/>', {
+                class: 'text-muted fa-comment-alt note',
+                id: `note-${key}`,
+                click: () => {this.promptNote(key);}
             });
             this.fixNotePopover(noteDiv, noteText);
-            let infoDiv = $('<span>', {id: `explain-${key}`, class: `explain ${hasExplain ? 'full' : 'empty'}`, html: '<i class="fas fa-info-circle text-muted"></i>'});
+
+            let infoDiv = $('<i/>', {
+                id: `explain-${key}`,
+                class: `fas fa-info-circle text-muted explain`,
+            });
+            if (!hasExplain) {
+                infoDiv.addClass('d-none');
+            }
 
             let entry = $('<div>', {class:`row entry entry-${type} form-group`, entry:key, html:[
                 labelDom,
                 widgetDiv,
-                $('<div>', {class: 'col-1 text-nowrap no-padding', html: [noteDiv, infoDiv]})
+                $('<div>', {class: 'col-1 text-nowrap p-0 d-flex', html: [noteDiv, infoDiv]})
             ]});
+            entry.css('align-items', 'center');
 
             switch (type) {
             
