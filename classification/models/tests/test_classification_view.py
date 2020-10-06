@@ -1,6 +1,6 @@
 from django.test import TestCase, RequestFactory, override_settings
 
-from classification.enums import EvidenceKeyValueType
+from classification.enums import EvidenceKeyValueType, SubmissionSource
 from classification.models import Classification, EvidenceKey
 from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.views.classification_view import ClassificationView
@@ -230,24 +230,34 @@ class ClassificationTestCaseViews(TestCase):
         response_1 = self.request_post({
             "id": f"{lab.group_name}/test_10",
             "test": False,
+            "source": SubmissionSource.API.value,
             "data": {
                 "c_hgvs": "xxx",
                 "genome_build": "GRCh37",
-                "foo": "BAAA"
-            },
-            "publish": "lab"
-        })
-        resonse_2 = self.request_post({
-            "id": f"{lab.group_name}/test_10",
-            "test": False,
-            "data": {
-                "c_hgvs": "xxx",
-                "genome_build": "GRCh37",
-                "zygosity": "mosaic",
-                "foo": "bar"
+                "p_hgvs": "abc",
+                "consent": "zzz"
             },
             "publish": "lab"
         })
         vc_id = response_1.data.get('id')
         vc = Classification.objects.get(pk=vc_id)
-        self.assertEqual(vc.get('zygosity'), 'mosaic')
+        self.assertEqual(vc.evidence["p_hgvs"].get('immutable'), 'api')
+
+        resonse_2 = self.request_post({
+            "id": f"{lab.group_name}/test_10",
+            "test": False,
+            "source": SubmissionSource.FORM.value,
+            "data": {
+                "c_hgvs": "xxx",
+                "consent": {"note": "nutty"},
+                "p_hgvs": "cant change api immutable"
+            },
+            "publish": "lab"
+        })
+
+        vc.refresh_from_db()
+        self.assertEqual(vc.get('consent'), 'zzz')
+
+        self.assertEqual(vc.evidence["p_hgvs"].get('immutable'), 'api')
+        self.assertEqual(vc.evidence["consent"].get('note'), 'nutty')
+        self.assertEqual(vc.evidence["consent"].get('immutable'), 'api')

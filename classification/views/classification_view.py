@@ -368,15 +368,14 @@ class ClassificationView(APIView):
                 json_data.append(result)
 
         else:
-            jsonny = request.data
-            if isinstance(jsonny.get('records'), list):
+            if isinstance(data.get('records'), list):
                 json_data = []
-                for record_data in jsonny.get('records'):
+                for record_data in data.get('records'):
                     result = importer.insert(record_data)
                     json_data.append(result)
                 json_data = {"results": json_data}
             else:
-                json_data = importer.insert(request.data, record_id)
+                json_data = importer.insert(data, record_id)
                 if 'fatal_error' in json_data:
                     return Response(status=HTTP_400_BAD_REQUEST, data=json_data)
                 elif 'internal_error' in json_data:
