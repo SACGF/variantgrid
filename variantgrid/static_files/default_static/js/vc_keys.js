@@ -59,10 +59,13 @@ let EKey = (function() {
                     if (matchingOpt) {
                         val = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
                     }
-                } else if (!Array.isArray(val)) {
+                    return {val: val, isBlank: true, isValidValue: true};
+                }
+
+                let formattedValues = [];
+                if (!Array.isArray(val)) {
                     val = [val];
                 }
-                let formattedValues = [];
                 for (let v of val) {
                     let matchingOpt = this.matchingOption(v);
                     if (matchingOpt) {
