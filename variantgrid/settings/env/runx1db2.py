@@ -8,6 +8,8 @@ from variantgrid.settings.components.celery_settings import *  # pylint: disable
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
+SYNC_DETAILS = get_secrets("SYNC", ["enabled", "username", "password", "host"])
+
 # import all the base settings #
 # Overwrite settings for your system below
 ANALYSIS_TEMPLATES_RUNX1 = True
