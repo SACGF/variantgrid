@@ -268,6 +268,14 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
 
         return AnalysisTemplate.filter_for_user(user).filter(analysistemplateversion__in=template_versions_qs)
 
+    def default_name_template(self):
+        """ The initial analysis_name_template in form for save version """
+        analysis_name_template = "%(template)s for %(input)s"  # default
+        if self.active:
+            # Use last value if available
+            analysis_name_template = self.active.analysis_name_template
+        return analysis_name_template
+
     def __str__(self):
         return self.name
 
@@ -365,7 +373,7 @@ class AnalysisTemplateRun(TimeStampedModel):
         try:
             self.analysis.name = self.template_version.analysis_name_template % params
             self.analysis.save()
-        except (ValueError, KeyError):
+        except (TypeError, ValueError, KeyError):
             pass
 
     def get_node_field_values(self):
