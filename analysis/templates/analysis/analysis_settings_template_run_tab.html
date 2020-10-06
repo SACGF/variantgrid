@@ -5,9 +5,14 @@
 
     <div>
         Generated from:
-        <a href="{% url 'analysis' analysis_template_run.template_version.template.analysis.pk %}">
-            {{ analysis_template_run.template_version }}
-        </a>
+
+        {% with analysis=analysis_template_run.template_version.template.analysis %}
+            {% if analysis %}
+                <a href="{% url 'analysis' analysis.pk %}">{{ analysis_template_run.template_version }}</a>
+            {% else %}
+                {{ analysis_template_run.template_version }}
+            {% endif %}
+        {% endwith %}
     </div>
 
     <div>

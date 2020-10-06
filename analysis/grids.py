@@ -296,9 +296,10 @@ class AnalysesGrid(JqGridUserRowConfig):
 class AnalysisTemplatesGrid(JqGridUserRowConfig):
     model = AnalysisTemplate
     caption = 'Analysis Templates'
-    fields = ["name", "analysis", "user__username", "modified"]
+    fields = ["id", "name", "analysis", "user__username", "modified"]
 
     colmodel_overrides = {
+        "id": {"hidden": True},
         "analysis": {"hidden": True},
         'name': {"width": 400,
                  'formatter': 'analysisLink',
@@ -314,10 +315,9 @@ class AnalysisTemplatesGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            queryset = AnalysisTemplate.filter_for_user(user)
-        else:
-            queryset = AnalysisTemplate.objects.filter(user=user)
+        queryset = AnalysisTemplate.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            queryset = queryset.filter(user=user)
         queryset = queryset.annotate(latest_version=Max("analysistemplateversion__version")).values("latest_version")
         fields = self.get_field_names() + ["latest_version"]
         self.queryset = queryset.values(*fields)
@@ -329,6 +329,11 @@ class AnalysisTemplatesGrid(JqGridUserRowConfig):
         extra = {'index': 'latest_version', 'name': 'latest_version', 'label': 'Latest version', 'sorttype': 'int'}
         colmodels.append(extra)
         return colmodels
+
+    def delete_row(self, pk):
+        analysis_template = AnalysisTemplate.get_for_user(self.user, pk)
+        analysis_template.check_can_write(self.user)
+        analysis_template.delete_or_soft_delete()
 
 
 class AnalysesVariantTagsGrid(JqGridUserRowConfig):

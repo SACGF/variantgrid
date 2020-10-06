@@ -5,7 +5,9 @@ from django.apps import apps
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Model, Q
-from django.db.models.deletion import SET_NULL, CASCADE, SET_DEFAULT, PROTECT
+from django.db.models.deletion import SET_NULL, CASCADE, SET_DEFAULT, PROTECT, ProtectedError
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
@@ -175,6 +177,16 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return analysis_copy
 
 
+@receiver(pre_delete, sender=Analysis)
+def pre_delete_analysis(sender, instance, *args, **kwargs):
+    """ Delete analysis template if not used for a run, otherwise soft delete it """
+    try:
+        analysis_template = instance.analysistemplate
+        analysis_template.delete_or_soft_delete()
+    except AnalysisTemplate.DoesNotExist:
+        pass
+
+
 class AnalysisNodeCountConfiguration(models.Model):
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)
 
@@ -222,7 +234,8 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
     name = models.TextField(unique=True)
     description = models.TextField(blank=True)
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)
-    analysis = models.OneToOneField(Analysis, on_delete=PROTECT)
+    analysis = models.OneToOneField(Analysis, null=True, on_delete=SET_NULL)  # deleted or soft deleted in pre_delete
+    deleted = models.BooleanField(default=False)
 
     @classmethod
     def get_permission_class(cls):
@@ -237,6 +250,13 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
     def _filter_from_permission_object_qs(cls, queryset):
         return cls.objects.filter(analysis__in=queryset)
 
+    def delete_or_soft_delete(self):
+        try:
+            self.delete()  # Will succeed if no analysis runs have been created
+        except ProtectedError:
+            self.deleted = True
+            self.save()
+
     @property
     def active(self):
         return self.analysistemplateversion_set.filter(active=True).first()
@@ -246,6 +266,12 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if last:
             return last.version
         return 0
+
+    @classmethod
+    def filter_for_user(cls, user, queryset=None, **kwargs):
+        """ Hides deleted objects """
+        qs = super().filter_for_user(user, queryset=queryset, **kwargs)
+        return qs.filter(deleted=False)
 
     @staticmethod
     def filter(user: User, sample_somatic=False, sample_gene_list=False, class_name=None, atv_kwargs=None):
@@ -277,7 +303,10 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         return analysis_name_template
 
     def __str__(self):
-        return self.name
+        s = self.name
+        if self.deleted:
+            s += " (deleted)"
+        return s
 
 
 class AnalysisTemplateVersion(TimeStampedModel):
@@ -299,7 +328,7 @@ class AnalysisTemplateVersion(TimeStampedModel):
 
 
 class AnalysisTemplateRun(TimeStampedModel):
-    template_version = models.ForeignKey(AnalysisTemplateVersion, null=True, on_delete=CASCADE)
+    template_version = models.ForeignKey(AnalysisTemplateVersion, null=True, on_delete=PROTECT)
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)  # Created new analysis
 
     @staticmethod
