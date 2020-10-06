@@ -229,7 +229,10 @@ class VariantGrid(JqGridSQL):
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
         }
         packed_data_replace = dict(Zygosity.CHOICES)
-        packed_data_replace[-1] = "?"
+        # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
+        # empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
+        MISSING_VALUES = [-1, -2147483648]
+        packed_data_replace.update({mv: "." for mv in MISSING_VALUES})
 
         sample_first_cohort_sample = {}
         for cohort in cohorts:
