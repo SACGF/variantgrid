@@ -80,6 +80,7 @@ class GeneSymbolAliasSummary:
     other_symbol_in_database: bool  # true if we have a GeneSymbol object for this
     source: str
     my_symbol_is_main: bool  # true if the other symbol is an alias for this symbol, false if this symbol is an alias for the other
+    different_genes: bool
 
     def __lt__(self, other):
         return self.other_symbol < other.other_symbol
@@ -105,6 +106,26 @@ class GeneSymbol(models.Model):
     def get_absolute_url(self):
         return reverse("view_gene_symbol", kwargs={"gene_symbol": self.symbol})
 
+    def has_different_genes(self, other: 'GeneSymbol') -> bool:
+        """
+        Tries to work out if genes are equivilant, not that sometimes refseq or ensembl assign gene ids to both the
+        symbol and the alias, but the other consortium only assigns to one. In that case we'd still like to treat them
+        as the "same"
+        """
+        my_genes = set(self.get_genes().all())
+        other_genes = set(other.get_genes().all())
+
+        all_genes = my_genes.union(other_genes)
+        source_has_extra = False
+        other_has_extra = False
+        for g in all_genes:
+            if g in my_genes and g not in other_genes:
+                source_has_extra = True
+            elif g in other_genes and g not in my_genes:
+                other_has_extra = True
+
+        return source_has_extra and other_has_extra
+
     @lazy
     def aliases_for(self) -> List[Tuple['GeneSymbol', str]]:  # pretty sure this is a Tuple of [str,str]
         """ Returns other symbols that this is an alias for """
@@ -123,16 +144,22 @@ class GeneSymbol(models.Model):
                     other_symbol=alias.gene_symbol.symbol,
                     source=alias.get_source_display(),
                     other_symbol_in_database=True,
-                    my_symbol_is_main=False
+                    my_symbol_is_main=False,
+                    different_genes=self.has_different_genes(alias.gene_symbol)
                 )
             )
         for alias in GeneSymbolAlias.objects.filter(gene_symbol=self.symbol):
+            other_gene_symbol = GeneSymbol.objects.filter(symbol=alias.alias).first()
+            different_genes = False
+            if other_gene_symbol:
+                different_genes = self.has_different_genes(other_gene_symbol)
             alias_list.append(
                 GeneSymbolAliasSummary(
                     other_symbol=alias.alias,
                     source=alias.get_source_display(),
                     other_symbol_in_database=GeneSymbol.objects.filter(symbol=alias.alias).exists(),
-                    my_symbol_is_main=True
+                    my_symbol_is_main=True,
+                    different_genes=different_genes
                 )
             )
         return alias_list

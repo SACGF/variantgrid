@@ -156,22 +156,33 @@
                         {% for gene_id, aliases in genes_and_aliases.items %}
                             {% if aliases %}
                                 <li class="list-group-item">
-                                  {{ annotation_consortium }} : <a class="hover-link" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
+                                  {{ annotation_consortium }} : <a class="hover-link text-monospace" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
                                      (aka: {% for alias in aliases %}<a class="comma-sep" href="{% url 'view_gene_symbol' alias %}">{{ alias }}</a>{% endfor %})
                                   </a>
                                 </li>
                             {% else %}
                                 <a class="list-group-item list-group-item-action" href="{% url 'view_gene' gene_id %}">
-                                    {{ annotation_consortium }} : {{ gene_id }}
+                                    {{ annotation_consortium }} : <span class="text-monospace">{{ gene_id }}</span>
                                 </a>
                             {% endif %}
                         {% endfor %}
                     {% endfor %}
                 {% endif %}
                 {% for alias_summary in aliases_out %}
-                    <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-arrow-circle-right"></i> {{ gene_symbol }} {% if has_real_gene %}can be{% else %}is{% endif %} an alias for <b>{{ alias_summary.other_symbol }}</b> ({{ alias_summary.source }})
-                    </a>
+                    {% if alias_summary.different_genes %}
+                            <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action"
+                               data-toggle="popover" title="Different Gene IDs" data-placement="left"
+                               data-content="These symbols have different Gene IDs associated with them.<br/>{{ gene_symbol }} should not be considered an alias for {{ alias_summary.other_symbol }} in all situations."
+                            >
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                            Aliased Gene Symbol : <span class="text-monospace">{{ alias_summary.other_symbol }}</span> - {{ gene_symbol }} can be an alias for {{ alias_summary.other_symbol }} ({{ alias_summary.source }})
+                        </a>
+                    {% else %}
+                        <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-arrow-circle-right"></i>
+                            Aliasesd Gene Symbol : <span class="text-monospace">{{ alias_summary.other_symbol }}</span> - {{ gene_symbol }} is an alias for {{ alias_summary.other_symbol }} ({{ alias_summary.source }})
+                        </a>
+                    {% endif %}
                 {% endfor %}
                 </ul>
             </div>
@@ -179,19 +190,26 @@
 
         {% if aliases_in %}
             <div class="card">
-                <div class="card-header">Aliases to {{ gene_symbol }}</div>
+                <div class="card-header">Aliases of {{ gene_symbol }}</div>
                 <div class="card-body card-body-list">
                     <ul class="list-group">
                         <li class="list-group-item list-group-item-light">
                             {% for alias_summary in aliases_in %}
                                 {% if not forloop.first %}<span>,&nbsp;</span>{% endif %}
                                 {% if alias_summary.other_symbol_in_database %}
+                                    {% if alias_summary.different_genes %}
+                                        <span data-toggle="popover" title="Different Gene IDs" data-placement="bottom"
+                                        data-content="These symbols have different Gene IDs associated with them.<br/>{{ alias_summary.other_symbol }} should not be considered an alias for {{ gene_symbol }} in all situations.">
+                                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                                            <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" data-toggle="tooltip" title="{{ alias_summary.source }}">{{ alias_summary.other_symbol }}</a>
+                                        </span>
+                                    {% else %}
                                     <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" data-toggle="tooltip" title="{{ alias_summary.source }}">{{ alias_summary.other_symbol }}</a>
+                                    {% endif %}
                                 {% else %}
                                     <span class="hover-detail" data-toggle="tooltip" title="{{ alias_summary.source }}">{{ alias_summary.other_symbol }}</span>
                                 {% endif %}
                             {% endfor %}
-                            {% if aliases|length == 1 %} is an alias {% else %} are aliases {% endif %} for {{ gene_symbol }}
                         </li>
                     </ul>
                 </div>
