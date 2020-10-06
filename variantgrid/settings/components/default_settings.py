@@ -538,7 +538,6 @@ INSTALLED_APPS = [
     'django_js_reverse',
     'django_starfield',
     'django_extensions',
-    'django_rename_app',
     'djgeojson',
     'easy_thumbnails',
     'guardian',
