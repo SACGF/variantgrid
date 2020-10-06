@@ -412,14 +412,14 @@ const VCForm = (function() {
             }
             if (this.record.published_version) {
                 this.generateLink(
-                    `/variantclassification/diff/?history=${this.record.id}`,
+                    `/classification/diff/?history=${this.record.id}`,
                     '<i class="fas fa-history"></i> Compare with historical versions of this record', true
                 ).addClass('list-group-item').addClass('list-group-item-action').appendTo(publishUL);
             }
             if (this.otherClassificationsSummary) {
                 let viewSummary = "<i class=\"fas fa-columns\"></i> Compare with other classifications for this variant (" + this.otherClassificationsSummary + ")";
                 this.generateLink(
-                    `/variantclassification/diff/?variant_compare=${this.record.id}`,
+                    `/classification/diff/?variant_compare=${this.record.id}`,
                     viewSummary, true
                 ).addClass('list-group-item').addClass('list-group-item-action').appendTo(publishUL);
             }
