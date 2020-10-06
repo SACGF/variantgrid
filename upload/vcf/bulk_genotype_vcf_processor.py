@@ -33,7 +33,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v8. VCF filters are in CohortGenotype now
     # v9. No ObservedVariant (sample level data)
     # v10. Shift fields from UploadedVCF to VCF. Fix various bugs
-    VCF_IMPORTER_VERSION = 11  # Change this if you make a major change to the code.
+    # v11. ?
+    # v12. Ensure missing data in FreeBayes is -1 not -2147483648 (CyVCF2 returns this from format)
+    VCF_IMPORTER_VERSION = 12  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -127,9 +129,15 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             return BulkGenotypeVCFProcessor.get_ref_alt_allele_depth_default  # use cyvcf2 defaults
         if vcf.ref_depth_field and vcf.alt_depth_field:  # explicitly set
             def get_ref_alt_depths(variant):
+                # CyVCF2 returns -1 for empty in gt_ref_depths / gt_alt_depths but this value in format()
+                # So convert to make consistent. @see https://github.com/brentp/cyvcf2/issues/172
+                _NUMPY_INT_NAN_VALUE = -2147483648
+
                 # As VCF is decomposed these arrays will always be length of 1, so return in same shape as default above
                 ref_depth = variant.format(vcf.ref_depth_field).flatten()
+                ref_depth[ref_depth == _NUMPY_INT_NAN_VALUE] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
                 alt_depth = variant.format(vcf.alt_depth_field).flatten()
+                alt_depth[alt_depth == _NUMPY_INT_NAN_VALUE] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
                 return ref_depth, alt_depth
             return get_ref_alt_depths
         raise ValueError(f"Don't know how to read allele depth for {vcf}")
