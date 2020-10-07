@@ -73,53 +73,13 @@ class ClassificationDatatableConfig(DatatableConfig):
             "search": id_filter
         }
 
-    def gene_symbol(self, row: Dict[str, Any]):
-        gene_symbol = row.get('published_evidence__gene_symbol__value')
-        data = {}
-        if not gene_symbol:
-            if c_hgvs := row.get(ClassificationModification.column_name_for_build(self.genome_build_prefs[0])):
-                try:
-                    parts = CHGVS(c_hgvs)
-                    gene_symbol = parts.gene
-                    data['from_chgvs'] = True
-                except:
-                    pass
-
-        filtered_for = self.get_query_param('gene_symbol')
-        data['gene_symbol'] = gene_symbol
-        if self.is_dangerous_alias(gene_symbol):
-            data['dangerous_alias'] = True
-        if filtered_for:
-            data['filtered_for'] = filtered_for
-        return data
-
     @lazy
     def genome_build_prefs(self) -> List[GenomeBuild]:
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
-
-    def is_dangerous_alias(self, gene_symbol_str: str) -> Optional[bool]:
-        if not self.filtered_gene_symbol:
-            return None
-        if self.filtered_gene_symbol.symbol == gene_symbol_str:
-            return False
-        if tested := self.safe_alias.get(gene_symbol_str):
-            return tested
-        is_dangerous: bool = None
-        if new_symbol := GeneSymbol.objects.filter(symbol=gene_symbol_str).first():
-            is_dangerous = self.filtered_gene_symbol.has_different_genes(new_symbol)
-        else:
-            is_dangerous = False
-
-        self.safe_alias[gene_symbol_str] = is_dangerous
-        return is_dangerous
-
     def __init__(self, request):
         super().__init__(request)
-
-        self.filtered_gene_symbol: Optional[GeneSymbol] = None
-        self.safe_alias: Dict[str, bool] = dict()
 
         user_settings = UserSettings.get_for_user(self.user)
 
@@ -137,8 +97,7 @@ class ClassificationDatatableConfig(DatatableConfig):
                 key='published_evidence__gene_symbol__value',
                 name='gene_symbol',
                 label='Gene Symbol',
-                client_renderer=f'VCTable.gene_symbol',
-                renderer=self.gene_symbol,
+                client_renderer=f'VCTable.evidence_key.bind(null, "{ SpecialEKeys.GENE_SYMBOL }")',
                 orderable=True
             ),
             RichColumn(
@@ -299,7 +258,6 @@ class ClassificationDatatableConfig(DatatableConfig):
             if gene_symbol_str:
                 gene_symbol = GeneSymbol.objects.filter(pk=gene_symbol_str).first()
                 if gene_symbol:
-                    self.filtered_gene_symbol = gene_symbol
                     gene_symbols = gene_symbol.traverse_aliases()
                     genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
 

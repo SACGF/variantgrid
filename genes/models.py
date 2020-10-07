@@ -76,6 +76,7 @@ class HGNCGeneNames(models.Model):
 @dataclass
 @total_ordering
 class GeneSymbolAliasSummary:
+    other_obj: Optional['GeneSymbol']
     other_symbol: str
     other_symbol_in_database: bool  # true if we have a GeneSymbol object for this
     source: str
@@ -127,20 +128,12 @@ class GeneSymbol(models.Model):
         return source_has_extra and other_has_extra
 
     @lazy
-    def aliases_for(self) -> List[Tuple['GeneSymbol', str]]:  # pretty sure this is a Tuple of [str,str]
-        """ Returns other symbols that this is an alias for """
-        alias_source = defaultdict(set)
-        for alias in GeneSymbolAlias.objects.filter(alias=self.symbol):
-            alias_source[alias.gene_symbol_id].add(alias.get_source_display())
-
-        return [(k, ", ".join(v)) for k, v in alias_source.items()]
-
-    @lazy
     def aliases_to_for(self) -> List[GeneSymbolAliasSummary]:
         alias_list: List[GeneSymbolAliasSummary] = list()
         for alias in GeneSymbolAlias.objects.filter(alias=self.symbol):
             alias_list.append(
                 GeneSymbolAliasSummary(
+                    other_obj=alias.gene_symbol,
                     other_symbol=alias.gene_symbol.symbol,
                     source=alias.get_source_display(),
                     other_symbol_in_database=True,
@@ -155,6 +148,7 @@ class GeneSymbol(models.Model):
                 different_genes = self.has_different_genes(other_gene_symbol)
             alias_list.append(
                 GeneSymbolAliasSummary(
+                    other_obj=other_gene_symbol,
                     other_symbol=alias.alias,
                     source=alias.get_source_display(),
                     other_symbol_in_database=GeneSymbol.objects.filter(symbol=alias.alias).exists(),
@@ -166,15 +160,14 @@ class GeneSymbol(models.Model):
 
     def traverse_aliases(self) -> Set['GeneSymbol']:
         """
-        Returns direct GeneSymbols that are aliases or alised to this symbol
+        Returns current gene symbol, and all "safe" aliased to/from gene symbols.
+        "safe" as in has_different_genes return false
         """
-        gene_symbols = set([self])
-        for alias in GeneSymbolAlias.objects.filter(gene_symbol=self.symbol):
-            for alias_symbol in GeneSymbol.objects.filter(symbol=alias.alias):
-                gene_symbols.add(alias_symbol)
-        for alias in GeneSymbolAlias.objects.filter(alias=self.symbol):
-            gene_symbols.add(alias.gene_symbol)
-        return gene_symbols
+        alias_set = set([self])
+        for alias in self.aliases_to_for:
+            if not alias.different_genes and alias.other_obj:
+                alias_set.add(alias.other_obj)
+        return alias_set
 
     def __lt__(self, other):
         return self.symbol < other.symbol
