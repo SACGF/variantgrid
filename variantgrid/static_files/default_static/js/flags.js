@@ -381,7 +381,7 @@ let Flags = (function () {
                 ]}).appendTo(description);
                 
                 if (flag.creating) {
-                    $('<h3>', { text: 'Enter a comment and click save to raise this flag' }).appendTo(description);
+                    $('<h5>', { text: 'Enter a comment and click save to raise this flag' }).appendTo(description);
                 }
                 return description;
             },
@@ -779,7 +779,7 @@ let Flags = (function () {
             },
             
             statusText() {
-                if (this.flag_type == 'variant_classification_significance_change') {
+                if (this.flag_type == 'classification_significance_change') {
                     return 'Primary Reason for Change';
                 }
                 if (this.creating) {
@@ -806,22 +806,22 @@ let Flags = (function () {
             
             helpFlagType() {
                 if (this.creating) {
-                    if (this.flag_type == 'variant_classification_suggestion') {
+                    if (this.flag_type === 'classification_suggestion') {
                         return $(`<div>
                         If you have found some extra information that you think should be incorporated into this classification,
                         you can raise a suggestion for the classification owner to accept or reject.
                         </div>`);
-                    } else if (this.flag_type == 'variant_classification_internal_review') {
+                    } else if (this.flag_type === 'classification_internal_review') {
                         return $(`<div>
                         You can raise this flag to let people know the classification is currently in review, or raise it
                         as "Completed" to record the fact that a review has recently taken place.<br/>
                         Please record any internal reviews while a classification is marked as discordant.
-                        </div>`)
+                        </div>`);
                     }
                     return $('<div>');
                 }
             
-                if (this.flag_type == 'variant_classification_suggestion') {
+                if (this.flag_type === 'classification_suggestion') {
                     return $(`<div>
                     Someone has raised suggestion(s) against this classification.
                     <ol><li>Review the contents of each suggestion.</li>
@@ -829,47 +829,47 @@ let Flags = (function () {
                     <li>If you decline the suggestion, mark it as Rejected.</li>
                     </ol></div>
                     `);
-                } else if (this.flag_type == 'variant_classification_outstanding_edits') {
+                } else if (this.flag_type === 'classification_outstanding_edits') {
                     return $(`<div>
                     Edits have been made to this classification that are not included in a published version.
                     <ol><li>From the classification form, ensure there are no validation errors stopping this record from being published.</li>
                     <li>At the bottom of the form, click the tick to submit the outstanding changes.</li></ol></div>`
                     );
-                } else if (this.flag_type == 'variant_classification_matching_variant') {
+                } else if (this.flag_type === 'classification_matching_variant') {
                     return $(`<div>
                     This classification is not yet linked to a variant
                     <ol><li>If this has a status of In Progress we should match it to a variant shortly, no action required.</li>
                     <li>If this has a status of Matching Failed we were unable to normalise the variant provided based on the c.hgvs and genome build values.
                     Please contact Shariant support for help in resolving this.</li></ol></div>
                     `);
-                } else if (this.flag_type == 'variant_classification_matching_variant_warning') {
+                } else if (this.flag_type === 'classification_matching_variant_warning') {
                     return $(`<div>
                     This classification has been matched to a variant, but requires a manual check to ensure it was matched correctly
                     <ol><li>If you believe it was matched correctly, select a status of Variant Confirmed and Save</li>
                     <li>If you believe that this is not the variant intended, select a status of Variant Rejected and Save. An admin will then attempt to fix the problem.</li>
                     </ol></div>
-                    `)
-                 } else if (this.flag_type == 'variant_classification_transcript_version_change') {
+                    `);
+                 } else if (this.flag_type === 'classification_transcript_version_change') {
                     return $(`<div>
                     This classification has been matched to a variant, but we did not have the requested transcript version on file and had to migrate it to another version of the same transcript.
                     <ol><li>If you believe the change of transcript version in this case has no impact on the variant, select a status of Change Accepted and Save.</li>
                     <li>If you believe this change is significant and that this classification should not apply to the variant on the new transcript, select a status of Change Rejected and Save. An admin will then attempt to fix the problem.</li>
                     </ol></div>
-                    `)
-                } else if (this.flag_type == 'variant_classification_internal_review') {
+                    `);
+                } else if (this.flag_type === 'classification_internal_review') {
                     return $(`<div>
                     This classification is marked as currently being internally reviewed.
                     <ol><li>Once the internal review is complete, ensure you update the classification in your curation system.</li>
                     <li>Mark the internal review as Completed</li></ol>
                     </div>
                     `);
-                } else if (this.flag_type == 'variant_classification_withdrawn') {
+                } else if (this.flag_type === 'classification_withdrawn') {
                     return $(`<div>
                     This classification has been marked as withdrawn. It will be hidden from almost all searches and exports.
                     <ol><li>If the classification is not of high enough quality or in error, you may leave it as "withdrawn" indefinitely.</li>
                     <li>If you wish to un-withdraw the classification, click the open bin icon in actions from the variant classification form</li></ol></div>
                     `);
-                } else if (this.flag_type == 'variant_classification_significance_change') {
+                } else if (this.flag_type === 'classification_significance_change') {
                     return $(`<div>
                     This classification has changed its clinical significance compared to a previously published version.
                     <ol><li>Set the status of this flag to reflect the primary reason behind the change in classification</li>
@@ -880,7 +880,7 @@ let Flags = (function () {
                     </ul>                 
                     </div>
                     <li>Please also add a comment providing some context.</li></ol></div>`);
-                } else if (this.flag_type == 'variant_classification_discordant') {
+                } else if (this.flag_type === 'classification_discordant') {
                     return $(`<div>
                     This classification is in discordance with one or more classifications.
                     <ol><li>Ensure that you have completed an internal review of your lab's classification recently (within the last 12 months is recommended). If not, raise the internal review flag and complete an internal review of your lab's classification.
@@ -889,28 +889,28 @@ let Flags = (function () {
                     <li>This Discordance flag will automatically be closed when concordance is reached.
                     </ol></div>
                     `);
-                } else if (this.flag_type == 'variant_classification_unshared') {
+                } else if (this.flag_type === 'classification_unshared') {
                     return $(`<div>
                     This classification is not yet shared outside of your lab or institution.
                     <ol><li>From the classification form, ensure there are no validation errors stopping this record from being published.</li>
                     <li>Review the content of the classification to make sure it's ready to be shared.</li>
                     <li>At the bottom of the form, click the Share to submit at a higher share level.</li></ol></div>
                     `);
-                } else if (this.flag_type == 'allele_missing_37') {
+                } else if (this.flag_type === 'allele_missing_37') {
                     return $(`<div>
                     This allele is missing a variant for GRCh37 and can't be lifted over in exports.<br/>
                     Our admins are looking at this allele and working on a fix.
-                    </div>`)
-                } else if (this.flag_type == 'allele_missing_38') {
+                    </div>`);
+                } else if (this.flag_type === 'allele_missing_38') {
                     return $(`<div>
                     This allele is missing a variant for GRCh38 and can't be lifted over in exports.<br/>
                     Our admins are looking at this allele and working on a fix.
-                    </div>`)
-                } else if (this.flag_type == 'allele_37_not_38') {
+                    </div>`);
+                } else if (this.flag_type === 'allele_37_not_38') {
                     return $(`<div>
                     For a given transcript, the c.hgvs produced for this allele produces a different value for GRCh37 to GRCh38.<br/>
                     Our admins are looking at this allele and working on a fix.
-                    </div>`)
+                    </div>`);
                 }
                 return $('<div>');
             },
@@ -948,31 +948,31 @@ let Flags = (function () {
                             '.'
                         ]});
                     }
-                } else if (this.flag_type == 'variant_classification_suggestion') {
+                } else if (this.flag_type === 'classification_suggestion') {
                     return $('<div>', {html: [
                         `Raised by `,
                         $('<span>', {class: 'username', text:this.userObj().name}),
                         ` in regards to `,
                         $('<span>', {class: 'quote', text: firstComment})
                     ]});
-                } else if (this.flag_type == 'variant_classification_significance_change') {
+                } else if (this.flag_type === 'classification_significance_change') {
                     return $('<div>', {text: firstComment});
-                } else if (this.flag_type == 'variant_classification_matching_variant_warning') {
+                } else if (this.flag_type === 'classification_matching_variant_warning') {
                     let variantId = this.collectionObj().variant;
                     return $('<div>', {html: [
                         `See more information about the linked variant `,
                         $('<a>', {class: 'hover-link', text: `here`, href:`/variantdetails/view_allele_from_variant/${variantId}`})
                     ]});
-                } else if (this.flag_type == 'variant_classification_discordant') {
+                } else if (this.flag_type === 'classification_discordant') {
                     let reportId = this.collectionObj().discordance_report;
                     let variantId = this.collectionObj().variant;
                     let clinicalContext = this.collectionObj().clinical_context;
                     if (reportId) {
                         return $('<div>', {html: [
                             `Go to the `,
-                            $('<a>', {class: 'hover-link', text: `Discordance Report`, href:`/variantclassification/variant_classification/discordance_report/${reportId}`}),
+                            $('<a>', {class: 'hover-link', text: `Discordance Report`, href:`/classification/classification/discordance_report/${reportId}`}),
                             ` | `,
-                            $('<a>', {class: 'hover-link', text: `Diff with other Classifications`, href: `/variantclassification/diff/?clinical_context=${clinicalContext}`})
+                            $('<a>', {class: 'hover-link', text: `Diff with other Classifications`, href: `/classification/diff/?clinical_context=${clinicalContext}`})
                         ]});
                     }
                 }
