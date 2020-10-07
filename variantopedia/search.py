@@ -419,10 +419,12 @@ def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: Que
     return results
 
 
-def search_gene_symbol(search_string: str, **kwargs) -> Iterable[GeneSymbol]:
+def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
     # itertools.chain doesn't work
+    # only return a GeneSymbol alias if we're not returning the source GeneSymbol
     gene_symbols = list(GeneSymbol.objects.filter(symbol__iexact=search_string))
-    aliases = list(GeneSymbolAlias.objects.filter(alias__iexact=search_string))
+    gene_symbol_strs = set([gene_symbol.symbol for gene_symbol in gene_symbols])
+    aliases = [alias for alias in GeneSymbolAlias.objects.filter(alias__iexact=search_string).all() if alias.alias not in gene_symbol_strs]
     return gene_symbols + aliases
 
 

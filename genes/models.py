@@ -166,28 +166,15 @@ class GeneSymbol(models.Model):
 
     def traverse_aliases(self) -> Set['GeneSymbol']:
         """
-        Recursively checks aliases and returns all gene symbols (shouldn't blow up with circular reference)
-        :param already_seen:
-        :return:
+        Returns direct GeneSymbols that are aliases or alised to this symbol
         """
-        gene_symbols = set()
-        self._traverse_aliases(gene_symbols)
-        return gene_symbols
-
-    def _traverse_aliases(self, already_seen: Optional[Set['GeneSymbol']]):
-        already_seen.add(self)
-        alias: GeneSymbolAlias
-        for alias in GeneSymbolAlias.objects.filter(alias=self.symbol):
-            alias_symbol = alias.gene_symbol
-            if alias_symbol not in already_seen:
-                alias_symbol._traverse_aliases(already_seen)
+        gene_symbols = set([self])
         for alias in GeneSymbolAlias.objects.filter(gene_symbol=self.symbol):
-            try:
-                alias_symbol = GeneSymbol.objects.get(symbol=alias.alias)
-                if alias_symbol not in already_seen:
-                    alias_symbol._traverse_aliases(already_seen)
-            except:
-                pass
+            for alias_symbol in GeneSymbol.objects.filter(symbol=alias.alias):
+                gene_symbols.add(alias_symbol)
+        for alias in GeneSymbolAlias.objects.filter(alias=self.symbol):
+            gene_symbols.add(alias.gene_symbol)
+        return gene_symbols
 
     def __lt__(self, other):
         return self.symbol < other.symbol

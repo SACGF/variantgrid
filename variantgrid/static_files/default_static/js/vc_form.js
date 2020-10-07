@@ -1877,13 +1877,20 @@ VCTable.gene_symbol = (data, type, row) => {
     let dom = $('<span>');
     if (data) {
         let gene_symbol = data.gene_symbol;
-        let filtered_for = data.filtered_for;
+        let dangerous_alias = data.dangerous_alias;
 
-        if (filtered_for && gene_symbol !== filtered_for) {
-            let message = `Filtering for ${filtered_for} and found ${gene_symbol} through aliases.<br/>Please confirm that this record is relevant to your desired gene.`;
-            dom.append($('<i>', {class:'fas fa-exclamation-triangle text-warning hover-detail', 'title':'Aliased Gene', 'data-content':message}));
+        if (dangerous_alias) {
+            let filtered_for = data.filtered_for;
+            let message = `Filtering for ${filtered_for} and found <a href="${Urls.view_gene_symbol(gene_symbol)}">${gene_symbol}</a> through aliases.<br/>These symbols have different Gene IDs associated with them, please ensure this record is relevant.`;
+            dom.attr('title', 'Aliased Gene');
+            dom.attr('data-toggle', 'popover');
+            dom.attr('data-content', message);
+            dom.addClass('hover-detail');
+            dom.append($('<i>', {class:'fas fa-exclamation-triangle text-warning'}));
         }
-        dom.append(gene_symbol);
+        if (!data.from_chgvs) {
+            dom.append(gene_symbol);
+        }
     } else {
         $('<span>', {class: 'no-value', text: '-'}).appendTo(dom);
     }

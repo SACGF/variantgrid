@@ -148,7 +148,7 @@
         {% endif %}
 
         <div class="card mb-4">
-            <div class="card-header">Gene Symbol {{  gene_symbol }} could refer to</div>
+            <div class="card-header">Gene Symbol {{  gene_symbol }} could refer to:</div>
             <div class="card-body card-body-list">
                 <ul class="list-group">
                 {% if consortium_genes_and_aliases %}
@@ -156,13 +156,13 @@
                         {% for gene_id, aliases in genes_and_aliases.items %}
                             {% if aliases %}
                                 <li class="list-group-item">
-                                  {{ annotation_consortium }} : <a class="hover-link text-monospace" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
+                                  {{ annotation_consortium }} Gene : <a class="hover-link text-monospace" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
                                      (aka: {% for alias in aliases %}<a class="comma-sep" href="{% url 'view_gene_symbol' alias %}">{{ alias }}</a>{% endfor %})
                                   </a>
                                 </li>
                             {% else %}
                                 <a class="list-group-item list-group-item-action" href="{% url 'view_gene' gene_id %}">
-                                    {{ annotation_consortium }} : <span class="text-monospace">{{ gene_id }}</span>
+                                    {{ annotation_consortium }} Gene : <span class="text-monospace">{{ gene_id }}</span>
                                 </a>
                             {% endif %}
                         {% endfor %}
@@ -302,35 +302,30 @@
     <div class="container-table mt-4">
         <h4>Variant Classifications</h4>
         <p>Filtering on gene symbols : {{ filter_aliases }}</p>
-        {% if has_classified_variants %}
-            <script>
 
-            function classificationFilter(data, type) {
-                data.gene_symbol = "{{ gene_symbol }}";
-                Object.assign(data, geneClassificationsGridParams);
-            }
+        <script>
+        function classificationFilter(data, type) {
+            data.gene_symbol = "{{ gene_symbol }}";
+            Object.assign(data, geneClassificationsGridParams);
+        }
 
-            function clearGeneClassificationsGrid() {
-                geneClassificationsGridParams = {};
-                $('#vc-datatable').DataTable().ajax.reload();
-                $("#gene-classifications-grid-filtering-message").empty().parent().hide();
-            }
+        function clearGeneClassificationsGrid() {
+            geneClassificationsGridParams = {};
+            $('#vc-datatable').DataTable().ajax.reload();
+            $("#gene-classifications-grid-filtering-message").empty().parent().hide();
+        }
 
-            </script>
+        </script>
 
-            {% if show_classifications_hotspot_graph %}
-                <div id='classifications-hotspot-graph-container'></div>
-            {% endif %}
-
-            <span class="hidden">
-                <span class="filter-message" id="gene-classifications-grid-filtering-message"></span>
-                <a class='hover-link' href="javascript:clearGeneClassificationsGrid()">Show all...</a>
-            </span>
-            {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
-        {% else %}
-            There are no classifications for this gene.
+        {% if show_classifications_hotspot_graph %}
+            <div id='classifications-hotspot-graph-container'></div>
         {% endif %}
 
+        <span class="hidden">
+            <span class="filter-message" id="gene-classifications-grid-filtering-message"></span>
+            <a class='hover-link' href="javascript:clearGeneClassificationsGrid()">Show all...</a>
+        </span>
+        {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
 
         {% if has_tagged_variants %}
             <script>
