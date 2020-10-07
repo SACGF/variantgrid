@@ -266,7 +266,7 @@ const Diff = (function() {
 
             //var percent = Math.floor(100 / Math.max(1, this.versions.length));
             includedVersions.forEach((v, index) => {
-                let url = `/variantclassification/variant_classification/${v.id}`;
+                let url = Urls.view_classification(v.id);
                 if (v.version) {
                     url += `.${v.version}`;
                 }
