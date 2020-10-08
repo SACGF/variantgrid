@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models
-from django.db.models import Min, Max
+from django.db.models import Min, Max, QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
@@ -73,20 +73,6 @@ class HGNCGeneNames(models.Model):
                f"previous symbols: {self.previous_symbols}, synonyms: {self.synonyms}"
 
 
-@dataclass
-@total_ordering
-class GeneSymbolAliasSummary:
-    other_obj: Optional['GeneSymbol']
-    other_symbol: str
-    other_symbol_in_database: bool  # true if we have a GeneSymbol object for this
-    source: str
-    my_symbol_is_main: bool  # true if the other symbol is an alias for this symbol, false if this symbol is an alias for the other
-    different_genes: bool
-
-    def __lt__(self, other):
-        return self.other_symbol < other.other_symbol
-
-
 class GeneSymbol(models.Model):
     symbol = models.TextField(primary_key=True)
 
@@ -100,12 +86,22 @@ class GeneSymbol(models.Model):
         """ For use by TextPhenotypeMatch """
         return self.symbol
 
-    def get_genes(self):
+    def get_genes(self) -> QuerySet:
         # To match HPO/OMIM so it can be used interchangeably during phenotype matching
         return Gene.objects.filter(~Q(identifier__startswith="unknown_"), geneversion__gene_symbol=self).distinct()
 
+    @lazy
+    def genes(self) -> List['Gene']:
+        # returns cached set of genes associated with this symbol
+        # use over get_genes when possible
+        return list(self.get_genes().all())
+
     def get_absolute_url(self):
         return reverse("view_gene_symbol", kwargs={"gene_symbol": self.symbol})
+
+    @lazy
+    def alias_meta(self) -> 'GeneSymbolAliasesMeta':
+        return GeneSymbolAliasesMeta(self)
 
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """
@@ -113,8 +109,8 @@ class GeneSymbol(models.Model):
         symbol and the alias, but the other consortium only assigns to one. In that case we'd still like to treat them
         as the "same"
         """
-        my_genes = set(self.get_genes().all())
-        other_genes = set(other.get_genes().all())
+        my_genes = set(self.genes)
+        other_genes = set(other.genes)
 
         all_genes = my_genes.union(other_genes)
         source_has_extra = False
@@ -126,48 +122,6 @@ class GeneSymbol(models.Model):
                 other_has_extra = True
 
         return source_has_extra and other_has_extra
-
-    @lazy
-    def aliases_to_for(self) -> List[GeneSymbolAliasSummary]:
-        alias_list: List[GeneSymbolAliasSummary] = list()
-        for alias in GeneSymbolAlias.objects.filter(alias=self.symbol):
-            alias_list.append(
-                GeneSymbolAliasSummary(
-                    other_obj=alias.gene_symbol,
-                    other_symbol=alias.gene_symbol.symbol,
-                    source=alias.get_source_display(),
-                    other_symbol_in_database=True,
-                    my_symbol_is_main=False,
-                    different_genes=self.has_different_genes(alias.gene_symbol)
-                )
-            )
-        for alias in GeneSymbolAlias.objects.filter(gene_symbol=self.symbol):
-            other_gene_symbol = GeneSymbol.objects.filter(symbol=alias.alias).first()
-            different_genes = False
-            if other_gene_symbol:
-                different_genes = self.has_different_genes(other_gene_symbol)
-            alias_list.append(
-                GeneSymbolAliasSummary(
-                    other_obj=other_gene_symbol,
-                    other_symbol=alias.alias,
-                    source=alias.get_source_display(),
-                    other_symbol_in_database=GeneSymbol.objects.filter(symbol=alias.alias).exists(),
-                    my_symbol_is_main=True,
-                    different_genes=different_genes
-                )
-            )
-        return alias_list
-
-    def traverse_aliases(self) -> Set['GeneSymbol']:
-        """
-        Returns current gene symbol, and all "safe" aliased to/from gene symbols.
-        "safe" as in has_different_genes return false
-        """
-        alias_set = set([self])
-        for alias in self.aliases_to_for:
-            if not alias.different_genes and alias.other_obj:
-                alias_set.add(alias.other_obj)
-        return alias_set
 
     def __lt__(self, other):
         return self.symbol < other.symbol
@@ -197,6 +151,93 @@ class GeneSymbolAlias(TimeStampedModel):
     @staticmethod
     def get_upper_case_lookup():
         return {a: (gs, alias_id) for a, gs, alias_id in GeneSymbolAlias.objects.values_list("alias", "gene_symbol", "id")}
+
+
+@dataclass
+@total_ordering
+class GeneSymbolAliasSummary:
+    other_obj: GeneSymbol
+    other_symbol: str
+    source: str # HGNC etc
+    my_symbol_is_main: bool  # true if the other symbol is an alias for this symbol, false if this symbol is an alias for the other
+    different_genes: bool # if true, then this should only be considered an alias with a priviso, and not used in automatic alias calculations
+
+    def __lt__(self, other):
+        return self.other_symbol < other.other_symbol
+
+    @property
+    def other_symbol_in_database(self) -> bool:
+        return self.other_obj is not None
+
+
+class GeneSymbolAliasesMeta:
+
+    def __init__(self, gene_symbol: GeneSymbol):
+        self.gene_symbol = gene_symbol
+        self.alias_list: List[GeneSymbolAliasSummary] = list()
+
+        symbol = self.gene_symbol.symbol
+
+        for alias in GeneSymbolAlias.objects.filter(alias=symbol):
+            self.alias_list.append(
+                GeneSymbolAliasSummary(
+                    other_obj=alias.gene_symbol,
+                    other_symbol=alias.gene_symbol.symbol,
+                    source=alias.get_source_display(),
+                    my_symbol_is_main=False,
+                    different_genes=self.gene_symbol.has_different_genes(alias.gene_symbol)
+                )
+            )
+        for alias in GeneSymbolAlias.objects.filter(gene_symbol=self.gene_symbol):
+            other_gene_symbol = GeneSymbol.objects.filter(symbol=alias.alias).first()
+            different_genes = False
+            if other_gene_symbol:
+                different_genes = self.gene_symbol.has_different_genes(other_gene_symbol)
+            self.alias_list.append(
+                GeneSymbolAliasSummary(
+                    other_obj=other_gene_symbol,
+                    other_symbol=alias.alias,
+                    source=alias.get_source_display(),
+                    my_symbol_is_main=True,
+                    different_genes=different_genes
+                )
+            )
+
+    @lazy
+    def genes(self) -> Set['Gene']:
+        """
+        Returns a set of genes associated with all safe aliases to/from the primary Gene Symbol.
+        (Even though we only look at "safe" aliases, e.g. ones where each symbol must be a subset of the other,
+        looking through these aliases still catch where Refseq assigned a Gene ID to both but Ensembl only assigned
+        their Gene ID to one and ignore the other)
+        """
+        gene_set: Set[Gene] = set(self.gene_symbol.genes)
+        for alias_summary in self.alias_list:
+            if not alias_summary.different_genes and alias_summary.other_obj:
+                gene_set = gene_set.union(alias_summary.other_obj.genes)
+        return gene_set
+
+    @lazy
+    def alias_symbol_strs(self) -> List[str]:
+        gene_symbol_strs: Set[str] = set([self.gene_symbol.symbol])
+        for alias_summary in self.alias_list:
+            if not alias_summary.different_genes:
+                gene_symbol_strs.add(alias_summary.other_symbol)
+        sorted = list(gene_symbol_strs)
+        sorted.sort()
+        return sorted
+
+    @lazy
+    def aliases_out(self) -> List[GeneSymbolAliasSummary]:
+        aliases_out = [alias for alias in self.alias_list if not alias.my_symbol_is_main]
+        aliases_out.sort()
+        return aliases_out
+
+    @lazy
+    def aliases_in(self) -> List[GeneSymbolAliasSummary]:
+        aliases_in = [alias for alias in self.alias_list if alias.my_symbol_is_main]
+        aliases_in.sort()
+        return aliases_in
 
 
 class GeneAnnotationImport(TimeStampedModel):
@@ -235,7 +276,7 @@ class Gene(models.Model):
     def get_gene_symbol(self, genome_build: GenomeBuild) -> GeneSymbol:
         return self.latest_gene_version(genome_build).gene_symbol
 
-    def get_symbols(self):
+    def get_symbols(self) -> QuerySet:
         """ This can change over time as versions are assigned different symbols... """
         return GeneSymbol.objects.filter(geneversion__gene=self).distinct()
 

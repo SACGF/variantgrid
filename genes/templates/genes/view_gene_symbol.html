@@ -168,7 +168,7 @@
                         {% endfor %}
                     {% endfor %}
                 {% endif %}
-                {% for alias_summary in aliases_out %}
+                {% for alias_summary in gene_symbol.alias_meta.aliases_out %}
                     {% if alias_summary.different_genes %}
                             <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action"
                                data-toggle="popover" title="Different Gene IDs" data-placement="left"
@@ -188,13 +188,13 @@
             </div>
         </div>
 
-        {% if aliases_in %}
+        {% if gene_symbol.alias_meta.aliases_in %}
             <div class="card">
                 <div class="card-header">Aliases of {{ gene_symbol }}</div>
                 <div class="card-body card-body-list">
                     <ul class="list-group">
-                        <li class="list-group-item list-group-item-light">
-                            {% for alias_summary in aliases_in %}
+                        <li class="list-group-item list-group-item-light text-monospace">
+                            {% for alias_summary in gene_symbol.alias_meta.aliases_in %}
                                 {% if not forloop.first %}<span>,&nbsp;</span>{% endif %}
                                 {% if alias_summary.other_symbol_in_database %}
                                     {% if alias_summary.different_genes %}
@@ -301,7 +301,7 @@
     </div>
     <div class="container-table mt-4">
         <h4>Variant Classifications</h4>
-        <p>Filtering on gene symbols : {{ filter_aliases }}</p>
+        <p>Filtering on gene symbols : <span class="text-monospace">{% for symbol in gene_symbol.alias_meta.alias_symbol_strs %}{% if not forloop.first %}, {% endif %}{{ symbol }}{% endfor %}</span> and associated alleles and transcripts.</p>
 
         <script>
         function classificationFilter(data, type) {

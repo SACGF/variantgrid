@@ -6,7 +6,7 @@ from functools import reduce
 import operator
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, Gene
 from snpdb.models import VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantAllele
@@ -22,15 +22,11 @@ def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, genome_build: 
     """
     # See issue #2449 - people often search for a gene symbol that exists in a different genome build
     # so we need to retrieve all the genes that have ever been associated with the symbol
-    gene_symbols: Set[GeneSymbol]
+    genes: Set[Gene]
     if traverse_aliases:
-        gene_symbols = gene_symbol.traverse_aliases()
+        genes = gene_symbol.alias_meta.genes
     else:
-        gene_symbols = set([gene_symbol])
-
-    genes = set()
-    for gene_symbol in gene_symbols:
-        genes = genes.union(gene_symbol.get_genes())
+        genes = set([gene_symbol.genes])
 
     qs = get_variant_queryset_for_latest_annotation_version(genome_build)
     return qs.filter(variantgeneoverlap__gene__in=genes)

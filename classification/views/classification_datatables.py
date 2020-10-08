@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Iterable
 
 from django.conf import settings
 from django.db.models import Q, Subquery, When, Case, TextField, Value
@@ -249,26 +249,28 @@ class ClassificationDatatableConfig(DatatableConfig):
             filters.append(id_filter_q)
 
         # We want to filter using the genes set via variant annotation
-        genes = []
+        genes: Iterable[Gene] = None
+        symbols: Iterable[str] = None
         gene_id = self.get_query_param('gene')
         if gene_id:
-            genes = Gene.objects.filter(pk=gene_id)
+            if gene := Gene.objects.filter(pk=gene_id).first():
+                genes = [gene]
+                symbols = gene.get_symbols().value_list('symbol', flat=True)
         else:
             gene_symbol_str = self.get_query_param("gene_symbol")
             if gene_symbol_str:
-                gene_symbol = GeneSymbol.objects.filter(pk=gene_symbol_str).first()
-                if gene_symbol:
-                    gene_symbols = gene_symbol.traverse_aliases()
-                    genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
+                gene_symbol: GeneSymbol
+                if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
+                    genes = gene_symbol.alias_meta.genes
+                    symbols = gene_symbol.alias_meta.alias_symbol_strs
+                    # used to do the below, which would include genes marked as "unknown"
+                    # now they wont be included, revert if this causes problems
+                    # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
 
         if genes:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
             match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
             evidence_q_list = []
-            symbols = set()
-            for gene in genes:
-                for gene_symbol in gene.get_symbols():
-                    symbols.add(gene_symbol.symbol)
 
             for symbol in symbols:
                 evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))

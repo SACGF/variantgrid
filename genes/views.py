@@ -119,7 +119,7 @@ def view_gene(request, gene_id):
 
 
 def _get_mim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
-    genes = gene_symbol.get_genes()
+    genes = gene_symbol.genes
     mim_set = set((mim_gene.mim_morbid for mim_gene in MIMGene.objects.filter(gene__in=genes)))
     mim_and_hpo_for_gene = []
     for mim in sorted(mim_set, key=lambda m: m.accession):
@@ -134,7 +134,7 @@ def view_gene_symbol(request, gene_symbol):
 
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
-    for gene in gene_symbol.get_genes():
+    for gene in gene_symbol.genes:
         aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
         aliases.update(gene.get_symbols().exclude(symbol=gene_symbol))
 
@@ -163,6 +163,8 @@ def view_gene_symbol(request, gene_symbol):
         q = get_has_variant_tags()
         has_tagged_variants = gene_variant_qs.filter(q).exists()
 
+        # has classifications isn't 100% in sync with the classification table:
+        # this code looks at VariantAlleles wheras the classification table will filter on gene symbol and transcript evidence keys
         q = get_has_classifications_q(genome_build)
         has_classified_variants = gene_variant_qs.filter(q).exists()
     else:
@@ -188,15 +190,6 @@ def view_gene_symbol(request, gene_symbol):
     has_gene_coverage = GeneCoverage.get_for_symbol(genome_build, gene_symbol).exists()
     has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).exists()
 
-    aliases_out = [alias for alias in gene_symbol.aliases_to_for if not alias.my_symbol_is_main]
-    aliases_out.sort()
-
-    aliases_in = [alias for alias in gene_symbol.aliases_to_for if alias.my_symbol_is_main]
-    aliases_in.sort()
-
-    filter_aliases = [gs.symbol for gs in gene_symbol.traverse_aliases()]
-    filter_aliases.sort()
-
     context = {
         "consortium_genes_and_aliases": defaultdict_to_dict(consortium_genes_and_aliases),
         "citations": citations,
@@ -216,10 +209,7 @@ def view_gene_symbol(request, gene_symbol):
         "num_gene_annotation_versions": num_gene_annotation_versions,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
-        "datatable_config": ClassificationDatatableConfig(request),
-        "aliases_out": aliases_out,
-        "aliases_in": aliases_in,
-        "filter_aliases": ', '.join(filter_aliases)
+        "datatable_config": ClassificationDatatableConfig(request)
     }
     return render(request, "genes/view_gene_symbol.html", context)
 
