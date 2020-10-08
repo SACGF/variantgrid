@@ -121,8 +121,6 @@ class BulkUnknownVariantInserter:
         # These operations are I/O heavy (writing files, calling redis) so use threads
         num_vcf_lines = len(self.vcf_lines)
         if num_vcf_lines and num_vcf_lines >= minimum_split_file_size:
-            logging.info("Writing split file")
-
             split_vcf_basename = f"split_vcf_step_{self.upload_step.pk}_batch_{self.split_vcf_batch_id}.vcf"
             split_vcf_filename = os.path.join(self.split_vcf_dir, split_vcf_basename)
             wpv_args = (self.upload_step, self.vcf_header_lines, self.vcf_lines, split_vcf_filename, num_vcf_lines)
