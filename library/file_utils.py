@@ -30,9 +30,12 @@ def rm_if_exists(path):
         os.unlink(path)
 
 
-def name_from_filename(filename):
+def name_from_filename(filename, remove_gz=False):
     """Gets file name without extension or directory"""
-    return os.path.splitext(os.path.basename(filename))[0]
+    if remove_gz:
+        filename = remove_gz_if_exists(filename)
+    name = os.path.splitext(os.path.basename(filename))[0]
+    return name
 
 
 def file_to_array(filename, comment=None, max_lines=None):

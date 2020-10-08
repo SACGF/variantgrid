@@ -70,7 +70,8 @@ class ImportVCFStepTask(Task):
                 upload_step = load_upload_step()  # Reload from DB (other processes may have modified)
                 upload_step.items_processed = items_processed
 
-                if items_processed is not None:
+                # If expected and actual items processed are provided, check they match
+                if upload_step.items_to_process is not None and items_processed is not None:
                     if upload_step.items_to_process != upload_step.items_processed:
                         params = (upload_step.pk, upload_step.items_to_process, upload_step.items_processed)
                         msg = "UploadStep (%d) has items_to_process (%d) != items_processed (%d)" % params

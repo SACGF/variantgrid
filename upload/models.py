@@ -260,7 +260,7 @@ class UploadStep(models.Model):
     # origin is used to indicate whether a step was from a import task factory where it will
     # be re-generated upon retry-import, or manually created (will be left alone and re-executed)
     origin = models.CharField(max_length=1, choices=UploadStepOrigin.CHOICES, default=UploadStepOrigin.IMPORT_TASK_FACTORY)
-    items_to_process = BigIntegerField(null=False, default=0)
+    items_to_process = models.IntegerField(null=True)
     items_processed = models.IntegerField(null=True)
     error_message = models.TextField()
     input_upload_step = models.ForeignKey("self", null=True, on_delete=CASCADE)
@@ -363,7 +363,7 @@ class UploadStepMultiFileOutput(models.Model):
     """ A step may split a file up into multiple files (eg per chrom)  """
     upload_step = models.ForeignKey(UploadStep, on_delete=CASCADE)
     output_filename = models.TextField()
-    items_to_process = models.IntegerField()
+    items_to_process = models.IntegerField(null=True)
 
 
 class VCFImporter(models.Model):

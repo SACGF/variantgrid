@@ -1,3 +1,4 @@
+import glob
 from collections import OrderedDict
 from django.conf import settings
 from django.utils import timezone
@@ -9,7 +10,9 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.file_utils import name_from_filename
 import pandas as pd
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
-    UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig
+    UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput
+from upload.models_enums import VCFPipelineStage
+from upload.tasks.vcf.unknown_variants_task import SeparateUnknownVariantsTask
 
 
 def get_vt_tool_version(vt_command):
@@ -41,7 +44,8 @@ def preprocess_vcf(upload_step):
     DECOMPOSE_SUB_STEP = "decompose"
     NORMALIZE_SUB_STEP = "normalize"
     UNIQ_SUB_STEP = "uniq"
-    EXTRACT_UNKNOWN_SUB_STEP = "vcf_extract_unknown_and_split_file"
+    REMOVE_HEADER_SUB_STEP = "remove_header"
+    SPLIT_VCF_SUB_STEP = "split_vcf"
 
     genome_build = upload_step.genome_build
     _ = genome_build.reference_fasta  # Fails if not available.
@@ -58,7 +62,8 @@ def preprocess_vcf(upload_step):
         pipe_commands["cat"] = ["cat", vcf_filename]
 
     upload_pipeline = upload_step.upload_pipeline
-    base_filename = "%s.skipped_contigs.tsv" % name_from_filename(vcf_filename)
+    vcf_name = name_from_filename(vcf_filename, remove_gz=True)
+    base_filename = f"{vcf_name}.skipped_contigs.tsv"
     skipped_contigs_stats_file = get_import_processing_filename(upload_pipeline.pk, base_filename)
     manage_command = settings.MANAGE_COMMAND
     read_variants_cmd = manage_command + ["vcf_filter_unknown_contigs",
@@ -73,9 +78,15 @@ def preprocess_vcf(upload_step):
     pipe_commands[DECOMPOSE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "decompose", "-s", "-"]
     pipe_commands[NORMALIZE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "normalize", "-n", "-r", genome_build.reference_fasta, "-"]
     pipe_commands[UNIQ_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "uniq", "-"]
-    pipe_commands[EXTRACT_UNKNOWN_SUB_STEP] = manage_command + ["vcf_extract_unknown_and_split_file", "--upload-step-pk", str(upload_step.pk)]
 
-    for sub_step_name in [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP, UNIQ_SUB_STEP, EXTRACT_UNKNOWN_SUB_STEP]:
+    # Split up the VCF
+    split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
+    pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "view", "-"]
+    pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
+                                         "--lines", str(settings.VCF_IMPORT_FILE_SPLIT_ROWS),
+                                         f"--filter='sh -c \"{{ vt view -H {vcf_filename}; cat; }} | gzip > {split_vcf_dir}/$FILE\"'"]
+
+    for sub_step_name in [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP, UNIQ_SUB_STEP]:
         sub_step_commands = pipe_commands[sub_step_name]
         sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands)
 
@@ -149,3 +160,22 @@ def preprocess_vcf(upload_step):
 
     # Create this here so downstream tasks can add modified imported variant messages
     import_info, _ = ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)
+
+    # split_vcf_dir
+    sort_order = upload_pipeline.get_max_step_sort_order()
+    for split_vcf_filename in glob.glob(f"{split_vcf_dir}/*.vcf.gz"):
+        sort_order += 1
+        separate_upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                         name="Separate Unknown Variants Task",
+                                                         sort_order=sort_order,
+                                                         task_type=UploadStepTaskType.CELERY,
+                                                         pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
+                                                         input_filename=split_vcf_filename)
+        separate_upload_step.launch_task(SeparateUnknownVariantsTask)
+
+        # We don't know how big the last split file is, so leave it as null so no check
+        UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
+                                                 output_filename=split_vcf_filename)
+
+
+

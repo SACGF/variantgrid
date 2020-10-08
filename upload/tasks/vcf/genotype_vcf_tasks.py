@@ -98,8 +98,7 @@ class ProcessGenotypeVCFDataTask(ImportVCFStepTask):
         (ie via ImportGenotypeVCFTask) - this can run in parallel """
 
     def process_items(self, upload_step):
-        items_processed = import_vcf_file(upload_step)
-        return items_processed
+        return import_vcf_file(upload_step)
 
 
 class CalculateVCFStatsTask(ImportVCFStepTask):
