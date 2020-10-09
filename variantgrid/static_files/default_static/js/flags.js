@@ -1130,7 +1130,7 @@ let Flags = (function () {
         updateFilter() {
             if (this.summaryFilter.length) {
                 this.summaryFilter.empty();
-                counts = {};
+                let counts = {};
                 for (let flag of this.flags.all()) {
                     if (flag.open) {
                         let resolution_counts = counts[flag.flag_type] || {};
@@ -1150,22 +1150,22 @@ let Flags = (function () {
                     for (let [resolution, value] of Object.entries(resolution_counts)) {
 
                         let label =  $('<span>', {class: 'label', text: flagType.label});
-                        if (resolution != 'open') {
+                        if (resolution !== 'open') {
                             let resolutionObj = this.flagResolutions.get(resolution);
                             $('<span>', {text: ` (${resolutionObj.label})`}).appendTo(label);
                         }
                         
-                        cell_parts = [
+                        let cell_parts = [
                             $('<div>').addClass('flag').addClass(`flag-${flagType.id} res-${resolution}`),
-                            $('<span>', {class: 'count', text: `${value}`}),
+                            $('<div>', {class: 'text-monospace mx-2', text: value.toString(), style:'min-width: 2rem; text-align:right'}),
                             label
                         ];
                         if (value > 1 && !flagType.label.endsWith('s')) {
                             $('<span>', {class: 'plural', text: 's'}).appendTo(label);
                         }
                         
-                        let filterCell = $('<div>', {
-                            class: 'filter-cell',
+                        let filterCell = $('<a/>', {
+                            class: 'list-group-item list-group-item-action d-flex',
                             'data-flag-type': `${flagType.id}-${resolution}`,
                             html: cell_parts,
                             click: () => {
@@ -1180,16 +1180,15 @@ let Flags = (function () {
         
         applyFilter(flag_type_id, resolution) {
             let filterValue = `${flag_type_id}-${resolution}`;
-            if (this.filterValue == filterValue || flag_type_id == null) {
+            this.summaryFilter.find('.list-group-item').removeClass('list-group-item-primary');
+            if (this.filterValue === filterValue || flag_type_id === null) {
                 this.filterValue = null;
-                $('.filter-cell').removeClass('selected');
                 this.collections.all().forEach(c => c.dom.closest('tr').show());
             } else {
                 this.filterValue = filterValue;
-                $('.filter-cell').removeClass('selected');
-                $(`.filter-cell[data-flag-type=${flag_type_id}-${resolution}]`).addClass('selected');
+                this.summaryFilter.find(`[data-flag-type=${flag_type_id}-${resolution}]`).addClass('list-group-item-primary');
                 let matching_collection_ids = {};
-                let flags = this.flags.all().filter(f => f.flag_type == flag_type_id && f.resolution == resolution).forEach(f => {
+                let flags = this.flags.all().filter(f => f.flag_type === flag_type_id && f.resolution === resolution).forEach(f => {
                     matching_collection_ids[f.collection] = true;
                 });
                 for (let fc of this.collections.all()) {
@@ -1218,7 +1217,7 @@ let Flags = (function () {
                 }
             }
             return window.setTimeout(() => {
-                this.refreshCurrentDialog()
+                this.refreshCurrentDialog();
             }, 5000);
         },
 
@@ -1255,7 +1254,7 @@ let Flags = (function () {
                     flag_collection_doms[id] = Object.assign({ dom: dom }, flag_collection_doms[id] || {});
                 }
             });
-            for (entry of Object.entries(flag_collection_doms)) {
+            for (let entry of Object.entries(flag_collection_doms)) {
                 let id = entry[0];
                 let data = entry[1];
                 if (existingCollections[id]) {
@@ -1389,8 +1388,8 @@ let Flags = (function () {
                     continue;
                 }
                 dom.empty();
-                flags = collection.flags();
-                watch = collection.watching === 0 || collection.watching;
+                let flags = collection.flags();
+                let watch = collection.watching === 0 || collection.watching;
                 let flagSummary = $('<div>', { class: `flag add`, title: 'Add or review flags for ' + collection.label}).appendTo(dom);
                 flagSummary.click(() => { new FlagCollectionDialog(collection).init({triggerDom: flagSummary}) });
 

@@ -13,14 +13,17 @@
 {% endblock %}
 {% block content %}
     <div class="container">
-        <h3>All Allele/HGVS Issues Filter</h3>
+        <h3>HGVS Issues</h3>
 
         <a class="btn btn-outline-primary" href="{% url 'hgvs_issues_download' %}"><i class="fas fa-file-csv"></i> Download HGVS Issues</a>
 
-        {% comment %}
         <!-- flags filter needs to be restyled -->
-        <div id="flags-filter" data-filter="{{ filter_flags }}"></div>
-        {% endcomment %}
+        <div class="card mt-4">
+            <div class="card-header">All Allele/HGVS Issues Filter</div>
+            <div class="card-body card-body-list">
+                <ul id="flags-filter" data-filter="{{ filter_flags }}" class="list-group"></ul>
+            </div>
+        </div>
 
         <h3>Allele Issues</h3>
         <table class="table">
