@@ -15,7 +15,6 @@ function setupTooltips() {
         }
     });
 
-
     let popoverOpts = {
         html: true,
         trigger: 'hover click',
@@ -37,7 +36,7 @@ function setupTooltips() {
         if (node.attr('data-content')) {
             node.addClass('hover-detail');
             node.popover(popoverOpts);
-        } else if (node.attr('title')) {
+        } else if (node.attr('title') && node.attr('class') !== 'select2-selection__clear') {
             node.tooltip({html: true, trigger : 'hover'});
         }
         for (let child of node.children()) {
