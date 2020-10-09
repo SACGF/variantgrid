@@ -62,11 +62,11 @@
            <div id="genotype-grid-pager"></div> 
 	   </div>
        <script>
-        const visible_rows = {{ visible_rows | jsonify }};
-        const ZYGOSITY_DICT = { 'O' : 'HOM_ALT',
-                                'E' : 'HET',
-                                'R' : 'HOM_REF',
-                                'U' : 'Unknown Zygosity',
+        let visible_rows = {{ visible_rows | jsonify }};
+        let ZYGOSITY_DICT = { 'O' : 'HOM_ALT',
+                              'E' : 'HET',
+                              'R' : 'HOM_REF',
+                              'U' : 'Unknown Zygosity',
         };
 
         function sampleFormatFieldFormatter(formatField) {
