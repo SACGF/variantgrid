@@ -42,13 +42,12 @@
 
                     <a href="#vep-command-{{ build_name }}" class="hover-link" data-toggle="collapse">Show VEP command...</a>
                     <div id="vep-command-{{ build_name }}" class="collapse">
-<pre class="border border-info p-2">
-{{ av_data.0 }}
-</pre>
+                        <pre class="border border-info p-2">
+                        {{ av_data.0 }}
+                        </pre>
                     </div>
                     {% load jqgrid_tags %}
                     {% jqgrid 'variant_annotation_version_grid' build_name search=False delete=False genome_build_name=build_name %}
-                    </div>
                 </div>
             {% end_ui_register_tab_embedded %}
         {% endfor %}
