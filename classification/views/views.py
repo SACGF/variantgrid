@@ -2,7 +2,7 @@ from datetime import datetime
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
-from crispy_forms.layout import Layout, Field, Button
+from crispy_forms.layout import Layout, Field, Button, Submit
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
@@ -75,7 +75,7 @@ def classifications(request):
     search_and_classify_form.fields['search'].label = "HGVS / dbSNP / VCF coordinate"
     helper = form_helper_horizontal()
     helper.layout = Layout(
-        FieldWithButtons(Field('search', placeholder=""), StrictButton("Go", css_class="btn btn-primary"))
+        FieldWithButtons(Field('search', placeholder=""), Submit(name="action", value="Go"))
     )
     search_and_classify_form.helper = helper
 

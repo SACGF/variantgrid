@@ -177,8 +177,6 @@
             <div class="col-md-4 col-lg-2">
                 {% if user_settings.default_lab %}
                 <a class="hover-link" onclick="filterDefaultLab()">Filter : {{ user_settings.default_lab.name }}</a>
-                {% else %}
-                &nbsp;
                 {% endif %}
                 {% crispy lab_form form_helper.horizontal_no_labels %}
             </div>
