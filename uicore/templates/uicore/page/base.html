@@ -89,6 +89,10 @@
 
     <script>
         {% block jshead %}{% endblock %}
+        function openExternalHelpUrl(suffix) {
+            let url = "{{ help_url }}" + suffix;
+            window.open(url, "_blank");
+        }
         $(document).ready(() => {
             globalSetup();
             {% block jsdocumentready %}{% endblock %}
