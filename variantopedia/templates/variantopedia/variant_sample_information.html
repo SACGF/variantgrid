@@ -54,7 +54,6 @@
         </p>
 	</div>
 	{% endif %}
-
 	{% if not vsi.hidden_samples_details or vsi.hidden_samples_details.num_visible_observations %}
 
 	   <div id="genotype-grid-container">
@@ -62,8 +61,8 @@
            <div id="genotype-grid-pager"></div> 
 	   </div>
        <script>
-        let visible_rows = {{ visible_rows | jsonify }};
-        let ZYGOSITY_DICT = { 'O' : 'HOM_ALT',
+        var visible_rows = {{ visible_rows | jsonify }};
+        var ZYGOSITY_DICT = { 'O' : 'HOM_ALT',
                               'E' : 'HET',
                               'R' : 'HOM_REF',
                               'U' : 'Unknown Zygosity',
