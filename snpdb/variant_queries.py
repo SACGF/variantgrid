@@ -26,7 +26,7 @@ def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, genome_build: 
     if traverse_aliases:
         genes = gene_symbol.alias_meta.genes
     else:
-        genes = set([gene_symbol.genes])
+        genes = set(gene_symbol.genes)
 
     qs = get_variant_queryset_for_latest_annotation_version(genome_build)
     return qs.filter(variantgeneoverlap__gene__in=genes)
