@@ -185,7 +185,7 @@ class VariantPKLookup:
                     logging.debug("Inserted %d of %d (%.2f%%)", inserted, num_to_insert, percent_done)
 
             if i:
-                logging.debug(f"Inserting remaining {i}")
+                logging.debug("Inserting remaining %d", i)
                 redis_pipeline.execute()
                 inserted += i
 
@@ -215,7 +215,7 @@ class VariantPKLookup:
             start = time()
             i = 0
             redis_pipeline = self.redis.pipeline()
-            logging.debug(f"Updating {num_new_loci} loci.")
+            logging.debug("Updating %d loci.", num_new_loci)
 
             loci_values_qs = Locus.objects.values_list('id', 'contig', 'position', 'ref')
             if old_max_loci_id:

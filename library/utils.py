@@ -364,7 +364,7 @@ class ModelUtilsMixin:
 def execute_cmd(cmd: list):
     if settings.POPEN_SHELL:
         command = ' '.join(cmd)
-        logging.info('About to call ', command)
+        logging.info('About to call %s', command)
         pipes = subprocess.Popen(command, shell=True)
         logging.info('Completed')
     else:

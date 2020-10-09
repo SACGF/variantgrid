@@ -29,7 +29,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
-    PfamSequenceIdentifier, GeneSymbolAliasSummary
+    PfamSequenceIdentifier
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict

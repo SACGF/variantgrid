@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from dataclasses import dataclass
 from functools import total_ordering
 from typing import Tuple, Optional, Dict, List, Set
