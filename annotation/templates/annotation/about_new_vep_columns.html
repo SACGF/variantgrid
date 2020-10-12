@@ -27,6 +27,23 @@
             width: 33%;
             word-break: break-all;
         }
+
+        .addition {
+            background-color: #e6ffe6;
+        }
+
+        .deletion {
+            background-color: #e6e6ff;
+        }
+
+        .modification {
+            background-color: #ffe6e6;
+        }
+
+        .addition.deletion {
+            background-color: #ffe6e6;
+        }
+
     </style>
     <script>
         $(document).ready(() => {
@@ -37,6 +54,7 @@
 {% block content %}
 
 <div class="container">
+    <h3>(New) VEP Columns</h3>
     <div>
         <p>
         In August 2019 we switched from an in-house annotation pipeline to using <a href="https://asia.ensembl.org/info/docs/tools/vep/script/index.html">Variant Effect Predictor</a> (<b>VEP</b>), by Ensembl.
@@ -65,18 +83,18 @@
         </ul>
     </div>
 
-    <div id='columns-legend'>
-        <div id='column-legend-header'>
-            <b>Column Changes</b>
-        </div>
-        <div class="d-flex flex-row">
-            <div class='color-box deletion'></div><div class="align-self-center ml-2"> - Deletion</div>
-        </div>
-        <div class="d-flex flex-row mt-2">
-            <div class='color-box modification'></div><div class="align-self-center ml-2"> - Modification</div>
-        </div>
-        <div class="d-flex flex-row mt-2">
-            <div class='color-box addition'></div><div class="align-self-center ml-2"> - Addition</div>
+    <div class="card">
+        <div class="card-header">Column Changes</b></div>
+        <div class="card-body">
+            <div class="d-flex flex-row">
+                <div class='color-box deletion'></div><div class="align-self-center ml-2"> - Deletion</div>
+            </div>
+            <div class="d-flex flex-row mt-2">
+                <div class='color-box modification'></div><div class="align-self-center ml-2"> - Modification</div>
+            </div>
+            <div class="d-flex flex-row mt-2">
+                <div class='color-box addition'></div><div class="align-self-center ml-2"> - Addition</div>
+            </div>
         </div>
     </div>
 
