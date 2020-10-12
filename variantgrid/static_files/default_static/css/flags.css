@@ -583,5 +583,8 @@ a.navigation-bar {
     }
 }
 */
+.res-closed {
+  opacity: 0.7;
+}
 
 /*# sourceMappingURL=flags.css.map */

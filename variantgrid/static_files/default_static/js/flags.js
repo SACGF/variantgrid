@@ -56,7 +56,7 @@ let Flags = (function () {
                 return $('<div>', {
                     class: 'user', html: [
                         $('<div>', { class: 'avatar' }).css(`background-image`, `url(${this.avatar})`).css('background-color', this.color),
-                        $('<div>', { class: 'username', text: this.name })
+                        $('<div>', { class: 'username', text: this.name }),
                     ]
                 });
             }
@@ -269,6 +269,7 @@ let Flags = (function () {
             this.states = null;
 
             this.title = null;
+            this.titleDom = null;
             this.body = null;
             this.footer = null;
 
@@ -279,7 +280,18 @@ let Flags = (function () {
         };
         FlagContent.prototype = {
             init() {
-                this.title = this.flag.flagTypeObj().label;
+                let flag = this.flag;
+                let flagType = flag.flagTypeObj();
+                let flagDiv = $('<div>', { class: `flag flag-${flagType.id} res-${this.resolution} mr-1`});
+                this.titleDom = [flagDiv, flagType.label];
+                if (flag.open === false) {
+                    flagDiv.addClass('closed');
+                }
+                if (flag.creating) {
+                    this.titleDom.push(' (New)');
+                } else {
+                    this.titleDom.push(` (Raised: ${flag.ageText()})`);
+                }
                 let dom = $('<div>');
                 this.body = dom;
 
@@ -287,7 +299,8 @@ let Flags = (function () {
                 let details = $('<div>', {class: 'flag-details'}).appendTo(content);
                 this.scrollablePanel = details;
                 
-                $('<div>', { class: 'description border rounded p-4' }).appendTo(details);
+                $('<div>', { class: 'description' }).appendTo(details);
+                $('<hr/>').appendTo(details);
                 $('<div>', { class: 'flag-comments' }).appendTo(details);
 
                 this.states = $('<div>');
@@ -313,7 +326,7 @@ let Flags = (function () {
                 let comment = null;
                 if (this.textarea) {
                     comment = this.textarea.val().trim();
-                    if (comment.length == 0) {
+                    if (comment.length === 0) {
                         comment = null;
                     }
                     this.textarea.val('');
@@ -373,16 +386,11 @@ let Flags = (function () {
                 description.empty();
                 let flag = this.flag;
 
-                description.append(flag.flagTypeObj().dom({flag: flag}));
                 $('<div>', {class: 'flag-help', html: [
                     flag.helpFlagType(),
                     flag.helpSpecific(),
                     flag.statusDom()
                 ]}).appendTo(description);
-                
-                if (flag.creating) {
-                    $('<h5>', { text: 'Enter a comment and click save to raise this flag' }).appendTo(description);
-                }
                 return description;
             },
 
@@ -453,35 +461,27 @@ let Flags = (function () {
 
                 this.states.empty();
                 if (resolutions.length > 0) {
-                    let content = $('<div>', {class:'inline-form'}).appendTo(this.states);
+                    if (flag.creating) {
+                        $('<label>', { class:'mb-2', text: 'Enter a comment and click save to raise this flag' }).appendTo(this.states);
+                    }
+                    let content = $('<div>', {class:'d-flex mb-2'}).css('align-items','center').appendTo(this.states);
+                    $('<label/>', {text: 'Status:', class:'mr-2 align-center'}).appendTo(content);
+                    let statusButtons = $('<div>', {class:'btn-group btn-group-toggle', 'data-toggle':'buttons'}).appendTo(content)
                     for (let resolution of resolutions) {
                         let did = `res-${resolution.id}`;
-                        let input = $('<input>', {class:"form-check-input", type:"radio", name:"flag-res", id:did, value:resolution.id});
+                        let input = $('<input>', {type:"radio", name:"flag-res", id:did, value:resolution.id});
+                        let label = $('<label>', {class:'btn btn-outline-secondary', html:[
+                            input, resolution.label
+                        ]});
                         if (resolution.id === newRes) {
                             input.attr('checked', true);
+                            label.addClass('active');
                         }
-                        $('<div>', {class:'form-check form-check-inline', html:[
-                            input,
-                            $('<label>', {class:"form-check-label", 'for':did, text:resolution.label})
-                        ]}).appendTo(content);
+                        label.appendTo(statusButtons);
                     }
 
                     /*
-                    $('<legend>', {class: 'status', text: flag.statusText()}).appendTo(content);
-                    if (resolutions.length <= 4) {
-                        let inputs = [];
-                        for (let resolution of resolutions) {
-                            let did = `res-${resolution.id}`;
-                            $('<label>', {'for': did, text: resolution.label}).appendTo(content);
-                            let input = $('<input>', {type: 'radio', name: 'flag-res', value: resolution.id, id: did}).appendTo(content);
-                            inputs.push(input);
-                            if (resolution.id == newRes) {
-                                input.attr('checked', true);
-                            }
-                        }
-                        $(inputs).checkboxradio();
-
-
+                    // old code for providing drop down if too many options
                     } else {
                         let select = $('<select>', {name: 'flag-res'}).appendTo(content);
                         for (let resolution of resolutions) {
@@ -540,11 +540,11 @@ let Flags = (function () {
                 } else {
                     if (flag.creating) {
                         bigIcon.addClass('new');
-                    } else if (flag.status == 'O') {
+                    } else if (flag.status === 'O') {
                         bigIcon.addClass('open');
-                    } else if (flag.status == 'C') {
+                    } else if (flag.status === 'C') {
                         bigIcon.addClass('closed');
-                    } else if (flag.status == 'R') {
+                    } else if (flag.status === 'R') {
                         bigIcon.addClass('rejected');
                     }
                 }
@@ -581,7 +581,6 @@ let Flags = (function () {
                         if (status == 'open' && flag.resolution) {
                             let res = flag.resolutionObj();
                             $('<div>', {html: [
-                                $('<br>'),
                                 $('<span>', {text: 'Current status : '}),
                                 $('<b>', {text: res.label})
                             ]}).appendTo(help);
@@ -723,19 +722,31 @@ let Flags = (function () {
                 this.activeContent = activeContent;
                 let parentTitle = (this.collection.label || 'Flags').replace('/', '-'); // fixme trim title
                 let title = this.activeContent.title;
+                let titleDom = this.activeContent.titleDom;
+                if (!titleDom && title) {
+                    titleDom = $('<span/>', {text: title});
+                }
                 let breadcrumbs = this.content.find('ol.breadcrumb');
-                if (!title) {
+                if (!title && !titleDom) {
                     breadcrumbs.html([
                         $('<li>', {class: 'breadcrumb-item', text: parentTitle})
                     ]);
                 } else {
+                    // not showing parent title as it can get a bit out of control
                     breadcrumbs.html([
-                        $('<li>', {class: 'breadcrumb-item', html: $('<a>', {text: parentTitle, click: () => { this.back() }})}),
-                        $('<li>', {class: 'breadcrumb-item active', text: title})
+                        $('<li>', {class: 'breadcrumb-item font-weight-bold', html: $('<a>', {html: '<i class="fas fa-angle-left"></i> Back to All Flags', click: () => { this.back(); }})}),
+                        $('<li>', {class: 'breadcrumb-item active', html: titleDom})
                     ]);
                 }
                 this.content.find('.modal-body').html(this.activeContent.body);
-                this.content.find('.modal-footer').html(this.activeContent.footer);
+                let footer = this.content.find('.modal-footer');
+                footer.html(this.activeContent.footer);
+                if (!this.activeContent.footer || this.activeContent.footer.css('display') === 'none') {
+                    footer.addClass('d-none');
+                } else {
+                    footer.removeClass('d-none');
+                }
+
             },
 
             timeline() {
@@ -779,7 +790,7 @@ let Flags = (function () {
             },
             
             statusText() {
-                if (this.flag_type == 'classification_significance_change') {
+                if (this.flag_type === 'classification_significance_change') {
                     return 'Primary Reason for Change';
                 }
                 if (this.creating) {
@@ -920,7 +931,7 @@ let Flags = (function () {
                     return $('<div>');
                 }
                 return $('<div>', {html: [
-                    `<br/>This ${this.flagTypeObj().label} has the status of `,
+                    `This ${this.flagTypeObj().label} has the status of `,
                     $('<b>', {text: this.resolutionObj().label})
                 ]});
             },
@@ -949,9 +960,11 @@ let Flags = (function () {
                         ]});
                     }
                 } else if (this.flag_type === 'classification_suggestion') {
+                    let user = this.userObj();
                     return $('<div>', {html: [
                         `Raised by `,
-                        $('<span>', {class: 'username', text:this.userObj().name}),
+                        $('<span>', {class: 'username', text:user.name}),
+                        $('<span>', { class: 'text-secondary text-italic font-italic d-inline-block mx-2', text: user.lab}),
                         ` in regards to `,
                         $('<span>', {class: 'quote', text: firstComment})
                     ]});
@@ -980,7 +993,7 @@ let Flags = (function () {
             },
             
             ageText() {
-                return jQuery.timeago(this.created * 1000) + ' ago';
+                return jQuery.timeago(this.created * 1000);
             },
             comments() {
                 return Object.values(this.db.comments.all()).filter(c => c.flag == this.id).sort((c1, c2) => c1.created - c2.created);
@@ -997,7 +1010,7 @@ let Flags = (function () {
                     flagDiv.tooltip('hide');
                     new FlagCollectionDialog(this.collectionObj()).init({activeFlag:this, triggerDom:flagDiv})
                 });
-                if (this.open == false) {
+                if (this.open === false) {
                     flagDiv.addClass('closed');
                 }
                 return flagDiv;
@@ -1024,7 +1037,7 @@ let Flags = (function () {
             action() {
                 let resolution = this.resolutionObj();
                 if (!resolution) {
-                    return 'Commented'
+                    return 'Commented';
                 } else {
                     return resolution.label;
                 }
@@ -1047,7 +1060,7 @@ let Flags = (function () {
                 let timestamp = moment(this.created * 1000).format('DD-MMM-YYYY');
                 if (lastEntry) {
                     oldTimestamp = moment(lastEntry.created * 1000).format('DD-MMM-YYYY');
-                    if (oldTimestamp == timestamp) {
+                    if (oldTimestamp === timestamp) {
                         timestamp = null;
                     }
                 }
@@ -1064,6 +1077,7 @@ let Flags = (function () {
                 let userInfo = $('<div>', {
                     class: 'header', html: [
                         $('<span>', { class: 'username', text: user.name }),
+                        $('<span>', { class: 'text-secondary text-italic font-italic d-inline-block mr-2', text: user.lab}),
                         $('<span>', { class: 'time', text: time })
                     ]
                 }).appendTo(content);

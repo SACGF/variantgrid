@@ -206,7 +206,8 @@ class FlagHelper:
                 'id': user.id,
                 'name': UserSettings.preferred_label_for(user),
                 'avatar': user_settings.avatar_url,
-                'color': user_settings.avatar_color
+                'color': user_settings.avatar_color,
+                'lab': user_settings.default_lab.name if not user.is_superuser else 'admin'
             }
             users_json.append(json_entry)
         json_data['users'] = users_json

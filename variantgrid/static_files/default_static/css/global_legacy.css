@@ -1347,11 +1347,6 @@ div.readonly {
   font-style: italic;
 }
 
-hr {
-  border: 0.5px solid #c8c8c8;
-  height: 0px;
-}
-
 .ui-tabs .ui-tabs-nav li.ui-tabs-active {
   padding-bottom: 0 !important;
 }

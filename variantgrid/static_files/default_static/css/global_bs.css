@@ -45,6 +45,13 @@ label {
   text-decoration: underline;
 }
 
+.modal-header {
+  background-color: #eee;
+}
+.modal-header a:hover {
+  text-decoration: underline !important;
+}
+
 /*
 .card-body {
     background-color: #f5fff5;

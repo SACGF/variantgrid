@@ -1403,11 +1403,6 @@ div.readonly {
     color: #8888AA;
     font-style: italic;
 }
-// make horizontal rule not look so 1990s
-hr {
-    border: 0.5px solid rgb(200, 200, 200);
-    height: 0px;
-}
 
 // jquery overrides
 .ui-tabs .ui-tabs-nav li.ui-tabs-active {

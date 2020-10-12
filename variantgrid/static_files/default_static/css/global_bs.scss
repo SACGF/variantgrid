@@ -64,6 +64,12 @@ label {
         }
     }
 }
+.modal-header {
+  background-color: #eee;
+  a:hover {
+      text-decoration: underline !important;
+  }
+}
 
 // not sure if we want to give all cards the pyprus background
 // but stops the screen from being too white..
