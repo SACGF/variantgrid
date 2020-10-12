@@ -952,7 +952,7 @@ let Flags = (function () {
                     if (match) {
                         let transcriptUrl = null;
                         let transcriptNoVer = match[1];
-                        transcriptUrl = `/genes/view_transcript/${transcriptNoVer}`;
+                        transcriptUrl = Urls.view_transcript(transcriptNoVer);
                         return $('<div>', {html: [
                             'View details about the transcript ',
                             $('<a>', {href:transcriptUrl, class:'hover-link', text:`${transcriptNoVer}`, target:'_blank'}),
