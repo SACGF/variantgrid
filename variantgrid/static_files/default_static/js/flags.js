@@ -974,7 +974,7 @@ let Flags = (function () {
                     let variantId = this.collectionObj().variant;
                     return $('<div>', {html: [
                         `See more information about the linked variant `,
-                        $('<a>', {class: 'hover-link', text: `here`, href:`/variantdetails/view_allele_from_variant/${variantId}`})
+                        $('<a>', {class: 'hover-link', text: `here`, href: Urls.view_allele_from_variant(variantId)})
                     ]});
                 } else if (this.flag_type === 'classification_discordant') {
                     let reportId = this.collectionObj().discordance_report;
