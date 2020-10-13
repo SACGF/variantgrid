@@ -135,6 +135,19 @@ class GeneSymbol(models.Model):
 
 
 class GeneSymbolAlias(TimeStampedModel):
+    """ Gene Aliases record keep track of "source" and are from:
+        NCBI:
+         * Source: ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
+         * Code: python3.8 manage.py import_ncbi_gene_info <file>
+
+        HGNC:
+         * Source: https://www.genenames.org/cgi-bin/download
+         * Code: python3.8 manage.py hgnc_gene_symbols_import <file>
+
+        UCSC: We no longer use UCSC aliases, they will only exist upgrading legacy systems
+         * Source: https://genome.ucsc.edu/cgi-bin/hgTables?command=start export kgAlias table
+         * Code: N/A - obsolete
+    """
     alias = models.TextField(unique=True)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.CHOICES)
