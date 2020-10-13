@@ -180,7 +180,7 @@
                     {% else %}
                         <a href="{% url 'view_gene_symbol' alias_summary.other_symbol %}" class="list-group-item list-group-item-action">
                             <i class="fas fa-arrow-circle-right"></i>
-                            Aliasesd Gene Symbol : <span class="text-monospace">{{ alias_summary.other_symbol }}</span> - {{ gene_symbol }} is an alias for {{ alias_summary.other_symbol }} ({{ alias_summary.source }})
+                            Aliased Gene Symbol : <span class="text-monospace">{{ alias_summary.other_symbol }}</span> - {{ gene_symbol }} is an alias for {{ alias_summary.other_symbol }} ({{ alias_summary.source }})
                         </a>
                     {% endif %}
                 {% endfor %}
