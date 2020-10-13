@@ -57,7 +57,7 @@ table.diff {
             width: 260px;
             word-break: break-all;
         }
-        tr.textarea td, tr.citation-row th {
+        tr.textarea td, tr.citation-row th, tr.note td {
             word-break: normal;
         }
         .group th {
