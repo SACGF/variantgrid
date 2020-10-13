@@ -144,7 +144,7 @@ class GeneSymbolAlias(TimeStampedModel):
          * Source: https://www.genenames.org/cgi-bin/download
          * Code: python3.8 manage.py hgnc_gene_symbols_import <file>
 
-        UCSC: We no longer use UCSC aliases, they will only exist upgrading legacy systems
+        UCSC: We no longer use UCSC aliases, they will only exist upgraded legacy systems
          * Source: https://genome.ucsc.edu/cgi-bin/hgTables?command=start export kgAlias table
          * Code: N/A - obsolete
     """
