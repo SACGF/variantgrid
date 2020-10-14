@@ -433,11 +433,15 @@ EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
     return content;
 };
 
+function replaceAll(originalString, find, replace) {
+  return originalString.replace(new RegExp(find, 'g'), replace);
+};
+
 EKeys.fixDescription = function(htmlText) {
     htmlText = htmlText.trim();
-    htmlText = htmlText.replaceAll(/(<br>|<br\/>|<br \/>)/gm, '\n');
-    htmlText = htmlText.replaceAll(/^\s+$/gm, '');
-    htmlText = htmlText.replaceAll(/\n{3,}/gm, '\n\n');
+    htmlText = replaceAll(htmlText, /(<br>|<br\/>|<br \/>)/gm, '\n');
+    htmlText = replaceAll(htmlText, /^\s+$/gm, '');
+    htmlText = replaceAll(htmlText, /\n{3,}/gm, '\n\n');
     let html = $('<span>', {html: htmlText});
     html.find('p').each(function() {
         let $this = $(this);
