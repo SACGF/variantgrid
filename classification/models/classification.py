@@ -380,7 +380,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         :return: Returns length of the c.hgvs if successfully updated caches
         """
         max_length = 0
-        if self.variant:
+        variant = self.variant
+        if variant:
             if GenomeBuild.grch37().is_annotated:
                 c_hgvs_name = self._generate_c_hgvs_extra(genome_build=GenomeBuild.grch37())
                 max_length = max(c_hgvs_name.ref_lengths(), max_length)
@@ -396,39 +397,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.chgvs_grch37_full = None
             self.chgvs_grch38 = None
             self.chgvs_grch38_full = None
-        return max_length
 
-    @transaction.atomic()
-    def set_variant(self, variant: Variant = None, message: str = None, failed: bool = False):
-        """
-        Update the variant matching lifecycle step
-        @param variant If we now match to a variant, pass it in and the variant set signal will be fired
-        @param message Any message to include about a matching failure or success
-        @param failed If we're unable to match and wont be able to match again in future
-
-        Calling set_variant will automatically call .save()
-        If there is no variant and failed = True, any classification_import will be unset
-        """
-        self.chgvs_grch37 = None
-        self.chgvs_grch38 = None
-        self.variant = variant
-
-        # don't want to be considered as part of the import anymore
-        # as we've failed matching somewhere along the line
-        if variant is None and failed:
-            self.classification_import = None
-
-        if not self.id:
-            # need to have an id to have a flag collection
-            self.save()
-
-        flag_collection = self.flag_collection_safe
         try:
             # if we had a previously opened flag match warning - don't re-open
             if variant:
-                self.update_cached_c_hgvs()
+                if not self.id:
+                    # need to save to have a flag collection
+                    self.save()
 
                 # record the fact that we did match
+                flag_collection = self.flag_collection_safe
                 flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_flag, comment='Variant Matched')
                 classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
 
@@ -484,22 +462,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 else:
                     flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
 
-            elif failed:
-                c_hgvs = self.get(SpecialEKeys.C_HGVS)
-                build_name = self.get(SpecialEKeys.GENOME_BUILD)
-                if not message:
-                    # This kind of information should already be added in
-                    # comments from get_evidence
-                    message = f'Could not resolve {build_name} {c_hgvs}'
-
-                flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
-                                                  resolution='matching_failed',
-                                                  comment=message)
-            else:
-                flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
-                                                  resolution='open',
-                                                  comment=message)
-
             if variant and variant.allele:
                 allele: Allele = variant.allele
                 # now that everything's saved - see if 37 rep != 38 rep
@@ -512,6 +474,53 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
                                               resolution='matching_failed',
                                               comment='Could not set variant for unexpected reason')
+
+
+        return max_length
+
+    @transaction.atomic()
+    def set_variant(self, variant: Variant = None, message: str = None, failed: bool = False):
+        """
+        Update the variant matching lifecycle step
+        @param variant If we now match to a variant, pass it in and the variant set signal will be fired
+        @param message Any message to include about a matching failure or success
+        @param failed If we're unable to match and wont be able to match again in future
+
+        Calling set_variant will automatically call .save()
+        If there is no variant and failed = True, any classification_import will be unset
+        """
+        self.chgvs_grch37 = None
+        self.chgvs_grch38 = None
+        self.variant = variant
+
+        # don't want to be considered as part of the import anymore
+        # as we've failed matching somewhere along the line
+        if variant is None and failed:
+            self.classification_import = None
+
+        if not self.id:
+            # need to save to have a flag collection
+            self.save()
+        flag_collection = self.flag_collection_safe
+
+        if failed:
+            c_hgvs = self.get(SpecialEKeys.C_HGVS)
+            build_name = self.get(SpecialEKeys.GENOME_BUILD)
+            if not message:
+                # This kind of information should already be added in
+                # comments from get_evidence
+                message = f'Could not resolve {build_name} {c_hgvs}'
+
+            flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
+                                              resolution='matching_failed',
+                                              comment=message)
+        else:
+            flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
+                                              resolution='open',
+                                              comment=message)
+
+        if self.variant:
+            self.update_cached_c_hgvs()
 
     @property
     def share_level_enum(self) -> ShareLevel:
