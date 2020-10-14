@@ -1,30 +1,45 @@
-## VariantGrid
+# VariantGrid
 
-A [source available](LICENCE.md) genetic database and web analysis platform written in Python/Django and Postgresql.
+VariantGrid is a database and web application for storing, analysing and classifying variants.
 
-Developed by SA Pathology (South Australian Health) for research or diagnostic labs to store, analyse and report on 10-100k exomes (VCF).
+Upload VCFs to:
 
-Currently used by SA Pathology, UniSA Centre for Cancer Biology research labs, RUNX1db, the RUNX1 foundation data sharing site, and Shariant, the Australian Genomics variant classification sharing server.
-
-## FEATURES
-
-* Open and extendible, API to integrate with other systems
-* Create custom analyses in real time via drag and drop interface
-* Imports VCF and automatically annotates variants with VEP + a range of plugins.  
-* Analyse singletons, trios, cohorts. See all variants in a gene, or everyone who has a variant
-* Classify and report on clinically relevant variants
+* Automatically annotate with Ensembl VEP
+* See samples from all VCFs that share a variant
+* Analyse and filter samples, trios or cohorts via real time drag & drop interactive analyses
+* Classify variants using customisable ACMG form
 * GRCh37 (hg19), GRCh38, Ensembl and RefSeq in the same database (some automatic conversion)
-* Many QC features and graphs
+* Manage and curate data, including patient phenotypes
 
-## INSTALL
+Research use is free, while commercial use requires a [licence](https://github.com/SACGF/variantgrid/blob/master/LICENCE.md), before code becomes fully free/open source in 4 years. This is our attempt to obtain sustainable funding to for future development. See [[Licence discussion]]
 
-Use an existing public server (research use only)
-Clone a VM (AWS, Nectar or NCI)
-Step by step guide to install from scratch
-Buy a support contract for an intranet or cloud server
+![VG screenshots](https://user-images.githubusercontent.com/763201/95926363-a0c6b580-0e03-11eb-9a5b-1d48e0e46722.png)
 
-## TECH
+## Use cases
 
-Python 3.8, Django 3.1 and Postgresql. Async celery tasks.
+Private servers:
 
-See technical guide in the wik.
+* Clinical/diagnostic use by [SA Pathology](https://www.sapathology.sa.gov.au), the South Australian public pathology service. 
+* Research exomes by labs at the [Centre for Cancer Biology](https://www.centreforcancerbiology.org.au)
+
+Public data sharing sites:
+
+* https://shariant.org.au - Australian Genomics variant classification sharing server
+* https://runx1db.runx1-fpd.org - Rare blood disease data sharing
+
+## Other resources
+
+This wiki is for a technical audience looking to install/modify VariantGrid code. For users of the software, please see:
+
+* [User guide at read the docs](https://variantgrid.readthedocs.io/en/latest/)
+* [VariantGrid.com](https://variantgrid.com) main site, and research cloud server
+
+## Installation
+
+* Contact us and we can setup and manage a cloud instance for you
+* [[Install]] from source/scratch
+* [Clone a VM](install_clone_vm) (AWS, VirtualBox, NECTAR, NCBI instances)
+
+## System design
+
+Written in Python3, using Django and PostgreSQL. See [wiki for technical details](https://github.com/SACGF/variantgrid/wiki)
