@@ -1,20 +1,19 @@
 import urllib
 from decimal import Decimal
 from html import escape
-from typing import Union
+from typing import Union, Any
 
 from django import template
 from django.utils.safestring import mark_safe
 import json
+import re
 
 # FIXME, move this out of classifications and into snpdb
 from classification.views.classification_datatables import DatatableConfig
 
 register = template.Library()
 
-
-@register.filter
-def jsonify(json_me) -> Union[str, float]:
+def _jsonify(json_me, pretty = False) -> Union[str, Any]:
     if isinstance(json_me, str):
         return json_me
     elif isinstance(json_me, bool):
@@ -24,10 +23,23 @@ def jsonify(json_me) -> Union[str, float]:
             return mark_safe('false')
     elif isinstance(json_me, int) or isinstance(json_me, float):
         return json_me
-    text = json.dumps(json_me)
+    indent = 0 if not pretty else 4
+    text = json.dumps(json_me, indent=indent)
+    if pretty:
+        # this stops arrays of arrays taking up too much vertical space
+        text = re.compile(r'],\s*\[', re.MULTILINE).sub('],[', text)
     text = text.replace('</script>','<\\/script>')
     return mark_safe(text)
 
+
+@register.filter
+def jsonify(json_me) -> Union[str, Any]:
+    return _jsonify(json_me)
+
+
+@register.filter
+def jsonify_pretty(json_me) -> Union[str, float]:
+    return _jsonify(json_me, pretty=True)
 
 @register.filter
 def query_unquote(query_string):

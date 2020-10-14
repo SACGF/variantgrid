@@ -1,36 +1,26 @@
-{% extends menu_data_base %}
-
+{% extends "uicore/page/base.html" %}
+{% load ui_help %}
+{% load js_tags %}
+{% load ui_menu_bars %}
 {% block title %}{{ accession }}{% endblock title %}
-
-{% block jshead %}
-{{ block.super }}
-function showJSON(genomeBuild) {
-    $("#" + genomeBuild + "-json").show();
-    $("#show-" + genomeBuild + "-link").hide();
-}
-
-{% endblock jshead %}
-
-
-{% block submenu_page_content %}
-<div class="chunk borderless">
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block content %}
+<div class="container">
     <h3>Transcript Version {{ accession }}</h3> 
     
     <p>
     Back to <a class="hover-link" href="{% url 'view_transcript' transcript.pk %}">{{ transcript }}</a> ({{ version_count }} versions)
     </p>
-    
-    {% load help_tags %}
+
     {% if transcript.annotation_consortium == 'R' %}
-        {% page_help user 'genes/transcript_version_refseq' 'RefSeq transcript versions' %}
+        {% page_help 'genes/transcript_version_refseq' 'RefSeq transcript versions' %}
     {% endif %}
     {% if transcript.annotation_consortium == 'E' %}
-        {% page_help user 'genes/transcript_version_ensembl' 'Ensembl transcript versions' %}
+        {% page_help 'genes/transcript_version_ensembl' 'Ensembl transcript versions' %}
     {% endif %}
 
     {% if transcripts_by_build %}
-        <div class="chunk">
-        <table class="styled">
+        <table class="table">
             <thead>
             <tr>
                 <th>Genome Build</th>
@@ -53,7 +43,7 @@ function showJSON(genomeBuild) {
                 {% if transcript_version.data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
-                    <td><a class="hover-link" id='show-{{ genome_build_id }}-link' href="javascript:showJSON('{{ genome_build_id }}')">show</a></td>
+                    <td><a class="hover-link" href="#{{ genome_build_id }}-json" data-toggle="collapse">show</a></td>
                 {% else %}
                     <td> N/A</td>
                     <td> N/A</td>
@@ -62,23 +52,20 @@ function showJSON(genomeBuild) {
                 {% if user.is_staff %}
                     <td>{{ transcript_version.import_source }}</td>
                 {% endif %}
-                <td><a class="hover-link" target="_blank" href="{{ transcript_version.get_external_url }}">
+                <td><a class="hover-link external-link" target="_blank" href="{{ transcript_version.get_external_url }}">
                         {{ transcript.get_annotation_consortium_display }} page.
                     </a>
                 </td>
             </tr>
-            <tr class='hidden' id='{{ genome_build_id }}-json'>
-                <td colspan="4">
-    <pre>
-    {{ transcript_version.data|pprint }}
-    </pre>
+            <tr class='collapse' id='{{ genome_build_id }}-json'>
+                <td colspan="8">
+                    <pre><code>{{ transcript_version.data|jsonify_pretty }}</code></pre>
                 </td>
             </tr>
         {% endfor %}
         </table>
-    </div>
     {% else %}
-    <div class="error-box">We don't have any data for this transcript version on file.</div>
+    <div class="alert alert-danger">We don't have any data for this transcript version on file.</div>
     {% endif %}
 
     {% if differences %}
@@ -89,11 +76,10 @@ function showJSON(genomeBuild) {
                 Transcripts differ between genome versions, which may affect HGVS coordinates between builds
             </li>
         </ul>        
-        
-        <div class="chunk">
+
         {% for builds, diff in differences %}
             
-            <table class="styled">
+            <table class="table">
                 <thead>
                 <tr>
                     <th>
@@ -110,8 +96,7 @@ function showJSON(genomeBuild) {
                 {% endfor %}
             </table>
         {% endfor %}
-        </div>
     {% endif %}
 
 </div>
-{% endblock submenu_page_content %}
+{% endblock content %}
