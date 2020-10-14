@@ -355,6 +355,8 @@ class ColumnVEPField(models.Model):
 
 
 class ColumnVCFInfo(models.Model):
+    """ Used to export columns to VCF (vcf_export_utils).
+        Should it be moved to snpdb? """
     info_id = models.TextField(primary_key=True)
     column = models.OneToOneField(VariantGridColumn, on_delete=CASCADE)
     number = models.IntegerField(null=True, blank=True)
