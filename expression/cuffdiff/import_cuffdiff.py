@@ -128,7 +128,7 @@ def import_cuffdiff(cuffdiff_file, name, user, annotation_level=None):
 
     df = pd.read_csv(cuffdiff_file, sep='\t')
     logging.debug("columns: %s", df.columns)
-    # Issue #259 - Fix for Postgres "out of range for type double precision" error
+    # Fix for Postgres "out of range for type double precision" error
     df = df_handle_below_minimum_floats(df)
 
     if annotation_level is None:

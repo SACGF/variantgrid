@@ -17,11 +17,11 @@ class TagNode(AnalysisNode):
         return True
 
     def _get_node_q(self) -> Q:
-        # If we filter with varianttag__analysis=self.analysis we get 1 row per tag, we want to just get 1 row per variant
+        # If we filter with varianttag__analysis=self.analysis we get a row per tag, we want to get a row per variant
         variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
         if self.tag:
             variants_with_tags = variants_with_tags.filter(tag=self.tag)
-        variants_list = list(variants_with_tags.values_list("variant_id", flat=True))  # Way faster, see #2133
+        variants_list = list(variants_with_tags.values_list("variant_id", flat=True))  # Much faster converting to list
         return Q(pk__in=variants_list)
 
     def get_node_name(self):

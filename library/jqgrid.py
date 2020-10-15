@@ -235,7 +235,7 @@ class JqGrid:
             if filter_fmt.endswith('__in'):
                 filter_kwargs = {filter_str: data.split(',')}
             elif filter_fmt.endswith('__isnull'):
-                # #806 - FilterNode slow - pass exclude as arg and don't invert Q
+                # FilterNode was slow - pass exclude as arg and don't invert Q
                 # Prev generated code like:
                 # (NOT (AND: ('variantannotation__dbsnp_rs_id__isnull', True))
                 # which generated a full table scan on variant (>100M+ rows...)

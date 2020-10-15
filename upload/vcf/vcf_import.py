@@ -456,7 +456,7 @@ def vcf_detect_genome_build_from_header(cyvcf2_reader: cyvcf2.VCF):
 def get_genome_build_from_contig_lengths(contig_lengths: dict) -> GenomeBuild:
     """ This isn't fast, designed to be called once per file, not in a loop """
     DECOY_CONTIGS = {"NC_007605", "hs37d5"}
-    MITO_CONTIGS = {"MT", "chrM"}  # Skip so hg19/GRCh37 are the same. TODO: #1857
+    MITO_CONTIGS = {"MT", "chrM"}  # Skip so hg19/GRCh37 are the same
     SKIP_CONTIGS = DECOY_CONTIGS | MITO_CONTIGS
 
     build_contig_diffs = {}

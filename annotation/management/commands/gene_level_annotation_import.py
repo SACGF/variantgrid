@@ -121,7 +121,7 @@ class Command(BaseCommand):
             row["gene_id"] = ensembl_gene_id
             row_data = row.reindex(ENSEMBL_GENE_ANNOTATION_HEADER)
 
-            # issue #861 - Type conversions from Frank's spreadsheet to our new format
+            # Use choices to save space
             row_data["status"] = transcript_status_lookup.get(row_data["status"])
             strand = row_data["strand"]  # Strand -1/1
             if float(strand) > 0:

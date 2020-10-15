@@ -478,7 +478,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                     search_message = f"Error reading HGVS: '{original_error}'"
                     return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
 
-                # Issue #2573 - we want to be able to rescue dodgy HGVS but don't want to raise errors
+                # We want to be able to rescue dodgy HGVS but don't want to raise errors
                 # for everything as that will cause lots of false positives.
                 if HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN.findall(search_string):
                     raise original_error  # cleaning didn't work don't tell anyone

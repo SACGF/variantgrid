@@ -12,7 +12,7 @@ def run_sql(sql, params=None):
 
 
 def queryset_to_sql(queryset, pretty=False):
-    """ str(queryset.query) doesn't quote variables properly.... (see issue #229)
+    """ str(queryset.query) doesn't quote variables properly....
 
         From: https://stackoverflow.com/a/47542953
         qs.query returns something that isn't valid SQL, this returns the actual

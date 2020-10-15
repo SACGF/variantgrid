@@ -161,7 +161,7 @@ def cohort_genotype_task(cohort_genotype_collection_id):
     # CohortGenotypeTaskVersion versions:
     # 1. Legacy - inserted to tag legacy data before we added task_version
     # 2. cohort_genotype_task - 20200319 - Split hom_count into ref_count, hom_count
-    # 3. cohort_genotype_task - 20200514 - Use code from grid_sample_columns, see #2472
+    # 3. cohort_genotype_task - 20200514 - Use code from grid_sample_columns
     NAME = "cohort_genotype_task - 20200514 - packed fields"  # Change this if the data changes!
     task_version, _ = CohortGenotypeTaskVersion.objects.get_or_create(name=NAME)
 

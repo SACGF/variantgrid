@@ -286,7 +286,7 @@ class HGVSMatcher:
     def format_hgvs_remove_long_ref(hgvs_name, max_allele_length=10):
         """ Similar to pyhgvs.variant_to_hgvs_name but only for dels, delins and dups and we don't specify length
 
-            See issue #1895. From a Facebook post:
+            From a Facebook post:
             Q: What is the correct way to describe a deletion, c.7432-2025_7536+372del2502 or c.7432-2025_7536+372del.
             While ClinVar seems to prefer the first, #HGVS seems to prefer the second format.
             A: HGVS descriptions do not contain redundant information. The size of the deletion, in the example 2502

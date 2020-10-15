@@ -2,8 +2,8 @@ from django.db import connection
 import logging
 
 # TODO: Could possibly use QS ops - https://docs.djangoproject.com/en/2.0/ref/models/querysets/#union
-# Rewritten due to issue #221 - Original implementation had problems when
-# Joining to a table with multiple entries for a variant (the OR caused a cartesian product)
+# Rewritten as original implementation had problems when joining to a table with multiple entries for a variant
+# (the OR caused a cartesian product)
 
 
 def write_sql_to_variant_collection(variant_collection, sql):

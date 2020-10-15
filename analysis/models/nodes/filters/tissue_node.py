@@ -21,7 +21,7 @@ class TissueNode(AnalysisNode):
     min_abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.DETECTED_CHOICES, default=HumanProteinAtlasAbundance.LOW)
     text_tissue = models.TextField(null=True, blank=True)
     accordion_panel = models.IntegerField(default=0)
-    disabled = True  # Needs to be made per-genome build see #617
+    disabled = True  # Needs to be made per-genome build see Issue #9
 
     def _get_configuration_errors(self):
         errors = []

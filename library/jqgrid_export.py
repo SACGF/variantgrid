@@ -45,8 +45,8 @@ def grid_export_request(request, grid, basename):
 
 def grid_export_csv(basename, colmodels, items):
     MAX_FILE_NAME_LENGTH = 100  # Shorted as someone got a DDE error opening it in Windows
-    # #1021 - If you make the first letters “ID” of a text file
-    #         Excel incorrectly assumes you are trying to open an SYLK file.
+    # If you make the first letters “ID” of a text file
+    # Excel incorrectly assumes you are trying to open an SYLK file.
     label_overrides = {"id": "variant_id"}
 
     pseudo_buffer = StashFile()

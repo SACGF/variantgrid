@@ -151,8 +151,7 @@ class VCF(models.Model):
         except ObjectDoesNotExist:
             pass
 
-        # Delete and recreate rather than truncate as we may have had a schema
-        # Change since - see issue #1210
+        # Delete and recreate rather than truncate as we may have had a schema change since
         logging.warning("*** Deleting then recreating partitions ***")
         for p in partitions:
             p.delete_related_objects()

@@ -101,8 +101,7 @@ def _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups):
         if node.analysis_update_uuid == analysis_update_uuid:
             update_job = node.get_update_task()
 
-            # Issue #284 - Cache jobs are separated, and put in a set to remove dupes
-            # such as when >=2 venn's have the same parents
+            # Cache jobs are separated, and put in a set to remove dupes such as when >=2 venn's have the same parents
             task_args_objs_set = node.get_cache_task_args_objs_set()
             if task_args_objs_set:
                 cache_jobs.update(task_args_objs_set)
@@ -111,7 +110,7 @@ def _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups):
                 jobs.append(update_job)
         elif node.pk in dependencies:
             # Sometimes nodes may be already loading from another update - need to keep dependencies on existing task
-            # Issue #769 - Node count not set exception - Need to wait on loading parent tasks
+            # and wait on loading parent tasks
             if NodeStatus.is_loading(node.status):
                 jobs.append(wait_for_node.si(node.pk))  # @UndefinedVariable
 
@@ -144,7 +143,7 @@ def get_analysis_update_tasks(analysis_id) -> List:
         # so use other toposort library
 
         # We need a way to lock/claim the nodes - so someone else calling get_analysis_update_task()
-        # doesn't also launch update tasks for them. (see #1579)
+        # doesn't also launch update tasks for them.
         sub_graph_nodes_qs = analysis.analysisnode_set.filter(pk__in=sub_graph_node_ids).select_subclasses()
         dirty_nodes_qs = sub_graph_nodes_qs.filter(status=NodeStatus.DIRTY)
         analysis_update_uuid = uuid.uuid4()

@@ -1281,12 +1281,13 @@ class GnomADGeneConstraint(models.Model):
     transcript = models.ForeignKey(Transcript, null=True, on_delete=CASCADE)
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
 
+    # @see https://gnomad.broadinstitute.org/downloads#gene-constraint
     # gnomAD per-gene constraint scores, @see https://macarthurlab.org/2018/10/17/gnomad-v2-1/ ("Constraint" section)
     # oe = observed / expected score. LOW oe = strong intolerance. lower/upper = 90% CI
     oe_lof = models.FloatField(null=True)
     oe_lof_lower = models.FloatField(null=True)
     oe_lof_upper = models.FloatField(null=True)
-    #  Lots of fields we don't use we could add (See #1880)
+    # There are dozens of other fields we could add...
 
     @property
     def oe_lof_summary(self):

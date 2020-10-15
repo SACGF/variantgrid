@@ -19,7 +19,7 @@ class TestVCFDetectBuild(TestCase):
             pass
 
     def test_bad_contigs(self):
-        """ #1608 - Got a VCF from Centogene that had maxint32 for all contig lengths"""
+        """ We got a VCF from Centogene that had maxint32 for all contig lengths"""
         vcf_filename = os.path.join(self.TEST_DATA, "bad_contigs.vcf")
         try:
             vcf_detect_genome_build_from_filename(vcf_filename)
