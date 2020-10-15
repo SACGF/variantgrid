@@ -18,10 +18,6 @@ def rename_variant_classification(apps, schema_editor):
         FlagCollection.objects.filter(context=old_context).update(context=classification_context)
         FlagType.objects.filter(context=old_context).update(context=classification_context)
 
-        print("Deleting old context - shouldn't cascade!!!")
-        print(old_context.delete())
-
-    flag_type_records = []
     for flag_type_value in FlagType.objects.filter(id__startswith="variant_classification").values():
         old_id = flag_type_value["id"]
         flag_type_value["id"] = old_id.replace("variant_classification", "classification")
@@ -30,9 +26,7 @@ def rename_variant_classification(apps, schema_editor):
         Flag.objects.filter(flag_type_id=old_id).update(flag_type=ft)
         FlagTypeResolution.objects.filter(flag_type_id=old_id).update(flag_type=ft)
 
-    print("Deleting old FlagType - shouldn't cascade!!!")
-    ret = FlagType.objects.filter(id__startswith="variant_classification").delete()
-    print(ret)
+    FlagType.objects.filter(id__startswith="variant_classification").delete()
 
 
 class Migration(migrations.Migration):
