@@ -71,19 +71,6 @@ def format_operation(op):
     return ops[op]
 
 
-def get_base_colmodel():
-    colmodel_rules = {'rule': 'number'}
-    base_colmodel = {
-        'model_field': True,
-        'queryset_field': True,
-        'editable': True,
-        'editrules': colmodel_rules,
-        'searchrules': colmodel_rules,
-        #'sorttype' : 'text',
-    }
-    return base_colmodel
-
-
 class JqGrid:
     queryset = None
     model = None
@@ -248,7 +235,7 @@ class JqGrid:
             if filter_fmt.endswith('__in'):
                 filter_kwargs = {filter_str: data.split(',')}
             elif filter_fmt.endswith('__isnull'):
-                # #806 - FilterNode slow - pass exclude as arg and don't invert Q
+                # FilterNode was slow - pass exclude as arg and don't invert Q
                 # Prev generated code like:
                 # (NOT (AND: ('variantannotation__dbsnp_rs_id__isnull', True))
                 # which generated a full table scan on variant (>100M+ rows...)

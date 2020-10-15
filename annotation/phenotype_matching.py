@@ -372,8 +372,8 @@ def get_special_case_match(text, hpo_records, omim_alias_records, gene_records):
                                 "waardenburg type ii": (load_original_mim_aliases_with_description, "waardenburg syndrome, type 2"),
                                 "widespread eyes": (load_hpo_by_name, "Widely spaced eyes")}
 
-    # Issue #776 - disease families
     # People put down eg Waardenburg but there are many different OMIM diseases - we'll put ALL of them
+    # Switching to MONDO will help disease families, as it's hierarchial (unlike OMIM)
     ALPORT_SYNDROME = (load_original_mim_aliases_with_description, "Alport Syndrome")
     CILIARY_DYSKINESIA = (load_original_mim_aliases_with_description, "Ciliary dyskinesia")
     BARTTER_SYNDROME = (load_original_mim_aliases_with_description, "Bartter Syndrome")

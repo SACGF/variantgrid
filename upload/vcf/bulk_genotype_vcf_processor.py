@@ -28,8 +28,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v2. Split read header (create vcf) from parsing VCF (so can be in parallel)
     # v3. PL/AD getters plus big refactoring
     # v5. Somatic, not inserting ref variants
-    # v6. Issue #2445 - Used to mark CohortGenotypeCollection as fixed by fix_cohort_genotype_task
-    # v7. Issue #2445 - Insert HOM_REF properly
+    # v6. Used to mark CohortGenotypeCollection as fixed by fix_cohort_genotype_task
+    # v7. Insert HOM_REF properly (March 23 2020)
     # v8. VCF filters are in CohortGenotype now
     # v9. No ObservedVariant (sample level data)
     # v10. Shift fields from UploadedVCF to VCF. Fix various bugs

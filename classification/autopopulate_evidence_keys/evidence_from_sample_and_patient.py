@@ -32,19 +32,6 @@ def negative_as_none(value):
     return value
 
 
-def get_vcf_filter_evidence_key(sample_genotype: SampleGenotype):
-    try:
-        vcf_filter = ", ".join(sample_genotype.get_vcf_filters())
-    except VCFFilter.MultipleObjectsReturned:
-        vcf_filter = {}
-        # Bug caused by #1233 VCF importer inserting duplicate locus filter records
-        # May still have bad data in some environments
-        message = "Multiple VCF Filters were found for locus, this is likely due to a VCF import issue #1233. Please contact your systems administrator"
-        VCDataDict.add_validation(vcf_filter, code=ValidationCode.TOO_MANY_VALUES, severity='warning', message=message)
-
-    return vcf_filter
-
-
 def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample) -> AutopopulateData:
     data = AutopopulateData("sample")
     data[SpecialEKeys.SAMPLE_ID] = sample.name
@@ -67,7 +54,7 @@ def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample)
             data[SpecialEKeys.PHRED_LIKELIHOOD] = negative_as_none(sample_genotype.phred_likelihood)
             data[SpecialEKeys.GENOTYPE_QUALITY] = negative_as_none(sample_genotype.genotype_quality)
             data[SpecialEKeys.ALLELE_FREQUENCY] = negative_as_none(sample_genotype.allele_frequency)
-            data[SpecialEKeys.VCF_FILTER] = get_vcf_filter_evidence_key(sample_genotype)
+            data[SpecialEKeys.VCF_FILTER] = ", ".join(sample_genotype.get_vcf_filters())
         else:
             logging.error("%s does not have ObservedVariant record for %s", sample, variant)
 

@@ -121,7 +121,7 @@ class TestSeqAutoModels(TestCase):
         logging.info("genes: %d, canonical: %d", num_genes_covered, num_canonical_genes)
 
     def test_gene_coverage_amplicon(self):
-        """ #1620 - Amplicons have different headers than capture:
+        """ Test fix: Amplicons have different headers than capture:
             ["% bases >100x", "% bases <20x"] """
 
         AMPLICON_GENES = os.path.join(self.QC_DIR, "myeloid_truSight/151113_M02027_0214_000000000-AHWJW_QC/bulky_files/blah_blah_genes.txt")
@@ -157,8 +157,7 @@ class TestSeqAutoModels(TestCase):
         self.assertEqual(qcgc.data_state, DataState.DELETED, msg)
 
     def test_gold_coverage(self):
-        """ #1609 - Gold Coverage
-            This test doesn't work very well as there's no genes/Transcripts/UCSC aliases etc """
+        """ This test doesn't work very well as there's no genes/Transcripts/UCSC aliases etc """
 
         SEQUENCING_RUN_NAME = "190322FakeRun"
         GENE_FILES_PATTERN = os.path.join(self.QC_DIR, "medical_exomes", SEQUENCING_RUN_NAME + "_QC", "bulky_files", "%s_genes.txt")

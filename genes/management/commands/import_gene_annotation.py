@@ -163,7 +163,7 @@ class Command(BaseCommand):
         unknown_gene_versions = []
         unknown_transcripts = []
         unknown_transcript_versions_by_gene_accession = defaultdict(list)
-        # When you have genePred only - we don't know the GeneID, so create fake ones with "unknown_" (see #2644)
+        # When you have genePred only - we don't know the GeneID, so create fake ones with "unknown_"
         # If we import the same transcript ID later via a GFF3, we can change the gene version to the real one
         known_transcript_versions_to_update_with_gene_accession = defaultdict(list)
         known_gene_versions_to_update = []

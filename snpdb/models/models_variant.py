@@ -214,7 +214,7 @@ VariantCoordinate = collections.namedtuple('VariantCoordinate', 'chrom pos ref a
 
 class Sequence(models.Model):
     """
-        Issue #2140: We want to guarantee seq is unique (so Locus/Variant can have unique constraints)
+        We want to guarantee seq is unique (so Locus/Variant can have unique constraints)
         Postgres by default uses indexes for constraints, and large TextFields give error of:
         "index row requires x bytes, maximum size is 8191"
 

@@ -17,10 +17,9 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
             if c.column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
                 sample_columns_position = field_pos
 
-        col_overrides = get_overrides([f], [{}])
+        col_overrides = get_overrides([f], [{}],
+                                      model_field=c.column.model_field, queryset_field=c.column.queryset_field)
         col_override = col_overrides[f]
-        col_override["model_field"] = c.column.model_field
-        col_override["queryset_field"] = c.column.queryset_field
         description = c.column.description.replace("'", "&#146;")
         col_override["headerTitle"] = description
         col_override["label"] = c.column.label

@@ -20,7 +20,7 @@ def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, genome_build: 
     :param traverse_aliases: If true, will see if the gene_symbol has aliases, will not
     :return:
     """
-    # See issue #2449 - people often search for a gene symbol that exists in a different genome build
+    # People often search for a gene symbol that exists in a different genome build
     # so we need to retrieve all the genes that have ever been associated with the symbol
     genes: Set[Gene]
     if traverse_aliases:
