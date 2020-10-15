@@ -291,6 +291,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     name = models.TextField(null=True)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     cohort_version = models.IntegerField()
+    num_samples = models.IntegerField()  # Number of elements in CohortGenotype arrays (samples may be deleted)
     # task fields only populated when created via cohort_genotype_task
     celery_task = models.CharField(max_length=36, null=True)
     task_version = models.ForeignKey(CohortGenotypeTaskVersion, null=True, on_delete=CASCADE)

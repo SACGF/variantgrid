@@ -74,7 +74,8 @@ def create_cohort_genotype_collection(cohort):
     name = f"cached count for {cohort.name} ({cohort.pk}:{cohort.version})"
     collection = CohortGenotypeCollection.objects.create(name=name,
                                                          cohort=cohort,
-                                                         cohort_version=cohort.version)
+                                                         cohort_version=cohort.version,
+                                                         num_samples=cohort.cohortsample_set.count())
     logging.info(f"Created {collection}")
     return collection
 

@@ -34,6 +34,8 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
     assign_permission_to_user_and_groups(user, cohort)
 
     # Cohort version has been bumped every time a cohort sample has been added
-    CohortGenotypeCollection.objects.create(cohort=cohort, cohort_version=cohort.version)
+    CohortGenotypeCollection.objects.create(cohort=cohort,
+                                            cohort_version=cohort.version,
+                                            num_samples=cohort.cohortsample_set.count())
 
     return trio

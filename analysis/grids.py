@@ -234,27 +234,30 @@ class VariantGrid(JqGridSQL):
         MISSING_VALUES = [-1, -2147483648]
         packed_data_replace.update({mv: "." for mv in MISSING_VALUES})
 
-        sample_first_cohort_sample = {}
+        # Record the 1st cohort a sample appears in, and the concatenated cohorts index
+        sample_cohort_cat_cohorts_index = {}
+        cohorts_offset = 0
         for cohort in cohorts:
             for cohort_sample in cohort.get_cohort_samples():
                 sample = cohort_sample.sample
-                if visibility.get(sample) and sample not in sample_first_cohort_sample:
-                    sample_first_cohort_sample[sample] = cohort_sample
+                if visibility.get(sample) and sample not in sample_cohort_cat_cohorts_index:
+                    cc_index = cohorts_offset + cohort_sample.cohort_genotype_packed_field_index
+                    sample_cohort_cat_cohorts_index[sample] = (cohort, cc_index)
+            cohorts_offset += cohort.cohort_genotype_collection.num_samples
 
         column_names = []
         column_data = []
-        for sample, cohort_sample in sample_first_cohort_sample.items():
+        for sample, (cohort, cc_index) in sample_cohort_cat_cohorts_index.items():
             for column, (column_label, label_format, width) in sample_columns.items():
                 column_names.append(f"{sample.pk}_{column}")
                 label = label_format % {"sample": sample.name, "label": column_label}
-                i = cohort_sample.cohort_genotype_packed_field_index
-                server_side_formatter = VariantGrid._get_packed_data_formatter(packed_data_replace, column, i)
+                server_side_formatter = VariantGrid._get_packed_data_formatter(packed_data_replace, column, cc_index)
 
                 col_data_dict = {
                     "label": label,
                     "width": width,
                     "server_side_formatter": server_side_formatter,
-                    "order_by": cohort_sample.cohort.get_sample_column_order_by(sample, column)
+                    "order_by": cohort.get_sample_column_order_by(sample, column)
                 }
                 column_data.append(col_data_dict)
 
