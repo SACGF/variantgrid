@@ -5,17 +5,20 @@ from django.db.models.query_utils import InvalidQuery
 import logging
 
 from library.database_utils import iter_dictfetchall
-from library.jqgrid import get_base_colmodel
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import Struct, double_quote
 
 
 def get_overrides(columns, column_data, model_field=True, queryset_field=True):
-    base_colmodel = get_base_colmodel()
+    base_colmodel_override = {
+        'model_field': True,
+        'queryset_field': True,
+        'editable': True,
+    }
     overrides = {}
 
     for c, col_data_dict in zip(columns, column_data):
-        colmodel = base_colmodel.copy()
+        colmodel = base_colmodel_override.copy()
         colmodel.update(col_data_dict)
         colmodel['name'] = c
         colmodel['index'] = c
