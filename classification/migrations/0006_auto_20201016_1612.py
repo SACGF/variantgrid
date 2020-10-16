@@ -12,5 +12,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.task_id_manage(["fix_matching_flags", "--apply"])
+        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_matching_flags", "--apply"]))
     ]
