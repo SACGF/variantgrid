@@ -1,0 +1,63 @@
+from typing import Optional
+
+from django.core.management import BaseCommand
+
+from classification.models import classification_flag_types, Classification
+from flags.models import Flag, FlagComment
+import re
+
+from genes.hgvs import CHGVS
+from snpdb.models import GenomeBuild
+
+
+class Command(BaseCommand):
+
+    def handle(self, *args, **options):
+
+        flags_of_interest = Flag.objects.filter(flag_type__in=[
+            classification_flag_types.transcript_version_change_flag,
+            classification_flag_types.matching_variant_warning_flag
+        ]).filter(data__isnull=True)
+
+        re_find_in_comment = [
+            re.compile(r'^(.*) \(resolved\)$', re.MULTILINE),
+            re.compile(r'^(.*) \(matched\)$', re.MULTILINE),
+            re.compile(r'^((?:NM|EN)\S*)$', re.MULTILINE)
+        ]
+
+        for flag in flags_of_interest:
+
+            resolved: Optional[str] = None
+
+            opening_comment: FlagComment
+            if opening_comment := flag.flagcomment_set.order_by('created').first():
+                if comment_text := opening_comment.text:
+                    for pattern in re_find_in_comment:
+                        if m := pattern.search(comment_text):
+                            resolved = m[1]
+                            break
+                    if not resolved:
+                        print('** Couldnt find the resolved value in')
+                        print('---')
+                        print(comment_text)
+                        print('---')
+
+            #  find the classification
+            if not resolved:
+                c: Classification
+                if c := Classification.objects.filter(flag_collection_id=flag.collection_id).first():
+                    if genome_build := c.get_genome_build():
+                        compare_to: Optional[str] = None
+                        if genome_build == GenomeBuild.grch37():
+                            compare_to = c.chgvs_grch37
+                        elif genome_build == GenomeBuild.grch38():
+                            compare_to = c.chgvs_grch38
+
+                        if compare_to:
+                            compare_to_chgvs = CHGVS(compare_to)
+                            if flag.flag_type == classification_flag_types.matching_variant_warning_flag:
+                                resolved = compare_to_chgvs.full_c_hgvs
+                            elif flag.flag_type == classification_flag_types.transcript_version_change_flag:
+                                resolved = compare_to_chgvs.transcript
+
+            print(f"Resolved flag {flag.id} to {resolved}")
