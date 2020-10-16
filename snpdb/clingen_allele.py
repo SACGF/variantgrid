@@ -204,11 +204,11 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant) 
     try:
         va = VariantAllele.objects.get(variant=variant)
         if va.needs_clinvar_call():
-            variant_allele_clingen(genome_build, variant, existing_variant_allele=va)
+            va = variant_allele_clingen(genome_build, variant, existing_variant_allele=va)
 
     except VariantAllele.DoesNotExist:
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
-            variant_allele_clingen(genome_build, variant)
+            va = variant_allele_clingen(genome_build, variant)
         else:
             logging.debug("Not using ClinGen")
             allele = Allele.objects.create()
