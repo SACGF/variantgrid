@@ -11,7 +11,7 @@ Upload VCFs to:
 * GRCh37 (hg19), GRCh38, Ensembl and RefSeq in the same database (some automatic conversion)
 * Manage and curate data, including patient phenotypes
 
-Research use is free, while commercial use requires a [licence](https://github.com/SACGF/variantgrid/blob/master/LICENCE.md), before code becomes fully free/open source in 4 years. This is our attempt to obtain sustainable funding to for future development. See [Licence discussion](https://github.com/SACGF/variantgrid/wiki/Licence-discussion)
+It is free to use for research and evaluation, while production commercial use requires a [licence](https://github.com/SACGF/variantgrid/blob/master/LICENCE.md), before code becomes fully free/open source in 4 years. This is our attempt to obtain sustainable funding to for future development. See [Licence discussion](https://github.com/SACGF/variantgrid/wiki/Licence-discussion)
 
 ![VG screenshots](https://user-images.githubusercontent.com/763201/95926363-a0c6b580-0e03-11eb-9a5b-1d48e0e46722.png)
 
