@@ -12,7 +12,14 @@ from snpdb.models import GenomeBuild
 
 class Command(BaseCommand):
 
+    def add_arguments(self, parser):
+        parser.add_argument('--apply', action='store_true', default=False)
+
     def handle(self, *args, **options):
+
+        apply = options.get('apply')
+        if apply:
+            print("Will be applying changes")
 
         flags_of_interest = Flag.objects.filter(flag_type__in=[
             classification_flag_types.transcript_version_change_flag,
@@ -21,8 +28,7 @@ class Command(BaseCommand):
 
         re_find_in_comment = [
             re.compile(r'^(.*) \(resolved\)$', re.MULTILINE),
-            re.compile(r'^(.*) \(matched\)$', re.MULTILINE),
-            re.compile(r'^((?:NM|EN)\S*)$', re.MULTILINE)
+            re.compile(r'^(.*) \(matched\)$', re.MULTILINE)
         ]
 
         for flag in flags_of_interest:
@@ -61,3 +67,6 @@ class Command(BaseCommand):
                                 resolved = compare_to_chgvs.transcript
 
             print(f"Resolved flag {flag.id} to {resolved}")
+            if resolved and apply:
+                flag.data = {'resolved': resolved}
+                flag.save()
