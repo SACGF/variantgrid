@@ -414,12 +414,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
                 # see if the match looks suspect
                 c_hgvs = self.get(SpecialEKeys.C_HGVS)
+                lifted_chgvs: Optional[CHGVS] = None
                 transcript_comment: Optional[str] = None
                 matching_warning_comment: Optional[str] = None
+                compare_to: Optional[str] = None
                 diff: Optional[CHGVSDiff] = None
                 if self.get(SpecialEKeys.GENOME_BUILD):
                     current_build = self.get_genome_build()
-                    compare_to: Optional[str] = None
                     if current_build == GenomeBuild.grch37():
                         compare_to = self.chgvs_grch37
                     elif current_build == GenomeBuild.grch38():
@@ -428,6 +429,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     if c_hgvs and compare_to:
                         original_chgvs = CHGVS(c_hgvs)
                         lifted_chgvs = CHGVS(compare_to)
+
                         diff = original_chgvs.diff(lifted_chgvs)
 
                         if diff:
@@ -448,7 +450,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     flag_collection.get_or_create_open_flag_of_type(
                         flag_type=classification_flag_types.transcript_version_change_flag,
                         comment=transcript_comment,
-                        only_if_new=True
+                        only_if_new=True,
+                        data={'resolved': lifted_chgvs.transcript},
+                        close_other_data=True
                     )
                 else:
                     flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag)
@@ -457,7 +461,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     flag_collection.get_or_create_open_flag_of_type(
                         flag_type=classification_flag_types.matching_variant_warning_flag,
                         comment=matching_warning_comment,
-                        only_if_new=True
+                        only_if_new=True,
+                        data={'resolved': lifted_chgvs.full_c_hgvs},
+                        close_other_data=True
                     )
                 else:
                     flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
@@ -489,8 +495,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         Calling set_variant will automatically call .save()
         If there is no variant and failed = True, any classification_import will be unset
         """
-        self.chgvs_grch37 = None
-        self.chgvs_grch38 = None
         self.variant = variant
 
         # don't want to be considered as part of the import anymore
@@ -515,12 +519,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                               resolution='matching_failed',
                                               comment=message)
         else:
+            # if there is a matching_variant_flag (and we haven't failed) make it open
+            # but updated_cached_c_hgvs will close it if all is looking good
             flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
                                               resolution='open',
                                               comment=message)
 
-        if self.variant:
-            self.update_cached_c_hgvs()
+        self.update_cached_c_hgvs()
 
     @property
     def share_level_enum(self) -> ShareLevel:

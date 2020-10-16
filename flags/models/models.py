@@ -384,6 +384,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         reopen: bool = False,
         add_comment_if_open: bool = False,
         data: Optional[dict] = None,
+        close_other_data: bool = False,
         only_if_new: bool = False) -> Tuple[Flag, bool]:
         """
         Returns the existing open flag or returns a new one
@@ -395,6 +396,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         :param reopen: If True will re-open a closed flag (if there is one) rather than create a new flag. Will be treated as True for only_one types of flags.
         :param add_comment_if_open: If re-opening a closed flag, should the comment still be added?
         :param data: data for the flag, when looking for existing flags we check to see if they have this data.
+        :param close_other_data: If we find a flag of the same type that has data different to the data provided, close it
         :param only_if_new: Only create a new flag if there isn't an existing one (in any state) for this type, data etc. Exclusive with reopen
         :return: A tuple of the flag and a boolean indicating if the flag was newly created
         """
@@ -407,6 +409,12 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         if data:
             for key, value in data.items():
                 relevant_qs = relevant_qs.filter(**{f'data__{key}': value})
+
+            if close_other_data:
+                close_us = relevant_qs.filter(FlagCollection.Q_OPEN_FLAGS).exclude(**{f'data__{key}': value})
+                for close_me in close_us:
+                    resolution = close_me.flag_type.resolution_for_status(FlagStatus.CLOSED)
+                    close_me.flag_action(user=user, comment='Data has changed. Raising a new flag.', resolution=resolution, permission_check=False)
 
         existing = relevant_qs.filter(FlagCollection.Q_OPEN_FLAGS).first()
         if existing:
