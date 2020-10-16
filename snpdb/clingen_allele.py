@@ -229,6 +229,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None):
         raise ClinGenAlleleAPIException(msg)
 
     api_response = get_single_element(list(clingen_hgvs_put([g_hgvs])))
+    va: VariantAllele = None
     if "errorType" in api_response:
         if existing_variant_allele:
             existing_variant_allele.error = api_response
