@@ -387,11 +387,14 @@ STATIC_ROOT = os.path.join(VARIANTGRID_APP_DIR, "sitestatic", "static")
 STATIC_URL = '/static/'
 
 # modify this configuration per environment
+rollbar_access_token = get_secret("ROLLBAR.access_token")
+rollbar_client_access_token = get_secret("ROLLBAR.client_access_token")
+
 ROLLBAR = {
-    'access_token': get_secret("ROLLBAR.access_token"),
-    'client_access_token': get_secret("ROLLBAR.client_access_token"),
+    'access_token': rollbar_access_token,
+    'client_access_token': rollbar_client_access_token,
     'environment': socket.gethostname().lower().split('.')[0].replace('-', ''),
-    'enabled': True,  # set this to false in environments where you don't want logging
+    'enabled': rollbar_access_token and rollbar_client_access_token,  # set to false in environments to disable rollbar
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,

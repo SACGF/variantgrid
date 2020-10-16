@@ -203,34 +203,68 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant) 
 
     try:
         va = VariantAllele.objects.get(variant=variant)
+        if va.needs_clinvar_call():
+            variant_allele_clingen(genome_build, variant, existing_variant_allele=va)
+
     except VariantAllele.DoesNotExist:
-        g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
-        ca_rep_size = len(g_hgvs)
-        if ca_rep_size > ClinGenAllele.CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE:
-            msg = f"Representation has size {ca_rep_size} which exceeds ClinGen max of {ClinGenAllele.CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE}"
-            raise ClinGenAlleleAPIException(msg)
-
-        api_response = get_single_element(list(clingen_hgvs_put([g_hgvs])))
-        alllele_kwargs = {}
-        if "errorType" in api_response:
+        if settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
+            variant_allele_clingen(genome_build, variant)
+        else:
+            logging.debug("Not using ClinGen")
             allele = Allele.objects.create()
-            alllele_kwargs["error"] = api_response
+            va = VariantAllele.objects.create(variant_id=variant.pk,
+                                              genome_build=genome_build,
+                                              allele=allele,
+                                              origin=AlleleOrigin.variant_origin(variant))
+    return va
 
+
+def variant_allele_clingen(genome_build, variant, existing_variant_allele=None):
+    """ Call ClinGen and setup VariantAllele - use existing if provided, otherwise create """
+    g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+    ca_rep_size = len(g_hgvs)
+    max_size = ClinGenAllele.CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE
+    if ca_rep_size > max_size:
+        msg = f"Representation has size {ca_rep_size} which exceeds ClinGen max of {max_size}"
+        raise ClinGenAlleleAPIException(msg)
+
+    api_response = get_single_element(list(clingen_hgvs_put([g_hgvs])))
+    if "errorType" in api_response:
+        if existing_variant_allele:
+            existing_variant_allele.error = api_response
+            existing_variant_allele.save()
+            va = existing_variant_allele
+        else:
+            allele = Allele.objects.create()
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
                                               origin=AlleleOrigin.variant_origin(variant),
-                                              **alllele_kwargs)
+                                              error=api_response)
 
+    else:
+        clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
+        kwargs = {"pk": clingen_allele_id,
+                  "defaults": {"api_response": api_response}}
+        clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, **kwargs)
+        if existing_variant_allele:
+            # Link existing_variant_allele.allele to ClinGen (merging if already exists)
+            try:
+                logging.debug("ClinGen (%s) exists - merging existing %s!", clingen_allele, existing_variant_allele)
+                existing_allele_with_clingen = Allele.objects.get(clingen_allele=clingen_allele)
+                existing_allele_with_clingen.merge(existing_variant_allele.allele)
+                existing_variant_allele.allele = existing_variant_allele
+                existing_variant_allele.save()
+            except Allele.DoesNotExist:
+                logging.debug("Linking existing %s against clingen %s", existing_variant_allele, clingen_allele)
+                existing_variant_allele.allele.clingen_allele = clingen_allele
+                existing_variant_allele.allele.save()
+            allele = existing_variant_allele.allele
         else:
-            clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
-            kwargs = {"pk": clingen_allele_id,
-                      "defaults": {"api_response": api_response}}
-            clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, **kwargs)
             allele, _ = Allele.objects.get_or_create(clingen_allele=clingen_allele)
-            variant_allele_by_build = link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
-            va = variant_allele_by_build[genome_build]
-
+        variant_allele_by_build = link_allele_to_existing_variants(allele,
+                                                                   AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+        va = variant_allele_by_build[genome_build]
     return va
 
 
@@ -239,8 +273,12 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant) 
     va = get_variant_allele_for_variant(genome_build, variant)
 
     if va.allele.clingen_allele is None:
-        raise ClinGenAlleleAPIException.from_api_response(va.error)
-
+        if va.error:
+            raise ClinGenAlleleAPIException.from_api_response(va.error)
+        else:
+            if not settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
+                raise ClinGenAlleleAPIException("'settings.CLINGEN_ALLELE_REGISTRY_LOGIN' not set")
+            ClinGenAlleleAPIException(f"Allele {va.allele} has no clingen_allele or error")
     return va.allele.clingen_allele
 
 

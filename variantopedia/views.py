@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from datetime import timedelta
 from typing import Optional
@@ -26,7 +27,7 @@ from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog
+from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings, UserPageAck
 from snpdb.serializers import VariantAlleleSerializer
@@ -425,8 +426,15 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         messages.add_message(request, messages.WARNING, msg)
 
     try:
-        variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant.variantallele)
-    except:
+        va = variant.variantallele
+        # If we require a ClinGen call (eg have Allele but no ClinGen, and settings say we can get it then don't
+        # provide the data so we will do an async call)
+        if not va.needs_clinvar_call():
+            logging.info("Skipping as we need clinvar call")
+            variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant.variantallele)
+        else:
+            variant_allele_data = None
+    except VariantAllele.DoesNotExist:
         variant_allele_data = None
 
     context = {
