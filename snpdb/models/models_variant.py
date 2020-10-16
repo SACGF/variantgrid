@@ -445,6 +445,9 @@ class VariantAllele(TimeStampedModel):
     conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.CHOICES)
     error = models.JSONField(null=True)  # Only set on error
 
+    def needs_clinvar_call(self):
+        return settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None and self.error is None
+
     def __str__(self):
         return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.conversion_tool})"
 
