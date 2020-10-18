@@ -70,3 +70,10 @@ class Command(BaseCommand):
             if resolved and apply:
                 flag.data = {'resolved': resolved}
                 flag.save()
+
+        if apply:
+            c: Classification
+            for index, c in enumerate(Classification.objects.all()):
+                c.update_cached_c_hgvs()
+                if index % 100 == 0:
+                    print(f"Processed {index + 1} classifications for updating flags")

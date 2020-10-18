@@ -398,89 +398,79 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.chgvs_grch38 = None
             self.chgvs_grch38_full = None
 
-        try:
-            # if we had a previously opened flag match warning - don't re-open
-            if variant:
-                if not self.id:
-                    # need to save to have a flag collection
-                    self.save()
-
-                # record the fact that we did match
-                flag_collection = self.flag_collection_safe
-                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_flag, comment='Variant Matched')
-                classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
-
+        # if we had a previously opened flag match warning - don't re-open
+        if variant:
+            if not self.id:
+                # need to save to have a flag collection
                 self.save()
 
-                # see if the match looks suspect
-                c_hgvs = self.get(SpecialEKeys.C_HGVS)
-                lifted_chgvs: Optional[CHGVS] = None
-                transcript_comment: Optional[str] = None
-                matching_warning_comment: Optional[str] = None
-                compare_to: Optional[str] = None
-                diff: Optional[CHGVSDiff] = None
-                if self.get(SpecialEKeys.GENOME_BUILD):
-                    current_build = self.get_genome_build()
-                    if current_build == GenomeBuild.grch37():
-                        compare_to = self.chgvs_grch37
-                    elif current_build == GenomeBuild.grch38():
-                        compare_to = self.chgvs_grch38
+            # record the fact that we did match
+            flag_collection = self.flag_collection_safe
 
-                    if c_hgvs and compare_to:
-                        original_chgvs = CHGVS(c_hgvs)
-                        lifted_chgvs = CHGVS(compare_to)
+            self.save()
 
-                        diff = original_chgvs.diff(lifted_chgvs)
+            # see if the match looks suspect
+            c_hgvs = self.get(SpecialEKeys.C_HGVS)
+            lifted_chgvs: Optional[CHGVS] = None
+            transcript_comment: Optional[str] = None
+            matching_warning_comment: Optional[str] = None
+            compare_to: Optional[str] = None
+            diff: Optional[CHGVSDiff] = None
+            if self.get(SpecialEKeys.GENOME_BUILD):
+                current_build = self.get_genome_build()
+                if current_build == GenomeBuild.grch37():
+                    compare_to = self.chgvs_grch37
+                elif current_build == GenomeBuild.grch38():
+                    compare_to = self.chgvs_grch38
 
-                        if diff:
-                            # DIFF_RAW_CGVS_EXPANDED is minor and expected process
-                            diff = diff & ~CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
+                if c_hgvs and compare_to:
+                    original_chgvs = CHGVS(c_hgvs)
+                    lifted_chgvs = CHGVS(compare_to)
 
-                            if diff == CHGVSDiff.DIFF_TRANSCRIPT_VER:
-                                transcript_comment = \
-                                    (f'For c.hgvs {c_hgvs} the transcripts are:\n\n'
-                                     f'{original_chgvs.transcript} (imported)\n{lifted_chgvs.transcript} (resolved)')
-                            elif diff:
-                                important_diffs = chgvs_diff_description(diff)
-                                diff_desc = ' - ' + '\n - '.join(important_diffs)
-                                matching_warning_comment = (f'Imported c.hgvs and matched c.hgvs differ in the following ways:\n\n{diff_desc}\n\n'
-                                                            f'{original_chgvs.full_c_hgvs} (imported)\n{lifted_chgvs.full_c_hgvs} (resolved)')
+                    diff = original_chgvs.diff(lifted_chgvs)
 
-                if transcript_comment:
-                    flag_collection.get_or_create_open_flag_of_type(
-                        flag_type=classification_flag_types.transcript_version_change_flag,
-                        comment=transcript_comment,
-                        only_if_new=True,
-                        data={'resolved': lifted_chgvs.transcript},
-                        close_other_data=True
-                    )
-                else:
-                    flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag)
+                    if diff:
+                        # DIFF_RAW_CGVS_EXPANDED is minor and expected process
+                        diff = diff & ~CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
 
-                if matching_warning_comment:
-                    flag_collection.get_or_create_open_flag_of_type(
-                        flag_type=classification_flag_types.matching_variant_warning_flag,
-                        comment=matching_warning_comment,
-                        only_if_new=True,
-                        data={'resolved': lifted_chgvs.full_c_hgvs},
-                        close_other_data=True
-                    )
-                else:
-                    flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
+                        if diff == CHGVSDiff.DIFF_TRANSCRIPT_VER:
+                            transcript_comment = \
+                                (f'For c.hgvs {c_hgvs} the transcripts are:\n\n'
+                                 f'{original_chgvs.transcript} (imported)\n{lifted_chgvs.transcript} (resolved)')
+                        elif diff:
+                            important_diffs = chgvs_diff_description(diff)
+                            diff_desc = ' - ' + '\n - '.join(important_diffs)
+                            matching_warning_comment = (f'Imported c.hgvs and matched c.hgvs differ in the following ways:\n\n{diff_desc}\n\n'
+                                                        f'{original_chgvs.full_c_hgvs} (imported)\n{lifted_chgvs.full_c_hgvs} (resolved)')
 
-            if variant and variant.allele:
-                allele: Allele = variant.allele
-                # now that everything's saved - see if 37 rep != 38 rep
-                # but note that the liftover might not be complete (if there is a liftover happening
-                # validation will be called again anyway)
-                allele.validate(liftover_complete=False)
+            if transcript_comment:
+                flag_collection.get_or_create_open_flag_of_type(
+                    flag_type=classification_flag_types.transcript_version_change_flag,
+                    comment=transcript_comment,
+                    only_if_new=True,
+                    data={'resolved': lifted_chgvs.transcript},
+                    close_other_data=True
+                )
+            else:
+                flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag)
 
-        except:
-            report_exc_info()
-            flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
-                                              resolution='matching_failed',
-                                              comment='Could not set variant for unexpected reason')
+            if matching_warning_comment:
+                flag_collection.get_or_create_open_flag_of_type(
+                    flag_type=classification_flag_types.matching_variant_warning_flag,
+                    comment=matching_warning_comment,
+                    only_if_new=True,
+                    data={'resolved': lifted_chgvs.full_c_hgvs},
+                    close_other_data=True
+                )
+            else:
+                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
 
+        if variant and variant.allele:
+            allele: Allele = variant.allele
+            # now that everything's saved - see if 37 rep != 38 rep
+            # but note that the liftover might not be complete (if there is a liftover happening
+            # validation will be called again anyway)
+            allele.validate(liftover_complete=False)
 
         return max_length
 
@@ -505,27 +495,39 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if not self.id:
             # need to save to have a flag collection
             self.save()
+
         flag_collection = self.flag_collection_safe
+        try:
+            if variant:
+                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_flag,
+                                                         comment='Variant Matched')
+                classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
 
-        if failed:
-            c_hgvs = self.get(SpecialEKeys.C_HGVS)
-            build_name = self.get(SpecialEKeys.GENOME_BUILD)
-            if not message:
-                # This kind of information should already be added in
-                # comments from get_evidence
-                message = f'Could not resolve {build_name} {c_hgvs}'
+            if failed:
+                c_hgvs = self.get(SpecialEKeys.C_HGVS)
+                build_name = self.get(SpecialEKeys.GENOME_BUILD)
+                if not message:
+                    # This kind of information should already be added in
+                    # comments from get_evidence
+                    message = f'Could not resolve {build_name} {c_hgvs}'
 
+                flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
+                                                  resolution='matching_failed',
+                                                  comment=message)
+            else:
+                # if there is a matching_variant_flag (and we haven't failed) make it open
+                # but updated_cached_c_hgvs will close it if all is looking good
+                flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
+                                                  resolution='open',
+                                                  comment=message)
+
+            self.update_cached_c_hgvs()
+
+        except:
+            report_exc_info()
             flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
                                               resolution='matching_failed',
-                                              comment=message)
-        else:
-            # if there is a matching_variant_flag (and we haven't failed) make it open
-            # but updated_cached_c_hgvs will close it if all is looking good
-            flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
-                                              resolution='open',
-                                              comment=message)
-
-        self.update_cached_c_hgvs()
+                                              comment='Could not set variant for unexpected reason')
 
     @property
     def share_level_enum(self) -> ShareLevel:

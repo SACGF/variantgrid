@@ -1,4 +1,5 @@
-from functools import total_ordering
+from functools import total_ordering, reduce
+from operator import __and__
 
 from django.contrib.auth.models import User
 from django.db import models, transaction
@@ -407,14 +408,18 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         relevant_qs = Flag.objects.filter(collection=self, flag_type=flag_type).order_by('-created')
 
         if data:
+            data_filters = []
             for key, value in data.items():
-                relevant_qs = relevant_qs.filter(**{f'data__{key}': value})
+                data_filters.append(Q(**{f'data__{key}': value}))
+            data_fitlers_q = reduce(__and__, data_filters)
 
             if close_other_data:
-                close_us = relevant_qs.filter(FlagCollection.Q_OPEN_FLAGS).exclude(**{f'data__{key}': value})
+                close_us = relevant_qs.filter(FlagCollection.Q_OPEN_FLAGS).exclude(data_fitlers_q)
                 for close_me in close_us:
                     resolution = close_me.flag_type.resolution_for_status(FlagStatus.CLOSED)
                     close_me.flag_action(user=user, comment='Data has changed. Raising a new flag.', resolution=resolution, permission_check=False)
+
+            relevant_qs = relevant_qs.filter(data_fitlers_q)
 
         existing = relevant_qs.filter(FlagCollection.Q_OPEN_FLAGS).first()
         if existing:
