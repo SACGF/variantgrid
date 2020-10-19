@@ -149,10 +149,16 @@ def get_criteria_counts(user: User, evidence_field: str) -> Dict[str, List[Dict]
     return acmg_data
 
 
-def get_lab_gene_counts(user: User, lab: Lab, evidence_field: str):
+def get_lab_gene_counts(user: User, lab: Lab):
+    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+        evidence_field = "published_evidence"
+        lab_field = "classification__lab"
+    else:
+        evidence_field = "evidence"
+        lab_field = "lab"
+
     gene_symbol_field = f"{evidence_field}__gene_symbol__value"
-    kwargs = {gene_symbol_field + "__isnull": False,
-              "lab": lab}
+    kwargs = {gene_symbol_field + "__isnull": False, lab_field: lab}
     vc_qs = get_visible_classifications_qs(user).filter(**kwargs)
     gene_clinical_significance_counts = defaultdict(Counter)
 

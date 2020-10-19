@@ -395,11 +395,7 @@ class LabGeneClassificationCountsView(APIView):
     def get(self, request, *args, **kwargs):
         lab = get_object_or_404(Lab, pk=kwargs["lab_id"])
 
-        if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
-            evidence_field = "published_evidence"
-        else:
-            evidence_field = "evidence"
-        lab_gene_counts = get_lab_gene_counts(request.user, lab, evidence_field)
+        lab_gene_counts = get_lab_gene_counts(request.user, lab)
         classification_counts = {}
         for gene_symbol, clinical_significance_count in lab_gene_counts.items():
             total = 0
