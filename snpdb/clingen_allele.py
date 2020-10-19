@@ -219,7 +219,7 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant) 
     return va
 
 
-def variant_allele_clingen(genome_build, variant, existing_variant_allele=None):
+def variant_allele_clingen(genome_build, variant, existing_variant_allele=None) -> VariantAllele:
     """ Call ClinGen and setup VariantAllele - use existing if provided, otherwise create """
     g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
     ca_rep_size = len(g_hgvs)
@@ -229,7 +229,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None):
         raise ClinGenAlleleAPIException(msg)
 
     api_response = get_single_element(list(clingen_hgvs_put([g_hgvs])))
-    va: VariantAllele = None
+    va: VariantAllele
     if "errorType" in api_response:
         if existing_variant_allele:
             existing_variant_allele.error = api_response
@@ -263,8 +263,11 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None):
             allele = existing_variant_allele.allele
         else:
             allele, _ = Allele.objects.get_or_create(clingen_allele=clingen_allele)
+
+        known_variants = {variant.genome_build: variant}  # Ensure this gets linked to Allele, no matter API response
         variant_allele_by_build = link_allele_to_existing_variants(allele,
-                                                                   AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+                                                                   AlleleConversionTool.CLINGEN_ALLELE_REGISTRY,
+                                                                   known_variants=known_variants)
         va = variant_allele_by_build[genome_build]
     return va
 
@@ -322,14 +325,26 @@ def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordT
     return clingen_allele_list
 
 
-def link_allele_to_existing_variants(allele: Allele, conversion_tool) -> Dict[GenomeBuild, VariantAllele]:
+def link_allele_to_existing_variants(allele: Allele, conversion_tool,
+                                     known_variants=None) -> Dict[GenomeBuild, VariantAllele]:
+    """ known_variants - be able to pass in variants you already know are linked to Allele. Workaround to deal with
+        ClinGen Allele registry accepting a coordinate (eg NC_000001.10:g.145299792A>G GRCh37) and retrieving record
+        CA1051218 but the API response won't have GRCh37 in it! """
+    if known_variants is None:
+        known_variants = {}
 
     variant_allele_by_build = {}
     # Attempt to link w/any existing Variant
     for genome_build in GenomeBuild.builds_with_annotation():
         try:
-            variant_tuple = allele.clingen_allele.get_variant_tuple(genome_build)
-            variant = Variant.get_from_tuple(variant_tuple, genome_build)
+            try:
+                variant_tuple = allele.clingen_allele.get_variant_tuple(genome_build)
+                variant = Variant.get_from_tuple(variant_tuple, genome_build)
+            except ClinGenAllele.ClinGenBuildNotInResponseError:
+                variant = known_variants.get(genome_build)
+                if variant is None:
+                    raise
+
             defaults = {"genome_build": genome_build,
                         "allele": allele,
                         "origin": AlleleOrigin.variant_origin(variant),
