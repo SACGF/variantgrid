@@ -17,7 +17,7 @@ from library.log_utils import report_exc_info
 from library.utils import empty_to_none
 from snpdb.models import Lab
 from snpdb.models.models_enums import ImportSource
-from classification.enums import SubmissionSource, ShareLevel
+from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
 from classification.models import ClassificationRef, ClassificationImport, \
     ClassificationJsonParams, PatchMeta
 from classification.models.evidence_mixin import EvidenceMixin, VCStore
@@ -399,7 +399,25 @@ class LabGeneClassificationCountsView(APIView):
             evidence_field = "published_evidence"
         else:
             evidence_field = "evidence"
-        data = get_lab_gene_counts(request.user, lab, evidence_field)
+        lab_gene_counts = get_lab_gene_counts(request.user, lab, evidence_field)
+        classification_counts = {}
+        for gene_symbol, clinical_significance_count in lab_gene_counts.items():
+            total = 0
+            summary = []
+            for cs, cs_display in ClinicalSignificance.SHORT_LABELS.items():
+                if count := clinical_significance_count.get(cs):
+                    summary.append(f"{cs_display}: {count}")
+                    total += count
+            classification_counts[gene_symbol] = {
+                "total": total,
+                "summary": ", ".join(summary),
+            }
+
+        data = {
+            "lab_name": lab.name,
+            "gene_symbols": lab_gene_counts.keys(),
+            "classification_counts": classification_counts,
+        }
         return Response(data)
 
 

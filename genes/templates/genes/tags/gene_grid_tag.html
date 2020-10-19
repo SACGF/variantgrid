@@ -120,6 +120,10 @@ table#gene-grid tr {
     background-image: url({% static 'icons/omim.png' %});
 }
 
+.lab-icon {
+    background-image: url({% static 'icons/share_level/lab.png' %});
+}
+
 .gene-container {
     height: 25px;
 }
@@ -180,6 +184,13 @@ table#gene-grid.color-coverage td.sub-column.coverage-none {
     background-color: #ffe6e6;
 }
 
+#color-coverage-container {
+    display: none;
+}
+
+.classification-count-summary {
+    display: none;
+}
 </style>
 <script>
 /* evidenceColumns/enrichmentKits/pathologyTestVersions/geneLists are the 1
@@ -892,6 +903,17 @@ function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
     });
 }
 
+function addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer) {
+    let htmlByGene = geneListDataById[geneListId]["gene_html"];
+    if (htmlByGene) {
+        geneContainer.append(htmlByGene[geneSymbol]);
+    } else {
+        // Defaults - just show symbol
+        geneContainer.append($("<span />").addClass("gene-symbol").text(geneSymbol));
+    }
+}
+
+
 /// Note: This is passed through PanelApp JSON
 function addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer) {
     let evidenceByGene = geneListDataById[geneListId]["gene_evidence"];
@@ -922,8 +944,8 @@ function setCellGene(tr, geneListId, geneListClass, geneSymbol, geneClickHandler
     cell.addClass(KEEP_CELL_CLASS);
     let geneContainer = $("<span />").addClass("gene-container");
     addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer);
-    
-    geneContainer.append($("<span />").addClass("gene-symbol").text(geneSymbol));
+    addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer);
+
     if (canWriteGeneList(geneListId)) {
         geneContainer.click(function(event) {
             geneClickHandler(cell, geneListId, geneListClass, geneSymbol);
@@ -1207,6 +1229,15 @@ function addEvidenceColumn(evidenceType) {
 }
 
 
+function toggleColorCoverageCheckbox() {
+    if (enrichmentKits.length) {
+        $("#color-coverage-container").show();
+    } else {
+        $("#color-coverage-container").hide();
+    }
+}
+
+
 function addEnrichmentKitColumn(enrichmentKitId, data, selectElement) {
     let gmTable = $("table#gene-grid");
     let thead = gmTable.children('thead');
@@ -1220,6 +1251,7 @@ function addEnrichmentKitColumn(enrichmentKitId, data, selectElement) {
     let closeButtonFunc = function() {
         $("." + className, gmTable).remove();
         removeItemFromArray(enrichmentKitId, enrichmentKits);
+        toggleColorCoverageCheckbox();
         // updateUrl();
         
         if (selectElement) { // Clear if provided - so we can re-select
@@ -1236,6 +1268,7 @@ function addEnrichmentKitColumn(enrichmentKitId, data, selectElement) {
     $("tr", tbody).each(function() {
         createRowColumns($(this));
     });
+    toggleColorCoverageCheckbox();
 }
 
 
@@ -1714,16 +1747,24 @@ function addLabGeneClassificationCountsColumn(labId, data, selectElement) {
         }
     };
 
-    let geneSymbols = [];
-    for (let [geneSymbol, clinicalSignificanceCounts] of Object.entries(data)) {
-        geneSymbols.push({original_name: geneSymbol, gene_symbol: geneSymbol});
+    let geneSymbols = data["gene_symbols"];
+    let classificationCountsByGene = data["classification_counts"];
+    let geneListGeneSymbols = [];
+    let htmlByGene = {};
+    for (let i=0 ; i<geneSymbols.length; ++i) {
+        let geneSymbol = geneSymbols[i];
+        geneListGeneSymbols.push({original_name: geneSymbol, gene_symbol: geneSymbol});
+        let ccSummary = classificationCountsByGene[geneSymbol]["summary"];
+        let ccTotal = classificationCountsByGene[geneSymbol]["total"];
+        htmlByGene[geneSymbol] = `<span class="classification-count-summary">${ccSummary}</span><span class="classification-count-total">${ccTotal}</span>`;
     }
 
     let geneListData = {};
-    geneListData["genelistgenesymbol_set"] = geneSymbols;
-    geneListData["name"] = "TODO: Lab Name";
+    geneListData["genelistgenesymbol_set"] = geneListGeneSymbols;
+    geneListData["gene_html"] = htmlByGene;
+    geneListData["name"] = data["lab_name"];
     geneListData["can_write"] = false;
-    // geneListData["extra_icons"] = [{"css_class": testIconClass, "title": testIconTitle}];
+    geneListData["category"] = {icon_css_class: "lab-icon"};
     geneListData["absolute_url"] = Urls.view_lab(labId);
 
     let geneListId = className; // fake
@@ -2232,6 +2273,17 @@ $(document).ready(function() {
         }
     });
 
+
+    $("input#classification-count-summary-checkbox").change(function() {
+        if ($(this).is(":checked")) {
+            $(".classification-count-summary").show();
+            $(".classification-count-total").hide();
+        } else {
+            $(".classification-count-summary").hide();
+            $(".classification-count-total").show();
+        }
+    });
+
     
     $("button", "#custom-gene-list").button().click(addCustomGeneList);
 
@@ -2281,6 +2333,10 @@ $(document).ready(function() {
             <input id="panelapp-evidence-checkbox" class='evidence-checkbox' type='checkbox' evidence_type="panelapp" />
         </div>
         <div>
+            <label for="classification-count-summary-checkbox">Classification Summary</label>
+            <input id="classification-count-summary-checkbox" type='checkbox' />
+        </div>
+        <div id="color-coverage-container">
             <label for="color-coverage-checkbox"><div class="column-icon enrichment-kit-icon"></div> Color Coverage</label>
             <input id="color-coverage-checkbox" class='color-coverage-checkbox' type='checkbox' checked="1" />
         </div>
@@ -2322,8 +2378,10 @@ $(document).ready(function() {
 {% endif %}
 </div>
 
-{% load ui_help %}
-{% page_help page_id='genes/gene_grid_tag_help' title='Gene Grid' %}
+{% if show_help %}
+    {% load ui_help %}
+    {% page_help page_id='genes/gene_grid_tag_help' title='Gene Grid' %}
+{% endif %}
 
 <table id='gene-grid' class="color-coverage">
 <thead>

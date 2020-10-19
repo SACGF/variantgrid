@@ -26,7 +26,8 @@ def gene_grid(context, columns_from_url=None,
               gene_list_categories_whitelist: set = None,
               default_enrichment_kits=None,
               show_gene_annotation_release: bool = True,
-              show_custom_gene_form: bool = True):
+              show_custom_gene_form: bool = True,
+              show_help: bool = True):
     user = context["user"]
     user_settings = UserSettings.get_for_user(user)
 
@@ -147,4 +148,5 @@ def gene_grid(context, columns_from_url=None,
             "has_gene_info": has_gene_info,
             "gene_symbol_form": GeneSymbolForm(),
             "named_custom_gene_list_form": named_custom_gene_list_form,
-            "user": user}
+            "user": user,
+            "show_help": show_help}

@@ -322,6 +322,17 @@ class ClinicalSignificance:
 
     LABELS = dict(CHOICES + [(None, "Unclassified")])
 
+    SHORT_CHOICES = [
+        (OTHER, 'O'),
+        (BENIGN, 'B'),
+        (LIKELY_BENIGN, 'LB'),
+        (VUS, 'VUS'),
+        (LIKELY_PATHOGENIC, 'LP'),
+        (PATHOGENIC, 'P'),
+    ]
+    SHORT_LABELS = dict(SHORT_CHOICES + [(None, "U")])
+
+
 
 class ClinicalSignificanceComparison:
     LESS_OR_EQUAL = "l"
