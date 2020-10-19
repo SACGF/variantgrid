@@ -498,25 +498,24 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         flag_collection = self.flag_collection_safe
         try:
-            if variant:
-                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_flag,
-                                                         comment='Variant Matched')
-                classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
-
             if failed:
-                c_hgvs = self.get(SpecialEKeys.C_HGVS)
-                build_name = self.get(SpecialEKeys.GENOME_BUILD)
+                # failed matching
                 if not message:
-                    # This kind of information should already be added in
-                    # comments from get_evidence
+                    c_hgvs = self.get(SpecialEKeys.C_HGVS)
+                    build_name = self.get(SpecialEKeys.GENOME_BUILD)
                     message = f'Could not resolve {build_name} {c_hgvs}'
 
                 flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
                                                   resolution='matching_failed',
                                                   comment=message)
+            elif variant:
+                # matching success
+                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_flag,
+                                                         comment='Variant Matched')
+                classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
+
             else:
-                # if there is a matching_variant_flag (and we haven't failed) make it open
-                # but updated_cached_c_hgvs will close it if all is looking good
+                # matching ongoing
                 flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
                                                   resolution='open',
                                                   comment=message)
