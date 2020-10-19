@@ -13,7 +13,7 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context
-from classification.views.classification_view import ClassificationView
+from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.views import classification_import_tool, AutopopulateView
 from variantgrid.perm_path import perm_path
 
@@ -74,6 +74,7 @@ urlpatterns = [
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),
+    perm_path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     perm_path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
 ]
 
@@ -91,7 +92,10 @@ rest_urlpatterns = [
     perm_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
     perm_path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
-    perm_path('api/classifications/datatables/', ClassificationModificationDatatableView.as_view(), name='classification_datatables')
+    perm_path('api/classifications/datatables/', ClassificationModificationDatatableView.as_view(), name='classification_datatables'),
+
+    perm_path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
+              name='lab_gene_classification_counts_api'),
 ]
 
 urlpatterns += format_suffix_patterns(rest_urlpatterns)

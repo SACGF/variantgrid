@@ -188,6 +188,7 @@ table#gene-grid.color-coverage td.sub-column.coverage-none {
 let evidenceColumns = [];
 let enrichmentKits = [];
 let geneAnnotationReleases = []
+let labClassificationCounts = [];
 let pathologyTestVersions = [];
 let geneLists = [];
 let pathologyTestVersionDataById = {};
@@ -383,6 +384,7 @@ function getGeneListColumn(geneListId, selectElement, addEmptyGeneLists) {
             {% endif %}
             };
 
+            console.log(data);
             populateGeneColumn(geneListId, data, className, saveGeneListFunc, closeButtonFunc);
         },
     });
@@ -541,7 +543,7 @@ function getNumberOfColumns(headerRow) {
         ekCols *= ENRICHMENT_KIT_COLUMNS.length;
     }
 
-    return evidenceColumns.length + geneAnnotationReleases.length + ekCols + pathologyTestVersions.length + geneLists.length;
+    return evidenceColumns.length + geneAnnotationReleases.length + ekCols + labClassificationCounts.length + pathologyTestVersions.length + geneLists.length;
 }
 
 
@@ -678,6 +680,20 @@ function getGeneRowColumns(geneSymbol, headerRow) {
             columns.push(columnData);
         }
     }
+
+    for (let i=0 ; i<labClassificationCounts.length ; ++i) {
+        (function() {
+            let labId = labClassificationCounts[i]; // inside anon func to capture this
+
+            let columnData = {
+                "txType": 'td',
+                "class": 'lab-classification-count-' + labId,
+            };
+            columns.push(columnData);
+        })();
+    }
+
+
 
     for (let i=0 ; i<pathologyTestVersions.length ; ++i) {
         (function() {
@@ -1660,6 +1676,62 @@ function panelAppCellInit(cell, gene_symbol) {
     });
 }
 
+///////
+
+function addAndRetrieveLabGeneClassificationCountColumnIfNotExists(labId, selectElement) {
+    if (labClassificationCounts.indexOf(labId) > -1) {
+        return;
+    }
+
+    $.ajax({
+        type: "GET",
+        url: Urls.lab_gene_classification_counts_api(labId),
+        success: function(data) {
+            addLabGeneClassificationCountsColumn(labId, data, selectElement);
+        }
+    });
+}
+
+
+function addLabGeneClassificationCountsColumn(labId, data, selectElement) {
+    if (labClassificationCounts.indexOf(labId) > -1) { // in case 2x callbacks were run
+        return;
+    }
+    labClassificationCounts.push(labId);
+
+    let className = 'lab-classification-count-' + labId;
+    let closeButtonFunc = function() {
+        let gmTable = $("table#gene-grid");
+        let tbody = gmTable.children('tbody');
+
+        removeColumn(className);
+        removeItemFromArray(labId, labClassificationCounts);
+        gcEmptyRows(tbody);
+        updateUrl();
+
+        if (selectElement) { // Clear if provided - so we can re-select
+            $(selectElement).empty();
+        }
+    };
+
+    let geneSymbols = [];
+    for (let [geneSymbol, clinicalSignificanceCounts] of Object.entries(data)) {
+        geneSymbols.push({original_name: geneSymbol, gene_symbol: geneSymbol});
+    }
+
+    let geneListData = {};
+    geneListData["genelistgenesymbol_set"] = geneSymbols;
+    geneListData["name"] = "TODO: Lab Name";
+    geneListData["can_write"] = false;
+    // geneListData["extra_icons"] = [{"css_class": testIconClass, "title": testIconTitle}];
+    geneListData["absolute_url"] = Urls.view_lab(labId);
+
+    let geneListId = className; // fake
+    populateGeneColumn(geneListId, geneListData, className, null, closeButtonFunc, null);
+
+}
+
+
 
 ////// Pathology test
 
@@ -2105,7 +2177,14 @@ $(document).ready(function() {
         }
     });
     
-    
+    $('#id_lab').change(function() {
+        let labId = $(this).val();
+        if (labId) {
+            addAndRetrieveLabGeneClassificationCountColumnIfNotExists(labId, this);
+        }
+    });
+
+
     $('#id_hpo_synonym').change(function() {
         let HPO_PREFIX = "hpo-synonym-";
         let hpo_synonym_id = $(this).val();
@@ -2228,8 +2307,7 @@ $(document).ready(function() {
         <td><div class='gene-list-icon {{ category.icon_css_class }}'></div>
         <td>
 {% endcomment %}
-
-
+{% if named_custom_gene_list_form %}
     <fieldset class="form-fields small" id="custom-gene-list">
         <legend>Create Custom Gene List</legend>
         <div id='custom-gene-list-help'></div>
@@ -2241,6 +2319,7 @@ $(document).ready(function() {
             <button id='add-custom-gene-list'>Add Custom Gene List</button>
         </div>
     </fieldset>
+{% endif %}
 </div>
 
 {% load ui_help %}

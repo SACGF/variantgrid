@@ -10,6 +10,7 @@ from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionF
 from pathtests.models import PathologyTest
 from seqauto.forms import EnrichmentKitForm
 from seqauto.models import EnrichmentKit
+from snpdb.forms import LabSelectForm
 from snpdb.models import Company, UserSettings
 
 register = Library()
@@ -21,8 +22,11 @@ def gene_grid(context, columns_from_url=None,
               update_url_callback: str = None,
               save_gene_list_callback: str = None,
               close_button_callback: str = None,
+              data_columns_whitelist: set = None,
               gene_list_categories_whitelist: set = None,
-              default_enrichment_kits=None):
+              default_enrichment_kits=None,
+              show_gene_annotation_release: bool = True,
+              show_custom_gene_form: bool = True):
     user = context["user"]
     user_settings = UserSettings.get_for_user(user)
 
@@ -34,8 +38,9 @@ def gene_grid(context, columns_from_url=None,
     if columns_from_url:
         initial_columns.extend(columns_from_url.split("/"))
 
-    gene_annotation_releases = user_settings.get_gene_annotation_releases()
-    initial_columns.extend([f"gene-annotation-release-{release.pk}" for release in gene_annotation_releases])
+    if show_gene_annotation_release:
+        gene_annotation_releases = user_settings.get_gene_annotation_releases()
+        initial_columns.extend([f"gene-annotation-release-{release.pk}" for release in gene_annotation_releases])
 
     data_columns = []
     enrichment_kit_data = {"name": "Enrichment Kit",
@@ -45,7 +50,7 @@ def gene_grid(context, columns_from_url=None,
     data_columns.append(enrichment_kit_data)
     enrichment_kit_data = {"name": "Gene Annotation Release",
                            "description": "Gene Annotation Release (match genes in VEP annotation)",
-                           #"icon_css_class": "enrichment-kit-icon",
+                           #"icon_css_class": "",
                            "form": GeneAnnotationReleaseForm()}
     data_columns.append(enrichment_kit_data)
 
@@ -91,6 +96,12 @@ def gene_grid(context, columns_from_url=None,
                       "form": PanelAppPanelForm()}
     categories.append(panel_app_data)
 
+    hpo_category_data = {"name": "Lab Gene Classification Counts",
+                         "description": "Lab Gene Classification Counts",
+                         "form": LabSelectForm()}
+    categories.append(hpo_category_data)
+
+
     # HPO
     hpo_category_data = {"name": "HPO",
                          "icon_css_class": "hpo-icon",
@@ -107,13 +118,21 @@ def gene_grid(context, columns_from_url=None,
     categories.append(omim_category_data)
 
     # Optionally filter based on whitelist given to tag
-    if gene_list_categories_whitelist:
+    if data_columns_whitelist is not None:
+        def in_whitelist(c):
+            return c["name"] in data_columns_whitelist
+        data_columns = filter(in_whitelist, data_columns)
+
+    if gene_list_categories_whitelist is not None:
         def in_whitelist(c):
             return c["name"] in gene_list_categories_whitelist
         categories = filter(in_whitelist, categories)
 
     has_gene_info = GeneInfo.objects.filter(gene_list__genelistgenesymbol__isnull=False).exists()
-    named_custom_gene_list_form = NamedCustomGeneListForm(username=user)
+    if show_custom_gene_form:
+        named_custom_gene_list_form = NamedCustomGeneListForm(username=user)
+    else:
+        named_custom_gene_list_form = None
     return {"ENRICHMENT_KIT_COLUMNS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMNS,
             "ENRICHMENT_KIT_COLUMN_TOOL_TIPS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS,
             "ENRICHMENT_KIT_COLUMN_LABELS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS,

@@ -5,14 +5,17 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils.decorators import method_decorator
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
     HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
 from typing import Optional
 
+from classification.classification_stats import get_lab_gene_counts
 from library.log_utils import report_exc_info
 from library.utils import empty_to_none
+from snpdb.models import Lab
 from snpdb.models.models_enums import ImportSource
 from classification.enums import SubmissionSource, ShareLevel
 from classification.models import ClassificationRef, ClassificationImport, \
@@ -384,3 +387,19 @@ class ClassificationView(APIView):
         importer.finish()
 
         return Response(status=HTTP_200_OK, data=json_data)
+
+
+class LabGeneClassificationCountsView(APIView):
+    """ Returns a dict of {gene_symbol: {clinical_significance: classification_counts}} """
+
+    def get(self, request, *args, **kwargs):
+        lab = get_object_or_404(Lab, pk=kwargs["lab_id"])
+
+        if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+            evidence_field = "published_evidence"
+        else:
+            evidence_field = "evidence"
+        data = get_lab_gene_counts(request.user, lab, evidence_field)
+        return Response(data)
+
+

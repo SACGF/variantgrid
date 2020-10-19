@@ -11,6 +11,8 @@ from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
 import numpy as np
 
+from snpdb.models import Lab
+
 
 def get_classification_counts(user: User, show_unclassified=True) -> Dict[str, int]:
     qs = get_visible_classifications_qs(user)
@@ -145,3 +147,16 @@ def get_criteria_counts(user: User, evidence_field: str) -> Dict[str, List[Dict]
         ]
 
     return acmg_data
+
+
+def get_lab_gene_counts(user: User, lab: Lab, evidence_field: str):
+    gene_symbol_field = f"{evidence_field}__gene_symbol__value"
+    kwargs = {gene_symbol_field + "__isnull": False,
+              "lab": lab}
+    vc_qs = get_visible_classifications_qs(user).filter(**kwargs)
+    gene_clinical_significance_counts = defaultdict(Counter)
+
+    for gene_symbol, clinical_significance in vc_qs.values_list(gene_symbol_field, "clinical_significance"):
+        gene_clinical_significance_counts[gene_symbol][clinical_significance] += 1
+
+    return gene_clinical_significance_counts
