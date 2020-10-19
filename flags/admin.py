@@ -34,8 +34,8 @@ class FlagStatusFilter(admin.SimpleListFilter):
 
 
 class FlagAdmin(admin.ModelAdmin):
-    list_display = ('id', 'collection', 'flag_type', 'resolution', 'user', 'created')
-    list_filter = (FlagTypeFilter,FlagStatusFilter,)
+    list_display = ('id', 'collection', 'flag_type', 'resolution', 'user', 'data', 'created', 'modified')
+    list_filter = (FlagTypeFilter, FlagStatusFilter,)
 
 admin.site.register(models.FlagType)
 admin.site.register(models.FlagTypeContext)
