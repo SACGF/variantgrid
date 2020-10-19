@@ -88,6 +88,7 @@ class KeycloakUserForm(BaseForm):
             Submit('submit', 'Create User')
         )
 
+
 class LabSelectForm(forms.Form):
     lab = forms.ModelChoiceField(queryset=Lab.objects.all(),
                                  required=False,
@@ -495,6 +496,7 @@ class CreateTagForm(forms.Form):
             FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary"))
         )
         self.helper = helper
+
 
 class UserSettingsGenomeBuildMixin:
     """ Mixin with ModelForm to have genome_build initialise from UserSettings """

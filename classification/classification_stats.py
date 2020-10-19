@@ -44,11 +44,11 @@ def get_visible_classifications_qs(user: User):
 
 
 def get_grouped_classification_counts(user: User,
-                                              field: str,
-                                              evidence_key: Optional[str] = None,
-                                              field_labels: Optional[Dict[str, str]] = None,
-                                              max_groups=10,
-                                              show_unclassified=True) -> List[Dict[str, Dict]]:
+                                      field: str,
+                                      evidence_key: Optional[str] = None,
+                                      field_labels: Optional[Dict[str, str]] = None,
+                                      max_groups=10,
+                                      show_unclassified=True) -> List[Dict[str, Dict]]:
     """ :param user: User used to check visibility of classifications
         :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
