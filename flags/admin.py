@@ -1,5 +1,6 @@
 from django.contrib import admin
 from flags import models
+from flags.models import FlagTypeResolution, FlagStatus
 from flags.models.models import FlagType
 
 class FlagTypeFilter(admin.SimpleListFilter):
@@ -16,9 +17,25 @@ class FlagTypeFilter(admin.SimpleListFilter):
             return queryset.filter(flag_type=self.value())
         return queryset
 
+
+class FlagStatusFilter(admin.SimpleListFilter):
+    list_per_page = 50
+    title = 'Resolution'
+    parameter_name = 'resolution'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return FlagStatus.CHOICES
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(resolution__status=self.value())
+        return queryset
+
+
 class FlagAdmin(admin.ModelAdmin):
-    list_display = ('id', 'collection', 'flag_type', 'resolution', 'user')
-    list_filter = (FlagTypeFilter,)
+    list_display = ('id', 'collection', 'flag_type', 'resolution', 'user', 'created')
+    list_filter = (FlagTypeFilter,FlagStatusFilter,)
 
 admin.site.register(models.FlagType)
 admin.site.register(models.FlagTypeContext)

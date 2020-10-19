@@ -74,6 +74,6 @@ class Command(BaseCommand):
         if apply:
             c: Classification
             for index, c in enumerate(Classification.objects.all()):
-                c.update_cached_c_hgvs()
                 if index % 100 == 0:
-                    print(f"Processed {index + 1} classifications for updating flags")
+                    print(f"Processed {index} classifications for updating flags")
+                c.update_cached_c_hgvs()
