@@ -490,3 +490,31 @@ tr.template-download {
         margin-left: 8px;
     }
 }
+
+#vc-form {
+    width: 555px;
+    .no-results {
+        display: none;
+    }
+    .btn-toolbar {
+        width: 100%;
+        display: flex;
+        & > * {
+            margin: 4px;
+            flex-grow:1;
+            flex-shrink:1;
+            width: 30%;
+            height: 40px;
+        }
+    }
+    .card-body {
+        background-color: rgb(245,255,245);
+    }
+}
+#vc-extras {
+    position: fixed;
+    min-width: 200px;
+    max-width: 800px;
+    left: 760px;
+    top: 62px;
+}

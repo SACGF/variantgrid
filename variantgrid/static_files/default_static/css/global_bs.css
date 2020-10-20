@@ -194,34 +194,6 @@ a.list-group-item-action {
   padding-right: 4px;
 }
 
-#vc-form {
-  width: 555px;
-}
-#vc-form .no-results {
-  display: none;
-}
-#vc-form .btn-toolbar {
-  width: 100%;
-  display: flex;
-}
-#vc-form .btn-toolbar > * {
-  margin: 4px;
-  flex-grow: 1;
-  flex-shrink: 1;
-  width: 30%;
-}
-#vc-form .card-body {
-  background-color: #f5fff5;
-}
-
-#vc-extras {
-  position: fixed;
-  min-width: 200px;
-  max-width: 800px;
-  left: 760px;
-  top: 62px;
-}
-
 .btn-disabled-wrapper {
   display: inline-block;
 }
