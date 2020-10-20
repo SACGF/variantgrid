@@ -66,7 +66,7 @@ class ManualOperation(Operation):
         return arg
 
     @staticmethod
-    def _task_id_generate(category: str, args: List[str]):
+    def _task_id_generate(category: str, args: List[str]) -> str:
         if isinstance(args, str):
             args = [args]
         args = [ManualOperation.escape_arg(arg) for arg in args]
@@ -74,5 +74,5 @@ class ManualOperation(Operation):
         return f"{category}*{arg_string}"
 
     @staticmethod
-    def task_id_manage(args: Union[str, List[str]]):
+    def task_id_manage(args: Union[str, List[str]]) -> str:
         return ManualOperation._task_id_generate(category="manage", args=args)
