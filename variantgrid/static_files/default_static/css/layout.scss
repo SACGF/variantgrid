@@ -88,7 +88,16 @@ nav .nav-link:hover {
 i.fas {
     margin-right: 4px;
 }
-
+/*
 .row.equal .card {
     height: 100%;
+}
+ */
+
+.row.equal > div {
+    display: flex;
+    flex-direction: column;
+    & > .card {
+        flex-grow: 1;
+    }
 }
