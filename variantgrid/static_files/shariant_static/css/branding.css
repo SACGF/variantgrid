@@ -16,20 +16,6 @@
   color: #444 !important;
 }
 
-/*
-.card-header, .card-footer {
-  background-color: #00aedb !important;
-  // background-color: rgb(5, 79, 148) !important;
-    color: white !important;
-    & * {
-        color: white !important;
-    }
-    a {
-      // text-decoration: underline !important;
-      text-decoration-color: rgba(255,255,255,0.5) !important;
-    }
-}
-*/
 nav.navbar a.nav-link {
   color: #ddd !important;
 }
@@ -52,6 +38,10 @@ nav.navbar a.nav-link.active {
 
 .navbar-brand {
   background-image: url("/static/images/AGHA WHITE REVERSED LOGO 3L stacked-01.png");
+}
+
+#site-name::after {
+  content: "Shariant";
 }
 
 /*# sourceMappingURL=branding.css.map */

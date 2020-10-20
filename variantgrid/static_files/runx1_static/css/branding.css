@@ -16,4 +16,8 @@ a.nav-link.active {
   background-image: url(/static/images/runx1-logo-standard.png);
 }
 
+#site-name::after {
+  content: "runx1";
+}
+
 /*# sourceMappingURL=branding.css.map */

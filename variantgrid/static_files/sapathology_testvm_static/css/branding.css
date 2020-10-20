@@ -16,4 +16,8 @@ a.nav-link.active {
   background-image: url(/static/images/sapath_logo_from_pdf.png);
 }
 
+#site-name::after {
+  content: "SA Pathology - VariantGrid Test";
+}
+
 /*# sourceMappingURL=branding.css.map */

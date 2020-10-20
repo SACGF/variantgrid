@@ -16,6 +16,11 @@ a.nav-link {
     background-image: url(/static/images/sapath_logo_from_pdf.png);
 }
 
+// used by 50x.html
+#site-name::after {
+    content: "SA Pathology - VariantGrid Test"
+}
+
 ///* This file is overwritten in sapathology_testvm_static - if you change this, change that!  */
 //
 //@import url('https://fonts.googleapis.com/css?family=Raleway:400,600');
