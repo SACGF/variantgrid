@@ -204,6 +204,10 @@ a.list-group-item-action {
 .btn-toolbar *.btn:not(:first-child) {
   margin-left: 10px;
 }
+.btn-toolbar .btn {
+  margin: 4px;
+  height: 40px;
+}
 
 .accordion > .card {
   overflow: inherit;

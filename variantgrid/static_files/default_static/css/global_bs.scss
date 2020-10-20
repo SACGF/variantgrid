@@ -260,6 +260,10 @@ a.list-group-item-action {
     *.btn:not(:first-child) {
         margin-left: 10px;
     }
+    & .btn {
+        margin: 4px;
+        height: 40px;
+    }
 }
 
 // Undo this bootstrap so drop downs don't get cut off on classification form

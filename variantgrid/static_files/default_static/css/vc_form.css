@@ -443,15 +443,13 @@ tr.template-download .toggle {
   display: none;
 }
 #vc-form .btn-toolbar {
-  width: 100%;
   display: flex;
+  width: 100%;
 }
 #vc-form .btn-toolbar > * {
-  margin: 4px;
   flex-grow: 1;
   flex-shrink: 1;
   width: 30%;
-  height: 40px;
 }
 #vc-form .card-body {
   background-color: #f5fff5;
