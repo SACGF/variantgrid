@@ -1191,13 +1191,11 @@ def labs(request):
         state_field = "lab__state"
         show_unclassified = True
 
-    vc_org_data_json = get_grouped_classification_counts(request.user,
-                                                                 org_field,
-                                                                 max_groups=15,
-                                                                 field_labels=name_to_short_name,
-                                                                 show_unclassified=show_unclassified)
-    vc_state_data_json = get_grouped_classification_counts(request.user, state_field,
-                                                                   max_groups=15, show_unclassified=show_unclassified)
+    vc_org_data_json = get_grouped_classification_counts(request.user, org_field, max_groups=15,
+                                                         field_labels=name_to_short_name,
+                                                         show_unclassified=show_unclassified)
+    vc_state_data_json = get_grouped_classification_counts(request.user, state_field, max_groups=15,
+                                                           show_unclassified=show_unclassified)
     active_organizations = Organization.objects.filter(active=True).order_by('name')
     organization_labs = {}
     for org in active_organizations:

@@ -176,6 +176,3 @@ def preprocess_vcf(upload_step):
         # We don't know how big the last split file is, so leave it as null so no check
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
                                                  output_filename=split_vcf_filename)
-
-
-

@@ -13,7 +13,7 @@ from classification.views.classification_datatables import DatatableConfig
 
 register = template.Library()
 
-def _jsonify(json_me, pretty = False) -> Union[str, Any]:
+def _jsonify(json_me, pretty=False) -> Union[str, Any]:
     if isinstance(json_me, str):
         return json_me
     elif isinstance(json_me, bool):

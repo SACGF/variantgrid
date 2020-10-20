@@ -90,9 +90,9 @@ class ManualSubMigration(SubMigration):
             selection = selection.strip().lower()
             if selection == "y":
                 return MigrationResult.success()
-            elif selection == "n":
+            if selection == "n":
                 return MigrationResult.failure()
-            elif selection == "x":
+            if selection == "x":
                 return MigrationResult.skip()
             print(f"Unexpected input - \"{selection}\"")
 
@@ -218,8 +218,7 @@ class Migrator:
         if category == "manage":
             args = ["python", "manage.py", line]
             return CommandSubMigration(args).using(task_id=task_id, notes=notes)
-        else:
-            return ManualSubMigration(line).using(task_id=task_id, notes=notes)
+        return ManualSubMigration(line).using(task_id=task_id, notes=notes)
 
     def prompt(self):
         self.refresh_migrations()

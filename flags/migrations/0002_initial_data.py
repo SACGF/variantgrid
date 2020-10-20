@@ -225,7 +225,6 @@ def flags_initial_data(apps, schema_editor):
          'raise_permission': 'A'}
     ]
 
-
     FLAG_TYPE_RESOLUTION = [
         {'flag_type_id': 'classification_discordant',
          'resolution_id': 'open'},

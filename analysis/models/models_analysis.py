@@ -15,7 +15,7 @@ from django_extensions.db.models import TimeStampedModel
 from analysis.models.enums import AnalysisType, AnalysisTemplateType
 from annotation.models import AnnotationVersion
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.guardian_utils import admin_bot
+from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
 from snpdb.models import CustomColumnsCollection, CustomColumn, \
     UserSettings, AbstractNodeCountSettings, Sample
 from snpdb.models.models_genome import GenomeBuild
@@ -343,6 +343,8 @@ class AnalysisTemplateRun(TimeStampedModel):
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments
         analysis.save()
+
+        assign_permission_to_user_and_groups(user, analysis)
         return AnalysisTemplateRun.objects.create(template_version=template_version, analysis=analysis)
 
     def populate_arguments(self, data: Dict):
