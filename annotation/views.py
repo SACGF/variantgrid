@@ -367,7 +367,7 @@ def retry_annotation_run_upload(request, annotation_run_id):
 
 @login_not_required
 @cache_page(WEEK_SECS)
-@vary_on_cookie # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
+@vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
 def view_annotation_descriptions(request):
     variantgrid_columns_by_annotation_level = defaultdict(list)
 
@@ -379,7 +379,7 @@ def view_annotation_descriptions(request):
 
 
 @cache_page(WEEK_SECS)
-@vary_on_cookie # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
+@vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
 def about_new_vep_columns(request):
     # Keep this around for another upgrade cycle
     return render(request, "annotation/about_new_vep_columns.html")

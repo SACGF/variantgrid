@@ -614,4 +614,3 @@ def lab_gene_classification_counts(request):
                "gene_list_categories_whitelist": gene_list_categories_whitelist,
                "default_enrichment_kits": []}
     return render(request, 'classification/lab_gene_classification_counts.html', context)
-

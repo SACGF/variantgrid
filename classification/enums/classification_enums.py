@@ -333,7 +333,6 @@ class ClinicalSignificance:
     SHORT_LABELS = dict(SHORT_CHOICES + [(None, "U")])
 
 
-
 class ClinicalSignificanceComparison:
     LESS_OR_EQUAL = "l"
     EQUAL = 'e'

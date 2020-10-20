@@ -415,5 +415,3 @@ class LabGeneClassificationCountsView(APIView):
             "classification_counts": classification_counts,
         }
         return Response(data)
-
-

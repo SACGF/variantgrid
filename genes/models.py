@@ -171,9 +171,9 @@ class GeneSymbolAlias(TimeStampedModel):
 class GeneSymbolAliasSummary:
     other_obj: GeneSymbol
     other_symbol: str
-    source: str # HGNC etc
+    source: str  # HGNC etc
     my_symbol_is_main: bool  # true if the other symbol is an alias for this symbol, false if this symbol is an alias for the other
-    different_genes: bool # if true, then this should only be considered an alias with a priviso, and not used in automatic alias calculations
+    different_genes: bool  # if true, then this should only be considered an alias with a priviso, and not used in automatic alias calculations
 
     def __lt__(self, other):
         return self.other_symbol < other.other_symbol

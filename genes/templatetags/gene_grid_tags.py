@@ -102,7 +102,6 @@ def gene_grid(context, columns_from_url=None,
                          "form": LabSelectForm()}
     categories.append(hpo_category_data)
 
-
     # HPO
     hpo_category_data = {"name": "HPO",
                          "icon_css_class": "hpo-icon",

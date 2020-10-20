@@ -475,7 +475,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                               resolution='matching_failed',
                                               comment='Could not set variant for unexpected reason')
 
-
         return max_length
 
     @transaction.atomic()

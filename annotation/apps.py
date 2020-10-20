@@ -29,8 +29,8 @@ class AnnotationConfig(AppConfig):
                     classification_withdraw_signal, classification_post_publish_signal
 
                 classification_withdraw_signal.connect(gene_counts_classification_withdraw_handler,
-                                                               sender=Classification)
+                                                       sender=Classification)
                 classification_post_publish_signal.connect(gene_counts_classification_publish_handler,
-                                                                   sender=Classification)
+                                                           sender=Classification)
         except ProgrammingError:
             pass  # Need to allow DB migrations adding these fields to run
