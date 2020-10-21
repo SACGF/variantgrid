@@ -1,0 +1,18 @@
+<div class="form-group row mb-4 mb-md-3">
+    <label class="col-12 col-md-6 text-md-right" for="nearby_codon">Codon</label>
+    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_codon">
+        {{ codon_summary|default_if_none:"-" }}
+    </div>
+    <label class="col-12 col-md-6 text-md-right" for="nearby_exon">Exon</label>
+    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_exon">
+        {{ exon_summary|default_if_none:"-" }}
+    </div>
+    <label class="col-12 col-md-6 text-md-right" for="nearby_domain">Domain</label>
+    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_domain">
+        {{ domain_summary|default_if_none:"-" }}
+    </div>
+    <label class="col-12 col-md-6 text-md-right" for="nearby_range">Range (+/- {{ distance }})</label>
+    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_range">
+        {{ range_summary|default_if_none:"-" }}
+    </div>
+</div>
