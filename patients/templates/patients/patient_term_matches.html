@@ -11,19 +11,19 @@
     {% load jqgrid_tags %}
 
     <div id='patient-header'>
-        <h1>Patient Term Matches</h1>
+        <h3>Patient Term Matches</h3>
         <div>
             <a href="{% url 'patients' %}">Back to Patients</a>
         </div>
     </div>
     <div>
-        <h2>Human Phenotype Ontology</h2>
+        <h4>Human Phenotype Ontology</h4>
         {% patient_phenotypes_graph max_records=40 graph_width=1024 graph_height=768 %}
     
-        <h2>OMIM</h2>
+        <h4>OMIM</h4>
         {% patient_omim_graph max_records=40 graph_width=1024 graph_height=768 %}
     
-        <h2>Genes</h2>
+        <h4>Genes</h4>
         {% patient_genes_graph max_records=40 graph_width=1024 graph_height=768 %}
     </div>
 {% endblock submenu_page_content %}

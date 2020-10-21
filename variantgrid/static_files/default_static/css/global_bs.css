@@ -444,4 +444,28 @@ table.as_table td {
   pointer-events: none;
 }
 
+.hpo, .omim, .gene {
+  display: inline-block;
+  border: 3px solid white;
+  margin: 0 4px 0 4px;
+  border-radius: 3px;
+  padding: 0 4px 0 4px;
+}
+
+.hpo {
+  background-color: #FF8C00;
+  border-color: #FF8C00;
+}
+
+.omim {
+  background-color: #22529e;
+  border-color: #22529e;
+  color: #ddd;
+}
+
+.gene {
+  background-color: #99CD83;
+  border-color: #99CD83;
+}
+
 /*# sourceMappingURL=global_bs.css.map */
