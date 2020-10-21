@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from avatar.templatetags.avatar_tags import avatar_url
 from collections import OrderedDict, defaultdict
 
+from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -330,6 +331,9 @@ class UserSettings:
         return lab
 
     def get_genome_builds(self) -> QuerySet:
+        if not settings.USER_SETTINGS_SHOW_BUILDS:
+            return GenomeBuild.objects.all()
+
         # Make sure default build comes through, even if form has never saved/created UserSettingsGenomeBuild objects
         q_default = Q(pk=self.default_genome_build.pk)
         # In override order get last configuration

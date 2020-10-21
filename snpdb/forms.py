@@ -349,9 +349,12 @@ class SettingsOverrideForm(BaseModelForm):
             if f in self.fields and not visible:
                 del self.fields[f]
 
+        if not settings.USER_SETTINGS_SHOW_BUILDS:
+            del self.fields['genome_builds']
+
     def save(self, commit=True):
         settings_override = super().save(commit=commit)
-        if commit:
+        if commit and settings.USER_SETTINGS_SHOW_BUILDS:
             usgb_set = settings_override.settingsgenomebuild_set
             old_genome_builds = set(usgb_set.all().values_list("genome_build", flat=True))
             new_genome_builds = set(self.cleaned_data['genome_builds'])

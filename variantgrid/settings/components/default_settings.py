@@ -365,6 +365,7 @@ PEDIGREE_MADELINE2_COMMAND = None  # Install https://madeline.med.umich.edu/made
 INITIAL_USER_DATA_PREFIX_KWARGS = {}  # Create UserDataPrefix object to setup IGV for new users
 
 USER_SETTINGS_SHOW_GROUPS = True
+USER_SETTINGS_SHOW_BUILDS = True  # If false, user can still choose preferred build, but can't ignore builds
 
 REDIS_PIPELINE_SIZE = 100000
 SQL_BATCH_INSERT_SIZE = 50000
