@@ -5,13 +5,31 @@ from functools import reduce
 from django.contrib.auth.models import User
 from django.db.models import Count, Sum, Q
 
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version, \
+    get_variant_queryset_for_annotation_version
 from classification.enums import ClinicalSignificance
 from classification.models import Classification
 from snpdb.models import Variant
 
 
-def interesting_summary(qs, user, genome_build, clinical_significance=False):
+def get_nearby_qs(variant, annotation_version, distance=50):
+    qs = get_variant_queryset_for_annotation_version(annotation_version)
+
+    return {
+        "codon": filter_variant_codon(qs, variant),
+        "exon": filter_variant_exon(qs, variant),
+        "domain": filter_variant_domain(qs, variant),
+        "range": filter_variant_range(qs, variant, distance=distance),
+    }
+
+
+def get_nearby_summaries(user, variant, annotation_version, distance=50, clinical_significance=False):
+    nearby_qs = get_nearby_qs(variant, annotation_version, distance=distance)
+    kwargs = {"user": user, "genome_build": variant.genome_build, "clinical_significance": clinical_significance}
+    return {f"{region}_summary": interesting_summary(qs, **kwargs) for region, qs in nearby_qs.items()}
+
+
+def interesting_summary(qs, user, genome_build, total=True, clinical_significance=False):
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
     # print(counts)
     summary = None
@@ -47,9 +65,12 @@ def interesting_summary(qs, user, genome_build, clinical_significance=False):
 
         optional_summary = ", ".join(summaries)
 
-        summary = f"{num_variants} variants."
+        if total:
+            summary = f"{num_variants} variants. "
+        else:
+            summary = ""
         if optional_summary:
-            summary += " " + optional_summary
+            summary += optional_summary
     return summary
 
 
@@ -80,7 +101,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
     return qs.aggregate(**agg_kwargs)
 
 
-def filter_variant_region(qs, variant: Variant, distance=50):
+def filter_variant_range(qs, variant: Variant, distance=50):
     start = variant.start + distance
     end = variant.end + distance
     annotation_kwargs, q = Variant.get_overlap_annotate_and_q(variant.locus.contig, start, end)
@@ -135,7 +156,8 @@ def filter_variant_domain(qs, variant: Variant):
 
 
 def variant_interesting_summary(variant: Variant, user: User, clinical_significance=False) -> str:
+    """ Could use this for search summary? """
     qs = get_variant_queryset_for_latest_annotation_version(variant.genome_build)
     qs = qs.filter(pk=variant.pk)
 
-    return interesting_summary(qs, user, variant.genome_build, clinical_significance)
+    return interesting_summary(qs, user, variant.genome_build, total=False, clinical_significance=clinical_significance)

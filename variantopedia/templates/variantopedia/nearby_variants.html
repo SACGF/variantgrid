@@ -1,0 +1,88 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_field %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load static %}
+{% load js_tags %}
+{% load datatable_tags %}
+{% load jqgrid_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+
+{% block title %}Nearby to {{ variant }}{% endblock title %}
+
+{% block head %}
+    <!-- <script type="text/javascript" src="{% static 'js/grid.js' %}"></script> -->
+    <script>
+        window.ANALYSIS_SETTINGS = {
+            show_igv_links : false,
+            open_variant_details_in_new_window: true,
+        };
+
+        console.log("defining formatter!");
+
+        function detailsLink(variantId, options, rowData) {
+            console.log("fake details link");
+        }
+
+        jQuery.extend($.fn.fmatter , {
+            'detailsLink': detailsLink,
+        });
+
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>Nearby Variants</h1>
+
+        <div class="card" id="clingen-allele">
+            <div class="card-header">Variant</div>
+            <div class="card-body">
+                {% if variant_annotation.hgvs_c %}
+                    {% labelled label="Canonical c.HGVS" %} {{ variant_annotation.hgvs_c }} {% endlabelled %}
+                {% endif %}
+                {% labelled label="Coordinate" %} <a href="{% url 'view_variant' variant.pk %}">{{ variant }}</a> {% endlabelled %}
+                {% labelled label="Genome Build" %}{{ variant.genome_build }}{% endlabelled %}
+            </div>
+        </div>
+
+        <h3>Codon</h3>
+        <div>
+            {% if codon.exists %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_codon' variant_id=variant.pk region_type='codon' search=False %}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+
+        <h3>Exon</h3>
+        <div>
+            {% if exon.exists %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_exon' variant_id=variant.pk region_type='exon' search=False %}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+
+        <h3>Domain</h3>
+        <div>
+            {% if domain.exists %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_domain' variant_id=variant.pk region_type='domain' search=False %}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+
+        <h3>Range</h3>
+        <div>
+            {% if range.exists %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_range' variant_id=variant.pk region_type='range' search=False %}
+            {% else %}
+                -
+            {% endif %}
+
+        </div>
+
+    </div>
+{% endblock content %}

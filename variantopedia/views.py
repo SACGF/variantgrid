@@ -34,6 +34,7 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
+from variantopedia.interesting_nearby import get_nearby_summaries, get_nearby_qs
 from variantopedia.variant_column_utils import get_columns_qs, get_variant_annotation_data
 from variantopedia import forms
 from variantopedia.search import search_data, SearchResults
@@ -483,3 +484,16 @@ def gene_coverage(request, gene_symbol_id):
     context = {"gene_symbol": gene_symbol,
                "twenty_x_coverage_percent_counts": twenty_x_coverage_percent_counts}
     return render(request, "variantopedia/gene_coverage.html", context)
+
+
+def nearby_variants(request, variant_id, annotation_version_id=None):
+    variant = get_object_or_404(Variant, pk=variant_id)
+    latest_annotation_version = AnnotationVersion.latest(variant.genome_build)
+
+    if annotation_version_id:
+        annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    else:
+        annotation_version = latest_annotation_version
+    context = {"variant": variant}
+    context.update(get_nearby_qs(variant, annotation_version))
+    return render(request, "variantopedia/nearby_variants.html", context)
