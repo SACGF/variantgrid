@@ -332,7 +332,7 @@ class UserSettings:
 
     def get_genome_builds(self) -> QuerySet:
         if not settings.USER_SETTINGS_SHOW_BUILDS:
-            return GenomeBuild.objects.all()
+            return GenomeBuild.builds_with_annotation()
 
         # Make sure default build comes through, even if form has never saved/created UserSettingsGenomeBuild objects
         q_default = Q(pk=self.default_genome_build.pk)
