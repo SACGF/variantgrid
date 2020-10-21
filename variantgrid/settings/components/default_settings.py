@@ -373,6 +373,7 @@ SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
 
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = False  # set True to only find classified variants
+SEARCH_VARIANT_SHOW_SUMMARY = True
 SILENCED_SYSTEM_CHECKS = ['models.E006']
 SITE_ID = 2
 SITE_MESSAGE = None  # displayed at the top of all logged-in pages

@@ -158,7 +158,7 @@ def filter_variant_domain(qs, variant: Variant):
     return qs
 
 
-def variant_interesting_summary(variant: Variant, user: User, clinical_significance=False) -> str:
+def variant_interesting_summary(user: User, variant: Variant, clinical_significance=False) -> str:
     """ Could use this for search summary? """
     qs = get_variant_queryset_for_latest_annotation_version(variant.genome_build)
     qs = qs.filter(pk=variant.pk)

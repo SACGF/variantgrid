@@ -2,6 +2,7 @@ from django.template import Library
 
 register = Library()
 
+
 @register.inclusion_tag("annotation/tags/clinvar_citation_abstract.html")
 def clinvar_citation_abstract(citation):
     return {"citation": citation}
