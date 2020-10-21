@@ -2,6 +2,7 @@
 {% load crispy_forms_field %}
 {% load ui_utils %}
 {% load ui_menu_bars %}
+{% load nearby_variants_tags %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block title %}Search{% endblock %}
@@ -61,6 +62,10 @@
                                         <span class="text-danger">{{ message }}</span>
                                     {% endfor %}<br>{% endif %}
                                         <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
+                                        {% comment %}Check it's a Variant object{% endcomment %}
+                                        {% if variant_summary and search_result.record.locus %}
+                                            {% nearby_summary search_result.record %}
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endif %}
