@@ -1,6 +1,10 @@
 <div class='gene-grid-tag'>
 {% load static %}
+{% load ui_tabs_builder %}
 {% load js_tags %}
+{% load ui_utils %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <link href="{% static 'css/companies.css' %}" rel="stylesheet">
@@ -157,10 +161,6 @@ table#gene-grid .clingen {
 .evidence-tooltip {
     max-width: auto;
     max-height: auto;
-}
-
-.no-labels label {
-    display: none;
 }
 
 tr.gene-type-alias {
@@ -970,7 +970,9 @@ function addColumnHeader(thead, className, columnName, copyButtonFunc, closeButt
 
     if (closeButtonFunc) {
         let closeButton = $("<div />", {"class": "delete-button right"});
-        closeButton.attr("title", "close").click(closeButtonFunc);
+        // closeButton.attr("title", "close");
+        // popper tooltips have trouble if you remove the element that raised them
+        closeButton.click(closeButtonFunc);
         th.append(closeButton);
     }
 
@@ -2307,75 +2309,99 @@ $(document).ready(function() {
 });
 </script>
 
-<div class="multi-columned">
-    <fieldset class="form-fields small gene-grid-control-box" id="data-columns-box">
-        <legend>Data columns</legend>
+{% ui_register_tab_embedded tab_set="gene_list_sources" label="Data columns" %}
+    <div id="data-columns-box">
         {% for dc in data_columns %}
         <div>
-            <label>{{ dc.description }}</label>
-            <div>
-                <form id='data-columns-{{ dc.pk }}' class="no-labels {{ dc.form_css_class }}">
-                    {{ dc.form.as_p }}
-                    {% if forloop.first %}
-                        <!-- Just need 1 of these -->
-                        {{ dc.form.media }}
-                    {% endif %}
-                </form>
-            </div>
+            <form id='data-columns-{{ dc.pk }}' class="{{ dc.form_css_class }}">
+                {% for field in dc.form %}
+                    {% labelled label=dc.description %}
+                        {{ field }}
+                    {% endlabelled %}
+                {% endfor %}
+                {% if forloop.first %}
+                    <!-- Just need 1 of these -->
+                    {{ dc.form.media }}
+                {% endif %}
+            </form>
         </div>
         {% endfor %}
-        <div>
-            <label for="clingen-evidence-checkbox"><div class="column-icon clingen-icon"></div></label>
-            <input id="clingen-evidence-checkbox" class='evidence-checkbox' type='checkbox' evidence_type="clingen" />
-        </div>
-        <div>
-            <label for="panelapp-evidence-checkbox"><div class="column-icon panel-app-icon"></div></label>
-            <input id="panelapp-evidence-checkbox" class='evidence-checkbox' type='checkbox' evidence_type="panelapp" />
-        </div>
-        <div>
-            <label for="classification-count-summary-checkbox">Classification Summary</label>
-            <input id="classification-count-summary-checkbox" type='checkbox' />
-        </div>
+        {% labelled %}
+            <div class="form-check">
+            <label class="form-check-label">
+                <input id="clingen-evidence-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="clingen" />
+                <div class="column-icon clingen-icon"></div>
+            </label>
+            </div>
+        {% endlabelled %}
+        {% labelled %}
+            <div class="form-check">
+            <label class="form-check-label">
+                <input id="panelapp-evidence-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="panelapp" />
+                <div class="column-icon panel-app-icon"></div>
+            </label>
+            </div>
+        {% endlabelled %}
+        {% labelled %}
+            <div class="form-check">
+            <label class="form-check-label">
+                <input id="classification-count-summary-checkbox" class='form-check-input' type='checkbox' />
+                Classification Summary
+            </label>
+            </div>
+        {% endlabelled %}
         <div id="color-coverage-container">
-            <label for="color-coverage-checkbox"><div class="column-icon enrichment-kit-icon"></div> Color Coverage</label>
-            <input id="color-coverage-checkbox" class='color-coverage-checkbox' type='checkbox' checked="1" />
+            {% labelled %}
+                <div class="form-check">
+                    <label for="color-coverage-checkbox">
+                        <input id="color-coverage-checkbox" class='color-coverage-checkbox' type='checkbox' checked="1" />
+                        <div class="column-icon enrichment-kit-icon"></div> Color Coverage
+                    </label>
+                </div>
+            {% endlabelled %}
         </div>
-    </fieldset>
-    <fieldset class="form-fields small" id="gene-grid-control-box" >
-        <legend>Gene Lists</legend>
+    </div>
+{% end_ui_register_tab_embedded %}
+{% ui_register_tab_embedded tab_set="gene_list_sources" label="Gene Lists" %}
+    <div id="gene-grid-control-box">
         {% for category in categories %}
-        <div>
-            <label>{{ category.description }}</label>
             <div>
-                <form id='gene-list-category-{{ category.pk }}' class="no-labels {{ category.form_css_class }}">
-                    {{ category.form.as_p }}
+                <form id='gene-list-category-{{ category.pk }}' class="{{ category.form_css_class }}">
+                    {% for field in category.form %}
+                        {% if not field.name == 'category' %}
+                            {% labelled label=category.description %}
+                                {{ field }}
+                            {% endlabelled %}
+                        {% endif %}
+                    {% endfor %}
                     {% if forloop.first %}
                         <!-- Just need 1 of these -->
                         {{ category.form.media }}
                     {% endif %}
                 </form>
             </div>
-        </div>
         {% endfor %}
-    </fieldset>
-{% comment %}
-        <th>{{ category.description }}:
-        <td><div class='gene-list-icon {{ category.icon_css_class }}'></div>
-        <td>
-{% endcomment %}
+    </div>
+{% end_ui_register_tab_embedded %}
 {% if named_custom_gene_list_form %}
-    <fieldset class="form-fields small" id="custom-gene-list">
-        <legend>Create Custom Gene List</legend>
-        <div id='custom-gene-list-help'></div>
-        {{ named_custom_gene_list_form.as_p }}
-        <input type='hidden' id="enable_save" value="true" />
-        <ul id='custom-genelist-messages' class='messages hidden'><b>Validation Messages:</b>
-        </ul>
-        <div class="buttons">
-            <button id='add-custom-gene-list'>Add Custom Gene List</button>
+
+    {% ui_register_tab_embedded tab_set="gene_list_sources" label="Create Custom Gene List" %}
+        <div id="custom-gene-list">
+            <div id='custom-gene-list-help'></div>
+            {% crispy named_custom_gene_list_form form_helper.horizontal_nested %}
+            <input type='hidden' id="enable_save" value="true" />
+            <ul id='custom-genelist-messages' class='messages hidden'><b>Validation Messages:</b>
+            </ul>
+            <div class="btn-toolbar">
+                <button id='add-custom-gene-list' class="btn btn-primary">Add Custom Gene List</button>
+            </div>
         </div>
-    </fieldset>
+    {% end_ui_register_tab_embedded %}
+
 {% endif %}
+<div class="container">
+    {% ui_render_tabs tab_set="gene_list_sources" %}
+    <hr/>
 </div>
 
 {% if show_help %}

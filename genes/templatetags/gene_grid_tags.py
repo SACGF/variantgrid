@@ -12,6 +12,7 @@ from seqauto.forms import EnrichmentKitForm
 from seqauto.models import EnrichmentKit
 from snpdb.forms import LabSelectForm
 from snpdb.models import Company, UserSettings
+from uicore.utils.form_helpers import FormHelperHelper
 
 register = Library()
 
@@ -148,4 +149,5 @@ def gene_grid(context, columns_from_url=None,
             "gene_symbol_form": GeneSymbolForm(),
             "named_custom_gene_list_form": named_custom_gene_list_form,
             "user": user,
-            "show_help": show_help}
+            "show_help": show_help,
+            "form_helper": context.get('form_helper')}
