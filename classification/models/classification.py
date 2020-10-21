@@ -1489,7 +1489,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             content['config'] = EvidenceKey.merge_config(self.lab.classification_config, self.lab.organization.classification_config)
 
         if include_messages:
-            content['messages'] = (content['messages'] or []) + self.current_state_validation(self.user).flat_messages
+            content['messages'] = (content['messages'] or []) + self.current_state_validation(user=current_user).flat_messages
 
         # Summary
         data = content['data']
