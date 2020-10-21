@@ -22,7 +22,7 @@ table.diff thead th {
   max-width: 260px;
   min-width: 260px;
   width: 260px;
-  word-break: break-all;
+  overflow-wrap: break-word;
 }
 table.diff tbody {
   background-color: white;
@@ -54,10 +54,7 @@ table.diff tbody td, table.diff tbody th {
   max-width: 260px;
   min-width: 260px;
   width: 260px;
-  word-break: break-all;
-}
-table.diff tbody tr.textarea td, table.diff tbody tr.citation-row th, table.diff tbody tr.note td {
-  word-break: normal;
+  overflow-wrap: break-word;
 }
 table.diff tbody .group th {
   font-weight: bold;
@@ -453,6 +450,9 @@ tr.template-download .toggle {
 }
 #vc-form .card-body {
   background-color: #f5fff5;
+}
+#vc-form .citation {
+  overflow-wrap: break-word;
 }
 
 #vc-extras {

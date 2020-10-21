@@ -257,12 +257,14 @@ a.list-group-item-action {
     }
 }
 .btn-toolbar {
-    *.btn:not(:first-child) {
+    > *:not(:first-child) {
         margin-left: 10px;
     }
-    & .btn {
-        margin: 4px;
+    > * {
+      height: 40px;
+      & .btn {
         height: 40px;
+      }
     }
 }
 

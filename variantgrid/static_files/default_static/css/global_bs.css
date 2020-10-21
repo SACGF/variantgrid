@@ -201,11 +201,13 @@ a.list-group-item-action {
   width: 100%;
 }
 
-.btn-toolbar *.btn:not(:first-child) {
+.btn-toolbar > *:not(:first-child) {
   margin-left: 10px;
 }
-.btn-toolbar .btn {
-  margin: 4px;
+.btn-toolbar > * {
+  height: 40px;
+}
+.btn-toolbar > * .btn {
   height: 40px;
 }
 
