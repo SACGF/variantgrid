@@ -67,12 +67,13 @@ class NearbyVariantsGrid(AbstractVariantGrid):
     colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'}}
 
     def __init__(self, user, variant_id, region_type, **kwargs):
+        super().__init__(user)
+
         variant = get_object_or_404(Variant, pk=variant_id)
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
         self.fields = fields
-        super().__init__(user)
         self.update_overrides(override)
 
         queryset = get_variant_queryset_for_latest_annotation_version(user_settings.default_genome_build)

@@ -7,7 +7,7 @@ from variantopedia.interesting_nearby import get_nearby_summaries
 register = Library()
 
 
-@register.inclusion_tag("variantopedia/tags/nearby_variants.html", takes_context=True)
+@register.inclusion_tag("variantopedia/tags/nearby_variants_tag.html", takes_context=True)
 def nearby_variants(context, variant: Variant, annotation_version: AnnotationVersion,
                     clinical_significance: bool = True, distance: int = 50):
     user = context["user"]

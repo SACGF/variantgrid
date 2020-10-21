@@ -494,6 +494,9 @@ def nearby_variants(request, variant_id, annotation_version_id=None):
         annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
     else:
         annotation_version = latest_annotation_version
-    context = {"variant": variant}
+    variant_annotation_version = annotation_version.variant_annotation_version
+    variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
+    context = {"variant": variant,
+               "variant_annotation": variant_annotation}
     context.update(get_nearby_qs(variant, annotation_version))
     return render(request, "variantopedia/nearby_variants.html", context)

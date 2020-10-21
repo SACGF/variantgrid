@@ -84,15 +84,18 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
         "HOM_ALT": Sum("global_variant_zygosity__hom_count"),
     }
 
+    clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]
+    q_classification = Classification.get_variant_q(user, genome_build,
+                                                    clinical_significance_list=clinical_significance_list)
     classifications = {
-        "clinvar": (None, "highest_pathogenicity"),
-        "classification": (Classification.get_variant_q(user, genome_build), "clinical_significance")
+        "clinvar": (Q(clinvar__isnull=False), "highest_pathogenicity"),
+        "classification": (q_classification, "clinical_significance")
     }
 
     for classification, (classification_q, clinical_significance_path) in classifications.items():
         agg_kwargs[f"{classification}_count"] = Count("id", filter=classification_q)
         if clinical_significance:
-            for cs, _ in ClinicalSignificance.SHORT_CHOICES:
+            for cs in clinical_significance_list:
                 q_clinical_significance = Q(**{f"{classification}__{clinical_significance_path}": cs})
                 if classification_q:
                     q_clinical_significance &= classification_q
