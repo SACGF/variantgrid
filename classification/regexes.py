@@ -53,6 +53,7 @@ class DbRegexes:
     GTR = DbRefRegex(db="GTR", prefixes="GTR", link="https://www.ncbi.nlm.nih.gov/gtr/tests/${1}/overview/")
     HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link="https://hpo.jax.org/app/browse/term/HP:${1}")
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
+    MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link="https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${1}")
     NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
     OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link="http://www.omim.org/entry/${1}")
@@ -75,6 +76,7 @@ class DbRefRegexResult:
         self.internal_id = None
         self.summary = None
         try:
+            # this is where we check our database to see if we know what this reference is about
             self.summary = externalDatabaseRefLookupInstance.lookup(self.db, self.idx)
             source = CitationSource.CODES.get(self.db)
             if source:

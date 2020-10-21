@@ -1,4 +1,7 @@
+from annotation.models import MonarchDiseaseOntology
 from annotation.models.models_mim_hpo import HumanPhenotypeOntology, MIMMorbid
+
+
 class ExternalDatabaseRefLookup:
 
     def lookup(self, database: str, idx: str):
@@ -18,15 +21,18 @@ class ExternalDatabaseRefLookup:
                 pass
 
         if database == 'HP':
-            hpo = HumanPhenotypeOntology.objects.filter(pk=idx).first()  # @UndefinedVariable
-            if hpo:
+            if hpo := HumanPhenotypeOntology.objects.filter(pk=idx).first():
                 return hpo.name
 
         elif database == 'OMIM':
-            omim = MIMMorbid.objects.filter(pk=idx).first()
-            if omim:
+            if omim := MIMMorbid.objects.filter(pk=idx).first():
                 return omim.description
 
+        elif database == 'MONDO':
+            if mondo := MonarchDiseaseOntology.objects.filter(pk=idx).first():
+                return mondo.name
+
         return None
+
 
 externalDatabaseRefLookupInstance = ExternalDatabaseRefLookup()
