@@ -113,9 +113,11 @@
             <div id='gene-classifications-graph' class="col-lg-4"></div>
         </div>
 
+        {% if user.is_superuser %}
         <div id="classification-stats-links">
-            <a href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a>
+            <a class="admin-only" href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a>
         </div>
+        {% endif %}
 
         <div>
             <h3>Criteria usage</h3>
