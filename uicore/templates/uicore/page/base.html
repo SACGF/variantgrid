@@ -156,7 +156,7 @@
                             <span class="badge badge-danger">{{ mail_count }}</span>
                         </a>
                     {% else %}
-                        <a class="nav-link" href="{% url 'messages_inbox' %}"><i class="fas fa-inbox"></i>
+                        <a class="nav-link" href="{% url 'messages_inbox' %}"><i class="fas fa-inbox"></i></a>
                     {% endif %}
                 {% endif %}
 
@@ -169,7 +169,7 @@
     </nav>
     <div>
         <div class="nav-side-bar no-gutters">
-            <nav class="nav flex-column navbar-light" aria-orientation="vertical">
+            <nav class="nav navbar-light" aria-orientation="vertical">
                 {% block submenu %}{% endblock submenu %}
                 {% site_messages site_messages %}
             </nav>

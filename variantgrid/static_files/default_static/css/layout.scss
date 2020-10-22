@@ -28,43 +28,69 @@ nav.navbar {
     height: 35px;
 }
 
-/// FUNDAMENTAL LAYOUT
-.nav-side-bar {
-    border-right: 1px solid #cfcfcf;
-    -ms-flex: 0 0 200px;
-    flex: 0 0 200px;
-    position: fixed;
-    width: 160px;
-    top: 49px;
-    // turn the below on if you want to have a scrollable menu
-    // at the cost of a vertical bar down the entire menu
-    // height: 100%;
-    // overflow-y: scroll;
-    // padding-bottom: 50px;
-
-    nav {
-        padding-top: 10px;
-        background-color: white;
-        min-height: 200px;
-        .nav-link {
-            cursor: pointer;
-            text-align: right;
-            line-height: 2rem;
-            &.active {
-                color: #000;
-            }
-        }
-    }
-}
 .main-content {
-    background-color: white;
-    margin-left: 170px;
-    padding-top: 80px;
+    // background-color: white;
     padding-bottom: 60px;
 
     overflow: scroll;
     max-width: calc(100vw);
-    height: calc(100vh);
+}
+
+@media screen and (min-width: 0) and (max-width: 991px) {
+    .nav-side-bar {
+        margin-top: 60px;
+        .site-message {
+            width: 100%;
+        }
+        border-bottom: 1px dotted #cfcfcf;
+        .nav-link {
+            font-weight: bold;
+        }
+    }
+    .main-content {
+        padding-top: 20px;
+    }
+}
+@media screen and (min-width: 992px) {
+    .main-content {
+        padding-top: 80px;
+        margin-left: 170px;
+        overflow: scroll;
+        max-width: calc(100vw);
+        height: calc(100vh);
+    }
+    .nav-side-bar {
+        .nav {
+            flex-direction: column !important;
+        }
+        border-right: 1px solid #cfcfcf;
+        -ms-flex: 0 0 200px;
+        flex: 0 0 200px;
+        position: fixed;
+        width: 160px;
+        top: 49px;
+        // turn the below on if you want to have a scrollable menu
+        // at the cost of a vertical bar down the entire menu
+        // height: 100%;
+        // overflow-y: scroll;
+        // padding-bottom: 50px;
+
+        nav {
+            padding-top: 10px;
+            background-color: white;
+            min-height: 200px;
+
+            .nav-link {
+                cursor: pointer;
+                text-align: right;
+                line-height: 2rem;
+
+                &.active {
+                    color: #000;
+                }
+            }
+        }
+    }
 }
 
 nav .nav-link:hover {
