@@ -501,6 +501,12 @@ tr.template-download {
             flex-shrink:1;
             width: 30%;
         }
+        > * {
+            height: 40px;
+            & .btn {
+                height: 40px;
+            }
+        }
     }
     .card-body {
         background-color: rgb(245,255,245);
@@ -509,6 +515,7 @@ tr.template-download {
         overflow-wrap: break-word;
     }
 }
+
 #vc-extras {
     position: fixed;
     min-width: 200px;

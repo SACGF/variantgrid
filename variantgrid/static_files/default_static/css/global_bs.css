@@ -205,10 +205,10 @@ a.list-group-item-action {
   margin-left: 10px;
 }
 .btn-toolbar > * {
-  height: 40px;
+  height: 32px;
 }
 .btn-toolbar > * .btn {
-  height: 40px;
+  height: 32px;
 }
 
 .accordion > .card {

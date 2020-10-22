@@ -448,6 +448,12 @@ tr.template-download .toggle {
   flex-shrink: 1;
   width: 30%;
 }
+#vc-form .btn-toolbar > * {
+  height: 40px;
+}
+#vc-form .btn-toolbar > * .btn {
+  height: 40px;
+}
 #vc-form .card-body {
   background-color: #f5fff5;
 }
