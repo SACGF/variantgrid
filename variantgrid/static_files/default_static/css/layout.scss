@@ -50,6 +50,17 @@ nav.navbar {
     .main-content {
         padding-top: 20px;
     }
+    #vcform-filter-wrapper {
+        position: inherit !important;
+    }
+    #vcform-content {
+        margin-top: 0 !important;
+    }
+    .container, .container-table {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        max-width: 991px !important;
+    }
 }
 @media screen and (min-width: 992px) {
     .main-content {
