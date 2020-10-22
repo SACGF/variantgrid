@@ -29,7 +29,7 @@
 
 {% block content %}
     <div class="container">
-        <h1>Nearby Variants</h1>
+        <h3>Nearby Variants</h3>
 
         <div class="card" id="clingen-allele">
             <div class="card-header">Variant</div>
@@ -44,7 +44,7 @@
             </div>
         </div>
 
-        <h3>Codon</h3>
+        <h4>Codon</h4>
         <div>
             {% if codon.exists %}
                 {% jqgrid 'nearby_variants_grid' 'nearby_codon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='codon' search=False %}
@@ -53,7 +53,7 @@
             {% endif %}
         </div>
 
-        <h3>Exon</h3>
+        <h4>Exon</h4>
         <div>
             {% if exon.exists %}
                 {% jqgrid 'nearby_variants_grid' 'nearby_exon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='exon' search=False %}
@@ -62,7 +62,7 @@
             {% endif %}
         </div>
 
-        <h3>Domain</h3>
+        <h4>Domain</h4>
         <div>
             {% if domain.exists %}
                 {% jqgrid 'nearby_variants_grid' 'nearby_domain' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='domain' search=False %}
@@ -71,7 +71,7 @@
             {% endif %}
         </div>
 
-        <h3>Range</h3>
+        <h4>Range</h4>
         <div>
             {% if range.exists %}
                 {% jqgrid 'nearby_variants_grid' 'nearby_range' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='range' search=False %}
