@@ -1,6 +1,9 @@
 function setupTooltips() {
     tooltipsDoms = $('[data-toggle=tooltip]');
     tooltipsDoms.tooltip({html:true, trigger : 'hover'});
+    tooltipsDoms.click(function(e) {
+        $(this).tooltip('hide');
+    });
 
     // when hitting enter on an input that has an input-group-append button
     // automatically trigger the button
@@ -38,6 +41,9 @@ function setupTooltips() {
             node.popover(popoverOpts);
         } else if (node.attr('title') && node.attr('class') !== 'select2-selection__clear') {
             node.tooltip({html: true, trigger : 'hover'});
+            $(node).click(function(e) {
+                $(this).tooltip('hide');
+            });
         }
         for (let child of node.children()) {
             checkNode($(child));
