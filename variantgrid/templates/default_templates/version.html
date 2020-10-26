@@ -19,27 +19,6 @@
             {% endlabelled %}
         </form>
 
-        {% if user.is_superuser %}
-            <h4 class="admin-only">Users with Weekly Update Emails Enabled</h4>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width:50%">User</th>
-                        <th style="width:50%">Email</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>All</td>
-                        <td><a class="hover-link mail-link" href="mailto:{% for user in weekly_update_users %}{% if not forloop.first %};{% endif %}{{ user.email }}{% endfor %}">Mail {{ weekly_update_users|length }} User(s)</a></td>
-                    </tr>
-                    {% for user in weekly_update_users %}
-                        <tr><td>{{ user.username }}</td><td><a href="mailto:{{ user.email }}" class="hover-link mail-link">{{ user.email }}</a></td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% endif %}
-
         {% if deployment_history %}
             <h4>Deployment History</h4>
             <table class="table">
@@ -59,6 +38,27 @@
                                 {% endif %}
                             </td>
                         </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if user.is_superuser %}
+            <h4 class="admin-only">Users with Weekly Update Emails Enabled</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:50%">User</th>
+                        <th style="width:50%">Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>All</td>
+                        <td><a class="hover-link mail-link" href="mailto:{% for user in weekly_update_users %}{% if not forloop.first %};{% endif %}{{ user.email }}{% endfor %}">Mail {{ weekly_update_users|length }} User(s)</a></td>
+                    </tr>
+                    {% for user in weekly_update_users %}
+                        <tr><td>{{ user.username }}</td><td><a href="mailto:{{ user.email }}" class="hover-link mail-link">{{ user.email }}</a></td></tr>
                     {% endfor %}
                 </tbody>
             </table>

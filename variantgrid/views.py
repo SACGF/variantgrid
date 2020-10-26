@@ -102,7 +102,7 @@ def version(request):
 
     weekly_update_users = list()
     if request.user.is_superuser:
-        all_users = User.objects.filter(is_active=True, email__isnull=False).order_by('-email')
+        all_users = User.objects.filter(is_active=True, email__isnull=False).order_by('email')
         for user in all_users:
             # user email could be blank instead of null
             if user.email and UserSettings.get_for_user(user).email_weekly_updates:
