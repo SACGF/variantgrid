@@ -55,6 +55,8 @@ class VariantPKLookup:
         last_variant = qs.last()
 
         for v in [first_variant, last_variant]:
+            if v is None:
+                continue
             v_hash = self.get_variant_object_hash(v)
             variant_id = self.redis.get(v_hash)
             if variant_id is None:
