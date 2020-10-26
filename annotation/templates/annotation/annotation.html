@@ -101,11 +101,16 @@
                     {% labelled label="Genome Fasta" %}
                         {% if details.reference_fasta %}
                             {{ details.reference_fasta }}
-                        {% else %}
-                            <div class='install-instructions'>
-                            <div class="mono">{{ details.reference_fasta_error }}</div>
+                        {% elif user.is_superuser %}
+                            <span class="admin-only">
+                                <div class='install-instructions'>
+                                <div class="mono">{{ details.reference_fasta_error }}</div>
 
-                            You need to download the annotations, or change <code>settings.GENOME_BUILD_REFERENCE_FASTA</code>
+                                You need to download the annotations, or change <code>settings.GENOME_BUILD_REFERENCE_FASTA</code>
+                                </div>
+                            </span>
+                        {% else %}
+                            <div class="not-installed">Not found</div>
                         {% endif %}
                     {% endlabelled %}
                     {% labelled label="Contigs" %}
@@ -156,119 +161,135 @@
                                 </div>
                             {% endfor %}
 
-                            <a class='show-more-gene-transcript-info-link hidden hover-link' href="javascript:showMoreGeneTranscriptInfo('{{ build_name }}')">Show more gene/transcript info</a>
-                            <div class='install-instructions gene-transcript-instructions'>
-                                <p>
-                                You can install both Ensembl and RefSeq transcripts (for HGVS) but you NEED the ones used by your variant annotation pipeline which is: '<b>{{ details.annotation_consortium }}</b>'
-                                </p>
+                            {% if user.is_superuser %}
+                                <span class="admin-only">
+                                    <a class='show-more-gene-transcript-info-link hidden hover-link' href="javascript:showMoreGeneTranscriptInfo('{{ build_name }}')">Show more gene/transcript info</a>
+                                    <div class='install-instructions gene-transcript-instructions'>
+                                        <p>
+                                        You can install both Ensembl and RefSeq transcripts (for HGVS) but you NEED the ones used by your variant annotation pipeline which is: '<b>{{ details.annotation_consortium }}</b>'
+                                        </p>
 
-                                <p>
-                                This only installs the latest annotations. See <a href="https://github.com/SACGF/variantgrid/wiki/Transcripts-and-HGVS">instructions for historical transcript versions</a> (to resolve obsolete HGVS)
-                                </p>
+                                        <p>
+                                        This only installs the latest annotations. See <a href="https://github.com/SACGF/variantgrid/wiki/Transcripts-and-HGVS">instructions for historical transcript versions</a> (to resolve obsolete HGVS)
+                                        </p>
 
-                                <code>
-    wget hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/gff3ToGenePred
-    chmod a+x gff3ToGenePred</code>
-                                {% if build_name == 'GRCh37' %}
-                                <h4>Ensembl GRCh37</h4>
+                                        <code>
+            wget hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/gff3ToGenePred
+            chmod a+x gff3ToGenePred</code>
+                                        {% if build_name == 'GRCh37' %}
+                                        <h4>Ensembl GRCh37</h4>
 
-    <code>
-    wget ftp://ftp.ensembl.org/pub/grch37/release-97/gff3/homo_sapiens/Homo_sapiens.GRCh37.87.gff3.gz
-    gff3ToGenePred -processAllGeneChildren Homo_sapiens.GRCh37.87.gff3.gz Homo_sapiens.GRCh37.87.genePred
-    {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh37 --annotation-consortium=Ensembl \
-    --gff ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh37.87.gff3.gz \
-    --genePred ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh37.87.genePred
-    </code>
-                                {% elif build_name == 'GRCh38' %}
-                                <h4>Ensembl GRCh38</h4>
+            <code>
+            wget ftp://ftp.ensembl.org/pub/grch37/release-97/gff3/homo_sapiens/Homo_sapiens.GRCh37.87.gff3.gz
+            gff3ToGenePred -processAllGeneChildren Homo_sapiens.GRCh37.87.gff3.gz Homo_sapiens.GRCh37.87.genePred
+            {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh37 --annotation-consortium=Ensembl \
+            --gff ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh37.87.gff3.gz \
+            --genePred ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh37.87.genePred
+            </code>
+                                        {% elif build_name == 'GRCh38' %}
+                                        <h4>Ensembl GRCh38</h4>
 
-    <code>
-    wget ftp://ftp.ensembl.org/pub/release-97/gff3/homo_sapiens/Homo_sapiens.GRCh38.97.gff3.gz
-    gff3ToGenePred -processAllGeneChildren Homo_sapiens.GRCh38.97.gff3.gz Homo_sapiens.GRCh38.97.genePred
-    {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh38 --annotation-consortium=Ensembl \
-    --gff ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh38.97.gff3.gz \
-    --genePred ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh38.97.genePred
-    </code>
-                                {% endif %}
+            <code>
+            wget ftp://ftp.ensembl.org/pub/release-97/gff3/homo_sapiens/Homo_sapiens.GRCh38.97.gff3.gz
+            gff3ToGenePred -processAllGeneChildren Homo_sapiens.GRCh38.97.gff3.gz Homo_sapiens.GRCh38.97.genePred
+            {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh38 --annotation-consortium=Ensembl \
+            --gff ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh38.97.gff3.gz \
+            --genePred ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh38.97.genePred
+            </code>
+                                        {% endif %}
 
-                                {% if build_name == 'GRCh37' %}
-                                <h4>RefSeq GRCh37</h4>
+                                        {% if build_name == 'GRCh37' %}
+                                        <h4>RefSeq GRCh37</h4>
 
-    <code>
-    wget ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/ARCHIVE/ANNOTATION_RELEASE.105/GFF/ref_GRCh37.p13_top_level.gff3.gz
-    gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ref_GRCh37.p13_top_level.gff3.gz ref_GRCh37.p13_top_level.genePred
-    {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh37 --annotation-consortium=RefSeq \
-    --gff ${GENEPRED_DATA_DIR}/ref_GRCh37.p13_top_level.gff3.gz \
-    --genePred ${GENEPRED_DATA_DIR}/ref_GRCh37.p13_top_level.genePred
-    </code>
-                                {% elif build_name == 'GRCh38' %}
-                                <h4>RefSeq GRCh38</h4>
-    <code>
-    wget ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/GFF/ref_GRCh38.p12_top_level.gff3.gz
-    gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ref_GRCh38.p12_top_level.gff3.gz ref_GRCh38.p12_top_level.genePred
-    {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh38 --annotation-consortium=RefSeq \
-    --gff ${GENEPRED_DATA_DIR}/ref_GRCh38.p12_top_level.gff3.gz \
-    --genePred ${GENEPRED_DATA_DIR}/ref_GRCh38.p12_top_level.genePred
-    </code>
-                                {% endif %}
-                            </div>
+            <code>
+            wget ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/ARCHIVE/ANNOTATION_RELEASE.105/GFF/ref_GRCh37.p13_top_level.gff3.gz
+            gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ref_GRCh37.p13_top_level.gff3.gz ref_GRCh37.p13_top_level.genePred
+            {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh37 --annotation-consortium=RefSeq \
+            --gff ${GENEPRED_DATA_DIR}/ref_GRCh37.p13_top_level.gff3.gz \
+            --genePred ${GENEPRED_DATA_DIR}/ref_GRCh37.p13_top_level.genePred
+            </code>
+                                        {% elif build_name == 'GRCh38' %}
+                                        <h4>RefSeq GRCh38</h4>
+            <code>
+            wget ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/GFF/ref_GRCh38.p12_top_level.gff3.gz
+            gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ref_GRCh38.p12_top_level.gff3.gz ref_GRCh38.p12_top_level.genePred
+            {{ python_command }} manage.py import_gene_annotation --genome-build=GRCh38 --annotation-consortium=RefSeq \
+            --gff ${GENEPRED_DATA_DIR}/ref_GRCh38.p12_top_level.gff3.gz \
+            --genePred ${GENEPRED_DATA_DIR}/ref_GRCh38.p12_top_level.genePred
+            </code>
+                                        {% endif %}
+                                    </div>
+                                </span>
+                            {% endif %}
                         {% endlabelled %}
                         {% labelled label="Gene Annotation Release" %}
                             {% if details.gene_annotation_release %}
                                 {{ details.gene_annotation_release }}
+                            {% elif user.is_superuser %}
+                                <span class="admin-only">
+                                    <div class='install-instructions'>
+                                        The latest variant annotation version does not have a Gene Annotation Release set. We need this to be able to match to the
+                                        exact gene/transcript versions used in a VEP release.
+
+                                        <ol>
+                                            <li>Find the release and GTF for your VEP release (see <a href="https://m.ensembl.org/info/docs/tools/vep/script/vep_cache.html">VEP Cache</a>
+                                                or <a href="https://github.com/Ensembl/ensembl-vep/issues/833">Issue</a>)
+                                                If you just have a GFF the release number can be found via (zcat gff | head)
+                                            </li>
+                                            <li>Run import_gene_annotation with a "--release" parameter (ok to re-do a previous GFF you've already imported)
+        <code>
+        {{ python_command }} manage.py import_gene_annotation --release=XXX
+        </code>
+                                            </li>
+                                            <li>
+                                                In Django Admin, open "variant_annotation_version" then set "gene_annotation_release" to what was uploaded in the previous step.
+                                            </li>
+                                        </ol>
+
+                                        We need
+
+                                        This stores the gene/transcript versions
+                                    in an gene annotation GFF, so that
+
+
+
+                                    </div>
+                                </span>
                             {% else %}
-                                <div class='install-instructions'>
-                                    The latest variant annotation version does not have a Gene Annotation Release set. We need this to be able to match to the
-                                    exact gene/transcript versions used in a VEP release.
-
-                                    <ol>
-                                        <li>Find the release and GTF for your VEP release (see <a href="https://m.ensembl.org/info/docs/tools/vep/script/vep_cache.html">VEP Cache</a>
-                                            or <a href="https://github.com/Ensembl/ensembl-vep/issues/833">Issue</a>)
-                                            If you just have a GFF the release number can be found via (zcat gff | head)
-                                        </li>
-                                        <li>Run import_gene_annotation with a "--release" parameter (ok to re-do a previous GFF you've already imported)
-    <code>
-    {{ python_command }} manage.py import_gene_annotation --release=XXX
-    </code>
-                                        </li>
-                                        <li>
-                                            In Django Admin, open "variant_annotation_version" then set "gene_annotation_release" to what was uploaded in the previous step.
-                                        </li>
-                                    </ol>
-
-                                    We need
-
-                                    This stores the gene/transcript versions
-                                in an gene annotation GFF, so that
-
-
-
-                                </div>
+                                Not installed
                             {% endif %}
                         {% endlabelled %}
                         {% labelled label="Ensembl Gene level Annotation" %}
                            {% if details.gene_level_annotation %}
                                 {{ details.gene_level_annotation }}
+                           {% elif user.is_superuser %}
+                               <span class="admin-only">
+                                    <div class='install-instructions'>
+                                        {% if build_name == 'GRCh37' %}
+                                            <code>{{ python_command }} manage.py gene_level_annotation_import --genome-build {{ build_name }} --ensembl-version 75 ${ANNOTATION_BASEDIR}/reference/gene_annotation/current/ensembl_key.v75.full_annotation.tsv</code>
+                                        {% elif build_name == 'GRCh38' %}
+                                            <code>{{ python_command }} manage.py gene_level_annotation_import --genome-build {{ build_name }} --ensembl-version 98 ${ANNOTATION_BASEDIR}/reference/gene_annotation/current/ensembl_key.v98.full_annotation.tsv</code>
+                                        {% endif %}
+                                    </div>
+                               </span>
                            {% else %}
-                                <div class='install-instructions'>
-                                    {% if build_name == 'GRCh37' %}
-                                        <code>{{ python_command }} manage.py gene_level_annotation_import --genome-build {{ build_name }} --ensembl-version 75 ${ANNOTATION_BASEDIR}/reference/gene_annotation/current/ensembl_key.v75.full_annotation.tsv</code>
-                                    {% elif build_name == 'GRCh38' %}
-                                        <code>{{ python_command }} manage.py gene_level_annotation_import --genome-build {{ build_name }} --ensembl-version 98 ${ANNOTATION_BASEDIR}/reference/gene_annotation/current/ensembl_key.v98.full_annotation.tsv</code>
-                                    {% endif %}
-                                </div>
-                            {% endif %}
+                               Not installed
+                           {% endif %}
                         {% endlabelled %}
                         {% labelled label="ClinVar" %}
                             {% if details.clinvar %}
                                 {{ details.clinvar }}
-                            {% else %}
-                                <div class='install-instructions'>
-                                    Download VCF (with date in file name) from <a href="http://www.ncbi.nlm.nih.gov/clinvar/">NCBI ClinVar</a> site, then run:
+                            {% elif user.is_superuser %}
+                                <span class="admin-only">
+                                    <div class='install-instructions'>
+                                        Download VCF (with date in file name) from <a href="http://www.ncbi.nlm.nih.gov/clinvar/">NCBI ClinVar</a> site, then run:
 
-                                    <code>{{ python_command }} manage.py clinvar_import ${VARIANTGRID_SETUP_DATA}/clinvar_20180401.vcf.gz</code>
-                                </div>
-                            {% endif %}
+                                        <code>{{ python_command }} manage.py clinvar_import ${VARIANTGRID_SETUP_DATA}/clinvar_20180401.vcf.gz</code>
+                                    </div>
+                               </span>
+                           {% else %}
+                               Not installed
+                           {% endif %}
                         {% endlabelled %}
                     </div>
             </div>
@@ -281,78 +302,102 @@
                 {% labelled label="ClinVar Citations" %}
                     {% if clinvar_citations %}
                         {{ clinvar_citations }}.
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                            Download 'var_citations.txt' from <a href="ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/">NCBI ClinVar FTP - Tab Delimited</a> then run:
+                            <code>{{ python_command }} manage.py import_clinvar_citations ${VARIANTGRID_SETUP_DATA}/var_citations.txt</code>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                        Download 'var_citations.txt' from <a href="ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/">NCBI ClinVar FTP - Tab Delimited</a> then run:
-                        <code>{{ python_command }} manage.py import_clinvar_citations ${VARIANTGRID_SETUP_DATA}/var_citations.txt</code>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% labelled label="Human Protein Atlas" %}
                     {% if hpa_counts_annotation %}
                         {{ hpa_counts_annotation }}
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                                <div>Go to <a href='http://v15.proteinatlas.org/about/download'>Protein Atlas Download Page</a> (We only support version &lt;=15 currently)> and download <b>rna_tissue.csv.zip</b> note the version (ie <b>15</b>):</div>
+                                <code>{{ python_command }} manage.py human_protein_atlas_import --hpa-version 15 ${VARIANTGRID_SETUP_DATA}/rna_tissue.csv.zip</code>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                            <div>Go to <a href='http://v15.proteinatlas.org/about/download'>Protein Atlas Download Page</a> (We only support version &lt;=15 currently)> and download <b>rna_tissue.csv.zip</b> note the version (ie <b>15</b>):</div>
-                            <code>{{ python_command }} manage.py human_protein_atlas_import --hpa-version 15 ${VARIANTGRID_SETUP_DATA}/rna_tissue.csv.zip</code>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% labelled label="OMIM" %}
                     {% if mim_import %}
                         {{ mim_import }}
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                                <ul>
+                                    <li>Export: "Gene stable ID", "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="http://www.ensembl.org/biomart/martview/">Ensembl Biomart</a>
+                                        Use (GRC38 version or later as it has aliases) and make sure you tick "unique"
+                                    </li>
+                                    <li>Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a>.</li>
+                                </ul>
+                                <code>{{ python_command }} manage.py mim_import --biomart ${VARIANTGRID_SETUP_DATA}/mim_biomart.tsv --disease_gene_txt ${VARIANTGRID_SETUP_DATA}/OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt</code>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                            <ul>
-                                <li>Export: "Gene stable ID", "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="http://www.ensembl.org/biomart/martview/">Ensembl Biomart</a>
-                                    Use (GRC38 version or later as it has aliases) and make sure you tick "unique"
-                                </li>
-                                <li>Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a>.</li>
-                            </ul>
-                            <code>{{ python_command }} manage.py mim_import --biomart ${VARIANTGRID_SETUP_DATA}/mim_biomart.tsv --disease_gene_txt ${VARIANTGRID_SETUP_DATA}/OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt</code>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% labelled label="Human Phenotype Ontology" %}
                     {% if human_phenotype_ontology_import %}
                         {{ human_phenotype_ontology_import }}
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                                <ul>
+                                <li>(you may already have this from OMIM above) Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a>.</li>
+                                <li>Get latest Git repo via:
+                                    <code>git clone https://github.com/obophenotype/human-phenotype-ontology.git ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology</code>
+                                </ul>
+                                <code>{{ python_command }} manage.py human_phenotype_ontology_import --disease_gene_txt ${VARIANTGRID_SETUP_DATA}/OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt --owl ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology/hp.owl</code>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                            <ul>
-                            <li>(you may already have this from OMIM above) Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a>.</li>
-                            <li>Get latest Git repo via:
-                                <code>git clone https://github.com/obophenotype/human-phenotype-ontology.git ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology</code>
-                            </ul>
-                            <code>{{ python_command }} manage.py human_phenotype_ontology_import --disease_gene_txt ${VARIANTGRID_SETUP_DATA}/OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt --owl ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology/hp.owl</code>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% labelled label="Monarch Disease Ontology" %}
                     {% if mondo_import %}
                         {{ mondo_import }}
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                            <ul>
+                            <li>Download mondo.owl from <a href="http://www.obofoundry.org/ontology/mondo.html">Monarch Disease Ontology</a> on OBO foundry.
+                            </ul>
+                            <P>
+                            <code>{{ python_command }} manage.py mondo_import --owl ${VARIANTGRID_SETUP_DATA}/mondo.owl</code>
+                            </p>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                        <ul>
-                        <li>Download mondo.owl from <a href="http://www.obofoundry.org/ontology/mondo.html">Monarch Disease Ontology</a> on OBO foundry.
-                        </ul>
-                        <P>
-                        <code>{{ python_command }} manage.py mondo_import --owl ${VARIANTGRID_SETUP_DATA}/mondo.owl</code>
-                        </p>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% labelled label="HGNC Gene Names" %}
                     {% if hgnc_gene_symbols_import %}
                         {{ hgnc_gene_symbols_import }}
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                            <ul>
+                            <li>Download default columns (as text) as "hgnc_gene_symbols.tsv" from <a href="https://www.genenames.org/cgi-bin/download">HGNC Gene Names Download</a>
+                            </ul>
+                            <P>
+                            <code>{{ python_command }} manage.py hgnc_gene_symbols_import ${VARIANTGRID_SETUP_DATA}/hgnc_gene_symbols.tsv</code>
+                            </p>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                        <ul>
-                        <li>Download default columns (as text) as "hgnc_gene_symbols.tsv" from <a href="https://www.genenames.org/cgi-bin/download">HGNC Gene Names Download</a>
-                        </ul>
-                        <P>
-                        <code>{{ python_command }} manage.py hgnc_gene_symbols_import ${VARIANTGRID_SETUP_DATA}/hgnc_gene_symbols.tsv</code>
-                        </p>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% labelled label="Gene Symbol Aliases" %}
@@ -360,31 +405,39 @@
                         {% for source, count in gene_symbol_alias_counts.items %}
                             <b>{{ source }}:</b> {{ count }}
                         {% endfor %}
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                            <P>
+                            <code>
+                                wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
+                                {{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz
+                            </code>
+                            </p>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                        <P>
-                        <code>
-                            wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-                            {{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz
-                        </code>
-                        </p>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% labelled label="Pfam Domains" %}
                     {% if pfam_domains %}
                         {{ pfam_domains }}
+                    {% elif user.is_superuser %}
+                        <span class="admin-only">
+                            <div class='install-instructions'>
+                            <P>
+                            <code>
+        wget ftp://ftp.uniprot.org/pub/databases/uniprot/current%5Frelease/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz \
+         ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/9606.tsv.gz
+        {{ python_command }} manage.py import_pfam --idmapping=${VARIANTGRID_SETUP_DATA}/HUMAN_9606_idmapping.dat.gz \
+        --pfam-tsv=${VARIANTGRID_SETUP_DATA}/9606.tsv.gz
+                            </code>
+                            </p>
+                            </div>
+                        </span>
                     {% else %}
-                        <div class='install-instructions'>
-                        <P>
-                        <code>
-    wget ftp://ftp.uniprot.org/pub/databases/uniprot/current%5Frelease/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz \
-     ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/9606.tsv.gz
-    {{ python_command }} manage.py import_pfam --idmapping=${VARIANTGRID_SETUP_DATA}/HUMAN_9606_idmapping.dat.gz \
-    --pfam-tsv=${VARIANTGRID_SETUP_DATA}/9606.tsv.gz
-                        </code>
-                        </p>
-                        </div>
+                        Not installed
                     {% endif %}
                 {% endlabelled %}
                 {% for cwr in cached_web_resources %}
@@ -400,7 +453,12 @@
                                 {% endif %}
                                 <button class='load-cached-web-resource btn btn-primary mr-2' cached-web-resource='{{ cwr.name }}' >Update from web</button>
                             {% endif %}
-                            <b>Imported:</b>&nbsp;{% timestamp cwr.modified time_ago=True %}. <b>Details:</b>&nbsp;{{ cwr.description }}
+                            <b>Imported:</b>&nbsp;{% timestamp cwr.modified time_ago=True %}.
+                            {% if cwr.import_status == 'S' or user.is_superuser %}
+                                <b>Details:</b>&nbsp;{{ cwr.description }}
+                            {% else %}
+                                <b>Status:</b> {{ cwr.get_import_status_display }}
+                            {% endif %}
                         {% endif %}
                         </div>
                     {% endlabelled %}
