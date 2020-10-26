@@ -420,26 +420,6 @@
                         Not installed
                     {% endif %}
                 {% endlabelled %}
-                {% labelled label="Pfam Domains" %}
-                    {% if pfam_domains %}
-                        {{ pfam_domains }}
-                    {% elif user.is_superuser %}
-                        <span class="admin-only">
-                            <div class='install-instructions'>
-                            <P>
-                            <code>
-        wget ftp://ftp.uniprot.org/pub/databases/uniprot/current%5Frelease/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz \
-         ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/9606.tsv.gz
-        {{ python_command }} manage.py import_pfam --idmapping=${VARIANTGRID_SETUP_DATA}/HUMAN_9606_idmapping.dat.gz \
-        --pfam-tsv=${VARIANTGRID_SETUP_DATA}/9606.tsv.gz
-                            </code>
-                            </p>
-                            </div>
-                        </span>
-                    {% else %}
-                        Not installed
-                    {% endif %}
-                {% endlabelled %}
                 {% for cwr in cached_web_resources %}
                     {% labelled label=cwr.name %}
                         <div class='cached-web-resource-container'>

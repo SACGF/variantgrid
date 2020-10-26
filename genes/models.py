@@ -75,6 +75,7 @@ class HGNCGeneNames(models.Model):
 
 gene_symbol_withdrawn_str = '~withdrawn'
 
+
 class GeneSymbol(models.Model):
     symbol = models.TextField(primary_key=True)
 

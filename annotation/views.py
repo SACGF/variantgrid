@@ -194,10 +194,6 @@ def annotation(request):
     if hpa_counts:
         hpa_counts_annotation = f"{hpa_counts} HPA entries"
 
-    pfam_domains = PfamDomains.objects.count()
-    if pfam_domains:
-        pfam_domains = f"{pfam_domains} Pfam Domains"
-
     # These are empty/None if not set.
     annotations_ok = [all(builds_ok),
                       clinvar_citations,
@@ -205,8 +201,7 @@ def annotation(request):
                       mim_import,
                       human_phenotype_ontology_import,
                       mondo_import,
-                      hgnc_gene_symbols_import,
-                      pfam_domains]
+                      hgnc_gene_symbols_import]
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header
 
     cached_web_resources = []
@@ -225,7 +220,6 @@ def annotation(request):
                "diagnostic_gene_list": diagnostic_gene_list,
                "clinvar_citations": clinvar_citations,
                "hpa_counts_annotation": hpa_counts_annotation,
-               "pfam_domains": pfam_domains,
                "num_annotation_columns": VariantGridColumn.objects.count(),
                "cached_web_resources": cached_web_resources,
                "python_command": settings.PYTHON_COMMAND}
