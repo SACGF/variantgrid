@@ -324,6 +324,7 @@ class SettingsOverrideForm(BaseModelForm):
         self.fields['genome_builds'].choices = GenomeBuild.get_choices()
         self.fields['columns'].queryset = models.CustomColumnsCollection.objects.filter(user__isnull=True)  # public
         self.fields['default_genome_build'].queryset = GenomeBuild.builds_with_annotation()
+        self.fields['email_weekly_updates'].label = 'Email regular updates'
         self._hide_unused_fields()
 
     def _hide_unused_fields(self):
@@ -334,7 +335,7 @@ class SettingsOverrideForm(BaseModelForm):
                                  settings.VARIANT_DETAILS_SHOW_ANNOTATION,
                                  settings.VARIANT_DETAILS_SHOW_SAMPLES))
         field_visibility = {
-            "email_weekly_updates": settings.DISCORDANCE_ENABLED,
+            # "email_weekly_updates": settings.DISCORDANCE_ENABLED, # this is also used for release note updates
             "email_discordance_updates": settings.DISCORDANCE_ENABLED,
             "columns": analysis_enabled,
             "default_sort_by_column": analysis_enabled,
