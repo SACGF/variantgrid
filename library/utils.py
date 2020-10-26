@@ -146,7 +146,7 @@ def get_git_last_modified_date(directory):
 
 
 def get_git_branch(directory):
-    git_branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=directory)
+    git_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=directory)
     return git_branch.decode().strip()
 
 
