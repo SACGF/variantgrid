@@ -880,13 +880,13 @@ class Flagstats(SeqAutoFile):
 
 
 def get_fake_variant_caller():
-    (variant_caller, _) = VariantCaller.objects.get_or_create(name='fake_variant_caller',
-                                                              version='0.666')
+    variant_caller, _ = VariantCaller.objects.get_or_create(name='fake_variant_caller',
+                                                            version='0.666')
     return variant_caller
 
 
 def get_seqauto_user():
-    (user, created) = User.objects.get_or_create(username=settings.SEQAUTO_USER)
+    user, created = User.objects.get_or_create(username=settings.SEQAUTO_USER)
     if created:
         if settings.SEQAUTO_GROUP:
             seqauto_group = Group.objects.get_or_create(name=settings.SEQAUTO_GROUP)
