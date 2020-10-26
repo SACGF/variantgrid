@@ -145,6 +145,11 @@ def get_git_last_modified_date(directory):
     return parse(date_string)
 
 
+def get_git_branch(directory):
+    git_branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=directory)
+    return git_branch.decode().strip()
+
+
 def rgb_hex_to_tuples(rgb):
     rgb = rgb.replace('#', '')
     return bytes.fromhex(rgb)

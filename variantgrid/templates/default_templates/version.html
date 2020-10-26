@@ -12,6 +12,27 @@
         <form class="mt-4">
             {% labelled id="git-last-modified" label="Git Modified Date" %}{% timestamp git_last_modified time_ago=True %}{% endlabelled %}
             {% labelled id="git-hash" label="Git Hash" value_css="text-monospace"%}{{ git_hash }}{% endlabelled %}
+            {% labelled id="git-branch" label="Branch" %}{{ git_branch }}{% endlabelled %}
         </form>
+
+        {% if deployment_history %}
+            <h4>Deployment History</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Deployment Date</th>
+                        <th>Git Hash</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for deployment in deployment_history %}
+                        <tr>
+                            <td>{{ deployment.created }}</td>
+                            <td>{{ deployment.git_hash }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
     </div>
 {% endblock content %}

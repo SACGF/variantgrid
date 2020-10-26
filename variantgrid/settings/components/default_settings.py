@@ -402,6 +402,8 @@ ROLLBAR = {
     'capture_username': True,
     'code_version': get_git_hash(BASE_DIR),
 }
+GIT_WEBSITE = 'https://github.com/SACGF/variantgrid'
+
 ROLLBAR_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 

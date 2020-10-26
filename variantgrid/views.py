@@ -12,7 +12,8 @@ from global_login_required import login_not_required
 from library.email import Email
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
 from library.log_utils import report_exc_info
-from library.utils import get_git_last_modified_date, get_git_hash
+from library.utils import get_git_last_modified_date, get_git_hash, get_git_branch
+from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 
 
@@ -77,9 +78,15 @@ def authenticated(request):
 
 def version(request):
     git_last_modified = get_git_last_modified_date(settings.BASE_DIR)
+    git_hash = get_git_hash(settings.BASE_DIR)
+    git_branch = get_git_branch(settings.BASE_DIR)
 
-    context = {"git_hash": get_git_hash(settings.BASE_DIR),
-               "git_last_modified": git_last_modified}
+    deployments = Deployment.objects.order_by('-created').all()[0:10]
+    context = {"git_hash":git_hash,
+               "git_last_modified": git_last_modified,
+               "git_branch": git_branch,
+               "deployment_history": deployments
+               }
 
     return render(request, 'version.html', context)
 
