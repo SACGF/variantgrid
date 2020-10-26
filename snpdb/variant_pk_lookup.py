@@ -205,11 +205,11 @@ class VariantPKLookup:
         num_new_loci = max_loci_id - old_max_loci_id
 
         if not num_new_loci:  # Look and double check
-            last_locus = Locus.objects.order_by("pk").last()
-            locus_hash = self._get_locus_hash(last_locus.contig_id, last_locus.position, last_locus.ref_id)
-            locus_pk = self.redis.get(locus_hash)
-            if locus_pk is None:
-                num_new_loci = "unknown...."
+            if last_locus := Locus.objects.order_by("pk").last():
+                locus_hash = self._get_locus_hash(last_locus.contig_id, last_locus.position, last_locus.ref_id)
+                locus_pk = self.redis.get(locus_hash)
+                if locus_pk is None:
+                    num_new_loci = "unknown...."
 
         if num_new_loci:
             start = time()
