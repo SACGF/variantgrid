@@ -230,6 +230,17 @@ a {
   margin-left: 4px;
 }
 
+.mail-link::after {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  font-family: "FontAwesome";
+  content: "";
+  opacity: 0.4;
+  margin-left: 4px;
+}
+
 .modal-header nav .breadcrumb {
   background-color: transparent;
   margin: 0;

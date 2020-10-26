@@ -287,6 +287,16 @@ a {
     opacity: 0.4;
     margin-left: 4px;
 }
+.mail-link::after {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'FontAwesome';
+    content: "\f2b6";
+    opacity: 0.4;
+    margin-left: 4px;
+}
 
 .modal-header nav .breadcrumb {
     background-color: transparent;

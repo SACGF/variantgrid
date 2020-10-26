@@ -12,23 +12,52 @@
         <form class="mt-4">
             {% labelled id="git-last-modified" label="Git Modified Date" %}{% timestamp git_last_modified time_ago=True %}{% endlabelled %}
             {% labelled id="git-hash" label="Git Hash" value_css="text-monospace"%}{{ git_hash }}{% endlabelled %}
-            {% labelled id="git-branch" label="Branch" %}{{ git_branch }}{% endlabelled %}
+            {% labelled id="git-branch" label="Branch" %}
+                {% if git_branch_link %}<a href="{{git_branch_link}}" target="_blank" class="external-link hover-link">{{ git_branch }}</a>
+                {% else %}{{ git_branch }}
+                {% endif %}
+            {% endlabelled %}
         </form>
+
+        {% if user.is_superuser %}
+            <h4 class="admin-only">Users with Weekly Update Emails Enabled</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:50%">User</th>
+                        <th style="width:50%">Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>All</td>
+                        <td><a class="hover-link mail-link" href="mailto:{% for user in weekly_update_users %}{% if not forloop.first %};{% endif %}{{ user.email }}{% endfor %}">Mail {{ weekly_update_users|length }} User(s)</a></td>
+                    </tr>
+                    {% for user in weekly_update_users %}
+                        <tr><td>{{ user.username }}</td><td><a href="mailto:{{ user.email }}" class="hover-link mail-link">{{ user.email }}</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
 
         {% if deployment_history %}
             <h4>Deployment History</h4>
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Deployment Date</th>
-                        <th>Git Hash</th>
+                        <th style="width:50%">Deployment Date</th>
+                        <th style="width:50%">Git Hash</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for deployment in deployment_history %}
                         <tr>
                             <td>{{ deployment.created }}</td>
-                            <td>{{ deployment.git_hash }}</td>
+                            <td>{% if deployment.git_link %}
+                                <a href="{{ deployment.git_link }}" class="hover-link external-link" target="_blank" title="Show differences between this deployment and current version" data-toggle="tooltip">{{ deployment.git_hash }}</a>
+                                {% else %}{{ deployment.git_hash }}
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
