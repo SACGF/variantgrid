@@ -1,5 +1,7 @@
 from collections import defaultdict
-from django.db.models import Count
+from typing import List, Optional, Dict, Union, Tuple, Iterable, Any
+
+from django.db.models import Count, QuerySet
 from django.db.models.expressions import F
 from django.db.models.functions import Lower
 import Levenshtein
@@ -12,7 +14,7 @@ import time
 from annotation.models.models_mim_hpo import HumanPhenotypeOntology, MIMMorbidAlias, HPOSynonym
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes, \
     TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, TextPhenotypeSentence
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, Gene
 from library.log_utils import log_traceback
 from library.utils import get_and_log_time_since, invert_dict_of_lists, all_equal
 from patients.models import Patient
@@ -25,8 +27,14 @@ MIN_MATCH_LENGTH = 3
 MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
 
+CodePK = Any
+Lookups = Dict[CodePK, str]
+OntologyObj = Union[HumanPhenotypeOntology, MIMMorbidAlias, Gene]
+OntologyDict = Dict[str, OntologyObj]
+OntologyResults = Tuple[str, List[Union[CodePK, OntologyObj]]]
 
-def get_word_combos_and_spans(words_and_spans, max_combo_length):
+
+def get_word_combos_and_spans(words_and_spans: List, max_combo_length: Optional[int]) -> List:
     combos_and_spans = []
     for i in range(len(words_and_spans)):
         combo_length = len(words_and_spans) - i
@@ -39,13 +47,13 @@ def get_word_combos_and_spans(words_and_spans, max_combo_length):
     return combos_and_spans
 
 
-def get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length=None):
+def get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length: Optional[int] = None) -> Iterable:
     word_combos_and_spans = get_word_combos_and_spans(words_and_spans, max_combo_length)
     return reversed(sorted(word_combos_and_spans, key=lambda item: sum([len(i[0]) for i in item])))
 
 
-def get_id_from_multi_word_fuzzy_match(lookup, words, text, distance):
-    potentials = {}
+def get_id_from_multi_word_fuzzy_match(lookup: Lookups, words: List[str], text: str, distance: int) -> Optional[CodePK]:
+    potentials: Lookups = dict()
     for w in words:
         potentials.update(lookup[w])
 
@@ -54,9 +62,9 @@ def get_id_from_multi_word_fuzzy_match(lookup, words, text, distance):
     return get_id_from_fuzzy_match(potentials, text, distance)
 
 
-def get_id_from_single_word_fuzzy_match(single_words_by_length, text, distance):
+def get_id_from_single_word_fuzzy_match(single_words_by_length: Dict[int, Lookups], text: str, distance: int) -> Optional[CodePK]:
     text_length = len(text)
-    potentials = {}
+    potentials: Lookups = dict()
     for l in [text_length - distance, text_length, text_length + distance]:
         words = single_words_by_length.get(l)
         if words:
@@ -64,7 +72,7 @@ def get_id_from_single_word_fuzzy_match(single_words_by_length, text, distance):
     return get_id_from_fuzzy_match(potentials, text, distance)
 
 
-def get_id_from_fuzzy_match(lookup, text, max_distance):
+def get_id_from_fuzzy_match(lookup: Lookups, text: str, max_distance: int) -> Optional[CodePK]:
     for (description, pk) in lookup.items():
         distance = Levenshtein.distance(description, text)  # @UndefinedVariable
         #print("'%s' <-> '%s' distance: %d" % (description, text, distance))
@@ -73,25 +81,25 @@ def get_id_from_fuzzy_match(lookup, text, max_distance):
     return None
 
 
-def get_multi_word_hpo_fuzzy(hpo_word_lookup, words, text, distance=1):
+def get_multi_word_hpo_fuzzy(hpo_word_lookup, words, text: str, distance: int = 1) -> Optional[CodePK]:
     return get_id_from_multi_word_fuzzy_match(hpo_word_lookup, words, text, distance)
 
 
-def get_multi_word_omim_fuzzy(omim_word_lookup, words, text, distance=1):
+def get_multi_word_omim_fuzzy(omim_word_lookup, words, text: str, distance=1) -> Optional[CodePK]:
     return get_id_from_multi_word_fuzzy_match(omim_word_lookup, words, text, distance)
 
 
-def get_single_word_hpo_fuzzy(hpo_single_words_by_length, text, distance=1):
+def get_single_word_hpo_fuzzy(hpo_single_words_by_length: Dict[int, Lookups], text: str, distance=1) -> Optional[CodePK]:
     return get_id_from_single_word_fuzzy_match(hpo_single_words_by_length, text, distance)
 
 
-def get_single_word_omim_fuzzy(omim_single_words_by_length, text, distance=1):
+def get_single_word_omim_fuzzy(omim_single_words_by_length: Dict[int, Lookups], text: str, distance=1) -> Optional[CodePK]:
     return get_id_from_single_word_fuzzy_match(omim_single_words_by_length, text, distance)
 
 
-def get_field_by_field_dict(qs, key_field, value_field):
+def get_field_by_field_dict(qs: QuerySet, key_field: str, value_field: str) -> Lookups:
     """ calls lower() before storing """
-    d = {}
+    d: Lookups = dict()
     for k, v in qs.annotate().values_list(key_field, value_field):
         # Remove commas, as phenotype to match will have that done also
         k = k.lower().replace(",", "")
@@ -99,7 +107,7 @@ def get_field_by_field_dict(qs, key_field, value_field):
     return d
 
 
-def get_records_by_field(qs, field):
+def get_records_by_field(qs: QuerySet, field: str) -> Dict[str, OntologyObj]:
     """ calls lower() before storing """
     records_by_field = {}
 
@@ -111,7 +119,7 @@ def get_records_by_field(qs, field):
     return records_by_field
 
 
-def create_word_lookups(records):
+def create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
     word_lookup = defaultdict(dict)
 
     for text, obj in records.items():
@@ -121,38 +129,38 @@ def create_word_lookups(records):
     return word_lookup
 
 
-def get_special_case_match(text, hpo_records, omim_alias_records, gene_records):
+def get_special_case_match(text, hpo_records: OntologyDict, omim_alias_records: OntologyDict, gene_records: OntologyDict) -> Tuple[List[OntologyObj], List[OntologyObj], List[OntologyObj]]:
     # For each MIM there is an alias (plus possibly others) - this gets the original one
     mim_aliases_to_original_mim_qs = MIMMorbidAlias.objects.filter(mim_morbid__description=F("description")).order_by("mim_morbid")
 
-    def load_omim_alias_by_id(accession):
+    def load_omim_alias_by_id(accession) -> OntologyResults:
         omim_alias = mim_aliases_to_original_mim_qs.get(mim_morbid__accession=accession)
         return PhenotypeMatchTypes.OMIM, [omim_alias.pk]
 
-    def load_omim_by_name(description):
+    def load_omim_by_name(description: str) -> OntologyResults:
         omim_alias = omim_alias_records[description.lower()]
         return PhenotypeMatchTypes.OMIM, [omim_alias]
 
-    def load_hpo_by_id(hpo_id):
+    def load_hpo_by_id(hpo_id) -> OntologyResults:
         hpo = HumanPhenotypeOntology.objects.get(pk=hpo_id)  # @UndefinedVariable
         return PhenotypeMatchTypes.HPO, [hpo.pk]
 
-    def load_hpo_by_name(hpo_name):
+    def load_hpo_by_name(hpo_name) -> OntologyResults:
         hpo = hpo_records[hpo_name.lower()]
         return PhenotypeMatchTypes.HPO, [hpo]
 
-    def load_hpo_list_by_names(hpo_name_list):
-        hpo_list = []
+    def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
+        hpo_list: List[OntologyObj] = list()
         for hpo_name in hpo_name_list:
             _, hpo = load_hpo_by_name(hpo_name)
             hpo_list.extend(hpo)
         return PhenotypeMatchTypes.HPO, hpo_list
 
-    def load_gene_by_name(gene_symbol):
+    def load_gene_by_name(gene_symbol: str) -> OntologyResults:
         gene = gene_records[gene_symbol.lower()]
         return PhenotypeMatchTypes.GENE, [gene]
 
-    def load_genes_by_name(gene_symbols_list):
+    def load_genes_by_name(gene_symbols_list: List[str]) -> OntologyResults:
         genes_list = []
         for gene_symbol in gene_symbols_list:
             _, genes = load_gene_by_name(gene_symbol)
@@ -160,10 +168,10 @@ def get_special_case_match(text, hpo_records, omim_alias_records, gene_records):
 
         return PhenotypeMatchTypes.GENE, genes_list
 
-    def load_original_mim_aliases_with_description(description):
+    def load_original_mim_aliases_with_description(description: str) -> OntologyResults:
         return PhenotypeMatchTypes.OMIM, mim_aliases_to_original_mim_qs.filter(description__icontains=description)
 
-    def load_mim_aliases_with_description(description):
+    def load_mim_aliases_with_description(description) -> OntologyResults:
         return PhenotypeMatchTypes.OMIM, MIMMorbidAlias.objects.filter(description__icontains=description)
 
     ABSENT_FOREARM = (load_hpo_by_name, 'absent forearm')
@@ -529,7 +537,7 @@ def skip_word(lower_text):
     return lower_text in COMMON_WORDS
 
 
-def calculate_match_distance(words):
+def calculate_match_distance(words: List[str]) -> int:
     """ by default we match on 1 - however we may want to be a bit lax sometimes """
     num_ae_words = 0
     for w in words:
@@ -538,7 +546,16 @@ def calculate_match_distance(words):
     return distance
 
 
-def get_terms_from_words(text_phenotype, words_and_spans_subset, hpo_records, hpo_word_lookup, hpo_single_words_by_length, omim_alias_records, omim_word_lookup, omim_single_words_by_length, gene_records):
+def get_terms_from_words(
+        text_phenotype,
+        words_and_spans_subset,
+        hpo_records,
+        hpo_word_lookup,
+        hpo_single_words_by_length,
+        omim_alias_records,
+        omim_word_lookup,
+        omim_single_words_by_length,
+        gene_records):
     words = [ws[0] for ws in words_and_spans_subset]
     text = ' '.join(words)
     lower_text = text.lower()
@@ -620,7 +637,15 @@ def sub_array_index(array, sub_array):
     return None
 
 
-def parse_words(text_phenotype, input_words_and_spans, hpo_records, hpo_word_lookup, hpo_single_words_by_length, omim_records, omim_word_lookup, omim_single_words_by_length, gene_records):
+def parse_words(text_phenotype,
+                input_words_and_spans,
+                hpo_records,
+                hpo_word_lookup,
+                hpo_single_words_by_length,
+                omim_records,
+                omim_word_lookup,
+                omim_single_words_by_length,
+                gene_records) -> List:
     results = []
 
     word_combos_and_spans = get_word_combos_and_spans_sorted_by_length(input_words_and_spans, max_combo_length=MAX_COMBO_LENGTH)
