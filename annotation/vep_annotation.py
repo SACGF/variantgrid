@@ -251,7 +251,9 @@ def vep_parse_version_line(line):
         # need "-" for eg 'ensembl-funcgen' and '.' as they have unquoted versions like: 97.378db18
         lexer.wordchars += value_sep + "-."
         lexer.whitespace = " "
-        return dict([word.split(value_sep, maxsplit=1) for word in lexer])
+        vep_version_dict = {"refseq": ""}  # Defaults - refseq won't be populated with Ensembl annotation
+        vep_version_dict.update(dict([word.split(value_sep, maxsplit=1) for word in lexer]))
+        return vep_version_dict
     except:
         logging.error("vep_parse_version_line - couldn't parse '%s'", line)
         raise
