@@ -3,6 +3,8 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, classification_import_upload_view
+from classification.views.condition_alias_view import ConditionAliasDatatableView, condition_aliases_view, \
+    condition_alias_view, SearchConditionView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues
@@ -39,6 +41,11 @@ urlpatterns = [
 
     perm_path('classification_grid/export/', views.export_classifications_grid, name='export_classifications_grid'),
     perm_path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
+
+    # condition aliases
+    perm_path('condition_alias', condition_aliases_view, name='condition_aliases'),
+    perm_path('condition_alias/datatable', ConditionAliasDatatableView.as_view(), name='condition_aliases_datatables'),
+    perm_path('condition_alias/<int:pk>', condition_alias_view, name='condition_alias'),
 
     perm_path('diff/', views.view_classification_diff, name='classification_diff'),
     perm_path('redcap_data_dictionary.csv', classification_export_view.redcap_data_dictionary, name='redcap_data_dictionary'),
@@ -79,6 +86,8 @@ urlpatterns = [
 ]
 
 rest_urlpatterns = [
+    perm_path('api/classifications/condition_alias/search', SearchConditionView.as_view(), name='condition_search_api'),
+
     perm_path('api/classifications/auto_populate', AutopopulateView.as_view(), name='classification_auto_populate_api'),
 
     perm_path('api/classifications/record/', ClassificationView.as_view(), name='classification_api'),

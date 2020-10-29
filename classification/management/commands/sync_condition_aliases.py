@@ -10,4 +10,6 @@ class Command(BaseCommand):
     """
 
     def handle(self, *args, **options):
+        print("Syncing")
         ConditionAlias.sync_aliases()
+        print("Complete")

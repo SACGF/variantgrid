@@ -1,0 +1,104 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% block title %}Condition Alias{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        .selectable-card:hover .fa-plus-circle {
+            color: blue !important;
+        }
+    </style>
+    <script>
+        matches = {};
+
+        function toggleMatch(result) {
+            matches[result.id] = true;
+            matchesList = Object.keys(matches);
+            $("#condition-alias-matches").text(matchesList.join(", "));
+        }
+
+        function makeCard(result) {
+            let htmlWrapper = $(`
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card selectable-card" style="cursor:pointer">
+                    <div class="card-header"><i class="fas fa-plus-circle"></i> ${result.id}</div>
+                    <div class="card-body">${result.highlight}</div>
+                </div>
+            </div>
+            `);
+            htmlWrapper.click(() => {
+                toggleMatch(result);
+            });
+            return htmlWrapper;
+        }
+
+        function search_conditions() {
+            let text = $('#condition-search-text').val();
+            // TODO load URLS
+            let url = '{% url "condition_search_api" %}';
+            let resultsDom = $("#condition-search-results");
+            resultsDom.LoadingOverlay('show');
+            $.ajax({
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                data: {
+                    "search_term": text
+                },
+                url: url,
+                type: 'GET',
+                error: (call, status, text) => {
+                    console.log("Failed");
+                },
+                success: async (results) => {
+                    $("#search-result-for").text(text);
+                    resultsDom.LoadingOverlay('hide');
+                    resultsDom.empty();
+                    if (results.length) {
+                        for (let result of results) {
+                            makeCard(result).appendTo(resultsDom);
+                        }
+                    } else {
+                        $('<div/>', {class:'no-value w-100 text-center', text:'no-results'}).appendTo(resultsDom);
+                    }
+                }
+            });
+        }
+
+        $(document).ready(() => {
+            $("#condition-search-button").click(() => {
+                search_conditions();
+            });
+            search_conditions();
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <h3>Condition Alias ({{ condition_alias.id }})</h3>
+        <a href="{% url 'condition_aliases' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all aliases</a>
+        {% page_help_embedded title='Condition Alias' %}
+            <p>
+            Help will go here
+            </p>
+        {% end_page_help_embedded %}
+
+        {% labelled label="Records Affected" %}{{ condition_alias.records_affected }}{% endlabelled %}
+        {% labelled label="Lab" %}{{ condition_alias.lab.name }}{% endlabelled %}
+        {% labelled label="Gene Symbol" %}{{ condition_alias.source_gene_symbol }}{% endlabelled %}
+        {% labelled label="Text" %}{{ condition_alias.source_text }}{% endlabelled %}
+        {% labelled label="Chosen Matches" %}<span id="condition-alias-matches"><span class="text-secondary">None yet</span></span>{% endlabelled %}
+        {% labelled label="Search Again Using" %}
+            <div class="input-group">
+                <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
+                <span class="input-group-append"><button id="condition-search-button" class="btn btn-primary" name="action">Search</button></span>
+            </div>
+        {% endlabelled %}
+        <h4>Possible Matches for "<span id="search-result-for"></span>"</h4>
+        <div class="row equal" id="condition-search-results"></div>
+    </div>
+{% endblock %}
