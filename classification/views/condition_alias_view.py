@@ -1,4 +1,5 @@
 import urllib
+from typing import Optional
 
 import requests
 from django.contrib.auth.models import User
@@ -10,6 +11,7 @@ import re
 
 from rest_framework.views import APIView
 
+from annotation.models import MonarchDiseaseOntology
 from classification.models import ConditionAlias
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, BaseDatatableView
 
@@ -78,7 +80,7 @@ class SearchConditionView(APIView):
             o_id = result.get('id')
             label = result.get('label')
             if label:
-                label = label[len(label) - 1]
+                label = label[0]
             match = result.get('match')
             # if extracted := ID_EXTRACT_MINI_P.match(o_id):
                 # id_part = extracted[1]
@@ -92,5 +94,15 @@ class SearchConditionView(APIView):
                 "match": match,
                 "highlight": highlight
             })
+
+        # populate more with our database
+        # do this separate so if we cache the above we can still apply the below
+        for result in clean_results:
+            mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
+            mondo_record: Optional[MonarchDiseaseOntology]
+            if mondo_record := MonarchDiseaseOntology.objects.filter(pk=mondo_int).first():
+                result['definition'] = mondo_record.definition
+            else:
+                result['definition'] = None
 
         return Response(status=HTTP_200_OK, data=clean_results)

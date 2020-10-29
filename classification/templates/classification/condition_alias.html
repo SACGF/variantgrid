@@ -10,25 +10,65 @@
         .selectable-card:hover .fa-plus-circle {
             color: blue !important;
         }
+        .selectable-card:hover .fa-minus-circle {
+            color: red !important;
+        }
+        .selectable-card:hover {
+            box-shadow: 0 0 3px #ccf;
+        }
     </style>
     <script>
         matches = {};
 
         function toggleMatch(result) {
-            matches[result.id] = true;
-            matchesList = Object.keys(matches);
-            $("#condition-alias-matches").text(matchesList.join(", "));
+            let adding = !matches[result.id];
+            console.log("Addding = " + adding);
+            if (adding) {
+                matches[result.id] = result;
+            } else {
+                delete matches[result.id];
+            }
+            let matchesDom = $("#condition-alias-matches");
+            matchesDom.empty();
+
+            let keys = Object.keys(matches);
+            if (keys.length == 0) {
+                $('<div/>', {class:'no-value w-100 text-center', text:'None Yet'}).appendTo(matchesDom);
+            } else {
+                keys.sort();
+                for (let key of keys) {
+                    makeCard(matches[key]).appendTo(matchesDom);
+                }
+            }
+            let multiple = keys.length >= 2;
+            let multipleHandler = $("#multiple-handling");
+            if (multiple) {
+                multipleHandler.collapse('show');
+            } else {
+                multipleHandler.collapse('hide');
+            }
+
+            let icon = $(`[data-mondo="${result.id}"]`).find('.toggle-icon');
+            if (adding) {
+                icon.removeClass('fa-plus-circle').addClass('fa-minus-circle');
+            } else {
+                icon.removeClass('fa-minus-circle').addClass('fa-plus-circle');
+            }
         }
 
         function makeCard(result) {
+            let adding = !!matches[result.id];
+            let icon = adding ? "minus" : "plus";
             let htmlWrapper = $(`
             <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card selectable-card" style="cursor:pointer">
-                    <div class="card-header"><i class="fas fa-plus-circle"></i> ${result.id}</div>
+                <div class="card selectable-card" style="cursor:pointer" data-mondo="${result.id}">
+                    <div class="card-header"><i class="toggle-icon fas fa-${icon}-circle"></i> ${result.id}</div>
                     <div class="card-body">${result.highlight}</div>
                 </div>
             </div>
             `);
+            let cardBody = htmlWrapper.find('.card-body');
+            cardBody.append($('<div>', {class:"text-secondary", text:result.definition || "This MONDO term has not been loaded locally"}));
             htmlWrapper.click(() => {
                 toggleMatch(result);
             });
@@ -63,7 +103,7 @@
                             makeCard(result).appendTo(resultsDom);
                         }
                     } else {
-                        $('<div/>', {class:'no-value w-100 text-center', text:'no-results'}).appendTo(resultsDom);
+                        $('<div/>', {class:'no-value w-100 text-center', text:'No Results'}).appendTo(resultsDom);
                     }
                 }
             });
@@ -91,13 +131,28 @@
         {% labelled label="Lab" %}{{ condition_alias.lab.name }}{% endlabelled %}
         {% labelled label="Gene Symbol" %}{{ condition_alias.source_gene_symbol }}{% endlabelled %}
         {% labelled label="Text" %}{{ condition_alias.source_text }}{% endlabelled %}
-        {% labelled label="Chosen Matches" %}<span id="condition-alias-matches"><span class="text-secondary">None yet</span></span>{% endlabelled %}
         {% labelled label="Search Again Using" %}
             <div class="input-group">
                 <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
                 <span class="input-group-append"><button id="condition-search-button" class="btn btn-primary" name="action">Search</button></span>
             </div>
         {% endlabelled %}
+        <div id="multiple-handling" class="collapse">
+            {% labelled label="Multiple" %}
+                <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                  <label class="btn btn-outline-primary active">
+                    <input type="radio" name="options" id="multiple-and" autocomplete="off" checked> Combined
+                  </label>
+                  <label class="btn btn-outline-primary">
+                    <input type="radio" name="options" id="multiple-or" autocomplete="off"> Uncertain
+                  </label>
+                </div>
+            {% endlabelled %}
+        </div>
+        <h4>Chosen Matches</h4>
+        <div class="row equal" id="condition-alias-matches">
+            <div class="no-value w-100 text-center">None Yet</div>
+        </div>
         <h4>Possible Matches for "<span id="search-result-for"></span>"</h4>
         <div class="row equal" id="condition-search-results"></div>
     </div>
