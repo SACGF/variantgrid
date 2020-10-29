@@ -10,7 +10,7 @@ from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.enums.classification_enums import EvidenceCategory, \
     SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification
+from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionAlias
 from classification.models.classification import Classification, ClassificationImport
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.classification_import import process_classification_import
@@ -459,3 +459,9 @@ class EvidenceKeyAdmin(admin.ModelAdmin):
             'examples': JSONEditorWidget(examples_schema, True),
 
         }, **kwargs)
+
+
+class ConditionAliasAdmin(admin.ModelAdmin):
+
+    list_display = ["pk", "lab", "source_text", "source_gene_symbol", "status", "records_affected", "aliases", "join_mode", "updated_by", "created"]
+    readonly_fields = ["pk", "lab"]
