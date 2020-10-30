@@ -24,6 +24,14 @@ class RichColumn:
     A column to be presented on a DataTable
     """
 
+    @staticmethod
+    def choices_client_renderer(choices):
+        json_data = {}
+        for choice in choices:
+            json_data[choice[0]] = choice[1]
+        json_str = json.dumps(json_data)
+        return f'TableFormat.choices.bind(null, { json_str })'
+
     def __init__(self,
                  key: str,
                  name: str = None,

@@ -510,6 +510,9 @@ TableFormat.timestamp = (data, type, row) => {
         return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
     }
 };
+TableFormat.choices = (choices, data, type, row) => {
+    return choices[data] || data;
+};
 TableFormat.flags = (data, type, row) => {
     if (data) {
         return $('<div>', {'data-flags': data, class:'flags', text:'...'}).prop('outerHTML');

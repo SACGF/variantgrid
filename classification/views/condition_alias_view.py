@@ -1,9 +1,10 @@
 import urllib
-from typing import Optional
+from typing import Optional, Dict
 
 import requests
+from django.contrib import messages
 from django.contrib.auth.models import User
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
@@ -12,7 +13,7 @@ import re
 from rest_framework.views import APIView
 
 from annotation.models import MonarchDiseaseOntology
-from classification.models import ConditionAlias
+from classification.models import ConditionAlias, ConditionAliasJoin, ConditionAliasStatus
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, BaseDatatableView
 
 
@@ -30,8 +31,7 @@ class ConditionAliasColumns(DatatableConfig):
             RichColumn('source_gene_symbol', label='Gene Symbol', orderable=True),
             RichColumn('source_text', name='Text', orderable=True),
             RichColumn('records_affected', name='Records Affected', orderable=True, default_sort=SortOrder.DESC, sort_keys=["records_affected", "id"]),
-            RichColumn('status', orderable=True),
-            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True)
+            RichColumn('status', orderable=True, client_renderer=RichColumn.choices_client_renderer(ConditionAliasStatus.choices))
         ]
 
     def get_initial_queryset(self):
@@ -50,13 +50,60 @@ def condition_aliases_view(request):
     })
 
 
+def _populateMondoResult(result) -> Dict:
+    if isinstance(result, str):
+        result = {"id": result}
+
+    mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
+    mondo_record: Optional[MonarchDiseaseOntology]
+    if mondo_record := MonarchDiseaseOntology.objects.filter(pk=mondo_int).first():
+        result['definition'] = mondo_record.definition
+        if 'label' not in result:
+            result['label'] = mondo_record.name
+    else:
+        result['definition'] = None
+
+    return result
+
+
+def _next_condition_alias(user: User, condition_alias: ConditionAlias) -> Optional[ConditionAlias]:
+    pending = ConditionAlias.objects.order_by('-records_affected').order_by('id').filter(status=ConditionAliasStatus.PENDING)
+    pending = ConditionAlias.filter_for_user(user, pending)
+    return pending.first()
+
 def condition_alias_view(request, pk: int):
     user: User = request.user
     condition_alias = ConditionAlias.objects.get(pk=pk)
-    condition_alias.check_can_view(user)
 
+    if request.method == "GET":
+        condition_alias.check_can_view(user)
+    else:
+        condition_alias.check_can_write(user)
+        aliases = request.POST.get('aliases', '').split(',')
+        join_mode = request.POST.get('join_mode')
+
+        condition_alias.aliases = aliases
+        condition_alias.join_mode = ConditionAliasJoin(join_mode)
+        condition_alias.updated_by = user
+        condition_alias.status = ConditionAliasStatus.RESOLVED
+        condition_alias.save()
+
+        messages.add_message(request, messages.SUCCESS, message=f"Alias {pk} Updated")
+
+        next = request.POST.get('next')
+        if next:
+            if next_ca := _next_condition_alias(user, condition_alias):
+                return redirect("condition_alias", pk=next_ca.pk)
+            else:
+                return redirect("condition_aliases")
+
+        return redirect("condition_alias", pk=pk)
+
+    matches_ids = (condition_alias.aliases or [])
+    matches = [_populateMondoResult(m_id) for m_id in matches_ids]
     return render(request, 'classification/condition_alias.html', context={
-        'condition_alias': condition_alias
+        'condition_alias': condition_alias,
+        'matches': matches
     })
 
 
@@ -98,11 +145,6 @@ class SearchConditionView(APIView):
         # populate more with our database
         # do this separate so if we cache the above we can still apply the below
         for result in clean_results:
-            mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
-            mondo_record: Optional[MonarchDiseaseOntology]
-            if mondo_record := MonarchDiseaseOntology.objects.filter(pk=mondo_int).first():
-                result['definition'] = mondo_record.definition
-            else:
-                result['definition'] = None
+            _populateMondoResult(result)
 
         return Response(status=HTTP_200_OK, data=clean_results)

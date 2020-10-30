@@ -13,14 +13,14 @@ from snpdb.models import Lab
 
 class ConditionAliasStatus(models.TextChoices):
     PENDING = 'P', 'Pending'
-    RESOLVED_AUTO = 'A', 'Resolved Auto'
-    SELECTED = 'S', 'Selected'
+    RESOLVED_AUTO = 'A', 'Resolved (Auto)'
+    RESOLVED = 'R', 'Resolved'
     UNMATCHABLE = 'U', 'Unmatchable'
 
 
 class ConditionAliasJoin(models.TextChoices):
-    UNCERTAIN = 'U', 'Uncertain'
-    COMBINATION = 'C', 'Combination'
+    OR = 'O', 'Or'  # aka uncertain
+    AND = 'A', 'And'  # aka combined
 
 
 class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
@@ -28,7 +28,7 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
     source_text = models.TextField()
     source_gene_symbol = models.TextField()
     status = models.CharField(max_length=1, choices=ConditionAliasStatus.choices, default=ConditionAliasStatus.PENDING)
-    join_mode = models.CharField(max_length=1, choices=ConditionAliasJoin.choices, null=True, blank=True, default=None)
+    join_mode = models.CharField(max_length=1, choices=ConditionAliasJoin.choices, default=ConditionAliasJoin.OR)
     records_affected = models.IntegerField()
     aliases = models.JSONField(null=True, blank=True)
     updated_by = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True, blank=True)
