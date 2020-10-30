@@ -600,6 +600,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             raise MissingTranscript(f"Transcript for '{transcript_name}' (build: {genome_build}),"
                                     f" but did not have complete data {data_str}")
 
+        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
+        # so replace it with the DB records
+        transcript_version.data["gene_name"] = transcript_version.gene_version.gene_symbol_id
         return make_transcript(transcript_version.data)
 
     @property
