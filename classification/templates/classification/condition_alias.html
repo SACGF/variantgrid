@@ -23,12 +23,16 @@
         .simple-pill {
             display: inline-block;
             padding: 2px 6px 2px 6px;
-            border: 3px solid #ccc;
-            border-radius: 12px;
+            border: 2px solid #ccc;
             background-color: #eee;
         }
-        .simple-pill + .simple-pill {
-            margin-left: 10px;
+        .simple-pill:first-child {
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
+        }
+        .simple-pill:last-child {
+            border-top-right-radius: 12px;
+            border-bottom-right-radius: 12px;
         }
         .joiner {
             display: inline-block;
@@ -150,7 +154,11 @@
                 url: url,
                 type: 'GET',
                 error: (call, status, text) => {
-                    console.log("Failed");
+                    resultsDom.LoadingOverlay('hide');
+                    resultsDom.empty();
+                    console.log(status);
+                    console.log(text);
+                    $('<div/>', {class:'no-value w-100 text-center', text:'Error Retrieving'}).appendTo(resultsDom);
                 },
                 success: async (results) => {
                     $("#search-result-for").text(text);
@@ -187,7 +195,6 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
-        <h3>Condition Alias ({{ condition_alias.id }})</h3>
         <a href="{% url 'condition_aliases' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all aliases</a>
         {% page_help_embedded title='Condition Alias' %}
             <p>
@@ -213,24 +220,33 @@
             <input type="hidden" name="join_mode" />
             <input type="hidden" name="next" />
         </form>
-        {% labelled label="Classification Records Affected" %}{{ condition_alias.records_affected }}{% endlabelled %}
-        {% labelled label="Lab" %}{{ condition_alias.lab.name }}{% endlabelled %}
-        {% labelled label="Gene Symbol" %}{{ condition_alias.source_gene_symbol }}{% endlabelled %}
-        {% labelled label="Text" %}{{ condition_alias.source_text }}{% endlabelled %}
-        {% labelled label="Summary" %}
-            <span class="simple-pill">{{ condition_alias.lab.name }}</span>
-            <span class="simple-pill">{{ condition_alias.source_gene_symbol }}</span>
-            <span class="simple-pill">{{ condition_alias.source_text }}</span>
-            <i class="fas fa-arrow-right d-inline-block mx-4"></i>
-            <span id="alias-summary">
-                <span class="simple-pill">?</span>
-            </span>
-        {% endlabelled %}
-        {% labelled label="Status" %}{{ condition_alias.get_status_display }}{% endlabelled %}
 
-        <div class="btn-toolbar">
-            <button id="alias-save" class="btn btn-primary">Save</button>
-            <button id="alias-save-next" class="btn btn-primary">Save & Next</button>
+        <div class="card">
+            <div class="card-header">Condition Alias ({{ condition_alias.id }})</div>
+            <div class="card-body">
+                {% labelled label="Classification Records Affected" %}{{ condition_alias.records_affected }}{% endlabelled %}
+                {% labelled label="Lab" %}{{ condition_alias.lab.name }}{% endlabelled %}
+                {% labelled label="Gene Symbol" %}{{ condition_alias.source_gene_symbol }}{% endlabelled %}
+                {% labelled label="Text" %}<b>{{ condition_alias.source_text }}</b>{% endlabelled %}
+                {% labelled label="Status" %}{{ condition_alias.get_status_display }}{% endlabelled %}
+                {% labelled label="Summary" %}
+                    <span>
+                    <span class="simple-pill">{{ condition_alias.lab.name }}</span>
+                    <span class="simple-pill">{{ condition_alias.source_gene_symbol }}</span>
+                    <span class="simple-pill">{{ condition_alias.source_text }}</span>
+                    </span>
+                    <i class="fas fa-arrow-right d-inline-block mx-4"></i>
+                    <span id="alias-summary">
+                        <span class="simple-pill">?</span>
+                    </span>
+                {% endlabelled %}
+            </div>
+            <div class="card-footer">
+                <div class="btn-toolbar" style="float:right">
+                    <button id="alias-save" class="btn btn-primary">Save</button>
+                    <button id="alias-save-next" class="btn btn-primary">Save & Next</button>
+                </div>
+            </div>
         </div>
 
         <div class="row mt-4">

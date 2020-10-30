@@ -36,6 +36,12 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
     class Meta:
         unique_together = ("lab", "source_text", "source_gene_symbol")
 
+    def __str__(self):
+        alias_text = "?"
+        if self.aliases:
+            alias_text = f" {self.get_join_mode_display().lower()} ".join(self.aliases)
+        return f"{self.lab.name} | {self.source_gene_symbol} | {self.source_text} -> {alias_text}"
+
     @staticmethod
     def sync_aliases():
         from classification.models import ClassificationModification

@@ -79,16 +79,25 @@ def condition_alias_view(request, pk: int):
         condition_alias.check_can_view(user)
     else:
         condition_alias.check_can_write(user)
-        aliases = request.POST.get('aliases', '').split(',')
+        aliases = request.POST.get('aliases', '')
+        if aliases:
+            aliases = aliases.split(',')
+        else:
+            aliases = None
+
         join_mode = request.POST.get('join_mode')
 
         condition_alias.aliases = aliases
         condition_alias.join_mode = ConditionAliasJoin(join_mode)
         condition_alias.updated_by = user
-        condition_alias.status = ConditionAliasStatus.RESOLVED
+        if aliases:
+            condition_alias.status = ConditionAliasStatus.RESOLVED
+        else:
+            condition_alias.status = ConditionAliasStatus.PENDING
+
         condition_alias.save()
 
-        messages.add_message(request, messages.SUCCESS, message=f"Alias {pk} Updated")
+        messages.add_message(request, messages.INFO, message=f"Alias ({pk}) Updated : {condition_alias}")
 
         next = request.POST.get('next')
         if next:
@@ -100,7 +109,7 @@ def condition_alias_view(request, pk: int):
         return redirect("condition_alias", pk=pk)
 
     matches_ids = (condition_alias.aliases or [])
-    matches = [_populateMondoResult(m_id) for m_id in matches_ids]
+    matches = [_populateMondoResult(m_id) for m_id in matches_ids if m_id]
     return render(request, 'classification/condition_alias.html', context={
         'condition_alias': condition_alias,
         'matches': matches
