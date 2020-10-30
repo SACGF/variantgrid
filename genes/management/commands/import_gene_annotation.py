@@ -2,8 +2,7 @@
 
 See [annotation] page for instructions
 
-We prefer GFF3 as then we can have gene ID, biotype and description etc
-but can handle genePred only in the case of UCSC/UTA etc
+GenePred is way easier to parse, but also want GFF3 as then we can have gene ID, biotype and description etc
 
 """
 from collections import Counter, defaultdict
@@ -26,7 +25,7 @@ from snpdb.models.models_enums import SequenceRole
 
 class Command(BaseCommand):
     BATCH_SIZE = 2000
-    FAKE_GENE_ID_PREFIX = "unknown_"
+    FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -45,7 +44,7 @@ class Command(BaseCommand):
 
         parser.add_argument('--genome-build', choices=builds, required=True)
         parser.add_argument('--annotation-consortium', choices=consortia, required=True)
-        parser.add_argument('--replace-symbols', action='store_true')
+        parser.add_argument('--replace', action='store_true', help="Replace gene symbols and relations")
         parser.add_argument('--release', type=int, required=False,
                             help="Make a release (to match VEP) store all gene/transcript versions")
 
@@ -56,7 +55,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         build_name = options["genome_build"]
         annotation_consortium_name = options["annotation_consortium"]
-        replace_symbols = options["replace_symbols"]
+        replace = options["replace"]
         release_version = options["release"]
         gff3_filenames = options["gff3"]
         genepred_filenames = options["genePred"]
@@ -71,24 +70,19 @@ class Command(BaseCommand):
         if len(gff3_filenames) != 1:
             if release_version:
                 raise ValueError("You can only specify 1 GFF in a release!")
-            if replace_symbols:
-                raise ValueError("You can only specify 1 GFF when using replace-symbols!")
+            if replace:
+                raise ValueError("You can only specify 1 GFF when using replace!")
 
-        gff3_filenames = [None if f == 'None' else f for f in gff3_filenames]
         for gff3_filename, genepred_filename in zip(gff3_filenames, genepred_filenames):
             if not os.path.exists(genepred_filename):
                 raise FileNotFoundError(genepred_filename)
             name, extension = os.path.splitext(genepred_filename)
             if extension != '.genePred':
                 raise ValueError(f"genePred files must have .genePred extension, was: '{extension}'")
-            if gff3_filename:
-                if not gff3_filename.startswith(name):
-                    raise ValueError(f"Start of GFF3 file '{gff3_filename}' must match start of genePred '{name}'")
-                if not os.path.exists(gff3_filename):
-                    raise FileNotFoundError(gff3_filename)
-            elif annotation_consortium == AnnotationConsortium.ENSEMBL:
-                msg = "Only RefSeq genePred files can be inserted w/o GFF (Ensembl genePred doesn't contain versions)"
-                raise ValueError(msg)
+            if not gff3_filename.startswith(name):
+                raise ValueError(f"Start of GFF3 file '{gff3_filename}' must match start of genePred '{name}'")
+            if not os.path.exists(gff3_filename):
+                raise FileNotFoundError(gff3_filename)
 
         self.annotation_consortium = annotation_consortium
         self.genome_build = genome_build
@@ -107,7 +101,7 @@ class Command(BaseCommand):
             num_remaining_file_pairs -= 1
             update_known_objects = num_remaining_file_pairs > 0
             self.insert_gene_annotations(gff3_filename, genepred_filename, update_known_objects,
-                                         replace_symbols=replace_symbols, release_version=release_version)
+                                         replace=replace, release_version=release_version)
 
         # Remove orphaned fake genes
         used_genes = TranscriptVersion.objects.filter(gene_version__gene__identifier__startswith=self.FAKE_GENE_ID_PREFIX).values_list("gene_version__gene")
@@ -131,14 +125,13 @@ class Command(BaseCommand):
         return f"{gene_id}.{version}"
 
     def insert_gene_annotations(self, gff3_filename, genepred_filename, update_known_objects,
-                                replace_symbols=False, release_version=None):
+                                replace=False, release_version=None):
         """ update_known_objects - set false as optimisation if you know it's the last loop """
 
         print(f"insert_gene_annotations('{gff3_filename}', '{genepred_filename}')")
-        filename = gff3_filename or genepred_filename
         import_source = GeneAnnotationImport.objects.create(genome_build=self.genome_build,
                                                             annotation_consortium=self.annotation_consortium,
-                                                            filename=filename)
+                                                            filename=gff3_filename)
         release = None
         if release_version:
             release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
@@ -168,125 +161,67 @@ class Command(BaseCommand):
         known_transcript_versions_to_update_with_gene_accession = defaultdict(list)
         known_gene_versions_to_update = []
 
-        if gff3_filename:
-            with open_handle_gzip(gff3_filename, "rt") as f:
-                for line in f:
-                    try:
-                        if line.startswith("#"):
-                            continue
-                        cols = line.strip().split("\t")
-                        feature_type = cols[2]
-                        if feature_type in {"CDS", "exon"}:
-                            continue
+        with open_handle_gzip(gff3_filename, "rt") as f:
+            for line in f:
+                try:
+                    if line.startswith("#"):
+                        continue
+                    cols = line.strip().split("\t")
+                    feature_type = cols[2]
+                    if feature_type in {"CDS", "exon"}:
+                        continue
 
-                        attributes = dict((a.split("=") for a in cols[8].split(";")))
-                        if parser.is_gene(feature_type, attributes):  # GeneVersion
-                            gene_version = parser.get_gene_version(attributes)
-                            gene_id = gene_version.gene_id
-                            gff3_gene_versions[gene_id] = gene_version.version
+                    attributes = dict((a.split("=") for a in cols[8].split(";")))
+                    if parser.is_gene(feature_type, attributes):  # GeneVersion
+                        gene_version = parser.get_gene_version(attributes)
+                        gene_id = gene_version.gene_id
+                        gff3_gene_versions[gene_id] = gene_version.version
 
-                            if gene_version.gene_symbol_id not in self.known_gene_symbols:
-                                unknown_gene_symbols.append(GeneSymbol(symbol=gene_version.gene_symbol_id))
+                        if gene_version.gene_symbol_id not in self.known_gene_symbols:
+                            unknown_gene_symbols.append(GeneSymbol(symbol=gene_version.gene_symbol_id))
 
-                            gene_versions_dict = self.known_gene_versions_by_gene_id.get(gene_id, {})
-                            if not gene_versions_dict:
-                                unknown_gene_ids.append(gene_id)
+                        gene_versions_dict = self.known_gene_versions_by_gene_id.get(gene_id, {})
+                        if not gene_versions_dict:
+                            unknown_gene_ids.append(gene_id)
 
-                            known_gene_version = gene_versions_dict.get(gene_version.version)
-                            if known_gene_version:
-                                if replace_symbols:
-                                    if known_gene_version.gene_symbol_id != gene_version.gene_symbol_id:
-                                        known_gene_version.import_source = import_source
-                                        known_gene_version.gene_symbol_id = gene_version.gene_symbol_id
-                                        known_gene_versions_to_update.append(known_gene_version)
-                            else:
-                                unknown_gene_versions.append(gene_version)
+                        known_gene_version = gene_versions_dict.get(gene_version.version)
+                        if known_gene_version:
+                            if replace:
+                                if known_gene_version.gene_symbol_id != gene_version.gene_symbol_id:
+                                    known_gene_version.import_source = import_source
+                                    known_gene_version.gene_symbol_id = gene_version.gene_symbol_id
+                                    known_gene_versions_to_update.append(known_gene_version)
+                        else:
+                            unknown_gene_versions.append(gene_version)
 
-                        elif parser.is_transcript(feature_type, attributes):
-                            gene_id, transcript_version = parser.get_gene_id_and_transcript(attributes)
-                            transcript_id = transcript_version.transcript_id
-                            gff3_transcript_versions[transcript_id] = transcript_version.version
-                            transcript_versions_dict = self.known_transcript_versions_by_transcript_id.get(transcript_id, {})
-                            if not transcript_versions_dict:
-                                unknown_transcripts.append(Transcript(identifier=transcript_id,
-                                                                      annotation_consortium=self.annotation_consortium))
-                            known_transcript_version = transcript_versions_dict.get(transcript_version.version)
-                            if known_transcript_version:
-                                gff3_existing_transcript_versions.add(known_transcript_version)
+                    elif parser.is_transcript(feature_type, attributes):
+                        gene_id, transcript_version = parser.get_gene_id_and_transcript(attributes)
+                        transcript_id = transcript_version.transcript_id
+                        gff3_transcript_versions[transcript_id] = transcript_version.version
+                        transcript_versions_dict = self.known_transcript_versions_by_transcript_id.get(transcript_id, {})
+                        if not transcript_versions_dict:
+                            unknown_transcripts.append(Transcript(identifier=transcript_id,
+                                                                  annotation_consortium=self.annotation_consortium))
 
-                                if known_transcript_version.gene_version.gene.identifier.startswith(self.FAKE_GENE_ID_PREFIX):
-                                    gene_accession = self.get_gene_accession(gene_id, gff3_gene_versions[gene_id])
-                                    known_transcript_versions_to_update_with_gene_accession[gene_accession].append(known_transcript_version)
+                        gene_accession = self.get_gene_accession(gene_id, gff3_gene_versions[gene_id])
+                        if known_transcript_version := transcript_versions_dict.get(transcript_version.version):
+                            gff3_existing_transcript_versions.add(known_transcript_version)
 
-                                # print(f"{transcript_version.accession} is KNOWN")
-                            else:
-                                # print(f"{transcript_version.accession} is unknown - have {transcript_versions_dict}")
-                                gene_accession = self.get_gene_accession(gene_id, gff3_gene_versions[gene_id])
-                                unknown_transcript_versions_by_gene_accession[gene_accession].append(transcript_version)
-                    except:
-                        print(f"Couldn't handle line:")
-                        print(line)
-                        raise
-        else:
-            # genePred only
-            for transcript_versions in self.known_transcript_versions_by_transcript_id.values():
-                for tv in transcript_versions.values():
-                    gff3_existing_transcript_versions.add(tv)
+                            # Always replace if starts with "unknown_" (or replace and different)
+                            current_gene_accession = known_transcript_version.gene_version.accession
+                            if current_gene_accession.startswith(self.FAKE_GENE_ID_PREFIX) or \
+                                    (replace and current_gene_accession != gene_accession):
+                                known_transcript_versions_to_update_with_gene_accession[gene_accession].append(known_transcript_version)
+                                # print(f"Updating {known_transcript_version} => {gene_accession}")
+                        else:
+                            # print(f"{transcript_version.accession} is unknown - have {transcript_versions_dict}")
+                            unknown_transcript_versions_by_gene_accession[gene_accession].append(transcript_version)
+                except:
+                    print(f"Couldn't handle line:")
+                    print(line)
+                    raise
 
         genepred_data_by_transcript_id = self.get_genepred_data_by_transcript_id(parser, gff3_existing_transcript_versions, genepred_filename)
-
-        if not gff3_filename:  # genePred only - anything in this is unknown needs to be inserted
-            # genePred files contain gene symbols but not the geneID
-            # If we have the same transcript ID (diff version) linked to same gene symbol, we'll use that gene
-            transcript_version_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=self.annotation_consortium,
-                                                                     genome_build=self.genome_build)
-            transcript_version_qs = transcript_version_qs.values_list("gene_version__gene_id",
-                                                                      "gene_version__version",
-                                                                      "gene_version__gene_symbol_id",
-                                                                      "transcript_id")
-            transcript_gene_symbol_accessions = defaultdict(dict)
-            for gene_id, version, gene_symbol, transcript_id in transcript_version_qs.distinct():
-                gene_accession = self.get_gene_accession(gene_id, version)
-                transcript_gene_symbol_accessions[transcript_id][gene_symbol] = gene_accession
-
-            for transcript_json in genepred_data_by_transcript_id.values():
-                transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_json['id'])
-                gene_symbol = transcript_json["gene_name"]
-                gene_symbol_accessions = transcript_gene_symbol_accessions.get(transcript_id)
-                gene_accession = None
-                if gene_symbol_accessions:
-                    gene_accession = gene_symbol_accessions.get(gene_symbol)
-
-                if not gene_accession:
-                    if gene_symbol not in self.known_gene_symbols:
-                        unknown_gene_symbols.append(GeneSymbol(symbol=gene_symbol))
-
-                    gene_id = self.FAKE_GENE_ID_PREFIX + gene_symbol
-                    gene_version = GeneVersion(gene_id=gene_id,
-                                               version=1,
-                                               gene_symbol_id=gene_symbol,
-                                               genome_build=self.genome_build,
-                                               import_source=import_source)
-                    gene_accession = self.get_gene_accession(gene_id, 1)
-                    gene_versions_dict = self.known_gene_versions_by_gene_id.get(gene_id, {})
-                    if not gene_versions_dict:
-                        unknown_gene_ids.append(gene_id)
-                    if gene_version.version not in gene_versions_dict:
-                        unknown_gene_versions.append(gene_version)
-
-                    transcript_versions_dict = self.known_transcript_versions_by_transcript_id.get(transcript_id, {})
-                    if not transcript_versions_dict:
-                        transcript = Transcript(identifier=transcript_id,
-                                                annotation_consortium=self.annotation_consortium)
-                        unknown_transcripts.append(transcript)
-                    known_transcript_version = transcript_versions_dict.get(version)
-                    if known_transcript_version is None:
-                        transcript_version = TranscriptVersion(transcript_id=transcript_id,
-                                                               version=version,
-                                                               genome_build=self.genome_build,
-                                                               import_source=import_source,
-                                                               biotype=None)  # No RefSeq transcript biotype
-                        unknown_transcript_versions_by_gene_accession[gene_accession].append(transcript_version)
 
         # Insert new data
         if unknown_gene_symbols:
@@ -412,7 +347,6 @@ class Command(BaseCommand):
     @staticmethod
     def set_transcript_data(existing_transcript_version, data):
         data["id"] = existing_transcript_version.accession  # Ensembl genePred data does not contain versions
-        data["gene_name"] = existing_transcript_version.gene_version.gene_symbol_id  # Replace with nice name
         existing_transcript_version.data = data
 
     def get_genepred_data_by_transcript_id(self, parser, gff3_existing_transcripts, genepred_filename):
@@ -437,6 +371,8 @@ class Command(BaseCommand):
         num_no_contig_match = 0
         with open(genepred_filename) as f:
             for transcript_json in read_genepred(f):
+                # No longer store gene_name in transcript JSON (will use TranscriptVersion/GeneVersion relation)
+                del transcript_json["gene_name"]
                 # NCBI file uses refseq accession IDs
                 # Map everything to our contigs, then convert to our Fasta
                 chrom = transcript_json['chrom']
