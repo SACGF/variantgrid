@@ -1,11 +1,14 @@
+import operator
+from functools import reduce
+from typing import List, Set, Optional
+
 from django.db import models, transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django_extensions.db.models import TimeStampedModel
 from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm
-
 from classification.regexes import db_ref_regexes
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from snpdb.models import Lab
@@ -68,6 +71,49 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
                                 "records_affected": total
                             }
                         )
+                        record.attempt_auto_match()
+
+    @staticmethod
+    def _name_to_words(name: str) -> Set[str]:
+        cleaned = name.replace(",", " ").lower()
+        words = cleaned.split(" ")
+        words = [word.strip() for word in words]
+        return set([word for word in words if word])
+
+    def attempt_auto_match(self):
+        from annotation.models import MonarchDiseaseOntology
+        word_set = ConditionAlias._name_to_words(self.source_text)
+        q_list: List[Q] = [Q(name__icontains=word) for word in word_set]
+        mondos = MonarchDiseaseOntology.objects.filter(reduce(operator.and_, q_list))
+
+        best_match: Optional[MonarchDiseaseOntology] = None
+
+        mondo: MonarchDiseaseOntology
+        for mondo in mondos:
+            defn = mondo.definition
+            if defn:
+                defn = defn.lower()
+            leftover_words = ConditionAlias._name_to_words(mondo.name)
+            for term in word_set:
+                if term in leftover_words:  # it should always be a term due to the query
+                    leftover_words.remove(term)
+            if not leftover_words:
+                best_match = term
+                break
+            if len(leftover_words) == 1 and self.source_gene_symbol in defn:
+                leftover_word = list(leftover_words)[0]
+                # want to see if single leftover word is number?
+                print(f"Leftover word = {leftover_word}")
+                best_match = term
+                break
+
+        if best_match:
+            self.aliases = [best_match.id_str]
+            self.status = ConditionAliasStatus.RESOLVED_AUTO
+            self.save()
+            return True
+        else:
+            return False
 
 
 @receiver(post_save, sender=ConditionAlias)

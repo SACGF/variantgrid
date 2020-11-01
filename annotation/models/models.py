@@ -981,6 +981,11 @@ class MonarchDiseaseOntology(models.Model):
         """ MONDO:0005045 -> 0005045 """
         return int(mondo_text.split(":")[1])
 
+    @property
+    def id_str(self):
+        num_part = str(self.id).rjust(7, '0')
+        return f"MONDO:{num_part}"
+
 
 class CachedWebResource(TimeStampedModel):
     """ These are annotations that can populate themselves via the web
