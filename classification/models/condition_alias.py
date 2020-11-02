@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import List, Set, Optional
 
-from django.db import models, transaction
+from django.db import models
 from django.db.models import Count, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -75,9 +75,9 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
                         total = result.get('total')
 
                         record, _ = ConditionAlias.objects.update_or_create(
-                            lab_id = lab_id,
-                            source_text = condition,
-                            source_gene_symbol = gene_symbol,
+                            lab_id=lab_id,
+                            source_text=condition,
+                            source_gene_symbol=gene_symbol,
                             defaults={
                                 "records_affected": total
                             }
@@ -112,14 +112,14 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
                 if term in leftover_words:  # it should always be a term due to the query
                     leftover_words.remove(term)
             if not leftover_words:
-                best_match = term
+                best_match = mondo
                 leftover_word = None
                 break
             if len(leftover_words) == 1 and self.source_gene_symbol in defn:
                 leftover_word = list(leftover_words)[0]
                 # want to see if single leftover word is number?
                 print(f"Leftover word = {leftover_word}")
-                best_match = term
+                best_match = mondo
                 break
 
         if best_match:
