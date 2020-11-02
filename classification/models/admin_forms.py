@@ -10,7 +10,8 @@ from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.enums.classification_enums import EvidenceCategory, \
     SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionAlias
+from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionAlias, \
+    ConditionAliasStatus
 from classification.models.classification import Classification, ClassificationImport
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.classification_import import process_classification_import
@@ -461,10 +462,26 @@ class EvidenceKeyAdmin(admin.ModelAdmin):
         }, **kwargs)
 
 
+class ConditionAliasStatusFilter(admin.SimpleListFilter):
+    title = 'Status Filter'
+    parameter_name = 'status'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return ConditionAliasStatus.choices
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(status=self.value())
+        return queryset
+
+
 class ConditionAliasAdmin(admin.ModelAdmin):
 
     list_display = ["pk", "lab", "source_text", "source_gene_symbol", "status", "records_affected", "aliases", "join_mode", "updated_by", "created"]
     readonly_fields = ["pk", "lab"]
+    search_fields = ['source_text', 'source_gene_symbol', 'aliases']
+    list_filter = [ConditionAliasStatusFilter]
 
     def auto_match(self, request, queryset):
         ca: ConditionAlias

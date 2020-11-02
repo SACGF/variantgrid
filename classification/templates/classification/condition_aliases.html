@@ -15,6 +15,27 @@
             let elem = $('<a/>', {href: `/classification/condition_alias/${data}`, text: `${data}`});
             return elem.prop('outerHTML');
         };
+        function mondo_list(data, type, row) {
+            let mondos = data.aliases;
+            if (mondos) {
+                let join_mode = data.join_mode == 'A' ? 'and' : 'or';
+                let dom = $('<div>');
+                let first = true;
+                for (let mondo of mondos) {
+                    if (!first) {
+                        dom.append(` ${join_mode} `);
+                    }
+                    first = false;
+                    mondo_num = mondo.substring("MONDO:".length);
+                    let href = `https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${mondo_num}`
+                    let aDom = $('<a>', {class: 'hover-link external-link', target:'_blank', text: mondo, href: href});
+                    dom.append(aDom);
+                }
+                return dom.prop('outerHTML');
+            } else {
+                return '';
+            }
+        }
     </script>
 {% endblock head %}
 {% block content %}

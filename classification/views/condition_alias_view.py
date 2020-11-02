@@ -1,5 +1,5 @@
 import urllib
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 import requests
 from django.contrib import messages
@@ -22,6 +22,12 @@ ID_EXTRACT_MINI_P = re.compile(r"MONDO:([0-9]+)$")
 
 class ConditionAliasColumns(DatatableConfig):
 
+    def render_aliases(self, row: Dict[str, Any]):
+        return {
+            'aliases': row.get('aliases'),
+            'join_mode': row.get('join_mode')
+        }
+
     def __init__(self, request):
         super().__init__(request)
 
@@ -30,9 +36,11 @@ class ConditionAliasColumns(DatatableConfig):
             RichColumn('lab__name', name='Lab', orderable=True),
             RichColumn('source_gene_symbol', label='Gene Symbol', orderable=True),
             RichColumn('source_text', name='Text', orderable=True),
+            RichColumn('aliases', name='Aliases', renderer=self.render_aliases, client_renderer='mondo_list'),
             RichColumn('records_affected', name='Records Affected', orderable=True, default_sort=SortOrder.DESC, sort_keys=["records_affected", "id"]),
             RichColumn('status', orderable=True, client_renderer=RichColumn.choices_client_renderer(ConditionAliasStatus.choices))
         ]
+        self.extra_columns = ['join_mode']
 
     def get_initial_queryset(self):
         return get_objects_for_user(self.user, ConditionAlias.get_read_perm(), klass=ConditionAlias, accept_global_perms=True)
