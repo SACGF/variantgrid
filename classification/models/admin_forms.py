@@ -465,3 +465,13 @@ class ConditionAliasAdmin(admin.ModelAdmin):
 
     list_display = ["pk", "lab", "source_text", "source_gene_symbol", "status", "records_affected", "aliases", "join_mode", "updated_by", "created"]
     readonly_fields = ["pk", "lab"]
+
+    def auto_match(self, request, queryset):
+        ca: ConditionAlias
+        for ca in queryset:
+            attempt = ca.attempt_auto_match()
+            messages.add_message(request, messages.INFO, message=f"({ca.id}) -> {attempt}")
+
+    auto_match.short_description = "Attempt auto match"
+
+    actions = [auto_match]

@@ -1,4 +1,5 @@
 import operator
+from dataclasses import dataclass
 from functools import reduce
 from typing import List, Set, Optional
 
@@ -24,6 +25,16 @@ class ConditionAliasStatus(models.TextChoices):
 class ConditionAliasJoin(models.TextChoices):
     OR = 'O', 'Or'  # aka uncertain
     AND = 'A', 'And'  # aka combined
+
+
+@dataclass(frozen=True)
+class ConditionAliasAutoMatch:
+    contains_all_count: int
+    leftover_word: Optional[str]
+    matched: Optional[str]
+
+    def __str__(self):
+        return f"{self.contains_all_count} candidate matches - matched {self.matched} leftover = '{self.leftover_word}'"
 
 
 class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
@@ -80,11 +91,14 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
         words = [word.strip() for word in words]
         return set([word for word in words if word])
 
-    def attempt_auto_match(self):
+    def attempt_auto_match(self) -> ConditionAliasAutoMatch:
         from annotation.models import MonarchDiseaseOntology
         word_set = ConditionAlias._name_to_words(self.source_text)
         q_list: List[Q] = [Q(name__icontains=word) for word in word_set]
-        mondos = MonarchDiseaseOntology.objects.filter(reduce(operator.and_, q_list))
+        mondos = list(MonarchDiseaseOntology.objects.filter(reduce(operator.and_, q_list)).order_by('name'))
+
+        possible_matches_count = len(mondos)
+        leftover_word: Optional[str] = None
 
         best_match: Optional[MonarchDiseaseOntology] = None
 
@@ -99,6 +113,7 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
                     leftover_words.remove(term)
             if not leftover_words:
                 best_match = term
+                leftover_word = None
                 break
             if len(leftover_words) == 1 and self.source_gene_symbol in defn:
                 leftover_word = list(leftover_words)[0]
@@ -111,9 +126,12 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
             self.aliases = [best_match.id_str]
             self.status = ConditionAliasStatus.RESOLVED_AUTO
             self.save()
-            return True
-        else:
-            return False
+
+        return ConditionAliasAutoMatch(
+            contains_all_count=possible_matches_count,
+            matched=best_match.id_str if best_match else None,
+            leftover_word=leftover_word
+        )
 
 
 @receiver(post_save, sender=ConditionAlias)
