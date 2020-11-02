@@ -10,6 +10,8 @@ from django.dispatch import receiver
 from django_extensions.db.models import TimeStampedModel
 from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm
+
+from annotation.models import MonarchDiseaseOntology
 from classification.regexes import db_ref_regexes
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from snpdb.models import Lab
@@ -30,11 +32,13 @@ class ConditionAliasJoin(models.TextChoices):
 @dataclass(frozen=True)
 class ConditionAliasAutoMatch:
     contains_all_count: int
-    leftover_word: Optional[str]
-    matched: Optional[str]
+    best_match: Optional[MonarchDiseaseOntology]
+    secondary_matches: List[MonarchDiseaseOntology]
 
     def __str__(self):
-        return f"{self.contains_all_count} candidate matches - matched {self.matched} leftover = '{self.leftover_word}'"
+        secondary_str = self.secondary_matches[0].name if len(self.secondary_matches) == 1 else str(len(self.secondary_matches))
+        did_match = self.best_match is not None or len(self.secondary_matches) == 1
+        return f"Matched = {did_match} - {self.contains_all_count} candidate, - perfect match = {self.best_match.name if self.best_match else 'None'} secondary = {secondary_str}"
 
 
 class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
@@ -82,7 +86,8 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
                                 "records_affected": total
                             }
                         )
-                        record.attempt_auto_match()
+                        match_summary = record.attempt_auto_match()
+                        print(f"{record.source_text} -> {match_summary}")
 
     @staticmethod
     def _name_to_words(name: str) -> Set[str]:
@@ -92,15 +97,15 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
         return set([word for word in words if word])
 
     def attempt_auto_match(self) -> ConditionAliasAutoMatch:
-        from annotation.models import MonarchDiseaseOntology
         word_set = ConditionAlias._name_to_words(self.source_text)
         q_list: List[Q] = [Q(name__icontains=word) for word in word_set]
         mondos = list(MonarchDiseaseOntology.objects.filter(reduce(operator.and_, q_list)).order_by('name'))
 
         possible_matches_count = len(mondos)
-        leftover_word: Optional[str] = None
 
         best_match: Optional[MonarchDiseaseOntology] = None
+        secondary_matches: List[MonarchDiseaseOntology] = list()
+        gene_symbol = self.source_gene_symbol.lower() if self.source_gene_symbol else None
 
         mondo: MonarchDiseaseOntology
         for mondo in mondos:
@@ -113,14 +118,14 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
                     leftover_words.remove(term)
             if not leftover_words:
                 best_match = mondo
-                leftover_word = None
-                break
-            if len(leftover_words) == 1 and self.source_gene_symbol in defn:
-                leftover_word = list(leftover_words)[0]
-                # want to see if single leftover word is number?
-                print(f"Leftover word = {leftover_word}")
-                best_match = mondo
-                break
+            elif len(leftover_words) <= 2 and gene_symbol and defn and gene_symbol in defn:
+                secondary_matches.append(mondo)
+
+        use_match: Optional[MonarchDiseaseOntology]
+        if best_match:
+            use_match = best_match
+        elif len(secondary_matches) == 1:
+            use_match = secondary_matches[0]
 
         if best_match:
             self.aliases = [best_match.id_str]
@@ -129,8 +134,8 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
 
         return ConditionAliasAutoMatch(
             contains_all_count=possible_matches_count,
-            matched=best_match.id_str if best_match else None,
-            leftover_word=leftover_word
+            best_match=best_match,
+            secondary_matches=secondary_matches
         )
 
 
