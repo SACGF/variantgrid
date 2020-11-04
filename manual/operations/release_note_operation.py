@@ -39,4 +39,4 @@ class ManualOperation(Operation):
         :param apps: where we can call get_model
         """
         Deployment = apps.get_model('manual', 'Deployment')
-        Deployment.objects.create(release_note = self.release_note, app = self.app)
+        Deployment.objects.create(release_note=self.release_note, app=self.app)
