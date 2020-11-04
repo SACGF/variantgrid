@@ -551,3 +551,29 @@ table.as_table {
   background-color: #99CD83;
   border-color: #99CD83;
 }
+
+// Condition Aliases
+.dt-status {
+    .val-R:before {
+        font-family: 'FontAwesome';
+        margin-right: 4px;
+        content: "\f058";
+        color: green;
+    }
+    .val-P:before {
+      font-family: 'FontAwesome';
+        margin-right: 4px;
+        content: "\f111";
+    }
+    .val-A:before {
+      font-family: 'FontAwesome';
+        margin-right: 4px;
+        content: "\f544";
+        color: #6a6;
+    }
+    .val-U:before {
+      font-family: 'FontAwesome';
+        margin-right: 4px;
+        content: "\f057";
+    }
+}

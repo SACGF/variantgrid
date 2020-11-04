@@ -146,7 +146,6 @@ def condition_alias_view(request, pk: int):
 
         return redirect("condition_alias", pk=pk)
 
-
     matches_ids = (condition_alias.aliases or [])
     matches = [_populateMondoResult(m_id) for m_id in matches_ids if m_id]
     return render(request, 'classification/condition_alias.html', context={

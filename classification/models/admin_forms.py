@@ -486,7 +486,7 @@ class ConditionAliasAdmin(admin.ModelAdmin):
     def auto_match(self, request, queryset):
         ca: ConditionAlias
         for ca in queryset:
-            attempt = ca.attempt_auto_match()
+            attempt = ca.attempt_auto_match(update_record=True)
             messages.add_message(request, messages.INFO, message=f"({ca.id}) -> {attempt}")
 
     auto_match.short_description = "Attempt auto match"

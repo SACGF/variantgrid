@@ -1,6 +1,7 @@
 import operator
 from dataclasses import dataclass
-from functools import reduce
+from enum import Enum
+from functools import reduce, total_ordering
 from typing import List, Set, Optional
 
 from django.db import models
@@ -30,17 +31,45 @@ class ConditionAliasJoin(models.TextChoices):
     OR = 'O', 'Or'  # aka uncertain
     AND = 'A', 'And'  # aka combined
 
+@total_ordering
+class ConditionAliasScore(Enum):
+    POSSIBLE = 1
+    ALL_TERMS = 2
+    ALL_TERMS_AND_GENE = 3
+
+    def __lt__(self, other):
+        return self.value < other.value
+
+
+@total_ordering
+@dataclass(frozen=True)
+class ConditionAliasScored:
+    term: MonarchDiseaseOntology
+    score: ConditionAliasScore
+
+    def __lt__(self, other):
+        return self.score < other.score
+
 
 @dataclass(frozen=True)
 class ConditionAliasAutoMatch:
-    contains_all_count: int
-    best_match: Optional[MonarchDiseaseOntology]
-    secondary_matches: List[MonarchDiseaseOntology]
+    matches: List[ConditionAliasScored]
+
+    @lazy
+    def winner(self) -> Optional[ConditionAliasScore]:
+        if not self.matches:
+            return None
+        if len(self.matches) == 1:
+            return self.matches[0]
+        self.matches.sort(reverse=True)
+
+        if self.matches[0].score != self.matches[1].score:
+            return self.matches[0]
+        return None
 
     def __str__(self):
-        secondary_str = self.secondary_matches[0].name if len(self.secondary_matches) == 1 else str(len(self.secondary_matches))
-        did_match = self.best_match is not None or len(self.secondary_matches) == 1
-        return f"Matched = {did_match} - {self.contains_all_count} candidate, - perfect match = {self.best_match.name if self.best_match else 'None'} secondary = {secondary_str}"
+        winner = self.winner
+        return f"Matched {len(self.matches)} candidates, - winning match = {winner.term.name if winner else 'None'}"
 
 
 class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
@@ -96,7 +125,7 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
                                 "records_affected": total
                             }
                         )
-                        match_summary = record.attempt_auto_match()
+                        match_summary = record.attempt_auto_match(update_record=True)
                         print(f"{record.source_text} -> {match_summary}")
 
     @staticmethod
@@ -106,16 +135,13 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
         words = [word.strip() for word in words]
         return set([word for word in words if word])
 
-    def attempt_auto_match(self) -> ConditionAliasAutoMatch:
+    def attempt_auto_match(self, update_record: bool = False) -> ConditionAliasAutoMatch:
         word_set = ConditionAlias._name_to_words(self.source_text)
         q_list: List[Q] = [Q(name__icontains=word) for word in word_set]
         mondos = list(MonarchDiseaseOntology.objects.filter(reduce(operator.and_, q_list)).order_by('name'))
-
-        possible_matches_count = len(mondos)
-
-        best_match: Optional[MonarchDiseaseOntology] = None
-        secondary_matches: List[MonarchDiseaseOntology] = list()
         gene_symbol = self.source_gene_symbol.lower() if self.source_gene_symbol else None
+
+        scored_matches: List[ConditionAliasScored] = list()
 
         mondo: MonarchDiseaseOntology
         for mondo in mondos:
@@ -126,27 +152,24 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
             for term in word_set:
                 if term in leftover_words:  # it should always be a term due to the query
                     leftover_words.remove(term)
-            if not leftover_words:
-                best_match = mondo
-            elif len(leftover_words) <= 2 and gene_symbol and defn and gene_symbol in defn:
-                secondary_matches.append(mondo)
 
-        use_match: Optional[MonarchDiseaseOntology]
-        if best_match:
-            use_match = best_match
-        elif len(secondary_matches) == 1:
-            use_match = secondary_matches[0]
+            scored_match: ConditionAliasScore
+            if len(leftover_words) <= 2 and gene_symbol and defn and gene_symbol in defn:
+                scored_match = ConditionAliasScored(term=mondo, score=ConditionAliasScore.ALL_TERMS_AND_GENE)
+            elif not leftover_words:
+                scored_match = ConditionAliasScored(term=mondo, score=ConditionAliasScore.ALL_TERMS)
+            else:
+                scored_match = ConditionAliasScored(term=mondo, score=ConditionAliasScore.POSSIBLE)
+            scored_matches.append(scored_match)
 
-        if best_match:
-            self.aliases = [best_match.id_str]
+        matches = ConditionAliasAutoMatch(matches=scored_matches)
+
+        if update_record and matches.winner:
+            self.aliases = [matches.winner.term.id_str]
             self.status = ConditionAliasStatus.RESOLVED_AUTO
             self.save()
 
-        return ConditionAliasAutoMatch(
-            contains_all_count=possible_matches_count,
-            best_match=best_match,
-            secondary_matches=secondary_matches
-        )
+        return matches
 
 
 @receiver(post_save, sender=ConditionAlias)

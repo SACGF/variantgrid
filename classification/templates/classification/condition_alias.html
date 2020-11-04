@@ -1,4 +1,5 @@
 {% extends "uicore/page/base.html" %}
+{% load user_tags %}
 {% load classification_tags %}
 {% load js_tags %}
 {% load ui_menu_bars %}
@@ -20,20 +21,10 @@
         .selectable-card .card-footer:hover {
             background-color: #eef;
         }
-        .simple-pill {
-            display: inline-block;
-            padding: 3px 8px 3px 8px;
-            border: 1px solid #ccc;
-            background-color: #eee;
-            margin-top: 2px;
-        }
-        .simple-pill:first-child {
-            border-top-left-radius: 12px;
-            border-bottom-left-radius: 12px;
-        }
-        .simple-pill:last-child {
-            border-top-right-radius: 12px;
-            border-bottom-right-radius: 12px;
+        .btn.active:before {
+            content: '\f00c';
+            font-family: 'FontAwesome';
+            margin-right: 8px;
         }
         .joiner {
             display: inline-block;
@@ -71,31 +62,6 @@
             form.submit();
         }
 
-        function updateSummary() {
-            let mmode = $(`[name="multiple-mode"]:checked`).val();
-            let keys = Object.keys(matches);
-            let summaryDom = $("#alias-summary");
-            summaryDom.empty();
-            if (keys.length == 0) {
-                $('<span>', {class:"simple-pill", text:"?"}).appendTo(summaryDom);
-            } else {
-                keys.sort();
-                let first = true;
-                for (let key of keys) {
-                    if (!first) {
-                        $('<span>', {class:'joiner', text:mmode}).appendTo(summaryDom);
-                    }
-
-                    let mondo_num = key.substring("MONDO:".length);
-                    let href = `https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${mondo_num}`
-                    $('<span>', {class:'simple-pill', html:
-                        $('<a>', {href:href, text:key, class:`hover-link external-link`, target:'_blank'})
-                    }).appendTo(summaryDom);
-                    first = false;
-                }
-            }
-        }
-
         function toggleMatch(result) {
             let adding = !matches[result.id];
             if (adding) {
@@ -108,7 +74,7 @@
 
             let keys = Object.keys(matches);
             if (keys.length == 0) {
-                $('<div/>', {class: 'no-value w-100 text-center', text: 'None Yet'}).appendTo(matchesDom);
+                $('<div/>', {class: 'no-value', text: 'None Yet'}).appendTo(matchesDom);
             } else {
                 keys.sort();
                 for (let key of keys) {
@@ -136,7 +102,6 @@
                 cards.removeClass('selected').addClass('possible');
                 icon.removeClass('fa-minus-circle').addClass('fa-plus-circle');
             }
-            updateSummary();
         }
 
         function makeCard(result) {
@@ -201,9 +166,6 @@
             $("#condition-search-button").click(() => {
                 searchConditions();
             });
-            $(`[name="multiple-mode"]`).click(() => {
-               updateSummary();
-            });
             $('#alias-save').click(() => submit(false));
             $('#alias-save-next').click(() => submit(true));
 
@@ -250,20 +212,38 @@
                         {% endif %}
                     </ul>
                 {% endlabelled %}
+                {% labelled label="Current Status" %}<span class="dt-status"><span class="val-{{condition_alias.status}}">{{ condition_alias.get_status_display }}</span></span>{% endlabelled %}
                 {% labelled label="Lab" %}{{ condition_alias.lab.name }}{% endlabelled %}
                 {% labelled label="Gene Symbol" %}{{ condition_alias.source_gene_symbol }}{% endlabelled %}
                 {% labelled label="Text" %}<b>{{ condition_alias.source_text }}</b>{% endlabelled %}
-                {% labelled label="Status" %}{{ condition_alias.get_status_display }}{% endlabelled %}
-                {% labelled label="Summary" %}
-                    <span>
-                    <span class="simple-pill">{{ condition_alias.lab.name }}</span>
-                    <span class="simple-pill">{{ condition_alias.source_gene_symbol }}</span>
-                    <span class="simple-pill">{{ condition_alias.source_text }}</span>
-                    </span>
-                    <i class="fas fa-arrow-right d-inline-block mx-4"></i>
-                    <span id="alias-summary">
-                        <span class="simple-pill">?</span>
-                    </span>
+                {% if condition_alias.updated_by %}
+                    {% labelled label="Last Updated by" %}
+                        {% user condition_alias.updated_by show_avatar=True %}
+                    {% endlabelled %}
+                {% endif %}
+                <hr/>
+                {% labelled label="Matches" %}
+                    {% comment %}<!-- need to provide support for unmatchable -->
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input class="form-check-input" type="checkbox" id="unmatchable">
+                            Unmatchable
+                        </label>
+                    </div>
+                    {% endcomment %}
+                    <div id="multiple-handling" class="collapse">
+                        <div class="btn-group btn-group-toggle my-3" data-toggle="buttons">
+                            <label class="btn btn-outline-secondary {% if condition_alias.join_mode != "A" %}active{% endif %}">
+                                <input type="radio" name="multiple-mode" id="multiple-mode-or" value="or" autocomplete="off" {% if condition_alias.join_mode != "A" %}checked{% endif %}> Uncertain (or)
+                            </label>
+                            <label class="btn btn-outline-secondary {% if condition_alias.join_mode == "A" %}active{% endif %}">
+                                <input type="radio" name="multiple-mode" id="multiple-mode-and" value="and" autocomplete="off" {% if condition_alias.join_mode == "A" %}checked{% endif %}> Co-occuring (and)
+                            </label>
+                        </div>
+                    </div>
+                    <div id="condition-alias-matches">
+                        <div class="no-value">None Yet</div>
+                    </div>
                 {% endlabelled %}
             </div>
             <div class="card-footer">
@@ -274,35 +254,15 @@
             </div>
         </div>
 
-        <div class="row mt-4">
-            <div class="col-6">
-                <h4 class="w-100 text-center my-4">Search Results for "<span id="search-result-for"></span>"</h4>
-                {% labelled label="Search MONDO Again Using" %}
-                    <div class="input-group">
-                        <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
-                        <span class="input-group-append"><button id="condition-search-button" class="btn btn-primary" name="action">Search</button></span>
-                    </div>
-                {% endlabelled %}
-                <div id="condition-search-results"></div>
-            </div>
-            <div class="col-6">
-                <h4 class="w-100 text-center my-4">Chosen Match(es)</h4>
-                <div id="multiple-handling" class="collapse">
-                    {% labelled label="Multiple chosen" %}
-                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                        <label class="btn btn-outline-secondary {% if condition_alias.join_mode != "A" %}active{% endif %}">
-                            <input type="radio" name="multiple-mode" id="multiple-mode-or" value="or" autocomplete="off" {% if condition_alias.join_mode != "A" %}checked{% endif %}> Uncertain (or)
-                        </label>
-                        <label class="btn btn-outline-secondary {% if condition_alias.join_mode == "A" %}active{% endif %}">
-                            <input type="radio" name="multiple-mode" id="multiple-mode-and" value="and" autocomplete="off" {% if condition_alias.join_mode == "A" %}checked{% endif %}> Co-occuring (and)
-                        </label>
-                    </div>
-                    {% endlabelled %}
+        <div class="mt-4">
+            {% labelled label="Search MONDO Again Using" %}
+                <div class="input-group">
+                    <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
+                    <span class="input-group-append"><button id="condition-search-button" class="btn btn-primary" name="action">Search</button></span>
                 </div>
-                <div id="condition-alias-matches">
-                    <div class="no-value w-100 text-center">None Yet</div>
-                </div>
-            </div>
+            {% endlabelled %}
+            <h4 class="w-100 text-center">Search Results for "<span id="search-result-for"></span>"</h4>
+            <div id="condition-search-results" class="mt-4"></div>
         </div>
     </div>
 {% endblock %}

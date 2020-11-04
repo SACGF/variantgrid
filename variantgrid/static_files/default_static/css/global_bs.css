@@ -479,4 +479,27 @@ table.as_table td {
   border-color: #99CD83;
 }
 
+.dt-status .val-R:before {
+  font-family: "FontAwesome";
+  margin-right: 4px;
+  content: "";
+  color: green;
+}
+.dt-status .val-P:before {
+  font-family: "FontAwesome";
+  margin-right: 4px;
+  content: "";
+}
+.dt-status .val-A:before {
+  font-family: "FontAwesome";
+  margin-right: 4px;
+  content: "";
+  color: #6a6;
+}
+.dt-status .val-U:before {
+  font-family: "FontAwesome";
+  margin-right: 4px;
+  content: "";
+}
+
 /*# sourceMappingURL=global_bs.css.map */
