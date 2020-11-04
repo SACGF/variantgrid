@@ -41,7 +41,7 @@ from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.create_resource_models import assign_old_sample_sheet_data_to_current_sample_sheet
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
 from snpdb.graphs import graphcache
-from snpdb.models import VCF, Sample
+from snpdb.models import VCF, Sample, UserSettings
 
 
 def sequencing_data(request):
@@ -418,8 +418,12 @@ def view_sample_qc_tab(request, sample_id):
 
 
 def view_enrichment_kit_gene_coverage(request, enrichment_kit_id, gene_symbol):
+    user_settings = UserSettings.get_for_user(request.user)
+    genome_build = user_settings.default_genome_build
+
     enrichment_kit = get_object_or_404(EnrichmentKit, pk=enrichment_kit_id)
     context = {"enrichment_kit": enrichment_kit,
+               "genome_build": genome_build,
                "gene_symbol": gene_symbol}
     return render(request, 'seqauto/view_enrichment_kit_gene_coverage.html', context)
 

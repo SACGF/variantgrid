@@ -44,6 +44,7 @@ def get_unannotated_count_min_max(annotation_version, min_variant_id, annotation
         too_few = results["count"] < annotation_batch_min
         might_be_more = max_variant_id < highest_pk(Variant)
         if too_few and might_be_more:
+            print(f"Range: {min_variant_id}-{max_variant_id}. only returned {results['count']}")
             print(f"Wanted: {annotation_batch_min}, got {results['count']} - doing slow query")
             # Do slow query
             qs = get_unannotated_variants_qs(annotation_version, min_variant_id=min_variant_id)
