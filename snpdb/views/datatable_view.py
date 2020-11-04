@@ -189,14 +189,23 @@ class DatatableConfig:
 
         return qs.order_by(*sort_by_list)
 
+    def pre_render(self, qs: QuerySet):
+        """
+        Last method called before we start rendering
+        qs: The QuerySet with all filtering, ordering applied
+        """
+        pass
 
 class DatatableMixin(object):
     """ JSON data for datatables """
     config: DatatableConfig
     max_display_length = 100
 
+    def config_for_request(self, request) -> DatatableConfig:
+        raise NotImplementedError("DatatableMixing must implement config_for_request")
+
     def get(self, request, *args, **kwargs):
-        self.config = self.config(request)
+        self.config = self.config_for_request(request)
         return super().get(request, *args, **kwargs)
 
     @property
@@ -256,6 +265,8 @@ class DatatableMixin(object):
         return self.config.filter_queryset(qs)
 
     def prepare_results(self, qs: QuerySet):
+        self.config.pre_render(qs)
+
         data = []
         # select out all columns but only send down data for enabled columns
         all_columns = self.config.value_columns()

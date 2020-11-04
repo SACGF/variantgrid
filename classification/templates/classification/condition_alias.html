@@ -11,20 +11,21 @@
         .selectable-card.selected .card-body {
             background-color: #efe;
         }
-        .selectable-card:hover .fa-plus-circle {
+        .selectable-card .card-footer:hover .fa-plus-circle {
             color: blue !important;
         }
-        .selectable-card:hover .fa-minus-circle {
+        .selectable-card .card-footer:hover .fa-minus-circle {
             color: red !important;
         }
-        .selectable-card:hover {
-            box-shadow: 0 0 3px #ccf;
+        .selectable-card .card-footer:hover {
+            background-color: #eef;
         }
         .simple-pill {
             display: inline-block;
-            padding: 2px 6px 2px 6px;
-            border: 2px solid #ccc;
+            padding: 3px 8px 3px 8px;
+            border: 1px solid #ccc;
             background-color: #eee;
+            margin-top: 2px;
         }
         .simple-pill:first-child {
             border-top-left-radius: 12px;
@@ -38,6 +39,20 @@
             display: inline-block;
             text-align: center;
             width: 3rem;
+        }
+        .fa-minus-circle:after {
+            font-family: 'Raleway',serif;
+            content: 'Remove';
+            margin-left: 6px;
+            font-weight: 500;
+            color: #844;
+        }
+        .fa-plus-circle:after {
+            font-family: 'Raleway',serif;
+            content: 'Add';
+            margin-left: 6px;
+            font-weight: 500;
+            color: #448;
         }
     </style>
     <script>
@@ -70,7 +85,12 @@
                     if (!first) {
                         $('<span>', {class:'joiner', text:mmode}).appendTo(summaryDom);
                     }
-                    $('<span>', {class:'simple-pill', text:key}).appendTo(summaryDom);
+
+                    let mondo_num = key.substring("MONDO:".length);
+                    let href = `https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${mondo_num}`
+                    $('<span>', {class:'simple-pill', html:
+                        $('<a>', {href:href, text:key, class:`hover-link external-link`, target:'_blank'})
+                    }).appendTo(summaryDom);
                     first = false;
                 }
             }
@@ -124,14 +144,16 @@
             let icon = adding ? "minus" : "plus";
             let mode = adding ? "selected" : "possible";
             let htmlWrapper = $(`
-                <div class="card selectable-card ${mode} w-100 mb-2" style="cursor:pointer" data-mondo="${result.id}">
-                    <div class="card-header"><i class="toggle-icon fas fa-${icon}-circle"></i> ${result.id}</div>
+                <div class="card selectable-card ${mode} w-100 mb-2" data-mondo="${result.id}">
+                    <div class="card-header"><a href="${result.url}" class="external-link" target="_blank">${result.id}</a></div>
                     <div class="card-body">${result.highlight || result.label}</div>
+                    <div class="card-footer" style="cursor:pointer"><i class="toggle-icon fas fa-${icon}-circle"></i></div>
                 </div>
             `);
             let cardBody = htmlWrapper.find('.card-body');
+            let cardFooter = htmlWrapper.find('.card-footer');
             cardBody.append($('<div>', {class:"text-secondary", text:result.definition || "This MONDO term has not been loaded locally"}));
-            htmlWrapper.click(() => {
+            cardFooter.click(() => {
                 toggleMatch(result);
             });
             return htmlWrapper;
@@ -224,7 +246,16 @@
         <div class="card">
             <div class="card-header">Condition Alias ({{ condition_alias.id }})</div>
             <div class="card-body">
-                {% labelled label="Classification Records Affected" %}{{ condition_alias.records_affected }}{% endlabelled %}
+                {% labelled label="Classification Records Affected" %}
+                    <ul class="list-group">
+                        {% for csm in classification_subset %}
+                            <a class="list-group-item list-group-item-action" target="_blank" href="{% url 'view_classification' csm.classification_id %}">{{ csm.classification.friendly_label }}</a>
+                        {% endfor %}
+                        {% if extra_count %}
+                        <li class="list-group-item">And <b>{{ extra_count }}</b> more</li>
+                        {% endif %}
+                    </ul>
+                {% endlabelled %}
                 {% labelled label="Lab" %}{{ condition_alias.lab.name }}{% endlabelled %}
                 {% labelled label="Gene Symbol" %}{{ condition_alias.source_gene_symbol }}{% endlabelled %}
                 {% labelled label="Text" %}<b>{{ condition_alias.source_text }}</b>{% endlabelled %}
@@ -269,7 +300,7 @@
                             <input type="radio" name="multiple-mode" id="multiple-mode-or" value="or" autocomplete="off" {% if condition_alias.join_mode != "A" %}checked{% endif %}> Uncertain (or)
                         </label>
                         <label class="btn btn-outline-secondary {% if condition_alias.join_mode == "A" %}active{% endif %}">
-                            <input type="radio" name="multiple-mode" id="multiple-mode-and" value="and" autocomplete="off" {% if condition_alias.join_mode == "A" %}checked{% endif %}> Combined (and)
+                            <input type="radio" name="multiple-mode" id="multiple-mode-and" value="and" autocomplete="off" {% if condition_alias.join_mode == "A" %}checked{% endif %}> Co-occuring (and)
                         </label>
                     </div>
                     {% endlabelled %}

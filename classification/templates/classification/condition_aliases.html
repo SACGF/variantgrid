@@ -26,9 +26,11 @@
                         dom.append(` ${join_mode} `);
                     }
                     first = false;
-                    mondo_num = mondo.substring("MONDO:".length);
+                    let mondo_id = mondo.id;
+                    let mondo_name = mondo.name || "?";
+                    let mondo_num = mondo_id.substring("MONDO:".length);
                     let href = `https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${mondo_num}`
-                    let aDom = $('<a>', {class: 'hover-link external-link', target:'_blank', text: mondo, href: href});
+                    let aDom = $('<a>', {class: 'hover-link external-link', target:'_blank', text: mondo_id, href: href, title:mondo_name, 'data-toggle':'tooltip'});
                     dom.append(aDom);
                 }
                 return dom.prop('outerHTML');

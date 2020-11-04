@@ -351,5 +351,5 @@ class ClassificationDatatableConfig(DatatableConfig):
 
 class ClassificationModificationDatatableView(BaseDatatableView):
 
-    def config(self, request):
+    def config_for_request(self, request):
         return ClassificationDatatableConfig(request)

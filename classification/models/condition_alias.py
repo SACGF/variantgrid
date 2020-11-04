@@ -4,14 +4,16 @@ from functools import reduce
 from typing import List, Set, Optional
 
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Q, QuerySet
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django_extensions.db.models import TimeStampedModel
 from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm
+from lazy import lazy
 
 from annotation.models import MonarchDiseaseOntology
+from classification.models import ClassificationModification
 from classification.regexes import db_ref_regexes
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from snpdb.models import Lab
@@ -60,6 +62,14 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
             alias_text = f" {self.get_join_mode_display().lower()} ".join(self.aliases)
         return f"{self.lab.name} | {self.source_gene_symbol} | {self.source_text} -> {alias_text}"
 
+    @lazy
+    def classification_modifications(self) -> QuerySet:
+        qs = ClassificationModification.objects.filter(is_last_published=True)\
+                .filter(published_evidence__condition__value=self.source_text)\
+                .filter(published_evidence__gene_symbol__value=self.source_gene_symbol)\
+                .filter(classification__lab=self.lab)
+        return qs
+
     @staticmethod
     def sync_aliases():
         from classification.models import ClassificationModification
@@ -91,7 +101,7 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
 
     @staticmethod
     def _name_to_words(name: str) -> Set[str]:
-        cleaned = name.replace(",", " ").lower()
+        cleaned = name.replace(",", " ").replace("-", " ").lower()
         words = cleaned.split(" ")
         words = [word.strip() for word in words]
         return set([word for word in words if word])

@@ -1,9 +1,10 @@
 import urllib
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Set
 
 import requests
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.db.models import QuerySet
 from django.shortcuts import render, redirect
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
@@ -13,7 +14,7 @@ import re
 from rest_framework.views import APIView
 
 from annotation.models import MonarchDiseaseOntology
-from classification.models import ConditionAlias, ConditionAliasJoin, ConditionAliasStatus
+from classification.models import ConditionAlias, ConditionAliasJoin, ConditionAliasStatus, Classification
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, BaseDatatableView
 
 
@@ -22,14 +23,39 @@ ID_EXTRACT_MINI_P = re.compile(r"MONDO:([0-9]+)$")
 
 class ConditionAliasColumns(DatatableConfig):
 
+    def pre_render(self, qs: QuerySet):
+        all_aliases: Set[int] = set()
+        for aliases in qs.values_list('aliases', flat=True):
+            if aliases:
+                for alias in aliases:
+                    try:
+                        all_aliases.add(MonarchDiseaseOntology.mondo_id_as_int(alias))
+                    except:
+                        pass
+        mondo: MonarchDiseaseOntology
+        for mondo in MonarchDiseaseOntology.objects.filter(pk__in=all_aliases):
+            self.mondo_dict[mondo.id_str] = mondo
+
     def render_aliases(self, row: Dict[str, Any]):
+        populated_aliases = []
+        if db_aliases := row.get('aliases'):
+            for alias in db_aliases:
+                pop_alias = {"id": alias}
+                populated_aliases.append(pop_alias)
+
+                mondo: MonarchDiseaseOntology
+                if mondo := self.mondo_dict.get(alias):
+                    pop_alias["name"] = mondo.name
+
         return {
-            'aliases': row.get('aliases'),
+            'aliases': populated_aliases,
             'join_mode': row.get('join_mode')
         }
 
     def __init__(self, request):
         super().__init__(request)
+
+        self.mondo_dict: Dict[str, MonarchDiseaseOntology] = dict()
 
         self.rich_columns = [
             RichColumn('id', name='ID', client_renderer='renderId', orderable=True),
@@ -48,7 +74,7 @@ class ConditionAliasColumns(DatatableConfig):
 
 class ConditionAliasDatatableView(BaseDatatableView):
 
-    def config(self, request):
+    def config_for_request(self, request):
         return ConditionAliasColumns(request)
 
 
@@ -65,11 +91,14 @@ def _populateMondoResult(result) -> Dict:
     mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
     mondo_record: Optional[MonarchDiseaseOntology]
     if mondo_record := MonarchDiseaseOntology.objects.filter(pk=mondo_int).first():
-        result['definition'] = mondo_record.definition
+        result['definition'] = mondo_record.definition or 'No description provided'
         if 'label' not in result:
             result['label'] = mondo_record.name
     else:
         result['definition'] = None
+
+    url_part = result["id"].replace(":","_")
+    result['url'] = f'https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{url_part}'
 
     return result
 
@@ -78,6 +107,7 @@ def _next_condition_alias(user: User, condition_alias: ConditionAlias) -> Option
     pending = ConditionAlias.objects.order_by('-records_affected').order_by('id').filter(status=ConditionAliasStatus.PENDING)
     pending = ConditionAlias.filter_for_user(user, pending)
     return pending.first()
+
 
 def condition_alias_view(request, pk: int):
     user: User = request.user
@@ -116,9 +146,12 @@ def condition_alias_view(request, pk: int):
 
         return redirect("condition_alias", pk=pk)
 
+
     matches_ids = (condition_alias.aliases or [])
     matches = [_populateMondoResult(m_id) for m_id in matches_ids if m_id]
     return render(request, 'classification/condition_alias.html', context={
+        'classification_subset': condition_alias.classification_modifications[0:4],
+        'extra_count': max(condition_alias.classification_modifications.count() - 4, 0),
         'condition_alias': condition_alias,
         'matches': matches
     })
