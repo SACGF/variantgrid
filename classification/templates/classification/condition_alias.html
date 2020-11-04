@@ -220,13 +220,7 @@
         <a href="{% url 'condition_aliases' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all aliases</a>
         {% page_help_embedded title='Condition Alias' %}
             <p>
-            This page exists because there was one or more classifications with the given lab, gene symbol and condition text combination
-            and the condition text did not include an ontology ID e.g. MONDO:0018151.
-            </p>
-            <p>
-            For uploading records to ClinVar an ontology ID must be provided. By searching through MONDO and associating this lab, gene symbol, condition text
-            combination to MONDO ids, we will be one step closer to uploading the records to ClinVar.<br/>
-            Note that future records that also share that combination will automatically be assigned this alias.
+            Use this page to assign MONDO term(s) to a combination of the source lab, gene symbol and condition text.
             </p>
             <p>
             Note that the gene symbol is automatically included in searches as many diseases have multiple versions distinguished between which gene is the cause.

@@ -511,7 +511,7 @@ TableFormat.timestamp = (data, type, row) => {
     }
 };
 TableFormat.choices = (choices, data, type, row) => {
-    return choices[data] || data;
+    return $('<span>', {class:`val-${data}`, text:choices[data] || data}).prop('outerHTML');
 };
 TableFormat.flags = (data, type, row) => {
     if (data) {
