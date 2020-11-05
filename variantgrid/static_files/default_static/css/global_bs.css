@@ -487,6 +487,7 @@ table.as_table td {
 }
 .dt-status .val-P:before {
   font-family: "FontAwesome";
+  color: #bbb;
   margin-right: 4px;
   content: "";
 }

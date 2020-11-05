@@ -87,6 +87,8 @@ class ConditionAlias(TimeStampedModel, GuardianPermissionsMixin):
 
     def __str__(self):
         alias_text = "?"
+        if self.status == ConditionAliasStatus.UNMATCHABLE:
+            alias_text = "UNMATCHABLE"
         if self.aliases:
             alias_text = f" {self.get_join_mode_display().lower()} ".join(self.aliases)
         return f"{self.lab.name} | {self.source_gene_symbol} | {self.source_text} -> {alias_text}"

@@ -131,7 +131,10 @@ def condition_alias_view(request, pk: int):
         if aliases:
             condition_alias.status = ConditionAliasStatus.RESOLVED
         else:
-            condition_alias.status = ConditionAliasStatus.PENDING
+            if request.POST.get('unmatchable'):
+                condition_alias.status = ConditionAliasStatus.UNMATCHABLE
+            else:
+                condition_alias.status = ConditionAliasStatus.PENDING
 
         condition_alias.save()
 
