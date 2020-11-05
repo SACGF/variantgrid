@@ -36,7 +36,6 @@ class GraphBase(metaclass=abc.ABCMeta):
 
     def figure(self, figure):
         """ a hook method if you want to do something about the figure """
-        pass
 
     def plot_figure(self, figure):
         ax = figure.add_subplot(1, 1, 1)

@@ -31,7 +31,7 @@ from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
 from genes.models import GeneListCategory, HGNCGeneNames, GeneAnnotationImport, \
-    GeneVersion, TranscriptVersion, PfamDomains, GeneSymbolAlias
+    GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts

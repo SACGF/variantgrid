@@ -45,7 +45,7 @@ class UploadPipelineModifiedVariantsGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'variant_string',
                                   'sortorder': 'asc'})
 
-    def get_colmodels(self, *args, **kwargs):
+    def get_colmodels(self, remove_server_side_only=False):
         before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant', 'formatter': 'formatVariantString'}]
-        colmodels = super().get_colmodels(*args, **kwargs)
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         return before_colmodels + colmodels

@@ -31,7 +31,7 @@ urlpatterns = [
     perm_path('wiki/grid/<slug:op>/', JQGridView.as_view(grid=VariantWikiGrid, csv_download=True),
               name='variantopedia_wiki_grid'),
     perm_path('nearby/grid/<variant_id>/<region_type>/<slug:op>/',
-              JQGridView.as_view(grid=NearbyVariantsGrid,csv_download=True),
+              JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),
               name='nearby_variants_grid'),
     perm_path('all_variants/grid/<slug:op>/', JQGridView.as_view(grid=AllVariantsGrid, csv_download=True),
               name='all_variants_grid'),

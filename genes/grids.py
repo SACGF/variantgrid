@@ -58,8 +58,8 @@ class GeneListsGrid(JqGridUserRowConfig):
 
         self.queryset = queryset.values(*self.get_field_names())
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         if self.show_category:
             for cm in colmodels:
                 if cm['index'] == 'category__name':
@@ -94,8 +94,8 @@ class GeneListGenesGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'original_name',
                                   'sortorder': 'desc'})
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=False)
         for field_name, label in self.annotation_field_labels.items():
             cm = {'index': field_name, 'name': field_name, 'label': label}
             colmodels.append(cm)
@@ -256,10 +256,10 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def get_coverage_queryset(self, gene_coverage_collection, genes):
+    def get_coverage_queryset(self, gene_coverage_collection, gene_list):
         queryset = self.model.objects.filter(gene_coverage_collection=gene_coverage_collection)
-        if genes:
-            queryset = queryset.filter(gene__in=genes)
+        if gene_list:
+            queryset = queryset.filter(gene__in=gene_list)
 
         return queryset
 

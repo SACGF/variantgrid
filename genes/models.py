@@ -235,25 +235,19 @@ class GeneSymbolAliasesMeta:
 
     @lazy
     def alias_symbol_strs(self) -> List[str]:
-        gene_symbol_strs: Set[str] = set([self.gene_symbol.symbol])
+        gene_symbol_strs: Set[str] = {self.gene_symbol.symbol}
         for alias_summary in self.alias_list:
             if not alias_summary.different_genes:
                 gene_symbol_strs.add(alias_summary.other_symbol)
-        sorted = list(gene_symbol_strs)
-        sorted.sort()
-        return sorted
+        return list(sorted(gene_symbol_strs))
 
     @lazy
     def aliases_out(self) -> List[GeneSymbolAliasSummary]:
-        aliases_out = [alias for alias in self.alias_list if not alias.my_symbol_is_main]
-        aliases_out.sort()
-        return aliases_out
+        return list(sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main]))
 
     @lazy
     def aliases_in(self) -> List[GeneSymbolAliasSummary]:
-        aliases_in = [alias for alias in self.alias_list if alias.my_symbol_is_main]
-        aliases_in.sort()
-        return aliases_in
+        return list(sorted([alias for alias in self.alias_list if alias.my_symbol_is_main]))
 
 
 class GeneAnnotationImport(TimeStampedModel):
@@ -835,7 +829,7 @@ class GeneListCategory(models.Model):
 
 
 class GeneList(models.Model):
-    """  Stores a gene/transcript list (to be used as a filter) """
+    """ Stores a gene/transcript list (to be used as a filter) """
 
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
     name = models.TextField()

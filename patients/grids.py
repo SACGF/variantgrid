@@ -61,8 +61,8 @@ class PatientListGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'modified',
                                   'sortorder': 'desc'})
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         EXTRA_COLUMNS = [
             {'index': 'reference_id', 'name': 'reference_id', 'label': 'Specimen ReferenceIDs'},
             {'index': 'phenotype_matches', 'name': 'phenotype_matches', 'label': 'Phenotype Matches', 'classes': 'no-word-wrap', 'formatter': 'phenotypeFormatter'},

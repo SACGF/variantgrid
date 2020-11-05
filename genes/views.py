@@ -526,7 +526,7 @@ class HotspotGraphView(TemplateView):
         genome_build_name = self.kwargs["genome_build_name"]
         return GenomeBuild.get_name_or_alias(genome_build_name)
 
-    @property
+    @lazy
     def transcript(self):
         transcript_id = self.kwargs.get("transcript_id")
         gene_id = self.kwargs.get("gene_id")
