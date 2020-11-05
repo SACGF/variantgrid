@@ -74,15 +74,11 @@
             matchesDom.empty();
 
             let keys = Object.keys(matches);
-            if (keys.length == 0) {
-                $('<div/>', {class: 'no-value', text: 'No matches selected yet, review the search results below'}).appendTo(matchesDom);
-            } else {
-                keys.sort();
-                for (let key of keys) {
-                    let card = makeCard(matches[key]).appendTo(matchesDom);
-                    if (key === result.id) {
-                        card.collapse('show');
-                    }
+            keys.sort();
+            for (let key of keys) {
+                let card = makeCard(matches[key]).appendTo(matchesDom);
+                if (key === result.id) {
+                    card.collapse('show');
                 }
             }
 
@@ -249,6 +245,10 @@
                                     Tick if Unmatchable
                                 </label>
                             </div>
+                            <div class="no-value">
+                                No matches selected yet, review the search results below.<br/>
+                                If the source text can't be reliably matched to MONDO terms, mark it as unmatchable.
+                            </div>
                         </div>
                         <div id="multiple-handling" class="collapse">
                             <div class="btn-group btn-group-toggle my-3" data-toggle="buttons">
@@ -261,7 +261,7 @@
                             </div>
                         </div>
                         <div id="condition-alias-matches">
-                            <div class="no-value">No matches selected yet, review the search results below</div>
+
                         </div>
                     {% endlabelled %}
                 </div>
