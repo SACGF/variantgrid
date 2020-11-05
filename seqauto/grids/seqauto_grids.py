@@ -125,12 +125,12 @@ class EnrichmentKitGeneCoverageGrid(JqGridUserRowConfig):
                           'percent_20x': number_format,
                           'sensitivity': number_format}
 
-    def __init__(self, user, enrichment_kit_id, gene_symbol, extra_filters=None):
+    def __init__(self, user, enrichment_kit_id, genome_build, gene_symbol, extra_filters=None):
         super().__init__(user)
         enrichment_kit = get_object_or_404(EnrichmentKit, pk=enrichment_kit_id)
         if extra_filters is None:
             extra_filters = {}
-        queryset = GeneCoverageCanonicalTranscript.filter_for_kit_and_gene_symbol(enrichment_kit, gene_symbol)
+        queryset = GeneCoverageCanonicalTranscript.filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol)
         if extra_filters.get("gold_only"):
             queryset = queryset.filter(**{self.GOLD_PATH: True})
 

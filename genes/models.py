@@ -1273,12 +1273,12 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, on_delete=SET_NULL)
 
     @staticmethod
-    def filter_for_kit_and_gene_symbol(enrichment_kit, gene_symbol):
+    def filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol):
         sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
         kwargs = {sequencing_sample + "__enrichment_kit": enrichment_kit,
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}
-        return GeneCoverageCanonicalTranscript.get_for_symbol(gene_symbol).filter(**kwargs)
+        return GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).filter(**kwargs)
 
 
 class GnomADGeneConstraint(models.Model):
