@@ -22,7 +22,6 @@ class QCColumnBoxPlotGraph(CacheableGraph):
         else:
             self.enrichment_kit = None
         self.percent = bool(percent)
-        #self.dpi = 100
 
         logging.info("QC_column: %s", self.qc_column)
         logging.info("EnrichmentKit Sep: %s", self.enrichment_kit_separation)

@@ -841,8 +841,7 @@ class BamFile(SeqAutoFile, SequencingSamplePropertiesMixin):
     @staticmethod
     def get_aligner_from_bam_file(bam_path):
         # TODO: Do properly
-        (aligner, _) = Aligner.objects.get_or_create(name='fake_aligner',
-                                                     version='0.666')
+        aligner, _ = Aligner.objects.get_or_create(name='fake_aligner', version='0.666')
         return aligner
 
     def __str__(self):

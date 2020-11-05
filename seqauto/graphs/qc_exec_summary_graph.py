@@ -30,7 +30,6 @@ class QCExecSummaryGraph(CacheableGraph):
         self.bp_color = QCExecSummaryGraph.BOXPLOT_COLORS.get(self.qc_compare_type, QCExecSummaryGraph.DEFAULT_BOXPLOT_COLOR)
         qc_types_dict = dict(QCCompareType.CHOICES)
         self.type_name = qc_types_dict[qc_compare_type]
-        self.dpi = 100
 
     def get_params_hash(self):
         """ This uses get_values_list rather than just hashing params as the underlying DB may have changed """
