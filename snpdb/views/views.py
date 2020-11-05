@@ -752,11 +752,14 @@ def tag_settings(request):
         valid = form.is_valid()
         if valid:
             tag_name = form.cleaned_data['tag']
+            name = f"Tag {tag_name}"
             try:
                 Tag.objects.create(pk=tag_name)
             except:
                 valid = False
-        add_save_message(request, valid, f"Tag {tag_name}", created=True)
+        else:
+            name = "Tag"
+        add_save_message(request, valid, name, created=True)
 
     user_tag_styles, user_tag_colors = UserTagColors.get_tag_styles_and_colors(request.user)
     context_dict = {'form': form,
