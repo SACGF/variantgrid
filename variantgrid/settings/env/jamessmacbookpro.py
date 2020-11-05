@@ -278,11 +278,12 @@ URLS_NAME_REGISTER.update({ # Disable selected snpdb urls
 })
 """
 URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
-     "classification_dashboard": True,
-     "hgvs_issues": True,
-     "classification_import_tool": True,
-     "keycloak_admin": True,
-    "classification_import_upload": True
+    "classification_dashboard": True,
+    "hgvs_issues": True,
+    "classification_import_tool": True,
+    "keycloak_admin": True,
+    "classification_import_upload": True,
+    "condition_aliases": True
 })
 
 # mimic shariant

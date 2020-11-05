@@ -690,7 +690,8 @@ _URLS_NAME_REGISTER_DEFAULT = True
 # Keys are url names (eg 'view_sample' or 'node_edit')
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
-    "classification_import_tool": False
+    "classification_import_tool": False,
+    "condition_aliases": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 
