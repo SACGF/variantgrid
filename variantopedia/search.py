@@ -424,7 +424,7 @@ def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbo
     # itertools.chain doesn't work
     # only return a GeneSymbol alias if we're not returning the source GeneSymbol
     gene_symbols = list(GeneSymbol.objects.filter(symbol__iexact=search_string).exclude(symbol__endswith=gene_symbol_withdrawn_str))
-    gene_symbol_strs = set([gene_symbol.symbol for gene_symbol in gene_symbols])
+    gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
     aliases = [alias for alias in GeneSymbolAlias.objects.filter(alias__iexact=search_string).all() if alias.alias not in gene_symbol_strs]
     return gene_symbols + aliases
 

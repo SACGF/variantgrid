@@ -15,7 +15,6 @@ class GraphBase(metaclass=abc.ABCMeta):
         self.legend = kwargs.get('legend')
         self.plot_methods = [self.plot]
         self.figsize = None
-        self.dpi = None
 
     def decorations(self, ax):
         if self.title:
@@ -37,7 +36,6 @@ class GraphBase(metaclass=abc.ABCMeta):
 
     def figure(self, figure):
         """ a hook method if you want to do something about the figure """
-        pass
 
     def plot_figure(self, figure):
         ax = figure.add_subplot(1, 1, 1)
@@ -47,11 +45,10 @@ class GraphBase(metaclass=abc.ABCMeta):
             plot(ax)  # Implementation
         self.post_plot(ax)
 
-    def save(self, filename_or_obj, figsize=None, dpi=None):
+    def save(self, filename_or_obj, figsize=None):
         figsize = figsize or self.figsize
-        dpi = dpi or self.dpi
 
-        figure = Figure(figsize=figsize, dpi=dpi)
+        figure = Figure(figsize=figsize)
         figure.patch.set_facecolor('white')
 
         self.plot_figure(figure)

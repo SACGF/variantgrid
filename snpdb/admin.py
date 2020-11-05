@@ -31,7 +31,7 @@ class AdminExportCsvMixin:
     def _get_readonly_fields(self, request, obj=None):
         readonly = []
         for f in self.model._meta.fields:
-            if isinstance(f, AutoField) or isinstance(f, ForeignKey):
+            if isinstance(f, (AutoField, ForeignKey)):
                 readonly.append(f.name)
         return readonly
 
@@ -39,7 +39,7 @@ class AdminExportCsvMixin:
         readonly = []
         mutable = []
         for f in self.model._meta.fields:
-            if isinstance(f, AutoField) or isinstance(f, ForeignKey):
+            if isinstance(f, (AutoField, ForeignKey)):
                 readonly.append(f.name)
             else:
                 mutable.append(f.name)

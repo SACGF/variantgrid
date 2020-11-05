@@ -115,8 +115,7 @@ class GitSubMigration(SubMigration):
         if completed_process.returncode != 0:
             return MigrationResult(status=MigrationStatus.FAILURE,
                                    note=f"Subprocess failed with error code {completed_process.returncode}")
-        else:
-            return MigrationResult(status=MigrationStatus.SUCCESS)
+        return MigrationResult(status=MigrationStatus.SUCCESS)
 
 
 class CommandSubMigration(SubMigration):

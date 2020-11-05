@@ -47,13 +47,14 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
                 for feature in BedFileReader(f):
                     yield feature.iv
         else:
-            return self.genomicinterval_set.all()
+            for gi in self.genomicinterval_set.all():
+                yield gi
 
-    def delete(self, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         if self.processed_file and os.path.exists(self.processed_file):
             logging.debug("Deleting '%s'", self.processed_file)
             os.remove(self.processed_file)
-        super().delete(**kwargs)
+        super().delete(using=using, keep_parents=keep_parents)
 
     def __str__(self):
         return self.name

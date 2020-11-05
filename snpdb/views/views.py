@@ -235,9 +235,9 @@ def view_vcf(request, vcf_id):
         retry_upload_pipeline(vcf.uploadedvcf.uploaded_file.uploadpipeline)
         vcf_form = forms.VCFForm(post, instance=vcf)  # Reload as import status has changed
         messages.add_message(request, messages.INFO, "Reloading VCF")
-    elif requires_user_input:
-        msg = "Unable to automatically set build, please select manually."
-        messages.add_message(request, messages.WARNING, msg, extra_tags='import-message')
+
+    for warning, _ in vcf.get_warnings():
+        messages.add_message(request, messages.WARNING, warning, extra_tags='import-message')
 
     context = {'vcf': vcf,
                'sample_stats_count': sample_stats_count,
@@ -752,11 +752,14 @@ def tag_settings(request):
         valid = form.is_valid()
         if valid:
             tag_name = form.cleaned_data['tag']
+            name = f"Tag {tag_name}"
             try:
                 Tag.objects.create(pk=tag_name)
             except:
                 valid = False
-        add_save_message(request, valid, f"Tag {tag_name}", created=True)
+        else:
+            name = "Tag"
+        add_save_message(request, valid, name, created=True)
 
     user_tag_styles, user_tag_colors = UserTagColors.get_tag_styles_and_colors(request.user)
     context_dict = {'form': form,
