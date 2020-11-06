@@ -105,8 +105,8 @@ def _populateMondoResult(result, gene_symbol) -> Dict:
 
     else:
         result['definition'] = None
-        url_part = result["id"].replace(":", "_")
 
+    url_part = result["id"].replace(":", "_")
     result['url'] = f'https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{url_part}'
 
     return result
