@@ -48,6 +48,7 @@
     </style>
     <script>
         matches = {};
+        gene_symbol = "{{ condition_alias.source_gene_symbol }}";
 
         function submit(next) {
             let keys = Object.keys(matches);
@@ -118,6 +119,7 @@
             let adding = !!matches[result.id];
             let icon = adding ? "minus" : "plus";
             let mode = adding ? "selected" : "possible";
+
             let htmlWrapper = $(`
                 <div class="card selectable-card ${mode} w-100 mb-2" data-mondo="${result.id}">
                     <div class="card-header"><a href="${result.url}" class="external-link" target="_blank">${result.id}</a></div>
@@ -127,6 +129,9 @@
             `);
             let cardBody = htmlWrapper.find('.card-body');
             let cardFooter = htmlWrapper.find('.card-footer');
+            if (result.relationship) {
+                cardBody.append($('<div>', {text:`${result.relationship} ${gene_symbol}`})).appendTo(cardBody);
+            }
             cardBody.append($('<div>', {class:"text-secondary", text:result.definition || "This MONDO term has not been loaded locally"}));
             cardFooter.click(() => {
                 toggleMatch(result);
@@ -146,7 +151,8 @@
                     'Content-Type': 'application/json'
                 },
                 data: {
-                    "search_term": text
+                    "search_term": text,
+                    "gene_symbol": gene_symbol
                 },
                 url: url,
                 type: 'GET',
@@ -186,6 +192,13 @@
             for (let match of matches) {
                 toggleMatch(match);
             }
+
+            let geneMatchesDom = $("#gene-search-results")
+            let geneMatches = {{ gene_matches | jsonify }};
+            for (let geneMatch of geneMatches) {
+                makeCard(geneMatch).appendTo(geneMatchesDom);
+            }
+
             updateResultCount();
             searchConditions();
         });
@@ -275,14 +288,22 @@
         </form>
 
         <div class="mt-4">
-            {% labelled label="Search MONDO Again Using" %}
-                <div class="input-group">
-                    <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
-                    <span class="input-group-append"><button id="condition-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
+            <div class="row">
+                <div class="col-6">
+                    <h4 class="w-100 text-center">Search Results for "<span id="search-result-for"></span>"</h4>
+                    {% labelled label="Search MONDO Again Using" %}
+                        <div class="input-group">
+                            <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
+                            <span class="input-group-append"><button id="condition-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
+                        </div>
+                    {% endlabelled %}
+                    <div id="condition-search-results" class="mt-4"></div>
                 </div>
-            {% endlabelled %}
-            <h4 class="w-100 text-center">Search Results for "<span id="search-result-for"></span>"</h4>
-            <div id="condition-search-results" class="mt-4"></div>
+                <div class="col-6">
+                    <h4 class="w-100 text-center">Related to Gene</h4>
+                    <div id="gene-search-results" class="mt-4"></div>
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}

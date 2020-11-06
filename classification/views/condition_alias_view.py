@@ -13,7 +13,7 @@ import re
 
 from rest_framework.views import APIView
 
-from annotation.models import MonarchDiseaseOntology
+from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship
 from classification.models import ConditionAlias, ConditionAliasJoin, ConditionAliasStatus, Classification
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, BaseDatatableView
 
@@ -84,20 +84,29 @@ def condition_aliases_view(request):
     })
 
 
-def _populateMondoResult(result) -> Dict:
-    if isinstance(result, str):
+def _populateMondoResult(result, gene_symbol) -> Dict:
+    if not isinstance(result, dict):
         result = {"id": result}
 
     mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
     mondo_record: Optional[MonarchDiseaseOntology]
+
+    url_part: str
     if mondo_record := MonarchDiseaseOntology.objects.filter(pk=mondo_int).first():
         result['definition'] = mondo_record.definition or 'No description provided'
         if 'label' not in result:
             result['label'] = mondo_record.name
+        url_part = mondo_record.id_str
+        result['id'] = mondo_record.id_str
+
+        relationship: MonarchDiseaseOntologyGeneRelationship
+        if relationship := MonarchDiseaseOntologyGeneRelationship.objects.filter(mondo_id=mondo_int, gene_symbol=gene_symbol).first():
+            result['relationship'] = relationship.relationship
+
     else:
         result['definition'] = None
+        url_part = result["id"].replace(":", "_")
 
-    url_part = result["id"].replace(":","_")
     result['url'] = f'https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{url_part}'
 
     return result
@@ -149,13 +158,21 @@ def condition_alias_view(request, pk: int):
 
         return redirect("condition_alias", pk=pk)
 
+    gene_matches = []
+    gene_relationships = MonarchDiseaseOntologyGeneRelationship.objects.filter(gene_symbol=condition_alias.source_gene_symbol)
+    mdgr: MonarchDiseaseOntologyGeneRelationship
+    for mdgr in gene_relationships:
+        gene_match = _populateMondoResult(mdgr.mondo_id, gene_symbol=condition_alias.source_gene_symbol)
+        gene_matches.append(gene_match)
+
     matches_ids = (condition_alias.aliases or [])
-    matches = [_populateMondoResult(m_id) for m_id in matches_ids if m_id]
+    matches = [_populateMondoResult(m_id, gene_symbol=condition_alias.source_gene_symbol) for m_id in matches_ids if m_id]
     return render(request, 'classification/condition_alias.html', context={
         'classification_subset': condition_alias.classification_modifications[0:4],
         'extra_count': max(condition_alias.classification_modifications.count() - 4, 0),
         'condition_alias': condition_alias,
-        'matches': matches
+        'matches': matches,
+        'gene_matches': gene_matches
     })
 
 
@@ -163,6 +180,7 @@ class SearchConditionView(APIView):
 
     def get(self, request, **kwargs) -> Response:
         search_term = request.GET.get('search_term')
+        gene_symbol = request.GET.get('gene_symbol')
         # a regular escape / gets confused for a URL divider
         urllib.parse.quote(search_term).replace('/', '%252F')
 
@@ -197,6 +215,6 @@ class SearchConditionView(APIView):
         # populate more with our database
         # do this separate so if we cache the above we can still apply the below
         for result in clean_results:
-            _populateMondoResult(result)
+            _populateMondoResult(result, gene_symbol=gene_symbol)
 
         return Response(status=HTTP_200_OK, data=clean_results)

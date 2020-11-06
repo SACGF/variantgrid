@@ -977,7 +977,9 @@ class MonarchDiseaseOntology(models.Model):
     # phenotype_mim = models.ForeignKey(MIMMorbid, on_delete=CASCADE)
 
     @staticmethod
-    def mondo_id_as_int(mondo_text):
+    def mondo_id_as_int(mondo_text) -> int:
+        if isinstance(mondo_text, int):
+            return mondo_text
         """ MONDO:0005045 -> 0005045 """
         return int(mondo_text.split(":")[1])
 
@@ -985,6 +987,15 @@ class MonarchDiseaseOntology(models.Model):
     def id_str(self):
         num_part = str(self.id).rjust(7, '0')
         return f"MONDO:{num_part}"
+
+
+class MonarchDiseaseOntologyGeneRelationship(models.Model):
+    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
+    relationship = models.TextField()
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ('mondo', 'relationship', 'gene_symbol')
 
 
 class CachedWebResource(TimeStampedModel):
