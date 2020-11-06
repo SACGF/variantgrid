@@ -3,18 +3,25 @@ import re
 
 from django.core.management import BaseCommand
 
-from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship
+from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship, MIMMorbid, \
+    MonarchDiseaseOntologyMIMMorbid
 from genes.models import GeneSymbol
 
 ID_EXTRACT_P = re.compile(r"^.*\/([A-Z]+)_([0-9]+)$")
 HGNC_EXTRACT_P = re.compile(r"http://identifiers.org/hgnc/([0-9]+)")
+OMIM_URL_P = re.compile(r"http://identifiers.org/omim/([0-9]+)")
 RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004025": "disease causes dysfunction of",
     "http://purl.obolibrary.org/obo/RO_0004001": "has material basis in gain of function germline mutation in",
     "http://purl.obolibrary.org/obo/RO_0004021": "disease has basis in disruption of",
     "http://purl.obolibrary.org/obo/RO_0004020": "disease has basis in dysfunction of"
 }
-
+MATCH_TYPES = {
+    "http://www.w3.org/2004/02/skos/core#exactMatch": "exact",
+    "http://www.w3.org/2004/02/skos/core#closeMatch": "close",
+    "http://www.w3.org/2004/02/skos/core#broadMatch": "broad",
+    "http://www.w3.org/2004/02/skos/core#narrowMatch": "narrow"
+}
 
 class Command(BaseCommand):
 
@@ -46,12 +53,24 @@ class Command(BaseCommand):
                             label = node.get("lbl")
                             defn = None
                             synonyms = []
+                            omim_relationships = []
                             if meta := node.get("meta"):
                                 defn = meta.get("definition", {}).get("val")
                                 for synonym in meta.get("synonyms", []):
                                     synonym_valu = synonym.get("val")
                                     if synonym_valu:
                                         synonyms.append(synonym_valu)
+                                for bp in meta.get("basicPropertyValues", []):
+                                    val = bp.get("val")
+                                    if omim_match := OMIM_URL_P.match(val):
+                                        omim = omim_match[1]
+                                        pred = bp.get("pred")
+                                        pred = MATCH_TYPES.get(pred)
+                                        omim_relationships.append({
+                                            "omim": omim,
+                                            "pred": pred
+                                        })
+
                             mondo_dict[node_id_full] = {
                                 "id": f"{type}:{raw_id}",
                                 "type": type,
@@ -59,7 +78,8 @@ class Command(BaseCommand):
                                 "label": label,
                                 "description": defn,
                                 # "synonyms": synonyms,
-                                "relationships": []
+                                "gene_relationships": [],
+                                "omim_relationships": omim_relationships
                             }
 
                         elif match := HGNC_EXTRACT_P.match(node_id_full):
@@ -71,13 +91,14 @@ class Command(BaseCommand):
                     if gene_obj := gene_dict.get(edge.get("obj")):
                         relationship = edge.get("pred")
                         relationship = RELATIONS.get(relationship, relationship)
-                        mondo_sub.get("relationships").append({
+                        mondo_sub.get("gene_relationships").append({
                             "type": relationship,
                             "gene_symbol": gene_obj.get("gene_symbol")
                         })
 
         mondo_list = list()
-        mondo_relationship_list = list()
+        mondo_gene_list = list()
+        mondo_omim_list = list()
 
         for mondo in mondo_dict.values():
             md = MonarchDiseaseOntology(
@@ -86,23 +107,33 @@ class Command(BaseCommand):
                 definition=mondo.get("description")
             )
             mondo_list.append(md)
-            for relation in mondo.get("relationships"):
-                if gene_symbol := GeneSymbol.objects.filter(symbol=relation.get("gene_symbol")).first():
+            for gene_relation in mondo.get("gene_relationships"):
+                if gene_symbol := GeneSymbol.objects.filter(symbol=gene_relation.get("gene_symbol")).first():
                     mdgr = MonarchDiseaseOntologyGeneRelationship(
                         mondo_id=mondo.get("type_id"),
-                        relationship=relation.get("type"),
+                        relationship=gene_relation.get("type"),
                         gene_symbol=gene_symbol
                     )
-                    mondo_relationship_list.append(mdgr)
+                    mondo_gene_list.append(mdgr)
                 else:
-                    print(f"Gene symbol {relation.get('gene_symbol')} doesn't exist")
+                    print(f"Gene symbol {gene_relation.get('gene_symbol')} doesn't exist")
+
+            for omim_relation in mondo.get("omim_relationships"):
+                moim = MonarchDiseaseOntologyMIMMorbid(
+                    mondo_id=mondo.get("type_id"),
+                    relationship=omim_relation.get("pred"),
+                    omim_id=omim_relation.get("omim")
+                )
+                mondo_omim_list.append(moim)
 
         print("About to update database")
 
         MonarchDiseaseOntologyGeneRelationship.objects.all().delete()
         MonarchDiseaseOntology.objects.all().delete()
+        MonarchDiseaseOntologyMIMMorbid.objects.all().delete()
 
         MonarchDiseaseOntology.objects.bulk_create(mondo_list)
-        MonarchDiseaseOntologyGeneRelationship.objects.bulk_create(mondo_relationship_list)
+        MonarchDiseaseOntologyGeneRelationship.objects.bulk_create(mondo_gene_list)
+        MonarchDiseaseOntologyMIMMorbid.objects.bulk_create(mondo_omim_list)
 
         print("Update complete")

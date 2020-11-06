@@ -13,13 +13,14 @@ import re
 
 from rest_framework.views import APIView
 
-from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship
+from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship, \
+    MonarchDiseaseOntologyMIMMorbid
 from classification.models import ConditionAlias, ConditionAliasJoin, ConditionAliasStatus, Classification
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, BaseDatatableView
 
 
 ID_EXTRACT_MINI_P = re.compile(r"MONDO:([0-9]+)$")
-
+PANEL_APP_OMIM = re.compile(r"MIM#[ ]*([0-9]+)")
 
 class ConditionAliasColumns(DatatableConfig):
 
@@ -167,14 +168,46 @@ def condition_alias_view(request, pk: int):
 
     matches_ids = (condition_alias.aliases or [])
     matches = [_populateMondoResult(m_id, gene_symbol=condition_alias.source_gene_symbol) for m_id in matches_ids if m_id]
+
+    panel_app_matches = []
+    # try:
+    panel_app_matches = search_panelapp(gene_symbol=condition_alias.source_gene_symbol)
+    # except:
+    #    pass
+
     return render(request, 'classification/condition_alias.html', context={
         'classification_subset': condition_alias.classification_modifications[0:4],
         'extra_count': max(condition_alias.classification_modifications.count() - 4, 0),
         'condition_alias': condition_alias,
         'matches': matches,
+        'panel_app_matches': panel_app_matches,
         'gene_matches': gene_matches
     })
 
+
+def search_panelapp(gene_symbol: str):
+    results = requests.get(f'https://panelapp.agha.umccr.org/api/v1/genes/{gene_symbol}/').json().get("results")
+    mondo_results = {}
+    for panel_app_result in results:
+        phenotype_row: str
+        for phenotype_row in panel_app_result.get("phenotypes", []):
+            for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
+                omim_id = omim_match[1]
+                if mondo := MonarchDiseaseOntologyMIMMorbid.objects.filter(omim_id=omim_id).first():
+                    mondo_result = _populateMondoResult(mondo.pk, gene_symbol)
+                    mondo_results[mondo.pk] = mondo_result
+                    evidence = mondo_result.get("panelapp_evidence", None)
+                    if not evidence:
+                        evidence = set()
+                        mondo_result["panelapp_evidence"] = evidence
+                    for evidence_str in panel_app_result.get("evidence"):
+                        evidence.add(evidence_str)
+
+    for mondo_result in mondo_results.values():
+        mondo_result["panelapp_evidence"] = list(mondo_result["panelapp_evidence"])
+        mondo_result["panelapp_evidence"].sort()
+
+    return list(mondo_results.values())
 
 class SearchConditionView(APIView):
 

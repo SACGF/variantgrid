@@ -998,6 +998,15 @@ class MonarchDiseaseOntologyGeneRelationship(models.Model):
         unique_together = ('mondo', 'relationship', 'gene_symbol')
 
 
+class MonarchDiseaseOntologyMIMMorbid(models.Model):
+    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
+    relationship = models.TextField()
+    omim_id = models.IntegerField()  # could also link this to MIMMorbid records, but that gets out of date
+
+    class Meta:
+        unique_together = ('mondo', 'relationship', 'omim_id')
+
+
 class CachedWebResource(TimeStampedModel):
     """ These are annotations that can populate themselves via the web
 

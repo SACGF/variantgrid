@@ -132,6 +132,9 @@
             if (result.relationship) {
                 cardBody.append($('<div>', {text:`${result.relationship} ${gene_symbol}`})).appendTo(cardBody);
             }
+            if (result.panelapp_evidence) {
+                cardBody.append($('<div>', {text: result.panelapp_evidence.join(", ")})).appendTo(cardBody);
+            }
             cardBody.append($('<div>', {class:"text-secondary", text:result.definition || "This MONDO term has not been loaded locally"}));
             cardFooter.click(() => {
                 toggleMatch(result);
@@ -200,6 +203,15 @@
             }
             for (let geneMatch of geneMatches) {
                 makeCard(geneMatch).appendTo(geneMatchesDom);
+            }
+
+            let panelAppMatchesDom = $("#panel-app-search-results")
+            let panelAppMatches = {{ panel_app_matches | jsonify }};
+            if (panelAppMatches.length) {
+                panelAppMatchesDom.empty();
+            }
+            for (let match of panelAppMatches) {
+                makeCard(match).appendTo(panelAppMatchesDom);
             }
 
             updateResultCount();
@@ -293,7 +305,17 @@
         <div class="mt-4">
             <div class="row">
                 <div class="col-md-6">
-                    <h4 class="w-100 text-center">Search Results for "<span id="search-result-for"></span>"</h4>
+                    <h4 class="w-100 text-center">From PanelApp Australia {{ condition_alias.source_gene_symbol }}</h4>
+                    <div id="panel-app-search-results" class="mt-4">
+                        <div class="w-100 text-center no-value">No results found for gene from PanelApp</div>
+                    </div>
+                    <h4 class="w-100 text-center">From MONDO {{ condition_alias.source_gene_symbol }}</h4>
+                    <div id="gene-search-results" class="mt-4">
+                        <div class="w-100 text-center no-value">No results found for gene from MONDO</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="w-100 text-center">Results for text search "<span id="search-result-for"></span>"</h4>
                     {% labelled label="Search MONDO Again Using" %}
                         <div class="input-group">
                             <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
@@ -301,12 +323,6 @@
                         </div>
                     {% endlabelled %}
                     <div id="condition-search-results" class="mt-4"></div>
-                </div>
-                <div class="col-md-6">
-                    <h4 class="w-100 text-center">Related to Gene</h4>
-                    <div id="gene-search-results" class="mt-4">
-                        <div class="w-100 text-center no-value">No results found for gene from MONDO</div>
-                    </div>
                 </div>
             </div>
         </div>
