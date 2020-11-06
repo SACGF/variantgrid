@@ -20,7 +20,8 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, B
 
 
 ID_EXTRACT_MINI_P = re.compile(r"MONDO:([0-9]+)$")
-PANEL_APP_OMIM = re.compile(r"MIM#[ ]*([0-9]+)")
+# PANEL_APP_OMIM = re.compile(r"MIM#[ ]*([0-9]+)")
+PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
 
 class ConditionAliasColumns(DatatableConfig):
 
@@ -193,13 +194,15 @@ def search_panelapp(gene_symbol: str):
         for phenotype_row in panel_app_result.get("phenotypes", []):
             for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
                 omim_id = omim_match[1]
-                if mondo := MonarchDiseaseOntologyMIMMorbid.objects.filter(omim_id=omim_id).first():
-                    mondo_result = _populateMondoResult(mondo.pk, gene_symbol)
-                    mondo_results[mondo.pk] = mondo_result
-                    evidence = mondo_result.get("panelapp_evidence", None)
-                    if not evidence:
-                        evidence = set()
-                        mondo_result["panelapp_evidence"] = evidence
+                if mondo_rel := MonarchDiseaseOntologyMIMMorbid.objects.filter(omim_id=omim_id).first():
+                    mondo = mondo_rel.mondo
+                    if not mondo in mondo_results:
+                        mondo_result = _populateMondoResult(mondo.pk, gene_symbol)
+                        mondo_results[mondo.pk] = mondo_result
+
+                        mondo_result["panelapp_evidence"] = set()
+                        mondo_result["panelapp_phenotype"] = phenotype_row
+                        evidence = mondo_result.get("panelapp_evidence")
                     for evidence_str in panel_app_result.get("evidence"):
                         evidence.add(evidence_str)
 

@@ -133,7 +133,10 @@
                 cardBody.append($('<div>', {text:`${result.relationship} ${gene_symbol}`})).appendTo(cardBody);
             }
             if (result.panelapp_evidence) {
-                cardBody.append($('<div>', {text: result.panelapp_evidence.join(", ")})).appendTo(cardBody);
+                cardBody.append($('<div>', {text: "Status : " + result.panelapp_evidence.join(", ")})).appendTo(cardBody);
+            }
+            if (result.panelapp_phenotype) {
+                cardBody.append($('<div>', {text: "Resolved from OMIM in : " + result.panelapp_phenotype})).appendTo(cardBody);
             }
             cardBody.append($('<div>', {class:"text-secondary", text:result.definition || "This MONDO term has not been loaded locally"}));
             cardFooter.click(() => {
@@ -305,7 +308,10 @@
         <div class="mt-4">
             <div class="row">
                 <div class="col-md-6">
-                    <h4 class="w-100 text-center">From PanelApp Australia {{ condition_alias.source_gene_symbol }}</h4>
+                    <h4 class="w-100 text-center">From PanelApp Australia <a href="https://panelapp.agha.umccr.org/panels/entities/{{ condition_alias.source_gene_symbol }}" target="_blank" class="external-link hover-link">
+                        {{ condition_alias.source_gene_symbol }}
+                    </a>
+                    </h4>
                     <div id="panel-app-search-results" class="mt-4">
                         <div class="w-100 text-center no-value">No results found for gene from PanelApp</div>
                     </div>
