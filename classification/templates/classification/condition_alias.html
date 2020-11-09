@@ -123,7 +123,7 @@
                 return null;
             }
             let dom = $('<div>', {"class": "border rounded p-2 mb-2", html:[
-                    $('<i class="fas fa-circle mr-2 text-success"></i>'),
+                    $('<i class="fas fa-circle mr-2"></i>').css('color', '#4c4'),
                     $('<span>', {text: "PanelApp", class:"text-weight-bold"}),
                     "<br/>",
                     $('<label>', {text: "Phenotype:"}),
@@ -143,7 +143,7 @@
                 return null;
             }
             let dom = $('<div>', {"class": "border rounded p-2 mb-2", html:[
-                    $('<i class="fas fa-circle mr-2 text-success"></i>'),
+                    $('<i class="fas fa-circle mr-2"></i>').css('color', '#4c4'),
                     $('<span>', {text: "Monarch", class:"text-weight-bold"}),
                     "<br/>",
                     $('<span>', {text: monarchData, class:'text-muted'}),
@@ -164,8 +164,8 @@
 
             let htmlWrapper = $(`
                 <div class="card selectable-card ${mode} w-100 mb-2" data-mondo="${result.id}" data-source="${source}">
-                    <div class="card-header">${result.label} <a href="${result.url}" class="external-link" target="_blank">${result.id}</a></div>
-                    <div class="card-body"></div>
+                    <div class="card-header"><a href="${result.url}" class="external-link" target="_blank">${result.id}</a></div>
+                    <div class="card-body"><label class="mb-2 d-block">${result.label}</label></div>
                     <div class="card-footer" style="cursor:pointer"><i class="toggle-icon fas fa-${icon}-circle"></i></div>
                 </div>
             `);
@@ -194,7 +194,7 @@
                     dom.appendTo(cardBody);
                 }
                 cardBody.append($('<div>', {
-                    class: "text-secondary",
+                    class: "text-dark",
                     text: result.definition || "This MONDO term has not been loaded locally"
                 }));
             }
