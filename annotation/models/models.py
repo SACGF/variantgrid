@@ -984,8 +984,12 @@ class MonarchDiseaseOntology(models.Model):
         return int(mondo_text.split(":")[1])
 
     @property
-    def id_str(self):
-        num_part = str(self.id).rjust(7, '0')
+    def id_str(self) -> str:
+        return MonarchDiseaseOntology.mondo_int_as_id(self.id)
+
+    @staticmethod
+    def mondo_int_as_id(mondo_id: int) -> str:
+        num_part = str(mondo_id).rjust(7, '0')
         return f"MONDO:{num_part}"
 
 

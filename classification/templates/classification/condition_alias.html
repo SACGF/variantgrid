@@ -49,6 +49,8 @@
     <script>
         matches = {};
         gene_symbol = "{{ condition_alias.source_gene_symbol }}";
+        meta = {{ meta | jsonify }};
+        text_matches = {};
 
         function submit(next) {
             let keys = Object.keys(matches);
@@ -77,7 +79,7 @@
             let keys = Object.keys(matches);
             keys.sort();
             for (let key of keys) {
-                let card = makeCard(matches[key]).appendTo(matchesDom);
+                let card = makeCard(matches[key], 'match').appendTo(matchesDom);
                 if (key === result.id) {
                     card.collapse('show');
                 }
@@ -115,30 +117,87 @@
             }
         }
 
-        function makeCard(result) {
+        function panelAppDom(mondo_id) {
+            let panelData = (meta[mondo_id] || {})['panelapp'];
+            if (!panelData) {
+                return null;
+            }
+            let dom = $('<div>', {"class": "border rounded p-2 mb-2", html:[
+                    $('<i class="fas fa-circle mr-2 text-success"></i>'),
+                    $('<span>', {text: "PanelApp", class:"text-weight-bold"}),
+                    "<br/>",
+                    $('<label>', {text: "Phenotype:"}),
+                    " ",
+                    $('<span>', {text: panelData.phenotype_row, class:'text-muted'}),
+                    "<br/>",
+                    $('<label>', {text: "Evidence:"}),
+                    " ",
+                    $('<span>', {text: panelData.evidence.join(", "), class:'text-muted'})
+            ]});
+            return dom;
+        }
+
+        function monarchDom(mondo_id) {
+            let monarchData = (meta[mondo_id] || {})['monarch'];
+            if (!monarchData) {
+                return null;
+            }
+            let dom = $('<div>', {"class": "border rounded p-2 mb-2", html:[
+                    $('<i class="fas fa-circle mr-2 text-success"></i>'),
+                    $('<span>', {text: "Monarch", class:"text-weight-bold"}),
+                    "<br/>",
+                    $('<span>', {text: monarchData, class:'text-muted'}),
+                    " ",
+                    $('<span>', {text: gene_symbol, class:'text-muted'})
+            ]});
+            return dom;
+        }
+
+        function hasMeta(mondo_id) {
+            return !!meta[mondo_id];
+        }
+
+        function makeCard(result, source) {
             let adding = !!matches[result.id];
             let icon = adding ? "minus" : "plus";
             let mode = adding ? "selected" : "possible";
 
             let htmlWrapper = $(`
-                <div class="card selectable-card ${mode} w-100 mb-2" data-mondo="${result.id}">
-                    <div class="card-header"><a href="${result.url}" class="external-link" target="_blank">${result.id}</a></div>
-                    <div class="card-body">${result.highlight || result.label}</div>
+                <div class="card selectable-card ${mode} w-100 mb-2" data-mondo="${result.id}" data-source="${source}">
+                    <div class="card-header">${result.label} <a href="${result.url}" class="external-link" target="_blank">${result.id}</a></div>
+                    <div class="card-body"></div>
                     <div class="card-footer" style="cursor:pointer"><i class="toggle-icon fas fa-${icon}-circle"></i></div>
                 </div>
             `);
             let cardBody = htmlWrapper.find('.card-body');
             let cardFooter = htmlWrapper.find('.card-footer');
-            if (result.relationship) {
-                cardBody.append($('<div>', {text:`${result.relationship} ${gene_symbol}`})).appendTo(cardBody);
+
+            if (source === 'text-match' && hasMeta(result.id)) {
+                $('<a>', {
+                    html:`<i class="far fa-hand-point-left"></i> Find result in gene matched terms`,
+                    click: function() {
+                        let geneMatch = $(`[data-mondo="${result.id}"][data-source="gene-match"]`);
+                        geneMatch[0].scrollIntoView(true);
+                        geneMatch.effect('highlight', {}, 500);
+                    },
+                    class: 'hover-link'
+                }).appendTo(cardBody);
+                htmlWrapper.css('opacity', 0.8);
+            } else {
+                let dom = null;
+                dom = panelAppDom(result.id);
+                if (dom) {
+                    dom.appendTo(cardBody);
+                }
+                dom = monarchDom(result.id);
+                if (dom) {
+                    dom.appendTo(cardBody);
+                }
+                cardBody.append($('<div>', {
+                    class: "text-secondary",
+                    text: result.definition || "This MONDO term has not been loaded locally"
+                }));
             }
-            if (result.panelapp_evidence) {
-                cardBody.append($('<div>', {text: "Status : " + result.panelapp_evidence.join(", ")})).appendTo(cardBody);
-            }
-            if (result.panelapp_phenotype) {
-                cardBody.append($('<div>', {text: "Resolved from OMIM in : " + result.panelapp_phenotype})).appendTo(cardBody);
-            }
-            cardBody.append($('<div>', {class:"text-secondary", text:result.definition || "This MONDO term has not been loaded locally"}));
             cardFooter.click(() => {
                 toggleMatch(result);
             });
@@ -173,9 +232,11 @@
                     $("#search-result-for").text(text);
                     resultsDom.LoadingOverlay('hide');
                     resultsDom.empty();
+                    text_matches = {};
                     if (results.length) {
                         for (let result of results) {
-                            makeCard(result).appendTo(resultsDom);
+                            makeCard(result, 'text-match').appendTo(resultsDom);
+                            text_matches[result.id] = true;
                         }
                     } else {
                         $('<div/>', {class:'no-value w-100 text-center', text:'No Results'}).appendTo(resultsDom);
@@ -200,21 +261,12 @@
             }
 
             let geneMatchesDom = $("#gene-search-results")
-            let geneMatches = {{ gene_matches | jsonify }};
+            let geneMatches = {{ possibilities | jsonify }};
             if (geneMatches.length) {
                 geneMatchesDom.empty();
             }
             for (let geneMatch of geneMatches) {
-                makeCard(geneMatch).appendTo(geneMatchesDom);
-            }
-
-            let panelAppMatchesDom = $("#panel-app-search-results")
-            let panelAppMatches = {{ panel_app_matches | jsonify }};
-            if (panelAppMatches.length) {
-                panelAppMatchesDom.empty();
-            }
-            for (let match of panelAppMatches) {
-                makeCard(match).appendTo(panelAppMatchesDom);
+                makeCard(geneMatch, 'gene-match').appendTo(geneMatchesDom);
             }
 
             updateResultCount();
@@ -308,20 +360,16 @@
         <div class="mt-4">
             <div class="row">
                 <div class="col-md-6">
-                    <h4 class="w-100 text-center">From PanelApp Australia <a href="https://panelapp.agha.umccr.org/panels/entities/{{ condition_alias.source_gene_symbol }}" target="_blank" class="external-link hover-link">
+                    <h4 class="w-100 text-center">Gene Matches for <a href="https://panelapp.agha.umccr.org/panels/entities/{{ condition_alias.source_gene_symbol }}" target="_blank" class="external-link hover-link">
                         {{ condition_alias.source_gene_symbol }}
                     </a>
                     </h4>
-                    <div id="panel-app-search-results" class="mt-4">
-                        <div class="w-100 text-center no-value">No results found for gene from PanelApp</div>
-                    </div>
-                    <h4 class="w-100 text-center">From MONDO {{ condition_alias.source_gene_symbol }}</h4>
                     <div id="gene-search-results" class="mt-4">
-                        <div class="w-100 text-center no-value">No results found for gene from MONDO</div>
+                        <div class="w-100 text-center no-value">No results found for gene from PanelApp or Monarch</div>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <h4 class="w-100 text-center">Results for text search "<span id="search-result-for"></span>"</h4>
+                    <h4 class="w-100 text-center mt-4 mt-md-0">Results for text search "<span id="search-result-for"></span>"</h4>
                     {% labelled label="Search MONDO Again Using" %}
                         <div class="input-group">
                             <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />

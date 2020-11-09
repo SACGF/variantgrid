@@ -1,5 +1,5 @@
 import urllib
-from typing import Optional, Dict, Any, Set
+from typing import Optional, Dict, Any, Set, List, Union
 
 import requests
 from django.contrib import messages
@@ -15,13 +15,105 @@ from rest_framework.views import APIView
 
 from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship, \
     MonarchDiseaseOntologyMIMMorbid
-from classification.models import ConditionAlias, ConditionAliasJoin, ConditionAliasStatus, Classification
+from classification.models import ConditionAlias, ConditionAliasJoin, ConditionAliasStatus
+from library.log_utils import report_exc_info
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, BaseDatatableView
 
 
 ID_EXTRACT_MINI_P = re.compile(r"MONDO:([0-9]+)$")
-# PANEL_APP_OMIM = re.compile(r"MIM#[ ]*([0-9]+)")
-PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
+
+
+class MondoGenePanelApp:
+
+    def __init__(self, omim_id: int, phenotype_row: str):
+        self.omim_id = omim_id
+        self.phenotype_row = phenotype_row
+        self.evidence = set()
+
+    def record_evidence(self, evidence: List[str]):
+        self.evidence = self.evidence.union(set(evidence))
+
+    def as_json(self) -> Dict:
+        evidence_list = list(self.evidence)
+        evidence_list.sort()
+        return {
+            "omim_id": self.omim_id,
+            "phenotype_row": self.phenotype_row,
+            "evidence": evidence_list
+        }
+
+
+class MondoGeneMeta:
+
+    def __init__(self, mondo_id: int):
+        self.mondo_id = mondo_id
+
+        self.monarch_relation: Optional[str] = None
+        self.panelapp_relation: Optional[MondoGenePanelApp] = None
+
+    def panelapp_link_data(self, omim_id: int, phenotype_row: str, panel: Dict):
+        if not self.panelapp_relation:
+            self.panelapp_relation = MondoGenePanelApp(omim_id=omim_id, phenotype_row=phenotype_row)
+
+        self.panelapp_relation.record_evidence(panel.get("evidence"))
+
+    def monarch_link_data(self, gene_relationship: str):
+        self.monarch_relation = gene_relationship
+
+    def as_json(self) -> Dict:
+        root = dict()
+        if self.monarch_relation:
+            root["monarch"] = self.monarch_relation
+        if self.panelapp_relation:
+            root["panelapp"] = self.panelapp_relation.as_json()
+        return root
+
+
+class MondoGeneMetas:
+
+    PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
+
+    def __init__(self, gene_symbol: str):
+        self.gene_symbol = gene_symbol
+        self.mondo_map: Dict[int, MondoGeneMeta] = dict()
+
+    def _find_or_create(self, mondo_id: int) -> MondoGeneMeta:
+        mondo = self.mondo_map.get(mondo_id)
+        if not mondo:
+            mondo = MondoGeneMeta(mondo_id=mondo_id)
+            self.mondo_map[mondo_id] = mondo
+        return mondo
+
+    def populate_panel_app_remote(self):
+        results = requests.get(f'https://panelapp.agha.umccr.org/api/v1/genes/{self.gene_symbol}/').json().get("results")
+        mondo_results = {}
+        for panel_app_result in results:
+            phenotype_row: str
+            for phenotype_row in panel_app_result.get("phenotypes", []):
+                for omim_match in MondoGeneMetas.PANEL_APP_OMIM.finditer(phenotype_row):
+                    omim_id = int(omim_match[1])
+                    if mondo_id := MonarchDiseaseOntologyMIMMorbid.objects.filter(omim_id=omim_id).values_list("mondo_id", flat=True).first():
+                        mondo_meta = self._find_or_create(mondo_id)
+                        mondo_meta.panelapp_link_data(omim_id=omim_id, phenotype_row=phenotype_row, panel=panel_app_result)
+
+    def populate_monarch_local(self):
+        gene_relationships = MonarchDiseaseOntologyGeneRelationship.objects.filter(
+            gene_symbol=self.gene_symbol)
+
+        mdgr: MonarchDiseaseOntologyGeneRelationship
+        for mdgr in gene_relationships:
+            self._find_or_create(mondo_id=mdgr.mondo_id).monarch_link_data(mdgr.relationship)
+
+    def mondos(self) -> List[MonarchDiseaseOntology]:
+        mondo_ids = [meta.mondo_id for meta in self.mondo_map.values()]
+        return MonarchDiseaseOntology.objects.filter(pk__in=mondo_ids)
+
+    def as_json(self) -> Dict:
+        root = dict()
+        for meta in self.mondo_map.values():
+            root[ MonarchDiseaseOntology.mondo_int_as_id(meta.mondo_id) ] = meta.as_json()
+        return root
+
 
 class ConditionAliasColumns(DatatableConfig):
 
@@ -86,25 +178,28 @@ def condition_aliases_view(request):
     })
 
 
-def _populateMondoResult(result, gene_symbol) -> Dict:
-    if not isinstance(result, dict):
-        result = {"id": result}
+def _populate_mondo_result(mondo: Union[Dict, str, MonarchDiseaseOntology]) -> Dict:
+    mondo_record: Optional[MonarchDiseaseOntology] = None
+    result: Dict
 
-    mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
-    mondo_record: Optional[MonarchDiseaseOntology]
+    if isinstance(mondo, str):
+        mondo = {"id": mondo}
 
-    url_part: str
-    if mondo_record := MonarchDiseaseOntology.objects.filter(pk=mondo_int).first():
+    if isinstance(mondo, MonarchDiseaseOntology):
+        mondo_record = mondo
+        result = {"id": mondo_record.id_str}
+    elif isinstance(mondo, dict):
+        result = mondo
+        mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
+        mondo_record = MonarchDiseaseOntology.objects.filter(pk=mondo_int).first()
+    else:
+        raise ValueError(f"Can't populate mondo result into {mondo}")
+
+    if mondo_record:
         result['definition'] = mondo_record.definition or 'No description provided'
         if 'label' not in result:
             result['label'] = mondo_record.name
-        url_part = mondo_record.id_str
         result['id'] = mondo_record.id_str
-
-        relationship: MonarchDiseaseOntologyGeneRelationship
-        if relationship := MonarchDiseaseOntologyGeneRelationship.objects.filter(mondo_id=mondo_int, gene_symbol=gene_symbol).first():
-            result['relationship'] = relationship.relationship
-
     else:
         result['definition'] = None
 
@@ -124,9 +219,7 @@ def condition_alias_view(request, pk: int):
     user: User = request.user
     condition_alias = ConditionAlias.objects.get(pk=pk)
 
-    if request.method == "GET":
-        condition_alias.check_can_view(user)
-    else:
+    if request.method == "POST":
         condition_alias.check_can_write(user)
         aliases = request.POST.get('aliases', '')
         if aliases:
@@ -160,63 +253,36 @@ def condition_alias_view(request, pk: int):
 
         return redirect("condition_alias", pk=pk)
 
-    gene_matches = []
-    gene_relationships = MonarchDiseaseOntologyGeneRelationship.objects.filter(gene_symbol=condition_alias.source_gene_symbol)
-    mdgr: MonarchDiseaseOntologyGeneRelationship
-    for mdgr in gene_relationships:
-        gene_match = _populateMondoResult(mdgr.mondo_id, gene_symbol=condition_alias.source_gene_symbol)
-        gene_matches.append(gene_match)
+    condition_alias.check_can_view(user)
+    meta = MondoGeneMetas(gene_symbol=condition_alias.source_gene_symbol)
+    # if we can't reach panel app, continue with other data
+    try:
+        meta.populate_panel_app_remote()
+    except:
+        report_exc_info(extra_data={"gene_symbol": meta.gene_symbol})
+        messages.add_message(request, messages.ERROR, "Could not connect to PanelApp")
+    meta.populate_monarch_local()
 
     matches_ids = (condition_alias.aliases or [])
-    matches = [_populateMondoResult(m_id, gene_symbol=condition_alias.source_gene_symbol) for m_id in matches_ids if m_id]
+    matches = [_populate_mondo_result(m_id) for m_id in matches_ids if m_id]
 
-    panel_app_matches = []
-    # try:
-    panel_app_matches = search_panelapp(gene_symbol=condition_alias.source_gene_symbol)
-    # except:
-    #    pass
+    possibilities = [_populate_mondo_result(mondo) for mondo in meta.mondos()]
 
     return render(request, 'classification/condition_alias.html', context={
         'classification_subset': condition_alias.classification_modifications[0:4],
         'extra_count': max(condition_alias.classification_modifications.count() - 4, 0),
         'condition_alias': condition_alias,
         'matches': matches,
-        'panel_app_matches': panel_app_matches,
-        'gene_matches': gene_matches
+        'meta': meta.as_json(),
+        'possibilities': possibilities
     })
 
-
-def search_panelapp(gene_symbol: str):
-    results = requests.get(f'https://panelapp.agha.umccr.org/api/v1/genes/{gene_symbol}/').json().get("results")
-    mondo_results = {}
-    for panel_app_result in results:
-        phenotype_row: str
-        for phenotype_row in panel_app_result.get("phenotypes", []):
-            for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
-                omim_id = omim_match[1]
-                if mondo_rel := MonarchDiseaseOntologyMIMMorbid.objects.filter(omim_id=omim_id).first():
-                    mondo = mondo_rel.mondo
-                    if not mondo in mondo_results:
-                        mondo_result = _populateMondoResult(mondo.pk, gene_symbol)
-                        mondo_results[mondo.pk] = mondo_result
-
-                        mondo_result["panelapp_evidence"] = set()
-                        mondo_result["panelapp_phenotype"] = phenotype_row
-                        evidence = mondo_result.get("panelapp_evidence")
-                    for evidence_str in panel_app_result.get("evidence"):
-                        evidence.add(evidence_str)
-
-    for mondo_result in mondo_results.values():
-        mondo_result["panelapp_evidence"] = list(mondo_result["panelapp_evidence"])
-        mondo_result["panelapp_evidence"].sort()
-
-    return list(mondo_results.values())
 
 class SearchConditionView(APIView):
 
     def get(self, request, **kwargs) -> Response:
         search_term = request.GET.get('search_term')
-        gene_symbol = request.GET.get('gene_symbol')
+        # gene_symbol = request.GET.get('gene_symbol')
         # a regular escape / gets confused for a URL divider
         urllib.parse.quote(search_term).replace('/', '%252F')
 
@@ -251,6 +317,6 @@ class SearchConditionView(APIView):
         # populate more with our database
         # do this separate so if we cache the above we can still apply the below
         for result in clean_results:
-            _populateMondoResult(result, gene_symbol=gene_symbol)
+            _populate_mondo_result(result)
 
         return Response(status=HTTP_200_OK, data=clean_results)
