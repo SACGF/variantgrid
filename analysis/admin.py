@@ -28,4 +28,5 @@ class AnalysisAdmin(GuardedModelAdmin):
 
 admin.site.register(models.Analysis, AnalysisAdmin)
 admin.site.register(models.AnalysisTemplate)
+admin.site.register(models.AnalysisTemplateRun)
 admin.site.register(models.AnalysisTemplateVersion)

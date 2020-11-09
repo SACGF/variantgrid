@@ -453,34 +453,36 @@ def vcf_detect_genome_build_from_header(cyvcf2_reader: cyvcf2.VCF):
     raise GenomeBuildDetectionException(msg)
 
 
-def get_genome_build_from_contig_lengths(contig_lengths: dict) -> GenomeBuild:
-    """ This isn't fast, designed to be called once per file, not in a loop """
-    DECOY_CONTIGS = {"NC_007605", "hs37d5"}
-    MITO_CONTIGS = {"MT", "chrM"}  # Skip so hg19/GRCh37 are the same
-    SKIP_CONTIGS = DECOY_CONTIGS | MITO_CONTIGS
+def get_genome_build_from_contig_lengths(contig_lengths: dict, min_contig_matches=1) -> GenomeBuild:
+    """ Match based on contig length (main chromosomes only)
+        This isn't fast, designed to be called once per file, not in a loop """
 
     build_contig_diffs = {}
     potential_genome_builds = []
 
     for genome_build in GenomeBuild.builds_with_annotation():
-        build_contig_lengths = {k: v.length for k, v in genome_build.chrom_contig_mappings.items()}
-
         diff = None
-        for c, l in contig_lengths.items():
-            if c in SKIP_CONTIGS:
-                continue
+        num_matching_contigs = 0
+        num_missing_contigs = 0
+        for vcf_contig, vcf_contig_length in contig_lengths.items():
             try:
-                build_len = build_contig_lengths[c]
-                if build_len != l:
-                    diff = f"Contig '{c}' supplied length: {l} not equal to build: {build_len}"
+                contig = genome_build.chrom_contig_mappings[vcf_contig]
+                if vcf_contig_length == contig.length:
+                    num_matching_contigs += 1
+                else:
+                    diff = f"VCF contig '{vcf_contig}' length: {vcf_contig_length} not equal to build: {contig.length}"
                     break
             except KeyError:
-                diff = f"build missing contig '{c}'"
-                break
+                num_missing_contigs += 1  # OK to miss some strange contigs
+
         if diff:
             build_contig_diffs[genome_build.name] = diff
         else:
-            potential_genome_builds.append(genome_build)
+            if num_matching_contigs > min_contig_matches:
+                potential_genome_builds.append(genome_build)
+            else:
+                matches = f"Matched: {num_matching_contigs} (min: {min_contig_matches}) Missing: {num_missing_contigs}"
+                build_contig_diffs[genome_build.name] = matches
 
     num_matches = len(potential_genome_builds)
     if num_matches:

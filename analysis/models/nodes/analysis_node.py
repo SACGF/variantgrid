@@ -448,7 +448,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def get_node_name(self):
         """ Automatic node name """
-        raise NotImplementedError()
+        raise NotImplementedError(f"Node Class: {self.get_class_name()}")
 
     @staticmethod
     def get_node_class_label():

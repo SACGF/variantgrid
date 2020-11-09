@@ -45,3 +45,8 @@ class TestVCFDetectBuild(TestCase):
         vcf_filename = os.path.join(self.TEST_DATA, "freebayes_b37.vcf")
         genome_build = vcf_detect_genome_build_from_filename(vcf_filename)
         self.assertEqual("GRCh37", genome_build.name, "Matched GRCh37 genome")
+
+    def test_big_grch38(self):
+        vcf_filename = os.path.join(self.TEST_DATA, "grch38_huge_header.vcf.gz")
+        genome_build = vcf_detect_genome_build_from_filename(vcf_filename)
+        self.assertEqual("GRCh38", genome_build.name, "Matched GRCh38 genome")
