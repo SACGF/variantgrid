@@ -152,7 +152,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                 try:
                     copy = node.save_clone()
                 except NotImplementedError as nie:
-                    raise ValueError(f"Could not clone node {old_id}") from nie
+                    raise NotImplementedError(f"Could not clone node {old_id}") from nie
                 copy.adjust_cloned_parents(old_new_map)
                 copy.save()
 
