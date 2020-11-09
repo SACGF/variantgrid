@@ -9,6 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('analysis', '0005_auto_20201006_2209'),
+        ('manual', '0002_deployment'),
     ]
 
     operations = [

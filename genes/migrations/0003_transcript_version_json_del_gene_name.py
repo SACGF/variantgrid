@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('genes', '0002_initial_data'),
+        ('manual', '0002_deployment'),
     ]
 
     operations = [
