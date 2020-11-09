@@ -154,6 +154,10 @@ class Flag(TimeStampedModel):
                 self.resolution = resolution
                 self.save()
 
+        if resolution is None and comment is None and not first_comment:
+            # no-op
+            return
+
         fc = FlagComment.objects.create(
             flag=self,
             user=user,
