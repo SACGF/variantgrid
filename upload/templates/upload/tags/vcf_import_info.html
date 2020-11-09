@@ -23,7 +23,9 @@ $(document).ready(function() {
     <ul class="messages">
         {% for vii in errors %}
             <li id="vcf-import-info-{{ vii.pk }}" class="import-message error">{{ vii.message }}
-                <button type="button" class="vcf-import-info-accept" vcf-import-info="{{ vii.pk }}">OK</button>
+                {% if vii.pk %}
+                    <button type="button" class="vcf-import-info-accept" vcf-import-info="{{ vii.pk }}">OK</button>
+                {% endif %}
             </li>
         {% endfor  %}
 
