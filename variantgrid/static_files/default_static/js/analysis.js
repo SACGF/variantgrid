@@ -83,7 +83,7 @@ function inputSamples() {
 }
 
 
-function layout_analysis_panels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections) {
+function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections, readOnly) {
     
     if (showAnalysisVariables) {
         $("#analysis-variables").show();
@@ -117,11 +117,11 @@ function layout_analysis_panels(showAnalysisVariables, initialGridAndEditorWidth
     });
 
     // Setup nodes
-    addNodesToDOM('#analysis', nodeDataArray);
+    addNodesToDOM('#analysis', nodeDataArray, readOnly);
 
-    window.variantgridPipeline.init();
+    window.variantgridPipeline.init(readOnly);
 
-    attatchAnalysisNodeConnections(nodeConnections);
+    attatchAnalysisNodeConnections(nodeConnections, readOnly);
 
     messagePoller.update_loop();
 }

@@ -1,4 +1,3 @@
-from django.db.models.aggregates import Max
 from django.http.response import HttpResponse
 import json
 
@@ -108,6 +107,7 @@ class FilterNodeView(NodeView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
+        self.object.analysis.check_can_write(request.user)
         # Delete all old filters (probably not best way to do it)
         self.object.filternodeitem_set.all().delete()
 

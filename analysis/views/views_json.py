@@ -50,7 +50,7 @@ class NodeUpdate(NodeJSONPostView):
         op = request.POST["op"]
         params = json.loads(request.POST['params'])
         # Load subclass, need to use OO to handle adding/deleting and save
-        node = get_node_subclass_or_non_fatal_exception(request.user, node_id)
+        node = get_node_subclass_or_non_fatal_exception(request.user, node_id, write=True)
         logging.debug("Loaded node %s version %d", node.pk, node.version)
 
         if op == "move":
@@ -58,7 +58,7 @@ class NodeUpdate(NodeJSONPostView):
             node.y = params['y']
         elif op == "update_connection":
             parent_id = params["parent_id"]
-            parent = get_node_subclass_or_non_fatal_exception(request.user, parent_id)
+            parent = get_node_subclass_or_non_fatal_exception(request.user, parent_id, write=True)
             if params.get("remove"):
                 node.remove_parent(parent)
             else:
@@ -90,7 +90,7 @@ def node_create(request, analysis_id, node_type):
     if NODE_TYPES_HASH is None:
         NODE_TYPES_HASH = get_node_types_hash_by_class_name()
 
-    analysis = get_analysis_or_404(request.user, analysis_id)
+    analysis = get_analysis_or_404(request.user, analysis_id, write=True)
 
     node_class = NODE_TYPES_HASH[node_type]
     node = node_class.objects.create(analysis=analysis)
@@ -106,7 +106,7 @@ def nodes_copy(request, analysis_id):
     nodes = []
     edges = []
 
-    analysis = get_analysis_or_404(request.user, analysis_id)
+    analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     nodes_qs = analysis.analysisnode_set.filter(id__in=node_ids).select_subclasses()
     topo_sorted = get_toposorted_nodes(nodes_qs)
 
@@ -150,7 +150,7 @@ def nodes_delete(request, analysis_id):
     node_ids = json.loads(request.POST["nodes"])
     node_ids = set([int(i) for i in node_ids])
 
-    analysis = get_analysis_or_404(request.user, analysis_id)
+    analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     nodes_qs = analysis.analysisnode_set.filter(id__in=node_ids).select_subclasses()
     topo_sorted = get_toposorted_nodes(nodes_qs)
 
@@ -172,7 +172,7 @@ def nodes_delete(request, analysis_id):
 
 @require_POST
 def set_variant_tag(request, analysis_id):
-    analysis = get_analysis_or_404(request.user, analysis_id)
+    analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     variant_id = request.POST['variant_id']
     node_id = request.POST.get('node_id')
     tag_id = request.POST['tag_id']
@@ -206,7 +206,7 @@ def set_variant_tag(request, analysis_id):
 
 @require_POST
 def set_variant_selected(request, node_id):
-    node = get_node_subclass_or_404(request.user, node_id)
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
     variant_id = request.POST['variant_id']
     checked = json.loads(request.POST['checked'])
 
@@ -240,7 +240,7 @@ def create_filter_child(request, node_id):
 
 @require_POST
 def create_extra_filter_child(request, node_id, extra_filters):
-    node = get_node_subclass_or_404(request.user, node_id)
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
     x = node.x + 50 + random.randrange(-10, 10)
     y = node.y + 100 + random.randrange(-10, 10)
     filter_node = BuiltInFilterNode.objects.create(analysis=node.analysis,
@@ -277,7 +277,7 @@ def create_selected_child(request, node_id):
 
 @require_POST
 def analysis_reload(request, analysis_id):
-    analysis = get_analysis_or_404(request.user, analysis_id)
+    analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     node_utils.reload_analysis_nodes(analysis.pk)
     return JsonResponse({})
 
@@ -337,7 +337,7 @@ def create_classification_from_variant_tag(request, analysis_id, sample_id, vari
 @require_POST
 def analysis_set_panel_size(request, analysis_id):
     """ This is set from AJAX queries, ie dragging a panel border """
-    analysis = get_analysis_or_404(request.user, analysis_id)
+    analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     analysis.analysis_panel_fraction = request.POST["analysis_panel_fraction"]
     analysis.save()
     return JsonResponse({})
@@ -345,7 +345,7 @@ def analysis_set_panel_size(request, analysis_id):
 
 @require_POST
 def analysis_template_variable(request, node_id):
-    node = get_node_subclass_or_404(request.user, node_id)
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
 
     field = request.POST["field"]
     operation = request.POST["op"]
@@ -364,7 +364,7 @@ def analysis_template_variable(request, node_id):
 @require_POST
 def analysis_template_save(request, pk):
     """ Creates a new AnalysisTemplateVersion for an AnalysisTemplate """
-    analysis_template = AnalysisTemplate.get_for_user(request.user, pk)
+    analysis_template = AnalysisTemplate.get_for_user(request.user, pk, write=True)
 
     analysis_name_template = request.POST.get("analysis_name_template")
 

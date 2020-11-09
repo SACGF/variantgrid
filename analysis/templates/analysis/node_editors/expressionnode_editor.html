@@ -63,7 +63,10 @@
 		{{ form.value }} <span id="significant-wrapper" class='differential-expression'>{{ form.significant }} Significant</span></td>
 		</tr>
 		<tr>
-		<td><button id='expression-save' class="btn btn-primary">save</button>
+		<td>
+            {% if has_write_permission %}
+                <button id='expression-save' class="btn btn-primary">save</button>
+            {% endif %}
 		</tr>
 		</table>
 		{% for hidden in form.hidden_fields %}

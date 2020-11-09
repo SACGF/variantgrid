@@ -8,7 +8,6 @@ from analysis.views.nodes.node_view import NodeView
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from genes.hgvs import HGVSMatcher
 from snpdb.models.models import Tag
-from snpdb.models.models_vcf import Sample
 from classification.models.classification import Classification
 
 

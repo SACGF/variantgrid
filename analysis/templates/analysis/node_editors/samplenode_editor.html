@@ -178,7 +178,9 @@ table.zygosity-table tr.top-header th {
         {% if form.output_node  %}
             <p>{{ form.output_node.label }}{{ form.output_node }}</p>
         {% endif %}
-    	<button id='sample-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+        	<button id='sample-save' class="btn btn-primary">save</button>
+        {% endif %}
 	    {{ form.media }}
 	</form>
 </div>

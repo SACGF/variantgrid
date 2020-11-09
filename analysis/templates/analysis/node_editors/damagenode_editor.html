@@ -182,8 +182,9 @@ setupSlider($("#id_min_damage_predictions"), $("#min_damage_predictions-slider")
                 </li>
 			</ul>
 		</div>
-
-		<button id='damage-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+    		<button id='damage-save' class="btn btn-primary">save</button>
+        {% endif %}
 		<span>Note: Damage, CADD and REVEL settings do not filter indels</span>
 	    {{ form.media }}
 	</form>
