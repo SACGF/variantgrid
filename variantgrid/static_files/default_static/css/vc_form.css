@@ -56,6 +56,9 @@ table.diff tbody td, table.diff tbody th {
   width: 260px;
   overflow-wrap: break-word;
 }
+table.diff tbody td.hover-detail {
+  padding-right: 18px;
+}
 table.diff tbody .group th {
   font-weight: bold;
 }

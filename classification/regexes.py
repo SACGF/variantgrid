@@ -26,7 +26,8 @@ class DbRefRegex:
                  prefixes: Union[str, List[str]],
                  link: str,
                  match_type: MatchType = MatchType.NUMERIC,
-                 min_length: int = 3):
+                 min_length: int = 3,
+                 expected_length: Optional[int] = None):
         """
         Creates an instance of a external id/link detection and automatically registers it with the complete collection.
         The end result allowing us to scan text for any number of kinds of links.
@@ -43,7 +44,13 @@ class DbRefRegex:
         self.link = link
         self.match_type = match_type
         self.min_length = min_length
+        self.expected_length = expected_length
         self._all_db_ref_regexes.append(self)
+
+    def fix_id(self, id_str: str) -> str:
+        if self.expected_length:
+            id_str = id_str.rjust(self.expected_length, '0')
+        return id_str
 
 
 class DbRegexes:
@@ -53,7 +60,7 @@ class DbRegexes:
     GTR = DbRefRegex(db="GTR", prefixes="GTR", link="https://www.ncbi.nlm.nih.gov/gtr/tests/${1}/overview/")
     HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link="https://hpo.jax.org/app/browse/term/HP:${1}")
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
-    MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link="https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${1}")
+    MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link="https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${1}", expected_length=7)
     NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
     OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link="http://www.omim.org/entry/${1}")
@@ -71,7 +78,7 @@ class DbRefRegexResult:
 
     def __init__(self, cregx: DbRefRegex, idx: str, match: Match):
         self.cregx = cregx
-        self.idx = idx
+        self.idx = cregx.fix_id(idx)
         self.match = match
         self.internal_id = None
         self.summary = None
