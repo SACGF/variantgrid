@@ -154,7 +154,7 @@ let VCLinks = (function() {
         generateClingenKb() {
             let hgnc_id = this.hgncIdSafe();
             if (hgnc_id) {
-                let link = `https://search.clinicalgenome.org/kb/genes/${val}`;
+                let link = `https://search.clinicalgenome.org/kb/genes/${hgnc_id}`;
                 return new VCLink({text: 'ClinGen KB', href: link});
             }
             let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
