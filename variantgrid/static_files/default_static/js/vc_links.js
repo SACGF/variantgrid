@@ -127,8 +127,8 @@ let VCLinks = (function() {
         hgncIdSafe() {
             let hgnc_id = this.data[SpecialEKeys.HGNC_ID];
             if (hgnc_id) {
-                if (!val.toUpperCase().startsWith('HGNC')) {
-                    hgnc_id = 'HGNC:' + val;
+                if (!hgnc_id.toUpperCase().startsWith('HGNC')) {
+                    hgnc_id = 'HGNC:' + hgnc_id;
                 }
             }
             return hgnc_id;
@@ -137,7 +137,7 @@ let VCLinks = (function() {
         generateMonarchLink() {
             let hgnc_id = this.hgncIdSafe();
             if (hgnc_id) {
-                return new VCLink({text: 'Monarch Phen.', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/gene/${val}`});
+                return new VCLink({text: 'Monarch Phen.', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/gene/${hgnc_id}`});
             }
             let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
             if (gene_symbol) {
