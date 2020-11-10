@@ -17,7 +17,7 @@ class Command(BaseCommand):
         test = options["test"]
         for c_id, c_hgvs, gene_symbol in Classification.objects.filter(evidence__c_hgvs__value__isnull=False).values_list("id", "evidence__c_hgvs__value", "evidence__gene_symbol__value"):
             c_parts = CHGVS(c_hgvs)
-            if not c_parts.gene and gene_symbol:
+            if not c_parts.gene and gene_symbol and gene_symbol not in c_hgvs and ":c." in c_hgvs:
                 desired_chgvs = c_parts.with_gene_symbol(gene_symbol).full_c_hgvs
 
                 c: Classification
