@@ -82,6 +82,11 @@ class CHGVS:
         else:
             self.raw_c = full_c_hgvs
 
+    def with_gene_symbol(self, gene_symbol: str) -> 'CHGVS':
+        self.gene = gene_symbol
+        new_full_chgvs = f'{self.transcript}({self.gene}):{self.raw_c}'
+        return CHGVS(new_full_chgvs)
+
     def without_transcript_version(self) -> 'CHGVS':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier
