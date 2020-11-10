@@ -4,7 +4,7 @@ from collections import defaultdict
 
 class VCFConstant:
     FREEBAYES = "freeBayes"
-    CLC_AD = "CLCAD2"  # CLC Genomics Workbench
+    CLCAD2 = "CLCAD2"  # CLC Genomics Workbench - variant track counts for ref,alt (1 for each alt)
     DEFAULT_ALLELE_FIELD = 'AD'
     DEFAULT_READ_DEPTH_FIELD = 'DP'
     DEFAULT_GENOTYPE_QUALITY_FIELD = 'GQ'

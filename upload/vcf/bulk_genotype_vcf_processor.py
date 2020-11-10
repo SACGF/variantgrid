@@ -10,6 +10,8 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.postgres_utils import postgres_arrays
 from library.utils import get_git_hash
 import numpy as np
+
+from library.vcf_utils import VCFConstant
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
@@ -35,7 +37,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v10. Shift fields from UploadedVCF to VCF. Fix various bugs
     # v11. ?
     # v12. Ensure missing data in FreeBayes is -1 not -2147483648 (CyVCF2 returns this from format)
-    VCF_IMPORTER_VERSION = 12  # Change this if you make a major change to the code.
+    # v13. Support CLCAD2 from CLC workbench
+    VCF_IMPORTER_VERSION = 13  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -127,6 +130,19 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def get_ref_alt_allele_depth_function(vcf):
         if vcf.allele_depth_field == BulkGenotypeVCFProcessor.DEFAULT_AD_FIELD:
             return BulkGenotypeVCFProcessor.get_ref_alt_allele_depth_default  # use cyvcf2 defaults
+        if vcf.allele_depth_field == VCFConstant.CLCAD2:
+            # @see http://resources.qiagenbioinformatics.com/manuals/clcgenomicsworkbench/700/index.php?manual=Annotation_variant_formats.html
+            # CLCAD2 tag follow the order of REF and ALT, with one value for the REF and for each ALT
+            def _get_clcad2_ref_alt_depths(variant):
+                # VCF is decomposed so will only have 0 or 1 alt
+                clcad2 = variant.format(vcf.allele_depth_field).flatten()
+                ref = clcad2[0]
+                if len(clcad2) == 2:
+                    alt = clcad2[1]
+                else:
+                    alt = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                return np.array([ref]), np.array([alt])
+            return _get_clcad2_ref_alt_depths
         if vcf.ref_depth_field and vcf.alt_depth_field:  # explicitly set
             def get_ref_alt_depths(variant):
                 # CyVCF2 returns -1 for empty in gt_ref_depths / gt_alt_depths but this value in format()
@@ -140,7 +156,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 alt_depth[alt_depth == _NUMPY_INT_NAN_VALUE] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
                 return ref_depth, alt_depth
             return get_ref_alt_depths
-        raise ValueError(f"Don't know how to read allele depth for {vcf}")
+        raise ValueError(f"Don't know how to get ref and alt allele depth for {vcf}")
 
     @staticmethod
     def get_format_array_str(variant, field, as_type=None):

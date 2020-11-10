@@ -51,8 +51,8 @@ def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_al
             return
 
     # Most callers pack depths for all alleles in AD field
-    if VCFConstant.CLC_AD in vcf_formats:
-        ad = VCFConstant.CLC_AD
+    if VCFConstant.CLCAD2 in vcf_formats:
+        ad = VCFConstant.CLCAD2
     else:  # Default (GATK)
         ad = get_format_field(vcf_formats, default_allele_field)
 
