@@ -114,7 +114,9 @@ function showGnomadPopulations() {
             </div>
         </div>
 
-		<button id='population-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+    		<button id='population-save' class="btn btn-primary">save</button>
+        {% endif %}
     	{{ form.media }}
 	</form>
 </div>

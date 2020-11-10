@@ -51,6 +51,7 @@
 <script>
     // noinspection JSAnnotator
     const ANALYSIS_ID = {{ analysis.pk }};
+
     // noinspection JSAnnotator
     const ANALYSIS_TAGS_NODE_ID = {{ analysis_tags_node.pk }};
     // noinspection JSAnnotator
@@ -100,11 +101,12 @@
         // noinspection JSAnnotator
         const nodeConnections = {% render_nodes_connections_array nodes %};
         const analysisVariablesArray = {{ analysis_variables | jsonify }};
+        const analysisReadOnly = !{{ has_write_permission|jsonify }};
 
         setupNodeTypeSelect();
         setupErrorHandlers();
 
-		layout_analysis_panels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections);
+		layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections, analysisReadOnly);
 		loadInitialGridEditor();
 		setLockedAnalysisWarningToolTip();
         setNumVariantTags(false);
@@ -161,32 +163,37 @@
     {% endif %}
         <div id="analysis-and-toolbar-container" class="ui-layout-center noselect">
             <div id="analysis-toolbar" class="ui-layout-north">
+            {% if has_write_permission %}
                 <div id="node-types">{{ node_classes_form.node_types }}</div>
-                <div id="toolbar-buttons">
-
-            {% if analysis.lock_input_sources %}
-                <img id='lock-input-sources-warning-icon' class="toolbar-button" src="{% static 'icons/warning.png' %}" />
-                <div id='lock-input-sources-warning-tooltip' style='display: none'>
-                    <ul style='background-color: #FEBC00;'>
-                        <li>This analysis is locked - you cannot create new input source nodes.
-                    </ul>
-                </div>
             {% endif %}
-
-                <a id="add-node-button" class="toolbar-button" href="javascript:addNode()" title="Add node"></a>
-                <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"></a>
-                <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"></a>
-                <a id="settings-button" class="toolbar-button" href="javascript:analysisSettings()" title="Analysis Settings"></a>
-                <a href="javascript:viewTags()" class='left no-link-style' title="Tags">
-                    <span id="view-tags-button" class="toolbar-button"></span>
-                    <span id="number-of-tags"></span>
-                </a>
-                <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"></a>
-                {% if ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED %}
-                <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
+                <div id="toolbar-buttons">
+                {% if warnings %}
+                    <img id='lock-input-sources-warning-icon' class="toolbar-button" src="{% static 'icons/warning.png' %}" />
+                    <div id='lock-input-sources-warning-tooltip' style='display: none'>
+                        <ul style='background-color: #FEBC00;'>
+                            {% for w in warnings %}
+                                <li>{{ w }}
+                            {% endfor %}
+                        </ul>
+                    </div>
                 {% endif %}
+
+                {% if has_write_permission %}
+                    <a id="add-node-button" class="toolbar-button" href="javascript:addNode()" title="Add node"></a>
+                    <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"></a>
+                    <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"></a>
+                {% endif %}
+                    <a id="settings-button" class="toolbar-button" href="javascript:analysisSettings()" title="Analysis Settings"></a>
+                    <a href="javascript:viewTags()" class='left no-link-style' title="Tags">
+                        <span id="view-tags-button" class="toolbar-button"></span>
+                        <span id="number-of-tags"></span>
+                    </a>
+                    <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"></a>
+                    {% if ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED %}
+                    <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
+                    {% endif %}
+                    </div>
                 </div>
-            </div>
 
             <div id="analysis-container" class="ui-layout-center">
                 <div>

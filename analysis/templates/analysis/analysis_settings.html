@@ -77,7 +77,9 @@
 	</div>
 	<hr>
 	<div>
-		<button class="btn btn-outline-danger" id='force-reload-nodes-button' type='button'>Force Reload Nodes</button>
+        {% if has_write_permission %}
+		    <button class="btn btn-outline-danger" id='force-reload-nodes-button' type='button'>Force Reload Nodes</button>
+        {% endif %}
         <button class="btn btn-outline-primary" id='close-analysis-settings' type='button'>Close</button>
 	</div>
 

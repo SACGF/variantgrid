@@ -1087,7 +1087,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         if initial_data:
             if SpecialEKeys.C_HGVS in patch:
-                c_hgvs = patch[SpecialEKeys.C_HGVS].value
+                c_parts_cell = patch[SpecialEKeys.C_HGVS]
+                c_hgvs = c_parts_cell.value
                 if c_hgvs:
                     c_parts = CHGVS(full_c_hgvs=c_hgvs)
                     transcript = c_parts.transcript
@@ -1103,7 +1104,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
                     gene_symbol_cell = patch[SpecialEKeys.GENE_SYMBOL]
                     if gene_symbol and not gene_symbol_cell.provided:
+                        # if no gene symbol value provided, populate it from c.hgvs
                         gene_symbol_cell.value = gene_symbol
+                    elif not gene_symbol and gene_symbol_cell.provided:
+                        # if gene symbol provided (but not in c.hgvs) inject it into it
+                        c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
+                        c_parts_cell.value = c_parts.full_c_hgvs
+
 
         # if submitting via API treat null as {value:None, explain:None, notes:None} for known keys
         # so we clear out any previous values but still retain immutability

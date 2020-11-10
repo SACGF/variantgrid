@@ -34,7 +34,8 @@
 
 				event.preventDefault();
 			}
-			
+
+        {% if has_write_permission %}
 			grid.bind('jqGridFilterSearch', save_filters);
 			grid.bind('jqGridFilterReset', save_filters);
 			
@@ -43,8 +44,12 @@
 				$("#filter-messages").text(UNSAVED_MESSAGE);
 			};
 			$("select", searchDialog).change(unsavedChanges);
-			$("input[type=button]", searchDialog).click(unsavedChanges);
+            $("input[type=button]", searchDialog).click(unsavedChanges);
+            $("input[type=button]", searchDialog).hide();
 			$("input[type=text]", searchDialog).change(unsavedChanges);
+        {% else %}
+            $(".EditButton", searchDialog).hide();
+        {% endif %}
 		}
 		hideLoadingOverlay();
 	}

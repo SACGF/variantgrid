@@ -100,7 +100,9 @@
         {% if form.output_node  %}
             <p>{{ form.output_node.label }}{{ form.output_node }}</p>
         {% endif %}
-		<button id="gene-list-button" class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+    		<button id="gene-list-button" class="btn btn-primary">save</button>
+        {% endif %}
 		{{ form.media }}
 	</form>
 </div>

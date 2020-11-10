@@ -46,7 +46,9 @@
                 <b>Require All Zygosity Calls:</b> {{ form.require_zygosity }}
             </span>
 		</div>
-		<button id='pedigree-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+    		<button id='pedigree-save' class="btn btn-primary">save</button>
+        {% endif %}
 		{{ form.media }}
 	</form>
 </div>

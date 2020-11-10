@@ -40,7 +40,7 @@ from annotation.models.models import MutationalSignatureInfo
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.database_utils import run_sql
-from library.django_utils import add_save_message, get_field_counts
+from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
 from patients.models_enums import TrioSample
@@ -114,6 +114,8 @@ def view_analysis(request, analysis_id, active_node_id=0):
                "active_node_id": active_node_id,
                "node_help": node_help_dict,
                "analysis_variables": analysis_variables,
+               "has_write_permission": analysis.can_write(request.user),
+               "warnings": analysis.get_warnings(request.user),
                "ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED": settings.ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED}
     return render(request, 'analysis/analysis.html', context)
 
@@ -593,15 +595,19 @@ def view_analysis_settings(request, analysis_id):
     context = {"analysis": analysis,
                "create_analysis_template_form": form,
                "new_analysis_settings": analysis_settings,
-               "has_write_permission": analysis.user == request.user}
+               "has_write_permission": analysis.can_write(request.user)}
     return render(request, 'analysis/analysis_settings.html', context)
 
 
 def analysis_settings_details_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     form = forms.AnalysisForm(request.POST or None, user=request.user, instance=analysis)
+    has_write_permission = analysis.can_write(request.user)
+    if not has_write_permission:
+        set_form_read_only(form)
 
     if request.method == "POST":
+        analysis.check_can_write(request.user)
         if form.has_changed:
             valid = form.is_valid()
             if valid:
@@ -617,13 +623,13 @@ def analysis_settings_details_tab(request, analysis_id):
     context = {"analysis": analysis,
                "form": form,
                "new_analysis_settings": analysis_settings,
-               "has_write_permission": analysis.user == request.user}
+               "has_write_permission": has_write_permission}
     return render(request, 'analysis/analysis_settings_details_tab.html', context)
 
 
 def analysis_settings_node_counts_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
-    return _analysis_settings_node_counts_tab(request, analysis)
+    return _analysis_settings_node_counts_tab(request, analysis, has_write_permission=analysis.can_write(request.user))
 
 
 def _analysis_settings_node_counts_tab(request, analysis, pass_analysis_settings=True, has_write_permission=True):

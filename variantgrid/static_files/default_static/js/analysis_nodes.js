@@ -103,7 +103,7 @@ function sendUpdateNodeMessage(nodeId, op, params, on_success_function) {
 	});
 }
 
-function addNodesToDOM(selector, nodeDataArray) {
+function addNodesToDOM(selector, nodeDataArray, readOnly) {
 	selector = $(selector);
 	for (var i=0 ; i<nodeDataArray.length ; ++i) {
 		node = createNodeFromData(nodeDataArray[i]);
@@ -232,21 +232,23 @@ function add_delete_overlay(connection) {
 }
 
 
-function addConnection(sourceId, targetId, side) {
+function addConnection(sourceId, targetId, side, readOnly) {
 	var source = getEndpoint(sourceId, 'source');
 	var target = getEndpoint(targetId, 'target', side);
 
-	var connection = jsPlumb.connect({source: source, target: target, fireEvent: false});
-	add_delete_overlay(connection);
+	var connection = jsPlumb.connect({source: source, target: target, fireEvent: false, detachable: !readOnly});
+	if (!readOnly) {
+		add_delete_overlay(connection);
+	}
 	connection.setReattach(false);
 	return connection;
 }
 
 
-function attatchAnalysisNodeConnections(connections) {
+function attatchAnalysisNodeConnections(connections, readOnly) {
 	for (var i=0 ; i<connections.length ; ++i) {
 		var conn = connections[i];
-		addConnection(conn["source_id"], conn["target_id"], conn["side"]);
+		addConnection(conn["source_id"], conn["target_id"], conn["side"], readOnly);
 	}
 }
 
@@ -512,20 +514,20 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 }
 
 
-function setupConnections(nodes_selector) {
+function setupConnections(nodes_selector, readOnly) {
 	// configure some drop options for use by all endpoints.
-	var exampleDropOptions = {
+	let exampleDropOptions = {
 		tolerance:"touch",
 		hoverClass:"dropHover",
 		activeClass:"dragActive"
 	};
 
-	var connectorStyle = {
-			lineWidth : 3,
-			strokeStyle: endpointColor,
+	let connectorStyle = {
+		lineWidth : 3,
+		strokeStyle: endpointColor,
 	};
 	
-	var inputEndpoint = {
+	let inputEndpoint = {
 		endpoint: ["Dot", { radius:11 }],
 		paintStyle:{ width:25, height:21, fillStyle: endpointColor },
 		reattach:true,
@@ -539,6 +541,7 @@ function setupConnections(nodes_selector) {
 		endpoint:["Dot", { radius:11 }],
 		paintStyle:{ fillStyle: endpointColor },
 		isSource: true,
+		enabled: !readOnly,
 		connectorStyle : connectorStyle,
 		connector: ["Bezier", { curviness:63 } ],
 		maxConnections: -1,
@@ -574,7 +577,9 @@ function setupConnections(nodes_selector) {
 		
 		if ($(this).hasClass("outputEndpoint")) {
 			var e = jsPlumb.addEndpoint(this, { anchor:"BottomCenter" }, outputEndpoint);
-			add_click_overlay(e);
+			if (!readOnly) {
+				add_click_overlay(e);
+			}
 		}
 	});
 }
@@ -598,33 +603,18 @@ function unselectActive() {
     $("." + ACTIVE_NODE_COUNT_CLASS, container).removeClass(ACTIVE_NODE_COUNT_CLASS);
 }
 
-function setupNodes(nodes_selector) {
-	function dragStop(event) {
-		nodeId = $(this).attr("node_id");
-		var position = $(this).position();
-		var params = {'x' : position.left, 'y' : position.top};
-		updateNode(nodeId, 'move', params);
 
-		// Avoid click event at end of drag
-		// http://stackoverflow.com/questions/3486760/how-to-avoid-jquery-ui-draggable-from-also-triggering-click-event/13973319#13973319
-		$( event.toElement ).one('click', function(e){ e.stopImmediatePropagation(); } );
-	}
-
-	var params = {	activeClass: ACTIVE_CLASS,
-					stopNative: dragStop,
-					stopAll: dragStop};
-	nodes_selector.multiDraggable(params);
-
+function setupNodes(nodes_selector, readOnly) {
 	nodes_selector.click(function() {
 		unselectActive();
 		$(this).addClass(ACTIVE_CLASS);
-		var nodeId = $(this).attr('node_id');
+		let nodeId = $(this).attr('node_id');
 		loadNodeData(nodeId, null, true);
 	});
 	
-	setupConnections(nodes_selector);
+	setupConnections(nodes_selector, readOnly);
 	
-	var nodeCountTypes = ANALYSIS_SETTINGS['node_count_types'];
+	let nodeCountTypes = ANALYSIS_SETTINGS['node_count_types'];
 	if (nodeCountTypes) {
 		attachVariantCounters(nodes_selector, nodeCountTypes);
 	}
@@ -640,16 +630,44 @@ function setupNodes(nodes_selector) {
 		}
 		$(this).attr('title', node_help);
 	});
-	
-	// unselectActive on start to also unselect node counts
-	$('#analysis-container').selectable({  filter:"div.window",
-	                                       start: function() {
-												// clear editor/grid so people don't get confused about active node
-												replaceEditorWindow();
-												loadGridAndEditorForNode();
-										   },
-	                                       cancel:'.cancel'});
+
+	if (!readOnly) {
+		setupNodeModifications(nodes_selector);
+	}
 }
+
+
+function setupNodeModifications(nodes_selector) {
+	function dragStop(event) {
+		let nodeId = $(this).attr("node_id");
+		let position = $(this).position();
+		let params = {'x' : position.left, 'y' : position.top};
+		updateNode(nodeId, 'move', params);
+
+		// Avoid click event at end of drag
+		// http://stackoverflow.com/questions/3486760/how-to-avoid-jquery-ui-draggable-from-also-triggering-click-event/13973319#13973319
+		$( event.toElement ).one('click', function(e){ e.stopImmediatePropagation(); } );
+	}
+
+	let params = {
+		activeClass: ACTIVE_CLASS,
+		stopNative: dragStop,
+		stopAll: dragStop
+	};
+	nodes_selector.multiDraggable(params);
+
+	// unselectActive on start to also unselect node counts
+	$('#analysis-container').selectable({
+		filter: "div.window",
+		start: function () {
+			// clear editor/grid so people don't get confused about active node
+			replaceEditorWindow();
+			loadGridAndEditorForNode();
+		},
+		cancel: '.cancel'
+	});
+}
+
 
 function getEndpointSide(ep) {
 	var uuid = ep.getUuid();
@@ -683,7 +701,7 @@ jsPlumb.ready(function() {
 		updateNode(targetId, 'update_connection', params, on_success_function);
 	};
 
-    window.variantgridPipeline = {init : function() {
+    window.variantgridPipeline = {init : function(readOnly) {
 		// setup jsPlumb defaults.
 		jsPlumb.importDefaults({
 			DragOptions : { cursor: 'pointer', zIndex:2000 },
@@ -705,7 +723,7 @@ jsPlumb.ready(function() {
 		setupHideInvalidConnectionsOnDrag();		
 
 		var nodes_selector = $(".window");
-		setupNodes(nodes_selector);
+		setupNodes(nodes_selector, readOnly);
 		
 		if (!_initialised) {
 			$(".drag").click(function() {

@@ -18,8 +18,9 @@
             {% load allele_frequency_tags %}
             {% allele_frequency_controls node %}
             </div>
-    
-            <button id='allele-frequency-node-save' class="btn btn-primary">save</button>
+            {% if has_write_permission %}
+                <button id='allele-frequency-node-save' class="btn btn-primary">save</button>
+            {% endif %}
         </div>
         {{ form.media }}
     </form>

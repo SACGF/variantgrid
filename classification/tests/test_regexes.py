@@ -112,7 +112,7 @@ class RegexTests(TestCase):
         self.assertEqual(str(results[0]), 'SNP:123')
 
     def test_mondo(self):
-        text = 'MONDO:000001'
+        text = 'MONDO:001'
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 1)
-        self.assertEqual(str(results[0]), 'MONDO:000001')
+        self.assertEqual(str(results[0]), 'MONDO:0000001')

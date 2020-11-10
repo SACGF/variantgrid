@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Tuple, Sequence, Dict
+from typing import Tuple, Sequence, Dict, List
 
 from django.apps import apps
 from django.contrib.auth.models import User
@@ -178,6 +178,15 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
             av.save()
 
         return analysis_copy
+
+    def get_warnings(self, user: User) -> List[str]:
+        warnings = []
+        if self.lock_input_sources:
+            warnings.append("This analysis is LOCKED - you cannot create new input source nodes.")
+        if not self.can_write(user):
+            warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
+        return warnings
+
 
 
 @receiver(pre_delete, sender=Analysis)

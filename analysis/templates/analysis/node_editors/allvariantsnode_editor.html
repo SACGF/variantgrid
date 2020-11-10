@@ -18,7 +18,9 @@
 		  <b>Warning:</b> This node retrieves all variants in the database - this can change! {{ out_of_date_message }} 
 		</div>
 	{% endif %}
+    {% if has_write_permission %}
 		<button id='all-variants-save' class="btn btn-primary">save</button>
+    {% endif %}
 	</form>
 </div>
 {% endblock content %}
