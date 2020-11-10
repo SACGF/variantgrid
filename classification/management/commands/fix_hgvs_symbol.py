@@ -45,6 +45,6 @@ class Command(BaseCommand):
                                 delta_changed = True
 
                     if not test:
-                        vc.save(update_fields=["evidence", "delta"])
+                        vc.save(update_fields=["published_evidence", "delta"])
 
                 print(f"Classification classification {c_id} {c_hgvs} - > {desired_chgvs}")
