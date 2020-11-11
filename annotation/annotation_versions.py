@@ -1,3 +1,5 @@
+import sys
+
 from django.db.models.aggregates import Max, Min, Count
 from django.utils import timezone
 import logging
@@ -26,35 +28,39 @@ def get_variant_annotation_version(genome_build: GenomeBuild):
     return variant_annotation_version
 
 
-def get_unannotated_count_min_max(annotation_version, min_variant_id, annotation_batch_min, annotation_batch_max):
-    """ Get at most annotation_batch_size unannotated variants above min_variant_id """
+def _get_unannotated_count_min_max(annotation_version, search_min: int, annotation_batch_min, annotation_batch_max):
+    """ Get at most annotation_batch_size unannotated variants above search_min """
+
+    if annotation_batch_max is None:
+        annotation_batch_max = sys.maxsize
 
     # Original code used a sort then limit to get a certain number of variants above a minimum but this was slow
     # when the variant table was huge. So we attempt to do this quickly by grabbing blocks of the primary key.
-    # Usually variant table is ~55% alt alleles so this should get some, however sometimes it fails if a whole block
-    # has been deleted. In that case we fall back on the slower query
+    variant_max = highest_pk(Variant)
+
+    unannotated_count = 0
+    min_variant_id = None
     max_variant_id = None
-    if annotation_batch_max and min_variant_id is not None:
-        max_variant_id = min_variant_id + annotation_batch_max
-    qs = get_unannotated_variants_qs(annotation_version, min_variant_id=min_variant_id, max_variant_id=max_variant_id)
-    results = _get_unannotated_count_min_max_for_qs(qs)
+    while True:
+        remaining_max = annotation_batch_max - unannotated_count
+        search_max = min(variant_max, search_min + remaining_max)
+        if search_min > variant_max:
+            break
 
-    # Check if range restriction was too harsh
-    if max_variant_id:
-        too_few = results["count"] < annotation_batch_min
-        might_be_more = max_variant_id < highest_pk(Variant)
-        if too_few and might_be_more:
-            print(f"Range: {min_variant_id}-{max_variant_id}. only returned {results['count']}")
-            print(f"Wanted: {annotation_batch_min}, got {results['count']} - doing slow query")
-            # Do slow query
-            qs = get_unannotated_variants_qs(annotation_version, min_variant_id=min_variant_id)
-            qs = qs.order_by("pk")[:annotation_batch_max]
-            results = _get_unannotated_count_min_max_for_qs(qs)
-    return results["count"], results["min_variant_id"], results["max_variant_id"]
+        logging.debug("Searching for unannotated variants in range: %d-%d", search_min, search_max)
+        qs = get_unannotated_variants_qs(annotation_version, min_variant_id=search_min, max_variant_id=search_max)
+        results = qs.aggregate(count=Count("id"), min_variant_id=Min("id"), max_variant_id=Max("id"))
+        if results["count"]:
+            unannotated_count += results["count"]
+            if min_variant_id is None:
+                min_variant_id = results["min_variant_id"]
+            max_variant_id = results["max_variant_id"]
+            if unannotated_count >= annotation_batch_min:
+                break
 
+        search_min = search_max + 1
 
-def _get_unannotated_count_min_max_for_qs(qs):
-    return qs.aggregate(count=Count("id"), min_variant_id=Min("id"), max_variant_id=Max("id"))
+    return unannotated_count, min_variant_id, max_variant_id
 
 
 def get_annotation_range_lock_and_unannotated_count(variant_annotation_version: VariantAnnotationVersion,
@@ -70,13 +76,13 @@ def get_annotation_range_lock_and_unannotated_count(variant_annotation_version: 
     # This query is fast (it's only when you join to tables looking for unannotated that it's slow)
     min_data = qs.aggregate(Min("pk"))
     # If max_locked_variant_id is the highest Variant on the system this will be None so use max + 1
-    min_variant_id = min_data["pk__min"] or max_locked_variant_id + 1
+    search_min = min_data["pk__min"] or max_locked_variant_id + 1
 
     annotation_version = variant_annotation_version.get_any_annotation_version()
-    unannotated_variants_count, min_variant_id, max_variant_id = get_unannotated_count_min_max(annotation_version,
-                                                                                               min_variant_id,
-                                                                                               annotation_batch_min,
-                                                                                               annotation_batch_max)
+    unannotated_variants_count, min_variant_id, max_variant_id = _get_unannotated_count_min_max(annotation_version,
+                                                                                                search_min,
+                                                                                                annotation_batch_min,
+                                                                                                annotation_batch_max)
 
     annotation_range_lock = None
     if unannotated_variants_count:
