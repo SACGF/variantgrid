@@ -1,0 +1,384 @@
+{% extends "uicore/page/base.html" %}
+{% load user_tags %}
+{% load classification_tags %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% block title %}Condition Alias{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        .selectable-card.selected .card-body {
+            background-color: #efe;
+        }
+        .selectable-card .card-footer:hover .fa-plus-circle {
+            color: blue !important;
+        }
+        .selectable-card .card-footer:hover .fa-minus-circle {
+            color: red !important;
+        }
+        .selectable-card .card-footer:hover {
+            background-color: #eef;
+        }
+        .btn.active:before {
+            content: '\f00c';
+            font-family: 'FontAwesome';
+            margin-right: 8px;
+        }
+        .joiner {
+            display: inline-block;
+            text-align: center;
+            width: 3rem;
+        }
+        .fa-minus-circle:after {
+            font-family: 'Raleway',serif;
+            content: 'Remove';
+            margin-left: 6px;
+            font-weight: 500;
+            color: #844;
+        }
+        .fa-plus-circle:after {
+            font-family: 'Raleway',serif;
+            content: 'Add';
+            margin-left: 6px;
+            font-weight: 500;
+            color: #448;
+        }
+    </style>
+    <script>
+        matches = {};
+        gene_symbol = "{{ condition_alias.source_gene_symbol }}";
+        meta = {{ meta | jsonify }};
+        text_matches = {};
+
+        function submit(next) {
+            let keys = Object.keys(matches);
+            keys.sort();
+
+            let form = $("#alias-form");
+            form.find(`[name="aliases"]`).val(keys.join(","));
+            form.find(`[name="join_mode"]`).val($(`[name="multiple-mode"]:checked`).val() == "and" ? "A" : "O");
+            if (next) {
+                form.find(`[name="next"]`).val("next")
+            }
+            form.submit();
+            return false;
+        }
+
+        function toggleMatch(result) {
+            let adding = !matches[result.id];
+            if (adding) {
+                matches[result.id] = result;
+            } else {
+                delete matches[result.id];
+            }
+            let matchesDom = $("#condition-alias-matches");
+            matchesDom.empty();
+
+            let keys = Object.keys(matches);
+            keys.sort();
+            for (let key of keys) {
+                let card = makeCard(matches[key], 'match').appendTo(matchesDom);
+                if (key === result.id) {
+                    card.collapse('show');
+                }
+            }
+
+            updateResultCount();
+
+            let cards = $(`[data-mondo="${result.id}"]`)
+            let icon = cards.find('.toggle-icon');
+            if (adding) {
+                cards.removeClass('possible').addClass('selected');
+                icon.removeClass('fa-plus-circle').addClass('fa-minus-circle');
+            } else {
+                cards.removeClass('selected').addClass('possible');
+                icon.removeClass('fa-minus-circle').addClass('fa-plus-circle');
+            }
+        }
+
+        function updateResultCount() {
+            let keys = Object.keys(matches);
+
+            let zeroHandler = $("#zero-handling");
+            let multipleHandler = $("#multiple-handling");
+
+            if (keys.length === 0) {
+                zeroHandler.collapse('show');
+            } else {
+                zeroHandler.collapse('hide');
+            }
+
+            if (keys.length >= 2) {
+                multipleHandler.collapse('show');
+            } else {
+                multipleHandler.collapse('hide');
+            }
+        }
+
+        function panelAppDom(mondo_id) {
+            let panelData = (meta[mondo_id] || {})['panelapp'];
+            if (!panelData) {
+                return null;
+            }
+            let dom = $('<div>', {"class": "border rounded p-2 mb-2", html:[
+                    $('<i class="fas fa-circle mr-2"></i>').css('color', '#4c4'),
+                    $('<span>', {text: "PanelApp Australia", class:"text-weight-bold"}),
+                    "<br/>",
+                    $('<label>', {text: "Phenotype:"}),
+                    " ",
+                    $('<span>', {text: panelData.phenotype_row, class:'text-muted'}),
+                    "<br/>",
+                    $('<label>', {text: "Evidence:"}),
+                    " ",
+                    $('<span>', {text: panelData.evidence.join(", "), class:'text-muted'})
+            ]});
+            return dom;
+        }
+
+        function monarchDom(mondo_id) {
+            let monarchData = (meta[mondo_id] || {})['monarch'];
+            if (!monarchData) {
+                return null;
+            }
+            let dom = $('<div>', {"class": "border rounded p-2 mb-2", html:[
+                    $('<i class="fas fa-circle mr-2"></i>').css('color', '#4c4'),
+                    $('<span>', {text: "Monarch", class:"text-weight-bold"}),
+                    "<br/>",
+                    $('<span>', {text: monarchData, class:'text-muted'}),
+                    " ",
+                    $('<span>', {text: gene_symbol, class:'text-muted'})
+            ]});
+            return dom;
+        }
+
+        function hasMeta(mondo_id) {
+            return !!meta[mondo_id];
+        }
+
+        function makeCard(result, source) {
+            let adding = !!matches[result.id];
+            let icon = adding ? "minus" : "plus";
+            let mode = adding ? "selected" : "possible";
+
+            let htmlWrapper = $(`
+                <div class="card selectable-card ${mode} w-100 mb-2" data-mondo="${result.id}" data-source="${source}">
+                    <div class="card-header"><a href="${result.url}" class="external-link" target="_blank">${result.id}</a></div>
+                    <div class="card-body"><label class="mb-2 d-block">${result.label}</label></div>
+                    <div class="card-footer" style="cursor:pointer"><i class="toggle-icon fas fa-${icon}-circle"></i></div>
+                </div>
+            `);
+            let cardBody = htmlWrapper.find('.card-body');
+            let cardFooter = htmlWrapper.find('.card-footer');
+
+            if (source === 'text-match' && hasMeta(result.id)) {
+                $('<a>', {
+                    html:`<i class="far fa-hand-point-left"></i> Find result in gene matched terms`,
+                    click: function() {
+                        let geneMatch = $(`[data-mondo="${result.id}"][data-source="gene-match"]`);
+                        geneMatch[0].scrollIntoView(true);
+                        geneMatch.effect('highlight', {}, 500);
+                    },
+                    class: 'hover-link'
+                }).appendTo(cardBody);
+                htmlWrapper.css('opacity', 0.8);
+            } else {
+                let dom = null;
+                dom = panelAppDom(result.id);
+                if (dom) {
+                    dom.appendTo(cardBody);
+                }
+                dom = monarchDom(result.id);
+                if (dom) {
+                    dom.appendTo(cardBody);
+                }
+                cardBody.append($('<div>', {
+                    class: "text-dark",
+                    text: result.definition || "This MONDO term has not been loaded locally"
+                }));
+            }
+            cardFooter.click(() => {
+                toggleMatch(result);
+            });
+            return htmlWrapper;
+        }
+
+        function searchConditions() {
+            let text = $('#condition-search-text').val();
+            // TODO load URLS
+            let url = '{% url "condition_search_api" %}';
+            let resultsDom = $("#condition-search-results");
+            resultsDom.LoadingOverlay('show');
+            $.ajax({
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                data: {
+                    "search_term": text,
+                    "gene_symbol": gene_symbol
+                },
+                url: url,
+                type: 'GET',
+                error: (call, status, text) => {
+                    resultsDom.LoadingOverlay('hide');
+                    resultsDom.empty();
+                    console.log(status);
+                    console.log(text);
+                    $('<div/>', {class:'no-value w-100 text-center', text:'Error Retrieving'}).appendTo(resultsDom);
+                },
+                success: async (results) => {
+                    $("#search-result-for").text(text);
+                    resultsDom.LoadingOverlay('hide');
+                    resultsDom.empty();
+                    text_matches = {};
+                    if (results.length) {
+                        for (let result of results) {
+                            makeCard(result, 'text-match').appendTo(resultsDom);
+                            text_matches[result.id] = true;
+                        }
+                    } else {
+                        $('<div/>', {class:'no-value w-100 text-center', text:'No Results'}).appendTo(resultsDom);
+                    }
+                }
+            });
+        }
+
+        $(document).ready(() => {
+            $("#condition-search-button").click(() => {
+                searchConditions();
+            });
+            $("#condition-search-button").click(() => {
+                searchConditions();
+            });
+            $('#alias-save').click(() => submit(false));
+            $('#alias-save-next').click(() => submit(true));
+
+            let matches = {{ matches | jsonify }};
+            for (let match of matches) {
+                toggleMatch(match);
+            }
+
+            let geneMatchesDom = $("#gene-search-results")
+            let geneMatches = {{ possibilities | jsonify }};
+            if (geneMatches.length) {
+                geneMatchesDom.empty();
+            }
+            for (let geneMatch of geneMatches) {
+                makeCard(geneMatch, 'gene-match').appendTo(geneMatchesDom);
+            }
+
+            updateResultCount();
+            searchConditions();
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <a href="{% url 'condition_aliases' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all aliases</a>
+        {% page_help_embedded title='Condition Alias' %}
+            <p>
+            Use this page to assign MONDO term(s) to a combination of the source lab, gene symbol and condition text.
+            </p>
+            <p>
+            Note that the gene symbol is automatically included in searches as many diseases have multiple versions distinguished between which gene is the cause.
+            </p>
+            <p>
+            If the condition text actually relates to two or more conditions, you can search multiple times and add multiple terms.
+            If doing that you will need to determine if the matches are all affecting the patient, or if it's just one of them but unsure as to which.
+            </p>
+        {% end_page_help_embedded %}
+        <form id="alias-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="aliases" />
+            <input type="hidden" name="join_mode" />
+            <input type="hidden" name="next" />
+
+
+            <div class="card">
+                <div class="card-header">Condition Alias ({{ condition_alias.id }})</div>
+                <div class="card-body">
+                    {% labelled label="Classification Records Affected" %}
+                        <ul class="list-group">
+                            {% for csm in classification_subset %}
+                                <a class="list-group-item list-group-item-action" target="_blank" href="{% url 'view_classification' csm.classification_id %}">{{ csm.classification.friendly_label }}</a>
+                            {% endfor %}
+                            {% if extra_count %}
+                            <li class="list-group-item">And <b>{{ extra_count }}</b> more</li>
+                            {% endif %}
+                        </ul>
+                    {% endlabelled %}
+                    {% labelled label="Current Status" %}<span class="dt-status"><span class="val-{{condition_alias.status}}">{{ condition_alias.get_status_display }}</span></span>{% endlabelled %}
+                    {% labelled label="Lab" %}{{ condition_alias.lab.name }}{% endlabelled %}
+                    {% labelled label="Gene Symbol" %}{{ condition_alias.source_gene_symbol }}{% endlabelled %}
+                    {% labelled label="Text" %}<b>{{ condition_alias.source_text }}</b>{% endlabelled %}
+                    {% if condition_alias.updated_by %}
+                        {% labelled label="Last Updated by" %}
+                            {% user condition_alias.updated_by show_avatar=True %}
+                        {% endlabelled %}
+                    {% endif %}
+                    <hr/>
+                    {% labelled label="Matches" %}
+                        <div id="zero-handling" class="collapse">
+                            <div id="zero-handling" class="form-check">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox" id="unmatchable" name="unmatchable" value="unmatchable"
+                                            {% if condition_alias.status == 'U' %}checked="checked"{% endif %}>
+                                    Tick if Unmatchable
+                                </label>
+                            </div>
+                            <div class="no-value">
+                                No matches selected yet, review the search results below.<br/>
+                                If the source text can't be reliably matched to MONDO terms, mark it as unmatchable.
+                            </div>
+                        </div>
+                        <div id="multiple-handling" class="collapse">
+                            <div class="btn-group btn-group-toggle my-3" data-toggle="buttons">
+                                <label class="btn btn-outline-secondary {% if condition_alias.join_mode != "A" %}active{% endif %}">
+                                    <input type="radio" name="multiple-mode" id="multiple-mode-or" value="or" autocomplete="off" {% if condition_alias.join_mode != "A" %}checked{% endif %}> Uncertain (or)
+                                </label>
+                                <label class="btn btn-outline-secondary {% if condition_alias.join_mode == "A" %}active{% endif %}">
+                                    <input type="radio" name="multiple-mode" id="multiple-mode-and" value="and" autocomplete="off" {% if condition_alias.join_mode == "A" %}checked{% endif %}> Co-occuring (and)
+                                </label>
+                            </div>
+                        </div>
+                        <div id="condition-alias-matches">
+
+                        </div>
+                    {% endlabelled %}
+                </div>
+                <div class="card-footer">
+                    <div class="btn-toolbar" style="float:right">
+                        <button id="alias-save" class="btn btn-primary">Save</button>
+                        <button id="alias-save-next" class="btn btn-primary">Save & Next</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="mt-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <h4 class="w-100 text-center">Gene Matches for <a href="https://panelapp.agha.umccr.org/panels/entities/{{ condition_alias.source_gene_symbol }}" target="_blank" class="external-link hover-link">
+                        {{ condition_alias.source_gene_symbol }}
+                    </a>
+                    </h4>
+                    <div id="gene-search-results" class="mt-4">
+                        <div class="w-100 text-center no-value">No results found for gene from PanelApp or Monarch</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="w-100 text-center mt-4 mt-md-0">Results for text search "<span id="search-result-for"></span>"</h4>
+                    {% labelled label="Search MONDO Again Using" %}
+                        <div class="input-group">
+                            <input class="form-control" type="text" id="condition-search-text" value="{{ condition_alias.source_text }} {{ condition_alias.source_gene_symbol }}" />
+                            <span class="input-group-append"><button id="condition-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
+                        </div>
+                    {% endlabelled %}
+                    <div id="condition-search-results" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
