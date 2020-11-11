@@ -10,11 +10,11 @@
         <h3>VariantGrid Version</h3>
 
         <form class="mt-4">
-            {% labelled id="git-last-modified" label="Git Modified Date" %}{% timestamp git_last_modified time_ago=True %}{% endlabelled %}
-            {% labelled id="git-hash" label="Git Hash" value_css="text-monospace"%}{{ git_hash }}{% endlabelled %}
+            {% labelled id="git-last-modified" label="Git Modified Date" %}{% timestamp git.last_modified_date time_ago=True %}{% endlabelled %}
+            {% labelled id="git-hash" label="Git Hash" value_css="text-monospace"%}{{ git.hash }}{% endlabelled %}
             {% labelled id="git-branch" label="Branch" %}
-                {% if git_branch_link %}<a href="{{git_branch_link}}" target="_blank" class="external-link hover-link">{{ git_branch }}</a>
-                {% else %}{{ git_branch }}
+                {% if git.branch_link %}<a href="{{ git.branch_link }}" target="_blank" class="external-link hover-link">{{ git.branch }}</a>
+                {% else %}{{ git.branch }}
                 {% endif %}
             {% endlabelled %}
         </form>

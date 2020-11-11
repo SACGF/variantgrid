@@ -11,9 +11,9 @@ from django.urls.exceptions import Resolver404
 from global_login_required import login_not_required
 
 from library.email import Email
+from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
 from library.log_utils import report_exc_info
-from library.utils import get_git_last_modified_date, get_git_hash, get_git_branch
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.models import UserSettings
@@ -79,20 +79,14 @@ def authenticated(request):
 
 
 def version(request):
-    git_last_modified = get_git_last_modified_date(settings.BASE_DIR)
-    git_hash = get_git_hash(settings.BASE_DIR)
-    git_branch = get_git_branch(settings.BASE_DIR)
-    git_site = settings.GIT_WEBSITE
-    git_branch_link = None
-    if git_site and git_branch and "github.com" in git_site:
-        git_branch_link = f"{git_site}/commits/{git_branch}"
+    git = Git(settings.BASE_DIR)
 
     deployments = list()
     for deployment in Deployment.objects.order_by('-created').all()[0:10]:
         deployment_git_hash = deployment.git_hash
         deployment_git_link = None
-        if git_site and git_hash and deployment_git_hash and git_hash != deployment_git_hash:
-            deployment_git_link = f"{git_site}/compare/{deployment_git_hash}...{git_hash}"
+        if git.site and git.hash and deployment_git_hash and git.hash != deployment_git_hash:
+            deployment_git_link = f"{git.site}/compare/{deployment_git_hash}...{git.hash}"
 
         deployments.append({
             "git_hash": deployment.git_hash,
@@ -109,14 +103,10 @@ def version(request):
                 weekly_update_users.append(user)
 
     context = {
-        "git_hash": git_hash,
-        "git_last_modified": git_last_modified,
-        "git_branch": git_branch,
-        "git_branch_link": git_branch_link,
+        "git": git,
         "deployment_history": deployments,
         "weekly_update_users": weekly_update_users
     }
-
     return render(request, 'version.html', context)
 
 

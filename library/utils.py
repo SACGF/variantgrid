@@ -3,10 +3,10 @@ import io
 from collections import defaultdict
 from datetime import date
 from operator import attrgetter
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from dateutil import parser
-from dateutil.parser import parse
 from decimal import Decimal
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
@@ -134,20 +134,9 @@ def upper(string):
     return string
 
 
-def get_git_hash(directory):
-    git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=directory)
-    return git_hash.decode().strip()
-
-
-def get_git_last_modified_date(directory):
-    git_hash = subprocess.check_output(["git", "log", "-1", "--format=%cd"], cwd=directory)
-    date_string = git_hash.decode().strip()
-    return parse(date_string)
-
-
-def get_git_branch(directory):
-    git_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=directory)
-    return git_branch.decode().strip()
+def is_url(url):
+    parse_result = urlparse(url)
+    return bool(parse_result.scheme in ('http', 'https') and parse_result.netloc)
 
 
 def rgb_hex_to_tuples(rgb):
@@ -304,7 +293,7 @@ def filename_safe(self, filename) -> str:
 
 def html_link(url: str, title: str) -> SafeString:
     if not url:
-        return title
+        return mark_safe(title)
     return mark_safe(f"<a href='{url}'>{html.escape(title)}</a>")
 
 

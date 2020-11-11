@@ -1,7 +1,7 @@
 from django.conf import settings
 import cyvcf2
 
-from library.utils import get_git_hash
+from library.git import Git
 from upload.models import VCFImporter
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
 
@@ -21,7 +21,7 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
                                                             version=1,
                                                             vcf_parser="cyvcf2",
                                                             vcf_parser_version=cyvcf2.__version__,
-                                                            code_git_hash=get_git_hash(settings.BASE_DIR))
+                                                            code_git_hash=Git(settings.BASE_DIR).hash)
         return vcf_importer
 
     def process_entry(self, variant):

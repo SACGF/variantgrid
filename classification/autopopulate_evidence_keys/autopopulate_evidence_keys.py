@@ -10,7 +10,7 @@ from django.contrib.sites.models import Site
 import socket
 
 from annotation.models.models import AnnotationVersion
-from library.utils import get_git_hash
+from library.git import Git
 from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant
 from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import get_evidence_fields_for_sample_and_patient
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant, \
@@ -118,7 +118,7 @@ def get_curation_system():
     details = {
         "site": Site.objects.get_current(),
         "hostname": socket.gethostname(),
-        "git": get_git_hash(settings.BASE_DIR),
+        "git": Git(settings.BASE_DIR).hash,
     }
     explain = ""
     site_name = getattr(settings, "SITE_NAME", None)

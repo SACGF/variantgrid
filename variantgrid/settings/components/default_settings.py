@@ -11,7 +11,7 @@ import os
 import socket
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
-from library.utils import get_git_hash
+from library.git import Git
 
 # if certain user settings are not relevant for the environment, list the columns in this
 from variantgrid.settings.components.secret_settings import get_secret, get_secrets
@@ -400,7 +400,7 @@ ROLLBAR = {
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
-    'code_version': get_git_hash(BASE_DIR),
+    'code_version': Git(BASE_DIR).hash,
 }
 GIT_WEBSITE = 'https://github.com/SACGF/variantgrid'
 

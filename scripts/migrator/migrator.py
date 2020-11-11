@@ -6,6 +6,8 @@ from enum import Enum, auto
 from subprocess import Popen
 from typing import List, Optional, Dict
 
+from library.git import Git
+
 PYTHON_CMD = "python3.8"
 PYTHON_ALIAS = "python"
 
@@ -204,9 +206,7 @@ class Migrator:
 
     @staticmethod
     def get_git_ver() -> str:
-        with Popen(["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE) as proc:
-            git_ver = proc.stdout.readline().decode('utf-8').strip()
-            return git_ver
+        return Git().hash
 
     @staticmethod
     def subcommand_for_json(task: Dict) -> SubMigration:
