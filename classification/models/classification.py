@@ -1086,6 +1086,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         patch = VCDataDict(EvidenceMixin.to_patch(patch))
 
         if initial_data:
+            # make sure gene symbol is uppercase
+            if SpecialEKeys.GENE_SYMBOL in patch:
+                gene_symbol_cell = patch[SpecialEKeys.GENE_SYMBOL]
+                if gene_symbol := gene_symbol_cell.value:
+                    if isinstance(gene_symbol, str) and gene_symbol != gene_symbol.upper():
+                        gene_symbol_cell.value = gene_symbol.upper()
+
+            # if c.hgvs contains other values (such as
             if SpecialEKeys.C_HGVS in patch:
                 c_parts_cell = patch[SpecialEKeys.C_HGVS]
                 c_hgvs = c_parts_cell.value
@@ -1093,6 +1101,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     c_parts = CHGVS(full_c_hgvs=c_hgvs)
                     transcript = c_parts.transcript
                     gene_symbol = c_parts.gene
+
+                    # upper case gene symbol if it's not already
+                    if gene_symbol and gene_symbol != gene_symbol.upper:
+                        c_parts_cell.value = c_parts.with_gene_symbol(gene_symbol.upper()).full_c_hgvs
+
                     if transcript:
                         transcript_key = SpecialEKeys.REFSEQ_TRANSCRIPT_ID
                         if transcript.startswith('ENST'):
