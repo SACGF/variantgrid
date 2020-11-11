@@ -178,7 +178,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "download_uploaded_file": False,
 
     "classification_import_upload": True,
-    "condition_aliases": True
+    # "condition_aliases": True
 })
 
 PREFER_ALLELE_LINKS = True
