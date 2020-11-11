@@ -1,0 +1,23 @@
+.bg-theme {
+  background-image: linear-gradient(45deg, #e4e4e4 25%, #eeeeee 25%, #eeeeee 50%, #e4e4e4 50%, #e4e4e4 75%, #eeeeee 75%, #eeeeee 100%);
+background-size: 56.57px 56.57px;
+}
+
+.navbar-brand {
+    background-image: url(/static/images/vg_logo2.png);
+}
+
+a.nav-link {
+    color: #666 !important;
+    &:hover {
+        color: #000 !important;
+    }
+    &.active {
+        color: #222 !important;
+    }
+}
+
+// used by 50x.html
+#site-name::after {
+    content: "VariantGrid Test"
+}
