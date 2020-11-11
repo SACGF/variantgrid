@@ -32,7 +32,7 @@ class Git:
     @lazy
     def site(self):
         git_site = self.git_cmd(["config", "--get", "remote.origin.url"])
-        return re.sub(r"([^/]+@|.git)", "", git_site)
+        return re.sub(r"([^/]+@|\.git)", "", git_site)
 
     @lazy
     def branch_link(self):
