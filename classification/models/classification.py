@@ -1124,7 +1124,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
                         c_parts_cell.value = c_parts.full_c_hgvs
 
-
         # if submitting via API treat null as {value:None, explain:None, notes:None} for known keys
         # so we clear out any previous values but still retain immutability
         # for non existent keys just leave as null (if it started as null)

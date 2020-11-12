@@ -40,4 +40,3 @@ class Git:
         if is_url(self.site) and self.branch:
             git_branch_link = f"{self.site}/commits/{self.branch}"
         return git_branch_link
-

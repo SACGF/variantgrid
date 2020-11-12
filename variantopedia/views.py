@@ -1,8 +1,10 @@
 import logging
+import re
 from collections import defaultdict
 from datetime import timedelta
 from typing import Optional
 
+from celery.task.control import inspect  # @UnresolvedImport
 from django.conf import settings
 from django.contrib import messages
 from django.db.models import Q
@@ -10,13 +12,10 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
-import re
 
 from analysis.models.nodes.analysis_node import Analysis
-from annotation.models import AnnotationRun, ClassificationModification, Classification
-from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, ClinVar
-from celery.task.control import inspect  # @UnresolvedImport
-
+from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
+    VariantAnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import Event, create_event
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
@@ -34,10 +33,10 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
-from variantopedia.interesting_nearby import get_nearby_summaries, get_nearby_qs
-from variantopedia.variant_column_utils import get_columns_qs, get_variant_annotation_data
 from variantopedia import forms
+from variantopedia.interesting_nearby import get_nearby_qs
 from variantopedia.search import search_data, SearchResults
+from variantopedia.variant_column_utils import get_columns_qs, get_variant_annotation_data
 
 
 def variants(request):

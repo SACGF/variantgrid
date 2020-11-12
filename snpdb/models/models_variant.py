@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Value as V, QuerySet, F, Max, ExpressionWrapper
+from django.db.models import Value as V, QuerySet, F
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions import Greatest
