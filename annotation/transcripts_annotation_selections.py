@@ -4,6 +4,7 @@ from lazy import lazy
 import operator
 
 from annotation.external_search_terms import get_variant_transcript_annotation_search_terms
+from annotation.models import VEPSkippedReason
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
     InvalidAnnotationVersionError, VariantTranscriptAnnotation
 from genes.hgvs import HGVSMatcher
@@ -122,6 +123,11 @@ class VariantTranscriptSelections:
         vav = annotation_version.variant_annotation_version
         try:
             self.variant_annotation = variant.variantannotation_set.get(version=vav)
+            if self.variant_annotation.vep_skipped_reason:
+                annotation_error = "Unable to annotate variant"
+                if self.variant_annotation.vep_skipped_reason != VEPSkippedReason.UNKNOWN:
+                    annotation_error += ": " + self.variant_annotation.get_vep_skipped_reason_display()
+                self.error_messages.append(annotation_error)
 
             representative_transcript = self.variant_annotation.transcript
             transcripts_list = list(variant.varianttranscriptannotation_set.filter(version=vav))

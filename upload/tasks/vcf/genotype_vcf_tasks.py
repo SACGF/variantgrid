@@ -4,7 +4,7 @@ import os
 
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
-from annotation.models.models import AnnotationVersion
+from annotation.models.models import AnnotationVersion, VCFAnnotationStats
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from library.log_utils import log_traceback
 from library.utils import full_class_name
@@ -15,7 +15,8 @@ from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStat
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
     create_variant_zygosity_counts
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
-from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, UploadPipeline
+from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, \
+    UploadPipeline, SimpleVCFImportInfo
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
 from upload.vcf.vcf_import import create_vcf_from_vcf, import_vcf_file, \
@@ -108,6 +109,11 @@ class CalculateVCFStatsTask(ImportVCFStepTask):
         annotation_version = AnnotationVersion.latest(upload_step.genome_build)
         vcf = upload_step.upload_pipeline.uploadedvcf.vcf
         calculate_vcf_stats(vcf.pk, annotation_version.pk)
+
+        if vcf_annotation_stats := VCFAnnotationStats.objects.filter(vcf=vcf, vep_skipped_count__gt=0).first():
+            message_string = f"Variant Effect Predictor (VEP) was unable to annotate {vcf_annotation_stats.vep_skipped_count} variants."
+            SimpleVCFImportInfo.objects.create(type=SimpleVCFImportInfo.ANNOTATION_SKIPPED, has_more_details=True,
+                                               upload_step=upload_step, message_string=message_string)
 
 
 class CalculateMutationalSignaturesForSampleTask(ImportVCFStepTask):

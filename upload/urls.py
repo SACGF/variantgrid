@@ -1,5 +1,5 @@
 from library.django_utils.jqgrid_view import JQGridView
-from upload.grids import UploadStepsGrid, UploadPipelineModifiedVariantsGrid
+from upload.grids import UploadStepsGrid, UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid
 from upload.views import views
 from variantgrid.perm_path import perm_path
 
@@ -12,6 +12,9 @@ urlpatterns = [
     perm_path('upload_retry_import/<int:upload_pipeline_id>', views.upload_retry_import, name='upload_retry_import'),
     # Grids
     perm_path('upload_pipeline/steps/grid/<int:upload_pipeline_id>/<slug:op>/', JQGridView.as_view(grid=UploadStepsGrid), name='upload_step_grid'),
+    perm_path('upload_pipeline/skipped_annotation/grid/<int:upload_pipeline_id>/<slug:op>/',
+              JQGridView.as_view(grid=UploadPipelineSkippedAnnotationGrid),
+              name='upload_pipeline_skipped_annotation_grid'),
     perm_path('upload_pipeline/modified_variants/grid/<int:upload_pipeline_id>/<slug:op>/', JQGridView.as_view(grid=UploadPipelineModifiedVariantsGrid), name='upload_pipeline_modified_variants_grid'),
 
     perm_path('view_upload_stats', views.view_upload_stats, name='view_upload_stats'),

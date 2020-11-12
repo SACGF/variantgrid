@@ -24,7 +24,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, VCFInfoTypes, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
-    VEPCustom, ClinVarReviewStatus
+    VEPCustom, ClinVarReviewStatus, VEPSkippedReason
 from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
@@ -32,7 +32,7 @@ from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
 from patients.models_enums import GnomADPopulation
-from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q
+from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -433,6 +433,16 @@ def variant_annotation_version_pre_delete_handler(sender, instance, **kwargs):
     instance.delete_related_objects()
 
 
+class VCFAnnotationStats(models.Model):
+    """ This is produced in calculate_sample_stats """
+    vcf = models.ForeignKey(VCF, on_delete=CASCADE)
+    variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
+    vep_skipped_count = models.IntegerField()
+
+    class Meta:
+        unique_together = ('vcf', 'variant_annotation_version')
+
+
 class AnnotationRangeLock(models.Model):
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     min_variant = models.ForeignKey(Variant, related_name='min_variant', on_delete=PROTECT)
@@ -462,9 +472,11 @@ class AnnotationRun(TimeStampedModel):
     pipeline_stdout = models.TextField(null=True)
     pipeline_stderr = models.TextField(null=True)
     error_exception = models.TextField(null=True)
+    vep_skipped_count = models.IntegerField(null=True)
+    vep_warnings = models.TextField(null=True)
     vcf_dump_filename = models.TextField(null=True)
     vcf_annotated_filename = models.TextField(null=True)
-    variant_count = models.IntegerField(null=True)
+    annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
 
     @property
@@ -710,7 +722,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     overlapping_symbols = models.TextField(null=True, blank=True)
 
     somatic = models.BooleanField(null=True, blank=True)
-    variant_class = models.CharField(max_length=2, choices=VariantClass.CHOICES)
+    variant_class = models.CharField(max_length=2, choices=VariantClass.CHOICES, null=True, blank=True)
+    vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.CHOICES, null=True, blank=True)
 
     GNOMAD_FIELDS = {
         GnomADPopulation.AFRICAN_AFRICAN_AMERICAN: 'gnomad_afr_af',
