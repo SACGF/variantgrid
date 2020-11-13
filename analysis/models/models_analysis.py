@@ -188,7 +188,6 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return warnings
 
 
-
 @receiver(pre_delete, sender=Analysis)
 def pre_delete_analysis(sender, instance, *args, **kwargs):
     """ Delete analysis template if not used for a run, otherwise soft delete it """

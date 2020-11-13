@@ -4,6 +4,18 @@
 {% block title %}Import Warnings and Errors{% endblock %}
 {% block head %}
 <script>
+$(document).ready(function() {
+    jQuery.extend($.fn.fmatter , {
+        formatVariantString : function(variantString, options, rowObject) {
+            const URL = Urls.view_variant(rowObject["id"]);
+            return "<a href='" + URL + "' target='_blank'>" + variantString + "</a>";
+        },
+        formatAnnotationRunLink : function(annotationRunId) {
+            const URL = Urls.view_annotation_run(annotationRunId);
+            return "<a href='" + URL + "' target='_blank'>AnnotationRun " + annotationRunId + "</a>";
+        },
+    });
+});
 </script>
 <style>
 </style>
@@ -47,9 +59,19 @@
         For more information about gVCFs, please see: <a href='https://gatkforums.broadinstitute.org/gatk/discussion/4017/what-is-a-gvcf-and-how-is-it-different-from-a-regular-vcf'>What is a GVCF and how is it different from a 'regular' VCF?</a>.
         </div>
     {% endif %}
-        
 
-    {% if modified_imported_variants %}
+    {% if skipped_annotation %}
+    <div>
+        <h3>Skipped annotation</h3>
+        <p>{{ skipped_annotation.message }}
+
+        {% load jqgrid_tags %}
+        {% jqgrid 'upload_pipeline_skipped_annotation_grid' name='Skipped Annotation' search=False upload_pipeline_id=upload_pipeline.pk %}
+    </div>
+    {% endif %}
+
+
+    {% if has_modified_imported_variants %}
     <div>
         <h3>Modified Imported Variants</h3>
         <p>We <a target='_blank' href="https://genome.sph.umich.edu/wiki/Vt#Normalization">Decompose and Normalise variants using VT</a> during import, so variants from different VCF files have a consistent representation.  

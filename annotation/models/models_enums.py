@@ -292,6 +292,18 @@ class VEPCustom:
     ]
 
 
+class VEPSkippedReason:
+    UNKNOWN_CONTIG = 'c'
+    INCOMPLETE = 'i'
+    UNKNOWN = 'u'
+
+    CHOICES = [
+        (UNKNOWN_CONTIG, "Unknown Contig"),
+        (INCOMPLETE, "Incomplete"),
+        (UNKNOWN, "Unknown"),
+    ]
+
+
 class ClinVarReviewStatus:
     NO_ASSERTION_PROVIDED = "N"
     NO_ASSERTION_CRITERIA_PROVIDED = "C"

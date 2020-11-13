@@ -504,6 +504,18 @@ class VCFImportInfo(models.Model):
         return f"{self.get_severity_display()}: {self.message}"
 
 
+class SimpleVCFImportInfo(VCFImportInfo):
+    ANNOTATION_SKIPPED = "annotation_skipped"
+
+    type = models.TextField()
+    has_more_details = models.BooleanField(default=False)
+    message_string = models.TextField()
+
+    @property
+    def message(self):
+        return self.message_string
+
+
 class ModifiedImportedVariants(VCFImportInfo):
     has_more_details = True
 
@@ -565,6 +577,7 @@ class ModifiedImportedVariant(models.Model):
     def get_variants_for_unnormalized_variant_any_alt(cls, chrom, position, ref) -> QuerySet:
         old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, "")
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
+
 
 class VCFSkippedContigs(VCFImportInfo):
     has_more_details = True

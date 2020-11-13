@@ -1,4 +1,4 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Callable
 
 from django.db.migrations.operations.base import Operation
 
@@ -8,9 +8,11 @@ class ManualOperation(Operation):
     reversable = False
     reduces_to_sql = False
 
-    def __init__(self, task_id: str, note: Optional[str] = None, *args, **kwargs):
+    def __init__(self, task_id: str, note: Optional[str] = None, test: Callable = None, *args, **kwargs):
+        """ test - optional callable, only create manual operation if test returns True  """
         self.task_id = task_id
         self.note = note
+        self.test = test
 
     def deconstruct(self):
         kwargs = {
@@ -39,6 +41,10 @@ class ManualOperation(Operation):
         Call this to run the operation right away in RunPython
         :param apps: where we can call get_model
         """
+        if self.test:
+            if not self.test(apps):
+                return  # Skip
+
         ManualMigrationTask = apps.get_model('manual', 'ManualMigrationTask')
         ManualMigrationRequsted = apps.get_model('manual', 'ManualMigrationRequired')
 

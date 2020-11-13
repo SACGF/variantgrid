@@ -17,7 +17,7 @@ class AnnotationRunGrid(JqGridUserRowConfig):
     fields = [
         'id', 'status',
         'annotation_range_lock__version__genome_build__name',
-        'annotation_range_lock__version', 'annotation_range_lock__count',
+        'annotation_range_lock__version', 'annotation_range_lock__count', 'vep_skipped_count',
         'annotation_range_lock__min_variant', 'annotation_range_lock__max_variant',
         'task_id', 'created', 'dump_start', 'dump_end',
         'annotation_start', 'annotation_end', 'upload_start', 'upload_end',

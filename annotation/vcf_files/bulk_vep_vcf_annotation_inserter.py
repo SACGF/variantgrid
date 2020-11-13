@@ -90,7 +90,7 @@ class BulkVEPVCFAnnotationInserter:
         "REFSEQ_OFFSET",
     ]
 
-    def __init__(self, annotation_run, infos, insert_variants):
+    def __init__(self, annotation_run, infos=None, insert_variants=True, validate_columns=True):
         self.annotation_run = annotation_run
         self.rows_processed = 0
         self.variant_transcript_annotation_list = []
@@ -102,7 +102,7 @@ class BulkVEPVCFAnnotationInserter:
             logging.warning("BulkVEPVCFAnnotationInserter: Not actually inserting variants")
 
         self.vep_columns = self._get_vep_columns_from_csq(infos)
-        self._setup_vep_fields_and_db_columns()
+        self._setup_vep_fields_and_db_columns(validate_columns)
 
     @staticmethod
     def _get_vep_columns_from_csq(infos):
@@ -113,12 +113,15 @@ class BulkVEPVCFAnnotationInserter:
         The VCF Header has info about what CSQ means, and looks like:
         Description=Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene
         """
-        description = infos["CSQ"]["Description"]
-        description = description.replace('"', '')  # Strip double quotes
+        columns = []
+        if infos is not None:
+            description = infos["CSQ"]["Description"]
+            description = description.replace('"', '')  # Strip double quotes
 
-        match = "Format: "
-        columns_str = description[description.rfind(match) + len(match):]
-        return columns_str.split("|")
+            match = "Format: "
+            columns_str = description[description.rfind(match) + len(match):]
+            columns = columns_str.split("|")
+        return columns
 
     def _add_vep_field_handlers(self):
         # TOPMED and 1k genomes can return multiple values - take highest
@@ -188,7 +191,7 @@ class BulkVEPVCFAnnotationInserter:
             'polyphen2_hvar_pred_most_damaging': Polyphen2Prediction.get_damage_or_greater_levels(),
         }
 
-    def _setup_vep_fields_and_db_columns(self):
+    def _setup_vep_fields_and_db_columns(self, validate_columns):
         self._add_vep_field_handlers()
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
@@ -206,21 +209,22 @@ class BulkVEPVCFAnnotationInserter:
         self.transcript_columns = set(get_model_fields(VariantTranscriptAnnotation)) - ignore_columns
         self.variant_only_columns = self.all_variant_columns - self.transcript_columns
 
-        # Display any unused VEP columns (can turn off for increased performance)
-        handled_vep_columns = set(self.ignored_vep_fields)
-        handled_vep_columns.update(self.source_field_to_columns)
+        if validate_columns:
+            # Display any unused VEP columns
+            handled_vep_columns = set(self.ignored_vep_fields)
+            handled_vep_columns.update(self.source_field_to_columns)
 
-        unused_vep_columns = set(self.vep_columns) - handled_vep_columns
-        if unused_vep_columns:
-            logging.warning("Unhandled VEP CSQ columns (maybe add to VEP_NOT_COPIED_FIELDS or disable in VEP pipeline?) :")
-            logging.warning(", ".join(sorted(unused_vep_columns)))
+            unused_vep_columns = set(self.vep_columns) - handled_vep_columns
+            if unused_vep_columns:
+                logging.warning("Unhandled VEP CSQ columns (maybe add to VEP_NOT_COPIED_FIELDS or disable in VEP pipeline?) :")
+                logging.warning(", ".join(sorted(unused_vep_columns)))
 
-        missing_expected_vep_columns = handled_vep_columns - set(self.vep_columns)
-        if missing_expected_vep_columns:
-            missing = ", ".join(sorted(missing_expected_vep_columns))
-            msg = f"Fields missing from VEP annotated vcf CSQ columns: {missing}"
-            logging.error(msg)
-            raise VEPMissingColumnsError(msg)
+            missing_expected_vep_columns = handled_vep_columns - set(self.vep_columns)
+            if missing_expected_vep_columns:
+                missing = ", ".join(sorted(missing_expected_vep_columns))
+                msg = f"Fields missing from VEP annotated vcf CSQ columns: {missing}"
+                logging.error(msg)
+                raise VEPMissingColumnsError(msg)
 
         # Display any unpopulated annotation columns (perhaps forgot map VEP fields?)
         populated_columns = set()
@@ -229,8 +233,9 @@ class BulkVEPVCFAnnotationInserter:
 
         unpopulated_columns = self.all_variant_columns - populated_columns
         if unpopulated_columns:
-            logging.warning("Unpopulated annotation columns:")
-            logging.warning(", ".join(sorted(unpopulated_columns)))
+            if validate_columns:
+                logging.warning("Unpopulated annotation columns:")
+                logging.warning(", ".join(sorted(unpopulated_columns)))
 
             self.all_variant_columns -= unpopulated_columns
             self.variant_only_columns -= unpopulated_columns

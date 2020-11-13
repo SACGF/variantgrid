@@ -12,7 +12,7 @@ from annotation.models import SampleVariantAnnotationStats, SampleEnsemblGeneAnn
     SampleEnsemblGeneAnnotationStatsPassingFilter, SampleClinVarAnnotationStatsPassingFilter, \
     AnnotationVersion
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import InvalidAnnotationVersionError
+from annotation.models.models import InvalidAnnotationVersionError, VCFAnnotationStats
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
@@ -89,12 +89,14 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         "variantannotation__impact",
         "variantannotation__transcript_id",
         "variantannotation__gene__ensemblgeneannotation__omim_phenotypes",
+        "variantannotation__vep_skipped_reason",
         "clinvar__highest_pathogenicity",
     ]
 
     values_queryset = qs.values(*columns)
     cohort_samples = list(vcf.cohort.get_cohort_samples())
     stats_per_sample, stats_passing_filters_per_sample = _create_stats_per_sample(vcf, annotation_version)
+    vep_skipped_count = 0
 
     for vals in values_queryset:
         chrom = vals["locus__contig__name"]
@@ -106,6 +108,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         impact = vals["variantannotation__impact"]
         transcript = vals["variantannotation__transcript_id"]
         omim = vals["variantannotation__gene__ensemblgeneannotation__omim_phenotypes"]
+        vep_skipped = vals["variantannotation__vep_skipped_reason"]
         clinvar_highest_pathogenicity = vals["clinvar__highest_pathogenicity"]
 
         impact_high_or_mod = impact in {PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE}
@@ -113,6 +116,9 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         stats_list = [stats_per_sample]
         if filters:
             stats_list.append(stats_passing_filters_per_sample)
+
+        if vep_skipped:
+            vep_skipped_count += 1
 
         for cohort_sample in cohort_samples:
             zygosity = samples_zygosity[cohort_sample.cohort_genotype_packed_field_index]
@@ -191,6 +197,10 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
             stats[SAMPLE_STATS].import_status = ImportStatus.SUCCESS
             for s in stats.values():
                 s.save()
+
+    if vep_skipped_count:
+        VCFAnnotationStats.objects.create(vcf=vcf, vep_skipped_count=vep_skipped_count,
+                                          variant_annotation_version=annotation_version.variant_annotation_version)
 
     end = time.time()
     logging.info("SampleStats for %s took %.2f seconds", vcf, end - start)
