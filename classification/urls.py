@@ -2,7 +2,7 @@ from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from classification.views import views, classification_dashboard_view, \
-    classification_export_view, views_autocomplete, classification_import_upload_view
+    classification_export_view, views_autocomplete, classification_import_upload_view, classification_accumulation_graph
 from classification.views.condition_alias_view import ConditionAliasDatatableView, condition_aliases_view, \
     condition_alias_view, SearchConditionView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
@@ -66,6 +66,8 @@ urlpatterns = [
     # giving the dashboard a mode has been deprecated, but a lot of refernces still exist
     perm_path('dashboard/all', classification_dashboard_view.dashboard, name="classification_dashboard_all"),
     perm_path('dashboard_download', problem_download, name='classification_dashboard_download'),
+
+    perm_path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
 
     perm_path('classification/discordance_report/<int:report_id>', discordance_report_view, name='discordance_report'),
     perm_path('classification/discordance_report/<int:report_id>/export', export_discordance_report, name='discordance_export'),

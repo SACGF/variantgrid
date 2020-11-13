@@ -297,6 +297,16 @@ a {
     opacity: 0.4;
     margin-left: 4px;
 }
+.download-link:after {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'FontAwesome';
+    content: "\f56d";
+    opacity: 0.6;
+    margin-left: 4px;
+}
 
 .modal-header nav .breadcrumb {
     background-color: transparent;

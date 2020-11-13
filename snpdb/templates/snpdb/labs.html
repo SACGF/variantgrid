@@ -80,6 +80,7 @@
 {% block content %}
     <div class="container">
         <h3>Lab Submissions</h3>
+        <div class="admin-only"><a href="{% url 'classification_accumulation_data' %}" class="hover-link download-link">Submissions over time</a></div>
         <div class="row">
             <div class="col-lg-8">
                 <div id='org-classifications-graph' class="per-org"></div>

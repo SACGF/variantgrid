@@ -101,6 +101,11 @@
             a.attr('href', url);
             a.attr('target', target);
             a.text(url);
+            if (downloadMode == 'api') {
+                a.addClass('download-link');
+            } else {
+                a.removeClass('download-link');
+            }
         }
     }
     

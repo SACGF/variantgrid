@@ -1,5 +1,6 @@
 import csv
 import io
+import operator
 from collections import defaultdict
 from datetime import date
 from operator import attrgetter
@@ -448,3 +449,79 @@ def delimited_row(data: list, delimiter: str = ',') -> str:
     writer = csv.writer(out, delimiter=delimiter)
     writer.writerow(data)
     return out.getvalue()
+
+
+class IterableTransformer:
+    """
+    Given an iterable and a transformer, makes a new iterable that will lazily transform the elements
+    """
+
+    class _IteratorTransformer:
+        def __init__(self, iterator: Iterator, transform):
+            self.iterator = iterator
+            self.transform = transform
+
+        def __next__(self):
+            return self.transform(next(self.iterator))
+
+    def __init__(self, iterable: Iterable, transform):
+        self.iterable = iterable
+        self.transform = transform
+
+    def __iter__(self):
+        return self._IteratorTransformer(iter(self.iterable), self.transform)
+
+
+class IteratableStitcher:
+    """
+    Given a list of SORTED iterables, will give you the smallest element from any of them
+    """
+
+    class _IteratorStitcher:
+
+        class _CachedIterator:
+
+            def __init__(self, iteratable):
+                self.iterator = iter(iteratable)
+                self.finished = False
+                self.cache = None
+                self.fetch_next()
+
+            def fetch_next(self):
+                if not self.finished:
+                    try:
+                        self.cache = next(self.iterator)
+                    except StopIteration:
+                        self.cache = None
+                        self.finished = True
+
+            @property
+            def preview(self):
+                return self.cache
+
+        def __init__(self, iteratables: List[Iterable], comparison):
+            self.iterators = [self._CachedIterator(iterable) for iterable in iteratables]
+            self.comparison = comparison
+
+        def __next__(self):
+            min_ci: Optional[IteratableStitcher._IteratorStitcher._CachedIterator] = None
+            min_value: Any = None
+
+            for ci in self.iterators:
+                value = ci.preview
+                if value is not None:
+                    if min_value is None or self.comparison(value, min_value):
+                        min_value = value
+                        min_ci = ci
+
+            if not min_ci:
+                raise StopIteration()
+            min_ci.fetch_next()
+            return min_value
+
+    def __init__(self, iterables: List[Iterable], comparison=operator.__lt__):
+        self.iterables = iterables
+        self.comparison = comparison
+
+    def __iter__(self):
+        return self._IteratorStitcher(iteratables=self.iterables, comparison=self.comparison)
