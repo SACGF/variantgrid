@@ -24,6 +24,7 @@ class ClassificationSummary:
     classification_id: int
     clinical_significance: str
     withdrawn: Optional[bool] = None
+    org_name: Optional[str] = None
 
     def __lt__(self, other):
         return self.at < other.at
@@ -39,7 +40,8 @@ class ClassificationSummary:
             allele_id=self.allele_id,
             classification_id=self.classification_id,
             clinical_significance=self.clinical_significance or older.clinical_significance,
-            withdrawn=self.withdrawn if self.withdrawn is not None else older.withdrawn
+            withdrawn=self.withdrawn if self.withdrawn is not None else older.withdrawn,
+            org_name=self.org_name or older.org_name
         )
 
 
@@ -100,40 +102,21 @@ class AlleleSummary:
 class ClassificationAccumulationGraph:
 
     @dataclass
-    class _AlleleSummarySnapshot:
+    class _SummarySnapshot:
         at: datetime
-        counts: Dict[AlleleStatus, int]
-
-        @property
-        def unique(self):
-            return self.counts.get(AlleleStatus.Unique, 0)
-
-        @property
-        def agreement(self):
-            return self.counts.get(AlleleStatus.Agreement, 0)
-
-        @property
-        def confidence(self):
-            return self.counts.get(AlleleStatus.Confidence, 0)
-
-        @property
-        def discordant(self):
-            return self.counts.get(AlleleStatus.Discordant, 0)
-
-        @property
-        def withdrawn(self):
-            return self.counts.get(AlleleStatus.Withdrawn, 0)
+        counts: Dict[Any, int]
 
     class _RunningAccumulation:
 
-        def __init__(self):
+        def __init__(self, mode:str = 'status'):
+            self.mode = mode
             self.allele_summaries: Dict[int, AlleleSummary] = defaultdict(AlleleSummary)
 
         def add_modification(self, summary: ClassificationSummary):
             allele_summary = self.allele_summaries[summary.allele_id]
             allele_summary.add_modification(summary=summary)
 
-        def snapshot(self, at: datetime) -> 'ClassificationAccumulationGraph._AlleleSummarySnapshot':
+        def snapshot(self, at: datetime) -> 'ClassificationAccumulationGraph._SummarySnapshot':
             counts: Dict[AlleleStatus, int] = defaultdict(int)
             for allele_summary in self.allele_summaries.values():
                 status = allele_summary.biggest_status
@@ -141,12 +124,17 @@ class ClassificationAccumulationGraph:
                     counts[status] += allele_summary.classification_count()
                 counts[AlleleStatus.Withdrawn] += allele_summary.withdrawn_count()
                 allele_summary.reset()
-            return ClassificationAccumulationGraph._AlleleSummarySnapshot(at=at, counts=counts)
+
+                for summary in allele_summary.not_withdrawn:
+                    counts[summary.org_name] = counts[summary.org_name] + 1
+
+            return ClassificationAccumulationGraph._SummarySnapshot(at=at, counts=counts)
+
 
     @staticmethod
     def withdrawn_iterable():
 
-        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int]] = dict()
+        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, str]] = dict()
 
         flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
             .order_by("created") \
@@ -156,19 +144,19 @@ class ClassificationAccumulationGraph:
             status, created, flag_collection_id = value_tuple
             if flag_collection_id not in flag_collection_id_to_allele_classification:
                 if classification_match := Classification.objects \
-                        .values_list("variant__variantallele__allele_id", "id") \
+                        .values_list("variant__variantallele__allele_id", "id", "lab__organization__name") \
                         .filter(flag_collection_id=flag_collection_id) \
                         .first():
                     flag_collection_id_to_allele_classification[flag_collection_id] = classification_match
                 else:
-                    flag_collection_id_to_allele_classification[flag_collection_id] = (0, 0)
+                    flag_collection_id_to_allele_classification[flag_collection_id] = (0, 0, None)
 
-            allele_id, classification_id = flag_collection_id_to_allele_classification[flag_collection_id]
+            allele_id, classification_id, org_name = flag_collection_id_to_allele_classification[flag_collection_id]
 
             withdrawn = status == 'O'
 
             return ClassificationSummary(allele_id=allele_id, classification_id=classification_id, at=created,
-                                         clinical_significance=None, withdrawn=withdrawn)
+                                         clinical_significance=None, withdrawn=withdrawn, org_name=org_name)
 
         return IterableTransformer(flag_qs, transformer)
 
@@ -177,13 +165,14 @@ class ClassificationAccumulationGraph:
         cm_qs_summary = ClassificationModification.objects.filter(published=True, classification__variant__isnull=False,
                                                           share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by(
             "created").values_list("classification_id", "created",
-                                          "published_evidence__clinical_significance__value",
-                                          "classification__variant__variantallele__allele_id")
+                                            "published_evidence__clinical_significance__value",
+                                            "classification__variant__variantallele__allele_id",
+                                            "classification__lab__organization__name")
 
         def classification_transformer(results_tuple):
-            c_id, created, clinical_significance, allele_id = results_tuple
+            c_id, created, clinical_significance, allele_id, org_name = results_tuple
             return ClassificationSummary(allele_id=allele_id, classification_id=c_id, at=created,
-                                         clinical_significance=clinical_significance)
+                                         clinical_significance=clinical_significance, org_name=org_name)
 
         return IterableTransformer(cm_qs_summary, classification_transformer)
 
@@ -192,7 +181,7 @@ class ClassificationAccumulationGraph:
         time_delta = relativedelta.relativedelta(days=7)
 
         running_accum = self._RunningAccumulation()
-        sub_totals: List[ClassificationAccumulationGraph._AlleleSummarySnapshot] = list()
+        sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = list()
 
         stitcher = IteratableStitcher(
             iterables=[
@@ -226,16 +215,25 @@ def download_report(request):
     report_data = cag.report()
 
     def iter_report():
-        yield delimited_row(["date", "unique", "agreement", "confidence", "discordant", "withdrawn"])
+
+        valid_orgs = set()
+        for row in report_data:
+            for key in [key for key in row.counts.keys() if isinstance(key, str)]:
+                valid_orgs.add(key)
+
+        org_list = list(valid_orgs)
+        org_list.sort()
+
+        yield delimited_row(["date", "unique", "agreement", "confidence", "discordant", "withdrawn"] + org_list)
         for row in report_data:
             yield delimited_row([
                 row.at.strftime('%Y-%m-%d'),
-                row.unique,
-                row.agreement,
-                row.confidence,
-                row.discordant,
-                row.withdrawn
-            ])
+                row.counts.get(AlleleStatus.Unique, 0),
+                row.counts.get(AlleleStatus.Agreement, 0),
+                row.counts.get(AlleleStatus.Confidence, 0),
+                row.counts.get(AlleleStatus.Discordant, 0),
+                row.counts.get(AlleleStatus.Withdrawn, 0)
+            ] + [row.counts.get(org, 0) for org in org_list])
 
     response = StreamingHttpResponse(iter_report(), content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="classification_accumulation_report.csv"'
