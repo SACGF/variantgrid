@@ -53,11 +53,9 @@ function transcriptFunc(transcriptId, data) {
     });
 
     handlePubMedLinks(data.pubmed);
-    handleSearchTermsLinks(data.search_terms);
 
     formatField($("#cosmic_id"), cosmicLink);
     formatField($("#cosmic_legacy_id"), cosmicLink);
-
 }
 
 
@@ -127,17 +125,6 @@ function handlePubMedLinks(pubmed) {
         $('<span>', {text: 'No Pubmed citations available'}).appendTo(pmCitations);
     }
 }
-
-function handleSearchTermsLinks(search_terms) {
-    let searchLink = $("<a>", {
-        text: search_terms,
-        target: "_blank",
-        class: 'hover-link',
-        href: "http://google.com/search?q=" + search_terms,
-    });
-    $("#search_terms").html(searchLink);
-}
-
 
 function showVariantCoordinate() {
     var variant_coordinate = $("#show-variant-coordinate-link").attr("variant_coordinate");
@@ -500,7 +487,23 @@ $(document).ready(function() {
                             {% labelled id='swissprot' label='Swiss-prot' hint="tiny" %}{% endlabelled %}
                             {% labelled id='trembl' label='Trembl' hint="tiny" %}{% endlabelled %}
                             {% labelled id='uniparc' label='UniParc' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='search_terms' label='Search Terms' hint="tiny" %}{% endlabelled %}
+
+                            {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
+                                {% with search_term=variant_annotation.get_search_terms %}
+                                    {% if search_term %}
+                                        <a target="_blank" class='hover-link' href="http://google.com/search?q={{search_term}}">{{ search_term }}</a>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endlabelled %}
+                            {% labelled id='pubmed_search_terms' label='PubMed Search' hint="tiny" %}
+                                {% with pubmed_search_term=variant_annotation.get_pubmed_search_terms %}
+                                    {% if pubmed_search_term %}
+                                        <a target="_blank" class='hover-link' href="https://pubmed.ncbi.nlm.nih.gov/?term={{pubmed_search_term}}">{{ pubmed_search_term }}</a>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endlabelled %}
+
+
                         </div>
                     </div>
                 </div>

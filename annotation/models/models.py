@@ -4,6 +4,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import List
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -20,6 +21,7 @@ from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
+from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, VCFInfoTypes, AnnotationStatus, CitationSource, \
@@ -752,7 +754,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     @property
     def gnomad_variant(self):
-        """ If you have gnomad frequency - returns variant formatted as per 1-169519049-T-C """
+        """ If you have gnomAD frequency - returns variant formatted as per 1-169519049-T-C """
         if self.gnomad_af is not None:
             v = self.variant
             return f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
@@ -775,6 +777,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @staticmethod
     def get_gnomad_population_field(population):
         return VariantAnnotation.GNOMAD_FIELDS.get(population)
+
+    @lazy
+    def transcript_annotation(self) -> List['VariantTranscriptAnnotation']:
+        return self.variant.varianttranscriptannotation_set.filter(version=self.version)
+
+    def get_search_terms(self):
+        return get_variant_search_terms(self.transcript_annotation)
+
+    def get_pubmed_search_terms(self):
+        return get_variant_pubmed_search_terms(self.transcript_annotation)
 
     def __str__(self):
         return f"{self.variant}: {self.version}"
