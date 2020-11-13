@@ -40,7 +40,7 @@ def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True,
 
         annotation_run.upload_end = timezone.now()
         annotation_run.save()
-        logging.info("%d variants imported!", annotation_run.variant_count)
+        logging.info("%d variants imported!", annotation_run.annotated_count)
     except:
         annotation_run.set_task_log("BulkVEPVCFAnnotationInserter line number", bulk_inserter.rows_processed)
         raise
