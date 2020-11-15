@@ -340,7 +340,10 @@ def get_evidence_fields_from_preferred_transcript(
                 "phylop_100_way_vertebrate": "100 way vertebrate",
             }
             data[SpecialEKeys.PHYLOP] = get_set_fields_summary(transcript_data, phylop_dict, phylop_dict)
-            data[SpecialEKeys.SEARCH_TERMS] = transcript_data[VariantTranscriptSelections.SEARCH_TERMS]
+            if variant_annotation := vts.variant_annotation:
+                data[SpecialEKeys.SEARCH_TERMS] = variant_annotation.get_search_terms()
+                data[SpecialEKeys.PUBMED_SEARCH_TERMS] = variant_annotation.get_pubmed_search_terms()
+
         except:
             log_traceback()
 

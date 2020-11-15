@@ -3,7 +3,6 @@ from django.forms.models import model_to_dict
 from lazy import lazy
 import operator
 
-from annotation.external_search_terms import get_variant_transcript_annotation_search_terms
 from annotation.models import VEPSkippedReason
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
     InvalidAnnotationVersionError, VariantTranscriptAnnotation
@@ -19,7 +18,6 @@ class VariantTranscriptSelections:
     GENE_SYMBOL = "gene_symbol"
     REFSEQ_TRANSCRIPT = "refseq_transcript_accession"
     REPRESENTATIVE = "representative"
-    SEARCH_TERMS = "search_terms"
 
     def __init__(self, variant: Variant,
                  genome_build: GenomeBuild, annotation_version=None,
@@ -116,8 +114,6 @@ class VariantTranscriptSelections:
             data["selected"] = selected
             if selected:
                 self.initial_transcript_id = data["transcript_id"]
-
-            data[self.SEARCH_TERMS] = get_variant_transcript_annotation_search_terms(obj)
             return data
 
         vav = annotation_version.variant_annotation_version
