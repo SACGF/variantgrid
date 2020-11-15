@@ -1085,14 +1085,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         patch = VCDataDict(EvidenceMixin.to_patch(patch))
 
-        if initial_data:
-            # make sure gene symbol is uppercase
-            if SpecialEKeys.GENE_SYMBOL in patch:
-                gene_symbol_cell = patch[SpecialEKeys.GENE_SYMBOL]
-                if gene_symbol := gene_symbol_cell.value:
-                    if isinstance(gene_symbol, str) and gene_symbol != gene_symbol.upper():
-                        gene_symbol_cell.value = gene_symbol.upper()
+        # make sure gene symbol is uppercase
+        # need to do it here because it might get used in c.hgvs
+        gene_symbol_cell = patch[SpecialEKeys.GENE_SYMBOL]
+        if gene_symbol_cell.provided:
+            if gene_symbol := gene_symbol_cell.value:
+                if isinstance(gene_symbol, str) and gene_symbol != gene_symbol.upper():
+                    gene_symbol_cell.value = gene_symbol.upper()
 
+        if initial_data:
             # if c.hgvs contains other values (such as
             if SpecialEKeys.C_HGVS in patch:
                 c_parts_cell = patch[SpecialEKeys.C_HGVS]
