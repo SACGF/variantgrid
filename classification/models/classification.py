@@ -1104,8 +1104,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     gene_symbol = c_parts.gene
 
                     # upper case gene symbol if it's not already
-                    if gene_symbol and gene_symbol != gene_symbol.upper:
-                        c_parts_cell.value = c_parts.with_gene_symbol(gene_symbol.upper()).full_c_hgvs
+                    if gene_symbol and gene_symbol != gene_symbol.upper():
+                        gene_symbol = gene_symbol.upper()
+                        c_parts_cell.value = c_parts.with_gene_symbol(gene_symbol).full_c_hgvs
 
                     if transcript:
                         transcript_key = SpecialEKeys.REFSEQ_TRANSCRIPT_ID
@@ -1116,7 +1117,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         if not transcript_cell.provided:
                             transcript_cell.value = transcript
 
-                    gene_symbol_cell = patch[SpecialEKeys.GENE_SYMBOL]
                     if gene_symbol and not gene_symbol_cell.provided:
                         # if no gene symbol value provided, populate it from c.hgvs
                         gene_symbol_cell.value = gene_symbol

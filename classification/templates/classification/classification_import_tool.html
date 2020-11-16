@@ -93,7 +93,8 @@
         }
         return [envelope_text, valid]
     }
-    
+
+    let last_record_id = null;
     function run() {
         let [text, valid] = generateRequest();
         if (!valid) {
@@ -118,10 +119,12 @@
                 if (record.meta && record.meta.id) {
                     let id = record.meta.id;
                     link = `/classification/classification/${id}`;
-                }
-                if (link) {
+                    let isNew = id !== last_record_id;
+                    last_record_id = id;
+
                     $('#record-link-pair').show();
                     $('#record-link').attr('href',link);
+                    $('#record-link').text(`Open ${isNew ? 'newly imported' : 'updated'} classification ${id}`);
                 } else {
                     $('#record-link-pair').hide();
                 }
