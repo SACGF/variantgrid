@@ -113,7 +113,7 @@ def filter_variant_range(qs, variant: Variant, distance=50):
 
 def filter_variant_codon(qs, variant: Variant):
     q_or = []
-    transcript_qs = variant.varianttranscriptannotation_set.filter(hgvs_c__isnull=False)
+    transcript_qs = variant.varianttranscriptannotation_set.filter(exon__isnull=False, hgvs_c__isnull=False)
     for t, hgvs_c in transcript_qs.values_list("transcript_id", "hgvs_c"):
         if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out eg ":c.1057"
             codon = m.group(1)
