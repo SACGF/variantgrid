@@ -196,7 +196,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
             data.message = message
         data[SpecialEKeys.CLINGEN_ALLELE_ID] = evidence_value
         data[SpecialEKeys.VARIANT_COORDINATE] = {
-            'value': str(variant),
+            'value': variant.full_string,
             'immutable': SubmissionSource.VARIANT_GRID
         }
 
