@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
         modified_classifications = []
         for classification in Classification.objects.filter(evidence__variant_coordinate__value__icontains=".."):
-            modified_classifications.append(classification.pk)
+            modified_classifications.append(str(classification.pk))
             patch = {
                 SpecialEKeys.VARIANT_COORDINATE: classification.variant.full_string
             }
