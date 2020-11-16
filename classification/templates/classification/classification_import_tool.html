@@ -94,7 +94,6 @@
         return [envelope_text, valid]
     }
 
-    let last_record_id = null;
     function run() {
         let [text, valid] = generateRequest();
         if (!valid) {
@@ -119,12 +118,10 @@
                 if (record.meta && record.meta.id) {
                     let id = record.meta.id;
                     link = `/classification/classification/${id}`;
-                    let isNew = id !== last_record_id;
-                    last_record_id = id;
 
                     $('#record-link-pair').show();
                     $('#record-link').attr('href',link);
-                    $('#record-link').text(`Open ${isNew ? 'newly imported' : 'updated'} classification ${id}`);
+                    $('#record-link').text(`Open classification ${id}`);
                 } else {
                     $('#record-link-pair').hide();
                 }
@@ -285,7 +282,7 @@ div.json {
             {% endlabelled %}
         </div>
     </form>
-    <div class="row">
+    <div class="row" id="preview">
         <div class="col-md-5">
             <label>Request Preview</label>
             <div id="request_preview" class="json"></div>
