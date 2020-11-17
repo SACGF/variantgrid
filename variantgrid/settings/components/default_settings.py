@@ -303,6 +303,14 @@ INTERSECT_BED_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'intersect_bed_and_uplo
 PUBLIC_GROUP_NAME = "public"
 LOGGED_IN_USERS_GROUP_NAME = "logged_in_users"
 
+# key/value = Organization.group_name : lab group name pattern
+# Org must already exist, lab pattern is filled with User values (if you want to create a group for each user)
+USER_CREATE_ORG_LABS = {
+    # "test_organization": "test_lab",
+    # "test_organization": "user_group_%(username)s",
+}
+
+
 # To use SeqAuto, your settings need to have:
 # "from variantgrid.settings.defaults.seqauto_default_settings import *"
 # after including this file
