@@ -27,10 +27,10 @@ def user_post_save_handler(sender, instance, **kwargs):
             for org_group_name, lab_pattern in org_labs.items():
                 organization = Organization.objects.get(group_name=org_group_name)
                 lab_name = lab_pattern % instance.__dict__
-                group_name = f"{organization.group_name}/{lab_name.lower()}"
-                lab, _ = Lab.objects.get_or_create(name=lab_name, organization=organization, group_name=group_name)
+                lab_group_name = f"{organization.group_name}/{lab_name.lower()}"
+                lab, _ = Lab.objects.get_or_create(name=lab_name, organization=organization, group_name=lab_group_name)
                 add_user_to_group(organization.group_name)
-                add_user_to_group(group_name)
+                add_user_to_group(lab_group_name)
 
 
 def group_post_save_handler(sender, instance, **kwargs):
