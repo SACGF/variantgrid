@@ -1747,7 +1747,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         va_qs = VariantAllele.objects.filter(genome_build=genome_build,
                                              allele__in=vc_qs.values_list("variant__variantallele__allele"))
         variant_ids = va_qs.values_list("variant_id", flat=True)
-        return Q(id__in=variant_ids)  # List was faster than inner query but started getting too long...
+        return Q(id__in=list(variant_ids))  # List is much faster than inner query...
 
     def get_other_classifications_summary_for_variant(self, user: User) -> str:
         other_classifications_summary = None
