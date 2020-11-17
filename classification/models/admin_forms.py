@@ -3,9 +3,11 @@ from django.contrib.auth.models import User
 from django_admin_json_editor.admin import JSONEditorWidget
 import json
 from django.conf import settings
+from django_extensions.management.commands.admin_generator import AdminModel
 
 from annotation.models.models import AnnotationVersion
 from library.guardian_utils import admin_bot
+from snpdb.admin import ModelAdminBasics
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.enums.classification_enums import EvidenceCategory, \
@@ -476,7 +478,7 @@ class ConditionAliasStatusFilter(admin.SimpleListFilter):
         return queryset
 
 
-class ConditionAliasAdmin(admin.ModelAdmin):
+class ConditionAliasAdmin(ModelAdminBasics):
 
     list_display = ["pk", "lab", "source_text", "source_gene_symbol", "status", "records_affected", "aliases", "join_mode", "updated_by", "created"]
     readonly_fields = ["pk", "lab"]
@@ -491,4 +493,4 @@ class ConditionAliasAdmin(admin.ModelAdmin):
 
     auto_match.short_description = "Attempt auto match"
 
-    actions = [auto_match]
+    actions = ["export_as_csv", auto_match]
