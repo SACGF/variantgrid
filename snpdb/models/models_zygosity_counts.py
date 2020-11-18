@@ -32,6 +32,10 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
         return f"zygosity_count_{self.pk}"
 
     @lazy
+    def ref_alias(self) -> str:
+        return f"{self.alias}__ref_count"
+
+    @lazy
     def het_alias(self) -> str:
         return f"{self.alias}__het_count"
 

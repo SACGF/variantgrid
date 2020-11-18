@@ -164,11 +164,21 @@ class AnalysisOutputNodeChoiceForm(forms.Form):
 
 
 class AllVariantsNodeForm(BaseNodeForm):
-
     class Meta:
         model = AllVariantsNode
-        fields = ('max_variant',)
-        widgets = {'max_variant': HiddenInput()}
+        fields = ('max_variant', "gene_symbol", "reference", "minimum_count", "maximum_count",
+                  "min_ref_count", "max_ref_count", "min_hom_count", "max_hom_count", "min_het_count", "max_het_count")
+        widgets = {'max_variant': HiddenInput(),
+                   'gene_symbol': autocomplete.ModelSelect2(url='gene_symbol_autocomplete',
+                                                            attrs={'data-placeholder': 'Gene...'}),
+                   'minimum_count': WIDGET_INTEGER_MIN_0,
+                   'maximum_count': WIDGET_INTEGER_MIN_1,
+                   'min_ref_count': WIDGET_INTEGER_MIN_0,
+                   'max_ref_count': WIDGET_INTEGER_MIN_1,
+                   'min_het_count': WIDGET_INTEGER_MIN_0,
+                   'max_het_count': WIDGET_INTEGER_MIN_1,
+                   'min_hom_count': WIDGET_INTEGER_MIN_0,
+                   'max_hom_count': WIDGET_INTEGER_MIN_1}
 
 
 class VennNodeForm(BaseNodeForm):

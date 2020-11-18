@@ -2,14 +2,69 @@
 
 {% block docreadyjs %}
     ajaxForm($("form#all-variants-form"));
+
+	$(".accordion", "#all-variants-form").accordion({
+			heightStyle: "content",
+			widthStyle: "fill",
+			active: false, // collapse all
+	});
+
 {% endblock docreadyjs %}
 
 
 {% block content %}
+<style>
+input.narrow {
+	width: 80px;
+}
+</style>
 <div>
 	<form id="all-variants-form" method="post" action="{{ request.path }}">
         {% csrf_token %}
-        {{ form.as_p }}
+		{{ form.non_field_errors }}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+		<span class="fieldWrapper">
+			{{ form.gene_symbol.errors }}
+			<label for="{{ form.gene_symbol.id_for_label }}">Gene:</label>
+			{{ form.gene_symbol }}
+		</span>
+		<span class="fieldWrapper">
+			{{ form.reference.errors }}
+			<label for="{{ form.reference.id_for_label }}">Show reference variants:</label>
+			{{ form.reference }}
+		</span>
+
+		<table id="zygosity-table">
+			<tr>
+				<th></th>
+				<th>Min</th>
+				<th>Max</th>
+			</tr>
+			<tr>
+				<th>Any zygosity</th>
+				<td>{{ form.minimum_count }}</td>
+				<td>{{ form.maximum_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+			</tr>
+			<tr>
+				<th>Ref</th>
+				<td>{{ form.min_ref_count }}</td>
+				<td>{{ form.max_ref_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+			</tr>
+			<tr>
+				<th>Het</th>
+				<td>{{ form.min_het_count }}</td>
+				<td>{{ form.max_het_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+			</tr>
+			<tr>
+				<th>Hom Alt</th>
+				<td>{{ form.min_hom_count }}</td>
+				<td>{{ form.max_hom_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+			</tr>
+		</table>
+
+        {{ form.media }}
 		<div>
 		  <b>Last Saved:</b> {{ node.modified }} 
         </div>
