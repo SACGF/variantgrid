@@ -48,6 +48,7 @@
             $("input[type=button]", searchDialog).click(unsavedChanges);
 			$("input[type=text]", searchDialog).change(unsavedChanges);
         {% else %}
+            $("input[type=button]", searchDialog).hide();
             $(".EditButton", searchDialog).hide();
         {% endif %}
 		}
