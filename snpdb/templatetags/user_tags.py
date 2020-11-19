@@ -1,3 +1,5 @@
+from typing import Dict
+
 from django import template
 from django.contrib.auth.models import User
 
@@ -16,13 +18,21 @@ def has_group_or_admin(user, group_name):
     return user.is_superuser or has_group(user, group_name)
 
 
-@register.inclusion_tag("snpdb/tags/user.html")
-def user(u: User, show_avatar=False, show_email=False, show_last_login=False, role='user', display='normal'):
+@register.inclusion_tag("snpdb/tags/user.html", takes_context=True)
+def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, role='user', display='normal'):
+    user_cache: Dict[int, UserSettings] = context.get("_user_cache")
+    if not user_cache:
+        user_cache = dict()
+        context["_user_cache"] = user_cache
+    us: UserSettings = user_cache.get(u.id)
+    if not us:
+        us = UserSettings.get_for_user(u)
+        user_cache[u.id] = us
+
     preferred_label = u.username
     if u.first_name or u.last_name:
         preferred_label = ' '.join([name for name in [u.first_name, u.last_name] if name])
 
-    us = UserSettings.get_for_user(u)
     avatar_url = us.avatar_url
     avatar_color = us.avatar_color
     return {
