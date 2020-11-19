@@ -405,10 +405,14 @@ function getVariantTagHtml(variantId, tag) {
 // This is so we can add/remove tags without wrecking cache  
 function tagsFormatter(tagsCellValue, a, rowData) {
     var variantId = rowData['id'];
-    var tagHtml = "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
-    tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>"; 
-
+    var tagHtml = "";
     var aWin = getAnalysisWindow();
+
+    if (!aWin.variantTagsReadOnly) {
+        tagHtml += "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
+        tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>";
+    }
+
     var tagList = aWin.variantTags[variantId];
     if (tagList) {
         for (var i=0 ; i<tagList.length ; ++i) {
@@ -499,7 +503,10 @@ function tagClickHandler() {
 
 // This is always kicked off after grid is loaded (after passed in function gridComplete)
 function gridCompleteExtra() {
-    $(".grid-tag").click(tagClickHandler);
+    var aWin = getAnalysisWindow();
+    if (!aWin.variantTagsReadOnly) {
+        $(".grid-tag").click(tagClickHandler);
+    }
 
     // We want to be able to right click to open full screen link new tab
     // but normal click does JS / load() call to open in the editor.

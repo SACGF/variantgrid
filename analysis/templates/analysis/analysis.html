@@ -66,6 +66,7 @@
 	var saveSettingsOnResize = true;
 
     variantTags = {% render_variant_tags_dict analysis %};
+    variantTagsReadOnly = !{{ has_write_permission|jsonify }};
     selectedVariants = {% render_node_variant_dict analysis %};
     analysisNodeVariables = {}; // { node_id: fields: Set()}
 

@@ -89,6 +89,11 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
         $("#analysis-variables").show();
     }
 
+    var centerLayoutParams = {};
+    if (!readOnly) {
+        centerLayoutParams.onresize = resizePanel;  // save panel widths
+    }
+
     $('div#content').layout();
     $('div#analysis-outer-container').layout({
         north: {
@@ -97,9 +102,7 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
             slidable: false,
             initClosed: !showAnalysisVariables,
         },
-        center: {
-            onresize: resizePanel,
-        },
+        center: centerLayoutParams,
         east: { onresize: resizeGrid,
                 triggerEventsOnLoad: true,
                 size: initialGridAndEditorWidth,
