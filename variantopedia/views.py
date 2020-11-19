@@ -439,6 +439,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         variant_allele_data = None
 
     context = {
+        "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
         "annotation_version": annotation_version,
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "classifications": latest_classifications,
