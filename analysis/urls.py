@@ -50,6 +50,7 @@ urlpatterns = [
     perm_path('analysis/<int:analysis_id>/edit_and_grid/stand_alone/', views.stand_alone_analysis_editor_and_grid, name='standalone_analysis_editor_and_grid'),
 
     perm_path('analysis/<int:analysis_id>/set_panel_size/', views_json.analysis_set_panel_size, name='analysis_set_panel_size'),
+    perm_path('analysis/<int:analysis_id>/settings/lock', views.analysis_settings_lock, name='analysis_settings_lock'),
     perm_path('analysis/<int:analysis_id>/settings/', views.view_analysis_settings, name='analysis_settings'),
     perm_path('analysis/<int:analysis_id>/settings_details_tab/', views.analysis_settings_details_tab, name='analysis_settings_details_tab'),
     perm_path('analysis/<int:analysis_id>/settings_node_counts_tab/', views.analysis_settings_node_counts_tab, name='analysis_settings_node_counts_tab'),

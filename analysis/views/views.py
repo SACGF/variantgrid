@@ -1,3 +1,4 @@
+import json
 from collections import Counter, defaultdict
 
 from celery.contrib.abortable import AbortableAsyncResult
@@ -12,6 +13,7 @@ from django.http.response import HttpResponse, HttpResponseRedirect, JsonRespons
 from django.shortcuts import get_object_or_404, redirect, render
 from django.test.client import RequestFactory
 from django.urls.base import reverse
+from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
@@ -26,7 +28,7 @@ from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFil
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
-    AnalysisTemplateRun
+    AnalysisTemplateRun, AnalysisLock, Analysis
 from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes.analysis_node import NodeVCFFilter
@@ -595,7 +597,9 @@ def view_analysis_settings(request, analysis_id):
     context = {"analysis": analysis,
                "create_analysis_template_form": form,
                "new_analysis_settings": analysis_settings,
-               "has_write_permission": analysis.can_write(request.user)}
+               "has_write_permission": analysis.can_write(request.user),
+               "last_lock": analysis.last_lock,
+               "can_unlock": analysis.can_unlock(request.user)}
     return render(request, 'analysis/analysis_settings.html', context)
 
 
@@ -665,6 +669,16 @@ def analysis_settings_template_run_tab(request, analysis_id):
     context = {"analysis_template_run": analysis.analysistemplaterun,
                "node_variables": defaultdict_to_dict(node_variables)}
     return render(request, 'analysis/analysis_settings_template_run_tab.html', context)
+
+
+@require_POST
+def analysis_settings_lock(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    if not analysis.can_unlock(request.user):  # check_can_write returns false if locked
+        raise PermissionDenied(f"You do not have write access to {analysis.pk}")
+    lock = json.loads(request.POST["lock"])
+    AnalysisLock.objects.create(analysis=analysis, locked=lock, user=request.user, date=timezone.now())
+    return redirect(analysis)  # Reload
 
 
 def analysis_input_samples(request, analysis_id):

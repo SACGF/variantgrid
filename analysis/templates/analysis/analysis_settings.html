@@ -1,4 +1,5 @@
 {% load static %}
+{% load tz %}
 {% load ui_tabs_builder %}
 {% load js_tags %}
 {% load crispy_forms_field %}
@@ -18,6 +19,20 @@
 		    }
 		});
 	}
+
+    function lockAnalysis(lock) {
+	    if (typeof(lock) === 'undefined') {
+	        lock = true;
+        }
+		$.ajax({
+		    type: "POST",
+		    url: "{% url 'analysis_settings_lock' analysis.pk %}",
+            data: 'lock=' + encodeURIComponent(JSON.stringify(lock)),
+		    success: function(data) {
+                window.location = "{% url 'analysis' analysis.pk %}";
+		    }
+		});
+    }
 
 	$(document).ready(function() {
         ANALYSIS_SETTINGS = {{ new_analysis_settings|jsonify }};
@@ -42,9 +57,18 @@
         };
         let analysisTemplateForm = $('form#analysis-template-form');
         analysisTemplateForm.ajaxForm(options);
+
+        $("button#lock-analysis-button").click(function() { lockAnalysis(); });
+        $("button#unlock-analysis-button").click(function() { lockAnalysis(false); });
+        // TODO: Lock history...
+
 	});
 </script>
-
+<style>
+    #lock-details {
+        padding-right: 10px;
+    }
+</style>
 <div>
     <div id="analysis-tabs">
         {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_details_tab' param=analysis.pk label="Analysis Settings" %}
@@ -77,10 +101,20 @@
 	</div>
 	<hr>
 	<div>
+        <button class="btn btn-outline-primary fas fas-fw fa-window-close" id='close-analysis-settings' type='button'>Close</button>
         {% if has_write_permission %}
-		    <button class="btn btn-outline-danger" id='force-reload-nodes-button' type='button'>Force Reload Nodes</button>
+		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-nodes-button' type='button'>Force Reload Nodes</button>
+		    <button class="btn btn-outline-danger fas fa-lock" id='lock-analysis-button' type='button'>Lock Analysis</button>
+        {% elif last_lock.locked %}
+            <div>
+                <span id="lock-details">
+                    <b>Locked by:</b> {{ last_lock.user }} on {{ last_lock.date|localtime }} ({{ last_lock.date|timesince }} ago)
+                </span>
+                {% if can_unlock %}
+                <button class="btn btn-outline-danger fas fa-unlock" id='unlock-analysis-button' type='button'>Unlock Analysis</button>
+                {% endif %}
+            </div>
         {% endif %}
-        <button class="btn btn-outline-primary" id='close-analysis-settings' type='button'>Close</button>
 	</div>
 
 </div>
