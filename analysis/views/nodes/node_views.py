@@ -49,14 +49,17 @@ class AllVariantsNodeView(NodeView):
         else:
             out_of_date_message = "Please press save."
 
-        context["max_variant_id"] = self.object.max_variant_id
         context["out_of_date_message"] = out_of_date_message
+        context["max_variant_id"] = self.object.max_variant_id
         return context
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
         max_variant_id = highest_pk(Variant)
         form_initial["max_variant"] = Variant(pk=max_variant_id)
+        # Set initial count to 1 (so it only shows variants from samples)
+        if self.object.version == 0:
+            form_initial["minimum_count"] = 1
         return form_initial
 
 
