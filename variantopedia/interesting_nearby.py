@@ -125,7 +125,6 @@ def filter_variant_codon(qs, variant: Variant):
     if q_or:
         q = reduce(operator.or_, q_or)
         qs = qs.filter(q).distinct()
-        print(qs.query)
     else:
         qs = qs.none()
     return qs
