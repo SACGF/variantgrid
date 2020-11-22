@@ -114,7 +114,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
-        non_gene_fields = [f for f in fields if not "__transcript_version__" in f]
+        non_gene_fields = [f for f in fields if "__transcript_version__" not in f]
         self.fields = non_gene_fields
         self.update_overrides(override)
 
@@ -122,8 +122,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         genes_qs = get_variant_queryset_for_gene_symbol(gene_symbol, genome_build)
         queryset = variant_qs_filter_has_internal_data(genes_qs, genome_build)
-        if extra_filters:
-            # Hotspot filters
+        if extra_filters:  # Hotspot filters
             protein_position = extra_filters.get("protein_position")
             if protein_position:
                 transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
@@ -199,8 +198,8 @@ class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
         field_names = self.get_field_names() + ["enrichment_kits"]
         self.queryset = queryset.values(*field_names)
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         enrichment_kits_colmodel = {'index': 'enrichment_kits', 'name': 'enrichment_kits', 'label': 'Enrichment Kits', 'width': 230}
         colmodels += [enrichment_kits_colmodel]
         return colmodels

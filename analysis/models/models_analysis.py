@@ -60,8 +60,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         if super().can_write(user):
             if self.last_lock:
                 return not self.last_lock.locked
-            else:
-                return True
+            return True
         return False
 
     def get_absolute_url(self):
