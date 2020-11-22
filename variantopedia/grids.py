@@ -2,14 +2,14 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from annotation.models import AnnotationVersion
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_user_settings import UserSettings
-from variantopedia.interesting_nearby import filter_variant_exon, filter_variant_codon, filter_variant_domain, \
-    filter_variant_range
+from variantopedia.interesting_nearby import get_nearby_qs
 
 
 class VariantWikiGrid(JqGridUserRowConfig):
@@ -76,18 +76,10 @@ class NearbyVariantsGrid(AbstractVariantGrid):
         self.fields = fields
         self.update_overrides(override)
 
-        queryset = get_variant_queryset_for_latest_annotation_version(user_settings.default_genome_build)
-        queryset, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(queryset)
-
-        REGION_FILTERS = {
-            "codon": filter_variant_codon,
-            "exon": filter_variant_exon,
-            "domain": filter_variant_domain,
-            "range": filter_variant_range,
-        }
-        filter_func = REGION_FILTERS[region_type]
-        queryset = filter_func(queryset, variant)
+        annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
+        region_filters = get_nearby_qs(variant, annotation_version)
+        queryset = region_filters[region_type]
         self.queryset = queryset.values(*self.get_queryset_field_names())
-        self.extra_config.update({'sortname': count_column,
+        self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "desc",
                                   'shrinkToFit': False})

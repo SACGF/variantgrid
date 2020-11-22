@@ -14,6 +14,8 @@ from snpdb.models import Variant
 
 def get_nearby_qs(variant, annotation_version, distance=50):
     qs = get_variant_queryset_for_annotation_version(annotation_version)
+    q = Variant.get_no_reference_q() & ~Q(pk=variant.pk)  # Exclude ref and self
+    qs = qs.filter(q)
 
     return {
         "codon": filter_variant_codon(qs, variant),
@@ -105,7 +107,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
 
 
 def filter_variant_range(qs, variant: Variant, distance=50):
-    start = variant.start + distance
+    start = variant.start - distance
     end = variant.end + distance
     annotation_kwargs, q = Variant.get_overlap_annotate_and_q(variant.locus.contig, start, end)
     return qs.annotate(**annotation_kwargs).filter(q)
@@ -117,12 +119,13 @@ def filter_variant_codon(qs, variant: Variant):
     for t, hgvs_c in transcript_qs.values_list("transcript_id", "hgvs_c"):
         if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out eg ":c.1057"
             codon = m.group(1)
+            codon_regex = codon + r"[^\d]"
             q_or.append(Q(varianttranscriptannotation__transcript_id=t,
-                          varianttranscriptannotation__hgvs_c__contains=codon))
+                          varianttranscriptannotation__hgvs_c__regex=codon_regex))
     if q_or:
         q = reduce(operator.or_, q_or)
-        q &= ~Q(pk=variant.pk)  # Exclude self
         qs = qs.filter(q).distinct()
+        print(qs.query)
     else:
         qs = qs.none()
     return qs
@@ -135,7 +138,6 @@ def filter_variant_exon(qs, variant: Variant):
         q_or.append(Q(varianttranscriptannotation__transcript_id=t, varianttranscriptannotation__exon=e))
     if q_or:
         q = reduce(operator.or_, q_or)
-        q &= ~Q(pk=variant.pk)  # Exclude self
         qs = qs.filter(q).distinct()
     else:
         qs = qs.none()
@@ -151,7 +153,6 @@ def filter_variant_domain(qs, variant: Variant):
                           varianttranscriptannotation__interpro_domain__contains=domain))
     if q_or:
         q = reduce(operator.or_, q_or)
-        q &= ~Q(pk=variant.pk)  # Exclude self
         qs = qs.filter(q).distinct()
     else:
         qs = qs.none()
