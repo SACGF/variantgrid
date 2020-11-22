@@ -1,3 +1,13 @@
+{% load js_tags %}
+<style>
+    code {
+        white-space: pre-wrap;
+    }
+</style>
+<div>
+    <code>{{ node_data|jsonify_pretty }}</code>
+</div>
+
 {% if node.valid %}
     <script>
     $(document).ready(function() {

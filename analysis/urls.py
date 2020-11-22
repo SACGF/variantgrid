@@ -21,7 +21,7 @@ urlpatterns = [
     # Node editor
     perm_path('node/view/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_view, name='node_view'),
     perm_path('node_update/<int:node_id>/', views_json.NodeUpdate.as_view(), name='node_update'),
-    perm_path('node_sql/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_sql, name='node_sql'),
+    perm_path('node_debug/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_debug, name='node_debug'),
     perm_path('node_doc/<int:node_id>/', views.node_doc, name='node_doc'),
     perm_path('node_load/<int:node_id>/', views.node_load, name='node_load'),
     perm_path('node_cancel_load/<int:node_id>/', views.node_cancel_load, name='node_cancel_load'),

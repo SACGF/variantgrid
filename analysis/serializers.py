@@ -1,3 +1,5 @@
+from typing import Dict
+
 from rest_framework import serializers
 
 from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, PhenotypeNode, PhenotypeNodeOMIM, \
@@ -82,6 +84,13 @@ class AnalysisNodeSerializer(DynamicFieldsModelSerializer):
             NodeWiki.objects.create(node=node, **nodewiki_data)
         return node
 
+    @staticmethod
+    def get_node_serializers() -> Dict[str, 'AnalysisNodeSerializer']:
+        node_serializers = {}
+        for serializer_subclass in AnalysisNodeSerializer.__subclasses__():
+            model_name = serializer_subclass.Meta.model._meta.label
+            node_serializers[model_name] = serializer_subclass
+        return node_serializers
 
 class AlleleFrequencyNodeSerializer(AnalysisNodeSerializer):
     class Meta(AnalysisNodeSerializer.Meta):

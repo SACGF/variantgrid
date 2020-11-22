@@ -21,6 +21,8 @@ import importlib
 import inspect
 import logging
 
+from htmlmin.decorators import not_minified_response
+
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
 from analysis.exceptions import NonFatalNodeError
@@ -35,6 +37,7 @@ from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import NodeHelp
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
+from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
 from analysis.views.nodes.node_view import NodeView
@@ -269,11 +272,17 @@ def get_node_sql(grid):
     return node_sql_, grid_sql
 
 
+@not_minified_response
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_sql(request, node_id, version_id, extra_filters):
+def node_debug(request, node_id, version_id, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, version=version_id)
-    context = {"node": node}
+    model_name = node._meta.label
+    node_serializers = AnalysisNodeSerializer.get_node_serializers()
+    serializer = node_serializers.get(model_name, AnalysisNodeSerializer)
+
+    context = {"node": node,
+               "node_data": serializer(node).data}
     if node.valid:
         grid = VariantGrid(request.user, node, extra_filters)
         try:
@@ -282,7 +291,7 @@ def node_sql(request, node_id, version_id, extra_filters):
             context['grid_sql'] = grid_sql
         except EmptyResultSet:
             pass
-    return render(request, "analysis/node_editors/grid_editor_sql_tab.html", context)
+    return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
 
 
 def node_doc(request, node_id):

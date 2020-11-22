@@ -36,7 +36,7 @@ class NodeView(UpdateView):
         context['snp_matrix_form'] = SNPMatrixForm(initial={'significant_figures': 2})
 
         user_settings = UserSettings.get_for_user(self.request.user)
-        context["node_sql_tab"] = user_settings.node_sql_tab
+        context["node_debug_tab"] = user_settings.node_debug_tab
         return context
 
     def _get_form_initial(self):

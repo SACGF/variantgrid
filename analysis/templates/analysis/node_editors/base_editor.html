@@ -193,8 +193,8 @@ $(document).ready(function() {
             {% else %}
                 {% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
 			{% endif %}
-			{% if node_sql_tab %}
-    		    <li><a id='tab-link-sql' href="{% url 'node_sql' node.pk node.version extra_filters %}">SQL</a></li>
+			{% if node_debug_tab %}
+    		    <li><a id='tab-link-debug' href="{% url 'node_debug' node.pk node.version extra_filters %}">Debug</a></li>
 			{% endif %}
 			{% block node_editor_tab_links_end %}{% endblock node_editor_tab_links_end %}
 	  	</ul>

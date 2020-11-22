@@ -305,8 +305,9 @@ class SettingsOverrideForm(BaseModelForm):
                    "email_discordance_updates": BlankNullBooleanSelect(),
                    "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
                    "tool_tips": BlankNullBooleanSelect(),
-                   "node_sql_tab": BlankNullBooleanSelect(),
+                   "node_debug_tab": BlankNullBooleanSelect(),
                    "import_messages": BlankNullBooleanSelect(),
+                   "variant_tag_group_by_variant": BlankNullBooleanSelect(),
                    'default_sort_by_column': autocomplete.ModelSelect2(url='custom_column_autocomplete',
                                                                        forward=['columns'],
                                                                        attrs={'data-placeholder': 'Column...'})}
@@ -341,9 +342,10 @@ class SettingsOverrideForm(BaseModelForm):
             "default_sort_by_column": analysis_enabled,
             "variant_link_in_analysis_opens_new_tab": analysis_enabled,
             "tool_tips": analysis_enabled,
-            "node_sql_tab": analysis_enabled,
+            "node_debug_tab": analysis_enabled,
             "import_messages": upload_enabled,
             "igv_port": igv_links_enabled,
+            "variant_tag_group_by_variant": analysis_enabled,
         }
 
         for f, visible in field_visibility.items():
