@@ -40,12 +40,11 @@
 
 {% block jsdocumentready %}
     jQuery.extend($.fn.fmatter , {
-        geneLinkFormatter : function(pk, options, rowObject) {
+        geneLinkFormatter : function(geneSymbol, options, rowObject) {
             var viewLink = "";
-            var geneId = rowObject["variant__variantannotation__transcript__gene_id"];
-            if (geneId) {
-                const URL = Urls.view_gene(geneId);
-                viewLink = "<a class='grid-link' target='_blank' href='" + URL + "'>" + pk + "</div></a>";
+            if (geneSymbol) {
+                const URL = Urls.view_gene_symbol(geneSymbol);
+                viewLink = "<a class='grid-link' target='_blank' href='" + URL + "'>" + geneSymbol + "</div></a>";
             }
             return viewLink;
         }
@@ -80,7 +79,7 @@
     {% endif %}
 
     {% load jqgrid_tags %}
-    {% user_data_grid_filter 'analyses_variant_tags' 'Analyses Variant Tags' %}
+    {% user_data_grid_filter 'analyses_variant_tags' 'Analyses Variant Tags' filter_name_choices=filter_name_choices %}
     {% jqgrid 'analyses_variant_tags_grid' 'analyses_variant_tags' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
 
 {% endblock submenu_page_content %}

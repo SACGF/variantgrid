@@ -342,14 +342,12 @@ class AnalysisTemplatesGrid(JqGridUserRowConfig):
 class AnalysesVariantTagsGrid(JqGridUserRowConfig):
     model = VariantTag
     caption = 'Analyses Variant Tags'
-    fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_id",
-              "variant__variantannotation__transcript_version__gene_version__gene_symbol",
+    fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_symbol",
               "variant__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
 
     colmodel_overrides = {
         'id': {'hidden': True},
         "variant__id": {"hidden": True},
-        "variant__variantannotation__transcript_version__gene_version__gene_id": {"hidden": True},
         "variant__variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene', 'formatter': 'geneLinkFormatter'},
         "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
         "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},
