@@ -51,8 +51,6 @@ def _get_gene_and_terms(vta, c_hgvs=True, dbsnp=True) -> Tuple[str, List]:
     return gene_symbol, terms
 
 
-
-
 def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **kwargs):
     gene_terms = defaultdict(set)
     for vta in variant_transcripts_list:

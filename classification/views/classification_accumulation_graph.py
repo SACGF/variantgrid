@@ -130,7 +130,6 @@ class ClassificationAccumulationGraph:
 
             return ClassificationAccumulationGraph._SummarySnapshot(at=at, counts=counts)
 
-
     @staticmethod
     def withdrawn_iterable():
 
