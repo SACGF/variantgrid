@@ -1,5 +1,5 @@
 from analysis.grids import AnalysesGrid, AnalysesVariantTagsGrid, NodeColumnSummaryGrid, \
-    KaromappingAnalysesGrid, AnalysisTemplatesGrid, AnalysisNodeIssuesGrid
+    KaromappingAnalysesGrid, AnalysisTemplatesGrid, AnalysisNodeIssuesGrid, TaggedVariantGrid
 from analysis.views import views, views_json, views_grid, \
     views_karyomapping, views_autocomplete
 from library.django_utils.jqgrid_view import JQGridView
@@ -83,7 +83,9 @@ urlpatterns = [
     perm_path('node_column_summary/grid/<int:node_id>/<int:version_id>/<slug:extra_filters>/<slug:variant_column>/<int:significant_figures>/<slug:op>/', JQGridView.as_view(grid=NodeColumnSummaryGrid, csv_download=True), name='node_column_summary_grid'),
     perm_path('analyses/grid/<slug:op>/', JQGridView.as_view(grid=AnalysesGrid, delete_row=True), name='analyses_grid'),
     perm_path('analysis_templates/grid/<slug:op>/', JQGridView.as_view(grid=AnalysisTemplatesGrid, delete_row=True), name='analysis_templates_grid'),
-    perm_path('analyses_variant_tags/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AnalysesVariantTagsGrid, delete_row=True), name='analyses_variant_tags_grid'),
+    perm_path('tags/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AnalysesVariantTagsGrid, delete_row=True), name='analyses_variant_tags_grid'),
+    perm_path('tagged_variants/grid/<genome_build_name>/<slug:op>/',
+              JQGridView.as_view(grid=TaggedVariantGrid, delete_row=True), name='analysis_tagged_variant_grid'),
 
     perm_path('analysis_issues/grid/<slug:op>/',
               JQGridView.as_view(grid=AnalysisNodeIssuesGrid), name='analysis_node_issues_grid'),

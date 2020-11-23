@@ -11,7 +11,8 @@ from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.views.analysis_permissions import get_node_subclass_or_404
-from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version, \
+    get_variant_queryset_for_latest_annotation_version
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -21,7 +22,8 @@ from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts
-from snpdb.models import Tag, VariantGridColumn, UserGridConfig
+from snpdb.grids import AbstractVariantGrid
+from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 
@@ -342,8 +344,9 @@ class AnalysisTemplatesGrid(JqGridUserRowConfig):
 
 
 class AnalysesVariantTagsGrid(JqGridUserRowConfig):
+    """ List VariantTags (Tag-centric) """
     model = VariantTag
-    caption = 'Analyses Variant Tags'
+    caption = 'Variant Tags'
     fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_symbol",
               "variant__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
 
@@ -402,6 +405,47 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
                              'formatter': 'formatVariantString'}]
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         return before_colmodels + colmodels
+
+
+class TaggedVariantGrid(AbstractVariantGrid):
+    """ Shows Variants that have been tagged (Variant-centric) """
+    model = Variant
+    caption = 'Variant with tags'
+    fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
+    colmodel_overrides = {
+        'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
+        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
+    }
+
+    def __init__(self, user, genome_build_name, extra_filters=None):
+        super().__init__(user)
+
+        user_grid_config = UserGridConfig.get(user, self.caption)
+        if user_grid_config.show_group_data:
+            analyses_queryset = Analysis.filter_for_user(user)
+        else:
+            analyses_queryset = Analysis.objects.filter(user=user)
+        tags_qs = VariantTag.objects.filter(analysis__in=analyses_queryset)
+        if extra_filters:
+            tag_id = extra_filters.get("tag")
+            if tag_id is not None:
+                tag = Tag.objects.get(pk=tag_id)
+                tags_qs = tags_qs.filter(tag=tag)
+
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+        qs = qs.filter(varianttag__in=tags_qs)
+
+        user_settings = UserSettings.get_for_user(user)
+        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
+        fields.remove("tags")
+        self.fields = fields
+        self.update_overrides(override)
+
+        self.queryset = qs.distinct().values(*self.get_queryset_field_names())
+        self.extra_config.update({'sortname': "locus__position",
+                                  'sortorder': "asc",
+                                  'shrinkToFit': False})
 
 
 class NodeColumnSummaryGrid(DataFrameJqGrid):

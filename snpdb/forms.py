@@ -307,7 +307,6 @@ class SettingsOverrideForm(BaseModelForm):
                    "tool_tips": BlankNullBooleanSelect(),
                    "node_debug_tab": BlankNullBooleanSelect(),
                    "import_messages": BlankNullBooleanSelect(),
-                   "variant_tag_group_by_variant": BlankNullBooleanSelect(),
                    'default_sort_by_column': autocomplete.ModelSelect2(url='custom_column_autocomplete',
                                                                        forward=['columns'],
                                                                        attrs={'data-placeholder': 'Column...'})}
@@ -345,7 +344,6 @@ class SettingsOverrideForm(BaseModelForm):
             "node_debug_tab": analysis_enabled,
             "import_messages": upload_enabled,
             "igv_port": igv_links_enabled,
-            "variant_tag_group_by_variant": analysis_enabled,
         }
 
         for f, visible in field_visibility.items():

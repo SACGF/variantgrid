@@ -129,7 +129,6 @@ class SettingsOverride(models.Model):
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True)
     tool_tips = models.BooleanField(null=True, blank=True)
     node_debug_tab = models.BooleanField(null=True, blank=True)
-    variant_tag_group_by_variant = models.BooleanField(null=True, blank=True)
     import_messages = models.BooleanField(null=True, blank=True)  # Get a message once import is done
     igv_port = models.IntegerField(null=True, blank=True)
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE, null=True, blank=True)
@@ -203,7 +202,6 @@ class UserSettings:
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
-    variant_tag_group_by_variant: bool
     default_lab: Optional[Lab]
     oauth_sub: str
     _settings_overrides: List[SettingsOverride]
