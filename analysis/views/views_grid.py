@@ -4,7 +4,6 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 import re
-import types
 
 from analysis import grids
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
