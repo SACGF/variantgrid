@@ -37,11 +37,12 @@ class SimpleZygosity:
 
 class Zygosity:
     """ Observed Variant Zygosity """
-    UNKNOWN_ZYGOSITY = 'U'  # For when a VCF has no genotype
+    UNKNOWN_ZYGOSITY = 'U'  # No genotype call
     HOM_REF = 'R'
     HET = 'E'
     HOM_ALT = 'O'
-    MISSING = '.'  # Multi-sample VCF, no call at position
+    # TODO: Missing shouldn't be '.' as that's confusing with './.' in VCF which is UNKNOWN_ZYGOSITY
+    MISSING = '.'  # Sample has reference (ie is missing variant) in a multi-sample VCF
 
     CHOICES = [
         (HOM_REF, "HOM_REF"),
@@ -56,11 +57,11 @@ class Zygosity:
         HOM_ALT: '1/1',
         HET: '0/1',
         UNKNOWN_ZYGOSITY: './.',
-        MISSING: '0/0',  # Used in samples_zygosity to indicate we don't have it
+        MISSING: '0/0',
     }
 
     ALL_ZYGOSITIES_SET = set(GENOTYPES)
-    VARIANT = [HOM_REF, HET, HOM_ALT]
+    VARIANT = {HOM_REF, HET, HOM_ALT}
 
     @staticmethod
     def display(zygosity):

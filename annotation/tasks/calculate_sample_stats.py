@@ -122,12 +122,14 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
 
         for cohort_sample in cohort_samples:
             zygosity = samples_zygosity[cohort_sample.cohort_genotype_packed_field_index]
-            if zygosity == Zygosity.MISSING:
-                continue
-
             sample_stats_list = [s[cohort_sample.sample] for s in stats_list]
 
             for ss in [sl[SAMPLE_STATS] for sl in sample_stats_list]:
+                if zygosity not in Zygosity.VARIANT:
+                    if zygosity == Zygosity.UNKNOWN_ZYGOSITY:
+                        ss.unk_count += 1
+                    continue
+
                 ss.variant_count += 1
 
                 if ref_len == 1 and alt_len == 1:
