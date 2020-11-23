@@ -245,3 +245,19 @@ class ClinGenAlleleExternalRecordType(Enum):
     """ @see http://reg.clinicalgenome.org/doc/AlleleRegistry_1.01.xx_api_v1.pdf
         "Query canonical alleles by identifiers from external records" section """
     DBSNP_ID = "dbSNP.rs"
+
+
+# Integer, Float, Flag, Character, and String.
+class VCFInfoTypes:
+    INTEGER = 'I'
+    FLOAT = 'F'
+    FLAG = 'B'  # Boolean
+    CHARACTER = 'C'
+    STRING = 'S'
+    CHOICES = [
+        (INTEGER, 'Integer'),
+        (FLOAT, 'Float'),
+        (FLAG, 'Flag'),
+        (CHARACTER, 'Character'),
+        (STRING, 'String'),
+    ]

@@ -24,7 +24,7 @@ from lazy import lazy
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
-from annotation.models.models_enums import HumanProteinAtlasAbundance, VCFInfoTypes, AnnotationStatus, CitationSource, \
+from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
     VEPCustom, ClinVarReviewStatus, VEPSkippedReason
 from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
@@ -354,20 +354,6 @@ class ColumnVEPField(models.Model):
     def get_source_fields(**columnvepfield_kwargs):
         qs = ColumnVEPField.objects.filter(**columnvepfield_kwargs).distinct("source_field")
         return list(qs.values_list("source_field", flat=True).order_by("source_field"))
-
-
-class ColumnVCFInfo(models.Model):
-    """ Used to export columns to VCF (vcf_export_utils).
-        Should it be moved to snpdb? """
-    info_id = models.TextField(primary_key=True)
-    column = models.OneToOneField(VariantGridColumn, on_delete=CASCADE)
-    number = models.IntegerField(null=True, blank=True)
-    type = models.CharField(max_length=1, choices=VCFInfoTypes.CHOICES)
-    description = models.TextField(null=True)
-
-    def __str__(self):
-        number = self.number or '.'
-        return f"ID={self.info_id},number={number},type={self.type},descr: {self.description}"
 
 
 class VariantAnnotationVersion(SubVersionPartition):

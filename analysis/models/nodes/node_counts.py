@@ -44,38 +44,6 @@ COUNTS = {
 }
 
 
-SELECT_INTERNALLY_CLASSIFIED_SQL = """
-select string_agg(coalesce(classification_classification.clinical_significance, 'U'), '|')
-from classification_classification
-where classification_classification.variant_id in (
-    select snpdb_variantallele.variant_id
-    from snpdb_variantallele
-    where
-    allele_id in (
-        select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-    )
-)
-"""
-
-SELECT_MAX_INTERNAL_CLASSIFICATION = """
-select max(coalesce(classification_classification.clinical_significance, '0'))
-from classification_classification
-where classification_classification.variant_id in (
-    select snpdb_variantallele.variant_id
-    from snpdb_variantallele
-    where
-    allele_id in (
-        select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-    )
-)
-"""
-
-INTERNAL_CLASSIFICATION_ALIASES_AND_SELECT = {
-    "internally_classified": SELECT_INTERNALLY_CLASSIFIED_SQL,
-    "max_internal_classification": SELECT_MAX_INTERNAL_CLASSIFICATION,
-}
-
-
 def get_extra_filters_q(user: User, genome_build: GenomeBuild, extra_filters):
     if extra_filters == BuiltInFilters.CLINVAR:
         q = Q(clinvar__highest_pathogenicity__gte=4)

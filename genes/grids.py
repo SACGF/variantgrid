@@ -106,7 +106,10 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
     """ Uses custom columns subtracting away the gene annotations (as they're displayed above) """
     caption = 'Gene Variants'
     fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
-    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'}}
+    colmodel_overrides = {
+        'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
+        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
+    }
 
     def __init__(self, user, gene_symbol, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)

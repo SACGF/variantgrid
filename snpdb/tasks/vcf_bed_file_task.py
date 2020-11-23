@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import tempfile
 
-from annotation.vcf_files.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
+from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 from library.log_utils import log_traceback, get_traceback
 from snpdb.models import VariantCollection, Variant, VCFBedIntersection
 from snpdb.models.models_enums import ProcessingStatus

@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
-from snpdb.models.models_enums import ColumnAnnotationLevel
+from snpdb.models.models_enums import ColumnAnnotationLevel, VCFInfoTypes
 
 
 class VariantGridColumn(models.Model):
@@ -31,6 +31,19 @@ class VariantGridColumn(models.Model):
 
     def __str__(self):
         return self.grid_column_name
+
+
+class ColumnVCFInfo(models.Model):
+    """ Used to export columns to VCF (vcf_export_utils) """
+    info_id = models.TextField(primary_key=True)
+    column = models.OneToOneField(VariantGridColumn, on_delete=CASCADE)
+    number = models.IntegerField(null=True, blank=True)
+    type = models.CharField(max_length=1, choices=VCFInfoTypes.CHOICES)
+    description = models.TextField(null=True)
+
+    def __str__(self):
+        number = self.number or '.'
+        return f"ID={self.info_id},number={number},type={self.type},descr: {self.description}"
 
 
 class CustomColumnsCollection(models.Model):

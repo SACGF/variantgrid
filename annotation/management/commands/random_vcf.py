@@ -3,7 +3,7 @@ import itertools
 from random import randrange
 import sys
 
-from annotation.vcf_files.vcf_export_utils import get_vcf_header_from_contigs
+from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 from snpdb.models import GenomeBuild
 
 MAX_SIZE = 1000000

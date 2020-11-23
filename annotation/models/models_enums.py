@@ -27,22 +27,6 @@ class HumanProteinAtlasAbundance:
         return higher_levels
 
 
-# Integer, Float, Flag, Character, and String.
-class VCFInfoTypes:
-    INTEGER = 'I'
-    FLOAT = 'F'
-    FLAG = 'B'  # Boolean
-    CHARACTER = 'C'
-    STRING = 'S'
-    CHOICES = [
-        (INTEGER, 'Integer'),
-        (FLOAT, 'Float'),
-        (FLAG, 'Flag'),
-        (CHARACTER, 'Character'),
-        (STRING, 'String'),
-    ]
-
-
 class AnnotationStatus:
     CREATED = 'C'
     DELETING = 'x'

@@ -10,7 +10,6 @@ from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, Analy
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.models.nodes.filters.tag_node import VariantTag
-from analysis.models.nodes.node_counts import INTERNAL_CLASSIFICATION_ALIASES_AND_SELECT
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
@@ -19,7 +18,8 @@ from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.utils import md5sum_str
 from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
+from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
+    get_variantgrid_extra_alias_and_select_columns
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts
 from snpdb.models import Tag, VariantGridColumn, UserGridConfig
 from snpdb.models.models_genome import GenomeBuild
@@ -33,6 +33,7 @@ class VariantGrid(JqGridSQL):
     colmodel_overrides = {
         'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink', 'sorttype': 'int'},
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
+        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
         'clinvar__clinvar_variation_id': {'width': 60, 'formatter': 'clinvarLink'},
         'variantannotation__cosmic_id': {'width': 90, 'formatter': 'cosmicLink'},
         'variantannotation__cosmic_legacy_id': {'width': 90, 'formatter': 'cosmicLink'},
@@ -153,7 +154,8 @@ class VariantGrid(JqGridSQL):
             select_part, from_part, where_part = get_queryset_select_from_where_parts(values_queryset)
 
         extra_column_selects = []
-        for alias, select in INTERNAL_CLASSIFICATION_ALIASES_AND_SELECT.items():
+        for alias, select in get_variantgrid_extra_alias_and_select_columns(self.user,
+                                                                            exclude_analysis=self.node.analysis):
             extra_column_selects.append(f'({select}) as "{alias}"')
             new_columns.append(alias)
 
