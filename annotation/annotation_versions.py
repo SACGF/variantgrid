@@ -28,7 +28,8 @@ def get_variant_annotation_version(genome_build: GenomeBuild):
     return variant_annotation_version
 
 
-def _get_unannotated_count_min_max(annotation_version, search_min: int, annotation_batch_min, annotation_batch_max):
+def _get_unannotated_count_min_max(annotation_version, search_min: int,
+                                   annotation_batch_min=None, annotation_batch_max=None):
     """ Get at most annotation_batch_size unannotated variants above search_min """
 
     if annotation_batch_max is None:
@@ -55,7 +56,7 @@ def _get_unannotated_count_min_max(annotation_version, search_min: int, annotati
             if min_variant_id is None:
                 min_variant_id = results["min_variant_id"]
             max_variant_id = results["max_variant_id"]
-            if unannotated_count >= annotation_batch_min:
+            if annotation_batch_min and unannotated_count >= annotation_batch_min:
                 break
 
         search_min = search_max + 1

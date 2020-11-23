@@ -107,7 +107,7 @@ class Test(URLTestCase):
 
             # Node editor
             ('node_view', node_editor_params, 200),
-            ('node_sql', node_editor_params, 200),
+            ('node_debug', node_editor_params, 200),
 
             ('node_doc', {"node_id": cls.node.pk}, 200),
             ('node_load', {"node_id": cls.node.pk}, 302),
