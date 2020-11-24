@@ -1,11 +1,11 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models.deletion import CASCADE, SET_NULL, DO_NOTHING, PROTECT
+from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
 from annotation.models.models_mim_hpo import HPOSynonym, MIMMorbidAlias
-from genes.models import PanelAppPanel, GeneList, Gene
+from genes.models import GeneList, Gene
 from library.enums import ModificationOperation
 from pathtests.models_enums import PathologyTestGeneModificationOutcome, \
     CaseState, InvestigationType, CaseWorkflowStatus
@@ -163,21 +163,6 @@ class RelatedGeneLists(models.ForeignKey):
     pathology_test = models.ForeignKey(PathologyTest, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
     comments = models.TextField(blank=True)
-
-
-class PathologyTestHPO(models.Model):
-    pathology_test = models.ForeignKey(PathologyTest, on_delete=CASCADE)
-    hpo_synonym = models.ForeignKey(HPOSynonym, on_delete=CASCADE)
-
-
-class PathologyTestOMIM(models.Model):
-    pathology_test = models.ForeignKey(PathologyTest, on_delete=CASCADE)
-    mim_morbid_alias = models.ForeignKey(MIMMorbidAlias, on_delete=CASCADE)
-
-
-class PathologyTestPanelAppPanel(models.Model):
-    pathology_test = models.ForeignKey(PathologyTest, on_delete=CASCADE)
-    panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=DO_NOTHING)  # This may be recreated w/CachedWebResource
 
 
 class Case(ExternallyManagedModel):
