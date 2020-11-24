@@ -807,6 +807,9 @@ class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
 class NodeWiki(Wiki):
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
 
+    def _get_restricted_object(self):
+        return self.node.analysis
+
 
 class NodeVersion(models.Model):
     """ This will be deleted once a node updates, so make all version specific caches cascade delete from this """

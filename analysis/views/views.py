@@ -296,14 +296,20 @@ def node_debug(request, node_id, version_id, extra_filters):
 
 def node_doc(request, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
+    has_write_permission = node.analysis.can_write(request.user)
     form = forms.AnalysisNodeForm(request.POST or None, instance=node)
+    if not has_write_permission:
+        set_form_read_only(form)
+
     if request.method == "POST":
+        node.analysis.check_can_write(request.user)
         if form.is_valid():
             # Doesn't set "queryset_dirty" so won't cause expensive reloads
             node = form.save()
 
     context = {"form": form,
-               "node": node}
+               "node": node,
+               "has_write_permission": has_write_permission}
     return render(request, "analysis/node_editors/grid_editor_doc_tab.html", context)
 
 
