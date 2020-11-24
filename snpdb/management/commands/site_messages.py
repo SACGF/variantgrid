@@ -27,7 +27,7 @@ class Command(BaseCommand):
                 sm.delete()
 
         if shutdown:
-            date_time = timezone.now() - datetime.timedelta(minutes=-shutdown)
+            date_time = timezone.now() + datetime.timedelta(minutes=shutdown)
             sm = SiteMessage.objects.create(message="The system will soon be shut down soon (approx: %(time_away)s)",
                                             date_time=date_time)
             print(f"Added message: '{sm}'")
