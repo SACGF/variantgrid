@@ -10,6 +10,12 @@ a.nav-link {
         color: #222 !important;
     }
 }
+
+// used by 50x.html
+#site-name::after {
+    content: "Shariant Test"
+}
+
 .navbar-brand {
     background-image: url("/static/images/AGHA WHITE REVERSED LOGO 3L stacked-01.png");
 }

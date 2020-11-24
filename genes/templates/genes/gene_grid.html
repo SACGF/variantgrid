@@ -2,20 +2,19 @@
 {% load gene_grid_tags %}
 
 {% block title %}GeneGrid{% endblock title %}
-{% block jshead %}
-{{ block.super }}
-
-function updateGeneGridUrl(allColumnsStr) {
-    var url;
-    if (allColumnsStr) {
-        url = Urls.passed_gene_grid(allColumnsStr);
-    } else {
-        url = Urls.gene_grid();
-    }
-    window.history.pushState({}, null, url)
-}
-
-{% endblock jshead %}
+{% block head %}
+    <script>
+        function updateGeneGridUrl(allColumnsStr) {
+            var url;
+            if (allColumnsStr) {
+                url = Urls.passed_gene_grid(allColumnsStr);
+            } else {
+                url = Urls.gene_grid();
+            }
+            window.history.pushState({}, null, url)
+        }
+    </script>
+{% endblock head %}
 {% block submenu_page_content %}
 
     {% gene_grid columns_from_url=columns_from_url update_url_callback='updateGeneGridUrl' %}

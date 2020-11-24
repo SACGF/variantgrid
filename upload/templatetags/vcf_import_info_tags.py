@@ -14,7 +14,7 @@ def vcf_import_info(vcf: VCF, examine_error_instructions):
         for vii in upload_pipeline.get_errors():
             errors.append(vii)
 
-        for vii in upload_pipeline.get_warnings():
+        for vii in upload_pipeline.get_warnings(include_vcf=False):
             warnings.append(vii)
     except UploadedVCF.DoesNotExist:
         msg = 'Import Error: This file has no associated import information. Please re-upload.'

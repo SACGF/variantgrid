@@ -1,24 +1,46 @@
+import operator
+from functools import reduce
 from typing import Optional
 
+from django.conf import settings
 from django.db import models
-from django.db.models import Q
-from django.db.models.deletion import SET_NULL
+from django.db.models import Q, CASCADE, SET_NULL
+from lazy import lazy
 
+from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from analysis.models.nodes.analysis_node import AnalysisNode
-from snpdb.models import Variant
+from genes.models import GeneSymbol
+from snpdb.models import Variant, VariantZygosityCountCollection
 
 
-class AllVariantsNode(AnalysisNode):
-    max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)  # Store this, so we know when we are out of date
+class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
+    # Store max_variant so we know when we are out of date
+    max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)
+    gene_symbol = models.ForeignKey(GeneSymbol, null=True, blank=True, on_delete=CASCADE)
+    reference = models.BooleanField(default=False, blank=True)
     min_inputs = 0
     max_inputs = 0
 
     def _get_node_q(self) -> Optional[Q]:
         """ Restrict to analysis genome build """
-        return Variant.get_contigs_q(self.analysis.genome_build)
+
+        and_q = [Variant.get_contigs_q(self.analysis.genome_build)]
+
+        if self.gene_symbol:
+            genes = list(self.gene_symbol.get_genes())
+            and_q.append(Q(variantgeneoverlap__gene__in=genes))
+
+        if not self.reference:
+            and_q.append(Variant.get_no_reference_q())
+
+        and_q.extend(self.get_zygosity_count_q_list())
+        return reduce(operator.and_, and_q)
 
     def get_node_name(self):
-        return ''
+        name = ""
+        if self.gene_symbol:
+            name = self.gene_symbol_id
+        return name
 
     @staticmethod
     def get_node_class_label():
@@ -35,3 +57,23 @@ class AllVariantsNode(AnalysisNode):
         if not self.max_variant:
             errors.append("Not Saved")
         return errors
+
+    @lazy
+    def db_counts(self):
+        return VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+
+    @property
+    def ref_count_column(self):
+        return self.db_counts.ref_alias
+
+    @property
+    def hom_count_column(self):
+        return self.db_counts.hom_alias
+
+    @property
+    def het_count_column(self):
+        return self.db_counts.het_alias
+
+    @property
+    def any_zygosity_count_column(self):
+        return self.db_counts.germline_counts_alias

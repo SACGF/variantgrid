@@ -24,38 +24,76 @@ nav.navbar a.nav-link.active {
   height: 35px;
 }
 
-.nav-side-bar {
-  border-right: 1px solid #cfcfcf;
-  -ms-flex: 0 0 200px;
-  flex: 0 0 200px;
-  position: fixed;
-  width: 160px;
-  top: 49px;
-}
-.nav-side-bar nav {
-  padding-top: 10px;
-  background-color: white;
-  min-height: 200px;
-}
-.nav-side-bar nav .nav-link {
-  cursor: pointer;
-  text-align: right;
-  line-height: 2rem;
-}
-.nav-side-bar nav .nav-link.active {
-  color: #000;
-}
-
 .main-content {
-  background-color: white;
-  margin-left: 170px;
-  padding-top: 80px;
   padding-bottom: 60px;
   overflow: scroll;
   max-width: calc(100vw);
-  height: calc(100vh);
 }
 
+@media screen and (min-width: 0) and (max-width: 991px) {
+  .nav-side-bar {
+    margin-top: 60px;
+    border-bottom: 1px dotted #cfcfcf;
+  }
+  .nav-side-bar .site-message {
+    width: 100%;
+  }
+  .nav-side-bar .nav-link {
+    font-weight: bold;
+  }
+
+  .main-content {
+    padding-top: 20px;
+  }
+
+  #vcform-filter-wrapper {
+    position: inherit !important;
+  }
+
+  #vcform-content {
+    margin-top: 0 !important;
+  }
+
+  .container, .container-table {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: 991px !important;
+  }
+}
+@media screen and (min-width: 992px) {
+  .main-content {
+    padding-top: 80px;
+    margin-left: 170px;
+    overflow: scroll;
+    max-width: calc(100vw);
+    height: calc(100vh);
+  }
+
+  .nav-side-bar {
+    border-right: 1px solid #cfcfcf;
+    -ms-flex: 0 0 200px;
+    flex: 0 0 200px;
+    position: fixed;
+    width: 160px;
+    top: 49px;
+  }
+  .nav-side-bar .nav {
+    flex-direction: column !important;
+  }
+  .nav-side-bar nav {
+    padding-top: 10px;
+    background-color: white;
+    min-height: 200px;
+  }
+  .nav-side-bar nav .nav-link {
+    cursor: pointer;
+    text-align: right;
+    line-height: 2rem;
+  }
+  .nav-side-bar nav .nav-link.active {
+    color: #000;
+  }
+}
 nav .nav-link:hover {
   text-decoration: underline;
   text-decoration-color: rgba(0, 0, 0, 0.3);
@@ -79,8 +117,17 @@ i.fas {
   margin-right: 4px;
 }
 
+/*
 .row.equal .card {
-  height: 100%;
+    height: 100%;
+}
+ */
+.row.equal > div {
+  display: flex;
+  flex-direction: column;
+}
+.row.equal > div > .card {
+  flex-grow: 1;
 }
 
 /*# sourceMappingURL=layout.css.map */

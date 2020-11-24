@@ -6,6 +6,7 @@ from analysis.forms import GraphTypeChoiceForm, ColumnSummaryForm, SNPMatrixForm
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_nodes
+from library.django_utils import set_form_read_only
 from snpdb.models.models_user_settings import UserTagColors, UserSettings
 from snpdb.models.models_enums import BuiltInFilters
 
@@ -21,7 +22,8 @@ class NodeView(UpdateView):
                         "user_tag_colors": user_tag_colors,
                         "annotation_version": self.object.analysis.annotation_version,
                         "extra_filters": extra_filters,
-                        "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters)})
+                        "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters),
+                        'has_write_permission': self.object.analysis.can_write(self.request.user)})
 
         grid = VariantGrid(self.request.user, self.object, extra_filters)
         colmodels = grid.get_colmodels()
@@ -34,7 +36,7 @@ class NodeView(UpdateView):
         context['snp_matrix_form'] = SNPMatrixForm(initial={'significant_figures': 2})
 
         user_settings = UserSettings.get_for_user(self.request.user)
-        context["node_sql_tab"] = user_settings.node_sql_tab
+        context["node_debug_tab"] = user_settings.node_debug_tab
         return context
 
     def _get_form_initial(self):
@@ -63,10 +65,15 @@ class NodeView(UpdateView):
     def get_form(self, form_class=None):
         """ When in AnalysisTemplate mode - want to add a widget wrapper """
         form = super().get_form(form_class=form_class)
+
         if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE:
             for field_name, field in form.fields.items():
                 if not field.widget.is_hidden:
                     self._monkey_patch_widget_render(field.widget)
+
+        if not form.instance.analysis.can_write(self.request.user):
+            set_form_read_only(form)
+
         return form
 
     @staticmethod

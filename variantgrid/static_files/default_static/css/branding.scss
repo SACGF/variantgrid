@@ -15,3 +15,8 @@ a.nav-link {
         color: #222 !important;
     }
 }
+
+// used by 50x.html
+#site-name::after {
+    content: "VariantGrid"
+}

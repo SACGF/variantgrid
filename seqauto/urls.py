@@ -71,7 +71,7 @@ urlpatterns = [
     perm_path('vcf_file/grid/<slug:op>/', JQGridView.as_view(grid=VCFFileListGrid), name='vcf_file_grid'),
     perm_path('qc/grid/<slug:op>/', JQGridView.as_view(grid=QCFileListGrid), name='qc_grid'),
     perm_path('enrichment_kit/grid/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitListGrid), name='enrichment_kit_list_grid'),
-    perm_path('enrichment_kit/gene/grid/<int:enrichment_kit_id>/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitGeneCoverageGrid), name='enrichment_kit_gene_coverage_grid'),
+    perm_path('enrichment_kit/gene/grid/<int:enrichment_kit_id>/<genome_build_name>/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitGeneCoverageGrid), name='enrichment_kit_gene_coverage_grid'),
     perm_path('gold_coverage_summary/grid/<pk>/<slug:op>/', JQGridView.as_view(grid=GoldCoverageSummaryGrid), name='gold_coverage_summary_grid'),
     perm_path('sequencing_stats/sequencing_samples/grid/<slug:op>/', JQGridView.as_view(grid=SequencingSamplesGrid, csv_download=True), name='sequencing_samples_grid'),
     perm_path('sequencing_stats/sequencing_samples_historical/grid/<slug:time_frame>/<slug:op>/', JQGridView.as_view(grid=SequencingSamplesHistoricalGrid, csv_download=True), name='sequencing_samples_historical_grid'),

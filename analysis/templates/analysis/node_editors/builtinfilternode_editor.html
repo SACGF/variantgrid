@@ -72,7 +72,9 @@
 	<form id="built-in-filter" method="post" action="{{ request.path }}">
         {% csrf_token %}
         {{  form.as_p }}
-		<button id='built-in-filter-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+		    <button id='built-in-filter-save' class="btn btn-primary">save</button>
+        {% endif %}
         {{ form.media }}
 	</form>
 </div>

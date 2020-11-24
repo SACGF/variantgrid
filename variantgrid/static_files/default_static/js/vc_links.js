@@ -104,7 +104,7 @@ let VCLinks = (function() {
             links.push(this.generateGnomad());
             links.push(this.makeLink('Google', 'https://google.com/search', '?q=@@', SpecialEKeys.SEARCH_TERMS));
             links.push(this.makeLink('GTEx', 'https://gtexportal.org/home/', 'gene/@@', SpecialEKeys.GENE_SYMBOL, 'Genotype-Tissue Expression'));
-            links.push(this.makeLink('Monarch Phen.', 'https://monarchinitiative.org', '/gene/HGNC:@@', SpecialEKeys.HGNC_ID, 'Monarch Phenotype'));
+            links.push(this.generateMonarchLink());
             links.push(this.makeLink('NCBI (Gene)', 'https://www.ncbi.nlm.nih.gov/gene/', '?term=@@', SpecialEKeys.GENE_SYMBOL));
             links.push(this.makeLink('OMIM (Gene)', 'https://www.omim.org', '/entry/@@', SpecialEKeys.GENE_OMIM_ID));
             links.push(this.makeLink('PDB', 'https://www.rcsb.org/pdb', '/protein/@@', SpecialEKeys.UNIPROT_ID, 'Protein Data Bank'));
@@ -124,21 +124,50 @@ let VCLinks = (function() {
             }
         },
 
-        generateClingenKb() {
-            let val = this.data[SpecialEKeys.HGNC_ID];
-            if (val) {
-                if (!val.toUpperCase().startsWith('HGNC')) {
-                    val = 'HGNC:' + val;
+        hgncIdSafe() {
+            let hgnc_id = this.data[SpecialEKeys.HGNC_ID];
+            if (hgnc_id) {
+                if (!hgnc_id.toUpperCase().startsWith('HGNC')) {
+                    hgnc_id = 'HGNC:' + hgnc_id;
                 }
-                let link = `https://search.clinicalgenome.org/kb/genes/${val}`;
-                return new VCLink({text: 'ClinGen KB', href: link});
-            } else {
-                return new VCLink({
-                    text: 'ClinGen KB',
-                    href: 'https://search.clinicalgenome.org',
-                    missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label
-                });
             }
+            return hgnc_id;
+        },
+
+        generateMonarchLink() {
+            let hgnc_id = this.hgncIdSafe();
+            if (hgnc_id) {
+                return new VCLink({text: 'Monarch Phen.', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/gene/${hgnc_id}`});
+            }
+            let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
+            if (gene_symbol) {
+                return new VCLink({text: 'Monarch Phen,', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/search/${gene_symbol}`});
+            }
+
+            return new VCLink({
+                text: 'Monarch Phen',
+                href: 'https://monarchinitiative.org',
+                missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label
+            });
+        },
+
+        generateClingenKb() {
+            let hgnc_id = this.hgncIdSafe();
+            if (hgnc_id) {
+                let link = `https://search.clinicalgenome.org/kb/genes/${hgnc_id}`;
+                return new VCLink({text: 'ClinGen KB', href: link});
+            }
+            let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
+            if (gene_symbol) {
+                let link = `https://search.clinicalgenome.org/kb/home?term=${gene_symbol}`;
+                return new VCLink({text: 'ClinGen KB', href: link});
+            }
+
+            return new VCLink({
+                text: 'ClinGen KB',
+                href: 'https://search.clinicalgenome.org/kb/home?term=',
+                missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label
+            });
         },
 
         generateBeacon() {

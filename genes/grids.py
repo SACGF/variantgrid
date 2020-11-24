@@ -58,8 +58,8 @@ class GeneListsGrid(JqGridUserRowConfig):
 
         self.queryset = queryset.values(*self.get_field_names())
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         if self.show_category:
             for cm in colmodels:
                 if cm['index'] == 'category__name':
@@ -94,8 +94,8 @@ class GeneListGenesGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'original_name',
                                   'sortorder': 'desc'})
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=False)
         for field_name, label in self.annotation_field_labels.items():
             cm = {'index': field_name, 'name': field_name, 'label': label}
             colmodels.append(cm)
@@ -106,7 +106,10 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
     """ Uses custom columns subtracting away the gene annotations (as they're displayed above) """
     caption = 'Gene Variants'
     fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
-    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'}}
+    colmodel_overrides = {
+        'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
+        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
+    }
 
     def __init__(self, user, gene_symbol, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)
@@ -114,7 +117,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
-        non_gene_fields = [f for f in fields if not "__transcript_version__" in f]
+        non_gene_fields = [f for f in fields if "__transcript_version__" not in f]
         self.fields = non_gene_fields
         self.update_overrides(override)
 
@@ -122,8 +125,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         genes_qs = get_variant_queryset_for_gene_symbol(gene_symbol, genome_build)
         queryset = variant_qs_filter_has_internal_data(genes_qs, genome_build)
-        if extra_filters:
-            # Hotspot filters
+        if extra_filters:  # Hotspot filters
             protein_position = extra_filters.get("protein_position")
             if protein_position:
                 transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
@@ -199,8 +201,8 @@ class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
         field_names = self.get_field_names() + ["enrichment_kits"]
         self.queryset = queryset.values(*field_names)
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         enrichment_kits_colmodel = {'index': 'enrichment_kits', 'name': 'enrichment_kits', 'label': 'Enrichment Kits', 'width': 230}
         colmodels += [enrichment_kits_colmodel]
         return colmodels
@@ -256,10 +258,10 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def get_coverage_queryset(self, gene_coverage_collection, genes):
+    def get_coverage_queryset(self, gene_coverage_collection, gene_list):
         queryset = self.model.objects.filter(gene_coverage_collection=gene_coverage_collection)
-        if genes:
-            queryset = queryset.filter(gene__in=genes)
+        if gene_list:
+            queryset = queryset.filter(gene__in=gene_list)
 
         return queryset
 

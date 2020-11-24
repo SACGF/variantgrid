@@ -15,8 +15,6 @@ def one_off_set_cohort_genotype_collection_num_samples(apps, schema_editor):
         cg_collection.save()
 
 
-
-
 class Migration(migrations.Migration):
 
     dependencies = [

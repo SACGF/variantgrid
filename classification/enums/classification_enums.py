@@ -51,6 +51,7 @@ class SpecialEKeys:
     PHASTCONS = "phastcons"
     PHYLOP = "phylop"
     PUBMED_GENE_SEARCH_COUNT = "pubmed_gene_search_count"
+    PUBMED_SEARCH_TERMS = "pubmed_search_terms"
     READ_DEPTH = 'read_depth'
     REFERENCE_DEPTH = 'reference_depth'
     REFSEQ_TRANSCRIPT_ID = "refseq_transcript_id"
@@ -321,6 +322,16 @@ class ClinicalSignificance:
     ]
 
     LABELS = dict(CHOICES + [(None, "Unclassified")])
+
+    SHORT_CHOICES = [
+        (OTHER, 'O'),
+        (BENIGN, 'B'),
+        (LIKELY_BENIGN, 'LB'),
+        (VUS, 'VUS'),
+        (LIKELY_PATHOGENIC, 'LP'),
+        (PATHOGENIC, 'P'),
+    ]
+    SHORT_LABELS = dict(SHORT_CHOICES + [(None, "U")])
 
 
 class ClinicalSignificanceComparison:

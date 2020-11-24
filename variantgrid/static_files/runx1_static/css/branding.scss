@@ -21,6 +21,11 @@ a.nav-link {
     background-image: url(/static/images/runx1-logo-standard.png);
 }
 
+// used by 50x.html
+#site-name::after {
+    content: "runx1"
+}
+
 //
 //:root {
 //  --main-fg-color: #7d1416;

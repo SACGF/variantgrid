@@ -25,7 +25,7 @@
                 {% endifchanged %}
             </td>
             <td class="user">
-                {% ifchanged  change_group.record_id change_group.source change_group.user change_group.flag %}
+                {% ifchanged change_group.record_id change_group.source change_group.user change_group.flag %}
                     {% if change_group.flag %}
                     <div class="submission-source flag flag-{{ change_group.flag.flag_type.id }}" title="{{ change_group.source_label }} ({{ change_group.flag.id }})"></div>
                     {% else %}

@@ -93,7 +93,7 @@
         }
         return [envelope_text, valid]
     }
-    
+
     function run() {
         let [text, valid] = generateRequest();
         if (!valid) {
@@ -118,10 +118,10 @@
                 if (record.meta && record.meta.id) {
                     let id = record.meta.id;
                     link = `/classification/classification/${id}`;
-                }
-                if (link) {
+
                     $('#record-link-pair').show();
                     $('#record-link').attr('href',link);
+                    $('#record-link').text(`Open classification ${id}`);
                 } else {
                     $('#record-link-pair').hide();
                 }
@@ -282,7 +282,7 @@ div.json {
             {% endlabelled %}
         </div>
     </form>
-    <div class="row">
+    <div class="row" id="preview">
         <div class="col-md-5">
             <label>Request Preview</label>
             <div id="request_preview" class="json"></div>

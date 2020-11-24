@@ -29,7 +29,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
-    PfamSequenceIdentifier
+    PfamSequenceIdentifier, gene_symbol_withdrawn_str
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
@@ -131,6 +131,8 @@ def _get_mim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
 
 def view_gene_symbol(request, gene_symbol):
     # determines if this gene symbol might ONLY be an alias
+    if gene_symbol.endswith(gene_symbol_withdrawn_str):
+        raise Http404('Withdrawn GeneSymbols not valid')
 
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
@@ -524,7 +526,7 @@ class HotspotGraphView(TemplateView):
         genome_build_name = self.kwargs["genome_build_name"]
         return GenomeBuild.get_name_or_alias(genome_build_name)
 
-    @property
+    @lazy
     def transcript(self):
         transcript_id = self.kwargs.get("transcript_id")
         gene_id = self.kwargs.get("gene_id")

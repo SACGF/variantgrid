@@ -177,7 +177,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "jfu_delete": False,
     "download_uploaded_file": False,
 
-    "classification_import_upload": True
+    "classification_import_upload": True,
+    # "condition_aliases": True
 })
 
 PREFER_ALLELE_LINKS = True
@@ -192,8 +193,11 @@ VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH = False
 VIEW_GENE_SHOW_WIKI = False
 
 USER_SETTINGS_SHOW_GROUPS = False
+USER_SETTINGS_SHOW_BUILDS = False
 
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = True
+SEARCH_VARIANT_SHOW_SUMMARY = False  # If you want to use this for Shariant we need to scrub all but classifications
+
 UNSHARED_FLAG_ENABLED = True
 VIEW_GENE_SHOW_HOTSPOT_GRAPH = False
 

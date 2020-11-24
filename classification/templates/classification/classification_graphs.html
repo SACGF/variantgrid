@@ -16,6 +16,11 @@
         #classify-container button {
             margin-left: 12px;
         }
+
+        #classification-stats-links {
+            margin: 10px 0px 10px 0px;
+        }
+
     </style>
     <script>
         var PATHOGENIC_COLORS = [   '#777777', // other
@@ -107,6 +112,12 @@
             <div id='classifications-graph' class="col-lg-6"></div>
             <div id='gene-classifications-graph' class="col-lg-4"></div>
         </div>
+
+        {% if user.is_superuser %}
+        <div id="classification-stats-links">
+            <a class="admin-only" href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a>
+        </div>
+        {% endif %}
 
         <div>
             <h3>Criteria usage</h3>

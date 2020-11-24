@@ -1,8 +1,8 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from library.git import Git
 from library.guardian_utils import admin_bot
-from library.utils import get_git_hash
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models.models_genome import GenomeBuild
@@ -21,7 +21,7 @@ class Command(BaseCommand):
         script = __file__
         add_clingen_allele = options["add_clingen_allele"]
         for genome_build in GenomeBuild.builds_with_annotation():
-            defaults = {"git_hash": get_git_hash(settings.BASE_DIR)}
+            defaults = {"git_hash": Git(settings.BASE_DIR).hash}
             allele_source, _ = AllClassificationsAlleleSource.objects.get_or_create(script=script,
                                                                                     genome_build=genome_build,
                                                                                     defaults=defaults)

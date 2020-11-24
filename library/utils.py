@@ -1,12 +1,13 @@
 import csv
 import io
+import operator
 from collections import defaultdict
 from datetime import date
 from operator import attrgetter
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from dateutil import parser
-from dateutil.parser import parse
 from decimal import Decimal
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
@@ -134,15 +135,9 @@ def upper(string):
     return string
 
 
-def get_git_hash(directory):
-    git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=directory)
-    return git_hash.decode().strip()
-
-
-def get_git_last_modified_date(directory):
-    git_hash = subprocess.check_output(["git", "log", "-1", "--format=%cd"], cwd=directory)
-    date_string = git_hash.decode().strip()
-    return parse(date_string)
+def is_url(url):
+    parse_result = urlparse(url)
+    return bool(parse_result.scheme in ('http', 'https') and parse_result.netloc)
 
 
 def rgb_hex_to_tuples(rgb):
@@ -299,7 +294,7 @@ def filename_safe(self, filename) -> str:
 
 def html_link(url: str, title: str) -> SafeString:
     if not url:
-        return title
+        return mark_safe(title)
     return mark_safe(f"<a href='{url}'>{html.escape(title)}</a>")
 
 
@@ -454,3 +449,79 @@ def delimited_row(data: list, delimiter: str = ',') -> str:
     writer = csv.writer(out, delimiter=delimiter)
     writer.writerow(data)
     return out.getvalue()
+
+
+class IterableTransformer:
+    """
+    Given an iterable and a transformer, makes a new iterable that will lazily transform the elements
+    """
+
+    class _IteratorTransformer:
+        def __init__(self, iterator: Iterator, transform):
+            self.iterator = iterator
+            self.transform = transform
+
+        def __next__(self):
+            return self.transform(next(self.iterator))
+
+    def __init__(self, iterable: Iterable, transform):
+        self.iterable = iterable
+        self.transform = transform
+
+    def __iter__(self):
+        return self._IteratorTransformer(iter(self.iterable), self.transform)
+
+
+class IteratableStitcher:
+    """
+    Given a list of SORTED iterables, will give you the smallest element from any of them
+    """
+
+    class _IteratorStitcher:
+
+        class _CachedIterator:
+
+            def __init__(self, iteratable):
+                self.iterator = iter(iteratable)
+                self.finished = False
+                self.cache = None
+                self.fetch_next()
+
+            def fetch_next(self):
+                if not self.finished:
+                    try:
+                        self.cache = next(self.iterator)
+                    except StopIteration:
+                        self.cache = None
+                        self.finished = True
+
+            @property
+            def preview(self):
+                return self.cache
+
+        def __init__(self, iteratables: List[Iterable], comparison):
+            self.iterators = [self._CachedIterator(iterable) for iterable in iteratables]
+            self.comparison = comparison
+
+        def __next__(self):
+            min_ci: Optional[IteratableStitcher._IteratorStitcher._CachedIterator] = None
+            min_value: Any = None
+
+            for ci in self.iterators:
+                value = ci.preview
+                if value is not None:
+                    if min_value is None or self.comparison(value, min_value):
+                        min_value = value
+                        min_ci = ci
+
+            if not min_ci:
+                raise StopIteration()
+            min_ci.fetch_next()
+            return min_value
+
+    def __init__(self, iterables: List[Iterable], comparison=operator.__lt__):
+        self.iterables = iterables
+        self.comparison = comparison
+
+    def __iter__(self):
+        return self._IteratorStitcher(iteratables=self.iterables, comparison=self.comparison)

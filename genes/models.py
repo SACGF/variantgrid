@@ -73,6 +73,9 @@ class HGNCGeneNames(models.Model):
                f"previous symbols: {self.previous_symbols}, synonyms: {self.synonyms}"
 
 
+gene_symbol_withdrawn_str = '~withdrawn'
+
+
 class GeneSymbol(models.Model):
     symbol = models.TextField(primary_key=True)
 
@@ -171,9 +174,9 @@ class GeneSymbolAlias(TimeStampedModel):
 class GeneSymbolAliasSummary:
     other_obj: GeneSymbol
     other_symbol: str
-    source: str # HGNC etc
+    source: str  # HGNC etc
     my_symbol_is_main: bool  # true if the other symbol is an alias for this symbol, false if this symbol is an alias for the other
-    different_genes: bool # if true, then this should only be considered an alias with a priviso, and not used in automatic alias calculations
+    different_genes: bool  # if true, then this should only be considered an alias with a priviso, and not used in automatic alias calculations
 
     def __lt__(self, other):
         return self.other_symbol < other.other_symbol
@@ -232,25 +235,19 @@ class GeneSymbolAliasesMeta:
 
     @lazy
     def alias_symbol_strs(self) -> List[str]:
-        gene_symbol_strs: Set[str] = set([self.gene_symbol.symbol])
+        gene_symbol_strs: Set[str] = {self.gene_symbol.symbol}
         for alias_summary in self.alias_list:
             if not alias_summary.different_genes:
                 gene_symbol_strs.add(alias_summary.other_symbol)
-        sorted = list(gene_symbol_strs)
-        sorted.sort()
-        return sorted
+        return list(sorted(gene_symbol_strs))
 
     @lazy
     def aliases_out(self) -> List[GeneSymbolAliasSummary]:
-        aliases_out = [alias for alias in self.alias_list if not alias.my_symbol_is_main]
-        aliases_out.sort()
-        return aliases_out
+        return list(sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main]))
 
     @lazy
     def aliases_in(self) -> List[GeneSymbolAliasSummary]:
-        aliases_in = [alias for alias in self.alias_list if alias.my_symbol_is_main]
-        aliases_in.sort()
-        return aliases_in
+        return list(sorted([alias for alias in self.alias_list if alias.my_symbol_is_main]))
 
 
 class GeneAnnotationImport(TimeStampedModel):
@@ -597,6 +594,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             raise MissingTranscript(f"Transcript for '{transcript_name}' (build: {genome_build}),"
                                     f" but did not have complete data {data_str}")
 
+        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
+        # so replace it with the DB records
+        transcript_version.data["gene_name"] = transcript_version.gene_version.gene_symbol_id
         return make_transcript(transcript_version.data)
 
     @property
@@ -829,7 +829,7 @@ class GeneListCategory(models.Model):
 
 
 class GeneList(models.Model):
-    """  Stores a gene/transcript list (to be used as a filter) """
+    """ Stores a gene/transcript list (to be used as a filter) """
 
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
     name = models.TextField()
@@ -1267,12 +1267,12 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, on_delete=SET_NULL)
 
     @staticmethod
-    def filter_for_kit_and_gene_symbol(enrichment_kit, gene_symbol):
+    def filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol):
         sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample"
         kwargs = {sequencing_sample + "__enrichment_kit": enrichment_kit,
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}
-        return GeneCoverageCanonicalTranscript.get_for_symbol(gene_symbol).filter(**kwargs)
+        return GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).filter(**kwargs)
 
 
 class GnomADGeneConstraint(models.Model):

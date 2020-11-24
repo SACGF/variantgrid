@@ -1,3 +1,4 @@
+import json
 from collections import Counter, defaultdict
 
 from celery.contrib.abortable import AbortableAsyncResult
@@ -12,12 +13,15 @@ from django.http.response import HttpResponse, HttpResponseRedirect, JsonRespons
 from django.shortcuts import get_object_or_404, redirect, render
 from django.test.client import RequestFactory
 from django.urls.base import reverse
+from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 import importlib
 import inspect
 import logging
+
+from htmlmin.decorators import not_minified_response
 
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
@@ -26,13 +30,14 @@ from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFil
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
-    AnalysisTemplateRun
+    AnalysisTemplateRun, AnalysisLock, Analysis
 from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import NodeHelp
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
+from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
 from analysis.views.nodes.node_view import NodeView
@@ -40,7 +45,7 @@ from annotation.models.models import MutationalSignatureInfo
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.database_utils import run_sql
-from library.django_utils import add_save_message, get_field_counts
+from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
 from patients.models_enums import TrioSample
@@ -114,6 +119,8 @@ def view_analysis(request, analysis_id, active_node_id=0):
                "active_node_id": active_node_id,
                "node_help": node_help_dict,
                "analysis_variables": analysis_variables,
+               "has_write_permission": analysis.can_write(request.user),
+               "warnings": analysis.get_warnings(request.user),
                "ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED": settings.ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED}
     return render(request, 'analysis/analysis.html', context)
 
@@ -265,11 +272,17 @@ def get_node_sql(grid):
     return node_sql_, grid_sql
 
 
+@not_minified_response
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_sql(request, node_id, version_id, extra_filters):
+def node_debug(request, node_id, version_id, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, version=version_id)
-    context = {"node": node}
+    model_name = node._meta.label
+    node_serializers = AnalysisNodeSerializer.get_node_serializers()
+    serializer = node_serializers.get(model_name, AnalysisNodeSerializer)
+
+    context = {"node": node,
+               "node_data": serializer(node).data}
     if node.valid:
         grid = VariantGrid(request.user, node, extra_filters)
         try:
@@ -278,19 +291,25 @@ def node_sql(request, node_id, version_id, extra_filters):
             context['grid_sql'] = grid_sql
         except EmptyResultSet:
             pass
-    return render(request, "analysis/node_editors/grid_editor_sql_tab.html", context)
+    return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
 
 
 def node_doc(request, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
+    has_write_permission = node.analysis.can_write(request.user)
     form = forms.AnalysisNodeForm(request.POST or None, instance=node)
+    if not has_write_permission:
+        set_form_read_only(form)
+
     if request.method == "POST":
+        node.analysis.check_can_write(request.user)
         if form.is_valid():
             # Doesn't set "queryset_dirty" so won't cause expensive reloads
             node = form.save()
 
     context = {"form": form,
-               "node": node}
+               "node": node,
+               "has_write_permission": has_write_permission}
     return render(request, "analysis/node_editors/grid_editor_doc_tab.html", context)
 
 
@@ -593,15 +612,20 @@ def view_analysis_settings(request, analysis_id):
     context = {"analysis": analysis,
                "create_analysis_template_form": form,
                "new_analysis_settings": analysis_settings,
-               "has_write_permission": analysis.user == request.user}
+               "has_write_permission": analysis.can_write(request.user),
+               "can_unlock": analysis.can_unlock(request.user)}
     return render(request, 'analysis/analysis_settings.html', context)
 
 
 def analysis_settings_details_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     form = forms.AnalysisForm(request.POST or None, user=request.user, instance=analysis)
+    has_write_permission = analysis.can_write(request.user)
+    if not has_write_permission:
+        set_form_read_only(form)
 
     if request.method == "POST":
+        analysis.check_can_write(request.user)
         if form.has_changed:
             valid = form.is_valid()
             if valid:
@@ -617,13 +641,13 @@ def analysis_settings_details_tab(request, analysis_id):
     context = {"analysis": analysis,
                "form": form,
                "new_analysis_settings": analysis_settings,
-               "has_write_permission": analysis.user == request.user}
+               "has_write_permission": has_write_permission}
     return render(request, 'analysis/analysis_settings_details_tab.html', context)
 
 
 def analysis_settings_node_counts_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
-    return _analysis_settings_node_counts_tab(request, analysis)
+    return _analysis_settings_node_counts_tab(request, analysis, has_write_permission=analysis.can_write(request.user))
 
 
 def _analysis_settings_node_counts_tab(request, analysis, pass_analysis_settings=True, has_write_permission=True):
@@ -659,6 +683,16 @@ def analysis_settings_template_run_tab(request, analysis_id):
     context = {"analysis_template_run": analysis.analysistemplaterun,
                "node_variables": defaultdict_to_dict(node_variables)}
     return render(request, 'analysis/analysis_settings_template_run_tab.html', context)
+
+
+@require_POST
+def analysis_settings_lock(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    if not analysis.can_unlock(request.user):  # check_can_write returns false if locked
+        raise PermissionDenied(f"You do not have write access to {analysis.pk}")
+    lock = json.loads(request.POST["lock"])
+    AnalysisLock.objects.create(analysis=analysis, locked=lock, user=request.user, date=timezone.now())
+    return redirect(analysis)  # Reload
 
 
 def analysis_input_samples(request, analysis_id):

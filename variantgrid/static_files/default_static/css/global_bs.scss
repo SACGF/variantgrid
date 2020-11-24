@@ -250,32 +250,6 @@ a.list-group-item-action {
     cursor: pointer;
     padding-right: 4px;
 }
-#vc-form {
-    width: 555px;
-    .no-results {
-        display: none;
-    }
-    .btn-toolbar {
-        width: 100%;
-        display: flex;
-        & > * {
-            margin: 4px;
-            flex-grow:1;
-            flex-shrink:1;
-            width: 30%;
-        }
-    }
-    .card-body {
-        background-color: rgb(245,255,245);
-    }
-}
-#vc-extras {
-    position: fixed;
-    min-width: 200px;
-    max-width: 800px;
-    left: 760px;
-    top: 62px;
-}
 .btn-disabled-wrapper {
     display: inline-block;
     & > * {
@@ -283,10 +257,17 @@ a.list-group-item-action {
     }
 }
 .btn-toolbar {
-    *.btn:not(:first-child) {
+    > *:not(:first-child) {
         margin-left: 10px;
     }
+    > * {
+      height: 32px;
+      & .btn {
+        height: 32px;
+      }
+    }
 }
+
 // Undo this bootstrap so drop downs don't get cut off on classification form
 .accordion>.card {
     overflow:inherit;
@@ -304,6 +285,26 @@ a {
     font-family: 'FontAwesome';
     content: "\f35d";
     opacity: 0.4;
+    margin-left: 4px;
+}
+.mail-link::after {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'FontAwesome';
+    content: "\f2b6";
+    opacity: 0.4;
+    margin-left: 4px;
+}
+.download-link:after {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'FontAwesome';
+    content: "\f56d";
+    opacity: 0.6;
     margin-left: 4px;
 }
 
@@ -536,4 +537,54 @@ table.as_table {
 
 .tooltip {
   pointer-events: none;
+}
+
+// term matches
+.hpo, .omim, .gene {
+
+  display: inline-block;
+  border: 3px solid white;
+  margin: 0 4px 0 4px;
+  border-radius: 3px;
+  padding: 0 4px 0 4px;
+}
+.hpo {
+  background-color: #FF8C00;
+  border-color: #FF8C00;
+}
+.omim {
+  background-color: #22529e;
+  border-color: #22529e;
+  color: #ddd;
+}
+.gene {
+  background-color: #99CD83;
+  border-color: #99CD83;
+}
+
+// Condition Aliases
+.dt-status {
+    .val-R:before {
+        font-family: 'FontAwesome';
+        margin-right: 4px;
+        content: "\f058";
+        color: green;
+    }
+    .val-P:before {
+        font-family: 'FontAwesome';
+        color: #bbb;
+        margin-right: 4px;
+        content: "\f111";
+    }
+    .val-A:before {
+      font-family: 'FontAwesome';
+        margin-right: 4px;
+        content: "\f544";
+        color: #6a6;
+    }
+    .val-U:before {
+      font-family: 'FontAwesome';
+        margin-right: 4px;
+        content: "\f057";
+    }
 }

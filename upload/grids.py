@@ -23,6 +23,36 @@ class UploadStepsGrid(JqGridUserRowConfig):
                                   'sortorder': 'desc'})
 
 
+class UploadPipelineSkippedAnnotationGrid(JqGridUserRowConfig):
+    model = Variant
+    caption = 'Skipped Annotation'
+    fields = ["id", "variantannotation__vep_skipped_reason", "variantannotation__annotation_run"]
+
+    colmodel_overrides = {"id": {"hidden": True},
+                          "variantannotation__annotation_run": {'formatter': 'formatAnnotationRunLink'}}
+
+    def __init__(self, user, upload_pipeline_id):
+        super().__init__(user)
+        upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
+        vcf = upload_pipeline.uploadedvcf.vcf
+
+        qs = get_queryset_for_latest_annotation_version(self.model, upload_pipeline.genome_build)
+        qs = vcf.get_variant_qs(qs).filter(variantannotation__vep_skipped_reason__isnull=False)
+        qs = Variant.annotate_variant_string(qs)
+
+        field_names = list(self.get_field_names())
+        field_names.insert(1, "variant_string")
+
+        self.queryset = qs.values(*field_names)
+        self.extra_config.update({'sortname': 'variant_string',
+                                  'sortorder': 'asc'})
+
+    def get_colmodels(self, remove_server_side_only=False):
+        before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant', 'formatter': 'formatVariantString'}]
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
+        return before_colmodels + colmodels
+
+
 class UploadPipelineModifiedVariantsGrid(JqGridUserRowConfig):
     model = ModifiedImportedVariant
     caption = 'Modified Imported Variant'
@@ -45,7 +75,7 @@ class UploadPipelineModifiedVariantsGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'variant_string',
                                   'sortorder': 'asc'})
 
-    def get_colmodels(self, *args, **kwargs):
-        before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant', 'formatter': 'formatVariantString'}]
-        colmodels = super().get_colmodels(*args, **kwargs)
+    def get_colmodels(self, remove_server_side_only=False):
+        before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant'}]
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         return before_colmodels + colmodels

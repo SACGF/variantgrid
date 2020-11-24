@@ -1,70 +1,17 @@
+import operator
 from datetime import datetime
+from functools import total_ordering
 from typing import Any, Iterator, List, Optional, Iterable, Union
 
 from django.db.models import QuerySet, Q
 from django.contrib.auth.models import User
 from flags.models import FlagComment, Flag, FlagResolution
+from library.utils import IterableTransformer, IteratableStitcher
 from snpdb.models import Allele
 from classification.enums import SubmissionSource
 from classification.models import ClassificationModification, Classification, \
     classification_flag_types
 from django.utils.timezone import now
-
-
-class InfiniteQuerySubject:
-
-    @staticmethod
-    def chunk_query(qs: QuerySet, chunk_size=50) -> Iterable[Any]:
-        skip = 0
-        while True:
-            cache = list(qs.all()[skip: skip+chunk_size])
-            skip = skip + chunk_size
-            if not cache:
-                return None
-            for val in cache:
-                yield val
-
-    def __init__(self, qs: QuerySet):
-        self.iterator = InfiniteQuerySubject.chunk_query(qs)
-        self.subject = None
-        self.finished = False
-        self.next()
-
-    def next(self):
-        while True:
-            if self.finished:
-                return
-            subject = None
-            try:
-                subject = next(self.iterator)
-            except StopIteration:
-                self.finished = True
-                return
-
-            changes = ClassificationChanges.from_object(subject)
-            if changes and changes.changes:
-                self.subject = changes
-                return
-
-
-class Stitch:
-    def __init__(self, queries: List[QuerySet]):
-        self.subjects = [InfiniteQuerySubject(qs) for qs in queries]
-
-    def iterate(self) -> Iterator['ClassificationChanges']:
-        while True:
-            min_iqs = None
-            for iqs in self.subjects:
-                if not iqs.finished:
-                    if min_iqs is None:
-                        min_iqs = iqs
-                    elif iqs.subject.date > min_iqs.subject.date:
-                        min_iqs = iqs
-            if not min_iqs:
-                return None
-            subject = min_iqs.subject
-            min_iqs.next()
-            yield subject
 
 
 class ClassificationChange:
@@ -79,6 +26,7 @@ class ClassificationChange:
         return f'{self.key}.{self.attribute}'
 
 
+@total_ordering
 class ClassificationChanges:
 
     @staticmethod
@@ -173,7 +121,7 @@ class ClassificationChanges:
         # Variant Classification Changes
         vcm_qs = ClassificationModification.objects.filter(vcm_q) \
                      .select_related('classification', 'classification__lab',
-                                     'classification__user').order_by('-created')
+                                     'classification__user', 'user').order_by('-created')
 
         # Flag Changes
         flags_qs = FlagComment.objects.filter(
@@ -181,11 +129,18 @@ class ClassificationChanges:
         ).exclude(flag__flag_type__in=[
             classification_flag_types.classification_outstanding_edits,
             classification_flag_types.unshared_flag
-        ]).select_related('flag', 'flag__flag_type', 'flag__collection', 'resolution').order_by('-created')
+        ]).select_related('flag', 'flag__flag_type', 'flag__collection', 'resolution', 'user').order_by('-created')
 
-        stitch = Stitch([vcm_qs, flags_qs])
+        stitcher = IteratableStitcher(
+            iterables=[
+                IterableTransformer(vcm_qs, ClassificationChanges.from_object),
+                IterableTransformer(flags_qs, ClassificationChanges.from_object)
+            ],
+            comparison=operator.__gt__
+        )
+
         changes = []
-        for index, vcmc in enumerate(stitch.iterate()):
+        for index, vcmc in enumerate(stitcher):
             changes.append(vcmc)
             if index >= limit:
                 break
@@ -242,6 +197,9 @@ class ClassificationChanges:
                         SubmissionSource.CONSENSUS: 'Copy from latest classification',
                         SubmissionSource.FORM: 'Form entry'}
         return source_label.get(self.source, self.source)
+
+    def __lt__(self, other):
+        return self.date < other.date
 
     def __str__(self):
         return f'{self.date} - {" ".join([str(c) for c in self.changes])}'

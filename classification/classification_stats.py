@@ -11,6 +11,8 @@ from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
 import numpy as np
 
+from snpdb.models import Lab
+
 
 def get_classification_counts(user: User, show_unclassified=True) -> Dict[str, int]:
     qs = get_visible_classifications_qs(user)
@@ -44,11 +46,11 @@ def get_visible_classifications_qs(user: User):
 
 
 def get_grouped_classification_counts(user: User,
-                                              field: str,
-                                              evidence_key: Optional[str] = None,
-                                              field_labels: Optional[Dict[str, str]] = None,
-                                              max_groups=10,
-                                              show_unclassified=True) -> List[Dict[str, Dict]]:
+                                      field: str,
+                                      evidence_key: Optional[str] = None,
+                                      field_labels: Optional[Dict[str, str]] = None,
+                                      max_groups=10,
+                                      show_unclassified=True) -> List[Dict[str, Dict]]:
     """ :param user: User used to check visibility of classifications
         :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
@@ -145,3 +147,22 @@ def get_criteria_counts(user: User, evidence_field: str) -> Dict[str, List[Dict]
         ]
 
     return acmg_data
+
+
+def get_lab_gene_counts(user: User, lab: Lab):
+    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+        evidence_field = "published_evidence"
+        lab_field = "classification__lab"
+    else:
+        evidence_field = "evidence"
+        lab_field = "lab"
+
+    gene_symbol_field = f"{evidence_field}__gene_symbol__value"
+    kwargs = {gene_symbol_field + "__isnull": False, lab_field: lab}
+    vc_qs = get_visible_classifications_qs(user).filter(**kwargs)
+    gene_clinical_significance_counts = defaultdict(Counter)
+
+    for gene_symbol, clinical_significance in vc_qs.values_list(gene_symbol_field, "clinical_significance"):
+        gene_clinical_significance_counts[gene_symbol][clinical_significance] += 1
+
+    return gene_clinical_significance_counts

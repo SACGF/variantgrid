@@ -31,7 +31,7 @@ from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
 from genes.models import GeneListCategory, HGNCGeneNames, GeneAnnotationImport, \
-    GeneVersion, TranscriptVersion, PfamDomains, GeneSymbolAlias
+    GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
@@ -194,10 +194,6 @@ def annotation(request):
     if hpa_counts:
         hpa_counts_annotation = f"{hpa_counts} HPA entries"
 
-    pfam_domains = PfamDomains.objects.count()
-    if pfam_domains:
-        pfam_domains = f"{pfam_domains} Pfam Domains"
-
     # These are empty/None if not set.
     annotations_ok = [all(builds_ok),
                       clinvar_citations,
@@ -205,8 +201,7 @@ def annotation(request):
                       mim_import,
                       human_phenotype_ontology_import,
                       mondo_import,
-                      hgnc_gene_symbols_import,
-                      pfam_domains]
+                      hgnc_gene_symbols_import]
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header
 
     cached_web_resources = []
@@ -225,7 +220,6 @@ def annotation(request):
                "diagnostic_gene_list": diagnostic_gene_list,
                "clinvar_citations": clinvar_citations,
                "hpa_counts_annotation": hpa_counts_annotation,
-               "pfam_domains": pfam_domains,
                "num_annotation_columns": VariantGridColumn.objects.count(),
                "cached_web_resources": cached_web_resources,
                "python_command": settings.PYTHON_COMMAND}
@@ -367,7 +361,7 @@ def retry_annotation_run_upload(request, annotation_run_id):
 
 @login_not_required
 @cache_page(WEEK_SECS)
-@vary_on_cookie # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
+@vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
 def view_annotation_descriptions(request):
     variantgrid_columns_by_annotation_level = defaultdict(list)
 
@@ -379,7 +373,7 @@ def view_annotation_descriptions(request):
 
 
 @cache_page(WEEK_SECS)
-@vary_on_cookie # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
+@vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
 def about_new_vep_columns(request):
     # Keep this around for another upgrade cycle
     return render(request, "annotation/about_new_vep_columns.html")

@@ -88,6 +88,7 @@ class KeycloakUserForm(BaseForm):
             Submit('submit', 'Create User')
         )
 
+
 class LabSelectForm(forms.Form):
     lab = forms.ModelChoiceField(queryset=Lab.objects.all(),
                                  required=False,
@@ -304,7 +305,7 @@ class SettingsOverrideForm(BaseModelForm):
                    "email_discordance_updates": BlankNullBooleanSelect(),
                    "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
                    "tool_tips": BlankNullBooleanSelect(),
-                   "node_sql_tab": BlankNullBooleanSelect(),
+                   "node_debug_tab": BlankNullBooleanSelect(),
                    "import_messages": BlankNullBooleanSelect(),
                    'default_sort_by_column': autocomplete.ModelSelect2(url='custom_column_autocomplete',
                                                                        forward=['columns'],
@@ -323,6 +324,7 @@ class SettingsOverrideForm(BaseModelForm):
         self.fields['genome_builds'].choices = GenomeBuild.get_choices()
         self.fields['columns'].queryset = models.CustomColumnsCollection.objects.filter(user__isnull=True)  # public
         self.fields['default_genome_build'].queryset = GenomeBuild.builds_with_annotation()
+        self.fields['email_weekly_updates'].label = 'Email regular updates'
         self._hide_unused_fields()
 
     def _hide_unused_fields(self):
@@ -333,13 +335,13 @@ class SettingsOverrideForm(BaseModelForm):
                                  settings.VARIANT_DETAILS_SHOW_ANNOTATION,
                                  settings.VARIANT_DETAILS_SHOW_SAMPLES))
         field_visibility = {
-            "email_weekly_updates": settings.DISCORDANCE_ENABLED,
+            # "email_weekly_updates": settings.DISCORDANCE_ENABLED, # this is also used for release note updates
             "email_discordance_updates": settings.DISCORDANCE_ENABLED,
             "columns": analysis_enabled,
             "default_sort_by_column": analysis_enabled,
             "variant_link_in_analysis_opens_new_tab": analysis_enabled,
             "tool_tips": analysis_enabled,
-            "node_sql_tab": analysis_enabled,
+            "node_debug_tab": analysis_enabled,
             "import_messages": upload_enabled,
             "igv_port": igv_links_enabled,
         }
@@ -348,9 +350,12 @@ class SettingsOverrideForm(BaseModelForm):
             if f in self.fields and not visible:
                 del self.fields[f]
 
+        if not settings.USER_SETTINGS_SHOW_BUILDS:
+            del self.fields['genome_builds']
+
     def save(self, commit=True):
         settings_override = super().save(commit=commit)
-        if commit:
+        if commit and settings.USER_SETTINGS_SHOW_BUILDS:
             usgb_set = settings_override.settingsgenomebuild_set
             old_genome_builds = set(usgb_set.all().values_list("genome_build", flat=True))
             new_genome_builds = set(self.cleaned_data['genome_builds'])
@@ -495,6 +500,7 @@ class CreateTagForm(forms.Form):
             FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary"))
         )
         self.helper = helper
+
 
 class UserSettingsGenomeBuildMixin:
     """ Mixin with ModelForm to have genome_build initialise from UserSettings """

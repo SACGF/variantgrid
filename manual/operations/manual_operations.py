@@ -1,4 +1,4 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Callable
 
 from django.db.migrations.operations.base import Operation
 
@@ -8,9 +8,11 @@ class ManualOperation(Operation):
     reversable = False
     reduces_to_sql = False
 
-    def __init__(self, task_id: str, note: Optional[str] = None, *args, **kwargs):
+    def __init__(self, task_id: str, note: Optional[str] = None, test: Callable = None, *args, **kwargs):
+        """ test - optional callable, only create manual operation if test returns True  """
         self.task_id = task_id
         self.note = note
+        self.test = test
 
     def deconstruct(self):
         kwargs = {
@@ -39,6 +41,10 @@ class ManualOperation(Operation):
         Call this to run the operation right away in RunPython
         :param apps: where we can call get_model
         """
+        if self.test:
+            if not self.test(apps):
+                return  # Skip
+
         ManualMigrationTask = apps.get_model('manual', 'ManualMigrationTask')
         ManualMigrationRequsted = apps.get_model('manual', 'ManualMigrationRequired')
 
@@ -66,7 +72,7 @@ class ManualOperation(Operation):
         return arg
 
     @staticmethod
-    def _task_id_generate(category: str, args: List[str]):
+    def _task_id_generate(category: str, args: List[str]) -> str:
         if isinstance(args, str):
             args = [args]
         args = [ManualOperation.escape_arg(arg) for arg in args]
@@ -74,5 +80,5 @@ class ManualOperation(Operation):
         return f"{category}*{arg_string}"
 
     @staticmethod
-    def task_id_manage(args: Union[str, List[str]]):
+    def task_id_manage(args: Union[str, List[str]]) -> str:
         return ManualOperation._task_id_generate(category="manage", args=args)

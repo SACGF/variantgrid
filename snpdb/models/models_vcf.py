@@ -1,4 +1,5 @@
-from typing import Dict
+from collections import namedtuple
+from typing import Dict, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -112,6 +113,13 @@ class VCF(models.Model):
 
     def get_absolute_url(self):
         return reverse('view_vcf', kwargs={"vcf_id": self.pk})
+
+    def get_warnings(self) -> List:
+        VCFImportWarning = namedtuple('VCFImportWarning', ['message', 'has_more_details'])
+        warnings = []
+        if self.import_status == ImportStatus.REQUIRES_USER_INPUT and self.genome_build is None:
+            warnings.append(VCFImportWarning("Unable to detect build, please select manually and save VCF.", False))
+        return warnings
 
     @classmethod
     def get_listing_url(cls):

@@ -1,10 +1,82 @@
 """ A list of (Google) search terms for a variant """
+from collections import defaultdict
+from typing import Tuple, List
+
 from pyhgvs import HGVSName
 
-from annotation.models import VariantTranscriptAnnotation
+
+def _get_gene_and_terms(vta, c_hgvs=True, dbsnp=True) -> Tuple[str, List]:
+    from annotation.models import VariantTranscriptAnnotation
+
+    if vta.gene:
+        gene_symbol = str(vta.gene.get_gene_symbol(vta.version.genome_build))
+    else:
+        gene_symbol = None
+
+    terms = []
+    hgvs_name = None
+    try:
+        hgvs_name = HGVSName(vta.hgvs_c)
+    except NotImplementedError:
+        pass
+
+    if c_hgvs and hgvs_name:
+        # "7051G>A" | "7051G->A" | "7051G-->A" | "7051G/A"
+        if hgvs_name.mutation_type == ">":
+            cdna_coords = hgvs_name.format_cdna_coords()
+            ref, alt = hgvs_name.get_ref_alt()
+            for change_symbol in [">", "->", "-->", "/"]:
+                terms.append(f"{cdna_coords}{ref}{change_symbol}{alt}")
+
+    if vta.hgvs_p:
+        # pyHGVS doesn't handle p.HGVS very well, so can't use HGVSName.format_protein() etc
+        protein_aa3 = vta.hgvs_p.split(":p.")[1]
+        terms.append(protein_aa3)
+        protein_aa1 = VariantTranscriptAnnotation.amino_acid_3_to_1(protein_aa3)
+        terms.append(protein_aa1)
+
+    if dbsnp and vta.dbsnp_rs_id:
+        terms.append(vta.dbsnp_rs_id)
+
+    if hgvs_name and hgvs_name.mutation_type in ('ins', 'del', 'dup'):
+        # "del ex 20" and "del exon 20"
+        ex_in_terms = [(vta.intron, ["intron", "in"]),
+                       (vta.exon, ["exon", "ex"])]
+        for val, in_terms in ex_in_terms:
+            if val:
+                num = val.split("/")[0]  # looks like: "20/24"
+                for t in in_terms:
+                    terms.append(f"{hgvs_name.mutation_type} {t} {num}")
+
+    return gene_symbol, terms
 
 
-def get_variant_transcript_annotation_search_terms(vta: VariantTranscriptAnnotation):
+def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **kwargs):
+    gene_terms = defaultdict(set)
+    for vta in variant_transcripts_list:
+        gene_symbol, terms = _get_gene_and_terms(vta, **kwargs)
+        gene_terms[gene_symbol].update(terms)
+
+    searches = []
+    for gene_symbol, terms in gene_terms.items():
+        if formatter:
+            gene_symbol = formatter % gene_symbol
+            terms = [formatter % s for s in terms]
+
+        and_terms = [gene_symbol]
+        optional_or = " OR ".join(terms)
+        if optional_or:
+            and_terms.append(f"({optional_or})")
+        search_terms = " AND ".join(and_terms)
+        searches.append(search_terms)
+
+    if len(searches) == 1:
+        return searches[0]
+    else:
+        return " OR ".join(["(%s)" % s for s in searches])
+
+
+def get_variant_search_terms(variant_transcripts_list: List):
     """
     Examples:
 
@@ -20,49 +92,13 @@ def get_variant_transcript_annotation_search_terms(vta: VariantTranscriptAnnotat
 
     """
 
-    mandatory_terms = []
-    optional_terms = []
-    if vta.gene:
-        gene_symbol = str(vta.gene.get_gene_symbol(vta.version.genome_build))
-        mandatory_terms.append(gene_symbol)
+    return _get_search_terms(variant_transcripts_list, formatter='"%s"')
 
-    if vta.hgvs_c:
-        try:
-            # "7051G>A" | "7051G->A" | "7051G-->A" | "7051G/A"
-            c_name = HGVSName(vta.hgvs_c)
-            if c_name.mutation_type == ">":
-                cdna_coords = c_name.format_cdna_coords()
-                ref, alt = c_name.get_ref_alt()
-                for change_symbol in [">", "->", "-->", "/"]:
-                    optional_terms.append(f"{cdna_coords}{ref}{change_symbol}{alt}")
-        except NotImplementedError:
-            pass
 
-    if vta.hgvs_p:
-        # pyHGVS doesn't handle p.HGVS very well, so can't use HGVSName.format_protein() etc
-        protein_aa3 = vta.hgvs_p.split(":p.")[1]
-        optional_terms.append(protein_aa3)
-        protein_aa1 = VariantTranscriptAnnotation.amino_acid_3_to_1(protein_aa3)
-        optional_terms.append(protein_aa1)
+def get_variant_pubmed_search_terms(variant_transcripts_list: List):
+    """ Examples:
 
-    if vta.dbsnp_rs_id:
-        optional_terms.append(vta.dbsnp_rs_id)
+            (CFTR) AND ((Arg117His) OR (R117H))
 
-    if vta.variant.is_deletion:
-        # "del ex 20" and "del exon 20"
-        ex_in_terms = [(vta.intron, ["intron", "in"]),
-                       (vta.exon, ["exon", "ex"])]
-        for val, terms in ex_in_terms:
-            if val:
-                num = val.split("/")[0]  # looks like: "20/24"
-                for t in terms:
-                    optional_terms.append(f"del {t} {num}")
-
-    # double quote strings
-    optional_terms = [f'"{s}"' for s in optional_terms]
-    mandatory_terms = [f'"{s}"' for s in mandatory_terms]
-
-    optional_or = " OR ".join(optional_terms)
-    mandatory_terms.append(f"({optional_or})")
-    search_terms = " AND ".join(mandatory_terms)
-    return search_terms
+        PubMed doesn't like rsIds or c.HGVS """
+    return _get_search_terms(variant_transcripts_list, formatter='(%s)', c_hgvs=False, dbsnp=False)

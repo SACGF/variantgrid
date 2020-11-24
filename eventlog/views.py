@@ -34,7 +34,7 @@ def eventlog(request):
 
 class EventLogDatatableView(BaseDatatableView):
 
-    def config(self, request):
+    def config_for_request(self, request):
         return EventColumns(request)
 
 

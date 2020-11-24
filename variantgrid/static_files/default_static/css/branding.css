@@ -16,4 +16,8 @@ a.nav-link.active {
   color: #222 !important;
 }
 
+#site-name::after {
+  content: "VariantGrid";
+}
+
 /*# sourceMappingURL=branding.css.map */

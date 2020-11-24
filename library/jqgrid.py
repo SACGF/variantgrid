@@ -273,7 +273,7 @@ class JqGrid:
 
             if 'sortname' in self.extra_config:
                 second_sidx = self.extra_config.get('sortname')
-                second_sort_order = self.extra_config.get('sortorder', '+') == 'desc' and '-' or ''
+                second_sort_order = ('-' if self.extra_config.get('sortorder') == 'desc' else '')
                 second_order_by = f"{second_sort_order}{second_sidx}"
 
             try:
@@ -506,7 +506,7 @@ class JqGrid:
 
     def get_field_names(self):
         """ Returns self.fields if set, otherwise model fields """
-        fields = self.fields
+        fields = list(self.fields)  # So caller won't modify internals
         if not fields:
             fields = [f.name for f in self.get_model()._meta.local_fields]
         return fields

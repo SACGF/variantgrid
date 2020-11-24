@@ -74,9 +74,12 @@ class GuardianPermissionsMixin:
         return cls._filter_from_permission_object_qs(queryset)
 
     @classmethod
-    def get_for_user(cls, user, pk):
+    def get_for_user(cls, user, pk, write=False):
         obj = get_object_or_404(cls, pk=pk)
-        obj.check_can_view(user)
+        if write:
+            obj.check_can_write(user)
+        else:
+            obj.check_can_view(user)
         return obj
 
 

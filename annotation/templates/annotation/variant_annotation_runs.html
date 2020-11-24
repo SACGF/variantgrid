@@ -9,6 +9,17 @@
 {{ block.super }}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<style>
+/* Keep JQGrid within parents */
+.ui-jqgrid,
+.ui-jqgrid-view,
+.ui-jqgrid-hdiv,
+.ui-jqgrid-bdiv,
+.ui-jqgrid-pager
+{
+width: 100% !important;
+}
+</style>
 {% endblock %}
 
 {% block jsdocumentready %}
@@ -79,28 +90,29 @@
     <div class="container-table">
         {% page_help 'annotation/variant_annotation_runs_help' 'Variant Annotation Runs' %}
 
-        <div id="annotation-runs-tabs">
-            <ul>
-                {% for build_name in genome_build_field_counts %}
-                <li><a href="#build-{{ build_name }}-details">{{ build_name }}</a></li>
-                {% endfor %}
-            </ul>
-            {% for build_name, field_counts in genome_build_field_counts.items %}
-                <div id="build-{{ build_name }}-details">
-                    <div id="build-{{ build_name }}-summary-graph"></div>
-                    <table>
-                        {%  for field, count in field_counts.items %}
-                            <tr>
-                              <th>{{ field }}:</th>
-                              <td>{{ count }}</td>
-                            </tr>
-                        {% endfor %}
-                    </table>
+        {% for build_name, field_counts in genome_build_field_counts.items %}
+            <div id="build-{{ build_name }}-details" class="card mt-4">
+                <div class="card-header">{{ build_name }}</div>
+                <div class="card-body">
+                    <div id="build-{{ build_name }}-details">
+                        <div id="build-{{ build_name }}-summary-graph"></div>
+                        <table>
+                            {%  for field, count in field_counts.items %}
+                                <tr>
+                                  <th>{{ field }}:</th>
+                                  <td>{{ count }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                    <a data-toggle="collapse" href="#grid-collapse-{{ build_name }}">grid</a>
+                    <div class="collapse" id="grid-collapse-{{ build_name }}">
+                        {% jqgrid 'annotation_run_grid' build_name template_name='annotation/grids/annotation_run_grid.html' search=False genome_build_name=build_name %}
+                    </div>
 
-                    {% jqgrid 'annotation_run_grid' build_name template_name='annotation/grids/annotation_run_grid.html' search=False genome_build_name=build_name %}
                 </div>
-            {% endfor %}
-        </div>
+            </div>
+        {% endfor %}
     </div>
 
 {% endblock submenu_page_content %}

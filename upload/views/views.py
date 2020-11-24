@@ -21,8 +21,8 @@ from library.log_utils import log_traceback
 from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
-    UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, ModifiedImportedVariants, VCFSkippedGVCFNonVarBlocks, \
-    VCFImportInfo
+    UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, VCFSkippedGVCFNonVarBlocks, \
+    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant
 from upload.models_enums import TimeFilterMethod
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
@@ -269,25 +269,18 @@ def view_upload_pipeline_warnings_and_errors(request, upload_pipeline_id):
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
     upload_pipeline.uploaded_file.check_can_view(request.user)
 
-    try:
-        skipped_contigs = VCFSkippedContigs.objects.get(upload_step__upload_pipeline=upload_pipeline)
-    except:
-        skipped_contigs = None
+    skipped_contigs = VCFSkippedContigs.objects.filter(upload_step__upload_pipeline=upload_pipeline).first()
 
     contigs_import = get_build_contigs()
-    try:
-        modified_imported_variants = ModifiedImportedVariants.objects.get(upload_step__upload_pipeline=upload_pipeline)
-    except:
-        modified_imported_variants = None
+    has_miv = ModifiedImportedVariant.objects.filter(import_info__upload_step__upload_pipeline=upload_pipeline).exists()
+    skipped_annotation = SimpleVCFImportInfo.objects.filter(type=SimpleVCFImportInfo.ANNOTATION_SKIPPED).first()
 
-    try:
-        vcf_skipped_gvcf_non_var_blocks = VCFSkippedGVCFNonVarBlocks.objects.get(upload_step__upload_pipeline=upload_pipeline)
-    except:
-        vcf_skipped_gvcf_non_var_blocks = None
+    vcf_skipped_gvcf_non_var_blocks = VCFSkippedGVCFNonVarBlocks.objects.filter(upload_step__upload_pipeline=upload_pipeline).first()
 
     context = {'upload_pipeline': upload_pipeline,
                'skipped_contigs': skipped_contigs,
-               "modified_imported_variants": modified_imported_variants,
+               "has_modified_imported_variants": has_miv,
+               "skipped_annotation": skipped_annotation,
                'contigs_import': contigs_import,
                'vcf_skipped_gvcf_non_var_blocks': vcf_skipped_gvcf_non_var_blocks}
     return render(request, 'upload/view_upload_pipeline_warnings_and_errors.html', context)

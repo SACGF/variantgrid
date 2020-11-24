@@ -195,14 +195,12 @@ class TagUtils:
             resolved = default
         return resolved
 
-
     @staticmethod
     def value_str(context, value: Any, default: Any = None) -> Optional[str]:
         val = TagUtils.value(context, value, default)
         if val is not None:
             return str(val)
         return None
-
 
     @staticmethod
     def value_bool(context, value: Any, default: Any = None) -> Optional[bool]:

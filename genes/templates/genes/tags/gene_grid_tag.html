@@ -1,6 +1,10 @@
 <div class='gene-grid-tag'>
 {% load static %}
+{% load ui_tabs_builder %}
 {% load js_tags %}
+{% load ui_utils %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <link href="{% static 'css/companies.css' %}" rel="stylesheet">
@@ -120,6 +124,10 @@ table#gene-grid tr {
     background-image: url({% static 'icons/omim.png' %});
 }
 
+.lab-icon {
+    background-image: url({% static 'icons/share_level/lab.png' %});
+}
+
 .gene-container {
     height: 25px;
 }
@@ -155,10 +163,6 @@ table#gene-grid .clingen {
     max-height: auto;
 }
 
-.no-labels label {
-    display: none;
-}
-
 tr.gene-type-alias {
     background-color: #FEBC00;
 }
@@ -180,6 +184,13 @@ table#gene-grid.color-coverage td.sub-column.coverage-none {
     background-color: #ffe6e6;
 }
 
+#color-coverage-container {
+    display: none;
+}
+
+.classification-count-summary {
+    display: none;
+}
 </style>
 <script>
 /* evidenceColumns/enrichmentKits/pathologyTestVersions/geneLists are the 1
@@ -188,6 +199,7 @@ table#gene-grid.color-coverage td.sub-column.coverage-none {
 let evidenceColumns = [];
 let enrichmentKits = [];
 let geneAnnotationReleases = []
+let labClassificationCounts = [];
 let pathologyTestVersions = [];
 let geneLists = [];
 let pathologyTestVersionDataById = {};
@@ -383,6 +395,7 @@ function getGeneListColumn(geneListId, selectElement, addEmptyGeneLists) {
             {% endif %}
             };
 
+            // console.log(data);
             populateGeneColumn(geneListId, data, className, saveGeneListFunc, closeButtonFunc);
         },
     });
@@ -541,7 +554,7 @@ function getNumberOfColumns(headerRow) {
         ekCols *= ENRICHMENT_KIT_COLUMNS.length;
     }
 
-    return evidenceColumns.length + geneAnnotationReleases.length + ekCols + pathologyTestVersions.length + geneLists.length;
+    return evidenceColumns.length + geneAnnotationReleases.length + ekCols + labClassificationCounts.length + pathologyTestVersions.length + geneLists.length;
 }
 
 
@@ -678,6 +691,20 @@ function getGeneRowColumns(geneSymbol, headerRow) {
             columns.push(columnData);
         }
     }
+
+    for (let i=0 ; i<labClassificationCounts.length ; ++i) {
+        (function() {
+            let labId = labClassificationCounts[i]; // inside anon func to capture this
+
+            let columnData = {
+                "txType": 'td',
+                "class": 'lab-classification-count-' + labId,
+            };
+            columns.push(columnData);
+        })();
+    }
+
+
 
     for (let i=0 ; i<pathologyTestVersions.length ; ++i) {
         (function() {
@@ -841,18 +868,18 @@ function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
             let container = $("<div />");
             let geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
             container.append(geneTitle); 
-            let modeOfInheritance = evidence["ModeOfInheritance"];
+            let modeOfInheritance = evidence["mode_of_inheritance"];
             if (modeOfInheritance) {
                 mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
                 container.append(mohDiv);
             }
-            let penetrance = evidence["Penetrance"];
+            let penetrance = evidence["penetrance"];
             if (penetrance) {
                 penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
                 container.append(penetranceDiv);
             }
 
-            let evidences = evidence["Evidences"];
+            let evidences = evidence["evidence"];
             if (evidences) {
                 container.append($("<h3 />").text("Sources"));
                 evidencesUl = $("<ul />");
@@ -862,7 +889,7 @@ function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
                 container.append(evidencesUl);
             }
 
-            let phenotypes = evidence["Phenotypes"];
+            let phenotypes = evidence["phenotypes"];
             if (phenotypes) {
                 container.append($("<h3 />").text("Phenotypes"));
                 phenotypesUl = $("<ul />");
@@ -876,6 +903,17 @@ function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
     });
 }
 
+function addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer) {
+    let htmlByGene = geneListDataById[geneListId]["gene_html"];
+    if (htmlByGene) {
+        geneContainer.append(htmlByGene[geneSymbol]);
+    } else {
+        // Defaults - just show symbol
+        geneContainer.append($("<span />").addClass("gene-symbol").text(geneSymbol));
+    }
+}
+
+
 /// Note: This is passed through PanelApp JSON
 function addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer) {
     let evidenceByGene = geneListDataById[geneListId]["gene_evidence"];
@@ -887,11 +925,13 @@ function addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer) {
 
 function addGeneEvidence(geneSymbol, evidence, geneContainer) {
     let evidenceDiv = $("<div />").addClass("evidence");
-    let confidence = evidence["LevelOfConfidence"];
+    let confidence = evidence["confidence_level"];
     addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv);
     if (confidence) {
+        const CONFIDENCE_CLASS = ["LowEvidence", "ModerateEvidence", "HighEvidence"]
+        let cssClass = CONFIDENCE_CLASS[parseInt(confidence)-1];
         // evidenceDiv.text(confidence[0]); // for colorblind??
-        evidenceDiv.addClass(confidence);
+        evidenceDiv.addClass(cssClass);
     }
     geneContainer.append(evidenceDiv);
 }
@@ -906,8 +946,8 @@ function setCellGene(tr, geneListId, geneListClass, geneSymbol, geneClickHandler
     cell.addClass(KEEP_CELL_CLASS);
     let geneContainer = $("<span />").addClass("gene-container");
     addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer);
-    
-    geneContainer.append($("<span />").addClass("gene-symbol").text(geneSymbol));
+    addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer);
+
     if (canWriteGeneList(geneListId)) {
         geneContainer.click(function(event) {
             geneClickHandler(cell, geneListId, geneListClass, geneSymbol);
@@ -932,7 +972,9 @@ function addColumnHeader(thead, className, columnName, copyButtonFunc, closeButt
 
     if (closeButtonFunc) {
         let closeButton = $("<div />", {"class": "delete-button right"});
-        closeButton.attr("title", "close").click(closeButtonFunc);
+        // closeButton.attr("title", "close");
+        // popper tooltips have trouble if you remove the element that raised them
+        closeButton.click(closeButtonFunc);
         th.append(closeButton);
     }
 
@@ -1191,6 +1233,15 @@ function addEvidenceColumn(evidenceType) {
 }
 
 
+function toggleColorCoverageCheckbox() {
+    if (enrichmentKits.length) {
+        $("#color-coverage-container").show();
+    } else {
+        $("#color-coverage-container").hide();
+    }
+}
+
+
 function addEnrichmentKitColumn(enrichmentKitId, data, selectElement) {
     let gmTable = $("table#gene-grid");
     let thead = gmTable.children('thead');
@@ -1204,6 +1255,7 @@ function addEnrichmentKitColumn(enrichmentKitId, data, selectElement) {
     let closeButtonFunc = function() {
         $("." + className, gmTable).remove();
         removeItemFromArray(enrichmentKitId, enrichmentKits);
+        toggleColorCoverageCheckbox();
         // updateUrl();
         
         if (selectElement) { // Clear if provided - so we can re-select
@@ -1220,6 +1272,7 @@ function addEnrichmentKitColumn(enrichmentKitId, data, selectElement) {
     $("tr", tbody).each(function() {
         createRowColumns($(this));
     });
+    toggleColorCoverageCheckbox();
 }
 
 
@@ -1640,11 +1693,14 @@ function panelAppCellInit(cell, gene_symbol) {
                 for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
                     let evidence = panelAppEvidenceResultsList[i];
                     addGeneEvidence(gene_symbol, evidence, newDiv);
-                    
-                    let diseaseName = evidence["SpecificDiseaseName"];
-                    //let confidence = evidence["LevelOfConfidence"];
-                    let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
-                    newDiv.append(diseaseSpan);
+
+                    let panel = evidence["panel"];
+                    if (panel) {
+                        let diseaseName = panel["name"];
+                        //let confidence = evidence["LevelOfConfidence"];
+                        let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
+                        newDiv.append(diseaseSpan);
+                    }
                 }
             }
             panelAppDiv.replaceWith(newDiv);
@@ -1659,6 +1715,70 @@ function panelAppCellInit(cell, gene_symbol) {
         }
     });
 }
+
+///////
+
+function addAndRetrieveLabGeneClassificationCountColumnIfNotExists(labId, selectElement) {
+    if (labClassificationCounts.indexOf(labId) > -1) {
+        return;
+    }
+
+    $.ajax({
+        type: "GET",
+        url: Urls.lab_gene_classification_counts_api(labId),
+        success: function(data) {
+            addLabGeneClassificationCountsColumn(labId, data, selectElement);
+        }
+    });
+}
+
+
+function addLabGeneClassificationCountsColumn(labId, data, selectElement) {
+    if (labClassificationCounts.indexOf(labId) > -1) { // in case 2x callbacks were run
+        return;
+    }
+    labClassificationCounts.push(labId);
+
+    let className = 'lab-classification-count-' + labId;
+    let closeButtonFunc = function() {
+        let gmTable = $("table#gene-grid");
+        let tbody = gmTable.children('tbody');
+
+        removeColumn(className);
+        removeItemFromArray(labId, labClassificationCounts);
+        gcEmptyRows(tbody);
+        updateUrl();
+
+        if (selectElement) { // Clear if provided - so we can re-select
+            $(selectElement).empty();
+        }
+    };
+
+    let geneSymbols = data["gene_symbols"];
+    let classificationCountsByGene = data["classification_counts"];
+    let geneListGeneSymbols = [];
+    let htmlByGene = {};
+    for (let i=0 ; i<geneSymbols.length; ++i) {
+        let geneSymbol = geneSymbols[i];
+        geneListGeneSymbols.push({original_name: geneSymbol, gene_symbol: geneSymbol});
+        let ccSummary = classificationCountsByGene[geneSymbol]["summary"];
+        let ccTotal = classificationCountsByGene[geneSymbol]["total"];
+        htmlByGene[geneSymbol] = `<span class="classification-count-summary">${ccSummary}</span><span class="classification-count-total">${ccTotal}</span>`;
+    }
+
+    let geneListData = {};
+    geneListData["genelistgenesymbol_set"] = geneListGeneSymbols;
+    geneListData["gene_html"] = htmlByGene;
+    geneListData["name"] = data["lab_name"];
+    geneListData["can_write"] = false;
+    geneListData["category"] = {icon_css_class: "lab-icon"};
+    geneListData["absolute_url"] = Urls.view_lab(labId);
+
+    let geneListId = className; // fake
+    populateGeneColumn(geneListId, geneListData, className, null, closeButtonFunc, null);
+
+}
+
 
 
 ////// Pathology test
@@ -2105,7 +2225,14 @@ $(document).ready(function() {
         }
     });
     
-    
+    $('#id_lab').change(function() {
+        let labId = $(this).val();
+        if (labId) {
+            addAndRetrieveLabGeneClassificationCountColumnIfNotExists(labId, this);
+        }
+    });
+
+
     $('#id_hpo_synonym').change(function() {
         let HPO_PREFIX = "hpo-synonym-";
         let hpo_synonym_id = $(this).val();
@@ -2153,6 +2280,17 @@ $(document).ready(function() {
         }
     });
 
+
+    $("input#classification-count-summary-checkbox").change(function() {
+        if ($(this).is(":checked")) {
+            $(".classification-count-summary").show();
+            $(".classification-count-total").hide();
+        } else {
+            $(".classification-count-summary").hide();
+            $(".classification-count-total").show();
+        }
+    });
+
     
     $("button", "#custom-gene-list").button().click(addCustomGeneList);
 
@@ -2176,75 +2314,105 @@ $(document).ready(function() {
 });
 </script>
 
-<div class="multi-columned">
-    <fieldset class="form-fields small gene-grid-control-box" id="data-columns-box">
-        <legend>Data columns</legend>
+{% ui_register_tab_embedded tab_set="gene_list_sources" label="Data columns" %}
+    <div id="data-columns-box">
         {% for dc in data_columns %}
         <div>
-            <label>{{ dc.description }}</label>
-            <div>
-                <form id='data-columns-{{ dc.pk }}' class="no-labels {{ dc.form_css_class }}">
-                    {{ dc.form.as_p }}
-                    {% if forloop.first %}
-                        <!-- Just need 1 of these -->
-                        {{ dc.form.media }}
-                    {% endif %}
-                </form>
-            </div>
+            <form id='data-columns-{{ dc.pk }}' class="{{ dc.form_css_class }}">
+                {% for field in dc.form %}
+                    {% labelled label=dc.description %}
+                        {{ field }}
+                    {% endlabelled %}
+                {% endfor %}
+                {% if forloop.first %}
+                    <!-- Just need 1 of these -->
+                    {{ dc.form.media }}
+                {% endif %}
+            </form>
         </div>
         {% endfor %}
-        <div>
-            <label for="clingen-evidence-checkbox"><div class="column-icon clingen-icon"></div></label>
-            <input id="clingen-evidence-checkbox" class='evidence-checkbox' type='checkbox' evidence_type="clingen" />
+        {% labelled %}
+            <div class="form-check">
+            <label class="form-check-label">
+                <input id="clingen-evidence-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="clingen" />
+                <div class="column-icon clingen-icon"></div>
+            </label>
+            </div>
+        {% endlabelled %}
+        {% labelled %}
+            <div class="form-check">
+            <label class="form-check-label">
+                <input id="panelapp-evidence-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="panelapp" />
+                <div class="column-icon panel-app-icon"></div>
+            </label>
+            </div>
+        {% endlabelled %}
+        {% labelled %}
+            <div class="form-check">
+            <label class="form-check-label">
+                <input id="classification-count-summary-checkbox" class='form-check-input' type='checkbox' />
+                Classification Summary
+            </label>
+            </div>
+        {% endlabelled %}
+        <div id="color-coverage-container">
+            {% labelled %}
+                <div class="form-check">
+                    <label for="color-coverage-checkbox">
+                        <input id="color-coverage-checkbox" class='color-coverage-checkbox' type='checkbox' checked="1" />
+                        <div class="column-icon enrichment-kit-icon"></div> Color Coverage
+                    </label>
+                </div>
+            {% endlabelled %}
         </div>
-        <div>
-            <label for="panelapp-evidence-checkbox"><div class="column-icon panel-app-icon"></div></label>
-            <input id="panelapp-evidence-checkbox" class='evidence-checkbox' type='checkbox' evidence_type="panelapp" />
-        </div>
-        <div>
-            <label for="color-coverage-checkbox"><div class="column-icon enrichment-kit-icon"></div> Color Coverage</label>
-            <input id="color-coverage-checkbox" class='color-coverage-checkbox' type='checkbox' checked="1" />
-        </div>
-    </fieldset>
-    <fieldset class="form-fields small" id="gene-grid-control-box" >
-        <legend>Gene Lists</legend>
+    </div>
+{% end_ui_register_tab_embedded %}
+{% ui_register_tab_embedded tab_set="gene_list_sources" label="Gene Lists" %}
+    <div id="gene-grid-control-box">
         {% for category in categories %}
-        <div>
-            <label>{{ category.description }}</label>
             <div>
-                <form id='gene-list-category-{{ category.pk }}' class="no-labels {{ category.form_css_class }}">
-                    {{ category.form.as_p }}
+                <form id='gene-list-category-{{ category.pk }}' class="{{ category.form_css_class }}">
+                    {% for field in category.form %}
+                        {% if not field.name == 'category' %}
+                            {% labelled label=category.description %}
+                                {{ field }}
+                            {% endlabelled %}
+                        {% endif %}
+                    {% endfor %}
                     {% if forloop.first %}
                         <!-- Just need 1 of these -->
                         {{ category.form.media }}
                     {% endif %}
                 </form>
             </div>
-        </div>
         {% endfor %}
-    </fieldset>
-{% comment %}
-        <th>{{ category.description }}:
-        <td><div class='gene-list-icon {{ category.icon_css_class }}'></div>
-        <td>
-{% endcomment %}
+    </div>
+{% end_ui_register_tab_embedded %}
+{% if named_custom_gene_list_form %}
 
-
-    <fieldset class="form-fields small" id="custom-gene-list">
-        <legend>Create Custom Gene List</legend>
-        <div id='custom-gene-list-help'></div>
-        {{ named_custom_gene_list_form.as_p }}
-        <input type='hidden' id="enable_save" value="true" />
-        <ul id='custom-genelist-messages' class='messages hidden'><b>Validation Messages:</b>
-        </ul>
-        <div class="buttons">
-            <button id='add-custom-gene-list'>Add Custom Gene List</button>
+    {% ui_register_tab_embedded tab_set="gene_list_sources" label="Create Custom Gene List" %}
+        <div id="custom-gene-list">
+            <div id='custom-gene-list-help'></div>
+            {% crispy named_custom_gene_list_form form_helper.horizontal_nested %}
+            <input type='hidden' id="enable_save" value="true" />
+            <ul id='custom-genelist-messages' class='messages hidden'><b>Validation Messages:</b>
+            </ul>
+            <div class="btn-toolbar">
+                <button id='add-custom-gene-list' class="btn btn-primary">Add Custom Gene List</button>
+            </div>
         </div>
-    </fieldset>
+    {% end_ui_register_tab_embedded %}
+
+{% endif %}
+<div class="container">
+    {% ui_render_tabs tab_set="gene_list_sources" %}
+    <hr/>
 </div>
 
-{% load ui_help %}
-{% page_help page_id='genes/gene_grid_tag_help' title='Gene Grid' %}
+{% if show_help %}
+    {% load ui_help %}
+    {% page_help page_id='genes/gene_grid_tag_help' title='Gene Grid' %}
+{% endif %}
 
 <table id='gene-grid' class="color-coverage">
 <thead>

@@ -52,7 +52,11 @@
             jQuery.extend($.fn.fmatter, {
                 analysisLink: function (cellvalue, options, rowObject) {
                     let analysisId = rowObject.id;
-                    let analysisLink = linkFormatter(cellvalue, options, rowObject);
+                    let iconCssClassList = []
+                    if (rowObject.analysislock__locked) {
+                        iconCssClassList.push("fa fa-lock fa-lg");
+                    }
+                    let analysisLink = linkFormatter(cellvalue, options, rowObject, iconCssClassList);
                     let settingsLink = "<a class='settings-button' href='javascript:analysisSettings(" + analysisId + ")' title='Open Settings'></a>";
                     return "<span>" + analysisLink + settingsLink + "</span>";
                 }

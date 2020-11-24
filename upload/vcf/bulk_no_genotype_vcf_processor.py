@@ -7,8 +7,8 @@ No point complicating BulkGenotypeVCFProcessor with lots of if statements etc
 from django.conf import settings
 import cyvcf2
 
+from library.git import Git
 from library.postgres_utils import postgres_arrays
-from library.utils import get_git_hash
 from patients.models_enums import Zygosity
 from upload.models import VCFImporter
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
@@ -36,7 +36,7 @@ class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
                                                             version=BulkNoGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
                                                             vcf_parser="cyvcf2",
                                                             vcf_parser_version=cyvcf2.__version__,
-                                                            code_git_hash=get_git_hash(settings.BASE_DIR))
+                                                            code_git_hash=Git(settings.BASE_DIR).hash)
         return vcf_importer
 
     def process_entry(self, variant):

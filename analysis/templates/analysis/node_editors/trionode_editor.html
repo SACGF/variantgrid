@@ -104,7 +104,9 @@
                 {% allele_frequency_controls node %}
             </div>
     		<div>
-    		  <button id='trio-save' class="btn btn-primary">save</button>
+                {% if has_write_permission %}
+    		        <button id='trio-save' class="btn btn-primary">save</button>
+                {% endif %}
     		</div>
 		</div>
     {{ form.media }} 

@@ -85,6 +85,8 @@ $(document).ready(function() {
     <span class='hidden saving-message'><img src="{% static 'images/spinner.gif' %}" /> Saving...</span>
     <span class="hidden saved-message"></span>
     <button class='btn btn-outline-primary hidden wiki-save'>save wiki</button>
-    <a class='btn btn-outline-primary show-wiki-link' href="javascript:initWiki()">Create wiki entry</a>
+    {% if has_write_permission %}
+        <a class='btn btn-outline-primary show-wiki-link' href="javascript:initWiki()">Create wiki entry</a>
+    {% endif %}
 </div>
 </div>

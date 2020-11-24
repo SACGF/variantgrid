@@ -48,7 +48,9 @@
         <div>
           <b>A:</b>{{a_name}} {{ form.set_operation }} <b>B:</b>{{b_name}}
         </div>
-        <button id='venn-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+            <button id='venn-save' class="btn btn-primary">save</button>
+        {% endif %}
 	</form>
 </div>
 {% endblock content %}

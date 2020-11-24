@@ -240,7 +240,6 @@ def discordance_current_state(sender, **kwargs) -> ValidationMerger:
     record = kwargs.get('record')  # type: Classification
     user = kwargs.get('user')  # type: User
 
-    #FIXME this should all be done via an event hook
     messages = ValidationMerger()
     my_classification = record.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 

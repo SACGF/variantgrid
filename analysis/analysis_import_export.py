@@ -11,11 +11,7 @@ from analysis.models import Analysis, GenomeBuild, AnnotationVersion, AnalysisEd
 
 
 def analysis_export_to_dict(analysis: Analysis) -> dict:
-    node_serializers = {}
-    for serializer_subclass in AnalysisNodeSerializer.__subclasses__():
-        model_name = serializer_subclass.Meta.model._meta.label
-        node_serializers[model_name] = serializer_subclass
-
+    node_serializers = AnalysisNodeSerializer.get_node_serializers()
     NODE_EXCLUDE = ["created", "modified", "version", "appearance_version", "ready", "valid", "count",
                     "celery_task", "db_pid"]
 

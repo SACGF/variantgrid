@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from avatar.templatetags.avatar_tags import avatar_url
 from collections import OrderedDict, defaultdict
 
+from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -127,7 +128,7 @@ class SettingsOverride(models.Model):
     default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True)
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True)
     tool_tips = models.BooleanField(null=True, blank=True)
-    node_sql_tab = models.BooleanField(null=True, blank=True)
+    node_debug_tab = models.BooleanField(null=True, blank=True)
     import_messages = models.BooleanField(null=True, blank=True)  # Get a message once import is done
     igv_port = models.IntegerField(null=True, blank=True)
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE, null=True, blank=True)
@@ -197,7 +198,7 @@ class UserSettings:
     default_sort_by_column: CustomColumn
     variant_link_in_analysis_opens_new_tab: bool
     tool_tips: bool
-    node_sql_tab: bool
+    node_debug_tab: bool
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
@@ -330,6 +331,9 @@ class UserSettings:
         return lab
 
     def get_genome_builds(self) -> QuerySet:
+        if not settings.USER_SETTINGS_SHOW_BUILDS:
+            return GenomeBuild.builds_with_annotation()
+
         # Make sure default build comes through, even if form has never saved/created UserSettingsGenomeBuild objects
         q_default = Q(pk=self.default_genome_build.pk)
         # In override order get last configuration

@@ -396,27 +396,66 @@ function showTagAutocomplete(variantId) {
 }
 
 
-function getVariantTagHtml(variantId, tag) {
-    return "<span class='grid-tag tagged-" + tag + "' title='Tagged as " + tag + "' variant_id='" + variantId + "' tag_id='" + tag + "'><span class='user-tag-colored'>" + tag + "</span></span>";
+function getVariantTagHtml(variantId, tag, readOnly, tagLabel) {
+    if (typeof(tagLabel) === 'undefined') {
+        tagLabel = tag;
+    }
+    let outerClasses = ["grid-tag", "tagged-" + tag]
+    if (!readOnly) {
+        outerClasses.push("grid-tag-deletable");
+    }
+    return `<span class='${outerClasses.join(' ')}' title='Tagged as ${tag}' variant_id='${variantId}' tag_id='${tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
 }
 
 
 // This is driven entirely off variantTags (not passed through SQL->JQGrid)
 // This is so we can add/remove tags without wrecking cache  
 function tagsFormatter(tagsCellValue, a, rowData) {
-    var variantId = rowData['id'];
-    var tagHtml = "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
-    tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>"; 
+    let variantId = rowData['id'];
+    let tagHtml = "";
+    let aWin = getAnalysisWindow();
 
-    var aWin = getAnalysisWindow();
-    var tagList = aWin.variantTags[variantId];
+    if (!aWin.variantTagsReadOnly) {
+        tagHtml += "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
+        tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>";
+    }
+
+    let tagList = aWin.variantTags[variantId];
     if (tagList) {
-        for (var i=0 ; i<tagList.length ; ++i) {
-            var tag = tagList[i];
-            tagHtml += getVariantTagHtml(variantId, tag);
+        for (let i=0 ; i<tagList.length ; ++i) {
+            let tag = tagList[i];
+            tagHtml += getVariantTagHtml(variantId, tag, aWin.variantTagsReadOnly);
         }        
     }
     return tagHtml;
+}
+
+
+function tagsGlobalFormatter(value, a, rowData) {
+    if (!value) {
+        return "";
+    }
+    let variantId = rowData['id'];
+    let tags = value.split("|");
+    let tagCounts = {};
+    for (let i=0 ; i<tags.length ; ++i) {
+        let tag = tags[i];
+        let count = tagCounts[tag] || 0;
+        tagCounts[tag] = count + 1;
+    }
+
+    let tagGlobalHtml = "";
+    let sortedKeys = Object.keys(tagCounts).sort();
+    for (let i=0 ; i<sortedKeys.length ; ++i) {
+        let tag = sortedKeys[i];
+        let tagCount = tagCounts[tag];
+        let tagLabel = tag;
+        if (tagCount > 1) {
+            tagLabel = `${tag} x ${tagCount}`;
+        }
+        tagGlobalHtml += getVariantTagHtml(variantId, tag, true, tagLabel);
+    }
+    return tagGlobalHtml;
 }
 
 
@@ -451,6 +490,7 @@ function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
 jQuery.extend($.fn.fmatter , {
     'detailsLink' : detailsLink,
     'tagsFormatter' : tagsFormatter,
+    'tagsGlobalFormatter' : tagsGlobalFormatter,
     'clinvarLink' : clinvarLink,
     'cosmicLink' : cosmicLink,
     'omimLink' : omimLink,
@@ -499,7 +539,10 @@ function tagClickHandler() {
 
 // This is always kicked off after grid is loaded (after passed in function gridComplete)
 function gridCompleteExtra() {
-    $(".grid-tag").click(tagClickHandler);
+    var aWin = getAnalysisWindow();
+    if (!aWin.variantTagsReadOnly) {
+        $(".grid-tag-deletable").click(tagClickHandler);
+    }
 
     // We want to be able to right click to open full screen link new tab
     // but normal click does JS / load() call to open in the editor.

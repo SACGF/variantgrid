@@ -11,7 +11,7 @@ import os
 import socket
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
-from library.utils import get_git_hash
+from library.git import Git
 
 # if certain user settings are not relevant for the environment, list the columns in this
 from variantgrid.settings.components.secret_settings import get_secret, get_secrets
@@ -91,7 +91,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 20  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 23  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "redis_cache.RedisCache",
@@ -234,6 +234,7 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(PRIVATE_DATA_ROOT, 'annotation_dump')
 ANNOTATION_ENTREZ_EMAIL = get_secret("ENTREZ.email")  # Automatically set in in annotation.apps.AnnotationConfig
 ANNOTATION_ENTREZ_API_KEY = get_secret("ENTREZ.api_key")
 ANNOTATION_PUBMED_GENE_SYMBOL_COUNT_CACHE_DAYS = 30
+ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED = False
 
 MUTATIONAL_SIGNATURE_CALCULATOR = "Mutational Signature Calculator"
 MUTATIONAL_SIGNATURE_ITERATIONS = 100
@@ -303,6 +304,14 @@ INTERSECT_BED_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'intersect_bed_and_uplo
 PUBLIC_GROUP_NAME = "public"
 LOGGED_IN_USERS_GROUP_NAME = "logged_in_users"
 
+# key/value = Organization.group_name : lab group name pattern
+# Org must already exist, lab pattern is filled with User values (if you want to create a group for each user)
+USER_CREATE_ORG_LABS = {
+    # "test_organization": "test_lab",
+    # "test_organization": "user_group_%(username)s",
+}
+
+
 # To use SeqAuto, your settings need to have:
 # "from variantgrid.settings.defaults.seqauto_default_settings import *"
 # after including this file
@@ -365,6 +374,7 @@ PEDIGREE_MADELINE2_COMMAND = None  # Install https://madeline.med.umich.edu/made
 INITIAL_USER_DATA_PREFIX_KWARGS = {}  # Create UserDataPrefix object to setup IGV for new users
 
 USER_SETTINGS_SHOW_GROUPS = True
+USER_SETTINGS_SHOW_BUILDS = True  # If false, user can still choose preferred build, but can't ignore builds
 
 REDIS_PIPELINE_SIZE = 100000
 SQL_BATCH_INSERT_SIZE = 50000
@@ -372,6 +382,7 @@ SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
 
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = False  # set True to only find classified variants
+SEARCH_VARIANT_SHOW_SUMMARY = True
 SILENCED_SYSTEM_CHECKS = ['models.E006']
 SITE_ID = 2
 SITE_MESSAGE = None  # displayed at the top of all logged-in pages
@@ -398,8 +409,9 @@ ROLLBAR = {
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
-    'code_version': get_git_hash(BASE_DIR),
+    'code_version': Git(BASE_DIR).hash,
 }
+
 ROLLBAR_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 
@@ -686,7 +698,8 @@ _URLS_NAME_REGISTER_DEFAULT = True
 # Keys are url names (eg 'view_sample' or 'node_edit')
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
-    "classification_import_tool": False
+    "classification_import_tool": False,
+    "condition_aliases": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 

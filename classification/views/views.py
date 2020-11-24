@@ -593,3 +593,24 @@ def classification_graphs(request):
         "acmg_by_significance": acmg_by_significance,
     }
     return render(request, 'classification/classification_graphs.html', context)
+
+
+def lab_gene_classification_counts(request):
+    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+        visibility = "Shared"
+    else:
+        visibility = f"Visible to user"
+
+    data_columns_whitelist = {
+
+    }
+    gene_list_categories_whitelist = {
+        "Panel App Panel",
+        "Lab Gene Classification Counts",
+    }
+
+    context = {"visibility": visibility,
+               "data_columns_whitelist": data_columns_whitelist,
+               "gene_list_categories_whitelist": gene_list_categories_whitelist,
+               "default_enrichment_kits": []}
+    return render(request, 'classification/lab_gene_classification_counts.html', context)

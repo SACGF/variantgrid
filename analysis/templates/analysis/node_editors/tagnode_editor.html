@@ -142,7 +142,9 @@
 		<div>
     		<b>Tag:</b> {{ form.tag }}
 		</div>
-        <button id='tag-node-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+            <button id='tag-node-save' class="btn btn-primary">save</button>
+        {% endif %}
         {{ form.media }}
 	</form>
 </div>

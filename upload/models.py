@@ -163,13 +163,8 @@ class UploadPipeline(models.Model):
         self.progress_status = f"Error: {error_message}"
         self.save()
 
-        if self.uploaded_file.file_type == UploadedFileTypes.VCF:
-            try:
-                vcf = self.uploaded_file.uploadedvcf.vcf
-                if vcf:
-                    set_vcf_and_samples_import_status(vcf, ImportStatus.ERROR)
-            except Exception as e:
-                logging.error("Exception again! value: %s", e)
+        if vcf := self.vcf:
+            set_vcf_and_samples_import_status(vcf, ImportStatus.ERROR)
 
         user = self.uploaded_file.user
         name = f"import_{self.file_type}_failed"
@@ -179,8 +174,16 @@ class UploadPipeline(models.Model):
             f"Filename: {self.get_file_type_display} Error: {error_message}"
         report_message(message, level='error')
 
-    def get_errors(self, hide_accepted=True):
-        """ returns a list of tuples (error string, has_more_details) """
+    @property
+    def vcf(self):
+        if self.uploaded_file.file_type == UploadedFileTypes.VCF:
+            try:
+                return self.uploaded_file.uploadedvcf.vcf
+            except (UploadedVCF.DoesNotExist, VCF.DoesNotExist) as _:
+                pass
+        return None
+
+    def get_errors(self, hide_accepted=True) -> List:
         errors = []
         if self.status == 'E':
             # Make a fake one for template
@@ -191,9 +194,12 @@ class UploadPipeline(models.Model):
         errors.extend(self._get_vcf_import_info(VCFImportInfoSeverity.ERROR, hide_accepted=hide_accepted))
         return errors
 
-    def get_warnings(self, hide_accepted=True):
-        """ returns a list of tuples (warning string, has_more_details) """
-        return self._get_vcf_import_info(VCFImportInfoSeverity.WARNING, hide_accepted=hide_accepted)
+    def get_warnings(self, hide_accepted=True, include_vcf=True) -> List:
+        warnings = self._get_vcf_import_info(VCFImportInfoSeverity.WARNING, hide_accepted=hide_accepted)
+        if include_vcf:
+            if vcf := self.vcf:
+                warnings.extend(vcf.get_warnings())
+        return warnings
 
     def _get_vcf_import_info(self, severity, hide_accepted=True):
         kwargs = {"upload_step__upload_pipeline": self,
@@ -498,6 +504,18 @@ class VCFImportInfo(models.Model):
         return f"{self.get_severity_display()}: {self.message}"
 
 
+class SimpleVCFImportInfo(VCFImportInfo):
+    ANNOTATION_SKIPPED = "annotation_skipped"
+
+    type = models.TextField()
+    has_more_details = models.BooleanField(default=False)
+    message_string = models.TextField()
+
+    @property
+    def message(self):
+        return self.message_string
+
+
 class ModifiedImportedVariants(VCFImportInfo):
     has_more_details = True
 
@@ -559,6 +577,7 @@ class ModifiedImportedVariant(models.Model):
     def get_variants_for_unnormalized_variant_any_alt(cls, chrom, position, ref) -> QuerySet:
         old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, "")
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
+
 
 class VCFSkippedContigs(VCFImportInfo):
     has_more_details = True

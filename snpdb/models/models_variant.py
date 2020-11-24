@@ -1,9 +1,10 @@
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Value as V, QuerySet
+from django.db.models import Value as V, QuerySet, F
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
+from django.db.models.functions import Greatest
 from django.db.models.functions.text import Concat
 from django.db.models.query_utils import Q, FilteredRelation
 from django.dispatch import receiver
@@ -296,6 +297,14 @@ class Variant(models.Model):
         return ~Q(alt__seq=Variant.REFERENCE_ALT)
 
     @staticmethod
+    def get_overlap_annotate_and_q(contig, start, end):
+        """ Query handling indels. Contigs must match and variant.start <= end AND variant.end_position >= start """
+        annotation_kwargs = {"longest_sequence": Greatest("locus__ref__length", "alt__length"),
+                             "end_position": F("locus__position") + F("longest_sequence")}
+        q = Q(locus__contig=contig, locus__position__lte=end, end_position__gte=start)
+        return annotation_kwargs, q
+
+    @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
         """ Return a "1:123321 G>C" style string in a query """
         kwargs = {name: Concat(f"{path_to_variant}locus__contig__name", V(":"),
@@ -422,6 +431,14 @@ class Variant(models.Model):
         if self.canonical_transcript_annotation:
             c_hgvs = self.canonical_transcript_annotation.hgvs_c
         return c_hgvs
+
+    @property
+    def start(self):
+        return self.locus.position
+
+    @property
+    def end(self):
+        return self.locus.position + max(self.locus.ref.length, self.alt.length)
 
 
 class VariantWiki(Wiki):

@@ -21,9 +21,9 @@ class RelatedModelsPartitionModel(models.Model):
     class Meta:
         abstract = True
 
-    def save(self, **kwargs):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         created = not self.pk
-        super().save(**kwargs)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
         if created:
             self.create_partition()
 

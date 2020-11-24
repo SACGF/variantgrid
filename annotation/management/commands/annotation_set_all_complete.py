@@ -5,7 +5,6 @@ import os
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models.models import AnnotationVersion
 from annotation.signals import annotation_run_complete_signal
-from snpdb.models import SequenceRole
 from snpdb.models.models_genome import GenomeBuild
 
 

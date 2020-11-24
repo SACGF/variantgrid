@@ -2,7 +2,9 @@ from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from classification.views import views, classification_dashboard_view, \
-    classification_export_view, views_autocomplete, classification_import_upload_view
+    classification_export_view, views_autocomplete, classification_import_upload_view, classification_accumulation_graph
+from classification.views.condition_alias_view import ConditionAliasDatatableView, condition_aliases_view, \
+    condition_alias_view, SearchConditionView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues
@@ -13,7 +15,7 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context
-from classification.views.classification_view import ClassificationView
+from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.views import classification_import_tool, AutopopulateView
 from variantgrid.perm_path import perm_path
 
@@ -40,6 +42,11 @@ urlpatterns = [
     perm_path('classification_grid/export/', views.export_classifications_grid, name='export_classifications_grid'),
     perm_path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
 
+    # condition aliases
+    perm_path('condition_alias', condition_aliases_view, name='condition_aliases'),
+    perm_path('condition_alias/datatable', ConditionAliasDatatableView.as_view(), name='condition_aliases_datatables'),
+    perm_path('condition_alias/<int:pk>', condition_alias_view, name='condition_alias'),
+
     perm_path('diff/', views.view_classification_diff, name='classification_diff'),
     perm_path('redcap_data_dictionary.csv', classification_export_view.redcap_data_dictionary, name='redcap_data_dictionary'),
     perm_path('classification/<record_id>/clinvar.xml', classification_export_view.clinvar_xml, name='classification_clinvar_xml'),
@@ -60,6 +67,8 @@ urlpatterns = [
     perm_path('dashboard/all', classification_dashboard_view.dashboard, name="classification_dashboard_all"),
     perm_path('dashboard_download', problem_download, name='classification_dashboard_download'),
 
+    perm_path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
+
     perm_path('classification/discordance_report/<int:report_id>', discordance_report_view, name='discordance_report'),
     perm_path('classification/discordance_report/<int:report_id>/export', export_discordance_report, name='discordance_export'),
 
@@ -74,10 +83,13 @@ urlpatterns = [
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),
+    perm_path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     perm_path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
 ]
 
 rest_urlpatterns = [
+    perm_path('api/classifications/condition_alias/search', SearchConditionView.as_view(), name='condition_search_api'),
+
     perm_path('api/classifications/auto_populate', AutopopulateView.as_view(), name='classification_auto_populate_api'),
 
     perm_path('api/classifications/record/', ClassificationView.as_view(), name='classification_api'),
@@ -91,7 +103,10 @@ rest_urlpatterns = [
     perm_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
     perm_path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
-    perm_path('api/classifications/datatables/', ClassificationModificationDatatableView.as_view(), name='classification_datatables')
+    perm_path('api/classifications/datatables/', ClassificationModificationDatatableView.as_view(), name='classification_datatables'),
+
+    perm_path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
+              name='lab_gene_classification_counts_api'),
 ]
 
 urlpatterns += format_suffix_patterns(rest_urlpatterns)

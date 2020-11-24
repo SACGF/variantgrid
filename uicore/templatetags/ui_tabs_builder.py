@@ -100,6 +100,11 @@ class LocalTabContent(template.Node):
     def render(self, context):
         tab_set = TagUtils.value_str(context, self.tab_set)
         label = TagUtils.value_str(context, self.label)
+        if not tab_set:
+            raise ValueError("UI Tab requires a value for 'tab_set'")
+        if not label:
+            raise ValueError("UI Tab requires a value for 'label'")
+
         tab_id = label.replace(' ', '-').replace('/', '_')
 
         tab_key = f"ui-tab-{tab_set}"

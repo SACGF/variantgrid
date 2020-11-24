@@ -40,8 +40,7 @@ class GeneAnnotationColumnData:
     def value(self) -> SafeString:
         if self.values:
             return '<br/>'.join(self.values)
-        else:
-            return '<span class="no-value">-</span>'
+        return '<span class="no-value">-</span>'
 
 
 def get_gene_annotation_column_data(ensembl_gene_annotation) -> List[GeneAnnotationColumnData]:

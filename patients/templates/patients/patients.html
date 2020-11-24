@@ -9,54 +9,56 @@
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     {% load patient_graph_tags %}
     {% endif %}
-{% endblock head %}
 
-{% block css %}
-{{ block.super }}
+    <style>
 
-#patient-header {
-    margin-bottom: 10px; 
-}
-#sample-node-container {
-    float: left;
-}
+    span.select2-container {
+        min-width: 20em !important;
+    }
 
-.matches-graph {
-    float: left;
-}
+    #patient-header {
+        margin-bottom: 10px;
+    }
+    #sample-node-container {
+        float: left;
+    }
 
-.patient-description {
-	background-image: url({% static 'icons/typewriter.jpeg' %});
-}
+    .matches-graph {
+        float: left;
+    }
 
-.grid-link {
-	float: left;
-}
+    .patient-description {
+        background-image: url({% static 'icons/typewriter.jpeg' %});
+    }
 
-#jump-forms {
-	float: left;
-	width: 350px;
-	height: 384px;
-	display: flex;
-	flex-direction: column;
-	justify-content: space-between;
-}
+    .grid-link {
+        float: left;
+    }
 
-#grid-filter-message {
-    display: none;
-}
+    #jump-forms {
+        float: left;
+        width: 350px;
+        height: 384px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
 
-.grid-term-link {
-	padding: 1px;
-	margin: 2px;
-	cursor: pointer;
-	cursor: hand;
-	display: inline-block;
-}
+    #grid-filter-message {
+        display: none;
+    }
 
-td.no-word-wrap {
-    white-space: normal !important;
-}
+    .grid-term-link {
+        padding: 1px;
+        margin: 2px;
+        cursor: pointer;
+        cursor: hand;
+        display: inline-block;
+    }
+
+    td.no-word-wrap {
+        white-space: normal !important;
+    }
     #patient-header a + a {
         padding-left: 10px;
     }
@@ -66,19 +68,17 @@ td.no-word-wrap {
         color: gray;
     }
 
-
-{% if initially_hide_create_patient_form %}
-#new-patient-form-container {
-    display: none;
-}
-{% else %}
-#new-patient-link {
-    display: none;
-}
-{% endif %}
-{% endblock css %}
-
-{% block jshead %}
+    {% if initially_hide_create_patient_form %}
+    #new-patient-form-container {
+        display: none;
+    }
+    {% else %}
+    #new-patient-link {
+        display: none;
+    }
+    {% endif %}
+</style>
+<script>
     ignoreAutcompleteChangeEvent = false;
     gridExtraFilters = {};
     filterFields = {};
@@ -159,9 +159,9 @@ td.no-word-wrap {
         var msgBox = $("#grid-filter-message");
         msgBox.html("Filtering grid to <span class='" + term_type + "'>" + value + "</span>... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
-        
+
         filterGrid({'term_type' : term_type, 'value' : value });
-        
+
         clearAutoCompletes(leave_autcomplete_term_type);
     }
 
@@ -174,7 +174,7 @@ td.no-word-wrap {
     function plotlyHPOClickHandler(data) {
         filterPatientGridFromBarClick('hpo', data);
     }
-    
+
     function plotlyOMIMClickHandler(data) {
         filterPatientGridFromBarClick('omim', data);
     }
@@ -190,11 +190,11 @@ td.no-word-wrap {
     	}
 		return links;
 	}
-    
+
     function patients_grid_complete() {
         var grid = $("#patient-grid");
         grid[0].p.postData["extra_filters"] = getExtraFilters;
-    
+
 		$(".grid-term-link").each(function() {
 			$(this).click(function() {
 				var term_type = $(this).attr("term_type");
@@ -203,7 +203,8 @@ td.no-word-wrap {
 			});
 		});
     }
-{% endblock jshead %}
+</script>
+{% endblock head %}
 
 {% block jsdocumentready %}
 	jQuery.extend($.fn.fmatter , {
@@ -236,7 +237,7 @@ td.no-word-wrap {
 
 
     function loadPatientOnSearchSelect() {
-    
+
         $('#id_patient').change(function() {
             let patientId = $(this).val();
             if (patientId) {
@@ -250,7 +251,7 @@ td.no-word-wrap {
     	    if (ignoreAutcompleteChangeEvent) {
     	        return;
     	    }
-    	
+
 			if (!$(selector).val()) { // empty - show all on grid
 				resetGrid();
 				return;
@@ -261,7 +262,7 @@ td.no-word-wrap {
 			if (match) {
 				var value = match[1].trim();
 				// pass in 3rd param to tell it we're from autocomplete box (and leave it)
-				filterPatientGrid(term_type, value, term_type);				
+				filterPatientGrid(term_type, value, term_type);
 			}
     	}
 
@@ -325,7 +326,7 @@ td.no-word-wrap {
         } else {
             delete filterFields["phenotype"];
         }
-        
+
         var filterMessage = filterMessages.join(", ");
         var msgBox = $("#grid-filter-message");
         msgBox.html("Filtering grid to " + filterMessage + " ... <a href='javascript:resetGrid()'>show all</a>");
@@ -342,7 +343,7 @@ td.no-word-wrap {
         <h3>Patients</h3>
         <div id='patient-header'>
             {% if url_name_visible.upload %}
-                Go to the <a href="{% url 'upload' %}" class="hover-link">upload</a> page to import new patient records.<br>
+                Go to the <a href="{% url 'upload' %}" class="hover-link">Upload</a> page to import new patient records.<br>
             {% endif %}
             {% if url_name_visible.patient_record_imports %}
                 View <a href="{% url 'patient_record_imports' %}" class="hover-link">Existing patient records imports</a>
@@ -385,12 +386,12 @@ td.no-word-wrap {
             <div id='jump-forms'>
     	        <div>
     	        Click the graphs to filter patients, or enter terms:
-                <table>
-                    <tr><td><div class='ontology-label hpo'>Human Phenotype Ontology</div>
+                <table class="pheno-drop-downs">
+                    <tr><td><div class='ontology-label hpo w-100'>Human Phenotype Ontology</div>
                     <tr><td class='hpo'> {{ hpo_form.hpo_synonym }} 
-                    <tr><td><div class='ontology-label omim'>OMIM</div>            
+                    <tr><td><div class='ontology-label omim w-100'>OMIM</div>
                     <tr><td class='omim'> {{ omim_form.mim_morbid_alias }} 
-                    <tr><td><div class='ontology-label gene'>Genes</div>
+                    <tr><td><div class='ontology-label gene w-100'>Genes</div>
                     <tr><td class='gene'> {{ gene_form.gene }}
                     <!-- Only need 1 media for entire page -->
                     {{ hpo_form.media }} 

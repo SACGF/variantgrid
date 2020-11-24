@@ -15,7 +15,9 @@
 		<tr>
 		<td>
 		<b>Genotype:</b> {{ form.zygosity }} <b>Exclude:</b> {{ form.exclude }}
-		<button id='zygosity-node-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+		    <button id='zygosity-node-save' class="btn btn-primary">save</button>
+        {% endif %}
 		</td>
 		</tr>
 		</table>

@@ -194,34 +194,6 @@ a.list-group-item-action {
   padding-right: 4px;
 }
 
-#vc-form {
-  width: 555px;
-}
-#vc-form .no-results {
-  display: none;
-}
-#vc-form .btn-toolbar {
-  width: 100%;
-  display: flex;
-}
-#vc-form .btn-toolbar > * {
-  margin: 4px;
-  flex-grow: 1;
-  flex-shrink: 1;
-  width: 30%;
-}
-#vc-form .card-body {
-  background-color: #f5fff5;
-}
-
-#vc-extras {
-  position: fixed;
-  min-width: 200px;
-  max-width: 800px;
-  left: 760px;
-  top: 62px;
-}
-
 .btn-disabled-wrapper {
   display: inline-block;
 }
@@ -229,8 +201,14 @@ a.list-group-item-action {
   width: 100%;
 }
 
-.btn-toolbar *.btn:not(:first-child) {
+.btn-toolbar > *:not(:first-child) {
   margin-left: 10px;
+}
+.btn-toolbar > * {
+  height: 32px;
+}
+.btn-toolbar > * .btn {
+  height: 32px;
 }
 
 .accordion > .card {
@@ -249,6 +227,28 @@ a {
   font-family: "FontAwesome";
   content: "";
   opacity: 0.4;
+  margin-left: 4px;
+}
+
+.mail-link::after {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  font-family: "FontAwesome";
+  content: "";
+  opacity: 0.4;
+  margin-left: 4px;
+}
+
+.download-link:after {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  font-family: "FontAwesome";
+  content: "";
+  opacity: 0.6;
   margin-left: 4px;
 }
 
@@ -464,6 +464,54 @@ table.as_table td {
 
 .tooltip {
   pointer-events: none;
+}
+
+.hpo, .omim, .gene {
+  display: inline-block;
+  border: 3px solid white;
+  margin: 0 4px 0 4px;
+  border-radius: 3px;
+  padding: 0 4px 0 4px;
+}
+
+.hpo {
+  background-color: #FF8C00;
+  border-color: #FF8C00;
+}
+
+.omim {
+  background-color: #22529e;
+  border-color: #22529e;
+  color: #ddd;
+}
+
+.gene {
+  background-color: #99CD83;
+  border-color: #99CD83;
+}
+
+.dt-status .val-R:before {
+  font-family: "FontAwesome";
+  margin-right: 4px;
+  content: "";
+  color: green;
+}
+.dt-status .val-P:before {
+  font-family: "FontAwesome";
+  color: #bbb;
+  margin-right: 4px;
+  content: "";
+}
+.dt-status .val-A:before {
+  font-family: "FontAwesome";
+  margin-right: 4px;
+  content: "";
+  color: #6a6;
+}
+.dt-status .val-U:before {
+  font-family: "FontAwesome";
+  margin-right: 4px;
+  content: "";
 }
 
 /*# sourceMappingURL=global_bs.css.map */

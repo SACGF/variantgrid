@@ -1,5 +1,6 @@
 import itertools
 
+from django.conf import settings
 from django.contrib.sites.models import Site
 from typing import List, Tuple, Iterable, Optional
 
@@ -196,7 +197,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
             data.message = message
         data[SpecialEKeys.CLINGEN_ALLELE_ID] = evidence_value
         data[SpecialEKeys.VARIANT_COORDINATE] = {
-            'value': str(variant),
+            'value': variant.full_string,
             'immutable': SubmissionSource.VARIANT_GRID
         }
 
@@ -340,7 +341,10 @@ def get_evidence_fields_from_preferred_transcript(
                 "phylop_100_way_vertebrate": "100 way vertebrate",
             }
             data[SpecialEKeys.PHYLOP] = get_set_fields_summary(transcript_data, phylop_dict, phylop_dict)
-            data[SpecialEKeys.SEARCH_TERMS] = transcript_data[VariantTranscriptSelections.SEARCH_TERMS]
+            if variant_annotation := vts.variant_annotation:
+                data[SpecialEKeys.SEARCH_TERMS] = variant_annotation.get_search_terms()
+                if settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED:
+                    data[SpecialEKeys.PUBMED_SEARCH_TERMS] = variant_annotation.get_pubmed_search_terms()
         except:
             log_traceback()
 

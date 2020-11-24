@@ -6,6 +6,8 @@ from enum import Enum, auto
 from subprocess import Popen
 from typing import List, Optional, Dict
 
+from library.git import Git
+
 PYTHON_CMD = "python3.8"
 PYTHON_ALIAS = "python"
 
@@ -90,9 +92,9 @@ class ManualSubMigration(SubMigration):
             selection = selection.strip().lower()
             if selection == "y":
                 return MigrationResult.success()
-            elif selection == "n":
+            if selection == "n":
                 return MigrationResult.failure()
-            elif selection == "x":
+            if selection == "x":
                 return MigrationResult.skip()
             print(f"Unexpected input - \"{selection}\"")
 
@@ -115,8 +117,7 @@ class GitSubMigration(SubMigration):
         if completed_process.returncode != 0:
             return MigrationResult(status=MigrationStatus.FAILURE,
                                    note=f"Subprocess failed with error code {completed_process.returncode}")
-        else:
-            return MigrationResult(status=MigrationStatus.SUCCESS)
+        return MigrationResult(status=MigrationStatus.SUCCESS)
 
 
 class CommandSubMigration(SubMigration):
@@ -205,9 +206,7 @@ class Migrator:
 
     @staticmethod
     def get_git_ver() -> str:
-        with Popen(["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE) as proc:
-            git_ver = proc.stdout.readline().decode('utf-8').strip()
-            return git_ver
+        return Git().hash
 
     @staticmethod
     def subcommand_for_json(task: Dict) -> SubMigration:
@@ -218,8 +217,7 @@ class Migrator:
         if category == "manage":
             args = ["python", "manage.py", line]
             return CommandSubMigration(args).using(task_id=task_id, notes=notes)
-        else:
-            return ManualSubMigration(line).using(task_id=task_id, notes=notes)
+        return ManualSubMigration(line).using(task_id=task_id, notes=notes)
 
     def prompt(self):
         self.refresh_migrations()

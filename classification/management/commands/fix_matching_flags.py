@@ -43,12 +43,14 @@ class Command(BaseCommand):
                             resolved = m[1]
                             break
                     if not resolved:
-                        print('** Couldnt find the resolved value in')
+                        print(f'** Couldnt find the resolved value in flag {flag.id}')
                         print('---')
                         print(comment_text)
                         print('---')
 
-            #  find the classification
+            #  find the classification, in the case of not being able to work it out, let's just leave things None
+            #  and flag will be closed and re-opened since the data doesn't match
+            """
             if not resolved:
                 c: Classification
                 if c := Classification.objects.filter(flag_collection_id=flag.collection_id).first():
@@ -65,8 +67,16 @@ class Command(BaseCommand):
                                 resolved = compare_to_chgvs.full_c_hgvs
                             elif flag.flag_type == classification_flag_types.transcript_version_change_flag:
                                 resolved = compare_to_chgvs.transcript
+            """
+            if resolved:
+                print(f"Resolved flag {flag.id} to {resolved}")
+                if apply:
+                    flag.data = {'resolved': resolved}
+                    flag.save()
 
-            print(f"Resolved flag {flag.id} to {resolved}")
-            if resolved and apply:
-                flag.data = {'resolved': resolved}
-                flag.save()
+        if apply:
+            c: Classification
+            for index, c in enumerate(Classification.objects.all()):
+                if index % 100 == 0:
+                    print(f"Processed {index} classifications for updating flags")
+                c.update_cached_c_hgvs()

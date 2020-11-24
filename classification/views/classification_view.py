@@ -5,16 +5,19 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils.decorators import method_decorator
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
     HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
 from typing import Optional
 
+from classification.classification_stats import get_lab_gene_counts
 from library.log_utils import report_exc_info
 from library.utils import empty_to_none
+from snpdb.models import Lab
 from snpdb.models.models_enums import ImportSource
-from classification.enums import SubmissionSource, ShareLevel
+from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
 from classification.models import ClassificationRef, ClassificationImport, \
     ClassificationJsonParams, PatchMeta
 from classification.models.evidence_mixin import EvidenceMixin, VCStore
@@ -384,3 +387,31 @@ class ClassificationView(APIView):
         importer.finish()
 
         return Response(status=HTTP_200_OK, data=json_data)
+
+
+class LabGeneClassificationCountsView(APIView):
+    """ Returns a dict of {gene_symbol: {clinical_significance: classification_counts}} """
+
+    def get(self, request, *args, **kwargs):
+        lab = get_object_or_404(Lab, pk=kwargs["lab_id"])
+
+        lab_gene_counts = get_lab_gene_counts(request.user, lab)
+        classification_counts = {}
+        for gene_symbol, clinical_significance_count in lab_gene_counts.items():
+            total = 0
+            summary = []
+            for cs, cs_display in ClinicalSignificance.SHORT_LABELS.items():
+                if count := clinical_significance_count.get(cs):
+                    summary.append(f"{cs_display}: {count}")
+                    total += count
+            classification_counts[gene_symbol] = {
+                "total": total,
+                "summary": ", ".join(summary),
+            }
+
+        data = {
+            "lab_name": lab.name,
+            "gene_symbols": lab_gene_counts.keys(),
+            "classification_counts": classification_counts,
+        }
+        return Response(data)

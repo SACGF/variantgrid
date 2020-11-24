@@ -1,12 +1,15 @@
+from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from annotation.models import AnnotationVersion
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_user_settings import UserSettings
+from variantopedia.interesting_nearby import get_nearby_qs
 
 
 class VariantWikiGrid(JqGridUserRowConfig):
@@ -54,5 +57,29 @@ class AllVariantsGrid(AbstractVariantGrid):
         queryset = queryset.filter(**filter_kwargs)
         self.queryset = queryset.values(*self.get_queryset_field_names())
         self.extra_config.update({'sortname': count_column,
+                                  'sortorder': "desc",
+                                  'shrinkToFit': False})
+
+
+class NearbyVariantsGrid(AbstractVariantGrid):
+    caption = 'Nearby Variants'
+    fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
+    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'}}
+
+    def __init__(self, user, variant_id, region_type, **kwargs):
+        super().__init__(user)
+
+        variant = get_object_or_404(Variant, pk=variant_id)
+
+        user_settings = UserSettings.get_for_user(user)
+        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
+        self.fields = fields
+        self.update_overrides(override)
+
+        annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
+        region_filters = get_nearby_qs(variant, annotation_version)
+        queryset = region_filters[region_type]
+        self.queryset = queryset.values(*self.get_queryset_field_names())
+        self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "desc",
                                   'shrinkToFit': False})

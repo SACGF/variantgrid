@@ -2,24 +2,35 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
-from snpdb.models import UserDataPrefix, SettingsInitialGroupPermission
+from snpdb.models import UserDataPrefix, SettingsInitialGroupPermission, Organization, Lab
 from snpdb.tasks.vcf_bed_file_task import create_backend_vcf_bed_intersections
 
 
 def user_post_save_handler(sender, instance, **kwargs):
     """ Add new user to the public group """
 
+    def add_user_to_group(group_name: str):
+        group, _ = Group.objects.get_or_create(name=group_name)
+        group.user_set.add(instance)
+
     created = kwargs.get("created")
     if created:
-        public_group, _ = Group.objects.get_or_create(name=settings.PUBLIC_GROUP_NAME)
-        public_group.user_set.add(instance)
-
-        public_group, _ = Group.objects.get_or_create(name=settings.LOGGED_IN_USERS_GROUP_NAME)
-        public_group.user_set.add(instance)
+        add_user_to_group(settings.PUBLIC_GROUP_NAME)
+        add_user_to_group(settings.LOGGED_IN_USERS_GROUP_NAME)
 
         udp_kwargs = getattr(settings, "INITIAL_USER_DATA_PREFIX_KWARGS", None)
         if udp_kwargs:
             UserDataPrefix.objects.get_or_create(user=instance, **udp_kwargs)
+
+        org_labs = getattr(settings, "USER_CREATE_ORG_LABS", None)
+        if org_labs:
+            for org_group_name, lab_pattern in org_labs.items():
+                organization = Organization.objects.get(group_name=org_group_name)
+                lab_name = lab_pattern % instance.__dict__
+                lab_group_name = f"{organization.group_name}/{lab_name.lower()}"
+                lab, _ = Lab.objects.get_or_create(name=lab_name, organization=organization, group_name=lab_group_name)
+                add_user_to_group(organization.group_name)
+                add_user_to_group(lab_group_name)
 
 
 def group_post_save_handler(sender, instance, **kwargs):

@@ -53,7 +53,9 @@
         {% crispy form form_helper.horizontal %}
         {% include "uicore/messages/messages.html" %}
         <div>
-            <button class="btn btn-primary" id='save-analysis-settings' type="submit">Save</button>
+            {% if has_write_permission %}
+                <button class="btn btn-primary" id='save-analysis-settings' type="submit">Save</button>
+            {% endif %}
         </div>
 
     </form>

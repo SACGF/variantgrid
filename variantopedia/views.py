@@ -1,8 +1,10 @@
 import logging
+import re
 from collections import defaultdict
 from datetime import timedelta
 from typing import Optional
 
+from celery.task.control import inspect  # @UnresolvedImport
 from django.conf import settings
 from django.contrib import messages
 from django.db.models import Q
@@ -10,13 +12,10 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
-import re
 
 from analysis.models.nodes.analysis_node import Analysis
-from annotation.models import AnnotationRun, ClassificationModification, Classification
-from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, ClinVar
-from celery.task.control import inspect  # @UnresolvedImport
-
+from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
+    VariantAnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import Event, create_event
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
@@ -34,9 +33,10 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
-from variantopedia.variant_column_utils import get_columns_qs, get_variant_annotation_data
 from variantopedia import forms
+from variantopedia.interesting_nearby import get_nearby_qs
 from variantopedia.search import search_data, SearchResults
+from variantopedia.variant_column_utils import get_columns_qs, get_variant_annotation_data
 
 
 def variants(request):
@@ -303,7 +303,8 @@ def search(request):
                "search": search_string,
                "search_results": search_results,
                "external_codes": external_codes,
-               "variant_vcf_db_prefix": settings.VARIANT_VCF_DB_PREFIX}
+               "variant_vcf_db_prefix": settings.VARIANT_VCF_DB_PREFIX,
+               "variant_summary": settings.SEARCH_VARIANT_SHOW_SUMMARY}
     return render(request, "variantopedia/search.html", context)
 
 
@@ -438,6 +439,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         variant_allele_data = None
 
     context = {
+        "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
         "annotation_version": annotation_version,
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "classifications": latest_classifications,
@@ -483,3 +485,19 @@ def gene_coverage(request, gene_symbol_id):
     context = {"gene_symbol": gene_symbol,
                "twenty_x_coverage_percent_counts": twenty_x_coverage_percent_counts}
     return render(request, "variantopedia/gene_coverage.html", context)
+
+
+def nearby_variants(request, variant_id, annotation_version_id=None):
+    variant = get_object_or_404(Variant, pk=variant_id)
+    latest_annotation_version = AnnotationVersion.latest(variant.genome_build)
+
+    if annotation_version_id:
+        annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    else:
+        annotation_version = latest_annotation_version
+    variant_annotation_version = annotation_version.variant_annotation_version
+    variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
+    context = {"variant": variant,
+               "variant_annotation": variant_annotation}
+    context.update(get_nearby_qs(variant, annotation_version))
+    return render(request, "variantopedia/nearby_variants.html", context)

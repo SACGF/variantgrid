@@ -83,10 +83,15 @@ function inputSamples() {
 }
 
 
-function layout_analysis_panels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections) {
+function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections, readOnly) {
     
     if (showAnalysisVariables) {
         $("#analysis-variables").show();
+    }
+
+    var centerLayoutParams = {};
+    if (!readOnly) {
+        centerLayoutParams.onresize = resizePanel;  // save panel widths
     }
 
     $('div#content').layout();
@@ -97,9 +102,7 @@ function layout_analysis_panels(showAnalysisVariables, initialGridAndEditorWidth
             slidable: false,
             initClosed: !showAnalysisVariables,
         },
-        center: {
-            onresize: resizePanel,
-        },
+        center: centerLayoutParams,
         east: { onresize: resizeGrid,
                 triggerEventsOnLoad: true,
                 size: initialGridAndEditorWidth,
@@ -117,11 +120,11 @@ function layout_analysis_panels(showAnalysisVariables, initialGridAndEditorWidth
     });
 
     // Setup nodes
-    addNodesToDOM('#analysis', nodeDataArray);
+    addNodesToDOM('#analysis', nodeDataArray, readOnly);
 
-    window.variantgridPipeline.init();
+    window.variantgridPipeline.init(readOnly);
 
-    attatchAnalysisNodeConnections(nodeConnections);
+    attatchAnalysisNodeConnections(nodeConnections, readOnly);
 
     messagePoller.update_loop();
 }
@@ -233,16 +236,6 @@ function setupNodeTypeSelect() {
     $("#id_node_types").iconselectmenu()
         .iconselectmenu( "menuWidget" )
         .addClass( "ui-menu-icons customicons" );
-
-}
-
-
-function setLockedAnalysisWarningToolTip() {
-    let warningIcon = $('#lock-input-sources-warning-icon');
-    warningIcon.attr('title', $('#lock-input-sources-warning-tooltip').show().remove().html())
-    warningIcon.tooltip({
-        content : function() { return $(this).prop('title') },
-    });
 
 }
 

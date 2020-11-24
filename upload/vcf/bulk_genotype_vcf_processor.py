@@ -7,8 +7,8 @@ import os
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
+from library.git import Git
 from library.postgres_utils import postgres_arrays
-from library.utils import get_git_hash
 import numpy as np
 
 from library.vcf_utils import VCFConstant
@@ -64,7 +64,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                                                                     version=BulkGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
                                                                     vcf_parser="cyvcf2",
                                                                     vcf_parser_version=cyvcf2.__version__,
-                                                                    code_git_hash=get_git_hash(settings.BASE_DIR))
+                                                                    code_git_hash=Git(settings.BASE_DIR).hash)
         return vcf_importer
 
     def __init__(self, upload_step, cohort_genotype_collection,

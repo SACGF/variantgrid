@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.http.response import HttpResponseServerError, JsonResponse, \
     HttpResponseForbidden
@@ -10,10 +11,12 @@ from django.urls.exceptions import Resolver404
 from global_login_required import login_not_required
 
 from library.email import Email
+from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
 from library.log_utils import report_exc_info
-from library.utils import get_git_last_modified_date, get_git_hash
+from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
+from snpdb.models import UserSettings
 
 
 @login_not_required
@@ -76,11 +79,34 @@ def authenticated(request):
 
 
 def version(request):
-    git_last_modified = get_git_last_modified_date(settings.BASE_DIR)
+    git = Git(settings.BASE_DIR)
 
-    context = {"git_hash": get_git_hash(settings.BASE_DIR),
-               "git_last_modified": git_last_modified}
+    deployments = list()
+    for deployment in Deployment.objects.order_by('-created').all()[0:10]:
+        deployment_git_hash = deployment.git_hash
+        deployment_git_link = None
+        if git.site and git.hash and deployment_git_hash and git.hash != deployment_git_hash:
+            deployment_git_link = f"{git.site}/compare/{deployment_git_hash}...{git.hash}"
 
+        deployments.append({
+            "git_hash": deployment.git_hash,
+            "created": deployment.created,
+            "git_link": deployment_git_link
+        })
+
+    weekly_update_users = list()
+    if request.user.is_superuser:
+        all_users = User.objects.filter(is_active=True, email__isnull=False).order_by('email')
+        for user in all_users:
+            # user email could be blank instead of null
+            if user.email and UserSettings.get_for_user(user).email_weekly_updates:
+                weekly_update_users.append(user)
+
+    context = {
+        "git": git,
+        "deployment_history": deployments,
+        "weekly_update_users": weekly_update_users
+    }
     return render(request, 'version.html', context)
 
 

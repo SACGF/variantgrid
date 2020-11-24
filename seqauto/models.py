@@ -829,13 +829,19 @@ class BamFile(SeqAutoFile, SequencingSamplePropertiesMixin):
     def get_path_from_unaligned_reads(unaligned_reads):
         params = unaligned_reads.get_params()
         pattern = os.path.join(settings.SEQAUTO_ALIGNED_DIR_PATTERN, settings.SEQAUTO_BAM_PATTERN)
-        return os.path.abspath(pattern % params)
+        try:
+            filename = pattern % params
+        except KeyError as ke:
+            if "enrichment_kit" in ke.args:
+                logging.error("'enrichment_kit' not set, this is usually done via signal handlers in a custom app")
+            logging.error(f"{unaligned_reads} missing: {', '.join(ke.args)}. params={params}")
+            raise
+        return os.path.abspath(filename)
 
     @staticmethod
     def get_aligner_from_bam_file(bam_path):
         # TODO: Do properly
-        (aligner, _) = Aligner.objects.get_or_create(name='fake_aligner',
-                                                     version='0.666')
+        aligner, _ = Aligner.objects.get_or_create(name='fake_aligner', version='0.666')
         return aligner
 
     def __str__(self):
@@ -880,13 +886,13 @@ class Flagstats(SeqAutoFile):
 
 
 def get_fake_variant_caller():
-    (variant_caller, _) = VariantCaller.objects.get_or_create(name='fake_variant_caller',
-                                                              version='0.666')
+    variant_caller, _ = VariantCaller.objects.get_or_create(name='fake_variant_caller',
+                                                            version='0.666')
     return variant_caller
 
 
 def get_seqauto_user():
-    (user, created) = User.objects.get_or_create(username=settings.SEQAUTO_USER)
+    user, created = User.objects.get_or_create(username=settings.SEQAUTO_USER)
     if created:
         if settings.SEQAUTO_GROUP:
             seqauto_group = Group.objects.get_or_create(name=settings.SEQAUTO_GROUP)

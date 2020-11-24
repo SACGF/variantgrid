@@ -16,7 +16,8 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from annotation.models.models import AnnotationVersion
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
+from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias, \
+    gene_symbol_withdrawn_str
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
@@ -422,8 +423,8 @@ def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: Que
 def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
     # itertools.chain doesn't work
     # only return a GeneSymbol alias if we're not returning the source GeneSymbol
-    gene_symbols = list(GeneSymbol.objects.filter(symbol__iexact=search_string))
-    gene_symbol_strs = set([gene_symbol.symbol for gene_symbol in gene_symbols])
+    gene_symbols = list(GeneSymbol.objects.filter(symbol__iexact=search_string).exclude(symbol__endswith=gene_symbol_withdrawn_str))
+    gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
     aliases = [alias for alias in GeneSymbolAlias.objects.filter(alias__iexact=search_string).all() if alias.alias not in gene_symbol_strs]
     return gene_symbols + aliases
 

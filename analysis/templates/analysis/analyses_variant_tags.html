@@ -7,6 +7,11 @@
 {% load user_tag_color_tags %}
 {% render_tag_styles_and_formatter %}
 <script>
+    window.ANALYSIS_SETTINGS = {
+        show_igv_links : false,
+        open_variant_details_in_new_window: true,
+    };
+
     gridParams = {};
     function getVariantTagsGridExtraFilters() {
         return JSON.stringify(gridParams);
@@ -23,11 +28,19 @@
     }
 
     function reloadGrid() {
-        var grid = $("#analyses_variant_tags-grid");
+        let grid = $("#analyses_variant_tags-grid");
         grid.trigger("reloadGrid");
+
+        let grid2 = $("#analysis_tagged_variant-grid");
+        grid2.trigger("reloadGrid");
+
+
     }
 </script>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <style>
+{% render_node_count_colors_css %}
+
 #tag-top-bar .grid-tag {
     cursor: pointer;
 }
@@ -40,12 +53,11 @@
 
 {% block jsdocumentready %}
     jQuery.extend($.fn.fmatter , {
-        geneLinkFormatter : function(pk, options, rowObject) {
+        geneLinkFormatter : function(geneSymbol, options, rowObject) {
             var viewLink = "";
-            var geneId = rowObject["variant__variantannotation__transcript__gene_id"];
-            if (geneId) {
-                const URL = Urls.view_gene(geneId);
-                viewLink = "<a class='grid-link' target='_blank' href='" + URL + "'>" + pk + "</div></a>";
+            if (geneSymbol) {
+                const URL = Urls.view_gene_symbol(geneSymbol);
+                viewLink = "<a class='grid-link' target='_blank' href='" + URL + "'>" + geneSymbol + "</div></a>";
             }
             return viewLink;
         }
@@ -80,7 +92,12 @@
     {% endif %}
 
     {% load jqgrid_tags %}
-    {% user_data_grid_filter 'analyses_variant_tags' 'Analyses Variant Tags' %}
+
+    {% jqgrid 'analysis_tagged_variant_grid' 'analysis_tagged_variant' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
+
+    {% user_data_grid_filter 'analyses_variant_tags' 'Analyses Variant Tags' filter_name_choices=filter_name_choices %}
     {% jqgrid 'analyses_variant_tags_grid' 'analyses_variant_tags' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
+
+
 
 {% endblock submenu_page_content %}

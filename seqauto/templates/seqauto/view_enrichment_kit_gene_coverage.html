@@ -65,7 +65,7 @@
     
     <div>
     {% load jqgrid_tags %}
-    {% jqgrid 'enrichment_kit_gene_coverage_grid' 'EnrichmentKitGeneCoverage' search=False enrichment_kit_id=enrichment_kit.pk gene_symbol=gene_symbol download_grid_json_as_csv=True init_func='initFunc' %}
+    {% jqgrid 'enrichment_kit_gene_coverage_grid' 'EnrichmentKitGeneCoverage' search=False enrichment_kit_id=enrichment_kit.pk genome_build=genome_build gene_symbol=gene_symbol download_grid_json_as_csv=True init_func='initFunc' %}
     </div>
 
 {% endblock %}

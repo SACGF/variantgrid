@@ -10,6 +10,7 @@ from library.database_utils import get_queryset_column_names, \
 from library.jqgrid_sql import JqGridSQL
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import calculate_age
+from snpdb.grid_columns.custom_columns import get_variantgrid_extra_alias_and_select_columns
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
@@ -250,10 +251,6 @@ class CustomColumnsCollectionListGrid(JqGridUserRowConfig):
 
 class AbstractVariantGrid(JqGridSQL):
     model = Variant
-    INTERNAL_CLASSIFICATION_ALIASES_AND_SELECT = {
-        "internally_classified": "select string_agg(classification_classification.clinical_significance, '|') from classification_classification where classification_classification.variant_id = snpdb_variant.id",
-        "max_internal_classification": "select max(classification_classification.clinical_significance) from classification_classification where classification_classification.variant_id = snpdb_variant.id",
-    }
 
     def column_in_queryset_fields(self, field):
         colmodel = self.get_override(field)
@@ -274,17 +271,19 @@ class AbstractVariantGrid(JqGridSQL):
         if self.column_in_queryset_fields(sidx):
             queryset = self.sort_items(request, queryset)
 
-        (select_part, from_part, where_part) = get_queryset_select_from_where_parts(queryset)
+        select_part, from_part, where_part = get_queryset_select_from_where_parts(queryset)
 
         extra_columns = []
-        for (alias, select) in self.INTERNAL_CLASSIFICATION_ALIASES_AND_SELECT.items():
-            extra_columns.append(f'({select}) as "{alias}"')
-        select_part += ",\n" + ",\n".join(extra_columns)
+        extra_select = []
+        for alias, select in get_variantgrid_extra_alias_and_select_columns(self.user):
+            extra_columns.append(alias)
+            extra_select.append(f'({select}) as "{alias}"')
+        select_part += ",\n" + ",\n".join(extra_select)
 
         sql = '\n'.join([select_part, from_part, where_part])
         #logging.info(sql)
 
-        column_names = get_queryset_column_names(queryset, list(self.INTERNAL_CLASSIFICATION_ALIASES_AND_SELECT.keys()))
+        column_names = get_queryset_column_names(queryset, extra_columns)
 
         params = []
         return sql, params, column_names, True

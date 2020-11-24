@@ -448,7 +448,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def get_node_name(self):
         """ Automatic node name """
-        raise NotImplementedError()
+        raise NotImplementedError(f"Node Class: {self.get_class_name()}")
 
     @staticmethod
     def get_node_class_label():
@@ -806,6 +806,9 @@ class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
 
 class NodeWiki(Wiki):
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
+
+    def _get_restricted_object(self):
+        return self.node.analysis
 
 
 class NodeVersion(models.Model):

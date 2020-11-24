@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Tuple, Sequence, Dict
+from typing import Tuple, Sequence, Dict, List
 
 from django.apps import apps
 from django.contrib.auth.models import User
@@ -11,6 +11,7 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+from lazy import lazy
 
 from analysis.models.enums import AnalysisType, AnalysisTemplateType
 from annotation.models import AnnotationVersion
@@ -45,6 +46,28 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         if self.description:
             name = f"{name} ({self.description})"
         return name
+
+    @lazy
+    def last_lock(self):
+        return self.analysislock_set.order_by("pk").last()
+
+    def is_locked(self):
+        return self.last_lock and self.last_lock.locked
+
+    def can_unlock(self, user):
+        """ Use parent to see if we have Guardian permissions to write """
+        return super().can_write(user)
+
+    def lock_history(self):
+        return self.analysislock_set.order_by("pk")
+
+    def can_write(self, user):
+        """ Disable modification when locked """
+        if super().can_write(user):
+            if self.last_lock:
+                return not self.last_lock.locked
+            return True
+        return False
 
     def get_absolute_url(self):
         return reverse('analysis', kwargs={"analysis_id": self.pk})
@@ -149,7 +172,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                 old_id = node.pk
                 old_version = node.version
                 node.analysis = analysis_copy
-                copy = node.save_clone()
+                try:
+                    copy = node.save_clone()
+                except NotImplementedError as nie:
+                    raise NotImplementedError(f"Could not clone node {old_id}") from nie
                 copy.adjust_cloned_parents(old_new_map)
                 copy.save()
 
@@ -176,6 +202,14 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
         return analysis_copy
 
+    def get_warnings(self, user: User) -> List[str]:
+        warnings = []
+        if self.lock_input_sources:
+            warnings.append("INPUT LOCKED - cannot create new input source nodes.")
+        if not self.can_write(user) and not self.is_locked():  # Locked has own icon, no need for warning
+            warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
+        return warnings
+
 
 @receiver(pre_delete, sender=Analysis)
 def pre_delete_analysis(sender, instance, *args, **kwargs):
@@ -185,6 +219,14 @@ def pre_delete_analysis(sender, instance, *args, **kwargs):
         analysis_template.delete_or_soft_delete()
     except AnalysisTemplate.DoesNotExist:
         pass
+
+
+class AnalysisLock(models.Model):
+    """ Users can lock/unlock however much they like - the last one set is the current status """
+    analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
+    locked = models.BooleanField()
+    user = models.ForeignKey(User, on_delete=CASCADE)
+    date = models.DateTimeField()
 
 
 class AnalysisNodeCountConfiguration(models.Model):

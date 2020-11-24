@@ -5,17 +5,18 @@ import celery
 import logging
 import os
 
-from annotation.models import AnnotationStatus
+from annotation.annotation_version_querysets import get_unannotated_variants_qs
+from annotation.models import AnnotationStatus, GenomeBuild
 from annotation.models.models import AnnotationRun
 from annotation.signals import annotation_run_complete_signal
-from annotation.vcf_files.variants_to_vcf import unannotated_variants_to_vcf
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
-from library.file_utils import name_from_filename
+from library.file_utils import name_from_filename, mk_path_for_file
 from library.log_utils import get_traceback, report_message
 from library.utils import execute_cmd
+from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT
 
 
 @celery.task
@@ -99,8 +100,8 @@ def dump_and_annotate_variants(annotation_run):
 
     genome_build = annotation_run.genome_build
     annotation_consortium = annotation_run.annotation_consortium
-    variants_to_annotate = unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
-                                                       annotation_run.annotation_range_lock)
+    variants_to_annotate = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
+                                                        annotation_run.annotation_range_lock)
 
     logging.info("Annotating %d variants", variants_to_annotate)
     if variants_to_annotate:
@@ -162,3 +163,21 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
     task.apply_async()
 
     return annotation_run
+
+
+def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename, annotation_range_lock):
+    logging.info("unannotated_variants_to_vcf()")
+    if os.path.exists(vcf_filename):
+        raise ValueError(f"Don't want to overwrite '{vcf_filename}' which already exists!")
+    mk_path_for_file(vcf_filename)
+    with open(vcf_filename, 'wb') as f:
+        kwargs = {}
+        if annotation_range_lock:
+            kwargs["min_variant_id"] = annotation_range_lock.min_variant.pk
+            kwargs["max_variant_id"] = annotation_range_lock.max_variant.pk
+
+        annotation_version = annotation_range_lock.version.get_any_annotation_version()
+        qs = get_unannotated_variants_qs(annotation_version, **kwargs)
+        qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
+        sorted_values = qs.values("id", "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq")
+        return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=VARIANT_GRID_INFO_DICT)

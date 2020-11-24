@@ -13,6 +13,10 @@ from variantgrid.settings.env.shariant import *  # pylint: disable=wildcard-impo
 # import all the base settings #
 SITE_ID = 6
 
+URLS_NAME_REGISTER.update({
+    "condition_aliases": True
+})
+
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
 SEND_EMAILS = False
 
@@ -39,3 +43,4 @@ SITE_NAME = "Shariant"
 VARIANT_VCF_DB_PREFIX = "stv"
 
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
+VARIANT_DETAILS_SHOW_ANNOTATION = True

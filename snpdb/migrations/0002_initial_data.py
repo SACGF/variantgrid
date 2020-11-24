@@ -24,7 +24,6 @@ def snpdb_initial_data(apps, schema_editor):
 
     bulk_insert_class_data(apps, "sites", [("Site", SITES)])
 
-
     GENOMIC_INTERVAL_CATEGORIES = [
         {'name': 'Exome Capture Regions',
          'description': "Manufacturer's capture region bed files"},

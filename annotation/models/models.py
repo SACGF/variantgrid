@@ -4,6 +4,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import List
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -20,11 +21,12 @@ from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
+from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
-from annotation.models.models_enums import HumanProteinAtlasAbundance, VCFInfoTypes, AnnotationStatus, CitationSource, \
+from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
-    VEPCustom, ClinVarReviewStatus
+    VEPCustom, ClinVarReviewStatus, VEPSkippedReason
 from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
@@ -32,7 +34,7 @@ from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
 from patients.models_enums import GnomADPopulation
-from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q
+from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -354,20 +356,6 @@ class ColumnVEPField(models.Model):
         return list(qs.values_list("source_field", flat=True).order_by("source_field"))
 
 
-class ColumnVCFInfo(models.Model):
-    """ Used to export columns to VCF (vcf_export_utils).
-        Should it be moved to snpdb? """
-    info_id = models.TextField(primary_key=True)
-    column = models.OneToOneField(VariantGridColumn, on_delete=CASCADE)
-    number = models.IntegerField(null=True, blank=True)
-    type = models.CharField(max_length=1, choices=VCFInfoTypes.CHOICES)
-    description = models.TextField(null=True)
-
-    def __str__(self):
-        number = self.number or '.'
-        return f"ID={self.info_id},number={number},type={self.type},descr: {self.description}"
-
-
 class VariantAnnotationVersion(SubVersionPartition):
     REPRESENTATIVE_TRANSCRIPT_ANNOTATION = "annotation_variantannotation"
     TRANSCRIPT_ANNOTATION = "annotation_varianttranscriptannotation"
@@ -433,6 +421,16 @@ def variant_annotation_version_pre_delete_handler(sender, instance, **kwargs):
     instance.delete_related_objects()
 
 
+class VCFAnnotationStats(models.Model):
+    """ This is produced in calculate_sample_stats """
+    vcf = models.ForeignKey(VCF, on_delete=CASCADE)
+    variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
+    vep_skipped_count = models.IntegerField()
+
+    class Meta:
+        unique_together = ('vcf', 'variant_annotation_version')
+
+
 class AnnotationRangeLock(models.Model):
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     min_variant = models.ForeignKey(Variant, related_name='min_variant', on_delete=PROTECT)
@@ -462,9 +460,11 @@ class AnnotationRun(TimeStampedModel):
     pipeline_stdout = models.TextField(null=True)
     pipeline_stderr = models.TextField(null=True)
     error_exception = models.TextField(null=True)
+    vep_skipped_count = models.IntegerField(null=True)
+    vep_warnings = models.TextField(null=True)
     vcf_dump_filename = models.TextField(null=True)
     vcf_annotated_filename = models.TextField(null=True)
-    variant_count = models.IntegerField(null=True)
+    annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
 
     @property
@@ -710,7 +710,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     overlapping_symbols = models.TextField(null=True, blank=True)
 
     somatic = models.BooleanField(null=True, blank=True)
-    variant_class = models.CharField(max_length=2, choices=VariantClass.CHOICES)
+    variant_class = models.CharField(max_length=2, choices=VariantClass.CHOICES, null=True, blank=True)
+    vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.CHOICES, null=True, blank=True)
 
     GNOMAD_FIELDS = {
         GnomADPopulation.AFRICAN_AFRICAN_AMERICAN: 'gnomad_afr_af',
@@ -739,7 +740,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     @property
     def gnomad_variant(self):
-        """ If you have gnomad frequency - returns variant formatted as per 1-169519049-T-C """
+        """ If you have gnomAD frequency - returns variant formatted as per 1-169519049-T-C """
         if self.gnomad_af is not None:
             v = self.variant
             return f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
@@ -762,6 +763,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @staticmethod
     def get_gnomad_population_field(population):
         return VariantAnnotation.GNOMAD_FIELDS.get(population)
+
+    @lazy
+    def transcript_annotation(self) -> List['VariantTranscriptAnnotation']:
+        return self.variant.varianttranscriptannotation_set.filter(version=self.version)
+
+    def get_search_terms(self):
+        return get_variant_search_terms(self.transcript_annotation)
+
+    def get_pubmed_search_terms(self):
+        return get_variant_pubmed_search_terms(self.transcript_annotation)
 
     def __str__(self):
         return f"{self.variant}: {self.version}"
@@ -977,9 +988,38 @@ class MonarchDiseaseOntology(models.Model):
     # phenotype_mim = models.ForeignKey(MIMMorbid, on_delete=CASCADE)
 
     @staticmethod
-    def mondo_id_as_int(mondo_text):
+    def mondo_id_as_int(mondo_text) -> int:
+        if isinstance(mondo_text, int):
+            return mondo_text
         """ MONDO:0005045 -> 0005045 """
         return int(mondo_text.split(":")[1])
+
+    @property
+    def id_str(self) -> str:
+        return MonarchDiseaseOntology.mondo_int_as_id(self.id)
+
+    @staticmethod
+    def mondo_int_as_id(mondo_id: int) -> str:
+        num_part = str(mondo_id).rjust(7, '0')
+        return f"MONDO:{num_part}"
+
+
+class MonarchDiseaseOntologyGeneRelationship(models.Model):
+    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
+    relationship = models.TextField()
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ('mondo', 'relationship', 'gene_symbol')
+
+
+class MonarchDiseaseOntologyMIMMorbid(models.Model):
+    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
+    relationship = models.TextField()
+    omim_id = models.IntegerField()  # could also link this to MIMMorbid records, but that gets out of date
+
+    class Meta:
+        unique_together = ('mondo', 'relationship', 'omim_id')
 
 
 class CachedWebResource(TimeStampedModel):

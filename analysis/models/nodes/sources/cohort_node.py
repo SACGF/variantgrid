@@ -11,6 +11,7 @@ import operator
 
 from analysis.models import GroupOperation, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
+from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import Zygosity, SimpleZygosity
 from snpdb.models import Cohort, CohortSample, VariantsType
 
@@ -51,24 +52,14 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         return q_and
 
 
-class CohortNode(AbstractCohortBasedNode):
+class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     COUNT = 0
     SIMPLE_ZYGOSITY = 1
     PER_SAMPLE_ZYGOSITY = 2
 
     cohort = models.ForeignKey(Cohort, null=True, on_delete=SET_NULL)
-    # Count mode fields
-    minimum_count = models.IntegerField(null=False, default=0)
-    maximum_count = models.IntegerField(null=True)
     zygosity = models.CharField(max_length=1, choices=SimpleZygosity.CHOICES, default=SimpleZygosity.ANY_GERMLINE)
     zygosity_op = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ALL)
-    # zygosity count
-    min_ref_count = models.IntegerField(null=True, blank=True)
-    max_ref_count = models.IntegerField(null=True, blank=True)
-    min_hom_count = models.IntegerField(null=True, blank=True)
-    max_hom_count = models.IntegerField(null=True, blank=True)
-    min_het_count = models.IntegerField(null=True, blank=True)
-    max_het_count = models.IntegerField(null=True, blank=True)
     accordion_panel = models.IntegerField(default=0)
     # /zygosity count
 
@@ -131,7 +122,9 @@ class CohortNode(AbstractCohortBasedNode):
         cohort_genotype_collection = cohort.cohort_genotype_collection
         and_q = []
         if self.accordion_panel == self.COUNT:
-            and_q.extend(self.get_cohort_count_q_list())
+            # Use minimum filters even for sub-cohorts as the min will always be above sub-cohort min
+            # And they are a fast integer test, so may be a quicker path
+            and_q.extend(self.get_zygosity_count_q_list())
         elif self.accordion_panel == self.SIMPLE_ZYGOSITY:
             and_q.extend(self.get_cohort_simple_zygosity_q_list())
         elif self.accordion_panel == self.PER_SAMPLE_ZYGOSITY:
@@ -142,24 +135,6 @@ class CohortNode(AbstractCohortBasedNode):
         else:
             q = self.q_all()
         return q
-
-    def get_cohort_count_q_list(self):
-        # Use minimum filters even for sub-cohorts as the min will always be above sub-cohort min
-        # And they are a fast integer test, so may be a quicker path
-        COUNT_COLUMNS = [
-            # column                         MIN                 MAX
-            (self.any_zygosity_count_column, self.minimum_count, self.maximum_count),
-            (self.ref_count_column, self.min_ref_count, self.max_ref_count),
-            (self.het_count_column, self.min_het_count, self.max_het_count),
-            (self.hom_count_column, self.min_hom_count, self.max_hom_count),
-        ]
-        q_and = []
-        for column, min_count, max_count in COUNT_COLUMNS:
-            if min_count:
-                q_and.append(Q(**{column + "__gte": min_count}))
-            if max_count:
-                q_and.append(Q(**{column + "__lte": max_count}))
-        return q_and
 
     def get_cohort_simple_zygosity_q_list(self):
         COLUMNS = {

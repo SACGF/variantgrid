@@ -1,0 +1,25 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load gene_grid_tags %}
+{% load static %}
+{% block title %}Lab Classification Gene Counts{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+    </style>
+    <script>
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container-table">
+        <h3>Lab Gene Classification Counts ({{ visibility }})</h3>
+        <div>
+
+            {% gene_grid data_columns_whitelist=data_columns_whitelist gene_list_categories_whitelist=gene_list_categories_whitelist default_enrichment_kits=default_enrichment_kits show_gene_annotation_release=False show_custom_gene_form=False show_help=False %}
+
+        </div>
+    </div>
+{% endblock %}

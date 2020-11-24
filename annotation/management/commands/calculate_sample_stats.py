@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from annotation.models import SampleVariantAnnotationStats, \
     SampleVariantAnnotationStatsPassingFilter, SampleEnsemblGeneAnnotationStats, \
     SampleEnsemblGeneAnnotationStatsPassingFilter, SampleClinVarAnnotationStats, \
-    SampleClinVarAnnotationStatsPassingFilter
+    SampleClinVarAnnotationStatsPassingFilter, VCFAnnotationStats
 from annotation.tasks.calculate_sample_stats import calculate_needed_stats
 from snpdb.models import SampleStats, SampleStatsPassingFilter
 
@@ -26,7 +26,8 @@ class Command(BaseCommand):
                        SampleEnsemblGeneAnnotationStats,
                        SampleEnsemblGeneAnnotationStatsPassingFilter,
                        SampleClinVarAnnotationStats,
-                       SampleClinVarAnnotationStatsPassingFilter]
+                       SampleClinVarAnnotationStatsPassingFilter,
+                       VCFAnnotationStats]
 
             for clazz in CLASSES:
                 clazz.objects.all().delete()

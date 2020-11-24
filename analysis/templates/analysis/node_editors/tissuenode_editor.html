@@ -67,7 +67,9 @@
 		        </li>
 			</ul>
 		</div>
-		<button id='tissue-node-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+    		<button id='tissue-node-save' class="btn btn-primary">save</button>
+        {% endif %}
 	</form>
 </div>
 

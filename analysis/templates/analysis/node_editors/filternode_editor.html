@@ -34,7 +34,9 @@
 
 				event.preventDefault();
 			}
-			
+
+        {% if has_write_permission %}
+			console.log("Has write permission");
 			grid.bind('jqGridFilterSearch', save_filters);
 			grid.bind('jqGridFilterReset', save_filters);
 			
@@ -43,8 +45,12 @@
 				$("#filter-messages").text(UNSAVED_MESSAGE);
 			};
 			$("select", searchDialog).change(unsavedChanges);
-			$("input[type=button]", searchDialog).click(unsavedChanges);
+            $("input[type=button]", searchDialog).click(unsavedChanges);
 			$("input[type=text]", searchDialog).change(unsavedChanges);
+        {% else %}
+            $("input[type=button]", searchDialog).hide();
+            $(".EditButton", searchDialog).hide();
+        {% endif %}
 		}
 		hideLoadingOverlay();
 	}

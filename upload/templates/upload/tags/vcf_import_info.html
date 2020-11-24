@@ -22,13 +22,15 @@ $(document).ready(function() {
 	<div>{{ examine_error_instructions }}</div>
     <ul class="messages">
         {% for vii in errors %}
-            <li id="vcf-import-info-{{ vii.pk }}" class="import-message error">{{ vii }}
-                <button type="button" class="vcf-import-info-accept" vcf-import-info="{{ vii.pk }}">OK</button>
+            <li id="vcf-import-info-{{ vii.pk }}" class="import-message error">{{ vii.message }}
+                {% if vii.pk %}
+                    <button type="button" class="vcf-import-info-accept" vcf-import-info="{{ vii.pk }}">OK</button>
+                {% endif %}
             </li>
         {% endfor  %}
 
         {% for vii in warnings %}
-            <li id="vcf-import-info-{{ vii.pk }}" class="import-message warning">{{ vii }}
+            <li id="vcf-import-info-{{ vii.pk }}" class="import-message warning">{{ vii.message }}
                 <button type="button" class="vcf-import-info-accept" vcf-import-info="{{ vii.pk }}">OK</button>
             </li>
         {% endfor  %}

@@ -114,7 +114,7 @@ class Command(BaseCommand):
         for _, row in df.iterrows():
             ensembl_gene_id = row['ensembl_gene_id']
             if ensembl_gene_id not in ensembl_genes_for_build:
-                self.stdout.write(f"Couldn't find ensembl ID {ensembl_gene_id} in {genome_build}")
+                # self.stdout.write(f"Couldn't find ensembl ID {ensembl_gene_id} in {genome_build}")
                 unmatched_genes += 1
                 continue
 

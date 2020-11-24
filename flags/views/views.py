@@ -13,6 +13,7 @@ from flags.models.models import FlagResolution, FlagTypeResolution, \
     fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none
+from snpdb.models import Lab
 from snpdb.models.models_user_settings import UserSettings
 
 
@@ -195,6 +196,22 @@ class FlagHelper:
     def include_collections(self):
         self._include_collections = True
 
+    def lab_text(self, user: User) -> str:
+        if user.is_superuser:
+            return 'admin'
+        labs = list(Lab.valid_labs_qs(user))
+        if len(labs) == 0:
+            return 'no affiliation'
+        elif len(labs) == 1:
+            return labs[0].name
+        else:
+            orgs = set()
+            for lab in labs:
+                orgs.add(lab.organization.name)
+            orgs = list(orgs)
+            orgs.sort()
+            return ', '.join(orgs)
+
     def to_json(self):
         json_data = {}
         flags_json = []
@@ -207,7 +224,7 @@ class FlagHelper:
                 'name': UserSettings.preferred_label_for(user),
                 'avatar': user_settings.avatar_url,
                 'color': user_settings.avatar_color,
-                'lab': user_settings.default_lab.name if not user.is_superuser else 'admin'
+                'lab': self.lab_text(user)
             }
             users_json.append(json_entry)
         json_data['users'] = users_json

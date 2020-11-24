@@ -24,7 +24,9 @@
             {% endif %}
 		    </div>
         </div>
-		<button id='classifications-node-save' class="btn btn-primary">save</button>
+        {% if has_write_permission %}
+            <button id='classifications-node-save' class="btn btn-primary">save</button>
+        {% endif %}
         {{ form.media }}
 	</form>
 </div>
