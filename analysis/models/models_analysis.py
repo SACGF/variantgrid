@@ -58,6 +58,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         """ Use parent to see if we have Guardian permissions to write """
         return super().can_write(user)
 
+    def lock_history(self):
+        return self.analysislock_set.order_by("pk")
+
     def can_write(self, user):
         """ Disable modification when locked """
         if super().can_write(user):
