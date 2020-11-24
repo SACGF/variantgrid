@@ -107,23 +107,16 @@ class GeneListCategoryAutocompleteForm(forms.Form):
         self.fields['category'].disabled = True
 
 
-def gene_list_category_autocomplete_form_factory(category_id, initial=None, description='Gene List...', css_class=None):
+def panel_app_server_autocomplete_form_factory(server, prefix, initial=None,
+                                               description='Panel App Panel...', css_class=None):
     attrs = {'data-placeholder': description}
     if css_class:
         attrs['class'] = css_class
 
-    class MyGeneListCategoryAutocompleteForm(forms.Form):
-        gene_list = forms.ModelChoiceField(queryset=GeneList.objects.all(),
-                                           widget=autocomplete.ModelSelect2(url='category_gene_list_autocomplete',
-                                                                            attrs=attrs,
-                                                                            forward=(forward.Const(category_id, 'category'),)),
-                                           required=False)
-
-    prefix = f"category-{category_id}"
-    return MyGeneListCategoryAutocompleteForm(initial=initial, prefix=prefix)
-
-
-class PanelAppPanelForm(forms.Form):
-    panel_app_panel = forms.ModelChoiceField(queryset=PanelAppPanel.objects.all(),
-                                             widget=autocomplete.ModelSelect2(url='panel_app_panel_autocomplete',
-                                                                              attrs={'data-placeholder': 'Panel App Panel...'}))
+    class PanelAppPanelForm(forms.Form):
+        panel_app_panel = forms.ModelChoiceField(queryset=PanelAppPanel.objects.all(),
+                                                 widget=autocomplete.ModelSelect2(url='panel_app_panel_autocomplete',
+                                                                                  attrs=attrs,
+                                                                                  forward=(forward.Const(server.pk,
+                                                                                                         'server_id'),)))
+    return PanelAppPanelForm(initial=initial, prefix=prefix)
