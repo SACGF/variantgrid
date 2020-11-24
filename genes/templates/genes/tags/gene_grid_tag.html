@@ -395,7 +395,7 @@ function getGeneListColumn(geneListId, selectElement, addEmptyGeneLists) {
             {% endif %}
             };
 
-            console.log(data);
+            // console.log(data);
             populateGeneColumn(geneListId, data, className, saveGeneListFunc, closeButtonFunc);
         },
     });
@@ -868,18 +868,18 @@ function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
             let container = $("<div />");
             let geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
             container.append(geneTitle); 
-            let modeOfInheritance = evidence["ModeOfInheritance"];
+            let modeOfInheritance = evidence["mode_of_inheritance"];
             if (modeOfInheritance) {
                 mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
                 container.append(mohDiv);
             }
-            let penetrance = evidence["Penetrance"];
+            let penetrance = evidence["penetrance"];
             if (penetrance) {
                 penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
                 container.append(penetranceDiv);
             }
 
-            let evidences = evidence["Evidences"];
+            let evidences = evidence["evidence"];
             if (evidences) {
                 container.append($("<h3 />").text("Sources"));
                 evidencesUl = $("<ul />");
@@ -889,7 +889,7 @@ function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
                 container.append(evidencesUl);
             }
 
-            let phenotypes = evidence["Phenotypes"];
+            let phenotypes = evidence["phenotypes"];
             if (phenotypes) {
                 container.append($("<h3 />").text("Phenotypes"));
                 phenotypesUl = $("<ul />");
@@ -925,11 +925,13 @@ function addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer) {
 
 function addGeneEvidence(geneSymbol, evidence, geneContainer) {
     let evidenceDiv = $("<div />").addClass("evidence");
-    let confidence = evidence["LevelOfConfidence"];
+    let confidence = evidence["confidence_level"];
     addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv);
     if (confidence) {
+        const CONFIDENCE_CLASS = ["LowEvidence", "ModerateEvidence", "HighEvidence"]
+        let cssClass = CONFIDENCE_CLASS[parseInt(confidence)-1];
         // evidenceDiv.text(confidence[0]); // for colorblind??
-        evidenceDiv.addClass(confidence);
+        evidenceDiv.addClass(cssClass);
     }
     geneContainer.append(evidenceDiv);
 }
@@ -1691,11 +1693,14 @@ function panelAppCellInit(cell, gene_symbol) {
                 for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
                     let evidence = panelAppEvidenceResultsList[i];
                     addGeneEvidence(gene_symbol, evidence, newDiv);
-                    
-                    let diseaseName = evidence["SpecificDiseaseName"];
-                    //let confidence = evidence["LevelOfConfidence"];
-                    let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
-                    newDiv.append(diseaseSpan);
+
+                    let panel = evidence["panel"];
+                    if (panel) {
+                        let diseaseName = panel["name"];
+                        //let confidence = evidence["LevelOfConfidence"];
+                        let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
+                        newDiv.append(diseaseSpan);
+                    }
                 }
             }
             panelAppDiv.replaceWith(newDiv);
