@@ -176,21 +176,31 @@ If we want to use jqgrid cdn, works for half
 		});
 	}
 
-	function linkFormatter(cellvalue, options, rowObject) {
+	function linkFormatter(cellvalue, options, rowObject, iconCssClassList) {
         let kwargs = options.colModel.formatter_kwargs;
         let css_classes = ["icon24", "left", "margin-r-5"];
+        let icon_list = [];
         if (kwargs.icon_css_class) {
-            css_classes.push(kwargs.icon_css_class);
-        } else {
-            css_classes.push("view-details-link");
+            icon_list.push(kwargs.icon_css_class);
         }
-        let css_class = css_classes.join(" ");
+        if (typeof(iconCssClassList) !== 'undefined') {
+        	icon_list.push(...iconCssClassList);
+		}
+        if (icon_list.length === 0) {
+            icon_list.push("view-details-link");
+        }
+        let icons = "";
+        for (let i=0 ; i<icon_list.length; ++i) {
+        	let icon = icon_list[i];
+			let css_class = css_classes.concat(icon).join(" ");
+			icons += `<div class='${css_class}'></div>`;
+		}
         let urlObject = cellvalue;
         if (kwargs.url_object_column) {
             urlObject = rowObject[kwargs.url_object_column];
         }
         let url = Urls[kwargs.url_name](urlObject);
-        return "<a class='grid-link' href='" + url + "'><div class='" + css_class + "'></div><div class='display-text'>" + cellvalue + "</div></a>";
+        return `<a class='grid-link' href='${url}'>${icons}<div class='display-text'>${cellvalue}</div></a>`;
     }
 
     function timestampFormat(pk, a, rowData) {

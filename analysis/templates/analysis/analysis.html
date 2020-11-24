@@ -1,6 +1,7 @@
 {% extends "snpdb/base.html" %}
 {% comment %}Should get to work on extends "uicore/page/base.html"{% endcomment %}
 {% load static %}
+{% load tz %}
 {% load analysis_node_tags %}
 {% load js_tags %}
 {% load user_tag_color_tags %}
@@ -109,7 +110,6 @@
 
 		layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections, analysisReadOnly);
 		loadInitialGridEditor();
-		setLockedAnalysisWarningToolTip();
         setNumVariantTags(false);
         {% if analysis.analysistemplate %}
         setupAnalysisTemplateTopBar({{ analysis.analysistemplate.pk }});
@@ -168,15 +168,18 @@
                 <div id="node-types">{{ node_classes_form.node_types }}</div>
             {% endif %}
                 <div id="toolbar-buttons">
+                {% if analysis.is_locked %}
+                    <i title='Locked by: {{ analysis.last_lock.user }} on {{ analysis.last_lock.date|localtime }} ({{ analysis.last_lock.date|timesince }} ago)' class="left fa fa-lock fa-lg toolbar-button"></i>
+                {% endif %}
+
                 {% if warnings %}
-                    <img id='lock-input-sources-warning-icon' class="toolbar-button" src="{% static 'icons/warning.png' %}" />
-                    <div id='lock-input-sources-warning-tooltip' style='display: none'>
-                        <ul style='background-color: #FEBC00;'>
-                            {% for w in warnings %}
-                                <li>{{ w }}
-                            {% endfor %}
-                        </ul>
-                    </div>
+                    <img id='lock-input-sources-warning-icon' class="toolbar-button"
+                         src="{% static 'icons/warning.png' %}"
+                         title="<ul style='background-color: #FEBC00;'>{% for w in warnings %}<li>{{ w }}{% endfor %}}</ul>"
+                         data-toggle="tooltip"
+                         data-placement="bottom"
+                         data-html="true"
+                    />
                 {% endif %}
 
                 {% if has_write_permission %}

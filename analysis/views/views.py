@@ -607,7 +607,6 @@ def view_analysis_settings(request, analysis_id):
                "create_analysis_template_form": form,
                "new_analysis_settings": analysis_settings,
                "has_write_permission": analysis.can_write(request.user),
-               "last_lock": analysis.last_lock,
                "can_unlock": analysis.can_unlock(request.user)}
     return render(request, 'analysis/analysis_settings.html', context)
 

@@ -239,16 +239,6 @@ function setupNodeTypeSelect() {
 
 }
 
-
-function setLockedAnalysisWarningToolTip() {
-    let warningIcon = $('#lock-input-sources-warning-icon');
-    warningIcon.attr('title', $('#lock-input-sources-warning-tooltip').show().remove().html())
-    warningIcon.tooltip({
-        content : function() { return $(this).prop('title') },
-    });
-
-}
-
 function addVariantTag(variantId, nodeId, tagId, successFunc) {
     setVariantTag(variantId, nodeId, tagId, successFunc, 'add');
 }

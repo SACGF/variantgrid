@@ -51,6 +51,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def last_lock(self):
         return self.analysislock_set.order_by("pk").last()
 
+    def is_locked(self):
+        return self.last_lock and self.last_lock.locked
+
     def can_unlock(self, user):
         """ Use parent to see if we have Guardian permissions to write """
         return super().can_write(user)
@@ -200,14 +203,8 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         warnings = []
         if self.lock_input_sources:
             warnings.append("INPUT LOCKED - cannot create new input source nodes.")
-        if not self.can_write(user):
-            if self.last_lock and self.last_lock.locked:
-                locked_message = "LOCKED - you cannot modify it."
-                if self.can_unlock(user):
-                    locked_message += " Unlock in user settings"
-                warnings.append(locked_message)
-            else:
-                warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
+        if not self.can_write(user) and not self.is_locked():  # Locked has own icon, no need for warning
+            warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
         return warnings
 
 

@@ -2,7 +2,7 @@ import pandas as pd
 from typing import Dict, List, Tuple
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import Max
+from django.db.models import Max, F, Q
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
@@ -272,7 +272,7 @@ class VariantGrid(JqGridSQL):
 class AnalysesGrid(JqGridUserRowConfig):
     model = Analysis
     caption = 'Analyses'
-    fields = ["id", "name", "analysis_type", "description", "modified", "user__username"]
+    fields = ["id", "name", "analysis_type", "description", "modified", "user__username", "analysislock__locked"]
     colmodel_overrides = {
         'id': {"hidden": True},
         'name': {"width": 400,
@@ -283,21 +283,37 @@ class AnalysesGrid(JqGridUserRowConfig):
         "analysis_type": {"label": "Type"},
         "user__username": {'label': 'Created by'},
         "modified": {'label': 'Modified'},
+        "analysislock__locked": {"hidden": True},
     }
 
     def __init__(self, **kwargs):
         user = kwargs.get("user")
         super().__init__(user)
+        fields = self.get_field_names()
 
+        user_settings = UserSettings.get_for_user(user)
+        self.genome_builds = list(user_settings.get_genome_builds())
+        if len(self.genome_builds) > 1:
+            fields.append("genome_build")
         user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
-            queryset = Analysis.filter_for_user(user)
+            qs = Analysis.filter_for_user(user)
         else:
-            queryset = Analysis.objects.filter(user=user)
-        queryset = queryset.filter(visible=True, template_type__isnull=True)  # Hide templates
-        self.queryset = queryset.values(*self.get_field_names())
+            qs = Analysis.objects.filter(user=user)
+        qs = qs.filter(genome_build__in=self.genome_builds)
+        qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
+        q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
+        qs = qs.annotate(last_lock=Max("analysislock__pk")).filter(q_last_lock)
+        self.queryset = qs.values(*fields)
         self.extra_config.update({'sortname': 'modified',
                                   'sortorder': 'desc'})
+
+    def get_colmodels(self, remove_server_side_only=False):
+        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
+        if len(self.genome_builds) > 1:
+            extra = {'index': 'genome_build', 'name': 'genome_build', 'label': 'Genome Build', 'sorttype': 'str'}
+            colmodels.append(extra)
+        return colmodels
 
 
 class AnalysisTemplatesGrid(JqGridUserRowConfig):

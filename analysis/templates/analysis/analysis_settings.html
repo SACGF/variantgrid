@@ -105,10 +105,10 @@
         {% if has_write_permission %}
 		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-nodes-button' type='button'>Force Reload Nodes</button>
 		    <button class="btn btn-outline-danger fas fa-lock" id='lock-analysis-button' type='button'>Lock Analysis</button>
-        {% elif last_lock.locked %}
+        {% elif analysis.is_locked %}
             <div>
                 <span id="lock-details">
-                    <b>Locked by:</b> {{ last_lock.user }} on {{ last_lock.date|localtime }} ({{ last_lock.date|timesince }} ago)
+                    <b>Locked by:</b> {{ analysis.last_lock.user }} on {{ analysis.last_lock.date|localtime }} ({{ analysis.last_lock.date|timesince }} ago)
                 </span>
                 {% if can_unlock %}
                 <button class="btn btn-outline-danger fas fa-unlock" id='unlock-analysis-button' type='button'>Unlock Analysis</button>

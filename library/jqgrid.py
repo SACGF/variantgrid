@@ -506,7 +506,7 @@ class JqGrid:
 
     def get_field_names(self):
         """ Returns self.fields if set, otherwise model fields """
-        fields = self.fields
+        fields = list(self.fields)  # So caller won't modify internals
         if not fields:
             fields = [f.name for f in self.get_model()._meta.local_fields]
         return fields
