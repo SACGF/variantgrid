@@ -5,6 +5,13 @@
     }
 </style>
 <div>
+    <div><b>NodeCache:</b>
+        {% if node.node_cache %}
+            {{ node.node_cache }}
+        {% else %}
+            N/A
+        {% endif %}
+    </div>
     <code>{{ node_data|jsonify_pretty }}</code>
 </div>
 
