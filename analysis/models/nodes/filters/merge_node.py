@@ -1,7 +1,7 @@
 import logging
 import operator
 from functools import reduce
-from typing import Optional, Set
+from typing import Optional, Set, Iterable
 
 from django.db.models import Q
 
@@ -38,7 +38,7 @@ class MergeNode(AnalysisNode):
 
     @lazy
     def _num_unique_parents_in_queryset(self):
-        return len(set(p.get_q() for p in self.get_non_empty_parents()))
+        return len(set(p.get_q() for p in self.get_non_empty_parents(require_parents_ready=False)))
 
     def get_single_parent(self):
         """ Override so we can use get_grid_node_id_and_version
@@ -53,7 +53,7 @@ class MergeNode(AnalysisNode):
         return super().get_single_parent()  # Will throw exception due to multiple samples
 
     @lazy
-    def _unique_parent_q_set(self) -> Set[Q]:
+    def _unique_parent_q_set(self) -> Iterable[Q]:
         """ Set to not duplicate Q's (eg from node that doesn't modify parents and that node's parent) """
         parent_variant_collection_ids = set()
         unique_parent_q_set = set()
@@ -65,8 +65,14 @@ class MergeNode(AnalysisNode):
 
         if parent_variant_collection_ids:
             variants_from_cache_qs = VariantCollectionRecord.objects.filter(
-                variant_collection__in=parent_variant_collection_ids)
+                variant_collection__in=sorted(parent_variant_collection_ids))  # Sort so Q object strings hash the same
             unique_parent_q_set.add(Q(pk__in=variants_from_cache_qs.values_list("variant_id")))
+
+        # Q objects for the same ultimate query don't hash the same, so remove duplicates via string equality
+        # This can save a distinct
+        if len(unique_parent_q_set) > 1:
+            q_by_string = {str(q): q for q in unique_parent_q_set}
+            return q_by_string.values()
         return unique_parent_q_set
 
     def get_parent_q(self):
