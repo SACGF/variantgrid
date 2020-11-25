@@ -868,47 +868,41 @@ function setCellText(tr, geneListClass, value) {
     col.text(value);
 }
 
-function addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv) {
-    evidenceDiv.attr("title", ""); // need to add empty for tooltip to show
-    evidenceDiv.tooltip({
-        tooltipClass: 'evidence-tooltip', 
-        content: function() {
-            let container = $("<div />");
-            let geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
-            container.append(geneTitle); 
-            let modeOfInheritance = evidence["mode_of_inheritance"];
-            if (modeOfInheritance) {
-                mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
-                container.append(mohDiv);
-            }
-            let penetrance = evidence["penetrance"];
-            if (penetrance) {
-                penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
-                container.append(penetranceDiv);
-            }
+function getEvidenceHover(geneSymbol, evidence, confidence) {
+    let container = $("<div />");
+    let geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
+    container.append(geneTitle);
+    let modeOfInheritance = evidence["mode_of_inheritance"];
+    if (modeOfInheritance) {
+        mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
+        container.append(mohDiv);
+    }
+    let penetrance = evidence["penetrance"];
+    if (penetrance) {
+        penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
+        container.append(penetranceDiv);
+    }
 
-            let evidences = evidence["evidence"];
-            if (evidences) {
-                container.append($("<h3 />").text("Sources"));
-                evidencesUl = $("<ul />");
-                for (let i=0 ; i<evidences.length ; ++i) {
-                    evidencesUl.append($("<li />").text(evidences[i]));
-                }
-                container.append(evidencesUl);
-            }
+    let evidences = evidence["evidence"];
+    if (evidences) {
+        container.append($("<h3 />").text("Sources"));
+        evidencesUl = $("<ul />");
+        for (let i=0 ; i<evidences.length ; ++i) {
+            evidencesUl.append($("<li />").text(evidences[i]));
+        }
+        container.append(evidencesUl);
+    }
 
-            let phenotypes = evidence["phenotypes"];
-            if (phenotypes) {
-                container.append($("<h3 />").text("Phenotypes"));
-                phenotypesUl = $("<ul />");
-                for (let i=0 ; i<phenotypes.length ; ++i) {
-                    phenotypesUl.append($("<li />").text(phenotypes[i]));
-                }
-                container.append(phenotypesUl);
-            }
-            return container;                       
-        },
-    });
+    let phenotypes = evidence["phenotypes"];
+    if (phenotypes) {
+        container.append($("<h3 />").text("Phenotypes"));
+        phenotypesUl = $("<ul />");
+        for (let i=0 ; i<phenotypes.length ; ++i) {
+            phenotypesUl.append($("<li />").text(phenotypes[i]));
+        }
+        container.append(phenotypesUl);
+    }
+    return container;
 }
 
 function addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer) {
@@ -932,9 +926,10 @@ function addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer) {
 }
 
 function addGeneEvidence(geneSymbol, evidence, geneContainer) {
-    let evidenceDiv = $("<div />").addClass("evidence");
+    let evidenceDiv = $("<div />").addClass("evidence hover-detail");
     let confidence = evidence["confidence_level"];
-    addEvidenceToolTip(geneSymbol, evidence, confidence, evidenceDiv);
+    let evidenceHover = getEvidenceHover(geneSymbol, evidence, confidence);
+    evidenceDiv.attr("data-content", evidenceHover.html());
     if (confidence) {
         const CONFIDENCE_CLASS = ["LowEvidence", "ModerateEvidence", "HighEvidence"]
         let cssClass = CONFIDENCE_CLASS[parseInt(confidence)-1];
