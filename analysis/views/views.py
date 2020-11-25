@@ -282,7 +282,7 @@ def node_debug(request, node_id, version_id, extra_filters):
     serializer = node_serializers.get(model_name, AnalysisNodeSerializer)
 
     context = {"node": node,
-               "node_data": serializer(node).data}
+               "node_data": dict(sorted(serializer(node).data.items()))}
     if node.valid:
         grid = VariantGrid(request.user, node, extra_filters)
         try:

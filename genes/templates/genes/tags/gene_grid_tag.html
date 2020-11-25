@@ -87,12 +87,20 @@ table#gene-grid tr {
     float: left;
 }
 
-.panel-app-icon {
+.panel-app-england-icon {
     width: 60px;
     height: 40px;
     background-size: 60px 40px;
     background-image: url({% static 'images/panel_app.png' %});
 }
+
+.panel-app-australia-icon {
+    width: 42px;
+    height: 40px;
+    background-size: 40px 42px;
+    background-image: url({% static 'images/panel_app_australia_icon.png' %});
+}
+
 
 .enrichment-kit-icon {
     background-image: url({% static 'icons/sequencing_capture.png' %});
@@ -2190,7 +2198,7 @@ $(document).ready(function() {
             addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
         }
     });
-    
+
     $('select', ".pathology-test-form").change(function() {
         changePathologyTestForm(this);
     });
@@ -2200,8 +2208,8 @@ $(document).ready(function() {
             addAndRetrievePathologyTestVersionColumnIfNotExists(pathologyTestVersionId, this);
         }
     });
-    
-    
+
+
     $('#id_enrichment_kit').change(function() {
         let enrichmentKitId = $(this).val();
         if (enrichmentKitId) {
@@ -2216,14 +2224,16 @@ $(document).ready(function() {
         }
     });
 
-    $('#id_panel_app_panel').change(function() {
-        let PANEL_APP_PREFIX = "panel-app-";
-        let panel_app_panel_id = $(this).val();
-        if (panel_app_panel_id) {
-            let geneListId = PANEL_APP_PREFIX + panel_app_panel_id;
-            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
-        }
-    });
+    {% for form_id in panel_app_form_ids %}
+        $('#{{ form_id }}').change(function() {
+            let PANEL_APP_PREFIX = "panel-app-";
+            let panel_app_panel_id = $(this).val();
+            if (panel_app_panel_id) {
+                let geneListId = PANEL_APP_PREFIX + panel_app_panel_id;
+                addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
+            }
+        });
+    {% endfor %}
     
     $('#id_lab').change(function() {
         let labId = $(this).val();

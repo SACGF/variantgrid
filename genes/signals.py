@@ -3,12 +3,15 @@ import logging
 
 from annotation.models.models import CachedWebResource
 from genes.models import GeneListCategory
-from genes.tasks.cached_web_resource_tasks import PanelAppPanelsWebResourceTask, GnomADGeneConstraintWebResourceTask, \
-    PfamWebResourceTask
+from genes.tasks.cached_web_resource_tasks import PanelAppEnglandPanelsWebResourceTask, \
+    PanelAppAustraliaPanelsWebResourceTask, GnomADGeneConstraintWebResourceTask, PfamWebResourceTask
 
 # For some reason this doesn't work as a variable, has to be stored here...
-panel_app_panels_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_PANEL_APP_PANELS,
-                                                                             PanelAppPanelsWebResourceTask)
+panel_app_england_panels_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
+                                                                                     PanelAppEnglandPanelsWebResourceTask)
+
+panel_app_australia_panels_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS,
+                                                                                       PanelAppAustraliaPanelsWebResourceTask)
 
 gnomad_gene_constraint_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
                                                                                    GnomADGeneConstraintWebResourceTask)

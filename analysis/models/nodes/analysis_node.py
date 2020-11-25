@@ -189,6 +189,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         task_args_objs_set = set()
         if self.is_valid() and (force_cache or self.use_cache):
+            if parent := self.get_unmodified_single_parent_node():
+                return parent.get_cache_task_args_objs_set(force_cache=force_cache)
+
             node_cache, created = NodeCache.get_or_create_for_node(self)
             if created:
                 task_args_objs_set.add((self.NODE_CACHE_TASK, (self.pk, self.version), node_cache))
@@ -356,6 +359,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     @lazy
     def node_cache(self) -> Optional['NodeCache']:
+        if parent := self.get_unmodified_single_parent_node():
+            return parent.node_cache
         return NodeCache.objects.filter(node_version=self.node_version,
                                         variant_collection__status=ProcessingStatus.SUCCESS).first()
 
@@ -600,6 +605,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Can overwrite and set to False to use parent counts """
         return True
 
+    def get_unmodified_single_parent_node(self) -> Optional['AnalysisNode']:
+        """ If a node doesn't modify single parent - can use that in some places to re-use cache """
+        if self.is_valid() and self.has_input() and not self.modifies_parents():
+            try:
+                return self.get_single_parent()
+            except ValueError:
+                pass
+        return None
+
     def get_cached_label_count(self, label):
         """ Override for optimisation """
 
@@ -623,13 +637,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Uses parent node_id/version if possible to re-use cache """
         node_id = self.pk
         version = self.version
-        try:
-            if not self.modifies_parents():
-                parent = self.get_single_parent()
-                node_id, version = parent.get_grid_node_id_and_version()
-        except:
-            pass
-
+        if parent := self.get_unmodified_single_parent_node():
+            node_id, version = parent.get_grid_node_id_and_version()
         return node_id, version
 
     def node_counts(self):
