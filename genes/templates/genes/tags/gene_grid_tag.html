@@ -7,8 +7,10 @@
 {% load crispy_forms_field %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/panel_app.js' %}"></script>
 <link href="{% static 'css/companies.css' %}" rel="stylesheet">
 <link href="{% static 'css/pathology_tests.css' %}" rel="stylesheet">
+<link href="{% static 'css/panel_app.css' %}" rel="stylesheet">
 <style>
 table#gene-grid {
     border-collapse: collapse;
@@ -87,21 +89,6 @@ table#gene-grid tr {
     float: left;
 }
 
-.panel-app-england-icon {
-    width: 60px;
-    height: 40px;
-    background-size: 60px 40px;
-    background-image: url({% static 'images/panel_app.png' %});
-}
-
-.panel-app-australia-icon {
-    width: 42px;
-    height: 40px;
-    background-size: 40px 42px;
-    background-image: url({% static 'images/panel_app_australia_icon.png' %});
-}
-
-
 .enrichment-kit-icon {
     background-image: url({% static 'icons/sequencing_capture.png' %});
 }
@@ -145,30 +132,6 @@ table#gene-grid tr {
 
 table#gene-grid .clingen {
     width: 400px;
-}
-
-.evidence {
-    width: 10px;
-    height: 10px;
-    margin: 2px;
-    display: inline-block;
-}
-
-.HighEvidence {
-    background-color: rgb(63, 173, 70);
-}
-
-.ModerateEvidence {
-    background-color: rgb(240, 173, 78);
-}
-
-.LowEvidence {
-    background-color: rgb(217, 83, 79);
-}
-
-.evidence-tooltip {
-    max-width: auto;
-    max-height: auto;
 }
 
 tr.gene-type-alias {
@@ -872,42 +835,6 @@ function setCellText(tr, geneListClass, value) {
     col.text(value);
 }
 
-function getEvidenceHover(geneSymbol, evidence, confidence) {
-    let container = $("<div />");
-    let geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
-    container.append(geneTitle);
-    let modeOfInheritance = evidence["mode_of_inheritance"];
-    if (modeOfInheritance) {
-        mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
-        container.append(mohDiv);
-    }
-    let penetrance = evidence["penetrance"];
-    if (penetrance) {
-        penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
-        container.append(penetranceDiv);
-    }
-
-    let evidences = evidence["evidence"];
-    if (evidences) {
-        container.append($("<h3 />").text("Sources"));
-        evidencesUl = $("<ul />");
-        for (let i=0 ; i<evidences.length ; ++i) {
-            evidencesUl.append($("<li />").text(evidences[i]));
-        }
-        container.append(evidencesUl);
-    }
-
-    let phenotypes = evidence["phenotypes"];
-    if (phenotypes) {
-        container.append($("<h3 />").text("Phenotypes"));
-        phenotypesUl = $("<ul />");
-        for (let i=0 ; i<phenotypes.length ; ++i) {
-            phenotypesUl.append($("<li />").text(phenotypes[i]));
-        }
-        container.append(phenotypesUl);
-    }
-    return container;
-}
 
 function addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer) {
     let htmlByGene = geneListDataById[geneListId]["gene_html"];
@@ -929,19 +856,6 @@ function addGeneEvidenceForGeneList(geneListId, geneSymbol, geneContainer) {
     }
 }
 
-function addGeneEvidence(geneSymbol, evidence, geneContainer) {
-    let evidenceDiv = $("<div />").addClass("evidence hover-detail");
-    let confidence = evidence["confidence_level"];
-    let evidenceHover = getEvidenceHover(geneSymbol, evidence, confidence);
-    evidenceDiv.attr("data-content", evidenceHover.html());
-    if (confidence) {
-        const CONFIDENCE_CLASS = ["LowEvidence", "ModerateEvidence", "HighEvidence"]
-        let cssClass = CONFIDENCE_CLASS[parseInt(confidence)-1];
-        // evidenceDiv.text(confidence[0]); // for colorblind??
-        evidenceDiv.addClass(cssClass);
-    }
-    geneContainer.append(evidenceDiv);
-}
 
 function setCellGene(tr, geneListId, geneListClass, geneSymbol, geneClickHandler) {
     if (!geneClickHandler) {
@@ -1686,41 +1600,9 @@ function clinGenCellInit(cell, gene_symbol) {
     });
 }
 
-function panelAppCellInit(cell, server_id, gene_symbol) {
-    let panelAppDiv = $("<div />").addClass("loading");
+function panelAppCellInit(cell, server_id, geneSymbol) {
+    let panelAppDiv = getPanelAppGeneEvidenceDiv(server_id, geneSymbol);
     cell.append(panelAppDiv);
-    // make API call and when done - replace with this
-
-    $.ajax({
-        type: "GET",
-        url: Urls.api_panel_app_gene_evidence(server_id, gene_symbol),
-        success: function(panelAppEvidenceResultsList) {
-            let newDiv = $("<div />");           
-            if (panelAppEvidenceResultsList) {
-                for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
-                    let evidence = panelAppEvidenceResultsList[i];
-                    addGeneEvidence(gene_symbol, evidence, newDiv);
-
-                    let panel = evidence["panel"];
-                    if (panel) {
-                        let diseaseName = panel["name"];
-                        //let confidence = evidence["LevelOfConfidence"];
-                        let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
-                        newDiv.append(diseaseSpan);
-                    }
-                }
-            }
-            panelAppDiv.replaceWith(newDiv);
-        },
-        error: function(qXHR, textStatus, errorThrown) {
-            let errorText = "Failed...";
-            if (qXHR.status == 404) {
-                errorText = "No found";
-            }
-            let newDiv = $("<div />").text(errorText);
-            panelAppDiv.replaceWith(newDiv);
-        }
-    });
 }
 
 ///////

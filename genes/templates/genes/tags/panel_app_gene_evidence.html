@@ -1,0 +1,30 @@
+{% load static %}
+<style>
+.column-icon {
+    width: 40px;
+    height: 40px;
+    background-size: 40px 40px;
+    margin: 5px;
+    float: left;
+}
+</style>
+<link href="{% static 'css/panel_app.css' %}" rel="stylesheet">
+<script type="text/javascript" src="{% static 'js/panel_app.js' %}"></script>
+<script>
+$(document).ready(function() {
+    let panelAppId = "#panel-app-{{ server.pk }}-gene-evidence";
+    $(panelAppId).append(getPanelAppGeneEvidenceDiv({{ server.pk }}, "{{ gene_symbol }}"));
+});
+</script>
+<div class='gene-disease card'>
+    <div class="card-header">
+        {{ server.name }}
+    </div>
+    <div class="card-body card-body-list">
+        <a href="{{ server.url }}/panels/entities/{{ gene_symbol }}">
+            <div class="column-icon {{ server.icon_css_class }}"></div>
+        </a>
+        <div id="panel-app-{{ server.pk }}-gene-evidence">
+        </div>
+    </div>
+</div>

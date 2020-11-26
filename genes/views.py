@@ -29,7 +29,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
-    PfamSequenceIdentifier, gene_symbol_withdrawn_str
+    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
@@ -202,6 +202,7 @@ def view_gene_symbol(request, gene_symbol):
         "gene_level_columns": gene_level_columns,
         "genome_build": genome_build,
         "has_classified_variants": has_classified_variants,
+        "panel_app_servers": PanelAppServer.objects.order_by("pk"),
         "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
         "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
         "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
