@@ -328,8 +328,8 @@ def node_data_grid(request, analysis_version, node_id, node_version, extra_filte
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_column_summary(request, analysis_version, node_id, version_id, extra_filters, grid_column_name, significant_figures):
-    node = get_node_subclass_or_404(request.user, node_id, version=version_id)
+def node_column_summary(request, analysis_version, node_id, node_version, extra_filters, grid_column_name, significant_figures):
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
 
     grid = VariantGrid(request.user, node, extra_filters)
     cm = grid.get_column_colmodel(grid_column_name)
@@ -338,7 +338,7 @@ def node_column_summary(request, analysis_version, node_id, version_id, extra_fi
     quantitative = sorttype in ['float', 'int']
 
     context = {"node_id": node.id,
-               "version_id": node.version,
+               "node_version": node.version,
                "extra_filters": extra_filters}
 
     if quantitative:

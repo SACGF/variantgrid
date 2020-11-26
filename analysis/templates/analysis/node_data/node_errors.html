@@ -6,7 +6,7 @@
 	on_error_function(errors);
 
     {% if node_id %}
-    var node_view_url = "{% url 'node_view' analysis_version node_id version_id extra_filters %}";
+    var node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
     load_node_editor(node_view_url);
     {% endif %}
 
