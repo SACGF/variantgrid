@@ -17,7 +17,7 @@
             var nodeId = nodeStatus.id;
             var version = nodeStatus.version;
 
-            var grid_url = Urls.node_grid_config(nodeId, version, "default");
+            var grid_url = Urls.node_grid_config({{ analysis.version }}, nodeId, version, "default");
             var unique_code = "sample-variants-grid";  // ok to be constant on this page
             function noOp() {};
             setupGrid(grid_url, nodeId, version, unique_code, noOp, gridLoadError, on_error_function);

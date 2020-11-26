@@ -165,6 +165,15 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
             raise forms.ValidationError(msg)
         return ccc
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if any(f in self.changed_data for f in Analysis.VERSION_BUMP_FIELDS):
+            instance.version += 1
+
+        if commit:
+            instance.save()
+        return instance
+
 
 class ColumnSummaryForm(forms.Form):
     column = forms.ChoiceField()

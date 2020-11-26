@@ -471,10 +471,10 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         "Percent": {"formatter": "number"},
     }
 
-    def __init__(self, user, node_id, version_id, extra_filters, variant_column, significant_figures):
+    def __init__(self, user, node_id, node_version, extra_filters, variant_column, significant_figures):
         super().__init__()
 
-        self.node = get_node_subclass_or_404(user, node_id, version=version_id)
+        self.node = get_node_subclass_or_404(user, node_id, version=node_version)
         grid = VariantGrid(user, self.node, extra_filters)
         cm = grid.get_column_colmodel(variant_column)
         grid_column_name = cm["label"]

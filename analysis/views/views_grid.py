@@ -30,8 +30,8 @@ class NodeGridHandler(NodeJSONGetView):
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
 class NodeGridConfig(NodeJSONGetView):
 
-    def _get_data(self, request, node_id, version_id, extra_filters):
-        node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=version_id)
+    def _get_data(self, request, analysis_version, node_id, node_version, extra_filters):
+        node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=node_version)
         errors = node.get_errors()
 
         if errors:
