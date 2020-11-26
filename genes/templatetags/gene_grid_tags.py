@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.db.models.query_utils import Q
 from django.template import Library
-from django.utils.text import slugify
 
 from annotation.forms import HPOSynonymForm, MIMAliasForm
 from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, GeneSymbolForm, \
@@ -88,8 +87,9 @@ def gene_grid(context, columns_from_url=None,
         category["form_css_class"] = "category-gene-list-form"
         categories.append(category)
 
+    panel_app_servers = list(PanelAppServer.objects.all().order_by("pk"))
     panel_app_form_ids = []
-    for server in PanelAppServer.objects.all().order_by("pk"):
+    for server in panel_app_servers:
         description = f"{server.name} Panel"
         prefix = f"server-{server.pk}"
         panel_app_form = panel_app_server_autocomplete_form_factory(server=server, prefix=prefix,
@@ -144,6 +144,7 @@ def gene_grid(context, columns_from_url=None,
             "close_button_callback": close_button_callback,
             "data_columns": data_columns,
             "categories": categories,
+            "panel_app_servers": panel_app_servers,
             "panel_app_form_ids": panel_app_form_ids,
             "has_gene_info": has_gene_info,
             "gene_symbol_form": GeneSymbolForm(),

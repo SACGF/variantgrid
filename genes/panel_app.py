@@ -11,14 +11,13 @@ from genes.serializers import GeneListGeneSymbolSerializer
 
 
 PANEL_APP_PREFIX = "panel-app-"
-PANEL_APP_BASE_URL = "https://panelapp.genomicsengland.co.uk"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
 PANEL_APP_GET_PANEL_API_BASE_PATH = "/api/v1/panels/"
 PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
 
 
-def get_panel_app_results_by_gene_symbol_json(gene_symbol):
-    url = PANEL_APP_BASE_URL + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
+def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol):
+    url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
     r = requests.get(url)
     data = r.json()
     return data.get("results")
@@ -69,12 +68,12 @@ def get_panel_app_panel_as_gene_list_json(gene_list_id, panel_app_panel_id):
     return data
 
 
-def store_panel_app_panels_from_web(panel_app_server: PanelAppServer, cached_web_resource: CachedWebResource):
+def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource: CachedWebResource):
     """ Used to build autocomplete list """
 
     # Now uses paging
     num_panels = 0
-    url = panel_app_server.url + PANEL_APP_LIST_PANELS_PATH
+    url = server.url + PANEL_APP_LIST_PANELS_PATH
     while url:
         logging.debug("Calling %s", url)
         r = requests.get(url)
@@ -83,7 +82,7 @@ def store_panel_app_panels_from_web(panel_app_server: PanelAppServer, cached_web
 
         for result in data["results"]:
             num_panels += 1
-            pap = PanelAppPanel.objects.create(server=panel_app_server,
+            pap = PanelAppPanel.objects.create(server=server,
                                                panel_id=result['id'],
                                                cached_web_resource=cached_web_resource,
                                                disease_group=result['disease_group'],

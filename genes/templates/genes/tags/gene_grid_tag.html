@@ -252,10 +252,14 @@ const EVIDENCE_COLUMN_INFO = {
         "icon": "clingen-icon",
         "initFunc": clinGenCellInit,
     },
-    "panelapp": {
-        "icon": "panel-app-icon",
-        "initFunc": panelAppCellInit,
+{% for server in panel_app_servers %}
+    "panelapp-{{ server.pk }}": {
+        "icon": "{{ server.icon_css_class }}",
+        "initFunc": function(cell, gene_symbol) {
+            panelAppCellInit(cell, {{ server.pk }}, gene_symbol);
+        },
     },
+{% endfor %}
 };
 
 const ENRICHMENT_KIT_COLUMNS = {{ ENRICHMENT_KIT_COLUMNS | jsonify }};
@@ -1682,14 +1686,14 @@ function clinGenCellInit(cell, gene_symbol) {
     });
 }
 
-function panelAppCellInit(cell, gene_symbol) {
+function panelAppCellInit(cell, server_id, gene_symbol) {
     let panelAppDiv = $("<div />").addClass("loading");
     cell.append(panelAppDiv);
     // make API call and when done - replace with this
 
     $.ajax({
         type: "GET",
-        url: Urls.api_panel_app_gene_evidence(gene_symbol),
+        url: Urls.api_panel_app_gene_evidence(server_id, gene_symbol),
         success: function(panelAppEvidenceResultsList) {
             let newDiv = $("<div />");           
             if (panelAppEvidenceResultsList) {
@@ -2344,14 +2348,16 @@ $(document).ready(function() {
             </label>
             </div>
         {% endlabelled %}
+{% for server in panel_app_servers %}
         {% labelled %}
             <div class="form-check">
             <label class="form-check-label">
-                <input id="panelapp-evidence-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="panelapp" />
-                <div class="column-icon panel-app-icon"></div>
+                <input id="panelapp-evidence-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="panelapp-{{ server.pk }}" />
+                <div class="column-icon {{ server.icon_css_class }}"></div>
             </label>
             </div>
         {% endlabelled %}
+{% endfor %}
         {% labelled %}
             <div class="form-check">
             <label class="form-check-label">

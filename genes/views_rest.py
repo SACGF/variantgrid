@@ -16,7 +16,7 @@ from annotation.models.models_mim_hpo import HPOSynonym, MIMMorbidAlias, \
     HumanPhenotypeOntology, MIMMorbid
 from genes.gene_matching import GeneSymbolMatcher, GeneMatcher
 from genes.models import GeneInfo, GeneList, FakeGeneList, GeneListGeneSymbol, GeneSymbol, GeneAnnotationRelease, \
-    ReleaseGeneSymbolGene
+    ReleaseGeneSymbolGene, PanelAppServer
 from genes.panel_app import PANEL_APP_PREFIX, get_panel_app_panel_as_gene_list_json
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json
 from genes.serializers import GeneInfoSerializer, GeneListGeneSymbolSerializer, GeneListSerializer, \
@@ -162,8 +162,10 @@ class PanelAppGeneEvidenceView(APIView):
 
     @method_decorator(cache_page(WEEK_SECS))
     def get(self, request, *args, **kwargs):
+        server_id = self.kwargs['server_id']
         gene_symbol = self.kwargs['gene_symbol']
-        data = get_panel_app_results_by_gene_symbol_json(gene_symbol)
+        server = PanelAppServer.objects.get(pk=server_id)
+        data = get_panel_app_results_by_gene_symbol_json(server, gene_symbol)
         if data is None:
             raise Http404(f"PanelApp has no results for '{gene_symbol}'")
         return Response(data)
