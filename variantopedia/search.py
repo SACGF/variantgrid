@@ -25,7 +25,7 @@ from patients.models import ExternalPK, Patient
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, \
-    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab
+    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, Allele
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
 from classification.models.classification import ClassificationModification, \
@@ -384,7 +384,7 @@ class Searcher:
         return results
 
 
-VARIANT_SEARCH_RESULTS = Optional[Union[Iterable[Union[ClassifyVariant, Variant, CreateManualVariant, SearchResult]], QuerySet]]
+VARIANT_SEARCH_RESULTS = Optional[Union[Iterable[Union[ClassifyVariant, Allele, Variant, CreateManualVariant, SearchResult]], QuerySet]]
 
 
 def get_visible_variants(user: User, genome_build: GenomeBuild) -> VARIANT_SEARCH_RESULTS:
@@ -635,7 +635,11 @@ def search_classification(search_string: str, user: User, **kwargs) -> Iterable[
 def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
     if ClinGenAllele.looks_like_id(search_string):
         clingen_allele = get_clingen_allele(search_string)
-        variant_qs = variant_qs.filter(variantallele__allele__clingen_allele=clingen_allele)
+        if settings.PREFER_ALLELE_LINKS:
+            return [clingen_allele.allele]
+
+        variant_qs = variant_qs.filter(variantallele__allele__clingen_allele=clingen_allele,
+                                       variantallele__genome_build=genome_build)
         if variant_qs.exists():
             return variant_qs
         variant_string = clingen_allele.get_variant_string(genome_build)
