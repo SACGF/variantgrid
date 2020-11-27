@@ -126,9 +126,12 @@ class LocalTabContent(template.Node):
             builder = TabBuilder()
             context[tab_key] = builder
 
+        tab_number = len(builder.tabs)
         content: str = self.nodelist.render(context)
         if content.startswith('/'):
-            builder.tabs.append(TabBuilderTab(tab_id=tab_id, label=label, resolved_url=content))
+            builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
+                                              tab_id=tab_id, label=label, resolved_url=content))
         else:
-            builder.tabs.append(TabBuilderTab(tab_id=tab_id, label=label, content=content))
+            builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
+                                              tab_id=tab_id, label=label, content=content))
         return ""

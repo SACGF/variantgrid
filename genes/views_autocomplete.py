@@ -14,9 +14,12 @@ class PanelAppPanelAutocompleteView(AutocompleteView):
     fields = ['name']
 
     def get_user_queryset(self, user):
-        server_id = self.forwarded.get('server_id')
-        server = PanelAppServer.objects.get(pk=server_id)
-        return PanelAppPanel.objects.filter(server=server)
+        server_id = self.forwarded.get('server_id', None)
+        qs = PanelAppPanel.objects.all()
+        if server_id:
+            server = PanelAppServer.objects.get(pk=server_id)
+            qs = qs.filter(server=server)
+        return qs
 
 
 @method_decorator(cache_page(WEEK_SECS), name='dispatch')
