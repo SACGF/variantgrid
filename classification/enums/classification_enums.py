@@ -68,6 +68,7 @@ class SpecialEKeys:
 
     # used for Clinvar export
     AFFECTED_STATUS = 'affected_status'
+    MODE_OF_INHERITANCE = 'mode_of_inheritance'
     ORIGIN = 'origin'
     OWNER = 'owner'
     SOURCE_ID = 'source_id'

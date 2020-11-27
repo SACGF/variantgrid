@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import enum
+import itertools
 import logging
 from datetime import datetime
 from typing import List, Dict, Optional
@@ -43,7 +44,8 @@ class RichColumn:
                  default_sort: Optional[SortOrder] = None,
                  client_renderer: Optional[str] = None,
                  detail: bool = False,
-                 css_class: str = None):
+                 css_class: str = None,
+                 extra_columns: Optional[List[str]] = None):
         """
         :param key: A column name to be retrieved and returned and sorted on
         :param name: A name to be shared between both client and server for this value
@@ -56,6 +58,7 @@ class RichColumn:
         :param client_renderer: JavaScript function to render the client
         :param detail: If True, the column will be shown in the expand section of the table only (requires responsive)
         :param css_class: css class to apply to the column
+        :param extra_columns: other columns that need to be selected out for the server renderer
         """
         self.key = key
         self.sort_keys = sort_keys
@@ -71,6 +74,7 @@ class RichColumn:
         self.enabled = enabled
         self.detail = detail
         self.css_class = css_class
+        self.extra_columns = extra_columns
 
     @property
     def css_classes(self) -> str:
@@ -85,11 +89,19 @@ class RichColumn:
         sdir = '-' if desc else ''
         return [f'{sdir}{key}' for key in use_keys]
 
+    @property
+    def value_columns(self) -> List[str]:
+        columns = list()
+        if key := self.key:
+            columns.append(key)
+        if self.extra_columns:
+            columns += self.extra_columns
+        return columns
+
     def __eq__(self, other):
         if isinstance(other, RichColumn):
             return self.name == other.name
         return False
-
 
 class DatatableConfig:
     """
@@ -101,10 +113,12 @@ class DatatableConfig:
     """
 
     rich_columns: List[RichColumn]  # columns for display
+
+    # DEPRECATED use extra_columns in the individual columns instead
     extra_columns: List[str] = []  # bonus columns to retrieve from the database
 
     def value_columns(self) -> List[str]:
-        column_names = [rc.key for rc in self.rich_columns if rc.key]
+        column_names = list(itertools.chain(*[rc.value_columns for rc in self.rich_columns if rc.enabled]))
         all_columns = list(set(column_names + self.extra_columns))
         return all_columns
 
@@ -322,3 +336,11 @@ class DatatableMixin(object):
 
 class BaseDatatableView(DatatableMixin, JSONResponseView):
     pass
+
+
+class DatabasetableView(BaseDatatableView):
+
+    column_class = None
+
+    def config_for_request(self, request):
+        return self.column_class(request)

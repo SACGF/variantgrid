@@ -1,10 +1,11 @@
 import csv
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import AutoField, ForeignKey
 from django.http import HttpResponse
 from guardian.admin import GuardedModelAdmin
 
+from classification.models.clinvar_export_models import ClinVarExport
 from snpdb import models
 from snpdb.models import Allele
 from snpdb.models.models_genome import GenomeBuild
@@ -31,7 +32,7 @@ class AdminExportCsvMixin:
     def _get_readonly_fields(self, request, obj=None):
         readonly = []
         for f in self.model._meta.fields:
-            if isinstance(f, (AutoField, ForeignKey)):
+            if isinstance(f, (AutoField, ForeignKey)) or f.name in ("created","modified"):
                 readonly.append(f.name)
         return readonly
 
@@ -76,7 +77,17 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
             allele.validate()
 
     validate.short_description = 'Validate'
-    actions = ["export_as_csv", validate]
+
+    def prepare_clinvar(self, request, queryset):
+        allele: Allele
+        for allele in queryset:
+            updated = ClinVarExport.sync_allele(allele=allele)
+            self.message_user(request, message=f'Changes to ClinvarExports for allele {allele.id} - {updated}',
+                              level=messages.INFO)
+
+    prepare_clinvar.short_description = 'ClinVar Export Prepare'
+
+    actions = ["export_as_csv", validate, prepare_clinvar]
     search_fields = ('id', 'clingen_allele__id')
     # flag collection and clingen allele blow up as drop downs as there's so many choices in them
     fieldsets = (

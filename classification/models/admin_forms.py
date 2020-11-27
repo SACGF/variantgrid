@@ -494,3 +494,9 @@ class ConditionAliasAdmin(ModelAdminBasics):
     auto_match.short_description = "Attempt auto match"
 
     actions = ["export_as_csv", auto_match]
+
+
+class ClinVarExportAdmin(ModelAdminBasics):
+
+    list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "condition_text_normal", "condition_xrefs",
+                    "requires_user_input", "created"]

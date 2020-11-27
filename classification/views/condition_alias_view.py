@@ -23,17 +23,35 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, B
 ID_EXTRACT_MINI_P = re.compile(r"MONDO:([0-9]+)$")
 
 
-class MondoGenePanelApp:
+class MondoMeta:
 
-    def __init__(self, omim_id: int, phenotype_row: str):
-        self.omim_id = omim_id
-        self.phenotype_row = phenotype_row
-        self.evidence = set()
+    def __init__(self, title: str, text: str, values: Dict):
+        self.title = title
+        self.text = text
+        self.values = dict()
+        for key, value in values.items():
+            self.add_value(key, value)
 
-    def record_evidence(self, evidence: List[str]):
-        self.evidence = self.evidence.union(set(evidence))
+    def add_value(self, key: str, value: Any):
+        if existing := self.values.get(key):
+            existing.append(value)
+        else:
+            self.values[key] = [value]
 
     def as_json(self) -> Dict:
+        values_list = []
+        data = {
+            "title": self.title,
+            "text": self.text,
+            "values": values_list
+        }
+
+        sorted_keys = list(self.values.keys())
+        sorted_keys.sort()
+        for key in sorted_keys:
+            values = values[key]
+
+
         evidence_list = list(self.evidence)
         evidence_list.sort()
         return {
@@ -75,7 +93,7 @@ class MondoGeneMetas:
 
     def __init__(self, gene_symbol: str):
         self.gene_symbol = gene_symbol
-        self.mondo_map: Dict[int, MondoGeneMeta] = dict()
+        self.mondo_map: Dict[int, ] = dict()
 
     def _find_or_create(self, mondo_id: int) -> MondoGeneMeta:
         mondo = self.mondo_map.get(mondo_id)
@@ -105,13 +123,13 @@ class MondoGeneMetas:
             self._find_or_create(mondo_id=mdgr.mondo_id).monarch_link_data(mdgr.relationship)
 
     def mondos(self) -> List[MonarchDiseaseOntology]:
-        mondo_ids = [meta.mondo_id for meta in self.mondo_map.values()]
+        mondo_ids = [meta.term_id for meta in self.mondo_map.values()]
         return MonarchDiseaseOntology.objects.filter(pk__in=mondo_ids)
 
     def as_json(self) -> Dict:
         root = dict()
         for meta in self.mondo_map.values():
-            root[ MonarchDiseaseOntology.mondo_int_as_id(meta.mondo_id) ] = meta.as_json()
+            root[ MonarchDiseaseOntology.mondo_int_as_id(meta.term_id)] = meta.as_json()
         return root
 
 
@@ -176,37 +194,6 @@ def condition_aliases_view(request):
     return render(request, 'classification/condition_aliases.html', context={
         'datatable_config': ConditionAliasColumns(request)
     })
-
-
-def _populate_mondo_result(mondo: Union[Dict, str, MonarchDiseaseOntology]) -> Dict:
-    mondo_record: Optional[MonarchDiseaseOntology] = None
-    result: Dict
-
-    if isinstance(mondo, str):
-        mondo = {"id": mondo}
-
-    if isinstance(mondo, MonarchDiseaseOntology):
-        mondo_record = mondo
-        result = {"id": mondo_record.id_str}
-    elif isinstance(mondo, dict):
-        result = mondo
-        mondo_int = MonarchDiseaseOntology.mondo_id_as_int(result.get('id'))
-        mondo_record = MonarchDiseaseOntology.objects.filter(pk=mondo_int).first()
-    else:
-        raise ValueError(f"Can't populate mondo result into {mondo}")
-
-    if mondo_record:
-        result['definition'] = mondo_record.definition or 'No description provided'
-        if 'label' not in result:
-            result['label'] = mondo_record.name
-        result['id'] = mondo_record.id_str
-    else:
-        result['definition'] = None
-
-    url_part = result["id"].replace(":", "_")
-    result['url'] = f'https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{url_part}'
-
-    return result
 
 
 def _next_condition_alias(user: User, condition_alias: ConditionAlias) -> Optional[ConditionAlias]:

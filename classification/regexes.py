@@ -93,6 +93,10 @@ class DbRefRegexResult:
             report_message(message=f"Couldnt resolve external DB reference for {self.db}:{self.idx}")
 
     @property
+    def id_fixed(self):
+        return f"{self.db}:{self.cregx.fix_id(self.idx)}"
+
+    @property
     def url(self):
         return self.cregx.link.replace('${1}', self.idx)
 

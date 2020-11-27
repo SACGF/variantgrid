@@ -1,0 +1,142 @@
+{% extends "uicore/page/base.html" %}
+{% load datatable_tags %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load js_tags %}
+{% block title %}Clinvar Export{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <script>
+        let mondos = {{ ontology_terms | jsonify }};
+
+        // TODO, should the JSON coming down be in a more general format that can always be rendered teh same?
+        function renderContext(title, context) {
+            if (title == "selected") {
+                return null;
+            }
+            if (title == "Monarch") {
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-success"></i>`),
+                        $('<span>', {text: title }),
+                        " ",
+                        $('<span>', {class: 'text-muted', text: `${context.relation} ${context.gene_symbol}`})
+                ]});
+            } else if (title == "PanelApp AU") {
+                let evidence = context.evidence.join(", ");
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-success"></i>`),
+                        $('<span>', {text: title }),
+                        " ",
+                        $('<span>', {class: 'hover-detail text-muted', text: `${context.phenotype_row}`, title: evidence})
+                    ]});
+            } else {
+                return $("<div>", {text: title});
+            }
+        }
+
+        function toggleSelection(mondo) {
+            let isSelected = !!mondo.contexts.selected;
+            if (isSelected) {
+                delete mondo.contexts.selected;
+            } else {
+                mondo.contexts.selected = true;
+            }
+            renderMondo();
+        }
+
+        function mondoItem(mondo) {
+            let contexts = $('<div>');
+            for (let [title, context] of Object.entries(mondo.contexts)) {
+                let contextBox = renderContext(title, context);
+                if (contextBox) {
+                    contextBox.appendTo(contexts);
+                }
+            }
+
+            let isSelected = !!mondo.contexts.selected;
+            let actionButton = null;
+            if (isSelected) {
+                actionButton = $(`<i class="btn btn-danger fas fa-minus-circle m-2"></i>`).css('font-size', '24px').click(() => toggleSelection(mondo));
+            } else {
+                actionButton = $(`<i class="btn btn-primary fas fa-plus-circle m-2"></i>`).css('font-size', '24px').click(() => toggleSelection(mondo));
+            }
+
+            return $('<li>', {class: 'list-group-item d-flex justify-content-between align-items-center', html: [
+                $('<div>', {html:[
+                    $('<a>', {class: 'external-link', target:'blank', url:mondo.url, text:mondo.id}),
+                    " ",
+                    mondo.title,
+                    contexts,
+                    $('<div>', {class:'text-muted', text: mondo.definition})
+                ]})
+                ,
+                actionButton
+            ]});
+        }
+
+        function renderMondo() {
+            let suggestions = $('#mondo-suggestions').empty();
+            // FIXME some kind of sensible ordering
+            let selected = [];
+
+            for (let mondo of Object.values(mondos)) {
+                mondoItem(mondo).appendTo(suggestions);
+                if (mondo.contexts.selected) {
+                    selected.push(mondo);
+                }
+            }
+            let termSelectionDom = $('#term-selection').empty();
+            for (let term of selected) {
+                termSelectionDom.append($('<div>', {class:'pill', text:term.id}));
+            }
+        }
+
+        $(document).ready(() => {
+            renderMondo();
+        });
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <a href="{% url 'clinvar_exports' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all ClinVar Exports</a>
+        <h3>ClinVar Export</h3>
+        {% page_help_embedded title='ClinVar Export' %}
+            <p>
+            Help will go here for exporting to Clinvar
+            </p>
+        {% end_page_help_embedded %}
+        <div class="card">
+            <div class="card-header">ClinVar Submission Source Summary</div>
+            <div class="card-body">
+                {% labelled label="Affected Status" %}{{ clinvar_export.affected_status }}{% endlabelled %}
+                {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
+                {% labelled label="Interpretation Summary" %}{{ clinvar_export.interpretation_summary }}{% endlabelled %}
+                {% labelled label="Gene Symbol" %}{{ clinvar_export.gene_symbol }}{% endlabelled %}
+                {% labelled label="Condition Text" %}{{ clinvar_export.condition_text_normal }}{% endlabelled %}
+                {% labelled label="Condition References" %}
+                    <div id="term-selection">...</div>
+                {% endlabelled %}
+                {% labelled label="Multi-Term Operation" %}
+                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N" checked="checked">Not Decided</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U">Uncertain</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C">Co-Occuring</label>
+                    </div>
+                {% endlabelled %}
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-primary">Save</button>
+            </div>
+        </div>
+        <div class="card mt-4">
+            <div class="card-header">MONDO Picker</div>
+            <div class="card-body-list">
+                <ul class="list-group" id="mondo-suggestions">
+
+                </ul>
+            </div>
+        </div>
+    </div>
+{% endblock %}
