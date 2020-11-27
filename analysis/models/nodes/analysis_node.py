@@ -791,7 +791,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             copy_naff.group_operation = naff.group_operation
             copy_naff.save()
 
-            for (min_value, max_value) in af_frequency_ranges:
+            for min_value, max_value in af_frequency_ranges:
                 copy_naff.nodeallelefrequencyrange_set.create(min=min_value, max=max_value)
 
         return copy
@@ -896,7 +896,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
             queryset = node.get_queryset(extra_filters_q)
             count_qs = queryset.values_list(variant_column).distinct().annotate(Count('id'))
             data_list = []
-            for (value, count) in count_qs:
+            for value, count in count_qs:
                 data = NodeColumnSummaryData(collection=ncscc,
                                              value=value,
                                              count=count)

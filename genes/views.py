@@ -296,7 +296,7 @@ def view_transcript_version(request, transcript_id, version):
         transcripts_by_build[genome_build_id] = t
 
     differences = []
-    for (a, b) in combinations(transcripts_by_build.keys(), 2):
+    for a, b in combinations(transcripts_by_build.keys(), 2):
         t_a = transcripts_by_build[a]
         t_b = transcripts_by_build[b]
         diff = t_a.get_differences(t_b)
@@ -454,7 +454,7 @@ def get_coverage_stats(base_gene_coverage_qs, filter_q, fields):
 
     values = defaultdict(list)
     for data in gene_coverage_qs.values(*fields):
-        for (k, v) in data.items():
+        for k, v in data.items():
             values[k].append(v)
     return values
 

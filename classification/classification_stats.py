@@ -68,7 +68,7 @@ def get_grouped_classification_counts(user: User,
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
-    for (clinical_significance, field) in values_qs:
+    for clinical_significance, field in values_qs:
         if evidence_key:
             value = Classification.get_optional_value_from(field, evidence_key)
         elif field_labels:

@@ -190,7 +190,7 @@ def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
             def get_cohort_sample(sample):
                 return cohort.cohortsample_set.get(sample=sample)
 
-            for (s, p) in zip(samples, people):
+            for s, p in zip(samples, people):
                 if p == TrioSample.FATHER:
                     father_cs = get_cohort_sample(s)
                 elif p == TrioSample.MOTHER:
@@ -786,7 +786,7 @@ def view_mutational_signature(request, pk):
     mutation_types = []
     mutation_type_counts = []
 
-    for (mutation_type, count) in mut_count_qs.values_list("mutation_type", "count"):
+    for mutation_type, count in mut_count_qs.values_list("mutation_type", "count"):
         mutation_types.append(mutation_type)
         mutation_type_counts.append(count)
 

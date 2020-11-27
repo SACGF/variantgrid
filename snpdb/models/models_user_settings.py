@@ -43,7 +43,7 @@ class UserDataPrefix(models.Model):
     @staticmethod
     def get_replace_dict(user):
         replace_dict = {}
-        for (prefix, replacement) in user.userdataprefix_set.values_list("prefix", "replacement"):
+        for prefix, replacement in user.userdataprefix_set.values_list("prefix", "replacement"):
             replace_dict[prefix] = replacement
         return replace_dict
 

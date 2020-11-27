@@ -898,7 +898,7 @@ class GeneList(models.Model):
 
         warning_list = []
         prefix = None
-        for (w, num) in warnings.items():
+        for w, num in warnings.items():
             if num:
                 if prefix is None:
                     prefix = "There were " if num > 1 else "There was "
@@ -1192,7 +1192,7 @@ class GeneCoverageCollection(models.Model):
 
         known_transcript_ids = Transcript.known_transcript_ids(canonical_transcript_collection.genome_build,
                                                                canonical_transcript_collection.annotation_consortium)
-        for (_, row) in gene_coverage_df.iterrows():
+        for _, row in gene_coverage_df.iterrows():
             original_gene_symbol = row["gene"]
             original_transcript_id = row["transcript"]
 

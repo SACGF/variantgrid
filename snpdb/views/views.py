@@ -169,7 +169,7 @@ def bulk_group_permissions(request, class_name):
 
     if request.method == 'POST':
         all_forms = []
-        for (_, permission_forms) in objects_and_forms:
+        for _, permission_forms in objects_and_forms:
             all_forms.extend(permission_forms)
         valid = all([pf.is_valid() for pf in all_forms])
         if valid:
@@ -721,7 +721,7 @@ def view_custom_columns(request, custom_columns_collection_id):
     if request.method == "POST":
 
         def update_user_columns(id_list, active):
-            for (i, col) in enumerate(id_list):
+            for i, col in enumerate(id_list):
                 column = variant_grid_columns[col]
                 CustomColumn.objects.update_or_create(custom_columns_collection=ccc, column=column,
                                                       defaults={"sort_order": i})
@@ -1092,7 +1092,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     pass
 
             FIELDS = ["gene__geneversion__gene_symbol", "value__rgb", "value__show_counts", "count"]
-            for (gene_symbol, rgb, show_counts, count) in gvc_qs.values_list(*FIELDS):
+            for gene_symbol, rgb, show_counts, count in gvc_qs.values_list(*FIELDS):
                 gene_link = gene_links_lookup[gene_symbol]
                 color_df.loc[gene_link, sample_name] = rgb
                 if show_counts:

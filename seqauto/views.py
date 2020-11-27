@@ -125,7 +125,7 @@ def view_seqauto_run(request, seqauto_run_id):
 
     sft_dict = dict(SequencingFileType.CHOICES)
 
-    for (file_type, file_type_count) in file_type_counts.values_list("file_type", "file_type_count"):
+    for file_type, file_type_count in file_type_counts.values_list("file_type", "file_type_count"):
         file_type_name = sft_dict[file_type]
         pbs_script_counts.append((file_type_name, file_type_count))
 
@@ -353,12 +353,13 @@ def view_qc_exec_summary_tab(request, qc_id):
         except:
             ref_range = None
 
-        for (description, field) in EXEC_STATS_LOOKUP:
+        for description, field in EXEC_STATS_LOOKUP:
             exec_data = getattr(exec_summary, field)
             if field.startswith("percent_") and exec_data is None:
                 continue
 
-            (reference_min, reference_max) = ('', '')
+            reference_min = ''
+            reference_max = ''
             if ref_range:
                 r = getattr(ref_range, field, None)
                 if r is not None:
@@ -588,7 +589,7 @@ def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
     current_label = get_label(qc_exec_summary.sequencing_run.name, qc_exec_summary.sample_name)
     sequencing_run_names = qc_exec_summary_data[sequencing_run_column]
     sample_names = qc_exec_summary_data["qc__bam_file__unaligned_reads__sequencing_sample__sample_name"]
-    labels = [get_label(sr, ss) for (sr, ss) in zip(sequencing_run_names, sample_names)]
+    labels = [get_label(sr, ss) for sr, ss in zip(sequencing_run_names, sample_names)]
     qc_exec_summary_data["label"] = labels
 
     context = {"current_label": current_label,

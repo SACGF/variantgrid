@@ -97,7 +97,7 @@ class SequencingRunQCGraph(CacheableGraph):
         num_rows = len(values)
         num_cols = 1
 
-        for (i, (column_name, column_values)) in enumerate(values):
+        for i, (column_name, column_values) in enumerate(values):
             ax = figure.add_subplot(num_rows, num_cols, i + 1)
             run_value = sequencing_run_qc[column_name]
             self.plot_enrichment_kit(ax, column_name, column_values, run_value)

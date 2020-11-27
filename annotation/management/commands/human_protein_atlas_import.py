@@ -61,10 +61,10 @@ class Command(BaseCommand):
         records = []
 
         hpa_samples_ids = get_or_create_hpa_samples_ids(df)
-        abundance_lookup = {b: a for (a, b) in HumanProteinAtlasAbundance.CHOICES}
+        abundance_lookup = {b: a for a, b in HumanProteinAtlasAbundance.CHOICES}
 
         logging.info("Parsing rows...")
-        for (_, row) in df.iterrows():
+        for _, row in df.iterrows():
             ensembl_gene_id = row['Gene']
             sample_name = row['Sample']
             abundance_string = row['Abundance']

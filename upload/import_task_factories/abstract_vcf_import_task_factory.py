@@ -137,7 +137,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
             VCFPipelineStage.DATA_INSERTION: post_data_insertion_classes,
             VCFPipelineStage.FINISH: self.get_finish_task_classes(),
         }
-        for (pipeline_stage_dependency, task_classes) in DEPENDENT_STAGES.items():
+        for pipeline_stage_dependency, task_classes in DEPENDENT_STAGES.items():
             self.create_pipeline_stage_dependent_upload_steps(upload_pipeline, pipeline_stage_dependency, task_classes)
 
         pipeline_tasks = filter(is_not_none, pipeline_tasks)

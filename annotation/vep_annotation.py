@@ -203,7 +203,7 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
     }
 
     kwargs = {"genome_build": genome_build}
-    for (json_field, python_field) in FIELD_LOOKUP.items():
+    for json_field, python_field in FIELD_LOOKUP.items():
         value = vep_version_dict.get(json_field)
         converter = FIELD_CONVERSION.get(python_field)
         if converter:

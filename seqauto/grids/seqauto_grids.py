@@ -78,7 +78,7 @@ class SequencingSamplesHistoricalGrid(DataFrameJqGrid):
             df = pd.DataFrame(enrichment_kit_counts).T
         else:
             enrichment_kits_over_time, enrichment_kit_labels = group_enrichment_kits_df(sample_enrichment_kits_df, self.time_frame)
-            enrichment_kit_counts_dict = {k: v for (k, v) in enrichment_kits_over_time}
+            enrichment_kit_counts_dict = {k: v for k, v in enrichment_kits_over_time}
             df = pd.DataFrame.from_records(enrichment_kit_counts_dict, index=enrichment_kit_labels)
 
         return df

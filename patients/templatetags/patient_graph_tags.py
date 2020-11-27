@@ -26,7 +26,7 @@ def match_graph(title, klass, field_label, color, graph_width, graph_height, max
 
     labels = []
     counts = []
-    for (n, count) in qs:
+    for n, count in qs:
         labels.append(n)
         counts.append(count)
 

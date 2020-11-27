@@ -124,14 +124,14 @@ class AlleleOverlap:
         classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id',
                                                                                                           'variant')
         variant_to_vcids: Dict[int, List[int]] = defaultdict(list)
-        for (classification_id, variant_id) in classification_variant_ids_qs:
+        for classification_id, variant_id in classification_variant_ids_qs:
             variant_to_vcids[variant_id].append(classification_id)
 
         # find all alleles for those variants, then merge the variant id to classification ids to be an allele id to classification ids
         variant_allele_qs = VariantAllele.objects.filter(variant_id__in=variant_to_vcids.keys()).values_list('variant',
                                                                                                              'allele')
         allele_to_vcids: Dict[int, List[int]] = defaultdict(list)
-        for (variant_id, allele_id) in variant_allele_qs:
+        for variant_id, allele_id in variant_allele_qs:
             allele_to_vcids[allele_id].extend(variant_to_vcids[variant_id])
 
         # only consider allele ids associated to 2 or more variant classifications

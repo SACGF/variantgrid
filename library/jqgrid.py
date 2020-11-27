@@ -543,7 +543,7 @@ class JqGrid:
                  (fields.DateTimeField, {'sorttype': 'date', 'rule': 'date'}),
                  (fields.related.ForeignKey, {'rule': 'integer'})]
 
-        for (t, type_info) in types:
+        for t, type_info in types:
             if isinstance(field, t):
                 sorttype = type_info.get('sorttype')
                 if sorttype:

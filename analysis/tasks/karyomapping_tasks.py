@@ -17,7 +17,7 @@ def create_genome_karyomapping_for_trio(trio_id):
     variant_and_genotypes = KaryotypeBins.get_variant_and_genotypes(trio)
 
     contig_code_count = defaultdict(Counter)
-    for (variant_data, genotype_tuple) in variant_and_genotypes:
+    for variant_data, genotype_tuple in variant_and_genotypes:
         contig_id = variant_data[1]
         (proband_gt, father_gt, mother_gt) = genotype_tuple
 

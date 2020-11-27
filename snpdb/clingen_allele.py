@@ -175,7 +175,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants):
 
     if variant_id_allele_error:
         variant_allele_list = []
-        for (variant_id, allele, error) in variant_id_allele_error:
+        for variant_id, allele, error in variant_id_allele_error:
             if variant_id in normalized_variants:
                 origin = AlleleOrigin.IMPORTED_NORMALIZED
             else:

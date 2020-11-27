@@ -15,7 +15,7 @@ def process_tiles(illumina_flowcell_qc, lines):
                (r'Aligned to PhiX:\s+' + FLOAT_REGEX, 'aligned_to_phix')]
 
     for line in lines:
-        for (regex, f) in REGEXES:
+        for regex, f in REGEXES:
             if m := re.match(regex, line):
                 value = m.group(1)
                 setattr(illumina_flowcell_qc, f, value)
@@ -99,7 +99,7 @@ def load_from_file(_seqauto_run, illumina_flowcell_qc):
         with open(illumina_flowcell_qc.path) as f:
             sections = break_into_sections(f)
 
-        for (section, processor) in SECTIONS.items():
+        for section, processor in SECTIONS.items():
             if processor:
                 lines = sections[section]
                 # check lines for errors

@@ -18,5 +18,5 @@ def load_flagstats(flagstats_file):
 
     with open(flagstats_file) as f:
         data = match_patterns_in_file(f, PATTERNS, True)
-        data = {k: int(match_obj.group(1)) for (k, match_obj) in data.items()}
+        data = {k: int(match_obj.group(1)) for k, match_obj in data.items()}
         return data

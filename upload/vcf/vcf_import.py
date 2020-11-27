@@ -358,7 +358,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
 
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
 
-        for (sequencing_sample, sample) in samples_by_sequencing_sample.items():
+        for sequencing_sample, sample in samples_by_sequencing_sample.items():
             bam_file = sequencing_sample.get_single_bam()
             if bam_file:
                 sample.bam_file_path = bam_file.path

@@ -34,7 +34,7 @@ class GeneListNodeView(NodeView):
         sample_coverage_and_uncovered = self.object.get_sample_coverage_and_uncovered()
         incomplete_gene_coverage = []
         if not self.object.has_gene_coverage:
-            for (sample, gene_coverage_collection, uncovered_genes) in sample_coverage_and_uncovered:
+            for sample, gene_coverage_collection, uncovered_genes in sample_coverage_and_uncovered:
                 if uncovered_genes and uncovered_genes.exists():
                     uncovered_gene_names = ','.join(map(str, uncovered_genes))
                     incomplete_gene_coverage.append((sample, gene_coverage_collection, uncovered_gene_names))

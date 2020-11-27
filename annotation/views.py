@@ -279,7 +279,7 @@ def version_diffs(request):
                       ('Variant', VariantAnnotationVersion, VariantAnnotationVersionDiff)]
 
     version_levels = []
-    for (name, version_klass, version_diff_klass) in VERSION_LEVELS:
+    for name, version_klass, version_diff_klass in VERSION_LEVELS:
         version_levels.append((name, get_last_2(version_klass, version_diff_klass)))
     context = {"version_levels": version_levels}
     return render(request, "annotation/version_diffs.html", context)

@@ -227,10 +227,10 @@ class Sequence(models.Model):
     seq_md5_hash = models.CharField(max_length=32, unique=True)
     length = models.IntegerField()
 
-    def save(self, *args, **kwargs):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.seq_md5_hash:
             self.seq_md5_hash = md5sum_str(self.seq)
-        super().save(*args, **kwargs)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     @staticmethod
     def abbreviate(s: str, max_length: int = 20):

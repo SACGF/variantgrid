@@ -175,7 +175,7 @@ class Citation(models.Model):
     @staticmethod
     def citations_from_text(text):
         """ returns a list of (unsaved) Citation objects from text """
-        citation_source_codes = dict({k.lower(): v for (k, v) in CitationSource.CODES.items()})
+        citation_source_codes = dict({k.lower(): v for k, v in CitationSource.CODES.items()})
         regex_pattern = r"(%s):\s*(\d+)" % '|'.join(citation_source_codes)
         pattern = re.compile(regex_pattern, flags=re.IGNORECASE)  # @UndefinedVariable
 
@@ -510,9 +510,9 @@ class AnnotationRun(TimeStampedModel):
             qs = get_queryset_for_annotation_version(klass, annotation_version)
             qs.filter(annotation_run=self).delete()
 
-    def delete(self, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         self.delete_related_objects()
-        super().delete(**kwargs)
+        super().delete(using=using, keep_parents=keep_parents)
 
     def set_task_log(self, key, value):
         assert self.task_id is not None
@@ -991,7 +991,7 @@ class MonarchDiseaseOntology(models.Model):
     def mondo_id_as_int(mondo_text) -> int:
         if isinstance(mondo_text, int):
             return mondo_text
-        """ MONDO:0005045 -> 0005045 """
+        # MONDO:0005045 -> 0005045
         return int(mondo_text.split(":")[1])
 
     @property

@@ -340,7 +340,7 @@ class Searcher:
         if genome_build:
             genome_build_results.add(genome_build)
 
-        for (search_type, regex_pattern, get_results_func) in searches:
+        for search_type, regex_pattern, get_results_func in searches:
             if search_type in self.exclude_search_types:
                 continue
 

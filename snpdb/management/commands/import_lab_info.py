@@ -33,7 +33,7 @@ class Command(BaseCommand):
                 raise ValueError(msg)
 
         # Insert Lab Information and Project Data
-        for (_, row) in df.iterrows():
+        for _, row in df.iterrows():
             organization, _ = Organization.objects.get_or_create(name=row[INSTITUTION])
 
             lab = Lab.objects.create(name=row[NAME],

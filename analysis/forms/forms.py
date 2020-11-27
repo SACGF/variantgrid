@@ -258,7 +258,7 @@ class UserTrioWizardForm(forms.Form):
         cleaned_data = super().clean()
 
         SAMPLES = ["sample_1", "sample_2", "sample_3"]
-        for (a, b) in itertools.combinations(SAMPLES, 2):
+        for a, b in itertools.combinations(SAMPLES, 2):
             a_v = cleaned_data.get(a)
             b_v = cleaned_data.get(b)
             if a_v == b_v:

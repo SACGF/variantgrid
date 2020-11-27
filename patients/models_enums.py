@@ -50,7 +50,7 @@ class Zygosity:
         (HOM_ALT, "HOM_ALT"),
         (UNKNOWN_ZYGOSITY, '?'),
     ]
-    REVERSE_CHOICES_LOOKUP = {v: k for (k, v) in CHOICES + [(MISSING, ".")]}
+    REVERSE_CHOICES_LOOKUP = {v: k for k, v in CHOICES + [(MISSING, ".")]}
 
     GENOTYPES = {
         HOM_REF: '1/1',  # Will only be stored on ref variant

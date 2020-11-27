@@ -423,7 +423,7 @@ class Clinician(models.Model):
             kwargs = {}
             name = nameparser.HumanName(clinician_string)
             if name.title:
-                title = {v: k for (k, v) in Title.CHOICES}.get(name.title)
+                title = {v: k for k, v in Title.CHOICES}.get(name.title)
                 if title:
                     kwargs["title"] = title
 

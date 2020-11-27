@@ -429,7 +429,7 @@ def get_evidence_fields_from_variant_query(
     columns.update([e['col'] for e in evidence_variant_columns.values()])
     values = qs.values(*columns).get()
 
-    for (evidence_key, variant_data) in evidence_variant_columns.items():
+    for evidence_key, variant_data in evidence_variant_columns.items():
         variant_column = variant_data['col']
         immutable = variant_data['immutable']
         value = values.get(variant_column)

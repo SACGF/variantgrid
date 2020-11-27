@@ -36,7 +36,7 @@ class Command(BaseCommand):
         logger.info("Loaded df")
 
         # Insert Sequencing Details
-        for (_, row) in df.iterrows():
+        for _, row in df.iterrows():
             # First get LabProject ID using Lab Name and Institution
             try:
                 lab = Lab.objects.get(name=row[LAB_NAME])

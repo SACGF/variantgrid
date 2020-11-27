@@ -73,7 +73,7 @@ def get_id_from_single_word_fuzzy_match(single_words_by_length: Dict[int, Lookup
 
 
 def get_id_from_fuzzy_match(lookup: Lookups, text: str, max_distance: int) -> Optional[CodePK]:
-    for (description, pk) in lookup.items():
+    for description, pk in lookup.items():
         distance = Levenshtein.distance(description, text)  # @UndefinedVariable
         #print("'%s' <-> '%s' distance: %d" % (description, text, distance))
         if distance <= max_distance:
@@ -724,7 +724,7 @@ def initial_replace_characters(text):
     REPLACE_CHARS = {';': ' '}
 
     cleaned_text = text
-    for (from_char, to_char) in REPLACE_CHARS.items():
+    for from_char, to_char in REPLACE_CHARS.items():
         cleaned_text = cleaned_text.replace(from_char, to_char)
 
     return cleaned_text
@@ -758,7 +758,7 @@ def word_tokenise_and_spans(txt):
     }
     replace_words = invert_dict_of_lists(REPLACE_ALTERNATES)
 
-    for (word, offset_start, _) in tokens_and_spans(cleaned_text, tokens):
+    for word, offset_start, _ in tokens_and_spans(cleaned_text, tokens):
         new_offset_start = offset_start
         unsplit_digits_and_spans = []  # Don't split up dates
 
@@ -792,7 +792,7 @@ def sentences_and_offsets(txt):
     tokens = nltk.sent_tokenize(txt)
 
     split_sentences_and_offsets = []
-    for (sentence, sentence_offset, _) in tokens_and_spans(txt, tokens):
+    for sentence, sentence_offset, _ in tokens_and_spans(txt, tokens):
         new_offset = sentence_offset
         for line in sentence.split('\n'):
             if line:
@@ -817,7 +817,7 @@ def process_text_phenotype(text_phenotype, hpo_records, hpo_word_lookup, hpo_sin
     tags = []
     spans = []
     commented_out = False
-    for ((w, t), span) in zip(tagged, tokenized_spans):
+    for (w, t), span in zip(tagged, tokenized_spans):
         if not commented_out:
             if w == t:
                 if w.startswith('--'):
@@ -930,7 +930,7 @@ def get_omim_pks_by_term():
 def get_single_words_by_length(records, min_length):
     """ if key is pure alpha (ie FOO not FOO,BAR or FOO1 or FOO BAR) put lookup into dict by lengths """
     words_by_length = defaultdict(dict)
-    for (k, v) in records.items():
+    for k, v in records.items():
         if k.isalpha():
             length = len(k)
             if length >= min_length:
@@ -1056,7 +1056,7 @@ def bulk_patient_phenotype_matching(patients=None):
             tpm_qs = TextPhenotypeMatch.objects.values("match_type")
             tpm_qs = tpm_qs.annotate(count=Count("pk")).values_list("match_type", "count")
             logging.info("%d match types:", total_matches)
-            for (match_type, count) in tpm_qs:
+            for match_type, count in tpm_qs:
                 logging.info("%s: %d", match_type, count)
     else:
         logging.info("No patients")

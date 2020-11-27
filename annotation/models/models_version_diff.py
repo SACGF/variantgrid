@@ -105,7 +105,7 @@ class VersionDiff(models.Model):
 
             v1 = [data[v] for v in v1_columns]
             v2 = [data[v] for v in v2_columns]
-            modified = reduce(operator.or_, [a != b for (a, b) in zip(v1, v2)])
+            modified = reduce(operator.or_, [a != b for a, b in zip(v1, v2)])
 
             if v1_id and not v2_id:
                 self.num_removed += 1
@@ -117,12 +117,12 @@ class VersionDiff(models.Model):
                 else:
                     self.num_unchanged += 1
 
-            for (column, vgc, counters) in counters_from_to:
+            for column, vgc, counters in counters_from_to:
                 val_1 = data[get_column_alias(a1, column)]
                 val_2 = data[get_column_alias(a2, column)]
                 counters[val_1][val_2] += 1
 
-            for (column, vgc, count_list) in counters_change:
+            for column, vgc, count_list in counters_change:
                 val_1 = data[get_column_alias(a1, column)]
                 val_2 = data[get_column_alias(a2, column)]
                 if val_1 != val_2:
@@ -130,15 +130,15 @@ class VersionDiff(models.Model):
 
         self.save()
 
-        for (column, vgc, count_list) in counters_change:
+        for column, vgc, count_list in counters_change:
             vdr = VersionDiffChangeCountResult(version_diff=self,
                                                vg_column=vgc,
                                                count=count_list[0])
             vdr.save()
 
-        for (column, vgc, counters) in counters_from_to:
-            for (value_from, counter) in counters.items():
-                for (value_to, count) in counter.items():
+        for column, vgc, counters in counters_from_to:
+            for value_from, counter in counters.items():
+                for value_to, count in counter.items():
                     vdr = VersionDiffFromToResult(version_diff=self,
                                                   vg_column=vgc,
                                                   value_from=value_from,
@@ -167,7 +167,7 @@ class VersionDiff(models.Model):
     def get_column_version_diff_as_df(self, variant_grid_column):
         qs = self.versiondifffromtoresult_set.filter(vg_column=variant_grid_column)
         data = defaultdict(dict)
-        for (value_from, value_to, count) in qs.values_list('value_from', 'value_to', 'count'):
+        for value_from, value_to, count in qs.values_list('value_from', 'value_to', 'count'):
             data[value_from][value_to] = count
         df = pd.DataFrame.from_dict(data).fillna(0)
         NO_ENTRY_DICT = {None: "No Entry"}

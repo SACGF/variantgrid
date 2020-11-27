@@ -1,7 +1,7 @@
 import logging
 import operator
 from functools import reduce
-from typing import Optional, Set, Iterable
+from typing import Optional, Iterable
 
 from django.db.models import Q
 
@@ -32,7 +32,7 @@ class MergeNode(AnalysisNode):
                 # Ensure that parents all have cache. This is only true if the cache is READY - it may be being
                 # written in another task.
                 if p.node_cache is None:
-                    logging.warning(f"Parent {p} didn't have cache!!!")
+                    logging.warning("Parent %s didn't have cache!!!", p)
                     cache_task_args_objs.update(p.get_cache_task_args_objs_set(force_cache=True))
         return cache_task_args_objs
 

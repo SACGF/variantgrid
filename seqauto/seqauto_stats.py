@@ -17,7 +17,7 @@ def get_sample_enrichment_kits_df():
         year_month_series = pd.Series(index=df.index, dtype='i')
         year_series = pd.Series(index=df.index, dtype='i')
 
-        for (i, val) in sr.items():
+        for i, val in sr.items():
             run_date = val.split("_")[0]
             year_series[i] = run_date[:2]
             year_month_series[i] = run_date[:4]
@@ -25,7 +25,7 @@ def get_sample_enrichment_kits_df():
         start_month, start_year = get_month_and_year(year_month_series.min())
 
         month_offset = pd.Series(index=df.index)
-        for (i, year_month) in year_month_series.items():
+        for i, year_month in year_month_series.items():
             month, year = get_month_and_year(year_month)
             month_offset[i] = get_months_since(start_month, start_year, month, year)
 
@@ -66,7 +66,7 @@ def group_enrichment_kits_df(df, by_column, max_groups=None):
             raise ValueError(msg)
         labels = get_labels_from_start_to_end(start, end, year_month_start)
 
-        for (enrichment_kit_name, enrichment_kit_df) in df.groupby("enrichment_kit__name"):
+        for enrichment_kit_name, enrichment_kit_df in df.groupby("enrichment_kit__name"):
             array = [0] * array_size
 
             for value in enrichment_kit_df[by_column]:
@@ -77,13 +77,13 @@ def group_enrichment_kits_df(df, by_column, max_groups=None):
 
     if max_groups is not None and len(enrichment_kit_data) > max_groups:
         named_groups = max_groups - 1
-        enrichment_kit_data_sum = [(name, array, sum(array)) for (name, array) in enrichment_kit_data]
+        enrichment_kit_data_sum = [(name, array, sum(array)) for name, array in enrichment_kit_data]
         enrichment_kit_data_sum = list(sorted(enrichment_kit_data_sum, key=operator.itemgetter(2), reverse=True))
         enrichment_kit_data = []
-        for (name, array, _) in enrichment_kit_data_sum[:named_groups]:
+        for name, array, _ in enrichment_kit_data_sum[:named_groups]:
             enrichment_kit_data.append((name, array))
 
-        other_sum = reduce(operator.add, [np.array(array) for (_, array, _) in enrichment_kit_data_sum[named_groups:]])
+        other_sum = reduce(operator.add, [np.array(array) for _, array, _ in enrichment_kit_data_sum[named_groups:]])
         enrichment_kit_data.append(("other", other_sum.tolist()))
 
     return enrichment_kit_data, labels

@@ -19,7 +19,7 @@ class HumanProteinAtlasAbundance:
     def get_abundance_or_greater_levels(abundance):
         higher_levels = []
         found = False
-        for (k, _) in HumanProteinAtlasAbundance.CHOICES:
+        for k, _ in HumanProteinAtlasAbundance.CHOICES:
             if k == abundance:
                 found = True
             if found:

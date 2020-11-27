@@ -33,5 +33,5 @@ class Command(BaseCommand):
             logging.info("Clearing Existing VersionDiffs")
             VersionDiff.objects.all().delete()
 
-        for (version_klass, version_diff_klass) in ANNOTATION_TYPES:
+        for version_klass, version_diff_klass in ANNOTATION_TYPES:
             calculate_version_diffs(version_klass, version_diff_klass)
