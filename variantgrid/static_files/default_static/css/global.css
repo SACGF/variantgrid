@@ -1330,7 +1330,7 @@ span.cs- {
   background-image: url(/static/icons/IGV_64.png);
 }
 
-.hiseq-2500 {
+.hiseq-2000, .hiseq-2500 {
   background-image: url(/static/icons/sequencers/hiseq_icon.png);
 }
 
