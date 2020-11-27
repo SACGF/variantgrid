@@ -7,8 +7,11 @@ from uicore.templatetags.ui_utils import parse_tag, TagUtils
 
 register = template.Library()
 
+
 @dataclass
 class TabBuilderTab:
+    tab_builder: 'TabBuilder'
+    tab_number: int
     tab_id: str
     label: str
     url: Optional[str] = None
@@ -16,10 +19,15 @@ class TabBuilderTab:
     param: Any = None
     content: str = ''
 
+    @property
+    def active(self):
+        return self.tab_builder.active_tab == self.tab_number
+
 
 class TabBuilder:
 
     def __init__(self):
+        self.active_tab = 0
         self.tabs: List[TabBuilderTab] = []
 
     @property
@@ -37,7 +45,8 @@ class TabBuilder:
 
 
 @register.simple_tag(takes_context=True)
-def ui_register_tab(context, tab_set: str, label: str, url: str = None, param: Any = None, url_check=False):
+def ui_register_tab(context, tab_set: str, label: str, url: str = None, param: Any = None,
+                    url_check=False, active=False):
     if url_check:
         if url not in context["url_name_visible"]:
             return ""
@@ -48,7 +57,11 @@ def ui_register_tab(context, tab_set: str, label: str, url: str = None, param: A
         builder = TabBuilder()
         context[tab_key] = builder
 
-    builder.tabs.append(TabBuilderTab(tab_id=url, label=label, url=url, param=param))
+    tab_number = len(builder.tabs)
+    if active:
+        builder.active_tab = tab_number
+    builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
+                                      tab_id=url, label=label, url=url, param=param))
     return ""
 
 
