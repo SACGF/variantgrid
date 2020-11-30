@@ -421,7 +421,7 @@ class ContigMismatchException(GenomeBuildDetectionException):
     pass
 
 
-def vcf_detect_genome_build_from_filename(vcf_filename):
+def vcf_detect_genome_build(vcf_filename):
     vcf_reader = cyvcf2.VCF(vcf_filename)
     return vcf_detect_genome_build_from_header(vcf_reader)
 
