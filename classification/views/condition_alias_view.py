@@ -22,6 +22,13 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, B
 
 ID_EXTRACT_MINI_P = re.compile(r"MONDO:([0-9]+)$")
 
+def _populateMondoResult(result, gene_symbol) -> Dict:
+    if not isinstance(result, dict):
+        result = {"id": result}
+
+def _populate_mondo_result(mondo: Union[Dict, str, MonarchDiseaseOntology]) -> Dict:
+    mondo_record: Optional[MonarchDiseaseOntology] = None
+    result: Dict
 
 class MondoMeta:
 
@@ -129,7 +136,7 @@ class MondoGeneMetas:
     def as_json(self) -> Dict:
         root = dict()
         for meta in self.mondo_map.values():
-            root[ MonarchDiseaseOntology.mondo_int_as_id(meta.term_id)] = meta.as_json()
+            root[ MonarchDiseaseOntology.int_as_id(meta.term_id)] = meta.as_json()
         return root
 
 
@@ -141,7 +148,7 @@ class ConditionAliasColumns(DatatableConfig):
             if aliases:
                 for alias in aliases:
                     try:
-                        all_aliases.add(MonarchDiseaseOntology.mondo_id_as_int(alias))
+                        all_aliases.add(MonarchDiseaseOntology.id_as_int(alias))
                     except:
                         pass
         mondo: MonarchDiseaseOntology

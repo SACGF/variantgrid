@@ -28,6 +28,7 @@ from annotation.models.models_enums import HumanProteinAtlasAbundance, Annotatio
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
     VEPCustom, ClinVarReviewStatus, VEPSkippedReason
 from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
+from annotation.ontology import OntologyMixin
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -979,29 +980,24 @@ class AnnotationVersion(models.Model):
         return f"{self.pk} ({self.annotation_date.date()})"
 
 
-class MonarchDiseaseOntology(models.Model):
+class MonarchDiseaseOntology(models.Model, OntologyMixin):
     # PK = Mondo ID
+    PREFIX = "MONDO:"
     name = models.TextField()
     definition = models.TextField(null=True)
 
     # TODO: Mappings to all the other ontologies
     # phenotype_mim = models.ForeignKey(MIMMorbid, on_delete=CASCADE)
+    # note the existance of MonarchDiseaseOntologyMIMMorbid though not sure a dedicated table is the best method
 
-    @staticmethod
-    def mondo_id_as_int(mondo_text) -> int:
-        if isinstance(mondo_text, int):
-            return mondo_text
-        """ MONDO:0005045 -> 0005045 """
-        return int(mondo_text.split(":")[1])
+    @classmethod
+    def expected_length(cls) -> int:
+        return 7
 
     @property
-    def id_str(self) -> str:
-        return MonarchDiseaseOntology.mondo_int_as_id(self.id)
-
-    @staticmethod
-    def mondo_int_as_id(mondo_id: int) -> str:
-        num_part = str(mondo_id).rjust(7, '0')
-        return f"MONDO:{num_part}"
+    def url(self) -> str:
+        # FIXME redundant to dbregex but don't want to reference that from this file
+        return f"https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_{self.padded_id}"
 
 
 class MonarchDiseaseOntologyGeneRelationship(models.Model):

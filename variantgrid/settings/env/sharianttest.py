@@ -14,7 +14,8 @@ from variantgrid.settings.env.shariant import *  # pylint: disable=wildcard-impo
 SITE_ID = 6
 
 URLS_NAME_REGISTER.update({
-    "condition_aliases": True
+    "condition_aliases": False,
+    "clinvar_exports": True
 })
 
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'

@@ -23,23 +23,38 @@
             return a.prop('outerHTML');
         };
 
-        function mondo_list(data, type, row) {
-            let mondos = data.condition_xrefs;
-            if (mondos) {
+        function ontologyList(data, type, row) {
+            let ontos = data.aliases;
+            if (ontos) {
                 let join_mode = data.condition_multi_operation == 'U' ? 'and' : 'or';
                 let dom = $('<div>');
                 let first = true;
-                for (let mondo of mondos) {
+                for (let onto of ontos) {
                     if (!first) {
                         dom.append(` ${join_mode} `);
                     }
                     first = false;
-                    let mondo_id = mondo.id;
-                    let mondo_name = mondo.name || "?";
-                    let mondo_num = mondo_id.substring("MONDO:".length);
-                    let href = `https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${mondo_num}`
-                    let aDom = $('<a>', {class: 'hover-link external-link', target:'_blank', text: mondo_id, href: href, title:mondo_name, 'data-toggle':'tooltip'});
-                    dom.append(aDom);
+                    let ontology_id = onto.id;
+                    let ontology_name = onto.name || "?";
+                    let href = onto.url;
+                    if (href) {
+                        $('<a>', {
+                            class: 'hover-link external-link',
+                            target: '_blank',
+                            text: ontology_id,
+                            href: href,
+                            title: ontology_name,
+                            'data-toggle': 'tooltip'
+                        }).appendTo(dom);
+                    } else {
+                        $('<span>', {
+                            class: 'hover-detail',
+                            target: '_blank',
+                            text: ontology_id,
+                            title: ontology_name,
+                            'data-toggle': 'tooltip'
+                        }).appendTo(dom);
+                    }
                 }
                 return dom.prop('outerHTML');
             } else {

@@ -8,13 +8,118 @@
 {% block title %}Clinvar Export{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+    <style>
+        .term-cell {
+            width: 200px;
+        }
+        .relevance-cell {
+            width: 250px;
+        }
+        .relevance-cell div + div {
+            margin-top: 0.5rem;
+        }
+        .description-cell {
+            white-space: pre-line;
+            overflow-wrap: break-word;
+        }
+    </style>
     <script>
         let mondos = {{ ontology_terms | jsonify }};
+        console.log(Object.keys(mondos));
+        const gene_symbol = "{{ clinvar_export.gene_symbol }}";
+        const basicHighlight = ["autosomal", "x-linked", "recessive", "dominant", gene_symbol];
+        const basicHighlightStr = basicHighlight.join("|");
+        const highlightRegex = new RegExp(`(${basicHighlightStr})`, 'g');
 
-        // TODO, should the JSON coming down be in a more general format that can always be rendered teh same?
+        function highlightDescription(description) {
+            if (!description) {
+                return description;
+            }
+            return description.replace(highlightRegex, "<b>$1</b>")
+        }
+
+        function mergeIn(ontology) {
+            console.log(ontology.id);
+            console.log(Object.keys(mondos));
+            let existing = mondos[ontology.id];
+            if (!existing) {
+                console.log(ontology);
+                mondos[ontology.id] = ontology;
+            } else {
+                console.log(ontology);
+                Object.assign(existing.contexts, ontology.contexts);
+            }
+        }
+
+        function search() {
+            let text = $('#condition-search-text').val();
+            // TODO load URLS
+            let url = '{% url "api_mondo_search" %}';
+            let resultsDom = $("#ontology_table");
+            resultsDom.LoadingOverlay('show');
+            $.ajax({
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                data: {
+                    "search_term": text,
+                    "gene_symbol": gene_symbol
+                },
+                url: url,
+                type: 'GET',
+                error: (call, status, text) => {
+                    resultsDom.LoadingOverlay('hide');
+                    renderOntologies();
+                    console.log(status);
+                    console.log(text);
+                    // $('<div/>', {class:'no-value w-100 text-center', text:'Error Retrieving'}).appendTo(resultsDom);
+                    // FIXME show errors
+                },
+                success: async (results) => {
+                    resultsDom.LoadingOverlay('hide');
+                    Object.values(mondos).forEach((item) => {
+                        delete item.contexts["searched"];
+                    });
+                    let mondo_list = Object.values(mondos).filter((item) => {
+                        return Object.keys(item.contexts).length > 0;
+                    });
+                    mondos = {}
+
+                    for (let value of mondo_list.concat(Object.values(results))) {
+                        mergeIn(value);
+                    }
+
+                    renderOntologies();
+                }
+            });
+        }
+
+        // TODO, should the JSON coming down be in a more general format that can always be rendered the same?
         function renderContext(title, context) {
             if (title == "selected") {
-                return null;
+                return null; // redundant to checkbox, so no need to show it here
+            }
+            if (title == "searched") {
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-secondary"></i>`),
+                        $('<span>', {text: "Text search" })
+                ]});
+            }
+            if (title == "referenced") {
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-dark"></i>`),
+                        $('<span>', {text: "Referenced in Condition Text" })
+                ]});
+            }
+            if (title == "similar_match") {
+                return $('<div>', {html: [
+                    $(`<i class="fas fa-circle text-primary"></i>`),
+                    $('<span>', {text: `Selected by another record for same text${context.matches_gene ? ' and gene symbol' : ''}` }),
+                    " ",
+                    // FIXME use URLS
+                    $('<a>', {href:`/classification/clinvar_export/${context.vce_id}`, target:"_blank", text:"View other export"})
+                ]});
             }
             if (title == "Monarch") {
                 return $('<div>', {html: [
@@ -36,65 +141,98 @@
             }
         }
 
-        function toggleSelection(mondo) {
-            let isSelected = !!mondo.contexts.selected;
+        function toggleSelection(onto) {
+            let isSelected = !!onto.contexts.selected;
             if (isSelected) {
-                delete mondo.contexts.selected;
+                delete onto.contexts.selected;
             } else {
-                mondo.contexts.selected = true;
+                onto.contexts.selected = true;
             }
-            renderMondo();
+            updateMultiModeVisibility();
         }
 
-        function mondoItem(mondo) {
-            let contexts = $('<div>');
-            for (let [title, context] of Object.entries(mondo.contexts)) {
+        function updateMultiModeVisibility() {
+            let selectedCount = Object.values(mondos).filter(onto => !!onto.contexts.selected).length;
+            if (selectedCount >= 2) {
+                $('#multimode').collapse('show');
+            } else {
+                console.log('Hiding multimode');
+                $('#multimode').collapse('hide');
+            }
+        }
+
+        function ontologyTr(onto) {
+            let row = $('<tr>');
+            let checkbox = $('<input>', {type:'checkbox', class:'form-check-input'});
+            checkbox.click(() => {
+                this.toggleSelection(onto);
+            });
+            if (onto.contexts.selected) {
+                checkbox.attr('checked', 'checked');
+            }
+            $('<td>', {html:checkbox, class:'text-center'}).appendTo(row);
+
+             $('<td>', {class: 'term-cell', html:[
+                $('<a>', {class: 'external-link', target:'blank', url:onto.url, text:onto.id}),
+                $('<br>'),
+                onto.title
+            ]}).appendTo(row);
+
+            let contexts = $('<td>', {class: 'relevance-cell'});
+            for (let [title, context] of Object.entries(onto.contexts)) {
                 let contextBox = renderContext(title, context);
                 if (contextBox) {
                     contextBox.appendTo(contexts);
                 }
             }
 
-            let isSelected = !!mondo.contexts.selected;
-            let actionButton = null;
-            if (isSelected) {
-                actionButton = $(`<i class="btn btn-danger fas fa-minus-circle m-2"></i>`).css('font-size', '24px').click(() => toggleSelection(mondo));
-            } else {
-                actionButton = $(`<i class="btn btn-primary fas fa-plus-circle m-2"></i>`).css('font-size', '24px').click(() => toggleSelection(mondo));
-            }
+            contexts.appendTo(row);
 
-            return $('<li>', {class: 'list-group-item d-flex justify-content-between align-items-center', html: [
-                $('<div>', {html:[
-                    $('<a>', {class: 'external-link', target:'blank', url:mondo.url, text:mondo.id}),
-                    " ",
-                    mondo.title,
-                    contexts,
-                    $('<div>', {class:'text-muted', text: mondo.definition})
-                ]})
-                ,
-                actionButton
-            ]});
+            $('<td>', {class:'description-cell text-muted', html: highlightDescription(onto.definition)}).appendTo(row);
+
+            return row;
         }
 
-        function renderMondo() {
-            let suggestions = $('#mondo-suggestions').empty();
+        function renderOntologies() {
             // FIXME some kind of sensible ordering
             let selected = [];
-
-            for (let mondo of Object.values(mondos)) {
-                mondoItem(mondo).appendTo(suggestions);
-                if (mondo.contexts.selected) {
-                    selected.push(mondo);
+            sortedOntos = Object.values(mondos);
+            sortedOntos.sort((a, b) => {
+                let scoreOnto = (onto) => {
+                    if (onto.contexts["referenced"]) {
+                        return 5;
+                    }
+                    if (onto.contexts["selected"]) {
+                        return 4;
+                    }
+                    if (onto.contexts["PanelApp AU"]) {
+                        return 2;
+                    }
+                    if (onto.contexts["Monarch"]) {
+                        return 1;
+                    }
                 }
-            }
-            let termSelectionDom = $('#term-selection').empty();
-            for (let term of selected) {
-                termSelectionDom.append($('<div>', {class:'pill', text:term.id}));
+                let score1 = scoreOnto(a);
+                let score2 = scoreOnto(b);
+                if (score1 == score2) {
+                    return (a.name || '').localeCompare((b.name || ''));
+                } else {
+                    return score2 - score1;
+                }
+            });
+
+            let tbody = $('#ontology_table tbody');
+            tbody.empty();
+            for (let onto of Object.values(sortedOntos)) {
+                ontologyTr(onto).appendTo(tbody);
             }
         }
 
         $(document).ready(() => {
-            renderMondo();
+            renderOntologies();
+            updateMultiModeVisibility();
+            $('#condition-search-button').click(() => search());
+            search();
         });
     </script>
 {% endblock %}
@@ -115,27 +253,40 @@
                 {% labelled label="Interpretation Summary" %}{{ clinvar_export.interpretation_summary }}{% endlabelled %}
                 {% labelled label="Gene Symbol" %}{{ clinvar_export.gene_symbol }}{% endlabelled %}
                 {% labelled label="Condition Text" %}{{ clinvar_export.condition_text_normal }}{% endlabelled %}
-                {% labelled label="Condition References" %}
-                    <div id="term-selection">...</div>
-                {% endlabelled %}
-                {% labelled label="Multi-Term Operation" %}
-                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N" checked="checked">Not Decided</label>
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U">Uncertain</label>
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C">Co-Occuring</label>
+                {% labelled label="Other Records w Same Text" %}{{ same_text_vcs | length }}{% endlabelled %}
+                {% labelled label="Other Records w Same Text & Gene" %}{{ Same_text_gene_vcs | length }}{% endlabelled %}
+                {% labelled label="Search Text" %}
+                    <div class="input-group">
+                        <input class="form-control" type="text" id="condition-search-text" value="{{ clinvar_export.condition_text_normal }} {{ clinvar_export.gene_symbol }}" />
+                        <span class="input-group-append"><button id="condition-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
                     </div>
                 {% endlabelled %}
+                <div id="multimode" class="collapse">
+                    {% labelled label="Multi-Term Operation" %}
+                        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                            <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N" checked="checked">Not Decided</label>
+                            <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U">Uncertain</label>
+                            <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C">Co-Occuring</label>
+                        </div>
+                    {% endlabelled %}
+                </div>
+                <label>Select Relevant Ontology Terms Below</label>
+                <table class="table" id="ontology_table">
+                    <thead>
+                        <tr>
+                            <th>Include</th>
+                            <th class="term-cell">Term</th>
+                            <th class="relevance-cell">Relevance</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                    </tbody>
+                </table>
             </div>
             <div class="card-footer">
                 <button class="btn btn-primary">Save</button>
-            </div>
-        </div>
-        <div class="card mt-4">
-            <div class="card-header">MONDO Picker</div>
-            <div class="card-body-list">
-                <ul class="list-group" id="mondo-suggestions">
-
-                </ul>
             </div>
         </div>
     </div>

@@ -47,6 +47,10 @@ class DbRefRegex:
         self.expected_length = expected_length
         self._all_db_ref_regexes.append(self)
 
+    def link_for(self, idx: int) -> str:
+        id_str = self.fix_id(str(idx))
+        return self.link.replace("${1}", id_str)
+
     def fix_id(self, id_str: str) -> str:
         if self.expected_length:
             id_str = id_str.rjust(self.expected_length, '0')
@@ -63,7 +67,7 @@ class DbRegexes:
     MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link="https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_${1}", expected_length=7)
     NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
-    OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link="http://www.omim.org/entry/${1}")
+    OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link="http://www.omim.org/entry/${1}", expected_length=6)
     PMC = DbRefRegex(db="PMC", prefixes="PMCID", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}")
     PUBMED = DbRefRegex(db="PubMed", prefixes=["PubMed", "PMID", "PubMedCentral"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
