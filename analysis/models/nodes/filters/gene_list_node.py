@@ -12,7 +12,7 @@ from analysis.models.nodes.analysis_node import NodeColors, AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol
+from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol, SampleGeneList
 from snpdb.models import Sample
 from snpdb.models.models_enums import ImportStatus
 
@@ -26,6 +26,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
     pathology_test_gene_list = models.ForeignKey(GeneList, null=True, blank=True, on_delete=SET_NULL,
                                                  related_name='pathology_test_gene_list')
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    sample_gene_list = models.ForeignKey(SampleGeneList, null=True, blank=True, on_delete=SET_NULL)
     has_gene_coverage = models.BooleanField(null=True)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
     exclude = models.BooleanField(default=False)

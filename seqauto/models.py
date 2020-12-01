@@ -14,7 +14,7 @@ import re
 import shutil
 
 from genes.models import CanonicalTranscriptCollection, GeneListCategory, \
-    CustomTextGeneList, GeneList, GeneCoverageCollection, Transcript, GeneSymbol
+    CustomTextGeneList, GeneList, GeneCoverageCollection, Transcript, GeneSymbol, SampleGeneList
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
@@ -1072,8 +1072,10 @@ class QC(SeqAutoFile, SequencingSamplePropertiesMixin):
 
 class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
     """ This represents a text file containing genes which will be used for initial pass and QC filters """
+    file_last_modified = models.IntegerField(null=True)
     qc = models.ForeignKey(QC, on_delete=CASCADE)
-    custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
+    custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=SET_NULL)
+    sample_gene_list = models.ForeignKey(SampleGeneList, null=True, on_delete=SET_NULL)
 
     @property
     def sequencing_sample(self):
@@ -1419,7 +1421,7 @@ class SequencingInfo(models.Model):
     paper_name = models.TextField(blank=True, null=True)
     year_published = models.IntegerField(null=True)
     enrichment_kit = models.ForeignKey(EnrichmentKit, on_delete=CASCADE, blank=True, null=True)
-    sequencer = models.ForeignKey(Sequencer, on_delete=models.CASCADE, blank=True, null=True)
+    sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE, blank=True, null=True)
     seq_details = models.TextField(blank=True, null=True)
     file_type = models.TextField(blank=True, null=True)
     file_count = models.IntegerField(blank=True, default=0)

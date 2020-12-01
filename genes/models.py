@@ -1053,6 +1053,23 @@ class CustomTextGeneList(models.Model):
         return f"CustomTextGeneList for '{text}': {self.gene_list}"
 
 
+class SampleGeneList(TimeStampedModel):
+    sample = models.ForeignKey(Sample, on_delete=CASCADE)
+    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
+    visible = models.BooleanField(default=True, blank=False)
+
+    class Meta:
+        unique_together = ('sample', 'gene_list')
+        ordering = ['created']
+
+
+class ActiveSampleGeneList(TimeStampedModel):
+    """ Use 1-to-1 to enforce there's only 1 in DB
+        (as compared to an "active" flag on SampleGeneList) """
+    sample = models.OneToOneField(Sample, on_delete=CASCADE)
+    sample_gene_list = models.ForeignKey(SampleGeneList, on_delete=CASCADE)
+
+
 class GeneListWiki(Wiki):
     gene_list = models.OneToOneField(GeneList, on_delete=CASCADE)
 
