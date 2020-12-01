@@ -898,7 +898,7 @@ class GeneList(models.Model):
 
         warning_list = []
         prefix = None
-        for (w, num) in warnings.items():
+        for w, num in warnings.items():
             if num:
                 if prefix is None:
                     prefix = "There were " if num > 1 else "There was "
@@ -1060,13 +1060,25 @@ class GeneListWiki(Wiki):
         return self.gene_list
 
 
+class PanelAppServer(models.Model):
+    name = models.TextField(unique=True)
+    url = models.TextField(unique=True)
+    icon_css_class = models.TextField()
+
+
 class PanelAppPanel(models.Model):
-    panel_id = models.TextField(primary_key=True)
+    """ Name, used in autocomplete list, actual gene list retrieved by API call (panel_app.py)
+        Cleared when cached web resource reloads """
+    server = models.ForeignKey(PanelAppServer, on_delete=CASCADE)
+    panel_id = models.IntegerField()
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
     disease_group = models.TextField()
     disease_sub_group = models.TextField()
     name = models.TextField()
     current_version = models.TextField()
+
+    class Meta:
+        unique_together = ('server', 'panel_id')
 
     def __str__(self):
         return self.name
@@ -1180,7 +1192,7 @@ class GeneCoverageCollection(models.Model):
 
         known_transcript_ids = Transcript.known_transcript_ids(canonical_transcript_collection.genome_build,
                                                                canonical_transcript_collection.annotation_consortium)
-        for (_, row) in gene_coverage_df.iterrows():
+        for _, row in gene_coverage_df.iterrows():
             original_gene_symbol = row["gene"]
             original_transcript_id = row["transcript"]
 

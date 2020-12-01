@@ -165,6 +165,15 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
             raise forms.ValidationError(msg)
         return ccc
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if any(f in self.changed_data for f in Analysis.VERSION_BUMP_FIELDS):
+            instance.version += 1
+
+        if commit:
+            instance.save()
+        return instance
+
 
 class ColumnSummaryForm(forms.Form):
     column = forms.ChoiceField()
@@ -249,7 +258,7 @@ class UserTrioWizardForm(forms.Form):
         cleaned_data = super().clean()
 
         SAMPLES = ["sample_1", "sample_2", "sample_3"]
-        for (a, b) in itertools.combinations(SAMPLES, 2):
+        for a, b in itertools.combinations(SAMPLES, 2):
             a_v = cleaned_data.get(a)
             b_v = cleaned_data.get(b)
             if a_v == b_v:

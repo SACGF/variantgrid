@@ -6,7 +6,7 @@
                     <div class="card-header hover-link" data-toggle="collapse" data-target="#{{ tab.tab_id }}" aria-expanded="true">
                         {{ tab.label }}
                     </div>
-                    <div id="{{ tab.tab_id }}" class="collapse {% if forloop.first %}show{% endif %}" data-parent="#{{ id }}">
+                    <div id="{{ tab.tab_id }}" class="collapse {% if tab.active %}show{% endif %}" data-parent="#{{ id }}">
                   <div class="card-body">
                       {{ tab.content }}
                   </div>
@@ -19,7 +19,7 @@
             <ul class="nav nav-tabs mb-4" role="tablist">
                 {% for tab in tab_builder.tabs %}
                     <li class="nav-item">
-                        <a class="nav-link {% if forloop.first %}show active{% endif %}"
+                        <a class="nav-link {% if tab.active %}show active{% endif %}"
                            id="{{ tab.tab_id }}-tab"
                            href="#{{ tab.tab_id }}-content"
                            {% if tab.resolved_url %}
@@ -33,7 +33,7 @@
 
             <div class="tab-content no-gutters">
                 {% for tab in tab_builder.tabs %}
-                    <div id="{{ tab.tab_id }}-content" class="tab-pane {% if forloop.first %}show active{% endif %}" role="tabpanel">{{ tab.content }}</div>
+                    <div id="{{ tab.tab_id }}-content" class="tab-pane {% if tab.active %}show active{% endif %}" role="tabpanel">{{ tab.content }}</div>
                 {% endfor %}
             </div>
         </div>

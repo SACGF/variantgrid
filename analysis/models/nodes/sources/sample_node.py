@@ -109,7 +109,7 @@ class SampleNode(SampleMixin, AnalysisNode):
     def _get_method_summary(self):
         if self.sample:
             sample_description = f"Sample {self.sample.name}"
-            for (node_field, _) in self.SAMPLE_FIELD_MAPPINGS:
+            for node_field, _ in self.SAMPLE_FIELD_MAPPINGS:
                 min_value = getattr(self, f"min_{node_field}")
                 if min_value:
                     sample_description += f" {node_field.upper()}>={min_value}"

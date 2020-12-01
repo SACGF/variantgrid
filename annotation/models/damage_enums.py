@@ -24,7 +24,7 @@ class AbstractPathogenicity:
 
         higher_levels = set()
         found = False
-        for (k, _) in cls.CHOICES:
+        for k, _ in cls.CHOICES:
             if k == min_level:
                 found = True
             if found:
@@ -44,7 +44,7 @@ class AbstractPathogenicity:
         """ level >= MINIMUM_FLAG_DAMAGE_LEVEL """
         if level is None:
             return False
-        level_score = {l: i for (i, l) in enumerate(dict(cls.CHOICES))}
+        level_score = {l: i for i, l in enumerate(dict(cls.CHOICES))}
         return level_score[level] >= level_score[cls.MINIMUM_FLAG_DAMAGE_LEVEL]
 
 

@@ -31,7 +31,7 @@ class IndexMetricsQCGraph(CacheableGraph):
         labels = []
         val = []
 
-        for (l, v) in self.get_values_list():
+        for l, v in self.get_values_list():
             labels.append(l)
             val.append(v)
 
@@ -48,6 +48,6 @@ class IndexMetricsQCGraph(CacheableGraph):
     def get_values_list(self):
         qs = self.illuminaflowcellqc.illuminaindexqc_set.all()
         data = []
-        for (name, reads) in qs.values_list("name", "reads"):
+        for name, reads in qs.values_list("name", "reads"):
             data.append((name, reads))
         return data

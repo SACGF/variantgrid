@@ -76,7 +76,7 @@ class KaryotypeBins:
         """ dict can lookup as per: [proband_gt][father_gt][mother_gt] """
         prob_father_mother_gt = defaultdict(lambda: defaultdict(dict))
 
-        for (code, zygosities) in KaryotypeBins.KAROTYPE_BINS.items():
+        for code, zygosities in KaryotypeBins.KAROTYPE_BINS.items():
             (proband_gt, father_gt, mother_gt) = zygosities
             prob_father_mother_gt[proband_gt][father_gt][mother_gt] = code
 

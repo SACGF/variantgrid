@@ -28,7 +28,7 @@ class NodeGenesCountCollection(models.Model):
             queryset = queryset.filter(**{VariantAnnotation.GENE_COLUMN + "__isnull": False})
             count_qs = queryset.values_list(VariantAnnotation.GENE_COLUMN).distinct().annotate(Count('id'))
             data_list = []
-            for (gene_id, count) in count_qs:
+            for gene_id, count in count_qs:
                 data = NodeGenesCount(collection=ncscc,
                                       gene_id=gene_id,
                                       count=count)

@@ -107,7 +107,7 @@ class Command(BaseCommand):
         df = df_nan_to_none(df)
         records = []
 
-        transcript_status_lookup = {v: k for (k, v) in TranscriptStatus.CHOICES}
+        transcript_status_lookup = {v: k for k, v in TranscriptStatus.CHOICES}
 
         self.stdout.write("Parsing rows...")
         unmatched_genes = 0

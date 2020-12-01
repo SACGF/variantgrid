@@ -112,7 +112,7 @@ class GeneMatcher:
             for release_gene_symbol in release_gene_symbols:
                 gene_symbol = release_gene_symbol.gene_symbol_id
                 if gene_id_and_match_list := gene_symbol_gene_id_and_match_info.get(gene_symbol):
-                    for (gene_id, match_info) in gene_id_and_match_list:
+                    for gene_id, match_info in gene_id_and_match_list:
                         matches.append(ReleaseGeneSymbolGene(release_gene_symbol=release_gene_symbol,
                                                              gene_id=gene_id,
                                                              match_info=match_info))

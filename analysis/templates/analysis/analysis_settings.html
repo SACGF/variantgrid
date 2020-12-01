@@ -80,9 +80,6 @@
             {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_run_tab' param=analysis.pk label="Template Run" %}
         {% endif %}
 
-        {% if has_write_permission %}
-            {% ui_register_tab_embedded tab_set="analysis_tab" label="Sharing / Permissions" %}{% url 'group_permissions' 'analysis.models.Analysis' analysis.pk %}{% end_ui_register_tab_embedded %}
-        {% endif %}
         {% if analysis.template_type != 'T' %}
             {% ui_register_tab_embedded tab_set="analysis_tab" label="Create Template" %}
                 <div id="create-template">
@@ -96,7 +93,25 @@
                 </div>
             {% end_ui_register_tab_embedded %}
         {% endif %}
-
+        {% with lock_history=analysis.lock_history %}
+            {% if lock_history %}
+                {% ui_register_tab_embedded tab_set="analysis_tab" label="Lock History" %}
+                    <table class="table">
+                        <tr><th>Action</th><th>User</th><th>Date</th></tr>
+                        {% for analysis_lock in lock_history %}
+                            <tr>
+                                <th>{% if analysis_lock.locked %}Locked{% else %}Unlocked{% endif %}</th>
+                                <td>{{ analysis_lock.user }}</td>
+                                <td>{{ analysis_lock.date|localtime }} ({{ analysis_lock.date|timesince }} ago)</td>
+                            </td>
+                        {% endfor %}
+                    </table>
+                {% end_ui_register_tab_embedded %}
+            {% endif %}
+        {% endwith %}
+        {% if has_write_permission %}
+            {% ui_register_tab_embedded tab_set="analysis_tab" label="Sharing / Permissions" %}{% url 'group_permissions' 'analysis.models.Analysis' analysis.pk %}{% end_ui_register_tab_embedded %}
+        {% endif %}
         {% ui_render_tabs tab_set="analysis_tab" %}
 	</div>
 	<hr>

@@ -369,7 +369,7 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
     colmodel_overrides = {
         'id': {'hidden': True},
         "variant__id": {"hidden": True},
-        "variant__variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene', 'formatter': 'geneLinkFormatter'},
+        "variant__variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
         "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
         "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},
         "analysis__id": {'hidden': True},
@@ -431,6 +431,8 @@ class TaggedVariantGrid(AbstractVariantGrid):
     colmodel_overrides = {
         'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
         'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
+        "variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene',
+                                                                             'formatter': 'geneSymbolNewWindowLink'},
     }
 
     def __init__(self, user, genome_build_name, extra_filters=None):
@@ -471,10 +473,10 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         "Percent": {"formatter": "number"},
     }
 
-    def __init__(self, user, node_id, version_id, extra_filters, variant_column, significant_figures):
+    def __init__(self, user, node_id, node_version, extra_filters, variant_column, significant_figures):
         super().__init__()
 
-        self.node = get_node_subclass_or_404(user, node_id, version=version_id)
+        self.node = get_node_subclass_or_404(user, node_id, version=node_version)
         grid = VariantGrid(user, self.node, extra_filters)
         cm = grid.get_column_colmodel(variant_column)
         grid_column_name = cm["label"]

@@ -97,7 +97,7 @@ class QCExecSummaryGraph(CacheableGraph):
         num_rows = len(self.get_columns())
         num_cols = 1
 
-        for (i, (column_name, column_values)) in enumerate(values):
+        for i, (column_name, column_values) in enumerate(values):
             ax = figure.add_subplot(num_rows, num_cols, i+1)
             run_value = exec_summary_qc[column_name]
             self.plot_enrichment_kit(ax, column_name, column_values, run_value)

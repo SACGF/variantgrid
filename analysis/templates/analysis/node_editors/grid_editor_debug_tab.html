@@ -5,6 +5,16 @@
     }
 </style>
 <div>
+    <div><b>NodeCache:</b>
+        {% if node.node_cache %}
+            {{ node.node_cache }}
+            {% if node.id != node.node_cache.node_id %}
+                (from parent)
+            {% endif %}
+        {% else %}
+            N/A
+        {% endif %}
+    </div>
     <code>{{ node_data|jsonify_pretty }}</code>
 </div>
 

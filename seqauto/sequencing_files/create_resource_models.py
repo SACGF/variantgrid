@@ -70,7 +70,7 @@ def create_samplesheet_samples(sample_sheet):
 
     sequencing_samples = []
     sample_number = 1
-    for (_, row) in df.iterrows():
+    for _, row in df.iterrows():
         sample_project = row["sample_project"]
         if pd.isnull(sample_project):
             sample_project = None
@@ -189,7 +189,7 @@ def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):
         return True, reason
 
     diff_barcodes = []
-    for (sequencing_sample_name, ss1) in ss_dict_1.items():
+    for sequencing_sample_name, ss1 in ss_dict_1.items():
         ss2 = ss_dict_2[sequencing_sample_name]
 
         if ss1.barcode != ss2.barcode:
@@ -227,10 +227,13 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
             vcf = sequencing_run.vcffromsequencingrun.vcf
             # TODO: Raise some kind of manual task here to fix things???
 
-            old_samples_by_sequencing_sample_id = {ss.sample_id: s for (ss, s) in get_samples_by_sequencing_sample(old_sample_sheet, vcf).items()}
-            new_ss_by_sequencing_sample_id = {ss.sample_id: ss for (ss, s) in get_samples_by_sequencing_sample(new_sample_sheet, vcf).items()}
+            def _get_samples_by_sequencing_sample_id(sample_sheet):
+                return {ss.sample_id: s for ss, s in get_samples_by_sequencing_sample(sample_sheet, vcf).items()}
 
-            for (sequencing_sample_id, sample) in old_samples_by_sequencing_sample_id.items():
+            old_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(old_sample_sheet)
+            new_ss_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(new_sample_sheet)
+
+            for sequencing_sample_id, sample in old_samples_by_sequencing_sample_id.items():
                 new_ss = new_ss_by_sequencing_sample_id[sequencing_sample_id]
 
                 try:
@@ -249,7 +252,7 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
         old_samples_by_name = old_sample_sheet.get_sequencing_samples_by_name()
         new_samples_by_name = new_sample_sheet.get_sequencing_samples_by_name()
 
-        for (sequencing_sample_name, old_sequencing_sample) in old_samples_by_name.items():
+        for sequencing_sample_name, old_sequencing_sample in old_samples_by_name.items():
             new_ss = new_samples_by_name[sequencing_sample_name]
 
             for fastq in old_sequencing_sample.fastq_set.all():
@@ -382,7 +385,6 @@ def process_flowcells(seqauto_run, existing_files, results):
 
             sequencing_run_created_signal.send(sender=os.path.basename(__file__),
                                                sequencing_run=sequencing_run)
-            samplesheet_path = SampleSheet.get_path_from_sequencing_run(sequencing_run)
         else:
             if experiment and sequencing_run.experiment is None:
                 logging.info("Setting Experiment on existing SequencingRun")
@@ -402,8 +404,8 @@ def process_flowcells(seqauto_run, existing_files, results):
         sequencing_run.save()
 
         if sequencing_run.data_state != DataState.SKIPPED:
-            (sample_sheet, created) = sequencing_run.samplesheet_set.get_or_create(hash=file_md5sum(samplesheet_path),
-                                                                                   path=samplesheet_path)
+            sample_sheet, created = sequencing_run.samplesheet_set.get_or_create(hash=file_md5sum(samplesheet_path),
+                                                                                 path=samplesheet_path)
             if created:
                 sample_sheet.date = django_modification_date(samplesheet_path)
                 sample_sheet.save()
@@ -562,7 +564,7 @@ def create_fastqs_for_sample_sheet(sample_sheet, existing_fastq_files, existing_
 def unaligned_reads_list_from_fastqs(fastq_pairs):
     unaligned_reads_list = []
 
-    for (_, reads) in fastq_pairs.items():
+    for _, reads in fastq_pairs.items():
         fastq_r1 = reads.get("R1")
         fastq_r2 = reads.get("R2")
         if fastq_r1 and fastq_r2:
@@ -574,9 +576,7 @@ def unaligned_reads_list_from_fastqs(fastq_pairs):
                 unaligned_reads = UnalignedReads.objects.create(sequencing_sample=sequencing_sample,
                                                                 fastq_r1=fastq_r1,
                                                                 fastq_r2=fastq_r2)
-
         unaligned_reads_list.append(unaligned_reads)
-
     return unaligned_reads_list
 
 
@@ -688,7 +688,7 @@ def process_bam_files_and_records(seqauto_run, existing_bam_files, existing_bam_
     expected_bams_and_unaligned_reads = get_expected_bams_and_unaligned_reads(unaligned_reads_list)
     bam_files = set()
 
-    for (bam_path, unaligned_reads) in expected_bams_and_unaligned_reads.items():
+    for bam_path, unaligned_reads in expected_bams_and_unaligned_reads.items():
         exists = bam_path in existing_bam_files
         data_state = get_data_state(unaligned_reads.data_state, exists)
 
@@ -761,7 +761,7 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
     expected_vcf_and_bams = get_expected_vcf_and_bams(bams)
     vcf_files = set()
 
-    for (vcf_path, bam_file) in expected_vcf_and_bams.items():
+    for vcf_path, bam_file in expected_vcf_and_bams.items():
         exists = vcf_path in existing_vcf_files
         data_state = get_data_state(bam_file.data_state, exists)
 
@@ -824,14 +824,12 @@ def process_combo_vcfs(seqauto_run, existing_files, results):
                                                                               path=vcf_path,
                                                                               data_state=data_state,
                                                                               variant_caller=variant_caller)
-
         if combined_vcf_file:
             combined_vcf_files.add(combined_vcf_file)
             try:
                 combined_vcf_file.backendvcf  # If there, VCF is already loaded
             except:
                 load_from_file_if_complete(seqauto_run, combined_vcf_file)
-
     return combined_vcf_files
 
 
@@ -845,7 +843,6 @@ def get_expected_qc_and_vcfs(vcfs):
     for vcf in vcfs:
         qc_path = QC.get_path_from_vcf(vcf)
         expected_qc_and_vcfs[qc_path] = vcf
-
     return expected_qc_and_vcfs
 
 
@@ -858,7 +855,7 @@ def process_qc(seqauto_run, existing_files, results):
     expected_qc_and_vcfs = get_expected_qc_and_vcfs(vcfs)
     qc_set = set()
 
-    for (qc_path, vcf_file) in expected_qc_and_vcfs.items():
+    for qc_path, vcf_file in expected_qc_and_vcfs.items():
         exists = qc_path in existing_qcs
         data_state = get_data_state(vcf_file.data_state, exists)
 

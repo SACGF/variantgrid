@@ -16,7 +16,7 @@ class QCCompareTypeForm(forms.Form):
         column_choices = [(x, x) for x in columns]
         self.fields['column'].choices = column_choices
         if compare_against:
-            filtered_choices = [(k, v) for (k, v) in QCCompareType.CHOICES if k in compare_against]
+            filtered_choices = [(k, v) for k, v in QCCompareType.CHOICES if k in compare_against]
             self.fields['compare_against'].choices = filtered_choices
 
     compare_against = forms.ChoiceField(choices=QCCompareType.CHOICES)

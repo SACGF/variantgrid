@@ -54,7 +54,7 @@ class ChromosomeIntervalsGraph(CacheableGraph):
 
         chrom_xmin_xmax, chrom_scatter = self.get_chrom_xmin_xmax(gic.genomic_interval_iterator())
 
-        for (chrom, (xmin, xmax)) in chrom_xmin_xmax.items():
+        for chrom, (xmin, xmax) in chrom_xmin_xmax.items():
             y = chrom_y.get(chrom)
             if y is not None:
                 y_array = np.empty(len(xmin))

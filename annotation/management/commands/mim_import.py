@@ -89,7 +89,7 @@ class Command(BaseCommand):
         mim_gene_records = []
         unknown_genes = set()
 
-        for (disease_id, data) in disease_gb:
+        for disease_id, data in disease_gb:
             if int(disease_id) not in mim_ids:
                 continue
 

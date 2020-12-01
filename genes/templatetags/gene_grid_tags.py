@@ -3,16 +3,15 @@ from django.db.models.query_utils import Q
 from django.template import Library
 
 from annotation.forms import HPOSynonymForm, MIMAliasForm
-from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, PanelAppPanelForm, GeneSymbolForm, \
-    GeneAnnotationReleaseForm
-from genes.models import GeneInfo, GeneListCategory
+from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, GeneSymbolForm, \
+    GeneAnnotationReleaseForm, panel_app_server_autocomplete_form_factory
+from genes.models import GeneInfo, GeneListCategory, PanelAppServer
 from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
 from pathtests.models import PathologyTest
 from seqauto.forms import EnrichmentKitForm
 from seqauto.models import EnrichmentKit
 from snpdb.forms import LabSelectForm
 from snpdb.models import Company, UserSettings
-from uicore.utils.form_helpers import FormHelperHelper
 
 register = Library()
 
@@ -45,13 +44,11 @@ def gene_grid(context, columns_from_url=None,
         initial_columns.extend([f"gene-annotation-release-{release.pk}" for release in gene_annotation_releases])
 
     data_columns = []
-    enrichment_kit_data = {"name": "Enrichment Kit",
-                           "description": "Enrichment Kit",
+    enrichment_kit_data = {"description": "Enrichment Kit",
                            "icon_css_class": "enrichment-kit-icon",
                            "form": EnrichmentKitForm()}
     data_columns.append(enrichment_kit_data)
-    enrichment_kit_data = {"name": "Gene Annotation Release",
-                           "description": "Gene Annotation Release (match genes in VEP annotation)",
+    enrichment_kit_data = {"description": "Gene Annotation Release (match genes in VEP annotation)",
                            #"icon_css_class": "",
                            "form": GeneAnnotationReleaseForm()}
     data_columns.append(enrichment_kit_data)
@@ -66,14 +63,12 @@ def gene_grid(context, columns_from_url=None,
                 company_name = str(company).replace("_", " ")
                 category = company.genelistcategory
                 css_classes = ' '.join([category.icon_css_class, "pathology-test"])
-                test_data = {"name": category.name,
-                             "icon_css_class": css_classes,
+                test_data = {"icon_css_class": css_classes,
                              "description": f"{company_name} current test",
                              "form": ActivePathologyTestForm(),
                              "form_css_class": "pathology-test-form"}
                 categories.append(test_data)
-                historical_test_data = {"name": f"historical-{category.name}",
-                                        "icon_css_class": css_classes,
+                historical_test_data = {"icon_css_class": css_classes,
                                         "description": f"{company_name} historical test",
                                         "form": SelectPathologyTestVersionForm(),
                                         "form_css_class": "pathology-test-version-form"}
@@ -92,27 +87,31 @@ def gene_grid(context, columns_from_url=None,
         category["form_css_class"] = "category-gene-list-form"
         categories.append(category)
 
-    panel_app_data = {"name": "Panel App Panel",
-                      "description": "Panel App Panel",
-                      "icon_css_class": "panel-app-icon",
-                      "form": PanelAppPanelForm()}
-    categories.append(panel_app_data)
+    panel_app_servers = list(PanelAppServer.objects.all().order_by("pk"))
+    panel_app_form_ids = []
+    for server in panel_app_servers:
+        description = f"{server.name} Panel"
+        prefix = f"server-{server.pk}"
+        panel_app_form = panel_app_server_autocomplete_form_factory(server=server, prefix=prefix,
+                                                                    description=f"{description}...")
+        panel_app_form_ids.append(f"id_{prefix}-panel_app_panel")  # id_server-1-panel_app_panel
+        panel_app_data = {"description": description,
+                          "icon_css_class": server.icon_css_class,
+                          "form": panel_app_form}
+        categories.append(panel_app_data)
 
-    hpo_category_data = {"name": "Lab Gene Classification Counts",
-                         "description": "Lab Gene Classification Counts",
+    hpo_category_data = {"description": "Lab Gene Classification Counts",
                          "form": LabSelectForm()}
     categories.append(hpo_category_data)
 
     # HPO
-    hpo_category_data = {"name": "HPO",
-                         "icon_css_class": "hpo-icon",
+    hpo_category_data = {"icon_css_class": "hpo-icon",
                          "description": "Human Phenotype Ontology",
                          "form": HPOSynonymForm(),
                          "form_css_class": "hpo-gene-list-form"}
     categories.append(hpo_category_data)
     # OMIM
-    omim_category_data = {"name": "OMIM",
-                          "icon_css_class": "omim-icon",
+    omim_category_data = {"icon_css_class": "omim-icon",
                           "description": "OMIM",
                           "form": MIMAliasForm(),
                           "form_css_class": "omim-gene-list-form"}
@@ -145,6 +144,8 @@ def gene_grid(context, columns_from_url=None,
             "close_button_callback": close_button_callback,
             "data_columns": data_columns,
             "categories": categories,
+            "panel_app_servers": panel_app_servers,
+            "panel_app_form_ids": panel_app_form_ids,
             "has_gene_info": has_gene_info,
             "gene_symbol_form": GeneSymbolForm(),
             "named_custom_gene_list_form": named_custom_gene_list_form,

@@ -24,7 +24,11 @@ from snpdb.models.models_enums import BuiltInFilters
 
 
 class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
+    # Changing some analysis settings alters node editors/grids - and we need to increment version to expire node cache
+    VERSION_BUMP_FIELDS = ["custom_columns_collection", "default_sort_by_column"]
+
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    version = models.IntegerField(default=0)  # By bumping this we can invalidate node caches
     # TODO: Remove 'analysis_type' by creating legacy 'AnalysisTemplateSnapshot'
     analysis_type = models.CharField(max_length=1, choices=AnalysisType.CHOICES, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=CASCADE)
@@ -57,6 +61,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def can_unlock(self, user):
         """ Use parent to see if we have Guardian permissions to write """
         return super().can_write(user)
+
+    def lock_history(self):
+        return self.analysislock_set.order_by("pk")
 
     def can_write(self, user):
         """ Disable modification when locked """

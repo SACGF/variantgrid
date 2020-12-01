@@ -62,7 +62,7 @@ def sha1_str(s):
 
 
 def invert_dict(source_dict):
-    return {v: k for (k, v) in source_dict.items()}
+    return {v: k for k, v in source_dict.items()}
 
 
 def invert_dict_of_lists(source_dict):

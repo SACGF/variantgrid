@@ -4,7 +4,7 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from genes.models import PanelAppPanel, GeneList, GeneSymbol, Gene, Transcript, GeneAnnotationRelease, \
-    gene_symbol_withdrawn_str
+    gene_symbol_withdrawn_str, PanelAppServer
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 
@@ -14,7 +14,12 @@ class PanelAppPanelAutocompleteView(AutocompleteView):
     fields = ['name']
 
     def get_user_queryset(self, user):
-        return PanelAppPanel.objects.all()
+        server_id = self.forwarded.get('server_id', None)
+        qs = PanelAppPanel.objects.all()
+        if server_id:
+            server = PanelAppServer.objects.get(pk=server_id)
+            qs = qs.filter(server=server)
+        return qs
 
 
 @method_decorator(cache_page(WEEK_SECS), name='dispatch')

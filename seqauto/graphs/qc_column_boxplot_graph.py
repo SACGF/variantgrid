@@ -128,7 +128,7 @@ class QCColumnBoxPlotGraph(CacheableGraph):
 
         ax.set_xlabel(self.qc_column.name)
 
-        for (sequencing_run, values) in enrichment_kit_values:
+        for sequencing_run, values in enrichment_kit_values:
             y_labels.append(sequencing_run)
             y_values.append(values)
 
@@ -146,7 +146,7 @@ class QCColumnBoxPlotGraph(CacheableGraph):
 
         first_axis = None
 
-        for (i, (enrichment_kit_name, enrichment_kit_values)) in enumerate(enrichment_kit_values):
+        for i, (enrichment_kit_name, enrichment_kit_values) in enumerate(enrichment_kit_values):
             logging.info("enrichment_kit_name = %s", enrichment_kit_name)
             logging.info("enrichment_kit data: %s ", enrichment_kit_values)
 

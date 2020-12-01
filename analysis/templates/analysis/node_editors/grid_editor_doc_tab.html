@@ -47,7 +47,9 @@ $(document).ready(function() {
                 {{ form.hide_node_and_descendants_upon_template_configuration_error }}
             </div>
         {% endif %}
+        {% if has_write_permission %}
             <button id='node-doc-save' class="btn btn-primary">save</button>
+        {% endif %}
         </div>
     </form>
 

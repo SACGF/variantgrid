@@ -104,7 +104,7 @@ class CohortSampleGeneDamageCountTask(Task):
         sample_ids = cohort.get_sample_ids()
 
         sample_gene_value_counts = defaultdict(lambda: defaultdict(Counter))
-        for (gene_id, consequence, samples_zygosity) in values_list:
+        for gene_id, consequence, samples_zygosity in values_list:
             for zyg, sample_id in zip(samples_zygosity, sample_ids):
                 if zyg in Zygosity.VARIANT:
                     g_value_counts = sample_gene_value_counts[sample_id][gene_id]

@@ -91,7 +91,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 22  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 23  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "redis_cache.RedisCache",
@@ -244,11 +244,13 @@ MUTATIONAL_SIGNATURE_DATA_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signature_analysis_data.formatted.txt")
 
 CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY = "ClinGenDiseaseValidity"
-CACHED_WEB_RESOURCE_PANEL_APP_PANELS = "PanelAppPanels"
+CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS = "Genomics England PanelApp Panels"
+CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS = "PanelApp Australia Panels"
 CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT = "GnomADGeneConstraint"
 CACHED_WEB_RESOURCE_PFAM = "Pfam"
 ANNOTATION_CACHED_WEB_RESOURCES = [CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY,
-                                   CACHED_WEB_RESOURCE_PANEL_APP_PANELS,
+                                   CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
+                                   CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS,
                                    CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
                                    CACHED_WEB_RESOURCE_PFAM]
 

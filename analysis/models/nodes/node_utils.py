@@ -36,7 +36,7 @@ def get_parent_value_dag_dictionary(nodes):
 
     query = Q(parent__in=nodes) | Q(child__in=nodes)
     qs = AnalysisEdge.objects.filter(query).values_list('parent_id', 'child_id')  # @UndefinedVariable
-    for (parent_id, child_id) in qs:
+    for parent_id, child_id in qs:
         graph[child_id].add(parent_id)
     return graph
 

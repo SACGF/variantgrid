@@ -69,7 +69,7 @@ def get_nodes_by_classification():
 
     node_help_dict = NodeHelp.get_node_help_dict()
 
-    for (node_class_name, node_class) in node_types.items():
+    for node_class_name, node_class in node_types.items():
         node = node_class()
         node_class = node.get_class_name()
 

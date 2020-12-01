@@ -65,7 +65,7 @@ class AlleleFrequencyMixin(forms.Form):
             af_ranges = af_filter.nodeallelefrequencyrange_set
             if not created:
                 af_ranges.all().delete()
-            for (min_val, max_val) in sliders:
+            for min_val, max_val in sliders:
                 af_ranges.create(min=min_val, max=max_val)
 
 

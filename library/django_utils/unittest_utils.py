@@ -60,7 +60,7 @@ class URLTestCase(TestCase):
         client = Client()
         client.force_login(user)
 
-        for (name, obj, get_kwargs) in names_obj_kwargs:
+        for name, obj, get_kwargs in names_obj_kwargs:
             url = reverse(name)
             if get_kwargs:
                 url += "?" + urlencode(get_kwargs)
@@ -80,7 +80,7 @@ class URLTestCase(TestCase):
         client = Client()
         client.force_login(user)
 
-        for (name, kwargs, obj) in names_obj:
+        for name, kwargs, obj in names_obj:
             kwargs = kwargs.copy()  # In case client shared them
             kwargs["op"] = "handler"  # To show grid
             url = reverse(name, kwargs=kwargs)

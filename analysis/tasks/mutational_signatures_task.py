@@ -52,7 +52,7 @@ def calculate_mutational_signature(sample_id):
 
     labels = ms.get_mutation_type_labels()
     counts = ms.ObservedRawFrequency
-    for (mutation_type, count) in zip(labels, counts):
+    for mutation_type, count in zip(labels, counts):
         MutationalSignatureMutationCount.objects.create(mutational_signature=mutational_signature,
                                                         mutation_type=mutation_type,
                                                         count=count)

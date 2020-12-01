@@ -27,7 +27,7 @@ def get_import_task_factory_from_extension(user, filename, file_extension):
         print(f"tasks: {tasks}")
         tasks = sorted(tasks, key=itemgetter(0), reverse=True)
         last_pa = None
-        for (pa, _) in tasks:
+        for pa, _ in tasks:
             if last_pa is not None:
                 if pa == last_pa:
                     logging.warning("Task for extension %s had 2 processors with equal ability - can't decide!", file_extension)

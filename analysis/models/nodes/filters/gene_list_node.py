@@ -169,7 +169,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
 
         coverage = None
         sample_coverage_and_uncovered = self.get_sample_coverage_and_uncovered()
-        for (_, _, uncovered_genes) in sample_coverage_and_uncovered:
+        for _, _, uncovered_genes in sample_coverage_and_uncovered:
             if uncovered_genes is not None:
                 coverage = True if coverage is None else coverage
                 coverage &= not uncovered_genes.exists()

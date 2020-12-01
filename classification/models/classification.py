@@ -2026,7 +2026,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
         seen_classifications = set()
         latest_version_ids = set()
-        for (vcm_id, vc_id) in qs:
+        for vcm_id, vc_id in qs:
             if vc_id not in seen_classifications:
                 latest_version_ids.add(vcm_id)
                 seen_classifications.add(vc_id)

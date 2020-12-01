@@ -24637,7 +24637,7 @@ def get_required_ns_prefix_defs(rootNode):
     nsmap = {
         prefix: uri
         for node in rootNode.iter()
-        for (prefix, uri) in node.nsmap.items()
+        for prefix, uri in node.nsmap.items()
         if prefix is not None
     }
     namespacedefs = ' '.join([

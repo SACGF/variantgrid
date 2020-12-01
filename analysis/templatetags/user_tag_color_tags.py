@@ -15,10 +15,10 @@ class AbstractCSSRGBNode(template.Node):
 
     def render_user_tag_styles(self, prefix, user_tag_style):
         css_string = ''
-        for (tag, data) in user_tag_style:
+        for tag, data in user_tag_style:
             if data:
                 data_css_lines = []
-                for (k, v) in data.items():
+                for k, v in data.items():
                     data_css_lines.append(f"{k}: {v} !important;")
 
                 data_string = '\n'.join(data_css_lines)
@@ -63,7 +63,7 @@ class VariantTagsJSNode(template.Node):
 
         variant_tags = defaultdict(list)
         variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list('variant__id', 'tag__id')
-        for (variant_id, tag_id) in variant_tags_qs:
+        for variant_id, tag_id in variant_tags_qs:
             variant_tags[variant_id].append(tag_id)
         return json.dumps(variant_tags)
 

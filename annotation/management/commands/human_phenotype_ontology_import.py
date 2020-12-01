@@ -22,7 +22,7 @@ def insert_human_phenotype_ontology(mim_ids, df):
     gb = df.groupby(["hpo_id", "hpo_name"])
     hpo_records = []
     phenotype_mim_records = []
-    for (hpo_id, name), data in gb:
+    for hpo_id, name, data in gb:
         hpo = HumanPhenotypeOntology(id=hpo_id, name=name)
         hpo_records.append(hpo)
 
@@ -86,7 +86,7 @@ def insert_owl_hpo(ot):
 
         logging.info("Updating definitions via bulk update")
         update_hpo_definitions = []
-        for (hpo_id, definition) in update_definitions.items():
+        for hpo_id, definition in update_definitions.items():
             hpo = HumanPhenotypeOntology(pk=hpo_id, definition=definition)
             update_hpo_definitions.append(hpo)
 
@@ -103,7 +103,7 @@ def create_hpo_synonyms(ot):
     start = time.time()
 
     scope_dict = {}
-    for (k, v) in HPOSynonymScope.CHOICES:
+    for k, v in HPOSynonymScope.CHOICES:
         scope_dict[v.upper()] = k
 
     hpo_synonyms = []

@@ -98,14 +98,14 @@ class DataFrameJqGrid:
 
     def get_dataframe_rows(self, df):
         items = []
-        for (i, row) in df.iterrows():
+        for i, row in df.iterrows():
             data = dict(iter(row.items()))
             data['ID'] = i
             items.append(data)
         return items
 
     def get_json(self, request):
-        (page_number, num_pages, items, num_records) = self.get_items(request)
+        page_number, num_pages, items, num_records = self.get_items(request)
         data = {
             'page': int(page_number),
             'total': int(num_pages),

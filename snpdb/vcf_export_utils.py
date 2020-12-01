@@ -11,7 +11,7 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=N
     if top_lines:
         header_lines.extend(top_lines)
     if info_dict:
-        for (info_id, data) in info_dict.items():
+        for info_id, data in info_dict.items():
             data['id'] = info_id
             line_template = '##INFO=<ID=%(id)s,Number=%(number)s,Type=%(type)s,Description="%(description)s">'
             line = line_template % data
@@ -22,7 +22,7 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=N
         header_lines.extend(formats)
 
     if contigs:
-        for (contig, length, assembly) in contigs:
+        for contig, length, assembly in contigs:
             line = f"##contig=<ID={contig},length={length},assembly={assembly}>"
             header_lines.append(line)
 
@@ -50,4 +50,3 @@ def get_vcf_header_from_contigs(genome_build, info_dict=None, samples=None):
                '##FORMAT=<ID=AF,Number=A,Type=Float,Description="Estimated allele frequency in the range (0,1)">']
 
     return get_vcf_header_lines(info_dict=info_dict, formats=formats, contigs=contigs, samples=samples)
-

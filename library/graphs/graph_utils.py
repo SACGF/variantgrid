@@ -47,7 +47,7 @@ def legend_patches_and_labels(legend):
     """ legend: [('label', 'color'), ('label2', 'color2')] """
     patches = []
     labels = []
-    for (name, color) in legend:
+    for name, color in legend:
         labels.append(name)
         shape = Rectangle((0, 0), 1, 1, fc=color)
         patches.append(shape)

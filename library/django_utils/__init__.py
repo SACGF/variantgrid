@@ -99,7 +99,7 @@ def column_arrays_from_values_queryset(qs, *fields, **formatters):
     keys = [f.split('__')[-1] for f in fields]
     annotation_run_values = qs.values(*fields)
     for value in annotation_run_values:
-        for (k, field) in zip(keys, fields):
+        for k, field in zip(keys, fields):
             v = value[field]
             f = formatters.get(field)
             if f:
@@ -162,7 +162,7 @@ def get_redis(**kwargs):
 
 
 def get_lower_choice(choices, value):
-    d = invert_dict({name.lower(): v for (v, name) in choices})
+    d = invert_dict({name.lower(): v for v, name in choices})
     return d.get(value.lower())
 
 

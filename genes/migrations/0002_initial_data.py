@@ -32,10 +32,8 @@ def initial_gene_info(apps, schema_editor):
         ("Triplet Repeat Disorders", "triplet-repeat-icon"),
     ]
 
-    for (name, icon_css_class) in GENE_INFO:
-        GeneInfo.objects.create(name=name,
-                                description="",
-                                icon_css_class=icon_css_class)
+    for name, icon_css_class in GENE_INFO:
+        GeneInfo.objects.create(name=name, description="", icon_css_class=icon_css_class)
 
 
 class Migration(migrations.Migration):
