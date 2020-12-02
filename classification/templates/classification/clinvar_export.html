@@ -187,8 +187,10 @@
             let selectedCount = Object.values(mondos).filter(onto => !!onto.contexts.selected).length;
             if (selectedCount >= 2) {
                 $('#multimode').collapse('show');
+                $('#singlemode').collapse('hide');
             } else {
                 $('#multimode').collapse('hide');
+                $('#singlemode').collapse('show');
             }
         }
 
@@ -238,10 +240,13 @@
                         score += 1000;
                     }
                     if (onto.contexts["PanelApp AU"]) {
-                        score += 50;
+                        score += 3;
                     }
                     if (onto.contexts["Monarch"]) {
-                        score += 25;
+                        score += 2;
+                    }
+                    if (onto.contexts["searched"]) {
+                        score += 1;
                     }
                     return score;
                 }
@@ -330,15 +335,16 @@
                     <span class="input-group-append"><button id="condition-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
                 </div>
             {% endlabelled %}
-            <div id="multimode" class="collapse">
-                {% labelled label="Multi-Term Operation" %}
+            {% labelled label="Multi-Term Operation" %}
+                <div id="multimode" class="collapse">
                     <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N">Not Decided</label>
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U">Uncertain</label>
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C">Co-Occuring</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N" {% if clinvar_export.condition_multi_operation == "N" %}checked="checked"{% endif %}>Not Decided</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U" {% if clinvar_export.condition_multi_operation == "U" %}checked="checked"{% endif %}>Uncertain</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C" {% if clinvar_export.condition_multi_operation == "C" %}checked="checked"{% endif %}>Co-Occuring</label>
                     </div>
-                {% endlabelled %}
-            </div>
+                </div>
+                <div id="singlemode" class="no-value">N/A</div>
+            {% endlabelled %}
             <label>Select Relevant Ontology Terms Below</label>
             <table class="table" id="ontology_table">
                 <thead>

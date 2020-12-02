@@ -519,7 +519,7 @@ table.as_table td {
 }
 
 .formatted-text {
-  white-space: pre;
+  white-space: pre-wrap;
   word-break: break-word;
 }
 
