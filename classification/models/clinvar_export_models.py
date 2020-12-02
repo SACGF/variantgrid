@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Dict
 
 import bs4
 from django.contrib.postgres.fields import ArrayField
@@ -9,9 +10,11 @@ from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
+from annotation.models import Citation
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
-from classification.regexes import db_ref_regexes
+from classification.models.evidence_mixin import VCDbRefDict
+from classification.regexes import db_ref_regexes, DbRegexes
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -152,6 +155,10 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
         return EvidenceKeyMap.cached().get(key).pretty_value(self.classification_based_on.get(key), dash_for_none=True)
 
     @property
+    def allele_origin(self):
+        return self.evidence_key(SpecialEKeys.ALLELE_ORIGIN)
+
+    @property
     def mode_of_inheritance(self):
         return self.evidence_key(SpecialEKeys.MODE_OF_INHERITANCE)
 
@@ -161,19 +168,63 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
 
     @property
     def genome_build(self):
-        return self.evidence_key(SpecialEKeys.GENE_SYMBOL)
+        return self.evidence_key(SpecialEKeys.GENOME_BUILD)
 
     @property
     def interpretation_summary(self):
+        # strip out any XML
         interpret = self.evidence_key(SpecialEKeys.INTERPRETATION_SUMMARY)
         soup = bs4.BeautifulSoup(interpret, 'lxml')
         return soup.text
+
+    @property
+    def curation_context(self):
+        return self.evidence_key(SpecialEKeys.CURATION_CONTEXT)
+
+    @property
+    def assertion_method(self):
+        return self.evidence_key(SpecialEKeys.ASSERTION_METHOD)
+
+    @property
+    def patient_phenotype(self):
+        return self.evidence_key(SpecialEKeys.PATIENT_PHENOTYPE)
+
+    # probably wont use this
+    @property
+    def patient_phenotype(self):
+        return self.evidence_key(SpecialEKeys.PATIENT_PHENOTYPE)
+
+    @property
+    def clinical_significance(self):
+        return self.evidence_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    def citation_refs(self) -> List[VCDbRefDict]:
+        pubmed_refs = [ref for ref in self.classification_based_on.db_refs if ref.get('db') == DbRegexes.PUBMED.db]
+        unique_refs = set()
+
+
+    @property
+    def curated_date(self):
+        if date_str := self.evidence_key(SpecialEKeys.CURATION_DATE):
+            try:
+                if date := datetime.datetime.strptime(date_str, '%Y-%m-%d'):
+                    return date
+            except:
+                pass
+        return self.classification_based_on.created
 
     @property
     def c_hgvs(self):
         gb = GenomeBuild.get_from_fuzzy_string(self.genome_build)
         return self.classification_based_on.classification.get_c_hgvs(genome_build=gb)
 
+    @property
+    def as_json(self):
+        data = dict()
+        data["genome_build"] = self.genome_build
+        data["c_hgvs"] = self.c_hgvs
+        data["Note"] = "This ClinVar API has not been published yet, so this is just placeholder"
+        return data
 
 @receiver(post_save, sender=ClinVarExport)
 def set_condition_alias_permissions(sender, created: bool, instance: ClinVarExport, **kwargs):

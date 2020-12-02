@@ -176,6 +176,8 @@ class Citation(models.Model):
     @staticmethod
     def citations_from_text(text):
         """ returns a list of (unsaved) Citation objects from text """
+        # TODO replace with code from dbregexes
+
         citation_source_codes = dict({k.lower(): v for k, v in CitationSource.CODES.items()})
         regex_pattern = r"(%s):\s*(\d+)" % '|'.join(citation_source_codes)
         pattern = re.compile(regex_pattern, flags=re.IGNORECASE)  # @UndefinedVariable

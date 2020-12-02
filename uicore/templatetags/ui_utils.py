@@ -183,6 +183,13 @@ def severity_icon(severity: str) -> str:
         return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
 
 
+@register.filter()
+def checked(test: bool) -> str:
+    if test:
+        return SafeString('checked="checked"')
+    else:
+        return ''
+
 class TagUtils:
 
     @staticmethod

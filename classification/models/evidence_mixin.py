@@ -1,5 +1,6 @@
+from enum import Enum
 from functools import total_ordering
-from typing import Dict, Any, Mapping, Optional, Union, List
+from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
 
 from lazy import lazy
 
@@ -16,6 +17,29 @@ VCStoreValue = Dict[str, Any]
 VCPatchValue = Union[None, Dict[str, Any]]
 VCStore = Dict[str, VCStoreValue]
 VCPatch = Dict[str, VCPatchValue]
+
+
+class VCBlobKeys(Enum):
+    VALUE = "value"
+    NOTE = "note"
+    DB_REFS = "db_refs"
+    EXPLAIN = "explain"
+
+
+class VCDbRefDict(TypedDict, total=False):
+    id: str
+    db: str
+    idx: Union[str, int]
+    url: str
+    summary: str
+    internal_id: int
+
+
+class VCBlobDict(TypedDict, total=False):
+    value: Any
+    note: str
+    explain: str
+    db_refs: List[VCDbRefDict]
 
 
 @total_ordering
@@ -97,7 +121,7 @@ class EvidenceMixin:
         return GenomeBuild.get_name_or_alias(build_name)
 
     @lazy
-    def db_refs(self) -> List[Dict]:
+    def db_refs(self) -> List[VCDbRefDict]:
         all_db_refs = []
         for blob in self._evidence.values():
             db_refs = blob.get('db_refs')

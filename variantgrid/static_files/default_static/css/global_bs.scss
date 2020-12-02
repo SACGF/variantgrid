@@ -588,3 +588,11 @@ table.as_table {
         content: "\f057";
     }
 }
+
+.list-group-small {
+    max-width: 300px;
+}
+.formatted-text {
+    white-space: pre;
+    word-break: break-word;
+}

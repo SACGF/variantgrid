@@ -4,6 +4,8 @@
 {% load ui_menu_bars %}
 {% load ui_help %}
 {% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load english_tags %}
 {% load js_tags %}
 {% block title %}Clinvar Export{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
@@ -22,10 +24,14 @@
             white-space: pre-line;
             overflow-wrap: break-word;
         }
+        /* need to do this for checkboxes inside tabs */
+        td {
+            position: relative;
+        }
     </style>
     <script>
         let mondos = {{ ontology_terms | jsonify }};
-        console.log(Object.keys(mondos));
+
         const gene_symbol = "{{ clinvar_export.gene_symbol }}";
         const basicHighlight = ["autosomal", "x-linked", "recessive", "dominant", gene_symbol];
         const basicHighlightStr = basicHighlight.join("|");
@@ -39,14 +45,10 @@
         }
 
         function mergeIn(ontology) {
-            console.log(ontology.id);
-            console.log(Object.keys(mondos));
             let existing = mondos[ontology.id];
             if (!existing) {
-                console.log(ontology);
                 mondos[ontology.id] = ontology;
             } else {
-                console.log(ontology);
                 Object.assign(existing.contexts, ontology.contexts);
             }
         }
@@ -91,6 +93,7 @@
                     }
 
                     renderOntologies();
+                    $("#ontology_table");
                 }
             });
         }
@@ -152,11 +155,39 @@
         }
 
         function updateMultiModeVisibility() {
+            let selected = Object.values(mondos).filter(onto => !!onto.contexts.selected);
+            let resolvedDom;
+            if (selected.length === 0) {
+                resolvedDom = $('<div>', {class: 'no-value', text: 'No selection yet'})
+            } else {
+                resolvedDom = $('<div>', {class: 'pills'});
+                if (selected.length >= 2) {
+                    // TODO load actual value
+                    let label = {
+                        "N": "Not Decided",
+                        "U": "Uncertain",
+                        "C": "Co-occuring"
+                    }[$('[name=multimode]:checked').val()];
+                    $('<span>', {text: label + ": "}).appendTo(resolvedDom);
+                }
+
+                for (let term of selected) {
+                    $('<a>', {
+                        href: term.url,
+                        text: term.id,
+                        target: '_blank',
+                        class: 'external-link',
+                        title: term.name,
+                        "data-toggle": 'tooltip'
+                    }).appendTo(resolvedDom);
+                }
+            }
+
+            $('#resolved_condition').empty().append(resolvedDom);
             let selectedCount = Object.values(mondos).filter(onto => !!onto.contexts.selected).length;
             if (selectedCount >= 2) {
                 $('#multimode').collapse('show');
             } else {
-                console.log('Hiding multimode');
                 $('#multimode').collapse('hide');
             }
         }
@@ -173,7 +204,7 @@
             $('<td>', {html:checkbox, class:'text-center'}).appendTo(row);
 
              $('<td>', {class: 'term-cell', html:[
-                $('<a>', {class: 'external-link', target:'blank', url:onto.url, text:onto.id}),
+                $('<a>', {class: 'external-link', target:'blank', href:onto.url, text:onto.id}),
                 $('<br>'),
                 onto.title
             ]}).appendTo(row);
@@ -199,18 +230,20 @@
             sortedOntos = Object.values(mondos);
             sortedOntos.sort((a, b) => {
                 let scoreOnto = (onto) => {
+                    let score = 0;
                     if (onto.contexts["referenced"]) {
-                        return 5;
+                        score += 100;
                     }
                     if (onto.contexts["selected"]) {
-                        return 4;
+                        score += 1000;
                     }
                     if (onto.contexts["PanelApp AU"]) {
-                        return 2;
+                        score += 50;
                     }
                     if (onto.contexts["Monarch"]) {
-                        return 1;
+                        score += 25;
                     }
+                    return score;
                 }
                 let score1 = scoreOnto(a);
                 let score2 = scoreOnto(b);
@@ -232,6 +265,7 @@
             renderOntologies();
             updateMultiModeVisibility();
             $('#condition-search-button').click(() => search());
+            $('[name=multimode]').click(() => updateMultiModeVisibility());
             search();
         });
     </script>
@@ -245,49 +279,107 @@
             Help will go here for exporting to Clinvar
             </p>
         {% end_page_help_embedded %}
-        <div class="card">
-            <div class="card-header">ClinVar Submission Source Summary</div>
+
+        <div class="modal fade" id="saveModal" tabindex="-1" aria-labelledby="saveModalLabel" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="saveModalLabel">Save</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                Will ask if this should be applied to other existing or future records
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Apply Changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Summary</div>
             <div class="card-body">
-                {% labelled label="Affected Status" %}{{ clinvar_export.affected_status }}{% endlabelled %}
-                {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
-                {% labelled label="Interpretation Summary" %}{{ clinvar_export.interpretation_summary }}{% endlabelled %}
-                {% labelled label="Gene Symbol" %}{{ clinvar_export.gene_symbol }}{% endlabelled %}
-                {% labelled label="Condition Text" %}{{ clinvar_export.condition_text_normal }}{% endlabelled %}
-                {% labelled label="Other Records w Same Text" %}{{ same_text_vcs | length }}{% endlabelled %}
-                {% labelled label="Other Records w Same Text & Gene" %}{{ Same_text_gene_vcs | length }}{% endlabelled %}
-                {% labelled label="Search Text" %}
-                    <div class="input-group">
-                        <input class="form-control" type="text" id="condition-search-text" value="{{ clinvar_export.condition_text_normal }} {{ clinvar_export.gene_symbol }}" />
-                        <span class="input-group-append"><button id="condition-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
+                {% labelled label="Genome Build" %}{{ clinvar_export.genome_build }}{% endlabelled %}
+                {% labelled label="c.hgvs" %}{{ clinvar_export.c_hgvs }}{% endlabelled %}
+                {% labelled label="Source Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
+                {% labelled label="Curated" %}{{ clinvar_export.curated_date }}{% endlabelled %}
+                {% labelled label="Clinical Significance" %}{{ clinvar_export.clinical_significance }}{% endlabelled %}
+                {% labelled label="Resolved Condition(s)" id="resolved_condition" %}...{% endlabelled %}
+                {% labelled label="Submit" %}
+                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                        <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="true" {% if not clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Under Review</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="false" {% if clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Auto-Submit When Ready</label>
                     </div>
                 {% endlabelled %}
-                <div id="multimode" class="collapse">
-                    {% labelled label="Multi-Term Operation" %}
-                        <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                            <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N" checked="checked">Not Decided</label>
-                            <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U">Uncertain</label>
-                            <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C">Co-Occuring</label>
-                        </div>
-                    {% endlabelled %}
-                </div>
-                <label>Select Relevant Ontology Terms Below</label>
-                <table class="table" id="ontology_table">
-                    <thead>
-                        <tr>
-                            <th>Include</th>
-                            <th class="term-cell">Term</th>
-                            <th class="relevance-cell">Relevance</th>
-                            <th>Description</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-
-                    </tbody>
-                </table>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary">Save</button>
+                <btn class="btn btn-primary" data-toggle="modal" data-target="#saveModal">Save</btn>
             </div>
         </div>
+        {% ui_register_tab_embedded label="Condition Matcher" tab_set="clinvar_tabs" %}
+            {% labelled label="Condition Text" %}{{ clinvar_export.condition_text_normal }} - <span class="text-muted">{% count same_text_vcs singular="1 other classification" plural="other classifications" %} with the same text</span>{% endlabelled %}
+            {% labelled label="Gene Symbol" %}{{ clinvar_export.gene_symbol }} - <span class="text-muted">{% count same_text_gene_vcs singular="1 other classification" plural="other classifications" %} with the same text and gene symbol</span>{% endlabelled %}
+            {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
+            {% labelled label="Search Text" %}
+                <div class="input-group">
+                    <input class="form-control" type="text" id="condition-search-text" value="{{ clinvar_export.condition_text_normal }} {{ clinvar_export.gene_symbol }}" />
+                    <span class="input-group-append"><button id="condition-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
+                </div>
+            {% endlabelled %}
+            <div id="multimode" class="collapse">
+                {% labelled label="Multi-Term Operation" %}
+                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N">Not Decided</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U">Uncertain</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C">Co-Occuring</label>
+                    </div>
+                {% endlabelled %}
+            </div>
+            <label>Select Relevant Ontology Terms Below</label>
+            <table class="table" id="ontology_table">
+                <thead>
+                    <tr>
+                        <th>Include</th>
+                        <th class="term-cell">Term</th>
+                        <th class="relevance-cell">Relevance</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                </tbody>
+            </table>
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
+            {% labelled label="Allele Origin" %}{{ clinvar_export.allele_origin }}{% endlabelled %}
+            {% labelled label="Affected Status" %}{{ clinvar_export.affected_status }}{% endlabelled %}
+            {% comment %}TODO format intepretations summary with new lines{% endcomment %}
+            {% labelled label="Interpretation Summary" class="formatted-text"%}<div class="formatted-text">{{ clinvar_export.interpretation_summary }}</div>{% endlabelled %}
+            {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
+            {% labelled label="Assertion Method" %}{{ clinvar_export.assertion_method }}{% endlabelled %}
+            {% labelled label="Curation Context" %}{{ clinvar_export.assertion_method }}{% endlabelled %}
+            {% labelled label="Citations" %}
+                <div class="pills">
+                {% for ref_data in clinvar_export.citation_refs %}
+                    {% db_ref data=ref_data %}
+                {% endfor %}
+                </div>
+            {% endlabelled %}
+            <h4>Export Preview</h4>
+            <p class="text-muted">This is how the data will be submitted to ClinVar</p>
+            <div class="code formatted-text">
+                {{ clinvar_export.as_json | jsonify_pretty }}
+            </div>
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded label="Submission History" tab_set="clinvar_tabs" %}
+            Submission is not yet implemented.
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_render_tabs tab_set="clinvar_tabs" %}
     </div>
 {% endblock %}

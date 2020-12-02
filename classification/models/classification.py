@@ -65,30 +65,6 @@ _key_to_regex = {
     'gtr_id': DbRegexes.GTR
 }
 
-
-class VCBlobKeys(Enum):
-    VALUE = "value"
-    NOTE = "note"
-    DB_REFS = "db_refs"
-    EXPLAIN = "explain"
-
-
-class VCDbRefDict(TypedDict, total=False):
-    id: str
-    db: str
-    idx: Union[str, int]
-    url: str
-    summary: str
-    internal_id: int
-
-
-class VCBlobDict(TypedDict, total=False):
-    value: Any
-    note: str
-    explain: str
-    db_refs: List[VCDbRefDict]
-
-
 class ClassificationProcessError(Exception):
     """
     Use to report critical errors that an API user should be able to see

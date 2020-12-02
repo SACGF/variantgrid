@@ -29,7 +29,7 @@ def _jsonify(json_me, pretty=False) -> Union[str, Any]:
     if pretty:
         # this stops arrays of arrays taking up too much vertical space
         text = re.compile(r'],\s*\[', re.MULTILINE).sub('],[', text)
-    text = text.replace('</script>','<\\/script>')
+    text = text.replace('</script>', '<\\/script>')
     return mark_safe(text)
 
 

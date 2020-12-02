@@ -15,7 +15,7 @@ from snpdb.models.models_variant import Allele, Variant
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS
+from classification.models import BestHGVS, VCDbRefDict
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceReportClassification
@@ -305,3 +305,10 @@ def variant_card(context, allele: Allele, build: GenomeBuild):
 def quick_link_data(variant: Variant):
     data = variant_link_info(variant)
     return jsonify(data)
+
+
+@register.inclusion_tag("classification/tags/db_ref.html")
+def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
+    context = dict(data)
+    context['css'] = css
+    return context

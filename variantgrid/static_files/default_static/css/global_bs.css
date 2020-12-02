@@ -514,4 +514,13 @@ table.as_table td {
   content: "";
 }
 
+.list-group-small {
+  max-width: 300px;
+}
+
+.formatted-text {
+  white-space: pre;
+  word-break: break-word;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

@@ -7,10 +7,11 @@ from xml.etree.cElementTree import Element, SubElement, tostring
 from django.contrib.sites.models import Site
 from django.utils.timezone import now
 
+from classification.models.evidence_mixin import VCBlobKeys
 from library.utils import group_by_key, cautious_attempt_html_to_text
 from snpdb.models import Lab
 from classification.enums import SpecialEKeys
-from classification.models import EvidenceKeyMap, VCBlobKeys
+from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.regexes import db_ref_regexes
 from classification.views.clinvar.clinvar import SubmissionSetType, SubmitterType, PersonType, NameType, \

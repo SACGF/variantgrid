@@ -1,8 +1,8 @@
 from django.test import TestCase
 
+from classification.models.evidence_mixin import VCBlobKeys
 from library.guardian_utils import admin_bot
 from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models import VCBlobKeys
 from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_ref import ClassificationRef

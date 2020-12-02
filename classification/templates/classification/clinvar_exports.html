@@ -14,13 +14,10 @@
         });
         function renderId(data, type, row) {
             // TODO geneate urls
-            let elem = $('<a/>', {href: `/classification/clinvar_export/${data}`, text: `${data}`, class:'id-link'});
-            return elem.prop('outerHTML');
-        };
-        function renderClassificationLink(data, type, row) {
             let content = data.genome_build + " " + data.c_hgvs;
-            let a = $('<a>', {text:content, href:Urls.view_classification(data.cm_id), target:'_blank', class:'hover-link'});
-            return a.prop('outerHTML');
+            let id = data.id;
+            let elem = $('<a/>', {href: `/classification/clinvar_export/${id}`, text: `${content}`, class:'id-link'});
+            return elem.prop('outerHTML');
         };
 
         function ontologyList(data, type, row) {
@@ -64,8 +61,12 @@
     </script>
     <style>
         a.id-link {
-            min-width: 30px;
             display: inline-block;
+        }
+        .dt-Requires-Input {
+            text-align: center;
+        }
+        .dt-Auto-submit-Enabled {
             text-align: center;
         }
     </style>

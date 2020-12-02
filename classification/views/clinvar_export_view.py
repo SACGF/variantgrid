@@ -10,7 +10,7 @@ from gunicorn.config import User
 from annotation.models import MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology
 from annotation.ontology_matching import OntologyMatching, OntologyContextSimilarMatch
 from classification.enums import SpecialEKeys
-from classification.models import ClinVarExport, ConditionAlias, EvidenceKeyMap, VCBlobKeys
+from classification.models import ClinVarExport, ConditionAlias, EvidenceKeyMap
 from classification.regexes import db_ref_regexes
 from classification.views.condition_alias_view import ConditionAliasColumns, MondoGeneMetas
 from library.log_utils import report_exc_info
@@ -76,6 +76,7 @@ class ClinVarExportColumns(DatatableConfig):
             c_hgvs = row["classification_based_on__classification__chgvs_grch38"]
 
         return {
+            "id": row["id"],
             "genome_build": genome_build,
             "c_hgvs": c_hgvs,
             "cm_id": link_id
@@ -88,23 +89,25 @@ class ClinVarExportColumns(DatatableConfig):
         evidence_keys = EvidenceKeyMap.cached()
 
         self.rich_columns = [
-            RichColumn('id', name='ID', client_renderer='renderId', orderable=True),
-            RichColumn('lab__name', name='Lab', orderable=True),
-
-            RichColumn(key="classification_based_on__created", label='Classification', orderable=False, extra_columns=[
+            RichColumn(key="classification_based_on__created", label='ClinVar Variant', orderable=True,
+                       sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
+                "id",
                 "classification_based_on__created",
                 "classification_based_on__classification_id",
                 "classification_based_on__published_evidence__genome_build__value",
                 "classification_based_on__classification__chgvs_grch37",
                 "classification_based_on__classification__chgvs_grch38",
-            ], renderer=self.render_classification_link, client_renderer='renderClassificationLink'),
+            ], renderer=self.render_classification_link, client_renderer='renderId'),
 
-            # evidence_keys.get(SpecialEKeys.AFFECTED_STATUS).rich_column(prefix="classification_based_on__published_evidence"),
-            evidence_keys.get(SpecialEKeys.MODE_OF_INHERITANCE).rich_column(prefix="classification_based_on__published_evidence"),
+            RichColumn('lab__name', name='Lab', orderable=True),
+
+            # this busy ups the table a little too much
+            # evidence_keys.get(SpecialEKeys.MODE_OF_INHERITANCE).rich_column(prefix="classification_based_on__published_evidence"),
 
             RichColumn('condition_text_normal', label='Condition Text', orderable=True),
             RichColumn('condition_xrefs', label='Terms', orderable=True, client_renderer='ontologyList', renderer=self.render_aliases),
-            RichColumn('requires_user_input', name='Requires Input', orderable=True, client_renderer='TableFormat.boolean.bind(null, "warning")')
+            RichColumn('requires_user_input', name='Requires Input', orderable=True, client_renderer='TableFormat.boolean.bind(null, "warning")'),
+            RichColumn('submit_when_possible', name='Auto-Submit Enabled', orderable=True, client_renderer='TableFormat.boolean.bind(null, "standard")')
         ]
         self.extra_columns = ['condition_multi_operation']
 
@@ -155,5 +158,5 @@ def clinvar_export_review_view(request, pk):
         'clinvar_export': clinvar_export,
         'ontology_terms': ontologyMatches.as_json(),
         "same_text_vcs": same_text,
-        "Same_text_gene_vcs": same_text_and_gene
+        "same_text_gene_vcs": same_text_and_gene
     })
