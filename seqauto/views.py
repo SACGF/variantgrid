@@ -323,7 +323,6 @@ def view_qc(request, qc_id):
     form = forms.QCFileForm(instance=qc)
 
     historical_exec_summaries = list(qc.qcexecsummary_set.all())
-    qc_gene_list = qc.qcgenelist_set.order_by("pk").last()
 
     try:
         gene_coverage_collection = qc.qcgenecoverage.gene_coverage_collection
@@ -333,7 +332,6 @@ def view_qc(request, qc_id):
     context = {"qc": qc,
                'form': form,
                "historical_exec_summaries": historical_exec_summaries,
-               "qc_gene_list": qc_gene_list,
                "gene_coverage": gene_coverage_collection}
     return render(request, 'seqauto/view_qc.html', context)
 
@@ -387,10 +385,8 @@ def view_qc_exec_summary_tab(request, qc_id):
 
 def view_qc_gene_list_tab(request, qc_id):
     qc = get_object_or_404(QC, pk=qc_id)
-    qc_gene_list = qc.qcgenelist_set.order_by("pk").last()
 
-    context = {"qc": qc,
-               "qc_gene_list": qc_gene_list}
+    context = {"qc": qc}
     return render(request, 'seqauto/tabs/view_qc_gene_list_tab.html', context)
 
 

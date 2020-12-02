@@ -12,11 +12,12 @@ class SampleNodeView(NodeView):
         has_genotype = True
         sample = self.object.sample
         show_genes_tab = False
-        qc_gene_list = None
+        gene_list = None
         if sample:
             has_genotype = sample.has_genotype
-            qc_gene_list = sample.qc_gene_list
-            show_genes_tab = qc_gene_list and self.object.restrict_to_qc_gene_list
+            if self.object.sample_gene_list:
+                gene_list = self.object.sample_gene_list.gene_list
+            show_genes_tab = gene_list and self.object.restrict_to_qc_gene_list
 
         if show_genes_tab:
             base_template = "analysis/node_editors/grid_editor_gene_coverage_tab.html"
@@ -27,7 +28,7 @@ class SampleNodeView(NodeView):
                         "sample": sample,
                         "has_genotype": has_genotype,
                         "show_genes_tab": show_genes_tab,
-                        "gene_lists": [qc_gene_list]})
+                        "gene_lists": [gene_list]})
         return context
 
     def get_form_kwargs(self):

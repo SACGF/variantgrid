@@ -12,7 +12,7 @@ from analysis.models.nodes.cohort_mixin import SampleMixin
 from annotation.models import SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, \
     SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter, \
     SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter
-from genes.models import SampleGeneList
+from genes.models import SampleGeneList, ActiveSampleGeneList
 from patients.models_enums import Zygosity
 from snpdb.models import SampleStats, SampleStatsPassingFilter, Sample
 from snpdb.models.models_enums import BuiltInFilters
@@ -22,6 +22,7 @@ class SampleNode(SampleMixin, AnalysisNode):
     """ Use restrict_to_qc_gene_list to keep track of that as sample_gene_list is cleared when a sample changes
         including in an AnalysisTemplates """
     sample = models.ForeignKey(Sample, null=True, on_delete=SET_NULL)
+    # When setting sample, if restrict_to_qc_gene_list = True, sample_gene_list is set to active sample gene list
     sample_gene_list = models.ForeignKey(SampleGeneList, null=True, blank=True, on_delete=SET_NULL)
     min_ad = models.IntegerField(default=0)
     min_dp = models.IntegerField(default=0)
@@ -101,8 +102,8 @@ class SampleNode(SampleMixin, AnalysisNode):
                 q_and.append(af_q)
 
         if self.restrict_to_qc_gene_list:
-            if self.sample.qc_gene_list:
-                q = self.sample.qc_gene_list.get_q(self.analysis.gene_annotation_release)
+            if self.sample_gene_list:
+                q = self.sample_gene_list.gene_list.get_q(self.analysis.gene_annotation_release)
             else:
                 q = self.q_none()  # Safety - don't show anything if missing
             q_and.append(q)
@@ -194,3 +195,15 @@ class SampleNode(SampleMixin, AnalysisNode):
             patient_args = self.sample.patient.get_json_dict()
 
         return {"patient": patient_args}
+
+    def __setattr__(self, key, value):
+        super().__setattr__(key, value)
+        if key == "sample":
+            print("SampleNode - Intercepting set sample")
+            if self.restrict_to_qc_gene_list and self.version == 0:  # New - being set in analysis template
+                if self.sample.samplegenelist_set.exists():
+                    try:
+                        self.sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
+                        print("Set to active gene list")
+                    except ActiveSampleGeneList.DoesNotExist:
+                        pass  # Will have to select manually

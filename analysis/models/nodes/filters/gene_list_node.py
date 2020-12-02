@@ -12,7 +12,8 @@ from analysis.models.nodes.analysis_node import NodeColors, AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol, SampleGeneList
+from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol, SampleGeneList, \
+    ActiveSampleGeneList
 from snpdb.models import Sample
 from snpdb.models.models_enums import ImportStatus
 
@@ -20,7 +21,7 @@ from snpdb.models.models_enums import ImportStatus
 class GeneListNode(AncestorSampleMixin, AnalysisNode):
     SELECTED_GENE_LIST = 0
     CUSTOM_GENE_LIST = 1
-    SAMPLE_QC_GENE_LIST = 2
+    SAMPLE_GENE_LIST = 2
     PATHOLOGY_TEST_GENE_LIST = 3
 
     pathology_test_gene_list = models.ForeignKey(GeneList, null=True, blank=True, on_delete=SET_NULL,
@@ -44,7 +45,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         GENE_LISTS = [
             lambda: [gln_gl.gene_list for gln_gl in self.genelistnodegenelist_set.all()],
             lambda: [self.custom_text_gene_list.gene_list],
-            lambda: [self.get_sample_gene_list()],
+            lambda: [self.sample_gene_list.gene_list],
             lambda: [self.pathology_test_gene_list],
         ]
         getter = GENE_LISTS[self.accordion_panel]
@@ -100,8 +101,8 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
                     prefix = "Custom"
                     if self.exclude:
                         prefix += " exclude"
-                elif self.accordion_panel == self.SAMPLE_QC_GENE_LIST:
-                    prefix = "Sample QC"
+                elif self.accordion_panel == self.SAMPLE_GENE_LIST:
+                    prefix = "Sample Gene List"
 
                 name = prefix + ": " + ','.join(self._get_sorted_gene_names())
 
@@ -109,25 +110,18 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
                 name = name[:MAX_NODE_NAME_LENGTH] + "..."
         return name
 
-    def get_sample_gene_list(self):
-        gene_list = None
-        if self.sample:
-            gene_list = self.sample.qc_gene_list
-
-        return gene_list
-
-    @property
-    def has_sample_qc_gene_list(self):
-        return self.get_sample_gene_list() is not None
-
     def __setattr__(self, key, value):
         super().__setattr__(key, value)
         if key == "sample":
             print("Intercepting set sample!")
             if self.version == 0:  # New - being set in analysis template
-                gene_list = self.get_sample_gene_list()
-                if gene_list:
-                    self.accordion_panel = self.SAMPLE_QC_GENE_LIST
+                if self.sample.samplegenelist_set.exists():
+                    self.accordion_panel = self.SAMPLE_GENE_LIST
+                    try:
+                        self.sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
+                        print("Set to active gene list")
+                    except ActiveSampleGeneList.DoesNotExist:
+                        pass  # Will have to select manually
 
     def save_clone(self):
         orig_custom_text_gene_list = self.custom_text_gene_list
@@ -151,9 +145,11 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         if self.use_custom_gene_list:
             create_custom_text_gene_list(self.custom_text_gene_list, self.analysis.user.username, hidden=True)
 
-        if (self.accordion_panel == self.SAMPLE_QC_GENE_LIST) and not self.has_sample_qc_gene_list:
-            self.name = ''
-            self.accordion_panel = self.SELECTED_GENE_LIST
+        # I think we are ok with this - as we'll require it to be set in the form...
+
+#        if (self.accordion_panel == self.SAMPLE_QC_GENE_LIST) and not self.sample_gene_list:
+#            self.name = ''
+#            self.accordion_panel = self.SELECTED_GENE_LIST
 
         # TODO: Also add to analysis settings and require that too
         check_for_gene_coverage = settings.SEQAUTO_ENABLED

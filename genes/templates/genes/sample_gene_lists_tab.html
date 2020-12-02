@@ -1,0 +1,29 @@
+{% load tz %}
+{% load jqgrid_tags %}
+
+{% if sample.activesamplegenelist %}
+    <h3>Active GeneList</h3>
+
+    <p>If set, the active gene list is automatically used in analyses as the sample gene list.</p>
+
+    {% jqgrid 'gene_list_genes_grid' 'gene_list' search=False download_grid_json_as_csv=True gene_list_id=sample.activesamplegenelist.sample_gene_list.gene_list.pk %}
+
+{% endif %}
+
+<b>TODO:</b>
+<ul>
+    <li>Be able to hide
+    <li>Be able to toggle to see hidden tests, and un-hide
+    <li>Be able to set active test
+    <li>Links to create analysis templates for the non-active ones
+
+</ul>
+
+{% for sample_gene_list in sample.samplegenelist_set.all %}
+    {% if sample_gene_list != sample.activesamplegenelist.sample_gene_list %}
+        <h3>{{ sample_gene_list.modified | localtime }}</h3>
+
+        {% jqgrid 'gene_list_genes_grid' 'gene_list' search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
+
+    {% endif %}
+{% endfor %}

@@ -126,8 +126,8 @@ function setIGVLink() {
         {% if sample.import_status == 'S' or sample.import_status == 'A' %}
         <li><a href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
         {% endif %}
-        {% if sample.qc_gene_list and url_name_visible.view_qc_gene_list_tab %}
-        <li><a href="{% url 'view_qc_gene_list_tab' sample.qc.pk %}">Genes of Interest</a></li>
+        {% if sample.samplegenelist_set.exists and url_name_visible.sample_gene_lists_tab %}
+        <li><a href="{% url 'sample_gene_lists_tab' sample.pk %}">Genes of Interest</a></li>
         {% endif %}
         {% if sample.sequencing_run and url_name_visible.view_sample_qc_tab %}
         <li><a href="{% url 'view_sample_qc_tab' sample.pk %}">QC</a></li>

@@ -34,7 +34,7 @@ from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
 from seqauto.models import EnrichmentKit
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection
+from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
@@ -492,6 +492,12 @@ def qc_gene_list_coverage_graphs(request, genome_build_name, gene_list_id):
     gene_list = GeneList.get_for_user(request.user, gene_list_id)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     return gene_coverage_graphs(request, genome_build, gene_list.get_gene_names())
+
+
+def sample_gene_lists_tab(request, sample_id):
+    sample = Sample.get_for_user(request.user, sample_id)
+    context = {"sample": sample}
+    return render(request, 'genes/sample_gene_lists_tab.html', context)
 
 
 class HotspotGraphView(TemplateView):

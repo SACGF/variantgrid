@@ -64,9 +64,9 @@
 {% block node_filter_info %}
     {{ block.super }}
 
-    {% if sample.qc_gene_list and node.restrict_to_qc_gene_list %}
+    {% if node.sample_gene_list and node.restrict_to_qc_gene_list %}
         <div>
-        <span id='restrict-to-qc-gene-listmessage'>Sample restricted to QC GeneList ({{ sample.qc_gene_list }}) (see Genes tab for details)</span>
+        <span id='restrict-to-qc-gene-listmessage'>Sample restricted to GeneList ({{ node.sample_gene_list.gene_list }}) (see Genes tab for details)</span>
         </div>
     {% endif %}
 
@@ -135,7 +135,7 @@ table.zygosity-table tr.top-header th {
 		{% endif %}
 		
 		<a class="cross-link" id="sample-link" target='_blank'>View Sample</a></td>
-        {% if sample.qc_gene_list and form.restrict_to_qc_gene_list %}
+        {% if sample.samplegenelist_set.exists and form.restrict_to_qc_gene_list %}
         <div>
             <span id='qc-gene-list'> <b>Restrict to Sample QC Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
         </div>

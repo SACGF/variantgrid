@@ -27,6 +27,7 @@ urlpatterns = [
     perm_path('gene_grid/<path:columns_from_url>', views.gene_grid, name='passed_gene_grid'),
     perm_path('gene_grid', views.gene_grid, name='gene_grid'),
     perm_path('canonical_transcripts', views.canonical_transcripts, name='canonical_transcripts'),
+    perm_path('sample_gene_lists_tab/<int:sample_id>', views.sample_gene_lists_tab, name='sample_gene_lists_tab'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_symbol>',
               views.HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_id>',
