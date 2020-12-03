@@ -515,6 +515,8 @@ class VCFBedIntersection(models.Model):
                       'right_padding': settings.DEFAULT_ENRICHMENT_KIT_RIGHT_PADDING}
 
             pbi = VCFBedIntersection.objects.get(**kwargs)
+        except VCFBedIntersection.DoesNotExist:
+            pass
         except:
             log_traceback()
             pbi = None
