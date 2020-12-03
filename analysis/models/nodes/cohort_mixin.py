@@ -252,7 +252,8 @@ class AncestorSampleMixin(SampleMixin):
         """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
 
         parent_sample_set = set()
-        for parent in self.get_parent_subclasses():  # Use parent samples not own as own inserts self.sample
+        parents, _errors = self.get_parent_subclasses_and_errors()
+        for parent in parents:  # Use parent samples not own as own inserts self.sample
             parent_sample_set.update(parent.get_samples())
 
         modified = False
