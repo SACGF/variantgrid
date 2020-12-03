@@ -45,7 +45,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         GENE_LISTS = [
             lambda: [gln_gl.gene_list for gln_gl in self.genelistnodegenelist_set.all()],
             lambda: [self.custom_text_gene_list.gene_list],
-            lambda: [self.sample_gene_list.gene_list],
+            lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
             lambda: [self.pathology_test_gene_list],
         ]
         getter = GENE_LISTS[self.accordion_panel]
@@ -113,15 +113,19 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
     def __setattr__(self, key, value):
         super().__setattr__(key, value)
         if key == "sample":
-            print("Intercepting set sample!")
-            if self.version == 0:  # New - being set in analysis template
-                if self.sample.samplegenelist_set.exists():
-                    self.accordion_panel = self.SAMPLE_GENE_LIST
-                    try:
-                        self.sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
-                        print("Set to active gene list")
-                    except ActiveSampleGeneList.DoesNotExist:
-                        pass  # Will have to select manually
+            # If we set anything here that's being changed by a form, it'll be overwritten by the form's values
+            # So this only works for setting in templates
+            print(f"Intercepting set sample to {value}!")
+            sample_gene_list = None
+            if value and self.sample.samplegenelist_set.exists():
+                self.accordion_panel = self.SAMPLE_GENE_LIST  # They can choose themselves
+                try:
+                    sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
+                    print("Set to active gene list")
+                except ActiveSampleGeneList.DoesNotExist:
+                    pass  # Will have to select manually
+            self.sample_gene_list = sample_gene_list
+
 
     def save_clone(self):
         orig_custom_text_gene_list = self.custom_text_gene_list

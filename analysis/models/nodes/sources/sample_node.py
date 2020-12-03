@@ -199,11 +199,15 @@ class SampleNode(SampleMixin, AnalysisNode):
     def __setattr__(self, key, value):
         super().__setattr__(key, value)
         if key == "sample":
-            print("SampleNode - Intercepting set sample")
-            if self.restrict_to_qc_gene_list and self.version == 0:  # New - being set in analysis template
-                if self.sample.samplegenelist_set.exists():
+            # The only way sample can best set with restrict_to_qc_gene_list is setting via analysis template
+            # Otherwise
+            print(f"SampleNode - Intercepting set sample to {value}")
+            if self.restrict_to_qc_gene_list:
+                sample_gene_list = None
+                if value and self.sample.samplegenelist_set.exists():
                     try:
                         self.sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
                         print("Set to active gene list")
                     except ActiveSampleGeneList.DoesNotExist:
                         pass  # Will have to select manually
+                self.sample_gene_list = sample_gene_list

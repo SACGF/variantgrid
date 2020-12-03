@@ -4,6 +4,7 @@ from rest_framework.status import HTTP_200_OK
 
 from analysis.exceptions import NonFatalNodeError, NodeNotFoundException
 from analysis.models.nodes.analysis_node import AnalysisNode
+from library.log_utils import log_traceback
 
 
 class NodeJSONViewMixin(View):
@@ -16,6 +17,7 @@ class NodeJSONViewMixin(View):
             data = self._get_data(request, *args, **kwargs)
             status = HTTP_200_OK
         except NonFatalNodeError as e:
+            log_traceback()
             data = {"message": str(e),
                     "non_fatal": True}
             status = e.status
