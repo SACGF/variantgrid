@@ -3,14 +3,14 @@ from typing import Set, Dict, Any, Union, List
 
 from django.contrib import messages
 from django.db.models import QuerySet
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from guardian.shortcuts import get_objects_for_user
 from gunicorn.config import User
 
 from annotation.models import MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology
 from annotation.ontology_matching import OntologyMatching, OntologyContextSimilarMatch
 from classification.enums import SpecialEKeys
-from classification.models import ClinVarExport, ConditionAlias, EvidenceKeyMap
+from classification.models import ClinVarExport, ConditionAlias, EvidenceKeyMap, MultiCondition
 from classification.regexes import db_ref_regexes
 from classification.views.condition_alias_view import ConditionAliasColumns, MondoGeneMetas
 from library.log_utils import report_exc_info
@@ -59,7 +59,7 @@ class ClinVarExportColumns(DatatableConfig):
 
         return {
             'aliases': populated_aliases,
-            'join_mode': row.get('join_mode')
+            'condition_multi_operation': row.get('condition_multi_operation')
         }
 
     def render_classification_link(self, row: Dict[str, Any]):
@@ -100,6 +100,7 @@ class ClinVarExportColumns(DatatableConfig):
             ], renderer=self.render_classification_link, client_renderer='renderId'),
 
             RichColumn('lab__name', name='Lab', orderable=True),
+            RichColumn('gene_symbol', name='Gene Symbol', orderable=True),
 
             # this busy ups the table a little too much
             # evidence_keys.get(SpecialEKeys.MODE_OF_INHERITANCE).rich_column(prefix="classification_based_on__published_evidence"),
@@ -124,6 +125,30 @@ def clinvar_exports_view(request):
 def clinvar_export_review_view(request, pk):
     user: User = request.user
     clinvar_export = ClinVarExport.objects.get(pk=pk)
+
+    if request.method == "POST":
+        clinvar_export.check_can_write(user)
+        terms = request.POST.get("terms")
+        multimode = request.POST.get("multimode")
+        apply = request.POST.get("apply")
+
+        apply_to: QuerySet = ClinVarExport.objects
+        if apply == "record":
+            apply_to = apply_to.filter(pk=pk)
+        else:
+            apply_to = apply_to.filter(condition_text_normal=clinvar_export.condition_text_normal)
+            if apply == "gene_symbol":
+                apply_to = apply_to.filter(gene_symbol=clinvar_export.gene_symbol)
+
+        apply_clinvar: ClinVarExport
+        for apply_clinvar in apply_to:
+            apply_clinvar.condition_xrefs = [term.strip() for term in terms.split(",") if term.strip()]
+            apply_clinvar.condition_multi_operation = MultiCondition(multimode)
+            apply_clinvar.update_required_input()
+            apply_clinvar.save()
+
+        return redirect('clinvar_export', pk=pk)
+
     clinvar_export.check_can_view(user)
 
     ontologyMatches = OntologyMatching()

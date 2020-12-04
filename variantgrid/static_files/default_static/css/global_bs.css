@@ -523,4 +523,14 @@ table.as_table td {
   word-break: break-word;
 }
 
+.code {
+  font-family: monospace;
+  color: #444;
+  font-weight: 400;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 20px;
+  background-color: #eee;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

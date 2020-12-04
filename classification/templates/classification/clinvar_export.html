@@ -138,7 +138,7 @@
                         $('<span>', {text: title }),
                         " ",
                         $('<span>', {class: 'hover-detail text-muted', text: `${context.phenotype_row}`, title: evidence})
-                    ]});
+                ]});
             } else {
                 return $("<div>", {text: title});
             }
@@ -164,7 +164,7 @@
                 if (selected.length >= 2) {
                     // TODO load actual value
                     let label = {
-                        "N": "Not Decided",
+                        "N": "Multi-Term Operation Required",
                         "U": "Uncertain",
                         "C": "Co-occuring"
                     }[$('[name=multimode]:checked').val()];
@@ -266,9 +266,19 @@
             }
         }
 
+        function submit() {
+            let form = $('#clinvar_form');
+            let selected = Object.values(mondos).filter(onto => !!onto.contexts.selected).map(onto => onto.id);
+            form.find('[name=terms]').val(selected.join(","));
+            form.find('[name=multimode]').val($('#multimode input[name=multimode]:checked').val());
+            form.find('[name=apply').val($('#saveModal input[name=applyLevel]:checked').val());
+            form.submit();
+        }
+
         $(document).ready(() => {
             renderOntologies();
             updateMultiModeVisibility();
+            $('#submission_json').text(JSON.stringify({{ clinvar_export.as_json | jsonify }}, null, 4));
             $('#condition-search-button').click(() => search());
             $('[name=multimode]').click(() => updateMultiModeVisibility());
             search();
@@ -276,6 +286,12 @@
     </script>
 {% endblock %}
 {% block content %}
+    <form method="POST" id="clinvar_form">
+        {% csrf_token %}
+        <input type="hidden" name="terms" />
+        <input type="hidden" name="multimode" />
+        <input type="hidden" name="apply" />
+    </form>
     <div class="container">
         <a href="{% url 'clinvar_exports' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all ClinVar Exports</a>
         <h3>ClinVar Export</h3>
@@ -286,7 +302,7 @@
         {% end_page_help_embedded %}
 
         <div class="modal fade" id="saveModal" tabindex="-1" aria-labelledby="saveModalLabel" aria-hidden="true">
-          <div class="modal-dialog">
+          <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
               <div class="modal-header">
                 <h5 class="modal-title" id="saveModalLabel">Save</h5>
@@ -295,11 +311,21 @@
                 </button>
               </div>
               <div class="modal-body">
-                Will ask if this should be applied to other existing or future records
+                Apply condition terms to:
+
+                  <div class="list-group mt-2">
+                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="record" class="mr-2" checked>To this record only</label>
+                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="gene_symbol" class="mr-2">As default for records with condition text "<span class="text-muted">{{ clinvar_export.condition_text_normal }}</span>" and Gene {{ clinvar_export.gene_symbol }}
+                      <div class="text-muted">{% count same_text_gene_vcs singular="1 other existing ClinVar Export" plural="other existing ClinVar Exports" %}</div>
+                      </label>
+                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="text" class="mr-2">As default for records with condition text "<span class="text-muted">{{ clinvar_export.condition_text_normal }}</span>"
+                      <div class="text-muted">{% count same_text_vcs singular="1 other existing ClinVar Export" plural="other existing ClinVar Exports" %}</div>
+                      </label>
+                  </div>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary">Apply Changes</button>
+                <button type="button" class="btn btn-primary" onclick="submit()">Apply Changes</button>
               </div>
             </div>
           </div>
@@ -338,12 +364,12 @@
             {% labelled label="Multi-Term Operation" %}
                 <div id="multimode" class="collapse">
                     <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N" {% if clinvar_export.condition_multi_operation == "N" %}checked="checked"{% endif %}>Not Decided</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-n" value="N" {% if clinvar_export.condition_multi_operation == "N" %}checked="checked"{% endif %}>Multi-Term Operation Required</label>
                         <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-u" value="U" {% if clinvar_export.condition_multi_operation == "U" %}checked="checked"{% endif %}>Uncertain</label>
-                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C" {% if clinvar_export.condition_multi_operation == "C" %}checked="checked"{% endif %}>Co-Occuring</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="multimode" id="multimode-c" value="C" {% if clinvar_export.condition_multi_operation == "C" %}checked="checked"{% endif %}>Co-occuring</label>
                     </div>
                 </div>
-                <div id="singlemode" class="no-value">N/A</div>
+                <div id="singlemode" class="collapse no-value">N/A</div>
             {% endlabelled %}
             <label>Select Relevant Ontology Terms Below</label>
             <table class="table" id="ontology_table">
@@ -367,7 +393,7 @@
             {% labelled label="Interpretation Summary" class="formatted-text"%}<div class="formatted-text">{{ clinvar_export.interpretation_summary }}</div>{% endlabelled %}
             {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
             {% labelled label="Assertion Method" %}{{ clinvar_export.assertion_method }}{% endlabelled %}
-            {% labelled label="Curation Context" %}{{ clinvar_export.assertion_method }}{% endlabelled %}
+            {% labelled label="Curation Context" %}{{ clinvar_export.curation_context }}{% endlabelled %}
             {% labelled label="Citations" %}
                 <div class="pills">
                 {% for ref_data in clinvar_export.citation_refs %}
@@ -377,8 +403,7 @@
             {% endlabelled %}
             <h4>Export Preview</h4>
             <p class="text-muted">This is how the data will be submitted to ClinVar</p>
-            <div class="code formatted-text">
-                {{ clinvar_export.as_json | jsonify_pretty }}
+            <div class="code formatted-text" id="submission_json">
             </div>
         {% end_ui_register_tab_embedded %}
 

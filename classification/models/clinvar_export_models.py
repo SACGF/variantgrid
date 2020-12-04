@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import List, Dict
 
@@ -62,7 +63,7 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
     def update_with(self, cm: ClassificationModification) -> bool:
         is_update = self.id is None or self.classification_based_on != cm
         self.classification_based_on = cm
-        condition_text = cm.get(SpecialEKeys.CONDITION)
+        condition_text = ClinVarExport.normalise_text(cm.get(SpecialEKeys.CONDITION))
 
         if condition_text != self.condition_text_normal:
             self.condition_text_normal = condition_text
@@ -73,10 +74,26 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
             self.condition_xrefs = [result.id_fixed for result in results]
             self.condition_multi_operation = MultiCondition.NOT_DECIDED
             self.dirty_date = datetime.now()
+            self.requires_user_input = self._calculate_required_input()
 
-            if len(results) == 0 or len(results) >= 2:
-                self.requires_user_input = True
         return is_update
+
+    @staticmethod
+    def normalise_text(text: str):
+        text = text.lower()
+        text = re.sub("[,;.]", " ", text) # replace , ; . with spaces
+        text = re.sub("[ ]{2,}", " ", text) # replace multiple spaces with
+        return text
+
+    def _calculate_required_input(self):
+        if len(self.condition_xrefs) == 0:
+            return True
+        if len(self.condition_xrefs) >= 2 and self.condition_xrefs == MultiCondition.NOT_DECIDED:
+            return True
+        return False
+
+    def update_required_input(self):
+        self.requires_user_input = self._calculate_required_input()
 
     @staticmethod
     def chgvs_for(cm: ClassificationModification):
