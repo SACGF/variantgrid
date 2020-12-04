@@ -16,7 +16,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from library.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant,\
     cyvcf2_get_contig_lengths_dict
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, \
-    VCFFromSequencingRun, SampleFromSequencingSample
+    VCFFromSequencingRun, SampleFromSequencingSample, QCGeneList
 from seqauto.signals import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
     Cohort, CohortSample, UserSettings, VCFSourceSettings
@@ -377,6 +377,12 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
             except SampleFromSequencingSample.DoesNotExist:
                 SampleFromSequencingSample.objects.create(sample=sample,
                                                           sequencing_sample=sequencing_sample)
+
+            # Link any QCGeneLists
+            for qcgl in QCGeneList.objects.filter(qc__bam_file__unaligned_reads__sequencing_sample=sequencing_sample,
+                                                  custom_text_gene_list__gene_list__isnull=False,
+                                                  sample_gene_list__isnull=True).distinct():
+                qcgl.create_and_assign_sample_gene_list(sample)
 
 
 def create_import_success_message(vcf):

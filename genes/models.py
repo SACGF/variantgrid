@@ -11,12 +11,14 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
-from django.db import models
+from django.db import models, IntegrityError, transaction
 from django.db.models import Min, Max, QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
 from django.db.models.query_utils import Q
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
@@ -1054,6 +1056,8 @@ class CustomTextGeneList(models.Model):
 
 
 class SampleGeneList(TimeStampedModel):
+    """ There can be multiple SampleGeneLists per sample, but only 1 active one.
+        If multiple exist, the active one must be set manually """
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
     visible = models.BooleanField(default=True, blank=False)
@@ -1061,6 +1065,19 @@ class SampleGeneList(TimeStampedModel):
     class Meta:
         unique_together = ('sample', 'gene_list')
         ordering = ['created']
+
+
+@receiver(post_save, sender=SampleGeneList)
+def sample_gene_list_created(sender, instance, created, **kwargs):
+    if created:
+        sample = instance.sample
+        try:
+            with transaction.atomic():
+                # There can only be 1 - if this works it's active
+                ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
+        except IntegrityError:
+            # Multiple exist, so need to set manually
+            ActiveSampleGeneList.objects.filter(sample=sample).delete()
 
 
 class ActiveSampleGeneList(TimeStampedModel):

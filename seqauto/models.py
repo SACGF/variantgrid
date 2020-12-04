@@ -1111,7 +1111,19 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
                                                    severity=LogLevel.ERROR)
 
             self.custom_text_gene_list = custom_text_gene_list
+
+        try:
+            # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
+            sample = self.sequencing_sample.samplefromsequencingsample.sample
+            self.create_and_assign_sample_gene_list(sample)  # Also saves
+        except SampleFromSequencingSample.DoesNotExist:
             self.save()
+
+    def create_and_assign_sample_gene_list(self, sample: Sample):
+        logging.info(f"QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
+        self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
+                                                                     gene_list=self.custom_text_gene_list.gene_list)[0]
+        self.save()
 
 
 class QCExecSummary(SeqAutoFile, SequencingSamplePropertiesMixin):

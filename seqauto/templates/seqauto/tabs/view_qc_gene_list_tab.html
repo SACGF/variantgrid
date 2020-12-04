@@ -6,7 +6,9 @@
     {% for qc_gene_list in qc.qcgenelist_set.all %}
 
         {% if qc_gene_list.custom_text_gene_list.gene_list.import_status == 'S' %}
-            {% jqgrid 'gene_list_genes_grid' 'gene_list' search=False download_grid_json_as_csv=True gene_list_id=qc_gene_list.custom_text_gene_list.gene_list.pk %}
+            <h3>QC Gene List</h3>
+
+            {% jqgrid 'gene_list_genes_grid' qc_gene_list.custom_text_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=qc_gene_list.custom_text_gene_list.gene_list.pk %}
         {% else %}
             <b>Error:</b>
             {% if qc_gene_list.custom_text_gene_list.gene_list.import_status == 'E' %}

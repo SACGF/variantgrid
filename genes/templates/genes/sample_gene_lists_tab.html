@@ -1,29 +1,36 @@
 {% load tz %}
 {% load jqgrid_tags %}
+<style>
+    .active-sample-gene-list {
+        background-image: url(/static/icons/check-mark-green.svg);
+    }
+</style>
 
-{% if sample.activesamplegenelist %}
-    <h3>Active GeneList</h3>
-
-    <p>If set, the active gene list is automatically used in analyses as the sample gene list.</p>
-
-    {% jqgrid 'gene_list_genes_grid' 'gene_list' search=False download_grid_json_as_csv=True gene_list_id=sample.activesamplegenelist.sample_gene_list.gene_list.pk %}
-
-{% endif %}
-
-<b>TODO:</b>
-<ul>
-    <li>Be able to hide
-    <li>Be able to toggle to see hidden tests, and un-hide
-    <li>Be able to set active test
-    <li>Links to create analysis templates for the non-active ones
-
-</ul>
+<p>If you have more than one sample gene list, you must manually set one as active.
+    The active one is automatically used in analyses templates and gene list nodes.
+    Hidden sample gene lists do not appear in gene list node auto-completes.
+</p>
 
 {% for sample_gene_list in sample.samplegenelist_set.all %}
-    {% if sample_gene_list != sample.activesamplegenelist.sample_gene_list %}
-        <h3>{{ sample_gene_list.modified | localtime }}</h3>
+    <h3>
+        {% if sample_gene_list == sample.activesamplegenelist.sample_gene_list %}
+            Active Gene List:
+        {% endif %}
+        {{ sample_gene_list.modified | localtime }}
+    </h3>
 
-        {% jqgrid 'gene_list_genes_grid' 'gene_list' search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
-
+    <div class="sample-gene-list-toolbar">
+    {% if sample_gene_list == sample.activesamplegenelist.sample_gene_list %}
+        <div class="icon48 active-sample-gene-list"></div>
+    {% else %}
+        <button class="btn btn-outline-primary">Make active</button>
     {% endif %}
+    {% if sample_gene_list.visible %}
+        <button class="btn btn-outline-primary">Hide</button>
+    {% else %}
+        <button class="btn btn-outline-primary">Un-Hide</button>
+    {% endif %}
+    </div>
+
+    {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
 {% endfor %}
