@@ -150,7 +150,7 @@ class OntologyMeta:
         elif term_id.startswith(HumanPhenotypeOntology.PREFIX):
             if hpo := HumanPhenotypeOntology.objects.filter(pk=HumanPhenotypeOntology.id_as_int(term_id)).first():
                 self.name = hpo.name
-                self.definition = hpo.description
+                self.definition = hpo.definition
 
         # FIXME can we do this in a method on Mondo?
         if self.definition:
