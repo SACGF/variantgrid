@@ -1082,6 +1082,9 @@ class PanelAppServer(models.Model):
     url = models.TextField(unique=True)
     icon_css_class = models.TextField()
 
+    def __str__(self):
+        return self.name
+
 
 class PanelAppPanel(models.Model):
     """ Name, used in autocomplete list, actual gene list retrieved by API call (panel_app.py)

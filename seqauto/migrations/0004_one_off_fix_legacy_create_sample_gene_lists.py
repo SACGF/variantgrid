@@ -26,17 +26,18 @@ def _fix_seqauto_qc_gene_list(apps, schema_editor):
                 * hash
                 * sample_gene_list
     """
-
+    BATCH_SIZE = 1000
     QCGeneList = apps.get_model("seqauto", "QCGeneList")
+    QCGeneCoverage = apps.get_model("seqauto", "QCGeneCoverage")
     DATASTATE_COMPLETE = 'C'
 
     # QCGeneList wasn't automatically reloaded, so what was loaded will have been the 1st one, not the
     # latest one on the disk. Thus we need to check genes - if it's the same we'll set last modified/hash etc
     # Otherwise set it to an earlier time/bad hash, so the new data will get loaded next scan
-
     num_skipped = 0
     num_set_to_latest = 0
     num_out_of_date = 0
+    qc_gene_list_list = []
     for qcgl in QCGeneList.objects.filter(data_state=DATASTATE_COMPLETE):
         path = pathlib.Path(qcgl.path)
         if path.exists():
@@ -45,18 +46,33 @@ def _fix_seqauto_qc_gene_list(apps, schema_editor):
                 md5_hash = md5sum_str(custom_gene_list_text)
                 if md5_hash == qcgl.custom_text_gene_list.md5_hash:
                     num_set_to_latest += 1
-                    qcgl.last_modified = path.stat().st_mtime
+                    qcgl.file_last_modified = path.stat().st_mtime
+                    qc_gene_list_list.append(qcgl)
                 else:
                     num_out_of_date += 1
-                    qcgl.last_modified = 1.0  # Next scan will get picked up
-                qcgl.save()
+                    # Will be left with default file_last_modified of 0.0
+                    # Thus will get updated automatically next time.
         else:
             num_skipped += 1
 
+    if qc_gene_list_list:
+        QCGeneList.objects.bulk_update(qc_gene_list_list, ["file_last_modified"], BATCH_SIZE)
+
     total = num_skipped + num_set_to_latest + num_out_of_date
+    print("QCGeneCoverage")
     print(f"total: {total} skipped: {num_skipped} ({100 * num_skipped / total})")
     print(f"Set to latest: {num_set_to_latest} ({100 * num_set_to_latest / total})")
     print(f"Out of date: {num_out_of_date} ({100 * num_out_of_date / total})")
+
+    qc_gene_coverage_list = []
+    for qcgc in QCGeneCoverage.objects.filter(data_state=DATASTATE_COMPLETE):
+        path = pathlib.Path(qcgc.path)
+        if path.exists():
+            qcgc.file_last_modified = path.stat().st_mtime
+            qc_gene_coverage_list.append(qcgc)
+
+    if qc_gene_coverage_list:
+        QCGeneCoverage.objects.bulk_update(qc_gene_coverage_list, ["file_last_modified"], BATCH_SIZE)
 
 
 def _create_sample_gene_lists(apps, schema_editor):
@@ -118,7 +134,7 @@ class Migration(migrations.Migration):
         ('analysis', '0010_auto_20201201_1152'),
         ('genes', '0007_activesamplegenelist_samplegenelist'),
         ('manual', '0002_deployment'),
-        ('seqauto', '0003_auto_20201130_1231'),
+        ('seqauto', '0003_auto_20201204_1153'),
     ]
 
     operations = [

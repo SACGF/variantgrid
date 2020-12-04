@@ -1,3 +1,5 @@
+import pathlib
+
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import DecimalRangeField
@@ -442,6 +444,8 @@ class SequencingRunModification(models.Model):
 
 class SeqAutoFile(models.Model):
     path = models.TextField()
+    # last modified - Stores stat st_mtime - time of last modification - only used for classes that can reload
+    file_last_modified = models.FloatField(default=0.0)
     data_state = models.CharField(max_length=1, choices=DataState.CHOICES)
     error_exception = models.TextField(null=True)
     #hash = models.TextField() ???
@@ -1072,7 +1076,6 @@ class QC(SeqAutoFile, SequencingSamplePropertiesMixin):
 
 class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
     """ This represents a text file containing genes which will be used for initial pass and QC filters """
-    file_last_modified = models.IntegerField(null=True)
     qc = models.ForeignKey(QC, on_delete=CASCADE)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=SET_NULL)
     sample_gene_list = models.ForeignKey(SampleGeneList, null=True, on_delete=SET_NULL)
@@ -1088,7 +1091,6 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
 
     def load_from_file(self, seqauto_run, **kwargs):
         from genes.custom_text_gene_list import create_custom_text_gene_list
-
         with open(self.path) as f:
             custom_gene_list_text = f.read()
             custom_text_gene_list = CustomTextGeneList(name=f"{self.qc} gene list", text=custom_gene_list_text)
