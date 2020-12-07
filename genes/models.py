@@ -21,6 +21,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
+from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
@@ -1065,6 +1066,12 @@ class SampleGeneList(TimeStampedModel):
     class Meta:
         unique_together = ('sample', 'gene_list')
         ordering = ['created']
+
+    def __str__(self):
+        s = f"{self.sample}: {localtime(self.modified)}"
+        if not self.visible:
+            s += " (hidden)"
+        return s
 
 
 @receiver(post_save, sender=SampleGeneList)

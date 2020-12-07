@@ -30,6 +30,7 @@ from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCatego
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
     PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer
+from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
@@ -496,7 +497,9 @@ def qc_gene_list_coverage_graphs(request, genome_build_name, gene_list_id):
 
 def sample_gene_lists_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
-    context = {"sample": sample}
+    sample_gene_lists_data = [SampleGeneListSerializer(sgl).data for sgl in sample.samplegenelist_set.all()]
+    context = {"sample": sample,
+               "sample_gene_lists_data": sample_gene_lists_data}
     return render(request, 'genes/sample_gene_lists_tab.html', context)
 
 

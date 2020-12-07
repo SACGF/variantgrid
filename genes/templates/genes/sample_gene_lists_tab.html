@@ -1,36 +1,103 @@
 {% load tz %}
+{% load js_tags %}
 {% load jqgrid_tags %}
 <style>
     .active-sample-gene-list {
         background-image: url(/static/icons/check-mark-green.svg);
     }
 </style>
+<script>
+// Note: This is a tab so can be re-loaded (ie don't use global let/const)
+SAMPLE_GENE_LIST_DATA = {{ sample_gene_lists_data | jsonify }};
+
+function populateSampleGeneListFromJSON(data) {
+    let sampleGeneListContainer = $(".sample-gene-list-container[sample-gene-list-id=" + data.pk + "]");
+    let details = $(".sample-gene-list-details", sampleGeneListContainer);
+    let toggle = $("a.show-sample-gene-list-toggle", sampleGeneListContainer);
+
+    if (data.visible) {
+        toggle.hide();
+        details.addClass("show");
+        $("button.hide", details).show();
+        $("button.un-hide", details).hide();
+    } else {
+        toggle.show();
+        details.removeClass("show");
+        $("button.hide", details).hide();
+        $("button.un-hide", details).show();
+    }
+
+    let myActiveIcon = $(".active-sample-gene-list", details);
+    if (data.active) {
+        $(".active-sample-gene-list").hide();  // hide all others
+        myActiveIcon.show();
+        $("button.make-active", details).hide();
+    } else {
+        myActiveIcon.hide();
+        $("button.make-active", details).show();
+    }
+}
+
+function drawInitialSampleGeneLists() {
+    for (let i=0 ; i<SAMPLE_GENE_LIST_DATA.length ; i++) {
+        populateSampleGeneListFromJSON(SAMPLE_GENE_LIST_DATA[i]);
+    }
+    $("#sample-gene-lists").show();
+}
+
+function modifySampleGeneList(that, data) {
+    let sampleGeneListContainer = $(that).parents(".sample-gene-list-container");
+    let sampleGeneListId = sampleGeneListContainer.attr("sample-gene-list-id");
+
+    $.ajax({
+        type: "POST",
+        data: data,
+        url: Urls.api_sample_gene_list(sampleGeneListId),
+        success: populateSampleGeneListFromJSON,
+    });
+}
+
+$(document).ready(function() {
+    drawInitialSampleGeneLists();
+
+    $("button.make-active").click(function() {
+        modifySampleGeneList(this, {active: true});
+    });
+
+    $("button.hide").click(function() {
+        modifySampleGeneList(this, {visible: false});
+    });
+
+    $("button.un-hide").click(function() {
+        modifySampleGeneList(this, {visible: true});
+    });
+});
+</script>
 
 <p>If you have more than one sample gene list, you must manually set one as active.
     The active one is automatically used in analyses templates and gene list nodes.
     Hidden sample gene lists do not appear in gene list node auto-completes.
 </p>
 
-{% for sample_gene_list in sample.samplegenelist_set.all %}
-    <h3>
-        {% if sample_gene_list == sample.activesamplegenelist.sample_gene_list %}
-            Active Gene List:
-        {% endif %}
-        {{ sample_gene_list.modified | localtime }}
-    </h3>
+<div id="sample-gene-lists" class="hidden">
+    {% for sample_gene_list in sample.samplegenelist_set.all %}
+    <div class="sample-gene-list-container" sample-gene-list-id="{{ sample_gene_list.pk }}">
+        <a data-toggle="collapse" href="#sample-gene-list-{{ sample_gene_list.pk }}" class="show-sample-gene-list-toggle">
+            Toggle {{ sample_gene_list.modified | localtime }} (hidden)
+        </a>
 
-    <div class="sample-gene-list-toolbar">
-    {% if sample_gene_list == sample.activesamplegenelist.sample_gene_list %}
-        <div class="icon48 active-sample-gene-list"></div>
-    {% else %}
-        <button class="btn btn-outline-primary">Make active</button>
-    {% endif %}
-    {% if sample_gene_list.visible %}
-        <button class="btn btn-outline-primary">Hide</button>
-    {% else %}
-        <button class="btn btn-outline-primary">Un-Hide</button>
-    {% endif %}
+        <div id="sample-gene-list-{{ sample_gene_list.pk }}" class="sample-gene-list-details collapse">
+            <h3>{{ sample_gene_list.modified | localtime }}</h3>
+
+            <div class="sample-gene-list-toolbar">
+                <div class="icon48 active-sample-gene-list"></div>
+                <button class="btn btn-outline-primary make-active">Make active</button>
+                <button class="btn btn-outline-primary hide">Hide</button>
+                <button class="btn btn-outline-primary un-hide">Un-Hide</button>
+            </div>
+
+            {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
+        </div>
     </div>
-
-    {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
-{% endfor %}
+    {% endfor %}
+</div>

@@ -78,7 +78,7 @@ rest_urlpatterns = [
     perm_path('api/gene/info/<gene_symbol>', views_rest.GeneInfoView.as_view(), name='api_gene_info'),
     perm_path('api/text_to_gene_list', views_rest.TextToGeneListView.as_view(), name='api_text_to_gene_list'),
     perm_path('api/gene_annotation_release/<int:pk>', views_rest.GeneAnnotationReleaseView.as_view(), name='api_gene_annotation_release'),
-
+    perm_path('api/sample_gene_list/<int:pk>', views_rest.SampleGeneListView.as_view(), name='api_sample_gene_list'),
 
 ]
 urlpatterns += format_suffix_patterns(rest_urlpatterns)
