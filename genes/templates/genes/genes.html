@@ -2,8 +2,35 @@
 {% load static %}
 
 {% block title %}Genes{% endblock title %}
+{% block submenu_page_content %}
+<style>
+    .filter-container {
+        height: 30px;
+        line-height: 30px;
+    }
 
-{% block jshead %}
+    .filter-label {
+      float: left;
+      margin: 0px 10px 0px 0px;
+      color: #707070;
+    }
+
+    .filter-status {
+      float: left;
+      margin: 0;
+      list-style: none;
+    }
+
+    .filter-status>li {
+      float: left;
+      margin-right: 10px;
+    }
+
+    .horizontal-fields {
+        margin: 6px 0 6px 0;
+    }
+</style>
+<script>
     searchVisible = false;
     gridExtraFilters = {};
     
@@ -42,56 +69,28 @@
     
 
     function genes_grid_complete() {
-        var grid = $("#gene-annotation-versions-grid");
+        let grid = $("#gene-annotation-versions-grid");
         grid[0].p.postData["extra_filters"] = getExtraFilters;
-        
+
+        let searchToolBox = $("#searchmodfbox_gene-annotation-versions-grid");
+        searchToolBox.width(650); // make space for data entry
         if (!searchVisible) {
-            $("#searchmodfbox_gene-annotation-versions-grid").hide();
+            searchToolBox.hide();
         }
     }
 
-{% endblock jshead %}
+    $(document).ready(function() {
+        $("#id_version").change(function() {
+            filterGrid();
+        });
 
-{% block jsdocumentready %}
-$("#id_version").change(function() {
-    filterGrid();
-});
+        $('#id_gene').change(function() {
+            var geneId = $("#id_gene").val();
+            window.location = Urls.view_gene(geneId);
+        });
+    });
+</script>
 
-$('#id_gene').change(function() {
-    var geneId = $("#id_gene").val();
-    window.location = Urls.view_gene(geneId);
-});
-
-{% endblock jsdocumentready %}
-
-{% block css %}
-.filter-container {
-    height: 30px;
-    line-height: 30px;
-}
-
-.filter-label {
-  float: left;
-  margin: 0px 10px 0px 0px;
-  color: #707070;
-}
-
-.filter-status {
-  float: left;
-  margin: 0;
-  list-style: none;
-}
-
-.filter-status>li {
-  float: left;
-  margin-right: 10px;
-}
-    .horizontal-fields {
-        margin: 6px 0 6px 0;
-    }
-{% endblock css %}
-
-{% block submenu_page_content %}
     {% load help_tags %}
     {% page_help user 'annotation/gene_annotations_help' ' ' %}
     {% load genome_build_tags %}
