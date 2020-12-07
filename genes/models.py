@@ -555,7 +555,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if exists:
             raise MissingTranscript(f"Transcript '{identifier}' valid but missing from our (build: {genome_build}) database.")
         accession = TranscriptVersion.get_accession(identifier, version)
-        raise BadTranscript(f"The transcript '{accession}' does not exist in the {annotation_consortium} database.")
+        raise BadTranscript(f"The transcript '{accession}' does not exist in the {genome_build} {annotation_consortium} database.")
 
     @staticmethod
     def get_refgene(genome_build: GenomeBuild, transcript_name, best_attempt=True):
