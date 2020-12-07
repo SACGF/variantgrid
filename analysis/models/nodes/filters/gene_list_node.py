@@ -126,7 +126,6 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
                     pass  # Will have to select manually
             self.sample_gene_list = sample_gene_list
 
-
     def save_clone(self):
         orig_custom_text_gene_list = self.custom_text_gene_list
 
