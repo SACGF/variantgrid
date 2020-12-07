@@ -133,22 +133,28 @@ def gene_grid(context, columns_from_url=None,
         named_custom_gene_list_form = NamedCustomGeneListForm(username=user)
     else:
         named_custom_gene_list_form = None
-    return {"ENRICHMENT_KIT_COLUMNS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMNS,
-            "ENRICHMENT_KIT_COLUMN_TOOL_TIPS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS,
-            "ENRICHMENT_KIT_COLUMN_LABELS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS,
-            "ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS,
-            "initial_columns": initial_columns,
-            "init_callback": init_callback,
-            "update_url_callback": update_url_callback,
-            "save_gene_list_callback": save_gene_list_callback,
-            "close_button_callback": close_button_callback,
-            "data_columns": data_columns,
-            "categories": categories,
-            "panel_app_servers": panel_app_servers,
-            "panel_app_form_ids": panel_app_form_ids,
-            "has_gene_info": has_gene_info,
-            "gene_symbol_form": GeneSymbolForm(),
-            "named_custom_gene_list_form": named_custom_gene_list_form,
-            "user": user,
-            "show_help": show_help,
-            "form_helper": context.get('form_helper')}
+
+    gene_symbol_form = GeneSymbolForm()
+    gene_symbol_form.fields["gene_symbol"].widget.attrs['data-placeholder'] = "Add Gene Symbol"
+
+    return {
+        "ENRICHMENT_KIT_COLUMNS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMNS,
+        "ENRICHMENT_KIT_COLUMN_TOOL_TIPS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS,
+        "ENRICHMENT_KIT_COLUMN_LABELS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS,
+        "ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS,
+        "initial_columns": initial_columns,
+        "init_callback": init_callback,
+        "update_url_callback": update_url_callback,
+        "save_gene_list_callback": save_gene_list_callback,
+        "close_button_callback": close_button_callback,
+        "data_columns": data_columns,
+        "categories": categories,
+        "panel_app_servers": panel_app_servers,
+        "panel_app_form_ids": panel_app_form_ids,
+        "has_gene_info": has_gene_info,
+        "gene_symbol_form": gene_symbol_form,
+        "named_custom_gene_list_form": named_custom_gene_list_form,
+        "user": user,
+        "show_help": show_help,
+        "form_helper": context.get('form_helper')
+    }
