@@ -13,4 +13,4 @@ wget ftp://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/
 wget ftp://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/109.20200228/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz --output-document=GCF_000001405.39_GRCh38.p13_genomic.109.20200228.gff.gz
 wget ftp://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/109.20200522/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz --output-document=GCF_000001405.39_GRCh38.p13_genomic.109.20200522.gff.gz
 wget ftp://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/109.20200815/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz --output-document=GCF_000001405.39_GRCh38.p13_genomic.109.20200815.gff.gz
-
+wget ftp://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/109.20201120/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz --output-document=GCF_000001405.39_GRCh38.p13_genomic.109.20201120.gff.gz
