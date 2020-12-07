@@ -89,7 +89,9 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
         $("#analysis-variables").show();
     }
 
-    var centerLayoutParams = {};
+    var centerLayoutParams = {
+        minWidth: 200,
+    };
     if (!readOnly) {
         centerLayoutParams.onresize = resizePanel;  // save panel widths
     }
