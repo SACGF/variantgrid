@@ -61,7 +61,6 @@ function setPatientLink() {
 
 
 function setIGVLink() {
-    console.log("setIGVLink");
     var bfpl = $("<span id='bam-files-path-container'></span>");
     var bamFilePathSelector = $("#id_bam_file_path");
     var parentContainer = bamFilePathSelector.parent();
@@ -85,18 +84,13 @@ function setIGVLink() {
     setBamFilesPathLink();
     bamFilePathSelector.change(setBamFilesPathLink);
 }
-</script>
-<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
-{% endblock %}
 
-{% block jsdocumentready %}
+$(document).ready(function() {
     setPatientLink();
     setIGVLink();
 
     $("#sample-tabs").tabs();
-    
+
     var sampleForm = $("#sample-form");
     var patientSelect = $("#id_patient", sampleForm);
     patientSelect.change(function() {
@@ -106,8 +100,11 @@ function setIGVLink() {
     var dialog = setupCreatePatientDialog();
     var sampleName = $("#id_name").val();
     addCreatePatientButton(dialog, patientSelect, sampleName);
-
-    
+});
+</script>
+<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 {% endblock %}
 
 {% block submenu_page_content %}
