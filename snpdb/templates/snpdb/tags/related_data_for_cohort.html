@@ -22,4 +22,20 @@
         {% endfor %}
     </div>
     {% endif %}
+
+    {% if cohort.pedigree_set.exists %}
+    <div id='related-pedigrees'>
+        <h3>Pedigrees</h3>
+        {% for pedigree in cohort.pedigree_set.all %}
+            <div>
+                <a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
+            </div>
+        {% endfor %}
+        </table>
+    </div>
+
+    {% endif %}
+
+
+
 {% endblock %}
