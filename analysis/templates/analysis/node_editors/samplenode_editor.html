@@ -139,6 +139,7 @@ table.zygosity-table tr.top-header th {
         </div>
 
         {% if node.analysis.template_type %}
+        <!-- We never set this manually, but show so it can be set as an analysis variable via template -->
         <div>
             <span id='sample-gene-list'> <b>Sample Gene List:</b> {{ form.sample_gene_list }} </span>
         </div>
