@@ -90,22 +90,24 @@ $(document).ready(function() {
             Toggle {{ sample_gene_list.modified | localtime }} (hidden)
         </a>
 
-        <div id="sample-gene-list-{{ sample_gene_list.pk }}" class="sample-gene-list-details collapse">
-            <h3>{{ sample_gene_list.modified | localtime }}</h3>
+        <div id="sample-gene-list-{{ sample_gene_list.pk }}" class="sample-gene-list-details collapse card mt-4">
+            <div class="card-header">
+                <div class="left icon32 active-sample-gene-list" title="Active Gene List"></div>
+                GeneList: {{ sample_gene_list.modified | localtime }}</div>
+            <div class="card-body">
+                <div class="sample-gene-list-toolbar">
+                    <button class="btn btn-outline-primary make-active">Make active</button>
+                    <button class="btn btn-outline-primary hide">Hide</button>
+                    <button class="btn btn-outline-primary un-hide">Un-Hide</button>
+                </div>
 
-            <div class="sample-gene-list-toolbar">
-                <div class="icon48 active-sample-gene-list"></div>
-                <button class="btn btn-outline-primary make-active">Make active</button>
-                <button class="btn btn-outline-primary hide">Hide</button>
-                <button class="btn btn-outline-primary un-hide">Un-Hide</button>
+                <div class="sample-gene-list-analysis-templates">
+                    <h3>Analysis Templates - using this gene list</h3>
+                    {% analysis_templates_tag sample_somatic=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
+                </div>
+
+                {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
             </div>
-
-            <div class="sample-gene-list-analysis-templates">
-                <h3>Analysis Templates - using this gene list</h3>
-                {% analysis_templates_tag sample_somatic=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
-            </div>
-
-            {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
         </div>
     </div>
     {% endfor %}
