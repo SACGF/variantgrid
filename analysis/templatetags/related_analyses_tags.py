@@ -1,4 +1,5 @@
 import operator
+import uuid
 from collections import defaultdict
 from functools import reduce
 
@@ -120,8 +121,10 @@ def analysis_templates_tag(context, sample_somatic=False, sample_gene_list=False
     analysis_template_links = AnalysisTemplate.filter(user, class_name=class_name,
                                                       sample_somatic=sample_somatic, sample_gene_list=sample_gene_list,
                                                       atv_kwargs={"appears_in_links": True})
+    tag_uuid = uuid.uuid4()
     return {
-        "analysis_template_form": AnalysisTemplateForm(),
+        "uuid": tag_uuid,
+        "analysis_template_form": AnalysisTemplateForm(prefix=tag_uuid),
         "analysis_template_links": analysis_template_links,
         "hidden_inputs": hidden_inputs,
     }

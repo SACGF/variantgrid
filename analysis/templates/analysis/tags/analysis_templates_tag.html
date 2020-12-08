@@ -1,7 +1,7 @@
 {% if analysis_template_links.exists %}
 <script>
     function createAnalysis(analysis_template_id) {
-        let atForm = $("form#analysis-template-form");
+        let atForm = $("form#analysis-template-form-{{ uuid }}");
         setAutocompleteValue($("#id_analysis_template", atForm), analysis_template_id, "");
         atForm.submit();
     }
@@ -17,7 +17,7 @@
 </ul>
 {% endif %}
 {% if analysis_template_form %}
-    <form id="analysis-template-form" method="post" action="{% url 'create_analysis_from_template' %}">
+    <form id="analysis-template-form-{{ uuid }}" method="post" action="{% url 'create_analysis_from_template' %}">
         {% csrf_token %}
         {% for name, value in hidden_inputs.items %}
             <input name="{{ name }}" type="hidden" value="{{ value }}">
