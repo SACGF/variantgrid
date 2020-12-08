@@ -2,7 +2,7 @@
 <script>
     function createAnalysis(analysis_template_id) {
         let atForm = $("form#analysis-template-form-{{ uuid }}");
-        setAutocompleteValue($("#id_analysis_template", atForm), analysis_template_id, "");
+        setAutocompleteValue($("#id_{{ uuid }}-analysis_template", atForm), analysis_template_id, "");
         atForm.submit();
     }
 </script>
@@ -19,6 +19,7 @@
 {% if analysis_template_form %}
     <form id="analysis-template-form-{{ uuid }}" method="post" action="{% url 'create_analysis_from_template' %}">
         {% csrf_token %}
+        <input name="tag_uuid" type="hidden" value="{{ uuid }}">
         {% for name, value in hidden_inputs.items %}
             <input name="{{ name }}" type="hidden" value="{{ value }}">
         {% endfor %}

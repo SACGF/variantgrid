@@ -1,6 +1,7 @@
 {% load tz %}
 {% load js_tags %}
 {% load jqgrid_tags %}
+{% load related_analyses_tags %}
 <style>
     .active-sample-gene-list {
         background-image: url(/static/icons/check-mark-green.svg);
@@ -13,6 +14,7 @@ SAMPLE_GENE_LIST_DATA = {{ sample_gene_lists_data | jsonify }};
 function populateSampleGeneListFromJSON(data) {
     let sampleGeneListContainer = $(".sample-gene-list-container[sample-gene-list-id=" + data.pk + "]");
     let details = $(".sample-gene-list-details", sampleGeneListContainer);
+    let analysisTemplates = $(".sample-gene-list-analysis-templates", sampleGeneListContainer);
     let toggle = $("a.show-sample-gene-list-toggle", sampleGeneListContainer);
 
     if (data.visible) {
@@ -20,11 +22,13 @@ function populateSampleGeneListFromJSON(data) {
         details.addClass("show");
         $("button.hide", details).show();
         $("button.un-hide", details).hide();
+        analysisTemplates.show();
     } else {
         toggle.show();
         details.removeClass("show");
         $("button.hide", details).hide();
         $("button.un-hide", details).show();
+        analysisTemplates.hide();
     }
 
     let myActiveIcon = $(".active-sample-gene-list", details);
@@ -94,6 +98,11 @@ $(document).ready(function() {
                 <button class="btn btn-outline-primary make-active">Make active</button>
                 <button class="btn btn-outline-primary hide">Hide</button>
                 <button class="btn btn-outline-primary un-hide">Un-Hide</button>
+            </div>
+
+            <div class="sample-gene-list-analysis-templates">
+                <h3>Analysis Templates - using this gene list</h3>
+                {% analysis_templates_tag sample_somatic=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
             </div>
 
             {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}

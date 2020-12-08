@@ -126,19 +126,28 @@ table.zygosity-table tr.top-header th {
         {{ hidden }}
     {% endfor %}
     <div>
-		<b>Sample:</b>
-		
-		{% if node.analysis.lock_input_sources %}
-            {{ sample }}
-        {% else %}
-            {{ form.sample }}
-		{% endif %}
-		
-		<a class="cross-link" id="sample-link" target='_blank'>View Sample</a></td>
-        {% if sample.samplegenelist_set.exists and form.restrict_to_qc_gene_list %}
         <div>
-            <span id='qc-gene-list'> <b>Restrict to Sample QC Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
+            <b>Sample:</b>
+
+            {% if node.analysis.lock_input_sources %}
+                {{ sample }}
+            {% else %}
+                {{ form.sample }}
+            {% endif %}
+
+            <a class="cross-link" id="sample-link" target='_blank'>View Sample</a>
         </div>
+
+        {% if node.analysis.template_type %}
+        <div>
+            <span id='sample-gene-list'> <b>Sample Gene List:</b> {{ form.sample_gene_list }} </span>
+        </div>
+        {% else %}
+            {% if form.restrict_to_qc_gene_list %}
+            <div>
+                <span id='qc-gene-list'> <b>Restrict to Sample Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
+            </div>
+            {% endif %}
         {% endif %}
         <div>
             {% load vcf_locus_filter_tags %}

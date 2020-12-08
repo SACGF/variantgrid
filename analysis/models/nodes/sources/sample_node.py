@@ -206,7 +206,7 @@ class SampleNode(SampleMixin, AnalysisNode):
                 sample_gene_list = None
                 if value and self.sample.samplegenelist_set.exists():
                     try:
-                        self.sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
+                        sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
                         print("Set to active gene list")
                     except ActiveSampleGeneList.DoesNotExist:
                         pass  # Will have to select manually

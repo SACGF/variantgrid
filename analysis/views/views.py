@@ -136,12 +136,13 @@ def view_active_node(analysis, active_node=None):
 
 @require_POST
 def create_analysis_from_template(request):
-    analysis_template_name = request.POST["analysis_template"]
+    data = request.POST.dict()
+    tag_uuid = data.pop("tag_uuid")
+    analysis_template_key = f"{tag_uuid}-analysis_template"
+    analysis_template_name = data.pop(analysis_template_key)
     analysis_template = AnalysisTemplate.get_for_user(request.user, analysis_template_name)
 
     template_run = AnalysisTemplateRun.create(analysis_template, user=request.user)
-    data = request.POST.dict()
-    data.pop("analysis_template")
     template_run.populate_arguments(data)
     populate_analysis_from_template_run(template_run)
 
