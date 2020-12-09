@@ -31,7 +31,7 @@ from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
     AnalysisTemplateRun, AnalysisLock, Analysis
-from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus
+from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
@@ -48,7 +48,6 @@ from library.database_utils import run_sql
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
-from patients.models_enums import TrioSample
 from pedigree.models import Pedigree
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
@@ -394,7 +393,7 @@ def node_snp_matrix(request, node_id, node_version, conversion, significant_figu
     elif conversion == SNPMatrix.COLS_PERCENT:
         df = pandas_utils.get_columns_percent_dataframe(counts_df)
 
-    conversion_description = dict(SNPMatrix.CHOICES)[conversion]
+    conversion_description = dict(SNPMatrix.choices)[conversion]
 
     context = {"node_id": node_id,
                "node_version": node_version,
@@ -749,7 +748,7 @@ def analyses_variant_tags(request, genome_build_name=None):
 
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
-    as_display = dict(NodeStatus.CHOICES)
+    as_display = dict(NodeStatus.choices)
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
     summary_data = Counter()

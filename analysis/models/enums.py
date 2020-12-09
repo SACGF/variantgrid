@@ -1,94 +1,61 @@
 import operator
 from functools import reduce
 
+from django.db import models
+
+from library.utils import Constant
 from patients.models_enums import Zygosity
 
 
-class AnalysisType:
-    SINGLETON = 'S'
-    COHORT = 'C'
-    TRIO = 'T'
-    PEDIGREE = 'P'
-
-    CHOICES = (
-        (SINGLETON, 'Singleton'),
-        (COHORT, 'Cohort'),
-        (TRIO, 'Trio'),
-        (PEDIGREE, 'Pedigree'),
-    )
+class AnalysisType(models.TextChoices):
+    SINGLETON = 'S', 'Singleton'
+    COHORT = 'C', 'Cohort'
+    TRIO = 'T', 'Trio'
+    PEDIGREE = 'P', 'Pedigree'
 
 
-class AnalysisTemplateType:
-    TEMPLATE = 'T'
-    SNAPSHOT = 'S'
-
-    CHOICES = (
-        (TEMPLATE, 'Template'),
-        (SNAPSHOT, 'Snapshot'),
-    )
+class AnalysisTemplateType(models.TextChoices):
+    TEMPLATE = 'T', 'Template'
+    SNAPSHOT = 'S', 'Snapshot'
 
 
-class SetOperations:
-    NONE = '0'
-    A_NOT_B = 'l'
-    INTERSECTION = '&'
-    A_ONLY = 'a'
-    B_NOT_A = 'r'
-    SYMMETRIC_DIFFERENCE = '^'
-    B_ONLY = 'b'
-    UNION = '|'
-    CHOICES = (
-        (NONE, 'none'),
-        (A_NOT_B, 'A-B'),
-        (INTERSECTION, '&'),
-        (A_ONLY, 'A'),
-        (B_NOT_A, 'B-A'),
-        (SYMMETRIC_DIFFERENCE, "^"),  # XOR (exclusive or)
-        (B_ONLY, 'B'),
-        (UNION, "|"),
-    )
+class SetOperations(models.TextChoices):
+    NONE = '0', 'none'
+    A_NOT_B = 'l', 'A-B'
+    INTERSECTION = '&', '&'
+    A_ONLY = 'a', 'A'
+    B_NOT_A = 'r', 'B-A'
+    SYMMETRIC_DIFFERENCE = '^', "^"  # XOR (exclusive or)
+    B_ONLY = 'b', 'B'
+    UNION = '|', "|"
 
 
-class SNPMatrix:
-    TOTAL_PERCENT = 't'
-    ROWS_PERCENT = 'r'
-    COLS_PERCENT = 'c'
-    CHOICES = (
-        (TOTAL_PERCENT, 'total percent'),
-        (ROWS_PERCENT, 'percent of rows'),
-        (COLS_PERCENT, 'percent of cols'),
-    )
+class SNPMatrix(models.TextChoices):
+    TOTAL_PERCENT = 't', 'total percent'
+    ROWS_PERCENT = 'r', 'percent of rows'
+    COLS_PERCENT = 'c', 'percent of cols'
 
 
-class TrioInheritance:
-    RECESSIVE = 'R'
-    COMPOUND_HET = 'C'
-    DOMINANT = 'D'
-    DENOVO = 'N'
-    PROBAND_HET = 'P'  # Proband HET can be fed into compound het (so analysis template only takes Trio variable)
-    XLINKED_RECESSIVE = 'X'
-
-    CHOICES = (
-        (RECESSIVE, 'Recessive'),
-        (COMPOUND_HET, 'C. Het'),
-        (DOMINANT, 'Dominant'),
-        (DENOVO, "Denovo"),
-        (PROBAND_HET, 'Proband Het'),
-        (XLINKED_RECESSIVE, "X-Linked Recessive"),
-    )
+class TrioInheritance(models.TextChoices):
+    RECESSIVE = 'R', 'Recessive'
+    COMPOUND_HET = 'C', 'C. Het'
+    DOMINANT = 'D', 'Dominant'
+    DENOVO = 'N', "Denovo"
+    PROBAND_HET = 'P', 'Proband Het'  # can be fed into compound het (so analysis template only takes Trio variable)
+    XLINKED_RECESSIVE = 'X', "X-Linked Recessive"
 
 
-class GroupOperation:
-    ALL = "L"
-    ANY = "Y"
-    CHOICES = [
-        (ALL, "All"),  # AND
-        (ANY, "Any"),  # OR
-    ]
-    OPERATIONS = {
-        ALL: operator.or_,
-        ANY: operator.and_,
-    }
+class GroupOperation(models.TextChoices):
+    ALL = "L", "All"  # AND
+    ANY = "Y", "Any"  # OR
+
+    @classmethod
+    def get_operation(cls, group_operation):
+        OPERATIONS = {
+            cls.ALL: operator.or_,
+            cls.ANY: operator.and_,
+        }
+        return OPERATIONS[group_operation]
 
     @staticmethod
     def reduce(sequence, group_operation):
@@ -97,64 +64,37 @@ class GroupOperation:
         return reduce(operator.or_, sequence)
 
 
-class MinimisationResultType:
-    FULL = 'F'
-    BOOTSTRAPPED = 'B'
-    CHOICES = [
-        (FULL, "Full"),
-        (BOOTSTRAPPED, "Bootstrapped"),
-    ]
+class MinimisationResultType(models.TextChoices):
+    FULL = 'F', "Full"
+    BOOTSTRAPPED = 'B', "Bootstrapped"
 
 
-class MinimisationStrategy:
-    LEAST_SQUARES = "LS"
-    LEAST_ABSOLUTE = "LA"
-
-    CHOICES = [
-        (LEAST_SQUARES, "Least Squares"),
-        (LEAST_ABSOLUTE, "Least Absolute Values"),
-    ]
+class MinimisationStrategy(models.TextChoices):
+    LEAST_SQUARES = "LS", "Least Squares"
+    LEAST_ABSOLUTE = "LA", "Least Absolute Values"
 
 
-class NodeErrorSource:
-    ANALYSIS = 'A'
-    CONFIGURATION = 'C'
-    INTERNAL_ERROR = 'I'
-    PARENT = 'P'
-
-    CHOICES = (
-        (ANALYSIS, 'Analysis'),
-        (CONFIGURATION, 'Configuration'),
-        (INTERNAL_ERROR, 'Internal Error'),
-        (PARENT, 'Parent'),
-    )
+class NodeErrorSource(models.TextChoices):
+    ANALYSIS = 'A', 'Analysis'
+    CONFIGURATION = 'C', 'Configuration'
+    INTERNAL_ERROR = 'I', 'Internal Error'
+    PARENT = 'P', 'Parent'
 
 
-class NodeStatus:
-    ERROR = 'E'
-    ERROR_CONFIGURATION = 'C'
-    ERROR_WITH_PARENT = 'P'
-    CANCELLED = 'N'
-    READY = 'R'
-    DIRTY = 'D'
-    QUEUED = 'Q'
-    LOADING_CACHE = 'H'
-    LOADING = 'L'
+class NodeStatus(models.TextChoices):
+    ERROR = 'E', 'Error'
+    ERROR_CONFIGURATION = 'C', 'Configuration Error'
+    ERROR_WITH_PARENT = 'P', 'Parent Error'
+    CANCELLED = 'N', 'Cancelled'
+    READY = 'R', 'Ready'
+    DIRTY = 'D', 'Dirty'
+    QUEUED = 'Q', 'Queued'
+    LOADING_CACHE = 'H', 'Loading Cache'
+    LOADING = 'L', 'Loading'
 
-    CHOICES = (
-        (ERROR, 'Error'),
-        (ERROR_CONFIGURATION, 'Configuration Error'),
-        (ERROR_WITH_PARENT, 'Parent Error'),
-        (CANCELLED, 'Cancelled'),
-        (READY, 'Ready'),
-        (DIRTY, 'Dirty'),
-        (QUEUED, 'Queued'),
-        (LOADING_CACHE, 'Loading Cache'),
-        (LOADING, 'Loading'),
-    )
-    LOADING_STATUSES = (DIRTY, QUEUED, LOADING_CACHE, LOADING)
-    ERROR_STATUSES = (ERROR, ERROR_CONFIGURATION, ERROR_WITH_PARENT, CANCELLED)
-    READY_STATUSES = (READY,) + ERROR_STATUSES  # Ready = Node load
+    LOADING_STATUSES = Constant((DIRTY, QUEUED, LOADING_CACHE, LOADING))
+    ERROR_STATUSES = Constant((ERROR, ERROR_CONFIGURATION, ERROR_WITH_PARENT, CANCELLED))
+    READY_STATUSES = Constant((ERROR, ERROR_CONFIGURATION, ERROR_WITH_PARENT, CANCELLED, READY))
 
     @staticmethod
     def is_loading(status):
@@ -193,3 +133,9 @@ class NodeColors:
 class ZygosityNodeZygosity(Zygosity):
     MULTIPLE_HIT = 'M'  # >=2 hits, regardless of zygosity
     CHOICES = Zygosity.CHOICES + [(MULTIPLE_HIT, "Multiple hits in gene")]
+
+
+class TrioSample(models.TextChoices):
+    MOTHER = 'M', 'Mother'
+    FATHER = 'F', 'Father'
+    PROBAND = 'P', 'Proband'

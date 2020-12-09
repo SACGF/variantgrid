@@ -1,38 +1,24 @@
-from library.utils import invert_dict
+from django.db import models
+
+from library.utils import invert_dict, Constant
 
 
-class NucleicAcid:
-    DNA = 'D'
-    RNA = 'R'
-    CHOICES = [
-        (DNA, 'DNA'),
-        (RNA, 'RNA'),
-    ]
+class NucleicAcid(models.TextChoices):
+    DNA = 'D', 'DNA'
+    RNA = 'R', 'RNA'
 
 
-class Mutation:
-    GERMLINE = 'G'
-    SOMATIC = 'S'
-    CHOICES = [
-        (GERMLINE, 'Germline'),
-        (SOMATIC, 'Somatic')
-    ]
+class Mutation(models.TextChoices):
+    GERMLINE = 'G', 'Germline'
+    SOMATIC = 'S', 'Somatic'
 
 
-class SimpleZygosity:
-    ANY_GERMLINE = 'A'
-    ANY_ZYGOSITY = 'Z'
-    HET = 'E'
-    HOM_ALT = 'O'
-    REF = 'R'
-
-    CHOICES = [
-        (ANY_GERMLINE, 'Het or Hom Alt'),
-        (ANY_ZYGOSITY, 'Any zygosity call'),
-        (HOM_ALT, "Hom alt"),
-        (HET, "Het"),
-        (REF, "Ref"),
-    ]
+class SimpleZygosity(models.TextChoices):
+    ANY_GERMLINE = 'A', 'Het or Hom Alt'
+    ANY_ZYGOSITY = 'Z', 'Any zygosity call'
+    HOM_ALT = 'O', "Hom alt"
+    HET = 'E', "Het"
+    REF = 'R', "Ref"
 
 
 class Zygosity:
@@ -103,74 +89,42 @@ class Zygosity:
         return Zygosity.get_genotype(Zygosity.REVERSE_CHOICES_LOOKUP[expanded_zygosity])
 
 
-class TrioSample:
-    MOTHER = 'M'
-    FATHER = 'F'
-    PROBAND = 'P'
-    CHOICES = [(MOTHER, 'Mother'),
-               (FATHER, 'Father'),
-               (PROBAND, 'Proband')]
-
-
-class Sex:
-    UNKNOWN = 'U'
-    MALE = 'M'
-    FEMALE = 'F'
-    FILLED_IN_CHOICES = [MALE, FEMALE]
-    CHOICES = [
-        (UNKNOWN, 'unknown'),
-        (MALE, 'male'),
-        (FEMALE, 'female')
-    ]
+class Sex(models.TextChoices):
+    UNKNOWN = 'U', 'unknown'
+    MALE = 'M', 'male'
+    FEMALE = 'F', 'female'
+    FILLED_IN_CHOICES = Constant((MALE, FEMALE))
 
     @staticmethod
     def string_to_sex(s):
-        sd = invert_dict(dict(Sex.CHOICES))
+        sd = invert_dict(dict(Sex.choices))
         return sd.get(s.lower(), Sex.UNKNOWN)
 
 
-class GnomADPopulation:
+class GnomADPopulation(models.TextChoices):
     """ http://gnomad.broadinstitute.org/faq """
-    AFRICAN_AFRICAN_AMERICAN = 'AFR'
-    LATINO = 'AMR'
-    ASHKENAZI_JEWISH = 'ASJ'
-    EAST_ASIAN = 'EAS'
-    FINNISH = 'FIN'
-    NON_FINNISH_EUROPEAN = 'NFE'
-    SOUTH_ASIAN = 'SAS'
-    OTHER = 'OTH'
-
-    CHOICES = [
-        (AFRICAN_AFRICAN_AMERICAN, 'African/African American'),
-        (ASHKENAZI_JEWISH, 'Ashkenazi Jewish'),
-        (EAST_ASIAN, 'East Asian'),
-        (FINNISH, 'Finnish'),
-        (LATINO, 'Latino / Mixed Amerindian'),
-        (NON_FINNISH_EUROPEAN, 'Non-Finnish European'),
-        (OTHER, 'Other'),
-        (SOUTH_ASIAN, 'South Asian'),
-    ]
+    AFRICAN_AFRICAN_AMERICAN = 'AFR', 'African/African American'
+    ASHKENAZI_JEWISH = 'ASJ', 'Ashkenazi Jewish'
+    EAST_ASIAN = 'EAS', 'East Asian'
+    FINNISH = 'FIN', 'Finnish'
+    LATINO = 'AMR', 'Latino / Mixed Amerindian'
+    NON_FINNISH_EUROPEAN = 'NFE', 'Non-Finnish European'
+    OTHER = 'OTH', 'Other'
+    SOUTH_ASIAN = 'SAS', 'South Asian'
 
 
-class PopulationGroup(GnomADPopulation):
-    AUSTRALO_MELANESIAN = 'AM'
-    CENTRAL_ASIAN = 'CA'
-    POLYNESIAN = 'PO'
-    SOUTH_EAST_ASIAN = 'SEA'
-    MIDDLE_EAST_NORTH_AFRICAN = 'MEA'
-
-    CHOICES = [
-        (GnomADPopulation.AFRICAN_AFRICAN_AMERICAN, 'African/African American'),
-        (GnomADPopulation.ASHKENAZI_JEWISH, 'Ashkenazi Jewish'),
-        (AUSTRALO_MELANESIAN, 'Australo Melanesian'),
-        (CENTRAL_ASIAN, 'Central Asian'),
-        (GnomADPopulation.EAST_ASIAN, 'East Asian'),
-        (GnomADPopulation.FINNISH, 'Finnish'),
-        (GnomADPopulation.LATINO, 'Latino / Mixed Amerindian'),
-        (MIDDLE_EAST_NORTH_AFRICAN, 'Middle East / North African'),
-        (GnomADPopulation.NON_FINNISH_EUROPEAN, 'Non-Finnish European'),
-        (POLYNESIAN, 'Polynesian'),
-        (GnomADPopulation.SOUTH_ASIAN, 'South Asian'),
-        (SOUTH_EAST_ASIAN, 'South East Asian'),
-        (GnomADPopulation.OTHER, 'Other'),
-    ]
+class PopulationGroup(models.TextChoices):
+    """ Extends gnomAD for common Australian populations """
+    AFRICAN_AFRICAN_AMERICAN = 'AFR', 'African/African American'
+    ASHKENAZI_JEWISH = 'ASJ', 'Ashkenazi Jewish'
+    AUSTRALO_MELANESIAN = 'AM', 'Australo Melanesian'
+    CENTRAL_ASIAN = 'CA', 'Central Asian'
+    EAST_ASIAN = 'EAS', 'East Asian'
+    FINNISH = 'FIN', 'Finnish'
+    LATINO = 'AMR', 'Latino / Mixed Amerindian'
+    MIDDLE_EAST_NORTH_AFRICAN = 'MEA', 'Middle East / North African'
+    NON_FINNISH_EUROPEAN = 'NFE', 'Non-Finnish European'
+    POLYNESIAN = 'PO', 'Polynesian'
+    SOUTH_ASIAN = 'SAS', 'South Asian'
+    SOUTH_EAST_ASIAN = 'SEA', 'South East Asian'
+    OTHER = 'OTH', 'Other'

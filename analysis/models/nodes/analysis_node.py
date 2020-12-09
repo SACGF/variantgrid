@@ -67,7 +67,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     # Task Update fields
     analysis_update_uuid = models.UUIDField(null=True, default=None)
-    status = models.CharField(max_length=1, choices=NodeStatus.CHOICES, default=NodeStatus.DIRTY)
+    status = models.CharField(max_length=1, choices=NodeStatus.choices, default=NodeStatus.DIRTY)
     celery_task = models.CharField(max_length=36, null=True)
     db_pid = models.IntegerField(null=True)
 
@@ -488,7 +488,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     @staticmethod
     def flatten_errors(errors):
-        nes_display = dict(NodeErrorSource.CHOICES)
+        nes_display = dict(NodeErrorSource.choices)
         return [f"{nes_display[nes]}: {error}" for nes, error in errors]
 
     @staticmethod
@@ -935,7 +935,7 @@ class NodeVCFFilter(models.Model):
 class NodeAlleleFrequencyFilter(models.Model):
     """ Used for various nodes """
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
-    group_operation = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ANY)
+    group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
 
     def get_q(self, allele_frequency_path):
         af_q = None
@@ -954,7 +954,7 @@ class NodeAlleleFrequencyFilter(models.Model):
                     and_q = reduce(operator.and_, and_filters)
                     filters.append(and_q)
             if filters:
-                group_op = GroupOperation.OPERATIONS[self.group_operation]
+                group_op = GroupOperation.get_operation(self.group_operation)
                 af_q = reduce(group_op, filters)
         except NodeAlleleFrequencyFilter.DoesNotExist:
             pass

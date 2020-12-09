@@ -459,7 +459,7 @@ class AbstractSampleStats(AbstractVariantStats):
             elif hom_het_ratio > 0.8:
                 sex = Sex.MALE
 
-        return dict(Sex.CHOICES)[sex]
+        return dict(Sex.choices)[sex]
 
 
 class SampleStats(AbstractSampleStats):

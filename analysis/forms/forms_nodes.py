@@ -517,7 +517,7 @@ class PopulationNodeForm(BaseNodeForm):
     gnomad_population = forms.MultipleChoiceField(
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        choices=GnomADPopulation.CHOICES,
+        choices=GnomADPopulation.choices,
     )
 
     class Meta:

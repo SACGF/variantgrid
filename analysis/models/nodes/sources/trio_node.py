@@ -13,7 +13,7 @@ from snpdb.models import Trio, Sample
 
 class TrioNode(AbstractCohortBasedNode):
     trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
-    inheritance = models.CharField(max_length=1, choices=TrioInheritance.CHOICES, default=TrioInheritance.RECESSIVE)
+    inheritance = models.CharField(max_length=1, choices=TrioInheritance.choices, default=TrioInheritance.RECESSIVE)
     require_zygosity = models.BooleanField(default=True)
 
     NO_VARIANT = {Zygosity.MISSING, Zygosity.HOM_REF}  # 2 different het would be "missing" (as has no ref)
@@ -146,7 +146,7 @@ class TrioNode(AbstractCohortBasedNode):
         return "TODO: method summary"
 
     def get_node_name(self):
-        name_parts = [dict(TrioInheritance.CHOICES)[self.inheritance]]
+        name_parts = [dict(TrioInheritance.choices)[self.inheritance]]
         if not self.require_zygosity:
             name_parts.append(' (non strict)')
 

@@ -7,14 +7,13 @@ import itertools
 import operator
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate
-from analysis.models.enums import SNPMatrix, AnalysisTemplateType
+from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
 from annotation.models.models import AnnotationVersion
 from library.django_utils import get_models_dict_by_column
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models_enums import TrioSample
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Sample, VariantGridColumn, Trio, UserSettings
 
@@ -204,7 +203,7 @@ class ColumnSummaryForm(forms.Form):
 
 
 class SNPMatrixForm(forms.Form):
-    conversion = forms.ChoiceField(choices=SNPMatrix.CHOICES)
+    conversion = forms.ChoiceField(choices=SNPMatrix.choices)
     significant_figures = forms.IntegerField(widget=NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1'}))
 
 
@@ -250,9 +249,9 @@ class UserTrioForm(GenomeBuildAutocompleteForwardMixin, forms.Form):
 class UserTrioWizardForm(forms.Form):
     mother_affected = forms.BooleanField(required=False)
     father_affected = forms.BooleanField(required=False)
-    sample_1 = forms.ChoiceField(choices=TrioSample.CHOICES)
-    sample_2 = forms.ChoiceField(choices=TrioSample.CHOICES)
-    sample_3 = forms.ChoiceField(choices=TrioSample.CHOICES)
+    sample_1 = forms.ChoiceField(choices=TrioSample.choices)
+    sample_2 = forms.ChoiceField(choices=TrioSample.choices)
+    sample_3 = forms.ChoiceField(choices=TrioSample.choices)
 
     def clean(self):
         cleaned_data = super().clean()

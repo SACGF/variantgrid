@@ -30,7 +30,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     version = models.IntegerField(default=0)  # By bumping this we can invalidate node caches
     # TODO: Remove 'analysis_type' by creating legacy 'AnalysisTemplateSnapshot'
-    analysis_type = models.CharField(max_length=1, choices=AnalysisType.CHOICES, null=True, blank=True)
+    analysis_type = models.CharField(max_length=1, choices=AnalysisType.choices, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
@@ -43,7 +43,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=SET_NULL)
     lock_input_sources = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
-    template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.CHOICES, null=True, blank=True)
+    template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.choices, null=True, blank=True)
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"

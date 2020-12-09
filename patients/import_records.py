@@ -188,7 +188,7 @@ def process_record(patient_records, record_id, row):
     last_name = row[PatientColumns.PATIENT_LAST_NAME]
     date_of_birth = parse_date(row, PatientColumns.DATE_OF_BIRTH, validation_messages)
     date_of_death = parse_date(row, PatientColumns.DATE_OF_DEATH, validation_messages)
-    sex = parse_choice(Sex.CHOICES, row, PatientColumns.SEX, validation_messages)
+    sex = parse_choice(Sex.choices, row, PatientColumns.SEX, validation_messages)
     affected = parse_boolean(row, PatientColumns.AFFECTED, validation_messages)
     consanguineous = parse_boolean(row, PatientColumns.CONSANGUINEOUS, validation_messages)
     patient_phenotype = row[PatientColumns.PATIENT_PHENOTYPE]
@@ -207,8 +207,8 @@ def process_record(patient_records, record_id, row):
     specimen_collected_by = row[PatientColumns.SPECIMEN_COLLECTED_BY]
     specimen_collection_date = parse_date(row, PatientColumns.SPECIMEN_COLLECTION_DATE, validation_messages)
     specimen_received_date = parse_date(row, PatientColumns.SPECIMEN_RECEIVED_DATE, validation_messages)
-    specimen_mutation_type = parse_choice(Mutation.CHOICES, row, PatientColumns.SPECIMEN_MUTATION_TYPE, validation_messages)
-    specimen_nucleic_acid_source = parse_choice(NucleicAcid.CHOICES, row, PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE, validation_messages)
+    specimen_mutation_type = parse_choice(Mutation.choices, row, PatientColumns.SPECIMEN_MUTATION_TYPE, validation_messages)
+    specimen_nucleic_acid_source = parse_choice(NucleicAcid.choices, row, PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE, validation_messages)
     specimen_age_at_collection = row[PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE]
 
     sample_id = row[PatientColumns.SAMPLE_ID] or None

@@ -20,7 +20,7 @@ from classification.models.classification import Classification
 class PopulationNode(AnalysisNode):
     EVERYTHING = 100.0  # Percent
     percent = models.FloatField(default=EVERYTHING)
-    group_operation = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ANY)
+    group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
     # highest in gnomAD - for diff groups see PopulationNodeGnomADPopulation below
     gnomad_af = models.BooleanField(default=True)
     gnomad_popmax_af = models.BooleanField(default=False)
@@ -28,7 +28,7 @@ class PopulationNode(AnalysisNode):
     af_1kg = models.BooleanField(default=True)
     af_uk10k = models.BooleanField(default=True)
     topmed_af = models.BooleanField(default=False)
-    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.CHOICES, default=SimpleZygosity.ANY_GERMLINE)
+    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.choices, default=SimpleZygosity.ANY_GERMLINE)
     use_internal_counts = models.BooleanField(default=False)
     max_samples = models.IntegerField(null=True, blank=True)
     internal_percent = models.FloatField(default=EVERYTHING)
@@ -56,7 +56,7 @@ class PopulationNode(AnalysisNode):
                 population_databases.add(field)
 
             if population_databases:
-                group_operation = GroupOperation.OPERATIONS[self.group_operation]
+                group_operation = GroupOperation.get_operation(self.group_operation)
                 max_allele_frequency = self.percent / 100
                 q_pop = population_frequency.get_population_af_q(max_allele_frequency,
                                                                  population_databases=population_databases,
@@ -167,4 +167,4 @@ class PopulationNode(AnalysisNode):
 
 class PopulationNodeGnomADPopulation(models.Model):
     population_node = models.ForeignKey(PopulationNode, on_delete=CASCADE)
-    population = models.CharField(max_length=3, choices=GnomADPopulation.CHOICES)
+    population = models.CharField(max_length=3, choices=GnomADPopulation.choices)
