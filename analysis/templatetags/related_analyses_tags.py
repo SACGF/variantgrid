@@ -3,7 +3,6 @@ import uuid
 from collections import defaultdict
 from functools import reduce
 
-from django.conf import settings
 from django.db.models import Q, Model
 from django.template import Library
 
@@ -125,10 +124,11 @@ def analysis_templates_tag(context, sample_somatic=False, **kwargs):
     analysis_template_links = AnalysisTemplate.filter(user, class_name=class_name, sample_somatic=sample_somatic,
                                                       sample_gene_list=sample_gene_list,
                                                       atv_kwargs={"appears_in_links": True})
-    tag_uuid = uuid.uuid4()
+
+    flattened_uuid = str(uuid.uuid4()).replace("-", "_")
     return {
-        "uuid": tag_uuid,
-        "analysis_template_form": AnalysisTemplateForm(prefix=tag_uuid),
+        "flattened_uuid": flattened_uuid,
+        "analysis_template_form": AnalysisTemplateForm(prefix=flattened_uuid),
         "analysis_template_links": analysis_template_links,
         "hidden_inputs": hidden_inputs,
     }

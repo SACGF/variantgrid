@@ -38,6 +38,7 @@ class SampleNodeView(NodeView):
             has_genotype = self.object.sample.has_genotype
         analysis = self.object.analysis
         kwargs["genome_build"] = analysis.genome_build
-        kwargs["lock_input_sources"] = analysis.lock_input_sources
-        kwargs["has_genotype"] = has_genotype
+        if not analysis.template_type:  # Always show everything in templates
+            kwargs["lock_input_sources"] = analysis.lock_input_sources
+            kwargs["has_genotype"] = has_genotype
         return kwargs
