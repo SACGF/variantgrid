@@ -110,22 +110,6 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
                 name = name[:MAX_NODE_NAME_LENGTH] + "..."
         return name
 
-    def __setattr__(self, key, value):
-        super().__setattr__(key, value)
-        if key == "sample":
-            # If we set anything here that's being changed by a form, it'll be overwritten by the form's values
-            # So this only works for setting in templates
-            print(f"Intercepting set sample to {value}!")
-            sample_gene_list = None
-            if value and self.sample.samplegenelist_set.exists():
-                self.accordion_panel = self.SAMPLE_GENE_LIST  # They can choose themselves
-                try:
-                    sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
-                    print("Set to active gene list")
-                except ActiveSampleGeneList.DoesNotExist:
-                    pass  # Will have to select manually
-            self.sample_gene_list = sample_gene_list
-
     def save_clone(self):
         orig_custom_text_gene_list = self.custom_text_gene_list
 
@@ -142,6 +126,19 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
             copy.genelistnodegenelist_set.create(gene_list=gln_gl.gene_list)
 
         return copy
+
+    def _set_sample(self, sample):
+        """ Called when sample changed due to ancestor change """
+        super()._set_sample(sample)
+        sample_gene_list = None
+        if self.sample and self.sample.samplegenelist_set.exists():
+            self.accordion_panel = self.SAMPLE_GENE_LIST  # They can choose themselves
+            try:
+                sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
+                print("Set to active gene list")
+            except ActiveSampleGeneList.DoesNotExist:
+                pass  # Will have to select manually
+        self.sample_gene_list = sample_gene_list
 
     def save(self, **kwargs):
         super().save(**kwargs)

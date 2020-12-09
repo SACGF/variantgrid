@@ -2,7 +2,12 @@
 <script>
     function createAnalysis_{{ flattened_uuid }}(analysis_template_id) {
         let atForm = $("form#analysis-template-form-{{ flattened_uuid }}");
-        setAutocompleteValue($("#id_{{ flattened_uuid }}-analysis_template", atForm), analysis_template_id, "");
+        let templateField = $("#id_{{ flattened_uuid }}-analysis_template", atForm);
+        {% if autocomplete_field %}
+        setAutocompleteValue(templateField, analysis_template_id, "");
+        {% else %}
+            templateField.val(analysis_template_id);
+        {% endif %}
         atForm.submit();
     }
 </script>
@@ -25,6 +30,8 @@
         {% endfor %}
         {{ analysis_template_form }}
         {{ analysis_template_form.media }}
-        <button id="run-analysis-template" class="btn btn-outline-primary">Create analysis from template</button>
+        {%  if autocomplete_field %}
+            <button id="run-analysis-template" class="btn btn-outline-primary">Create analysis from template</button>
+        {% endif %}
     </form>
 {% endif %}

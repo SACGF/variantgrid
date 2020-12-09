@@ -96,7 +96,8 @@ def related_analyses_for_pedigree(context, pedigree):
 
 
 @register.inclusion_tag("analysis/tags/analysis_templates_tag.html", takes_context=True)
-def analysis_templates_tag(context, sample_somatic=False, **kwargs):
+def analysis_templates_tag(context, autocomplete_field=True, links_sample_gene_list_only=False, sample_somatic=False,
+                           **kwargs):
     user = context["user"]
     single_model_args = {"sample", "cohort", "trio", "pedigree"}
     params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
@@ -116,8 +117,16 @@ def analysis_templates_tag(context, sample_somatic=False, **kwargs):
         raise ValueError(params_error_message)
 
     class_name = klass._meta.label
-    sample_gene_list = bool(kwargs.get("sample_gene_list"))
+    # Show/Hide AnalysisTemplateVersions based on requires_sample_gene_list
+    if kwargs.get("sample_gene_list"):
+        if links_sample_gene_list_only:
+            sample_gene_list = True  # Only
+        else:
+            sample_gene_list = None  # Both
+    else:
+        sample_gene_list = False  # Hide
     AnalysisTemplateForm = get_analysis_template_form_for_variables_only_of_class(class_name,
+                                                                                  autocomplete_field=autocomplete_field,
                                                                                   sample_somatic=sample_somatic,
                                                                                   sample_gene_list=sample_gene_list)
 
@@ -128,6 +137,7 @@ def analysis_templates_tag(context, sample_somatic=False, **kwargs):
     flattened_uuid = str(uuid.uuid4()).replace("-", "_")
     return {
         "flattened_uuid": flattened_uuid,
+        "autocomplete_field": autocomplete_field,
         "analysis_template_form": AnalysisTemplateForm(prefix=flattened_uuid),
         "analysis_template_links": analysis_template_links,
         "hidden_inputs": hidden_inputs,

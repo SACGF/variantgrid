@@ -320,7 +320,8 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         return qs.filter(deleted=False)
 
     @staticmethod
-    def filter(user: User, sample_somatic=False, sample_gene_list=False, class_name=None, atv_kwargs=None):
+    def filter(user: User, sample_somatic=False, sample_gene_list=None, class_name=None, atv_kwargs=None):
+        """ sample_gene_list - None for both, True/False to filter """
         if atv_kwargs is None:
             atv_kwargs = {}
 
@@ -329,8 +330,8 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if not sample_somatic:
             template_versions_qs = template_versions_qs.exclude(requires_sample_somatic=True)
 
-        if not sample_gene_list:
-            template_versions_qs = template_versions_qs.exclude(requires_sample_gene_list=True)
+        if sample_gene_list is not None:
+            template_versions_qs = template_versions_qs.filter(requires_sample_gene_list=sample_gene_list)
 
         if class_name:
             # Restrict to template versions who's variables are all of class_name

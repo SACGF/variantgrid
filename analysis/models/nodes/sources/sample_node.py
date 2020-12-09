@@ -195,19 +195,3 @@ class SampleNode(SampleMixin, AnalysisNode):
             patient_args = self.sample.patient.get_json_dict()
 
         return {"patient": patient_args}
-
-    def __setattr__(self, key, value):
-        super().__setattr__(key, value)
-        if key == "sample":
-            # The only way sample can best set with restrict_to_qc_gene_list is setting via analysis template
-            # Otherwise
-            print(f"SampleNode - Intercepting set sample to {value}")
-            if self.restrict_to_qc_gene_list:
-                sample_gene_list = None
-                if value and self.sample.samplegenelist_set.exists():
-                    try:
-                        sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
-                        print("Set to active gene list")
-                    except ActiveSampleGeneList.DoesNotExist:
-                        pass  # Will have to select manually
-                self.sample_gene_list = sample_gene_list

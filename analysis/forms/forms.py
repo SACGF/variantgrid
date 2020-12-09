@@ -24,17 +24,21 @@ class AnalysisChoiceForm(forms.Form):
                                                                        attrs={'data-placeholder': 'Analysis...'}))
 
 
-def get_analysis_template_form_for_variables_only_of_class(class_name, sample_somatic=False, sample_gene_list=False):
-    """ Returns a AnalysisTemplate form with autocomplete forwards set """
-    widget = autocomplete.ModelSelect2(url='analysis_template_autocomplete',
-                                       attrs={'data-placeholder': 'Analysis Template...'},
-                                       forward=(forward.Const(class_name, 'class_name'),
-                                                forward.Const(bool(sample_somatic), 'sample_somatic'),
-                                                forward.Const(bool(sample_gene_list), 'sample_gene_list'),))
+def get_analysis_template_form_for_variables_only_of_class(class_name, autocomplete_field=True,
+                                                           sample_somatic=False, sample_gene_list=False):
+    """ Returns a AnalysisTemplateForm - with either autocomplete forwards set or hidden input """
+    if autocomplete_field:
+        widget = autocomplete.ModelSelect2(url='analysis_template_autocomplete',
+                                           attrs={'data-placeholder': 'Analysis Template...'},
+                                           forward=(forward.Const(class_name, 'class_name'),
+                                                    forward.Const(bool(sample_somatic), 'sample_somatic'),
+                                                    forward.Const(bool(sample_gene_list), 'sample_gene_list'),))
+
+    else:
+        widget = forms.HiddenInput()
 
     class AnalysisTemplateForm(forms.Form):
-        analysis_template = forms.ModelChoiceField(queryset=AnalysisTemplate.objects.all(),
-                                                   widget=widget)
+        analysis_template = forms.ModelChoiceField(queryset=AnalysisTemplate.objects.all(), widget=widget)
     return AnalysisTemplateForm
 
 

@@ -248,6 +248,9 @@ class SampleMixin(CohortMixin):
 class AncestorSampleMixin(SampleMixin):
     """ Must have a "sample" field that is set from ancestor """
 
+    def _set_sample(self, sample):
+        self.sample = sample
+
     def handle_ancestor_input_samples_changed(self):
         """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
 
@@ -261,15 +264,15 @@ class AncestorSampleMixin(SampleMixin):
         if self.version != 0:  # Being set in analysis template
             # may have been moved/copied into a different DAG without current sample as ancestor
             if self.sample and self.sample not in parent_sample_set:
-                self.sample = None
+                self._set_sample(None)
                 modified = True
 
         if self.sample is None:
             if proband_sample := self.get_proband_sample():
-                self.sample = proband_sample
+                self._set_sample(proband_sample)
                 modified = True
             elif len(parent_sample_set) == 1:
-                self.sample = parent_sample_set.pop()
+                self._set_sample(parent_sample_set.pop())
                 modified = True
 
         if modified:
