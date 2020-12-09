@@ -89,8 +89,9 @@ def _create_sample_gene_lists(apps, schema_editor):
     ActiveSampleGeneList = apps.get_model("genes", "ActiveSampleGeneList")
 
     # Make SampleGeneList for each QCGeneList reachable by a sample
-    for sample in Sample.objects.filter(samplefromsequencingsample__sequencing_sample__unalignedreads__bamfile__qc__qcgenelist__isnull=False).distinct():
+    for sample in Sample.objects.filter(samplefromsequencingsample__sequencing_sample__unalignedreads__bamfile__qc__qcgenelist__data_state='C').distinct():
         if qc_gene_list := _get_qc_gene_list_for_sample(apps, sample):
+
             gene_list = qc_gene_list.custom_text_gene_list.gene_list
             sample_gene_list = SampleGeneList.objects.create(sample=sample, gene_list=gene_list)
             # As there's only one, set it to be the active one
