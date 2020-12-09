@@ -42,8 +42,12 @@ def _fix_seqauto_qc_gene_list(apps, schema_editor):
         path = pathlib.Path(qcgl.path)
         if path.exists():
             with open(qcgl.path) as f:
-                custom_gene_list_text = f.read()
-                md5_hash = md5sum_str(custom_gene_list_text)
+                try:
+                    custom_gene_list_text = f.read()
+                    md5_hash = md5sum_str(custom_gene_list_text)
+                except UnicodeDecodeError as e:
+                    print(f"Error reading file: {qcgl.path}: {e}")
+                    raise e
                 if md5_hash == qcgl.custom_text_gene_list.md5_hash:
                     num_set_to_latest += 1
                     qcgl.file_last_modified = path.stat().st_mtime
