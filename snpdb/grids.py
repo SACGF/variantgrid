@@ -110,10 +110,7 @@ class SamplesListGrid(JqGridUserRowConfig):
 
         annotation_kwargs = {"sample_gene_list_count": Count("samplegenelist", distinct=True)}
         queryset = queryset.annotate(**annotation_kwargs)
-        field_names = self.get_field_names()
-        i = field_names.index("vcf__uploadedvcf__uploaded_file__import_source")
-        field_names = field_names[:i] + list(annotation_kwargs.keys()) + field_names[i:]
-        self.queryset = queryset.order_by("-pk").values(*field_names)
+        self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
         self.extra_config.update({'shrinkToFit': False,
                                   'sortname': 'id',
                                   'sortorder': 'desc'})
