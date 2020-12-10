@@ -31,6 +31,10 @@
         float: left;
     }
 
+    .sample-gene-list-link div {
+        margin-left: 2px;
+    }
+
 </style>
 <script>
 function getBams() {
@@ -124,7 +128,15 @@ $(document).ready(function() {
         <li><a href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
         {% endif %}
         {% if sample.samplegenelist_set.exists and url_name_visible.sample_gene_lists_tab %}
-        <li><a href="{% url 'sample_gene_lists_tab' sample.pk %}">Genes of Interest</a></li>
+        <li>
+            <a class="sample-gene-list-link" href="{% url 'sample_gene_lists_tab' sample.pk %}">
+                <div class="left">Genes of Interest</div>
+                {% if sample.activesamplegenelist %}
+                <div title="Active GeneList" class="left icon16 check-mark-green"></div>
+                {% endif %}
+                <div class="left">({{ sample.samplegenelist_set.count }})</div>
+            </a>
+        </li>
         {% endif %}
         {% if sample.sequencing_run and url_name_visible.view_sample_qc_tab %}
         <li><a href="{% url 'view_sample_qc_tab' sample.pk %}">QC</a></li>

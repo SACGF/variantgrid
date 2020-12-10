@@ -58,7 +58,8 @@ class SamplesListGrid(JqGridUserRowConfig):
     caption = 'Samples'
     fields = ["id", "name", "import_status", "variants_type",
               "vcf__name", "vcf__user__username", "vcf__uploadedvcf__uploaded_file__import_source",
-              "mutationalsignature__id", "mutationalsignature__summary", "samplestats__variant_count",
+              "samplestats__variant_count", "sample_gene_list_count", "activesamplegenelist__id",
+              "mutationalsignature__id", "mutationalsignature__summary",
               "patient__first_name", "patient__last_name", "patient__sex", "patient__date_of_birth", "patient__date_of_death",
               "specimen__reference_id", "specimen__tissue", "specimen__collection_date"]
     colmodel_overrides = {
@@ -70,6 +71,9 @@ class SamplesListGrid(JqGridUserRowConfig):
                                       "url_object_column": "id"}},
         'vcf__name': {'label': 'VCF Name'},
         'import_status': {'formatter': 'viewImportStatus'},
+        "sample_gene_list_count": {'name': 'sample_gene_list_count', 'label': '# Sample GeneLists',
+                                   "model_field": False, "formatter": "viewSampleGeneList", 'sorttype': 'int'},
+        'activesamplegenelist__id': {'hidden': True},
         'mutationalsignature__id': {'hidden': True},
         'mutationalsignature__summary': {'label': 'Mutational Signature',
                                          'formatter': 'viewMutationalSignature'},
@@ -104,7 +108,12 @@ class SamplesListGrid(JqGridUserRowConfig):
             mut_sig_colmodel['hidden'] = True
             self._overrides['mutationalsignature__summary'] = mut_sig_colmodel
 
-        self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
+        annotation_kwargs = {"sample_gene_list_count": Count("samplegenelist", distinct=True)}
+        queryset = queryset.annotate(**annotation_kwargs)
+        field_names = self.get_field_names()
+        i = field_names.index("vcf__uploadedvcf__uploaded_file__import_source")
+        field_names = field_names[:i] + list(annotation_kwargs.keys()) + field_names[i:]
+        self.queryset = queryset.order_by("-pk").values(*field_names)
         self.extra_config.update({'shrinkToFit': False,
                                   'sortname': 'id',
                                   'sortorder': 'desc'})

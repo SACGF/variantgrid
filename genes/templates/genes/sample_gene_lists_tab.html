@@ -2,11 +2,6 @@
 {% load js_tags %}
 {% load jqgrid_tags %}
 {% load related_analyses_tags %}
-<style>
-    .active-sample-gene-list {
-        background-image: url(/static/icons/check-mark-green.svg);
-    }
-</style>
 <script>
 // Note: This is a tab so can be re-loaded (ie don't use global let/const)
 SAMPLE_GENE_LIST_DATA = {{ sample_gene_lists_data | jsonify }};
@@ -92,7 +87,7 @@ $(document).ready(function() {
 
         <div id="sample-gene-list-{{ sample_gene_list.pk }}" class="sample-gene-list-details collapse card mt-4">
             <div class="card-header">
-                <div class="left icon32 active-sample-gene-list" title="Active Gene List"></div>
+                <div class="left icon32 check-mark-green active-sample-gene-list" title="Active Gene List"></div>
                 GeneList: {{ sample_gene_list.modified | localtime }}</div>
             <div class="card-body">
                 <div class="sample-gene-list-toolbar">
