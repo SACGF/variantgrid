@@ -1829,20 +1829,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self._generate_c_hgvs_extra(genome_build).format()
 
     def __str__(self) -> str:
-        if self.variant:
-            variant_details = str(self.variant)
-        else:
-            variant_details_list = []
-            for ek in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:
-                hgvs_val = self.get(ek)
-                if hgvs_val:
-                    variant_details_list.append(hgvs_val)
-                    break
-            variant_details_list.append("(not linked to variant)")
-            variant_details = " ".join(variant_details_list)
-
-        clinical_significance = self.get_clinical_significance_display() or "Unclassified"
-        return f"({str(self.id)}) {variant_details}: {clinical_significance} by {self.user}"
+        return self.friendly_label
 
     @staticmethod
     def check_can_create_no_classification_via_web_form(_user: User):

@@ -111,6 +111,10 @@ class Command(BaseCommand):
              print(f"Deleted orphaned {self.FAKE_GENE_ID_PREFIX} records:")
              print(ret)
 
+        if replace:
+            print(f"Please run command classification_cache_chgvs to update classification records with new gene symbols")
+            print(f"Please run command allele_validate to update warnings about alleles")
+
     def update_known_gene_versions_by_gene_id(self, gv_qs):
         for gv in gv_qs:
             self.known_gene_versions_by_gene_id[gv.gene_id][gv.version] = gv

@@ -239,7 +239,7 @@ class OntologyMatching:
         self.find_or_create(term).add_context(OntologyContextDirectReference())
 
     def as_json(self) -> Dict:
-        return {value.term_id: value.as_json() for key, value in self.term_map.items()}
+        return [value.as_json() for value in self.term_map.values()]
 
 
 class SearchMondoText(APIView):
@@ -248,32 +248,46 @@ class SearchMondoText(APIView):
 
         ontologyMatches = OntologyMatching()
 
-        search_term = request.GET.get('search_term')
+        search_term = request.GET.get('search_term') or ''
         # gene_symbol = request.GET.get('gene_symbol')
         # a regular escape / gets confused for a URL divider
         urllib.parse.quote(search_term).replace('/', '%252F')
 
-        results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{search_term}', {
-            "prefix": "MONDO",
-            "rows": 6,
-            "minimal_tokenizer": "false",
-            "category": "disease"
-        }).json().get("docs")
+        selected = [term.strip() for term in (request.GET.get('selected') or '').split(",") if term.strip()]
+        for term in selected:
+            ontologyMatches.select_term(term)
 
-        for result in results:
-            o_id = result.get('id')
-            label = result.get('label')
-            if label:
-                label = label[0]
-            # match = result.get('match')
-            # if extracted := ID_EXTRACT_MINI_P.match(o_id):
-                # id_part = extracted[1]
-                # defn = mondo_defns.get(int(id_part))
-            # highlight = result.get('highlight')
+        if gene_symbol := request.GET.get('gene_symbol'):
+            ontologyMatches.populate_monarch_local(gene_symbol)
+            try:
+                ontologyMatches.populate_panel_app_remote(gene_symbol)
+            except:
+                # TODO communicate to the user couldn't search panel app
+                pass
+                # report_exc_info(extra_data={"gene_symbol": clinvar_export.gene_symbol.symbol})
+                # messages.add_message(request, messages.ERROR, "Could not connect to PanelApp")
 
-            onto = ontologyMatches.find_or_create(term_id=o_id)
-            if not onto.name:
-                onto.name = label
-            onto.add_context(OntologyContextSearched())
+        # Call for Text Matches
+        try:
+            results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{search_term}', {
+                "prefix": "MONDO",
+                "rows": 6,
+                "minimal_tokenizer": "false",
+                "category": "disease"
+            }).json().get("docs")
+
+            for result in results:
+                o_id = result.get('id')
+                label = result.get('label')
+                if label:
+                    label = label[0]
+
+                onto = ontologyMatches.find_or_create(term_id=o_id)
+                if not onto.name:
+                    onto.name = label
+                onto.add_context(OntologyContextSearched())
+        except:
+            pass
+            # TODO communicate to the user couldn't search mondo text search
 
         return Response(status=HTTP_200_OK, data=ontologyMatches.as_json())

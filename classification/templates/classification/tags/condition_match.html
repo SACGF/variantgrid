@@ -1,0 +1,23 @@
+{% load classification_tags %}
+<div class="condition-match list-group-item">
+    <div class="row">
+        <div class="col-6">
+            {% if condition_match.classification %}
+                <span style="margin-left:32px">{% classification_quick condition_match.classification %}</span>
+            {% elif condition_match.gene_symbol %}
+                <span style="margin-left:16px">Gene Symbol : {{ condition_match.gene_symbol }}</span>
+            {% else %}
+                <span>Default</span>
+            {% endif %}
+        </div>
+        <div class="col-6 d-flex">
+            <div class="input-group">
+                <input class="form-control condition-match-input" id="condition-match-{{ condition_match.id }}" name="condition-match-{{ condition_match.id }}" placeholder="{% if condition_match.gene_symbol %}Inherit{% endif %}" value="{{ condition_match.condition_matching_str }}" />
+                <span class="input-group-append"><button class="btn btn-outline-primary mr-2 mondo-picker" data-gene-symbol="{{ condition_match.gene_symbol | default_if_none:'' }}" data-label="{{ condition_match.leaf }}" data-id={{ condition_match.id }}><i class="fas fa-edit"></i></button></span>
+            </div>
+        </div>
+    </div>
+</div>
+{% for child in condition_match.children %}
+    {% condition_match child indent=indent %}
+{% endfor %}

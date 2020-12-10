@@ -3,7 +3,7 @@ import enum
 import itertools
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from django.db.models import QuerySet
 from kombu.utils import json
@@ -235,16 +235,25 @@ class DatatableMixin(object):
         #if not self.config:
         #    raise ValueError('DatatableMixin must set self.config in initialize')
 
+    @staticmethod
+    def sanitize_value(value: Any) -> Any:
+        if isinstance(value, datetime):
+            value = value.timestamp()
+        return value
+
     def render_column(self, row: Dict, column: RichColumn):
         """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type
         """
         if column.renderer:
             return column.renderer(row)
-        if column.key:
-            value = row.get(column.key)
-            if isinstance(value, datetime):
-                value = value.timestamp()
-            return value
+        if column.extra_columns:
+            data_dict = dict()
+            for col in column.value_columns:
+                data_dict[col] = DatatableMixin.sanitize_value(row.get(col))
+            return data_dict
+
+        elif column.key:
+            return DatatableMixin.sanitize_value(row.get(column.key))
         else:
             return None
 

@@ -101,12 +101,21 @@ function setupAjaxTabs(element) {
     });
 }
 
+function setupListGroupCheckboxes() {
+    $('.list-group-checkbox').click(function(event) {
+        console.log("Clickity clickity");
+        $(this).find('input[type=radio]').prop("checked", true); //.trigger("click");
+        // return false;
+    });
+}
+
 function globalSetup() {
     convertTimestamps();
     setupAjaxTabs();
     handleAjaxErrors();
     setupTooltips();
     highlightImportStatus();
+    setupListGroupCheckboxes();
 
     $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
     $('.radio-row').click(event => {

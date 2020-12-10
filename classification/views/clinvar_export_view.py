@@ -10,9 +10,8 @@ from gunicorn.config import User
 from annotation.models import MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology
 from annotation.ontology_matching import OntologyMatching, OntologyContextSimilarMatch
 from classification.enums import SpecialEKeys
-from classification.models import ClinVarExport, ConditionAlias, EvidenceKeyMap, MultiCondition
+from classification.models import ClinVarExport, EvidenceKeyMap, MultiCondition
 from classification.regexes import db_ref_regexes
-from classification.views.condition_alias_view import ConditionAliasColumns, MondoGeneMetas
 from library.log_utils import report_exc_info
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, BaseDatatableView
 
@@ -21,6 +20,7 @@ Ontology = Union[MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology]
 
 class ClinVarExportColumns(DatatableConfig):
 
+    """
     ONTOLOGY_TO_CLASS = {
         "MONDO": MonarchDiseaseOntology,
         "OMIM": MIMMorbid,
@@ -61,6 +61,7 @@ class ClinVarExportColumns(DatatableConfig):
             'aliases': populated_aliases,
             'condition_multi_operation': row.get('condition_multi_operation')
         }
+    """
 
     def render_classification_link(self, row: Dict[str, Any]):
         created = row["classification_based_on__created"]
@@ -105,12 +106,10 @@ class ClinVarExportColumns(DatatableConfig):
             # this busy ups the table a little too much
             # evidence_keys.get(SpecialEKeys.MODE_OF_INHERITANCE).rich_column(prefix="classification_based_on__published_evidence"),
 
-            RichColumn('condition_text_normal', label='Condition Text', orderable=True),
-            RichColumn('condition_xrefs', label='Terms', orderable=True, client_renderer='ontologyList', renderer=self.render_aliases),
-            RichColumn('requires_user_input', name='Requires Input', orderable=True, client_renderer='TableFormat.boolean.bind(null, "warning")'),
+            # RichColumn('condition_text_normal', label='Condition Text', orderable=True),
+            # RichColumn('condition_xrefs', label='Terms', orderable=True, client_renderer='ontologyList', renderer=self.render_aliases),
             RichColumn('submit_when_possible', name='Auto-Submit Enabled', orderable=True, client_renderer='TableFormat.boolean.bind(null, "standard")')
         ]
-        self.extra_columns = ['condition_multi_operation']
 
     def get_initial_queryset(self):
         return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
@@ -126,6 +125,7 @@ def clinvar_export_review_view(request, pk):
     user: User = request.user
     clinvar_export = ClinVarExport.objects.get(pk=pk)
 
+    """
     if request.method == "POST":
         clinvar_export.check_can_write(user)
         terms = request.POST.get("terms")
@@ -143,14 +143,14 @@ def clinvar_export_review_view(request, pk):
         apply_clinvar: ClinVarExport
         for apply_clinvar in apply_to:
             apply_clinvar.condition_xrefs = [term.strip() for term in terms.split(",") if term.strip()]
-            apply_clinvar.condition_multi_operation = MultiCondition(multimode)
-            apply_clinvar.update_required_input()
             apply_clinvar.save()
 
         return redirect('clinvar_export', pk=pk)
+    """
 
     clinvar_export.check_can_view(user)
 
+    """
     ontologyMatches = OntologyMatching()
     ontologyMatches.populate_monarch_local(clinvar_export.gene_symbol.symbol)
     try:
@@ -178,10 +178,11 @@ def clinvar_export_review_view(request, pk):
     for reference in direct_references:
         if reference.db in ("OMIM", "MONDO", "HP"):
             ontologyMatches.reference_term(reference.id_fixed)
+    """
 
     return render(request, 'classification/clinvar_export.html', context={
         'clinvar_export': clinvar_export,
-        'ontology_terms': ontologyMatches.as_json(),
-        "same_text_vcs": same_text,
-        "same_text_gene_vcs": same_text_and_gene
+        # 'ontology_terms': ontologyMatches.as_json(),
+        # "same_text_vcs": same_text,
+        # "same_text_gene_vcs": same_text_and_gene
     })

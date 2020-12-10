@@ -41,16 +41,11 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
     transcript = models.TextField()
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=PROTECT)
 
-    condition_text_normal = models.TextField(null=True, blank=True)
-    condition_xrefs = ArrayField(models.TextField(blank=False), default=list)
-    condition_multi_operation = models.CharField(max_length=1, choices=MultiCondition.choices, default=MultiCondition.NOT_DECIDED)
-
     review_date = models.DateTimeField(null=True, blank=True)
     review_status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.PENDING)
     dirty_date = models.DateTimeField(null=True, blank=True)
 
     submit_when_possible = models.BooleanField(default=False)
-    requires_user_input = models.BooleanField(default=False)
     withdrawn = models.BooleanField(default=False)
 
     @staticmethod
@@ -71,29 +66,9 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
             # but even if we do, should that be done on import and this
             # code should see what we've matched in the past
             results = db_ref_regexes.search(condition_text)
-            self.condition_xrefs = [result.id_fixed for result in results]
-            self.condition_multi_operation = MultiCondition.NOT_DECIDED
             self.dirty_date = datetime.now()
-            self.requires_user_input = self._calculate_required_input()
 
         return is_update
-
-    @staticmethod
-    def normalise_text(text: str):
-        text = text.lower()
-        text = re.sub("[,;.]", " ", text) # replace , ; . with spaces
-        text = re.sub("[ ]{2,}", " ", text) # replace multiple spaces with
-        return text
-
-    def _calculate_required_input(self):
-        if len(self.condition_xrefs) == 0:
-            return True
-        if len(self.condition_xrefs) >= 2 and self.condition_xrefs == MultiCondition.NOT_DECIDED:
-            return True
-        return False
-
-    def update_required_input(self):
-        self.requires_user_input = self._calculate_required_input()
 
     @staticmethod
     def chgvs_for(cm: ClassificationModification):
