@@ -29,7 +29,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
-    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer
+    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
@@ -497,8 +497,21 @@ def qc_gene_list_coverage_graphs(request, genome_build_name, gene_list_id):
 
 def sample_gene_lists_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
-    sample_gene_lists_data = [SampleGeneListSerializer(sgl).data for sgl in sample.samplegenelist_set.all()]
+
+    create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user,
+                                                    initial={"name": "Sample Gene List"})
+    if request.method == "POST":
+        if create_gene_list_form.is_valid():
+            custom_text_gene_list = create_gene_list_form.save()
+            category = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
+            gene_list = custom_text_gene_list.gene_list
+            gene_list.category = category
+            gene_list.save()
+            SampleGeneList.objects.create(sample=sample, gene_list=gene_list)
+
+    sample_gene_lists_data = [SampleGeneListSerializer(sgl).data for sgl in SampleGeneList.objects.filter(sample=sample)]
     context = {"sample": sample,
+               "create_gene_list_form": create_gene_list_form,
                "sample_gene_lists_data": sample_gene_lists_data}
     return render(request, 'genes/sample_gene_lists_tab.html', context)
 

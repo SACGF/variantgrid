@@ -792,6 +792,14 @@ class GeneListCategory(models.Model):
     description = models.TextField()
 
     @staticmethod
+    def get_or_create_category(category_name, hidden=False):
+        category, created = GeneListCategory.objects.get_or_create(name=category_name)
+        if created:
+            category.hidden = hidden
+            category.save()
+        return category
+
+    @staticmethod
     def _get_pathology_test_gene_category(category_name, set_company=False):
         """ Requires settings.COMPANY to be set """
         category = None
@@ -1078,13 +1086,16 @@ class SampleGeneList(TimeStampedModel):
 def sample_gene_list_created(sender, instance, created, **kwargs):
     if created:
         sample = instance.sample
-        try:
-            with transaction.atomic():
-                # There can only be 1 - if this works it's active
-                ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
-        except IntegrityError:
+        if SampleGeneList.objects.filter(sample=sample).exists():
             # Multiple exist, so need to set manually
             ActiveSampleGeneList.objects.filter(sample=sample).delete()
+        else:
+            try:
+                with transaction.atomic():
+                    # There can only be 1 - if this works it's active
+                    ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
+            except IntegrityError:
+                ActiveSampleGeneList.objects.filter(sample=sample).delete()
 
 
 class ActiveSampleGeneList(TimeStampedModel):

@@ -262,7 +262,7 @@
           {
             "id": 227,
             "field": "sample_gene_list",
-            "class_name": "snpdb.SampleGeneList",
+            "class_name": "genes.SampleGeneList",
             "node": 2494
           }
         ],

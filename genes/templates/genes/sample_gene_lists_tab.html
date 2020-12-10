@@ -2,6 +2,8 @@
 {% load js_tags %}
 {% load jqgrid_tags %}
 {% load related_analyses_tags %}
+
+<div id="sample-gene-list-tab-container">
 <script>
 // Note: This is a tab so can be re-loaded (ie don't use global let/const)
 SAMPLE_GENE_LIST_DATA = {{ sample_gene_lists_data | jsonify }};
@@ -70,6 +72,9 @@ $(document).ready(function() {
     $("button.un-hide").click(function() {
         modifySampleGeneList(this, {visible: true});
     });
+
+    $("form#new-gene-list-form").ajaxForm({target: "#sample-gene-list-tab-container"});
+
 });
 </script>
 
@@ -77,6 +82,21 @@ $(document).ready(function() {
     The active one is automatically used in analyses templates and gene list nodes.
     Hidden sample gene lists do not appear in gene list node auto-completes.
 </p>
+
+<a data-toggle="collapse" href="#new-gene-list-form-container">Create new Sample GeneList</a>
+
+<div id="new-gene-list-form-container" class="collapse">
+  <form id="new-gene-list-form" method="post" action="{% url 'sample_gene_lists_tab' sample.pk %}">
+    {% csrf_token %}
+      <fieldset class="form-fields small">
+          <legend>Create</legend>
+          {{ create_gene_list_form.as_p }}
+          {% include "messages/messages.html" %}
+          <button id='submit-button' class="btn btn-primary">Create GeneList</button>
+      </fieldset>
+  </form>
+</div>
+
 
 <div id="sample-gene-lists" class="hidden">
     {% for sample_gene_list in sample.samplegenelist_set.all %}
@@ -106,4 +126,5 @@ $(document).ready(function() {
         </div>
     </div>
     {% endfor %}
+</div>
 </div>
