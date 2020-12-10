@@ -525,3 +525,14 @@ class IteratableStitcher:
 
     def __iter__(self):
         return self._IteratorStitcher(iteratables=self.iterables, comparison=self.comparison)
+
+
+class Constant:
+    """ Used for creating non-enum properties in Enums
+        From https://stackoverflow.com/a/18035135 """
+    def __init__(self, value):
+        self.value = value
+    def __get__(self, *args):
+        return self.value
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, self.value)

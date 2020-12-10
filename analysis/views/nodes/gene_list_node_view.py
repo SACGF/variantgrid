@@ -3,7 +3,7 @@ from django.conf import settings
 from analysis.forms.forms_nodes import GeneListNodeForm
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.views.nodes.node_view import NodeView
-from genes.models import GeneListCategory, GeneList
+from genes.models import GeneListCategory, GeneList, SampleGeneList
 from snpdb.models.models_vcf import Sample
 
 
@@ -26,7 +26,7 @@ class GeneListNodeView(NodeView):
         context['gene_list_id_list'] = "/".join([str(gl.pk) for gl in gene_lists])
 
         context.update(self._get_coverage_context())
-        context.update(self._get_sample_qc_gene_lists_context())
+        context.update(self._get_sample_gene_lists_context())
         context.update(self._get_pathology_test_context())
         return context
 
@@ -43,18 +43,9 @@ class GeneListNodeView(NodeView):
                 "sample_coverage_and_uncovered": sample_coverage_and_uncovered,
                 "incomplete_gene_coverage": incomplete_gene_coverage}
 
-    def _get_sample_qc_gene_lists_context(self):
-        sample_ids = []
-        input_samples_from_sequencing_samples = Sample.objects.filter(pk__in=self.object.get_sample_ids(),
-                                                                      samplefromsequencingsample__isnull=False)
-        for sample in input_samples_from_sequencing_samples:
-            if sample.qc_gene_list:
-                sample_ids.append(sample.pk)
-
-        samples_with_qc_gene_lists = Sample.objects.filter(pk__in=sample_ids)
-        has_sample_qc_gene_lists = samples_with_qc_gene_lists.exists()
-
-        return {'has_sample_qc_gene_lists': has_sample_qc_gene_lists}
+    def _get_sample_gene_lists_context(self):
+        has_sample_gene_lists = SampleGeneList.objects.filter(sample__in=self.object.get_sample_ids()).exists()
+        return {'has_sample_gene_lists': has_sample_gene_lists}
 
     def _get_pathology_test_context(self):
         pathology_test_category = GeneListCategory.get_pathology_test_gene_category()

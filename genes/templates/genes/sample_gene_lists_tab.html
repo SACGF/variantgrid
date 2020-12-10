@@ -1,0 +1,130 @@
+{% load tz %}
+{% load js_tags %}
+{% load jqgrid_tags %}
+{% load related_analyses_tags %}
+
+<div id="sample-gene-list-tab-container">
+<script>
+// Note: This is a tab so can be re-loaded (ie don't use global let/const)
+SAMPLE_GENE_LIST_DATA = {{ sample_gene_lists_data | jsonify }};
+
+function populateSampleGeneListFromJSON(data) {
+    let sampleGeneListContainer = $(".sample-gene-list-container[sample-gene-list-id=" + data.pk + "]");
+    let details = $(".sample-gene-list-details", sampleGeneListContainer);
+    let analysisTemplates = $(".sample-gene-list-analysis-templates", sampleGeneListContainer);
+    let toggle = $("a.show-sample-gene-list-toggle", sampleGeneListContainer);
+
+    if (data.visible) {
+        toggle.hide();
+        details.addClass("show");
+        $("button.hide", details).show();
+        $("button.un-hide", details).hide();
+        analysisTemplates.show();
+    } else {
+        toggle.show();
+        details.removeClass("show");
+        $("button.hide", details).hide();
+        $("button.un-hide", details).show();
+        analysisTemplates.hide();
+    }
+
+    let myActiveIcon = $(".active-sample-gene-list", details);
+    if (data.active) {
+        $(".active-sample-gene-list").hide();  // hide all others
+        myActiveIcon.show();
+        $("button.make-active", details).hide();
+    } else {
+        myActiveIcon.hide();
+        $("button.make-active", details).show();
+    }
+}
+
+function drawInitialSampleGeneLists() {
+    for (let i=0 ; i<SAMPLE_GENE_LIST_DATA.length ; i++) {
+        populateSampleGeneListFromJSON(SAMPLE_GENE_LIST_DATA[i]);
+    }
+    $("#sample-gene-lists").show();
+}
+
+function modifySampleGeneList(that, data) {
+    let sampleGeneListContainer = $(that).parents(".sample-gene-list-container");
+    let sampleGeneListId = sampleGeneListContainer.attr("sample-gene-list-id");
+
+    $.ajax({
+        type: "POST",
+        data: data,
+        url: Urls.api_sample_gene_list(sampleGeneListId),
+        success: populateSampleGeneListFromJSON,
+    });
+}
+
+$(document).ready(function() {
+    drawInitialSampleGeneLists();
+
+    $("button.make-active").click(function() {
+        modifySampleGeneList(this, {active: true});
+    });
+
+    $("button.hide").click(function() {
+        modifySampleGeneList(this, {visible: false});
+    });
+
+    $("button.un-hide").click(function() {
+        modifySampleGeneList(this, {visible: true});
+    });
+
+    $("form#new-gene-list-form").ajaxForm({target: "#sample-gene-list-tab-container"});
+
+});
+</script>
+
+<p>If you have more than one sample gene list, you must manually set one as active.
+    The active one is automatically used in analyses templates and gene list nodes.
+    Hidden sample gene lists do not appear in gene list node auto-completes.
+</p>
+
+<a data-toggle="collapse" href="#new-gene-list-form-container">Create new Sample GeneList</a>
+
+<div id="new-gene-list-form-container" class="collapse">
+  <form id="new-gene-list-form" method="post" action="{% url 'sample_gene_lists_tab' sample.pk %}">
+    {% csrf_token %}
+      <fieldset class="form-fields small">
+          <legend>Create</legend>
+          {{ create_gene_list_form.as_p }}
+          {% include "messages/messages.html" %}
+          <button id='submit-button' class="btn btn-primary">Create GeneList</button>
+      </fieldset>
+  </form>
+</div>
+
+
+<div id="sample-gene-lists" class="hidden">
+    {% for sample_gene_list in sample.samplegenelist_set.all %}
+    <div class="sample-gene-list-container" sample-gene-list-id="{{ sample_gene_list.pk }}">
+        <a data-toggle="collapse" href="#sample-gene-list-{{ sample_gene_list.pk }}" class="show-sample-gene-list-toggle">
+            Toggle {{ sample_gene_list.modified | localtime }} (hidden)
+        </a>
+
+        <div id="sample-gene-list-{{ sample_gene_list.pk }}" class="sample-gene-list-details collapse card mt-4">
+            <div class="card-header">
+                <div class="left icon32 check-mark-green active-sample-gene-list" title="Active Gene List"></div>
+                GeneList: {{ sample_gene_list.modified | localtime }}</div>
+            <div class="card-body">
+                <div class="sample-gene-list-toolbar">
+                    <button class="btn btn-outline-primary make-active">Make active</button>
+                    <button class="btn btn-outline-primary hide">Hide</button>
+                    <button class="btn btn-outline-primary un-hide">Un-Hide</button>
+                </div>
+
+                <div class="sample-gene-list-analysis-templates">
+                    <h3>Analysis Templates - using this gene list</h3>
+                    {% analysis_templates_tag autocomplete_field=False requires_sample_gene_list=True has_somatic_sample=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
+                </div>
+
+                {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+</div>

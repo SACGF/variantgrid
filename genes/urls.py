@@ -27,6 +27,7 @@ urlpatterns = [
     perm_path('gene_grid/<path:columns_from_url>', views.gene_grid, name='passed_gene_grid'),
     perm_path('gene_grid', views.gene_grid, name='gene_grid'),
     perm_path('canonical_transcripts', views.canonical_transcripts, name='canonical_transcripts'),
+    perm_path('sample_gene_lists_tab/<int:sample_id>', views.sample_gene_lists_tab, name='sample_gene_lists_tab'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_symbol>',
               views.HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_id>',
@@ -77,7 +78,7 @@ rest_urlpatterns = [
     perm_path('api/gene/info/<gene_symbol>', views_rest.GeneInfoView.as_view(), name='api_gene_info'),
     perm_path('api/text_to_gene_list', views_rest.TextToGeneListView.as_view(), name='api_text_to_gene_list'),
     perm_path('api/gene_annotation_release/<int:pk>', views_rest.GeneAnnotationReleaseView.as_view(), name='api_gene_annotation_release'),
-
+    perm_path('api/sample_gene_list/<int:pk>', views_rest.SampleGeneListView.as_view(), name='api_sample_gene_list'),
 
 ]
 urlpatterns += format_suffix_patterns(rest_urlpatterns)

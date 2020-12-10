@@ -21,10 +21,10 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
     min_dp = models.IntegerField(default=0)
     min_gq = models.IntegerField(default=0)
     max_pl = models.IntegerField(null=True, blank=True)
-    min_ad_op = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ANY)
-    min_dp_op = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ANY)
-    min_gq_op = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ANY)
-    max_pl_op = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ANY)
+    min_ad_op = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
+    min_dp_op = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
+    min_gq_op = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
+    max_pl_op = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
 
     COHORT_GENOTYPE_FIELD_MAPPINGS = [("min_ad", "samples_allele_depth", "gte"),
                                       ("min_dp", "samples_read_depth", "gte"),
@@ -58,8 +58,8 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     PER_SAMPLE_ZYGOSITY = 2
 
     cohort = models.ForeignKey(Cohort, null=True, on_delete=SET_NULL)
-    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.CHOICES, default=SimpleZygosity.ANY_GERMLINE)
-    zygosity_op = models.CharField(max_length=1, choices=GroupOperation.CHOICES, default=GroupOperation.ALL)
+    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.choices, default=SimpleZygosity.ANY_GERMLINE)
+    zygosity_op = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ALL)
     accordion_panel = models.IntegerField(default=0)
     # /zygosity count
 

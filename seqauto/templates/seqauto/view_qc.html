@@ -25,7 +25,7 @@
 	<div id="qc-tabs">
 		<ul>
 	    	<li><a href="{% url 'view_qc_exec_summary_tab' qc.pk %}">Exec Summary</a></li>
-            {% if qc_gene_list %}
+            {% if qc.qcgenelist_set.exists %}
             <li><a href="{% url 'view_qc_gene_list_tab' qc.pk %}">Genes of Interest</a></li>
             {% endif %}
 			{% if gene_coverage %}

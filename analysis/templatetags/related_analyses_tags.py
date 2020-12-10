@@ -1,8 +1,8 @@
 import operator
+import uuid
 from collections import defaultdict
 from functools import reduce
 
-from django.conf import settings
 from django.db.models import Q, Model
 from django.template import Library
 
@@ -96,32 +96,47 @@ def related_analyses_for_pedigree(context, pedigree):
 
 
 @register.inclusion_tag("analysis/tags/analysis_templates_tag.html", takes_context=True)
-def analysis_templates_tag(context, sample_somatic=False, sample_gene_list=False, **kwargs):
+def analysis_templates_tag(context, autocomplete_field=True, has_somatic_sample=False, requires_sample_gene_list=None,
+                           **kwargs):
     user = context["user"]
-    params_error_message = f"analysis_templates_tag should be passed dict with exactly one value as model: {kwargs}"
+    single_model_args = {"sample", "cohort", "trio", "pedigree"}
+    params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
 
     hidden_inputs = {}
     klass = None
     for k, v in kwargs.items():
         if isinstance(v, Model):
-            if klass:
-                raise ValueError(params_error_message)
-            klass = type(v)
+            if k in single_model_args:
+                if klass:
+                    raise ValueError(params_error_message)
+                klass = type(v)
             v = v.pk
+
         hidden_inputs[k] = v
     if klass is None:
         raise ValueError(params_error_message)
 
     class_name = klass._meta.label
+    # Show/Hide AnalysisTemplateVersions based on requires_sample_gene_list
+
+    requires_sample_somatic = None
+    if not has_somatic_sample:
+        requires_sample_somatic = False
     AnalysisTemplateForm = get_analysis_template_form_for_variables_only_of_class(class_name,
-                                                                                  sample_somatic=sample_somatic,
-                                                                                  sample_gene_list=sample_gene_list)
+                                                                                  autocomplete_field=autocomplete_field,
+                                                                                  requires_sample_somatic=requires_sample_somatic,
+                                                                                  requires_sample_gene_list=requires_sample_gene_list)
 
     analysis_template_links = AnalysisTemplate.filter(user, class_name=class_name,
-                                                      sample_somatic=sample_somatic, sample_gene_list=sample_gene_list,
+                                                      requires_sample_somatic=requires_sample_somatic,
+                                                      requires_sample_gene_list=requires_sample_gene_list,
                                                       atv_kwargs={"appears_in_links": True})
+
+    flattened_uuid = str(uuid.uuid4()).replace("-", "_")
     return {
-        "analysis_template_form": AnalysisTemplateForm(),
+        "flattened_uuid": flattened_uuid,
+        "autocomplete_field": autocomplete_field,
+        "analysis_template_form": AnalysisTemplateForm(prefix=flattened_uuid),
         "analysis_template_links": analysis_template_links,
         "hidden_inputs": hidden_inputs,
     }

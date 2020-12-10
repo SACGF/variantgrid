@@ -683,7 +683,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
     topmed_af = models.FloatField(null=True, blank=True)
     gnomad_filtered = models.BooleanField(null=True, blank=True)
-    gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.CHOICES, null=True, blank=True)
+    gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.choices, null=True, blank=True)
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"

@@ -12,7 +12,7 @@ class MutationalSignatureCalculator(SoftwareVersion):
     num_iterations = models.IntegerField()
     sampling_fraction = models.FloatField()
     signature_data_filename = models.TextField()
-    minimisation_strategy = models.CharField(max_length=2, choices=MinimisationStrategy.CHOICES)
+    minimisation_strategy = models.CharField(max_length=2, choices=MinimisationStrategy.choices)
 
     class Meta:
         unique_together = ("name", "version", "num_iterations", "sampling_fraction", "signature_data_filename", "minimisation_strategy")
@@ -40,7 +40,7 @@ class MutationalSignature(models.Model):
 
 class MutationalSignatureMinimisationResult(models.Model):
     mutational_signature = models.ForeignKey(MutationalSignature, on_delete=CASCADE)
-    result_type = models.CharField(max_length=1, choices=MinimisationResultType.CHOICES)
+    result_type = models.CharField(max_length=1, choices=MinimisationResultType.choices)
     iteration = models.IntegerField()
     solution_array = ArrayField(FloatField())
     fit_data = ArrayField(FloatField())

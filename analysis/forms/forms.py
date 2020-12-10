@@ -7,14 +7,13 @@ import itertools
 import operator
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate
-from analysis.models.enums import SNPMatrix, AnalysisTemplateType
+from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
 from annotation.models.models import AnnotationVersion
 from library.django_utils import get_models_dict_by_column
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models_enums import TrioSample
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Sample, VariantGridColumn, Trio, UserSettings
 
@@ -25,17 +24,21 @@ class AnalysisChoiceForm(forms.Form):
                                                                        attrs={'data-placeholder': 'Analysis...'}))
 
 
-def get_analysis_template_form_for_variables_only_of_class(class_name, sample_somatic=False, sample_gene_list=False):
-    """ Returns a AnalysisTemplate form with autocomplete forwards set """
-    widget = autocomplete.ModelSelect2(url='analysis_template_autocomplete',
-                                       attrs={'data-placeholder': 'Analysis Template...'},
-                                       forward=(forward.Const(class_name, 'class_name'),
-                                                forward.Const(bool(sample_somatic), 'sample_somatic'),
-                                                forward.Const(bool(sample_gene_list), 'sample_gene_list'),))
+def get_analysis_template_form_for_variables_only_of_class(class_name, autocomplete_field=True,
+                                                           requires_sample_somatic=None, requires_sample_gene_list=None):
+    """ Returns a AnalysisTemplateForm - with either autocomplete forwards set or hidden input """
+    if autocomplete_field:
+        widget = autocomplete.ModelSelect2(url='analysis_template_autocomplete',
+                                           attrs={'data-placeholder': 'Analysis Template...'},
+                                           forward=(forward.Const(class_name, 'class_name'),
+                                                    forward.Const(requires_sample_somatic, 'requires_sample_somatic'),
+                                                    forward.Const(requires_sample_gene_list, 'requires_sample_gene_list'),))
+
+    else:
+        widget = forms.HiddenInput()
 
     class AnalysisTemplateForm(forms.Form):
-        analysis_template = forms.ModelChoiceField(queryset=AnalysisTemplate.objects.all(),
-                                                   widget=widget)
+        analysis_template = forms.ModelChoiceField(queryset=AnalysisTemplate.objects.all(), widget=widget)
     return AnalysisTemplateForm
 
 
@@ -204,7 +207,7 @@ class ColumnSummaryForm(forms.Form):
 
 
 class SNPMatrixForm(forms.Form):
-    conversion = forms.ChoiceField(choices=SNPMatrix.CHOICES)
+    conversion = forms.ChoiceField(choices=SNPMatrix.choices)
     significant_figures = forms.IntegerField(widget=NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1'}))
 
 
@@ -250,9 +253,9 @@ class UserTrioForm(GenomeBuildAutocompleteForwardMixin, forms.Form):
 class UserTrioWizardForm(forms.Form):
     mother_affected = forms.BooleanField(required=False)
     father_affected = forms.BooleanField(required=False)
-    sample_1 = forms.ChoiceField(choices=TrioSample.CHOICES)
-    sample_2 = forms.ChoiceField(choices=TrioSample.CHOICES)
-    sample_3 = forms.ChoiceField(choices=TrioSample.CHOICES)
+    sample_1 = forms.ChoiceField(choices=TrioSample.choices)
+    sample_2 = forms.ChoiceField(choices=TrioSample.choices)
+    sample_3 = forms.ChoiceField(choices=TrioSample.choices)
 
     def clean(self):
         cleaned_data = super().clean()

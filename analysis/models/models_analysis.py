@@ -30,7 +30,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     version = models.IntegerField(default=0)  # By bumping this we can invalidate node caches
     # TODO: Remove 'analysis_type' by creating legacy 'AnalysisTemplateSnapshot'
-    analysis_type = models.CharField(max_length=1, choices=AnalysisType.CHOICES, null=True, blank=True)
+    analysis_type = models.CharField(max_length=1, choices=AnalysisType.choices, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
@@ -43,7 +43,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=SET_NULL)
     lock_input_sources = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
-    template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.CHOICES, null=True, blank=True)
+    template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.choices, null=True, blank=True)
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"
@@ -320,17 +320,18 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         return qs.filter(deleted=False)
 
     @staticmethod
-    def filter(user: User, sample_somatic=False, sample_gene_list=False, class_name=None, atv_kwargs=None):
+    def filter(user: User, requires_sample_somatic=None, requires_sample_gene_list=None, class_name=None, atv_kwargs=None):
+        """ requires_sample_somatic/requires_sample_gene_list - leave None for all """
         if atv_kwargs is None:
             atv_kwargs = {}
 
         template_versions_qs = AnalysisTemplateVersion.objects.filter(active=True, **atv_kwargs)
 
-        if not sample_somatic:
-            template_versions_qs = template_versions_qs.exclude(requires_sample_somatic=True)
+        if requires_sample_somatic is not None:
+            template_versions_qs = template_versions_qs.filter(requires_sample_somatic=requires_sample_somatic)
 
-        if not sample_gene_list:
-            template_versions_qs = template_versions_qs.exclude(requires_sample_gene_list=True)
+        if requires_sample_gene_list is not None:
+            template_versions_qs = template_versions_qs.filter(requires_sample_gene_list=requires_sample_gene_list)
 
         if class_name:
             # Restrict to template versions who's variables are all of class_name

@@ -1,3 +1,5 @@
+import pathlib
+
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import DecimalRangeField
@@ -14,7 +16,7 @@ import re
 import shutil
 
 from genes.models import CanonicalTranscriptCollection, GeneListCategory, \
-    CustomTextGeneList, GeneList, GeneCoverageCollection, Transcript, GeneSymbol
+    CustomTextGeneList, GeneList, GeneCoverageCollection, Transcript, GeneSymbol, SampleGeneList
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
@@ -442,6 +444,8 @@ class SequencingRunModification(models.Model):
 
 class SeqAutoFile(models.Model):
     path = models.TextField()
+    # last modified - Stores stat st_mtime - time of last modification - only used for classes that can reload
+    file_last_modified = models.FloatField(default=0.0)
     data_state = models.CharField(max_length=1, choices=DataState.CHOICES)
     error_exception = models.TextField(null=True)
     #hash = models.TextField() ???
@@ -1073,7 +1077,8 @@ class QC(SeqAutoFile, SequencingSamplePropertiesMixin):
 class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
     """ This represents a text file containing genes which will be used for initial pass and QC filters """
     qc = models.ForeignKey(QC, on_delete=CASCADE)
-    custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
+    custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=SET_NULL)
+    sample_gene_list = models.ForeignKey(SampleGeneList, null=True, on_delete=SET_NULL)
 
     @property
     def sequencing_sample(self):
@@ -1086,7 +1091,6 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
 
     def load_from_file(self, seqauto_run, **kwargs):
         from genes.custom_text_gene_list import create_custom_text_gene_list
-
         with open(self.path) as f:
             custom_gene_list_text = f.read()
             custom_text_gene_list = CustomTextGeneList(name=f"{self.qc} gene list", text=custom_gene_list_text)
@@ -1107,7 +1111,19 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
                                                    severity=LogLevel.ERROR)
 
             self.custom_text_gene_list = custom_text_gene_list
+
+        try:
+            # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
+            sample = self.sequencing_sample.samplefromsequencingsample.sample
+            self.create_and_assign_sample_gene_list(sample)  # Also saves
+        except SampleFromSequencingSample.DoesNotExist:
             self.save()
+
+    def create_and_assign_sample_gene_list(self, sample: Sample):
+        logging.info(f"QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
+        self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
+                                                                     gene_list=self.custom_text_gene_list.gene_list)[0]
+        self.save()
 
 
 class QCExecSummary(SeqAutoFile, SequencingSamplePropertiesMixin):
@@ -1419,7 +1435,7 @@ class SequencingInfo(models.Model):
     paper_name = models.TextField(blank=True, null=True)
     year_published = models.IntegerField(null=True)
     enrichment_kit = models.ForeignKey(EnrichmentKit, on_delete=CASCADE, blank=True, null=True)
-    sequencer = models.ForeignKey(Sequencer, on_delete=models.CASCADE, blank=True, null=True)
+    sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE, blank=True, null=True)
     seq_details = models.TextField(blank=True, null=True)
     file_type = models.TextField(blank=True, null=True)
     file_count = models.IntegerField(blank=True, default=0)

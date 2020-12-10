@@ -352,27 +352,6 @@ class Sample(SortByPKMixin, models.Model):
         return sample
 
     @lazy
-    def qc(self):
-        try:
-            return self.samplefromsequencingsample.sequencing_sample.get_single_qc()
-        except:
-            return None
-
-    @lazy
-    def qc_gene_list(self):
-        qc = self.qc
-        gene_list = None
-        if qc:
-            try:
-                qc_gene_list = qc.qcgenelist_set.get()
-                ctgl = qc_gene_list.custom_text_gene_list
-                if ctgl:
-                    gene_list = ctgl.gene_list
-            except:
-                pass
-        return gene_list
-
-    @lazy
     def sequencing_run(self):
         try:
             return self.samplefromsequencingsample.sequencing_run
@@ -480,7 +459,7 @@ class AbstractSampleStats(AbstractVariantStats):
             elif hom_het_ratio > 0.8:
                 sex = Sex.MALE
 
-        return dict(Sex.CHOICES)[sex]
+        return dict(Sex.choices)[sex]
 
 
 class SampleStats(AbstractSampleStats):
@@ -536,6 +515,8 @@ class VCFBedIntersection(models.Model):
                       'right_padding': settings.DEFAULT_ENRICHMENT_KIT_RIGHT_PADDING}
 
             pbi = VCFBedIntersection.objects.get(**kwargs)
+        except VCFBedIntersection.DoesNotExist:
+            pass
         except:
             log_traceback()
             pbi = None

@@ -58,7 +58,7 @@ class PedFileRecord(models.Model):
     sample = models.TextField(blank=False, null=False)
     father = models.ForeignKey("self", related_name='father_rel', null=True, on_delete=CASCADE)
     mother = models.ForeignKey("self", related_name='mother_rel', null=True, on_delete=CASCADE)
-    sex = models.CharField(max_length=1, choices=Sex.CHOICES, null=True)
+    sex = models.CharField(max_length=1, choices=Sex.choices, null=True)
     affection = models.BooleanField(null=True)
 
     @property

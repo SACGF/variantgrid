@@ -1,3 +1,4 @@
+import pathlib
 from collections import Counter, defaultdict
 from datetime import datetime
 from django.conf import settings
@@ -899,6 +900,7 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
     existing_other_qc_records = returning_existing_records_by_path(klass)
     created = 0
     updated = 0
+    reloaded = 0
     missing = 0
     unchanged = 0
 
@@ -906,6 +908,18 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
         other_qc_path = klass.get_path_from_qc(qc)
         exists = other_qc_path in existing_qcs
         data_state = get_data_state(qc.data_state, exists)
+
+        path = pathlib.Path(other_qc_path)
+        if exists:
+            file_last_modified = path.stat().st_mtime
+        else:
+            file_last_modified = 0.0
+
+        def _create_new_record():
+            return klass.objects.create(path=other_qc_path,
+                                        qc=qc,
+                                        data_state=data_state,
+                                        file_last_modified=file_last_modified)
 
         record = existing_other_qc_records.get(other_qc_path)
         if record:
@@ -915,6 +929,9 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             if record.data_state != data_state:
                 updated += 1
                 logging.info("QC %s data state changed from %s->%s", record, record.data_state, data_state)
+                if data_state == DataState.COMPLETE:
+                    record.file_last_modified = file_last_modified
+
                 record.data_state = data_state
                 record.save()
                 load_from_file_if_complete(seqauto_run,
@@ -922,13 +939,22 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
                                            gene_matcher=gene_matcher,
                                            canonical_transcript_manager=canonical_transcript_manager)
             else:
-                unchanged += 1
+                #logging.info("%s - previous last modified: %f - now %f",
+                #             record.path, record.file_last_modified, file_last_modified)
+                if exists and file_last_modified > record.file_last_modified:
+                    logging.info("**** RECORD last modified has changed! ***")
+                    record = _create_new_record()
+                    load_from_file_if_complete(seqauto_run,
+                                               record,
+                                               gene_matcher=gene_matcher,
+                                               canonical_transcript_manager=canonical_transcript_manager)
+                    reloaded += 1
+                else:
+                    unchanged += 1
         else:
             if DataState.should_create_new_record(data_state):
                 created += 1
-                record = klass.objects.create(path=other_qc_path,
-                                              qc=qc,
-                                              data_state=data_state,)
+                record = _create_new_record()
                 load_from_file_if_complete(seqauto_run,
                                            record,
                                            gene_matcher=gene_matcher,
@@ -936,7 +962,8 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             else:
                 missing += 1
 
-    logging.info("%s: created: %d, updated: %d, missing: %d, unchanged: %d", klass, created, updated, missing, unchanged)
+    logging.info("%s: created: %d, updated: %d, reloaded: %d, missing: %d, unchanged: %d",
+                 klass, created, updated, reloaded, missing, unchanged)
 
 
 def print_data_state_stats(data):

@@ -253,7 +253,7 @@ class PathologyTestOrderSample(models.Model):
 
 class PathologyTestOrderPopulation(models.Model):
     pathology_test_order = models.ForeignKey(PathologyTestOrder, on_delete=CASCADE)
-    population = models.CharField(max_length=3, choices=PopulationGroup.CHOICES)
+    population = models.CharField(max_length=3, choices=PopulationGroup.choices)
 
 
 class PathologyTestOrderHPO(models.Model):

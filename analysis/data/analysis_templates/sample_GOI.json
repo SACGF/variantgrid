@@ -258,6 +258,12 @@
             "field": "sample",
             "class_name": "snpdb.Sample",
             "node": 2494
+          },
+          {
+            "id": 227,
+            "field": "sample_gene_list",
+            "class_name": "genes.SampleGeneList",
+            "node": 2494
           }
         ],
         "nodeallelefrequencyfilter": {

@@ -106,7 +106,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     last_name = models.TextField(null=True)
     date_of_birth = models.DateField(null=True, blank=True)
     date_of_death = models.DateField(null=True, blank=True)
-    sex = models.CharField(max_length=1, choices=Sex.CHOICES, default=Sex.UNKNOWN)
+    sex = models.CharField(max_length=1, choices=Sex.choices, default=Sex.UNKNOWN)
     phenotype = models.TextField(null=True, blank=True)
     affected = models.BooleanField(null=True)
     consanguineous = models.BooleanField(null=True)
@@ -220,7 +220,7 @@ class PatientPopulation(models.Model):
     """ Can have many-to-one - eg Obama would have an entry for
         both AFRICAN_AFRICAN_AMERICAN and NON_FINNISH_EUROPEAN """
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
-    population = models.CharField(max_length=3, choices=PopulationGroup.CHOICES)
+    population = models.CharField(max_length=3, choices=PopulationGroup.choices)
 
 
 class Tissue(models.Model):
@@ -240,8 +240,8 @@ class Specimen(models.Model):
     tissue = models.ForeignKey(Tissue, null=True, blank=True, on_delete=SET_NULL)
     collection_date = models.DateTimeField(null=True, blank=True)
     received_date = models.DateTimeField(null=True, blank=True)
-    mutation_type = models.CharField(max_length=1, choices=Mutation.CHOICES, default=Mutation.GERMLINE, null=True, blank=True)
-    nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.CHOICES, default=NucleicAcid.DNA, null=True, blank=True)
+    mutation_type = models.CharField(max_length=1, choices=Mutation.choices, default=Mutation.GERMLINE, null=True, blank=True)
+    nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, default=NucleicAcid.DNA, null=True, blank=True)
     # See note on patient / sample ages and dates above Patient model
     _age_at_collection_date = models.IntegerField(null=True, blank=True)
 
@@ -499,7 +499,7 @@ class PatientRecord(models.Model):
     patient_last_name = models.TextField()
     date_of_birth = models.DateField(null=True)
     date_of_death = models.DateField(null=True)
-    sex = models.CharField(max_length=1, choices=Sex.CHOICES, null=True)
+    sex = models.CharField(max_length=1, choices=Sex.choices, null=True)
     affected = models.BooleanField(null=True, blank=True)
     consanguineous = models.BooleanField(null=True, blank=True)
     _deceased = models.BooleanField(null=True, blank=True)
@@ -509,8 +509,8 @@ class PatientRecord(models.Model):
     specimen_collected_by = models.TextField(null=True)
     specimen_collection_date = models.TextField(null=True)
     specimen_received_date = models.TextField(null=True)
-    specimen_mutation_type = models.CharField(max_length=1, choices=Mutation.CHOICES, null=True)
-    specimen_nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.CHOICES, null=True)
+    specimen_mutation_type = models.CharField(max_length=1, choices=Mutation.choices, null=True)
+    specimen_nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, null=True)
     specimen_age_at_collection_date = models.IntegerField(null=True, blank=True)
 
     # Methods on this can include save / isvalid etc -

@@ -11,14 +11,17 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
-from django.db import models
+from django.db import models, IntegrityError, transaction
 from django.db.models import Min, Max, QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
 from django.db.models.query_utils import Q
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
+from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
@@ -552,7 +555,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if exists:
             raise MissingTranscript(f"Transcript '{identifier}' valid but missing from our (build: {genome_build}) database.")
         accession = TranscriptVersion.get_accession(identifier, version)
-        raise BadTranscript(f"The transcript '{accession}' does not exist in the {annotation_consortium} database.")
+        raise BadTranscript(f"The transcript '{accession}' does not exist in the {genome_build} {annotation_consortium} database.")
 
     @staticmethod
     def get_refgene(genome_build: GenomeBuild, transcript_name, best_attempt=True):
@@ -787,6 +790,14 @@ class GeneListCategory(models.Model):
     hidden = models.BooleanField(default=False)  # for special ones
     public = models.BooleanField(default=False)
     description = models.TextField()
+
+    @staticmethod
+    def get_or_create_category(category_name, hidden=False):
+        category, created = GeneListCategory.objects.get_or_create(name=category_name)
+        if created:
+            category.hidden = hidden
+            category.save()
+        return category
 
     @staticmethod
     def _get_pathology_test_gene_category(category_name, set_company=False):
@@ -1053,6 +1064,47 @@ class CustomTextGeneList(models.Model):
         return f"CustomTextGeneList for '{text}': {self.gene_list}"
 
 
+class SampleGeneList(TimeStampedModel):
+    """ There can be multiple SampleGeneLists per sample, but only 1 active one.
+        If multiple exist, the active one must be set manually """
+    sample = models.ForeignKey(Sample, on_delete=CASCADE)
+    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
+    visible = models.BooleanField(default=True, blank=False)
+
+    class Meta:
+        unique_together = ('sample', 'gene_list')
+        ordering = ['created']
+
+    def __str__(self):
+        s = f"{self.sample}: {localtime(self.modified)}"
+        if not self.visible:
+            s += " (hidden)"
+        return s
+
+
+@receiver(post_save, sender=SampleGeneList)
+def sample_gene_list_created(sender, instance, created, **kwargs):
+    if created:
+        sample = instance.sample
+        if SampleGeneList.objects.filter(sample=sample).exists():
+            # Multiple exist, so need to set manually
+            ActiveSampleGeneList.objects.filter(sample=sample).delete()
+        else:
+            try:
+                with transaction.atomic():
+                    # There can only be 1 - if this works it's active
+                    ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
+            except IntegrityError:
+                ActiveSampleGeneList.objects.filter(sample=sample).delete()
+
+
+class ActiveSampleGeneList(TimeStampedModel):
+    """ Use 1-to-1 to enforce there's only 1 in DB
+        (as compared to an "active" flag on SampleGeneList) """
+    sample = models.OneToOneField(Sample, on_delete=CASCADE)
+    sample_gene_list = models.ForeignKey(SampleGeneList, on_delete=CASCADE)
+
+
 class GeneListWiki(Wiki):
     gene_list = models.OneToOneField(GeneList, on_delete=CASCADE)
 
@@ -1064,6 +1116,9 @@ class PanelAppServer(models.Model):
     name = models.TextField(unique=True)
     url = models.TextField(unique=True)
     icon_css_class = models.TextField()
+
+    def __str__(self):
+        return self.name
 
 
 class PanelAppPanel(models.Model):

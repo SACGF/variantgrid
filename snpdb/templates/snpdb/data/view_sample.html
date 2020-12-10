@@ -31,6 +31,10 @@
         float: left;
     }
 
+    .sample-gene-list-link div {
+        margin-left: 2px;
+    }
+
 </style>
 <script>
 function getBams() {
@@ -61,7 +65,6 @@ function setPatientLink() {
 
 
 function setIGVLink() {
-    console.log("setIGVLink");
     var bfpl = $("<span id='bam-files-path-container'></span>");
     var bamFilePathSelector = $("#id_bam_file_path");
     var parentContainer = bamFilePathSelector.parent();
@@ -85,18 +88,13 @@ function setIGVLink() {
     setBamFilesPathLink();
     bamFilePathSelector.change(setBamFilesPathLink);
 }
-</script>
-<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
-{% endblock %}
 
-{% block jsdocumentready %}
+$(document).ready(function() {
     setPatientLink();
     setIGVLink();
 
     $("#sample-tabs").tabs();
-    
+
     var sampleForm = $("#sample-form");
     var patientSelect = $("#id_patient", sampleForm);
     patientSelect.change(function() {
@@ -106,8 +104,11 @@ function setIGVLink() {
     var dialog = setupCreatePatientDialog();
     var sampleName = $("#id_name").val();
     addCreatePatientButton(dialog, patientSelect, sampleName);
-
-    
+});
+</script>
+<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 {% endblock %}
 
 {% block submenu_page_content %}
@@ -126,8 +127,16 @@ function setIGVLink() {
         {% if sample.import_status == 'S' or sample.import_status == 'A' %}
         <li><a href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
         {% endif %}
-        {% if sample.qc_gene_list and url_name_visible.view_qc_gene_list_tab %}
-        <li><a href="{% url 'view_qc_gene_list_tab' sample.qc.pk %}">Genes of Interest</a></li>
+        {% if sample.samplegenelist_set.exists and url_name_visible.sample_gene_lists_tab %}
+        <li>
+            <a class="sample-gene-list-link" href="{% url 'sample_gene_lists_tab' sample.pk %}">
+                <div class="left">Genes of Interest</div>
+                {% if sample.activesamplegenelist %}
+                <div title="Active GeneList" class="left icon16 check-mark-green"></div>
+                {% endif %}
+                <div class="left">({{ sample.samplegenelist_set.count }})</div>
+            </a>
+        </li>
         {% endif %}
         {% if sample.sequencing_run and url_name_visible.view_sample_qc_tab %}
         <li><a href="{% url 'view_sample_qc_tab' sample.pk %}">QC</a></li>
