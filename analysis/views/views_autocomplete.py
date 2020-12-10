@@ -21,7 +21,7 @@ class AnalysisTemplateAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, user):
         return AnalysisTemplate.filter(user,
-                                       sample_somatic=self.forwarded.get("sample_somatic"),
-                                       sample_gene_list=self.forwarded.get("sample_gene_list"),
+                                       requires_sample_somatic=self.forwarded.get("requires_sample_somatic"),
+                                       requires_sample_gene_list=self.forwarded.get("requires_sample_gene_list"),
                                        class_name=self.forwarded.get("class_name"),
                                        atv_kwargs={"appears_in_autocomplete": True})

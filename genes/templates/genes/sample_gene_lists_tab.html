@@ -103,7 +103,7 @@ $(document).ready(function() {
 
                 <div class="sample-gene-list-analysis-templates">
                     <h3>Analysis Templates - using this gene list</h3>
-                    {% analysis_templates_tag autocomplete_field=False links_sample_gene_list_only=True sample_somatic=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
+                    {% analysis_templates_tag autocomplete_field=False requires_sample_gene_list=True has_somatic_sample=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
                 </div>
 
                 {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}

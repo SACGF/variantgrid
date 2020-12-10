@@ -96,7 +96,7 @@ def related_analyses_for_pedigree(context, pedigree):
 
 
 @register.inclusion_tag("analysis/tags/analysis_templates_tag.html", takes_context=True)
-def analysis_templates_tag(context, autocomplete_field=True, links_sample_gene_list_only=False, sample_somatic=False,
+def analysis_templates_tag(context, autocomplete_field=True, has_somatic_sample=False, requires_sample_gene_list=None,
                            **kwargs):
     user = context["user"]
     single_model_args = {"sample", "cohort", "trio", "pedigree"}
@@ -118,20 +118,18 @@ def analysis_templates_tag(context, autocomplete_field=True, links_sample_gene_l
 
     class_name = klass._meta.label
     # Show/Hide AnalysisTemplateVersions based on requires_sample_gene_list
-    if kwargs.get("sample_gene_list"):
-        if links_sample_gene_list_only:
-            sample_gene_list = True  # Only
-        else:
-            sample_gene_list = None  # Both
-    else:
-        sample_gene_list = False  # Hide
+
+    requires_sample_somatic = None
+    if not has_somatic_sample:
+        requires_sample_somatic = False
     AnalysisTemplateForm = get_analysis_template_form_for_variables_only_of_class(class_name,
                                                                                   autocomplete_field=autocomplete_field,
-                                                                                  sample_somatic=sample_somatic,
-                                                                                  sample_gene_list=sample_gene_list)
+                                                                                  requires_sample_somatic=requires_sample_somatic,
+                                                                                  requires_sample_gene_list=requires_sample_gene_list)
 
-    analysis_template_links = AnalysisTemplate.filter(user, class_name=class_name, sample_somatic=sample_somatic,
-                                                      sample_gene_list=sample_gene_list,
+    analysis_template_links = AnalysisTemplate.filter(user, class_name=class_name,
+                                                      requires_sample_somatic=requires_sample_somatic,
+                                                      requires_sample_gene_list=requires_sample_gene_list,
                                                       atv_kwargs={"appears_in_links": True})
 
     flattened_uuid = str(uuid.uuid4()).replace("-", "_")
