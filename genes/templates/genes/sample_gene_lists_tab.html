@@ -83,11 +83,13 @@ $(document).ready(function() {
     Hidden sample gene lists do not appear in gene list node auto-completes.
 </p>
 
-<a class='hover-link' id='gene-grid-link' target="_blank" href="{{ gene_grid_url }}">
-    <div class='left gene-grid-icon'></div>
-    <span class='left'> View/Edit in GeneGrid</span>
-    <div class='clear'></div>
-</a>
+{%  if gene_grid_url %}
+    <a class='hover-link' id='gene-grid-link' target="_blank" href="{{ gene_grid_url }}">
+        <div class='left gene-grid-icon'></div>
+        <span class='left'> View/Edit in GeneGrid</span>
+        <div class='clear'></div>
+    </a>
+{% endif %}
 
 <a data-toggle="collapse" href="#new-gene-list-form-container">Create new Sample GeneList</a>
 

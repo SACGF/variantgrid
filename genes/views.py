@@ -516,7 +516,11 @@ def sample_gene_lists_tab(request, sample_id):
         sample_gene_lists_data.append(SampleGeneListSerializer(sgl).data)
         gene_grid_arg_list.append(f"gene-list-{sgl.gene_list_id}")
 
-    gene_grid_url = reverse("passed_gene_grid", kwargs={"columns_from_url": "/".join(gene_grid_arg_list)})
+    if gene_grid_arg_list:
+        gene_grid_url = reverse("passed_gene_grid", kwargs={"columns_from_url": "/".join(gene_grid_arg_list)})
+    else:
+        gene_grid_url = None
+
     context = {"sample": sample,
                "gene_grid_url": gene_grid_url,
                "create_gene_list_form": create_gene_list_form,
