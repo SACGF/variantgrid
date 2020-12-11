@@ -8,6 +8,11 @@
 {% block title %}Condition Matching{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+    <style>
+        tr.selected {
+            background-color: #ccffcc;
+        }
+    </style>
     <script>
         const gene_symbol = "{{ clinvar_export.gene_symbol }}";
         const basicHighlight = ["autosomal", "x-linked", "recessive", "dominant", gene_symbol];
@@ -86,12 +91,17 @@
             return description.replace(highlightRegex, "<b>$1</b>")
         }
 
+        function idSafe(id) {
+            return id.replace(":", "-");
+        }
+
         function ontologyTr(onto) {
-            let row = $('<tr>');
+            let row = $('<tr>', {id: `result-${idSafe(onto.id)}`, class: 'onto-row'});
             let toggleButton = $('<button>', {class:'btn btn-outline-primary', text:'Toggle'}).click(() => {
                 let fullText = $('#mp-selected').val();
                 let newText = toggleTerm(fullText, onto.id);
                 $('#mp-selected').val(newText);
+                updateOntoRowSelections();
             });
 
             $('<td>', {html:toggleButton}).appendTo(row);
@@ -109,11 +119,18 @@
                     contextBox.appendTo(contexts);
                 }
             }
-
             contexts.appendTo(row);
             $('<td>', {class:'description-cell text-muted', html: highlightDescription(onto.definition)}).appendTo(row);
-
             return row;
+        }
+
+        function updateOntoRowSelections() {
+            $('.onto-row').removeClass('selected');
+            let allSelected = $('#mp-selected').val().split(',').map(t => t.trim()).filter(t => t.length > 0);
+            for (let selected of allSelected) {
+                $(`#result-${idSafe(selected)}`).addClass('selected');
+                console.log(`Trying to add class to #result-${selected}`);
+            }
         }
 
         function renderOntologies(ontos) {
@@ -191,6 +208,7 @@
                 success: async (results) => {
                     resultsDom.LoadingOverlay('hide');
                     renderOntologies(results);
+                    updateOntoRowSelections();
                 }
             });
         }
@@ -290,6 +308,10 @@
             $('#mp-search-button').click(() => {
                 triggerSearchMondo();
             });
+
+            $('#mp-selected').change(() => {
+                updateOntoRowSelections();
+            })
         });
     </script>
 {% endblock %}
@@ -312,6 +334,7 @@
                         </div>
                     {% endlabelled %}
                     {% labelled label="Gene Symbol" %}<span id="mp-gene-symbol">None</span>{% endlabelled %}
+                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
                     {% labelled label="Mutli-Mode" %}
                         <div id="mp-multimode" >
                             <div class="btn-group btn-group-toggle" data-toggle="buttons">
@@ -322,7 +345,6 @@
                         </div>
                         <div id="mp-singlemode" class="collapse no-value">N/A</div>
                     {% endlabelled %}
-                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
                     {% labelled label="Terms" %}<input class="form-control" id="mp-selected" />{% endlabelled %}
 
                     <label>Select Relevant Ontology Terms Below</label>

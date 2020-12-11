@@ -169,7 +169,7 @@ class OntologyMeta:
         # don't want to use class definitions as an instance might not exist
         # FIXME handle other types
         if self.term_id.startswith("MONDO"):
-            return f'https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2{self.term_id.replace(":", "_")}'
+            return f'https://vm-monitor.monarchinitiative.org/disease/{self.term_id}'
         return None
 
     def as_json(self) -> Dict:
