@@ -45,7 +45,6 @@
             if (parts.length == 2) {
                 termText = parts[0].trim();
                 join = parts[1].trim().toLowerCase();
-                console.log(join);
                 if (join.includes('/')) {
                     join = 'X';
                 } else if (join.includes('un')) {
@@ -129,12 +128,10 @@
             let allSelected = $('#mp-selected').val().split(',').map(t => t.trim()).filter(t => t.length > 0);
             for (let selected of allSelected) {
                 $(`#result-${idSafe(selected)}`).addClass('selected');
-                console.log(`Trying to add class to #result-${selected}`);
             }
         }
 
         function renderOntologies(ontos) {
-            console.log(ontos);
             ontos.sort((a, b) => {
                 let scoreOnto = (onto) => {
                     let score = 0;
@@ -172,7 +169,6 @@
         }
 
         function searchMondo(data) {
-            console.log(data);
             let searchText = data.searchText;
             let geneSymbol = data.geneSymbol;
             let selected = data.selected;
