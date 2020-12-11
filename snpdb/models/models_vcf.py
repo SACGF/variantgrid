@@ -321,7 +321,6 @@ class Sample(SortByPKMixin, models.Model):
         qs = qs.annotate(**annotation_kwargs)
         filter_kwargs = {
             f"{self.cohort_genotype_collection.cohortgenotype_alias}__isnull": False,  # Inner join to CohortGenotype
-            f"{self.zygosity_alias}__in": Zygosity.VARIANT,
         }
         return qs.filter(**filter_kwargs)
 
