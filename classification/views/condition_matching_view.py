@@ -3,8 +3,9 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from classification.models import ConditionTextMatch, ConditionText
-from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import re
+
 
 class ConditionTextColumns(DatatableConfig):
 
@@ -13,7 +14,9 @@ class ConditionTextColumns(DatatableConfig):
 
         self.rich_columns = [
             RichColumn(key="lab__name", label='Lab', orderable=True),
-            RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"])
+            RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"]),
+            RichColumn(key="classifications_count", label="Classifications Affected", orderable=True),
+            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, default_sort=SortOrder.DESC)
 
             # TODO count matches?
         ]
@@ -45,6 +48,11 @@ def condition_matching_view(request, pk: int):
                     ctm.save()
                 else:
                     print(f"Couldn't find ConditionMatchText record {match_id}")
+
+        ct.last_edited_by = request.user
+        ct.update_counts()
+        ct.save()
+
         return redirect(reverse('condition_matching', kwargs={"pk": pk}))
 
     ct.check_can_view(request.user)

@@ -6,7 +6,7 @@ import re
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
-from django.db.models import CASCADE, QuerySet
+from django.db.models import CASCADE, QuerySet, SET_NULL
 from guardian.shortcuts import get_objects_for_user, assign_perm
 from lazy import lazy
 from model_utils.models import TimeStampedModel
@@ -25,8 +25,34 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     normalized_text = models.TextField()
     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
 
+    # set to true if root condition text was set by auto-matching
+    requires_approval = models.BooleanField(blank=True, default=False)
+    last_edited_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True)
+
+    classifications_count = models.IntegerField(default=0)
+    classifications_count_outstanding = models.IntegerField(default=0)
+
     class Meta:
         unique_together = ("normalized_text", "lab")
+
+    def update_counts(self):
+        global_okay = False
+        by_gene: Dict[str, bool] = dict()
+        by_classification: Dict[str, bool] = dict()
+
+        if root := self.conditiontextmatch_set.filter(gene_symbol__isnull=True).first():
+            global_okay = root.is_valid
+
+        ctms_gene_symbols = self.conditiontextmatch_set.filter(gene_symbol__isnull=False, classification__isnull=True)
+        for ctm in ctms_gene_symbols:
+            by_gene[ctm.gene_symbol.symbol] = ctm.is_valid or (ctm.is_blank and global_okay)
+
+        ctms_classifications = self.conditiontextmatch_set.filter(classification__isnull=False)
+        for ctm in ctms_classifications:
+            by_classification[ctm.gene_symbol] = ctm.is_valid or (ctm.is_blank and by_gene.get(ctm.gene_symbol.symbol))
+
+        self.classifications_count = len(by_classification)
+        self.classifications_count_outstanding = len([status for status in by_classification.values() if status is False])
 
     @staticmethod
     def normalize(text: str):
@@ -50,13 +76,6 @@ class MultiCondition(models.TextChoices):
     NOT_DECIDED = 'X', 'Not decided'
     UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
     CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
-
-
-class ConditionTextLevel(Enum):
-    ALL = 0
-    LAB = 1
-    LAB_GENE = 2
-    LAB_GENE_CLASS = 3
 
 
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
@@ -139,6 +158,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     class Meta:
         unique_together = ("condition_text", "gene_symbol", "classification")
 
+    @property
+    def is_valid(self):
+        return len(self.condition_xrefs) == 1 or \
+               (len(self.condition_xrefs) > 1 and self.condition_multi_operation != MultiCondition.NOT_DECIDED)
+
+    @property
+    def is_blank(self):
+        return len(self.condition_xrefs) == 0
+
     @lazy
     def parent(self) -> Optional['ConditionTextMatch']:
         qs = ConditionTextMatch.objects.filter(condition_text=self.condition_text)
@@ -160,14 +188,12 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         else:
             return qs.filter(classification__isnull=True, gene_symbol__isnull=False).order_by('gene_symbol__symbol')
 
-
     @staticmethod
     def sync_all():
         cms = ClassificationModification.objects.filter(is_last_published=True, classification__withdrawn=False).select_related("classification", "classification__lab")
         cm: ClassificationModification
         for cm in cms:
             ConditionTextMatch.sync_condition_text_classification(cm=cm)
-
 
     @staticmethod
     def sync_condition_text_classification(cm: ClassificationModification):
@@ -206,3 +232,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 gene_symbol=gene_symbol,
                 classification=None
             )
+
+            ct.update_counts()
+            ct.save()
