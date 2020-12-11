@@ -3,6 +3,7 @@
 {% load classification_tags %}
 {% load ui_menu_bars %}
 {% load ui_help %}
+{% load user_tags %}
 {% load ui_utils %}
 {% block title %}Condition Matching{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
@@ -28,7 +29,6 @@
                     default: finalText += "; uncertain/co-occuring"; break;
                 }
             }
-
             $(`#condition-match-${id}`).val(finalText);
         }
 
@@ -257,8 +257,10 @@
             // open MODAL
 
             $('.mondo-picker').click(function () {
-                let geneSymbol = $(this).attr('data-gene-symbol');
-                let label = $(this).attr('data-label');
+                let mondoButton = $(this);
+                let geneSymbol = mondoButton.attr('data-gene-symbol');
+                let label = mondoButton.attr('data-label');
+                let inheritance = mondoButton.attr('data-mode-of-inheritance');
                 if (geneSymbol == '') {
                     $('#mp-gene-symbol').text('-').addClass('no-value');
                 } else {
@@ -274,6 +276,7 @@
                 $('#mp-search-text').val(`{{ condition_text.normalized_text }} ${geneSymbol}`.trim());
                 $('#mp-selection-title').text(label);
                 $('#mp-selected').val(parsedMatch.terms.join(", "));
+                $('#mp-mode-of-inheritance').text(inheritance);
                 $('#mondoModal').modal('show');
 
                 triggerSearchMondo();
@@ -282,6 +285,10 @@
 
             $('#mondoModal').on('hide.bs.modal', () => {
                 modalClosed();
+            });
+
+            $('#mp-search-button').click(() => {
+                triggerSearchMondo();
             });
         });
     </script>
@@ -315,6 +322,7 @@
                         </div>
                         <div id="mp-singlemode" class="collapse no-value">N/A</div>
                     {% endlabelled %}
+                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
                     {% labelled label="Terms" %}<input class="form-control" id="mp-selected" />{% endlabelled %}
 
                     <label>Select Relevant Ontology Terms Below</label>
@@ -348,9 +356,13 @@
                     Help will go here for matching text to conditions
                 </p>
             {% end_page_help_embedded %}
-            <h4>Condition Text</h4>
-            {{ condition_text.normalized_text }}
-
+            {% labelled label="Lab" %}{{ condition_text.lab.name }}{% endlabelled %}
+            {% labelled label="Text" %}{{ condition_text.normalized_text }}{% endlabelled %}
+            {% labelled label="Last Updated By" %}
+                {% if condition_text.last_edited_by %}
+                {% user condition_text.last_edited_by %}
+                {% else %}-{% endif %}
+            {% endlabelled %}
             <ul class="list-group mt-4">
                 {% condition_match condition_match %}
             </ul>

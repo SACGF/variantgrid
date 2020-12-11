@@ -49,7 +49,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
         ctms_classifications = self.conditiontextmatch_set.filter(classification__isnull=False)
         for ctm in ctms_classifications:
-            by_classification[ctm.gene_symbol] = ctm.is_valid or (ctm.is_blank and by_gene.get(ctm.gene_symbol.symbol))
+            by_classification[ctm.classification_id] = ctm.is_valid or (ctm.is_blank and by_gene.get(ctm.gene_symbol.symbol))
 
         self.classifications_count = len(by_classification)
         self.classifications_count_outstanding = len([status for status in by_classification.values() if status is False])
@@ -193,10 +193,14 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         cms = ClassificationModification.objects.filter(is_last_published=True, classification__withdrawn=False).select_related("classification", "classification__lab")
         cm: ClassificationModification
         for cm in cms:
-            ConditionTextMatch.sync_condition_text_classification(cm=cm)
+            ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
+
+        for ct in ConditionText.objects.all():
+            ct.update_counts()
+            ct.save()
 
     @staticmethod
-    def sync_condition_text_classification(cm: ClassificationModification):
+    def sync_condition_text_classification(cm: ClassificationModification, update_counts=True):
         classification = cm.classification
 
         if classification.withdrawn:
@@ -233,5 +237,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 classification=None
             )
 
-            ct.update_counts()
-            ct.save()
+            if update_counts:
+                ct.update_counts()
+                ct.save()
