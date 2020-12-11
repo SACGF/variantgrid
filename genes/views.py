@@ -9,6 +9,7 @@ from django.db.models.query_utils import Q
 from django.forms.models import model_to_dict
 from django.http.response import JsonResponse, Http404
 from django.shortcuts import render, get_object_or_404
+from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -509,8 +510,15 @@ def sample_gene_lists_tab(request, sample_id):
             gene_list.save()
             SampleGeneList.objects.create(sample=sample, gene_list=gene_list)
 
-    sample_gene_lists_data = [SampleGeneListSerializer(sgl).data for sgl in SampleGeneList.objects.filter(sample=sample)]
+    sample_gene_lists_data = []
+    gene_grid_arg_list = []
+    for sgl in sample.samplegenelist_set.all():
+        sample_gene_lists_data.append(SampleGeneListSerializer(sgl).data)
+        gene_grid_arg_list.append(f"gene-list-{sgl.gene_list_id}")
+
+    gene_grid_url = reverse("passed_gene_grid", kwargs={"columns_from_url": "/".join(gene_grid_arg_list)})
     context = {"sample": sample,
+               "gene_grid_url": gene_grid_url,
                "create_gene_list_form": create_gene_list_form,
                "sample_gene_lists_data": sample_gene_lists_data}
     return render(request, 'genes/sample_gene_lists_tab.html', context)
