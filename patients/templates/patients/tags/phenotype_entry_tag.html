@@ -247,13 +247,15 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
 <div id='patient-ontology'>
     <table>
         <tr>
-            {% if hpo_form %}<td><div class='ontology-label hpo'>Human Phenotype Ontology</div>{% endif %}
-            {% if omim_form %}<td><div class='ontology-label omim'>OMIM</div>{% endif %}
-            {% if gene_form %}<td><div class='ontology-label gene'>Genes</div>{% endif %}
+            {% if hpo_form %}<td><div class='ontology-label hpo'>Human Phenotype Ontology</div></td>{% endif %}
+            {% if omim_form %}<td><div class='ontology-label omim'>OMIM</div></td>{% endif %}
+            {% if gene_form %}<td><div class='ontology-label gene'>Genes</div></td>{% endif %}
+        </tr>
         <tr>
-            {% if hpo_form %}<td class='hpo'> {{ hpo_form.hpo_synonym }} {{ hpo_form.media }}{% endif %} 
-            {% if omim_form %}<td class='omim'> {{ omim_form.mim_morbid_alias }}{% endif %}
-            {% if gene_form %}<td class='gene'> {{ gene_form.gene }}{% endif %}
+            {% if hpo_form %}<td class='hpo'> {{ hpo_form.hpo_synonym }} {{ hpo_form.media }}</td>{% endif %}
+            {% if omim_form %}<td class='omim'> {{ omim_form.mim_morbid_alias }}</td>{% endif %}
+            {% if gene_form %}<td class='gene'> {{ gene_form.gene }}</td>{% endif %}
+        </tr>
     </table>
     <div>
         Auto-complete terms in boxes above, or type free text into the large box below.

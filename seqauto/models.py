@@ -1093,10 +1093,13 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
         from genes.custom_text_gene_list import create_custom_text_gene_list
         with open(self.path) as f:
             custom_gene_list_text = f.read()
-            custom_text_gene_list = CustomTextGeneList(name=f"{self.qc} gene list", text=custom_gene_list_text)
+            custom_text_gene_list = CustomTextGeneList(name=f"QC GeneList for {self.sequencing_sample.sample_name}",
+                                                       text=custom_gene_list_text)
             custom_text_gene_list.save()
             seqauto_user = get_seqauto_user()
             create_custom_text_gene_list(custom_text_gene_list, seqauto_user, GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
+            custom_text_gene_list.gene_list.locked = True
+            custom_text_gene_list.gene_list.save()
             # TODO: Verify gene list is good otherwise create SeqAutoRunEvent
 
             if custom_text_gene_list.gene_list.import_status != ImportStatus.SUCCESS:

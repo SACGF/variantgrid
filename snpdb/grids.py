@@ -108,6 +108,11 @@ class SamplesListGrid(JqGridUserRowConfig):
             mut_sig_colmodel['hidden'] = True
             self._overrides['mutationalsignature__summary'] = mut_sig_colmodel
 
+        if not queryset.filter(samplegenelist__isnull=False).exists():
+            sample_gene_list_count = self._overrides.get('sample_gene_list_count', {})
+            sample_gene_list_count['hidden'] = True
+            self._overrides['sample_gene_list_count'] = sample_gene_list_count
+
         annotation_kwargs = {"sample_gene_list_count": Count("samplegenelist", distinct=True)}
         queryset = queryset.annotate(**annotation_kwargs)
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())

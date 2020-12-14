@@ -1086,7 +1086,7 @@ class SampleGeneList(TimeStampedModel):
 def sample_gene_list_created(sender, instance, created, **kwargs):
     if created:
         sample = instance.sample
-        if SampleGeneList.objects.filter(sample=sample).exists():
+        if SampleGeneList.objects.filter(sample=sample).count() > 1:
             # Multiple exist, so need to set manually
             ActiveSampleGeneList.objects.filter(sample=sample).delete()
         else:
