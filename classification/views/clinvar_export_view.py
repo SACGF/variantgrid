@@ -10,7 +10,7 @@ from gunicorn.config import User
 from annotation.models import MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology
 from annotation.ontology_matching import OntologyMatching, OntologyContextSimilarMatch
 from classification.enums import SpecialEKeys
-from classification.models import ClinVarExport, EvidenceKeyMap, MultiCondition
+from classification.models import ClinVarExport, EvidenceKeyMap, MultiCondition, ConditionTextMatch
 from classification.regexes import db_ref_regexes
 from library.log_utils import report_exc_info
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, BaseDatatableView
@@ -123,65 +123,12 @@ def clinvar_exports_view(request):
 
 def clinvar_export_review_view(request, pk):
     user: User = request.user
-    clinvar_export = ClinVarExport.objects.get(pk=pk)
-
-    """
-    if request.method == "POST":
-        clinvar_export.check_can_write(user)
-        terms = request.POST.get("terms")
-        multimode = request.POST.get("multimode")
-        apply = request.POST.get("apply")
-
-        apply_to: QuerySet = ClinVarExport.objects
-        if apply == "record":
-            apply_to = apply_to.filter(pk=pk)
-        else:
-            apply_to = apply_to.filter(condition_text_normal=clinvar_export.condition_text_normal)
-            if apply == "gene_symbol":
-                apply_to = apply_to.filter(gene_symbol=clinvar_export.gene_symbol)
-
-        apply_clinvar: ClinVarExport
-        for apply_clinvar in apply_to:
-            apply_clinvar.condition_xrefs = [term.strip() for term in terms.split(",") if term.strip()]
-            apply_clinvar.save()
-
-        return redirect('clinvar_export', pk=pk)
-    """
-
-    clinvar_export.check_can_view(user)
-
-    """
-    ontologyMatches = OntologyMatching()
-    ontologyMatches.populate_monarch_local(clinvar_export.gene_symbol.symbol)
-    try:
-        ontologyMatches.populate_panel_app_remote(clinvar_export.gene_symbol.symbol)
-    except:
-        report_exc_info(extra_data={"gene_symbol": clinvar_export.gene_symbol.symbol})
-        messages.add_message(request, messages.ERROR, "Could not connect to PanelApp")
-
-    same_text: List[int] = list()
-    same_text_and_gene: List[int] = list()
-    other_cve: ClinVarExport
-    for other_cve in ClinVarExport.objects.filter(condition_text_normal=clinvar_export.condition_text_normal).exclude(pk=clinvar_export.pk).select_related("classification_based_on"):
-        matches_gene = other_cve.gene_symbol == clinvar_export.gene_symbol
-        if other_cve.condition_xrefs:
-            for symbol in other_cve.condition_xrefs:
-                ontologyMatches.find_or_create(symbol).add_context(OntologyContextSimilarMatch(matches_gene=matches_gene, vce_id=other_cve.id))
-        if matches_gene:
-            same_text_and_gene.append(other_cve.classification_based_on.classification_id)
-        same_text.append(other_cve.classification_based_on.classification_id)
-
-    for term in clinvar_export.condition_xrefs:
-        ontologyMatches.select_term(term)
-
-    direct_references = db_ref_regexes.search(clinvar_export.condition_text_normal)
-    for reference in direct_references:
-        if reference.db in ("OMIM", "MONDO", "HP"):
-            ontologyMatches.reference_term(reference.id_fixed)
-    """
+    clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
+    condition_text_match = ConditionTextMatch.objects.filter(classification=clinvar_export.classification_based_on.classification).first()
 
     return render(request, 'classification/clinvar_export.html', context={
         'clinvar_export': clinvar_export,
+        'condition_text_match': condition_text_match
         # 'ontology_terms': ontologyMatches.as_json(),
         # "same_text_vcs": same_text,
         # "same_text_gene_vcs": same_text_and_gene

@@ -1,9 +1,8 @@
-import re
 from datetime import datetime
-from typing import List, Dict
+from typing import List
 
 import bs4
-from django.contrib.postgres.fields import ArrayField
+from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import PROTECT, CASCADE
 from django.db.models.signals import post_save
@@ -11,11 +10,12 @@ from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
-from annotation.models import Citation
 from classification.enums import ShareLevel, SpecialEKeys
-from classification.models import ClassificationModification, EvidenceKeyMap
+from classification.models import ClassificationModification, EvidenceKeyMap, classification_post_publish_signal, \
+    Classification, flag_types
 from classification.models.evidence_mixin import VCDbRefDict
 from classification.regexes import db_ref_regexes, DbRegexes
+from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution, FlagStatus
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -58,16 +58,8 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
     def update_with(self, cm: ClassificationModification) -> bool:
         is_update = self.id is None or self.classification_based_on != cm
         self.classification_based_on = cm
-        condition_text = ClinVarExport.normalise_text(cm.get(SpecialEKeys.CONDITION))
-
-        if condition_text != self.condition_text_normal:
-            self.condition_text_normal = condition_text
-            # TODO, do we want labs to have a default data type?
-            # but even if we do, should that be done on import and this
-            # code should see what we've matched in the past
-            results = db_ref_regexes.search(condition_text)
-            self.dirty_date = datetime.now()
-
+        # self.dirty_date = datetime.now()
+        # only update dirty date if json that we will send changes
         return is_update
 
     @staticmethod
@@ -89,6 +81,8 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
         transcript_lab_to_cm = dict()
 
         cm: ClassificationModification
+        # TODO - do we reduce this to just records shared globally??!
+        # or do we accept both, and treat the share level as a to be confirmed globally
         for cm in ClassificationModification.objects.filter(
             classification__withdrawn=False,
             classification__variant__variantallele__allele=allele,
@@ -177,10 +171,6 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
     def assertion_method(self):
         return self.evidence_key(SpecialEKeys.ASSERTION_METHOD)
 
-    @property
-    def patient_phenotype(self):
-        return self.evidence_key(SpecialEKeys.PATIENT_PHENOTYPE)
-
     # probably wont use this
     @property
     def patient_phenotype(self):
@@ -190,10 +180,18 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
     def clinical_significance(self):
         return self.evidence_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
+    @property
     def citation_refs(self) -> List[VCDbRefDict]:
         pubmed_refs = [ref for ref in self.classification_based_on.db_refs if ref.get('db') == DbRegexes.PUBMED.db]
         unique_refs = set()
 
+    @property
+    def condition(self) -> str:
+        """
+        Note condition isn't actually sent, but the value from ConditionTextMatching
+        this is just here for reference
+        """
+        return self.evidence_key(SpecialEKeys.CONDITION)
 
     @property
     def curated_date(self):
@@ -218,6 +216,7 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
         data["Note"] = "This ClinVar API has not been published yet, so this is just placeholder"
         return data
 
+
 @receiver(post_save, sender=ClinVarExport)
 def set_condition_alias_permissions(sender, created: bool, instance: ClinVarExport, **kwargs):
     if created:
@@ -230,3 +229,33 @@ class ClinVarExportSubmission(TimeStampedModel, GuardianPermissionsMixin):
     clinvar_export = models.ForeignKey(ClinVarExport, on_delete=CASCADE)
     evidence = models.JSONField()
     submission_status = models.TextField()
+
+
+@receiver(classification_post_publish_signal, sender=Classification)
+def published(sender,
+              classification: Classification,
+              previously_published: ClassificationModification,
+              newly_published: ClassificationModification,
+              previous_share_level: ShareLevel,
+              user: User,
+              **kwargs):
+
+    cve: ClinVarExport
+    if cve := ClinVarExport.objects.filter(classification_based_on__classification=classification).first():
+        cve.update_with(newly_published)
+        cve.save()
+
+
+@receiver(flag_comment_action, sender=Flag)
+def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
+    """
+    Keeps condition_text_match in sync with the classifications when withdraws happen/finish
+    """
+    flag = flag_comment.flag
+    if flag.flag_type == flag_types.classification_flag_types.classification_withdrawn:
+        cl: Classification
+        if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
+            cve: ClinVarExport
+            if cve := ClinVarExport.objects.filter(classification_based_on__classification=cl):
+                cve.withdrawn = flag_comment.resolution.status == FlagStatus.OPEN
+                cve.save()

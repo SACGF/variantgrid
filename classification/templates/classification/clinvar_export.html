@@ -102,6 +102,15 @@
             {% labelled label="Interpretation Summary" class="formatted-text"%}<div class="formatted-text">{{ clinvar_export.interpretation_summary }}</div>{% endlabelled %}
             {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
             {% labelled label="Assertion Method" %}{{ clinvar_export.assertion_method }}{% endlabelled %}
+            {% labelled label="Condition Text" %}{{ clinvar_export.condition }}{% endlabelled %}
+            {% labelled label="Condition Terms" %}
+                {% if condition_text_match %}
+                    {{ condition_text_match.resolve_condition_xrefs.condition_xrefs }}
+                    <a class="btn btn-outline-primary" target="_blank" href="{% url 'condition_matching' pk=condition_text_match.condition_text.pk %}"><i class="fas fa-edit"></i></a>
+                {% else %}
+                    <span class="text-danger">No condition matching found for this classification</span>
+                {% endif %}
+            {% endlabelled %}
             {% labelled label="Curation Context" %}{{ clinvar_export.curation_context }}{% endlabelled %}
             {% labelled label="Citations" %}
                 <div class="pills">

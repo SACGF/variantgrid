@@ -1,20 +1,23 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import re
 
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db.models import CASCADE, QuerySet, SET_NULL
+from django.dispatch import receiver
 from guardian.shortcuts import get_objects_for_user, assign_perm
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 from django.db import models
 
-from classification.enums import SpecialEKeys
-from classification.models import Classification, ClassificationModification
+from classification.enums import SpecialEKeys, ShareLevel
+from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
+    flag_types
 from classification.regexes import db_ref_regexes, DbRefRegex, DbRegexes
+from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import all_users_group
@@ -59,6 +62,12 @@ class MultiCondition(models.TextChoices):
     CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
 
 
+@dataclass(frozen=True)
+class ResolvedCondition:
+    condition_xrefs: List[str]
+    condition_multi_operation: MultiCondition
+
+
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     condition_text = models.ForeignKey(ConditionText, on_delete=CASCADE)
 
@@ -100,6 +109,20 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     # resolved to this,
     condition_xrefs = ArrayField(models.TextField(blank=False), default=list)
     condition_multi_operation = models.CharField(max_length=1, choices=MultiCondition.choices, default=MultiCondition.NOT_DECIDED)
+
+    @lazy
+    def resolve_condition_xrefs(self) -> Optional[ResolvedCondition]:
+        if not self.condition_xrefs:
+            if not self.parent:
+                return None
+            else:
+                return self.parent.resolve_condition_xrefs
+
+        return ResolvedCondition(
+            condition_xrefs=self.condition_xrefs,
+            condition_multi_operation=self.condition_multi_operation
+        )
+
 
     @property
     def condition_matching_str(self) -> str:
@@ -178,7 +201,18 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         lab = classification.lab
         gene_str = cm.get(SpecialEKeys.GENE_SYMBOL)
-        if gene_symbol := GeneSymbol.objects.filter(symbol=gene_str).first():
+        gene_symbol = GeneSymbol.objects.filter(symbol=gene_str).first()
+
+        existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification)
+
+        if not gene_symbol or classification.withdrawn:
+            if existing:
+                ct = existing.condition_text
+                existing.delete()
+                if update_counts:
+                    update_condition_text_match_counts(ct)
+            return
+        else:
             raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
             normalized = ConditionText.normalize(raw_condition_text)
 
@@ -216,17 +250,42 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 classification=None
             )
 
-            classification_level, _ = ConditionTextMatch.objects.get_or_create(
-                parent=mode_of_inheritance_level,
-                condition_text=ct,
-                gene_symbol=gene_symbol,
-                mode_of_inheritance=mode_of_inheritance,
-                classification=classification
-            )
+            if existing:
+                if existing.parent != mode_of_inheritance_level or \
+                        existing.condition_text != ct or \
+                        existing.gene_symbol != gene_symbol or \
+                        existing.mode_of_inheritance != mode_of_inheritance:
 
-            if update_counts:
-                update_condition_text_match_counts(ct)
-                ct.save()
+                    # update existing to new hierarchy
+                    # assume if a condition has been set for this classification specifically that it's
+                    # still valid
+                    old_root = existing.condition_text
+                    existing.parent = mode_of_inheritance_level
+                    existing.condition_text = ct
+                    existing.mode_of_inheritance = mode_of_inheritance
+                    existing.save()
+
+                    if update_counts:
+                        update_condition_text_match_counts(old_root)
+                        old_root.save()
+                        if old_root != ct:
+                            update_condition_text_match_counts(ct)
+                            ct.save()
+                else:
+                    # nothing has changed, no need to update count
+                    pass
+            else:
+                ConditionTextMatch.objects.create(
+                    parent=mode_of_inheritance_level,
+                    condition_text=ct,
+                    gene_symbol=gene_symbol,
+                    mode_of_inheritance=mode_of_inheritance,
+                    classification=classification
+                )
+
+                if update_counts:
+                    update_condition_text_match_counts(ct)
+                    ct.save()
 
 
 def update_condition_text_match_counts(ct: ConditionText):
@@ -256,3 +315,29 @@ def update_condition_text_match_counts(ct: ConditionText):
 
     ct.classifications_count = len(classification_related)
     ct.classifications_count_outstanding = invalid_count
+
+
+@receiver(classification_post_publish_signal, sender=Classification)
+def published(sender,
+              classification: Classification,
+              previously_published: ClassificationModification,
+              newly_published: ClassificationModification,
+              previous_share_level: ShareLevel,
+              user: User,
+              **kwargs):
+    """
+    Keeps condition_text_match in sync with the classifications when evidence changes
+    """
+    ConditionTextMatch.sync_condition_text_classification(newly_published)
+
+
+@receiver(flag_comment_action, sender=Flag)
+def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
+    """
+    Keeps condition_text_match in sync with the classifications when withdraws happen/finish
+    """
+    flag = flag_comment.flag
+    if flag.flag_type == flag_types.classification_flag_types.classification_withdrawn:
+        cl: Classification
+        if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
+            ConditionTextMatch.sync_condition_text_classification(cl.last_published_version)
