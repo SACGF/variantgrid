@@ -268,6 +268,7 @@ class GeneAnnotationImport(TimeStampedModel):
 
 class Gene(models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
+    FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
 
@@ -306,6 +307,16 @@ class Gene(models.Model):
         if annotation_consortium:
             qs = qs.filter(annotation_consortium=annotation_consortium)
         return set(qs.values_list("identifier", flat=True))
+
+    @staticmethod
+    def delete_orphaned_fake_genes():
+        used_genes = TranscriptVersion.objects.filter(gene_version__gene__identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).values_list("gene_version__gene")
+        qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
+        ret = qs.delete()
+        if ret:
+             print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
+             print(ret)
+
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """

@@ -25,7 +25,6 @@ from snpdb.models.models_enums import SequenceRole
 
 class Command(BaseCommand):
     BATCH_SIZE = 2000
-    FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -103,13 +102,7 @@ class Command(BaseCommand):
             self.insert_gene_annotations(gff3_filename, genepred_filename, update_known_objects,
                                          replace=replace, release_version=release_version)
 
-        # Remove orphaned fake genes
-        used_genes = TranscriptVersion.objects.filter(gene_version__gene__identifier__startswith=self.FAKE_GENE_ID_PREFIX).values_list("gene_version__gene")
-        qs = Gene.objects.filter(identifier__startswith=self.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
-        ret = qs.delete()
-        if ret:
-             print(f"Deleted orphaned {self.FAKE_GENE_ID_PREFIX} records:")
-             print(ret)
+        Gene.delete_orphaned_fake_genes()
 
     def update_known_gene_versions_by_gene_id(self, gv_qs):
         for gv in gv_qs:
@@ -209,7 +202,7 @@ class Command(BaseCommand):
 
                             # Always replace if starts with "unknown_" (or replace and different)
                             current_gene_accession = known_transcript_version.gene_version.accession
-                            if current_gene_accession.startswith(self.FAKE_GENE_ID_PREFIX) or \
+                            if current_gene_accession.startswith(Gene.FAKE_GENE_ID_PREFIX) or \
                                     (replace and current_gene_accession != gene_accession):
                                 known_transcript_versions_to_update_with_gene_accession[gene_accession].append(known_transcript_version)
                                 # print(f"Updating {known_transcript_version} => {gene_accession}")
