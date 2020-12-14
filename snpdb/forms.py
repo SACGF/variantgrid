@@ -11,6 +11,8 @@ from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
+from annotation.models import ManualVariantEntry
+from annotation.models.models_enums import ManualVariantEntryType
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
 from snpdb import models
@@ -474,8 +476,8 @@ class ManualVariantEntryForm(forms.Form):
         if variants_text:
             for line in variants_text.split('\n'):
                 line = line.strip()
-                if not (DBSNP_PATTERN.match(line) or VARIANT_PATTERN.match(line)):
-                    msg = f"'{line}' does not match dbSNP or variant patterns"
+                if ManualVariantEntry.get_entry_type(line) == ManualVariantEntryType.UNKNOWN:
+                    msg = f"'{line}' does not match known patterns"
                     if " " in line:
                         msg += " (remember to only enter one variant per line)"
                     raise forms.ValidationError(msg)

@@ -1,3 +1,6 @@
+from django.db import models
+
+
 class HumanProteinAtlasAbundance:
     NOT_DETECTED = 'N'
     LOW = 'L'
@@ -330,3 +333,10 @@ class ClinVarReviewStatus:
         'reviewed_by_expert_panel': REVIEWED_BY_EXPERT_PANEL,
         'practice_guideline': PRACTICE_GUIDELINE,
     }
+
+
+class ManualVariantEntryType(models.TextChoices):
+    DBSNP = "d"
+    HGVS = "h"
+    VARIANT = "v"
+    UNKNOWN = "u"

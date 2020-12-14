@@ -26,7 +26,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
-    VEPCustom, ClinVarReviewStatus, VEPSkippedReason
+    VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
 from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
@@ -34,7 +34,7 @@ from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
 from patients.models_enums import GnomADPopulation
-from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF
+from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -839,10 +839,29 @@ class ManualVariantEntry(models.Model):
     manual_variant_entry_collection = models.ForeignKey(ManualVariantEntryCollection, on_delete=CASCADE)
     line_number = models.IntegerField()
     entry_text = models.TextField()
+    entry_type = models.CharField(max_length=1, choices=ManualVariantEntryType.choices, default=ManualVariantEntryType.UNKNOWN)
     error_message = models.TextField(blank=True, null=True)  # Set if any error...
+
     @property
     def unique_created_variants(self):
         return self.createdmanualvariant_set.distinct('variant_id').all()
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.manual_variant_entry_collection.genome_build
+
+    @staticmethod
+    def get_entry_type(line: str) -> ManualVariantEntryType:
+        HGVS_MINIMAL_PATTERN = re.compile(r"[^:].+:(c|g|p)\..*\d+.*")
+        MATCHERS = {
+            DBSNP_PATTERN: ManualVariantEntryType.DBSNP,
+            HGVS_MINIMAL_PATTERN: ManualVariantEntryType.HGVS,
+            VARIANT_PATTERN: ManualVariantEntryType.VARIANT,
+        }
+        for k, v in MATCHERS.items():
+            if k.match(line):
+                return v
+        return ManualVariantEntryType.UNKNOWN
 
 
 class CreatedManualVariant(models.Model):

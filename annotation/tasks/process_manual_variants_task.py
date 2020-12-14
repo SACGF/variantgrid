@@ -3,15 +3,33 @@ from typing import List
 from django.db.models.query_utils import Q
 import logging
 
-from annotation.models.models import CreatedManualVariant
+from annotation.models import ManualVariantEntryType
+from annotation.models.models import CreatedManualVariant, ManualVariantEntry
+from genes.hgvs import get_hgvs_variant_tuple
 from library.log_utils import log_traceback
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models import Variant
-from snpdb.models.models_enums import ImportStatus
+from snpdb.clingen_allele import populate_clingen_alleles_for_variants, get_clingen_alleles_from_external_code
+from snpdb.models import Variant, VariantCoordinate
+from snpdb.models.models_enums import ImportStatus, ClinGenAlleleExternalRecordType
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import ModifiedImportedVariant
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
+
+
+def get_manual_variant_tuples(mve: ManualVariantEntry) -> List[VariantCoordinate]:
+    """ List as dbSNP can return multiple values """
+    variant_tuples = []
+    if mve.entry_type == ManualVariantEntryType.DBSNP:
+        for clingen_allele in get_clingen_alleles_from_external_code(ClinGenAlleleExternalRecordType.DBSNP_ID,
+                                                                     mve.entry_text):
+            variant_tuples.append(clingen_allele.get_variant_tuple(mve.genome_build))
+    elif mve.entry_type == ManualVariantEntryType.HGVS:
+        variant_tuples.append(get_hgvs_variant_tuple(mve.entry_text, mve.genome_build))
+    elif mve.entry_type == ManualVariantEntryType.VARIANT:
+        variant_tuples.append(Variant.get_tuple_from_string(mve.entry_text, mve.genome_build))
+    else:
+        raise ValueError(f"Could not convert entry type of {mve.entry_type}")
+    return variant_tuples
 
 
 class ManualVariantsPostInsertTask(ImportVCFStepTask):
@@ -25,14 +43,11 @@ class ManualVariantsPostInsertTask(ImportVCFStepTask):
         variant_tuple_by_hash = {}
         mvec_id_by_variant_hash = {}
 
-        for mve in mvec.manualvariantentry_set.all():
-            try:
-                variant_tuple = Variant.get_tuple_from_string(mve.entry_text, mvec.genome_build)
+        for mve in mvec.manualvariantentry_set.filter(error_message__isnull=True):
+            for variant_tuple in get_manual_variant_tuples(mve):
                 variant_hash = variant_pk_lookup.add(*variant_tuple)
                 variant_tuple_by_hash[variant_hash] = variant_tuple
                 mvec_id_by_variant_hash[variant_hash] = mve.pk
-            except:
-                log_traceback()
 
         logging.info("%d variant hashes", len(variant_tuple_by_hash))
         created_manual_variants: List[CreatedManualVariant] = []
