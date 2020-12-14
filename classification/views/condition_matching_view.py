@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
-from classification.models import ConditionTextMatch, ConditionText
+from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import re
 
@@ -50,7 +50,7 @@ def condition_matching_view(request, pk: int):
                     print(f"Couldn't find ConditionMatchText record {match_id}")
 
         ct.last_edited_by = request.user
-        ct.update_counts()
+        update_condition_text_match_counts(ct)
         ct.save()
 
         return redirect(reverse('condition_matching', kwargs={"pk": pk}))

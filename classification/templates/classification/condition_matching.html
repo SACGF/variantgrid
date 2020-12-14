@@ -12,6 +12,9 @@
         tr.selected {
             background-color: #ccffcc;
         }
+        .condition-match-input::placeholder {
+            color: #bbb;
+        }
     </style>
     <script>
         const gene_symbol = "{{ clinvar_export.gene_symbol }}";
@@ -34,7 +37,9 @@
                     default: finalText += "; uncertain/co-occuring"; break;
                 }
             }
-            $(`#condition-match-${id}`).val(finalText);
+            let input = $(`#condition-match-${id}`);
+            input.val(finalText);
+            applyInheritRoot(input);
         }
 
         function parseTermText(text) {
@@ -266,7 +271,49 @@
             });
         }
 
+        // on form
+        function applyInheritRoot(input) {
+            let this$ = $(input);
+            console.log(`Applying root ${this$.length}`)
+            let useValue = this$.val();
+            let checkValueOf = this$;
+
+            // we may have blanked out the value, and now actually need to apply a parent value
+            while (_.isEmpty(useValue)) {
+                let parentId = checkValueOf.attr('data-parent-id');
+                if (parentId) {
+                    checkValueOf = $(`input[data-id=${parentId}]`);
+                    if (!checkValueOf.length) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+                useValue = checkValueOf.val();
+            }
+            applyInherit(this$, useValue);
+        }
+
+        function applyInherit(input, parentValue) {
+            let input$ = $(input);
+            let val = input$.val();
+            let inputId = input$.attr('data-id');
+            let inheritValue = _.isEmpty(val) ? parentValue : val;
+            input$.attr('placeholder', inheritValue);
+
+            let children = $(`[data-parent-id=${inputId}]`);
+            for (let child of children) {
+                applyInherit(child, inheritValue);
+            }
+        }
+
         $(document).ready(() => {
+            // should be actual root, and will then filter down to all children
+            applyInheritRoot($('[data-parent-id=None]'));
+
+            $('input[data-id]').keyup(function() {
+                applyInheritRoot(this);
+            });
 
             // open MODAL
 
@@ -290,7 +337,13 @@
                 $('#mp-search-text').val(`{{ condition_text.normalized_text }} ${geneSymbol}`.trim());
                 $('#mp-selection-title').text(label);
                 $('#mp-selected').val(parsedMatch.terms.join(", "));
-                $('#mp-mode-of-inheritance').text(inheritance);
+                if (inheritance == 'N/A') {
+                    $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'N/A'}));
+                } else if (inheritance == 'None') {
+                    $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'Not Specified'}));
+                } else {
+                    $('#mp-mode-of-inheritance').text(inheritance);
+                }
                 $('#mondoModal').modal('show');
 
                 triggerSearchMondo();

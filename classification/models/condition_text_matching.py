@@ -35,25 +35,6 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     class Meta:
         unique_together = ("normalized_text", "lab")
 
-    def update_counts(self):
-        global_okay = False
-        by_gene: Dict[str, bool] = dict()
-        by_classification: Dict[str, bool] = dict()
-
-        if root := self.conditiontextmatch_set.filter(gene_symbol__isnull=True).first():
-            global_okay = root.is_valid
-
-        ctms_gene_symbols = self.conditiontextmatch_set.filter(gene_symbol__isnull=False, classification__isnull=True)
-        for ctm in ctms_gene_symbols:
-            by_gene[ctm.gene_symbol.symbol] = ctm.is_valid or (ctm.is_blank and global_okay)
-
-        ctms_classifications = self.conditiontextmatch_set.filter(classification__isnull=False)
-        for ctm in ctms_classifications:
-            by_classification[ctm.classification_id] = ctm.is_valid or (ctm.is_blank and by_gene.get(ctm.gene_symbol.symbol))
-
-        self.classifications_count = len(by_classification)
-        self.classifications_count_outstanding = len([status for status in by_classification.values() if status is False])
-
     @staticmethod
     def normalize(text: str):
         text = text.lower()
@@ -81,7 +62,9 @@ class MultiCondition(models.TextChoices):
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     condition_text = models.ForeignKey(ConditionText, on_delete=CASCADE)
 
+    parent = models.ForeignKey('ConditionTextMatch', on_delete=CASCADE, null=True, blank=True)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE, null=True, blank=True)
+    mode_of_inheritance = ArrayField(models.TextField(blank=False), default=None, null=True, blank=True)
     classification = models.OneToOneField(Classification, on_delete=CASCADE, null=True, blank=True)
 
     @classmethod
@@ -97,6 +80,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         h_list = list()
         if self.gene_symbol:
             h_list.append(self.gene_symbol)
+        if self.mode_of_inheritance is not None:
+            h_list.append(self.mode_of_inheritance)
         if self.classification:
             h_list.append(self.classification)
         return h_list
@@ -107,6 +92,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return self.classification
         elif self.gene_symbol:
             return self.gene_symbol
+        elif self.mode_of_inheritance is not None:
+            return self.mode_of_inheritance
         else:
             return None
 
@@ -121,9 +108,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             result = ", ".join(self.condition_xrefs)
         if len(self.condition_xrefs) >= 2:
             if self.condition_multi_operation == MultiCondition.NOT_DECIDED:
-                result += "; uncertain/co-occuring"
+                result += "; uncertain/co-occurring"
             elif self.condition_multi_operation == MultiCondition.CO_OCCURRING:
-                result += "; co-occuring"
+                result += "; co-occurring"
             elif self.condition_multi_operation == MultiCondition.UNCERTAIN:
                 result += "; uncertain"
         return result
@@ -154,9 +141,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         self.condition_xrefs = terms
         self.condition_multi_operation = condition_multi_operation
 
-
     class Meta:
-        unique_together = ("condition_text", "gene_symbol", "classification")
+        unique_together = ("condition_text", "gene_symbol", "mode_of_inheritance", "classification")
 
     @property
     def is_valid(self):
@@ -168,25 +154,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return len(self.condition_xrefs) == 0
 
     @lazy
-    def parent(self) -> Optional['ConditionTextMatch']:
-        qs = ConditionTextMatch.objects.filter(condition_text=self.condition_text)
-        if self.classification:
-            qs = qs.filter(classification__isnull=True).filter(gene_symbol=self.gene_symbol)
-        elif self.gene_symbol:
-            qs = qs.filter(gene_symbol__isnull=True)
-        else:
-            return None
-        return qs.first()
-
-    @lazy
     def children(self) -> QuerySet:
-        qs = ConditionTextMatch.objects.filter(condition_text=self.condition_text)
-        if self.classification:
-            return ConditionTextMatch.objects.none()
-        elif self.gene_symbol:
-            return qs.filter(classification__isnull=False).filter(gene_symbol=self.gene_symbol).order_by('classification_id')
-        else:
-            return qs.filter(classification__isnull=True, gene_symbol__isnull=False).order_by('gene_symbol__symbol')
+        return self.conditiontextmatch_set.all()
 
     @staticmethod
     def sync_all():
@@ -196,7 +165,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
 
         for ct in ConditionText.objects.all():
-            ct.update_counts()
+            update_condition_text_match_counts(ct)
             ct.save()
 
     @staticmethod
@@ -212,6 +181,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         if gene_symbol := GeneSymbol.objects.filter(symbol=gene_str).first():
             raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
             normalized = ConditionText.normalize(raw_condition_text)
+
+            # need mode_of_inheritance to be not null
+            mode_of_inheritance = cm.get(SpecialEKeys.MODE_OF_INHERITANCE) or []
+
             ct: ConditionText
             ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
 
@@ -219,24 +192,67 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ConditionTextMatch.objects.filter(classification=classification).exclude(condition_text=ct).delete()
 
             matches = db_ref_regexes.search(text=normalized)
-            ConditionTextMatch.objects.get_or_create(
+            root, _ = ConditionTextMatch.objects.get_or_create(
                 condition_text=ct,
                 gene_symbol=None,
+                mode_of_inheritance=None,
                 classification=None,
                 defaults={"condition_xrefs": [match.id_fixed for match in matches]}
             )
 
-            ConditionTextMatch.objects.get_or_create(
+            gene_level, _ = ConditionTextMatch.objects.get_or_create(
+                parent=root,
                 condition_text=ct,
                 gene_symbol=gene_symbol,
-                classification=classification
-            )
-            ConditionTextMatch.objects.get_or_create(
-                condition_text=ct,
-                gene_symbol=gene_symbol,
+                mode_of_inheritance=None,
                 classification=None
             )
 
+            mode_of_inheritance_level, _ = ConditionTextMatch.objects.get_or_create(
+                parent=gene_level,
+                condition_text=ct,
+                gene_symbol=gene_symbol,
+                mode_of_inheritance=mode_of_inheritance,
+                classification=None
+            )
+
+            classification_level, _ = ConditionTextMatch.objects.get_or_create(
+                parent=mode_of_inheritance_level,
+                condition_text=ct,
+                gene_symbol=gene_symbol,
+                mode_of_inheritance=mode_of_inheritance,
+                classification=classification
+            )
+
             if update_counts:
-                ct.update_counts()
+                update_condition_text_match_counts(ct)
                 ct.save()
+
+
+def update_condition_text_match_counts(ct: ConditionText):
+    # let's us count by doing one select out of the databse, rather than continually
+    # selecting parents from the DB
+    by_id: Dict[int, ConditionTextMatch] = dict()
+    classification_related: List[ConditionTextMatch] = list()
+    for ctm in ConditionTextMatch.objects.filter(condition_text=ct):
+        by_id[ctm.id] = ctm
+        if ctm.classification:
+            classification_related.append(ctm)
+
+    def check_hierarchy(ctm: ConditionTextMatch) -> bool:
+        if ctm.is_valid:
+            return True
+        elif not ctm.is_blank:
+            return False
+        else:
+            if parent := by_id.get(ctm.parent_id):
+                return check_hierarchy(parent)
+            return False
+
+    invalid_count = 0
+    for ctm in classification_related:
+        if not check_hierarchy(ctm):
+            invalid_count += 1
+
+    ct.classifications_count = len(classification_related)
+    ct.classifications_count_outstanding = invalid_count
