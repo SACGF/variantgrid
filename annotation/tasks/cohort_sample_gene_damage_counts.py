@@ -19,7 +19,7 @@ from classification.models import Classification
 from variantgrid.celery import app
 
 
-def get_or_create_gene_count_type_and_values(gene_count_type_name: str):
+def get_or_create_gene_count_type_and_values(gene_count_type_name: str, show_other_counts=False):
     """ Make sure a GeneCountType is enabled and has related data defined """
     gene_count_type, _ = GeneCountType.objects.update_or_create(name=gene_count_type_name,
                                                                 defaults={"enabled": True})
@@ -32,7 +32,7 @@ def get_or_create_gene_count_type_and_values(gene_count_type_name: str):
         gene_values[gv.label] = gv
 
     other = gene_values[MolecularConsequenceColors.OTHER]
-    other.show_counts = False
+    other.show_counts = show_other_counts
     other.save()
 
     not_tested = gene_values[MolecularConsequenceColors.NOT_TESTED]
@@ -65,13 +65,20 @@ class CalculateCohortSampleGeneDamageCountsTask(ImportVCFStepTask):
 class CohortSampleGeneDamageCountTask(Task):
     """ Task name in CohortGeneCounts.celery_task_name, called from CohortGeneCounts.launch_task () """
 
+    @classmethod
+    def _get_show_other_counts(cls):
+        return False
+
     def run(self, cohort_gene_counts_id, update_gene_id=None):
         cohort_gene_counts = CohortGeneCounts.objects.get(pk=cohort_gene_counts_id)
         cohort_gene_counts.processing_status = ProcessingStatus.PROCESSING
         cohort_gene_counts.save()
 
         try:
-            gene_count_type, gene_values = get_or_create_gene_count_type_and_values(cohort_gene_counts.gene_count_type.pk)
+            gene_count_type_name = cohort_gene_counts.gene_count_type.pk
+            show_other_counts = self._get_show_other_counts()
+            gene_count_type, gene_values = get_or_create_gene_count_type_and_values(gene_count_type_name,
+                                                                                    show_other_counts=show_other_counts)
             variant_annotation_version = cohort_gene_counts.variant_annotation_version
             sample_gene_value_counts = self._get_gene_value_counts(cohort_gene_counts, gene_values,
                                                                    variant_annotation_version, update_gene_id)
@@ -158,6 +165,10 @@ class CohortSampleGeneDamageCountTask(Task):
 
 
 class CohortSampleClassificationGeneDamageCountTask(CohortSampleGeneDamageCountTask):
+    @classmethod
+    def _get_show_other_counts(cls):
+        return True
+
     @classmethod
     def _get_gene_value_counts(cls, cohort_gene_counts, gene_values, variant_annotation_version, update_gene_id):
         # There are way less Classifications, and each has a sample, so handle this per-sample

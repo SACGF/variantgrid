@@ -6,7 +6,7 @@ import logging
 from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneCountType, CohortGeneCounts
 from annotation.tasks.cohort_sample_gene_damage_counts import get_or_create_gene_count_type_and_values
-from snpdb.models import VCF
+from snpdb.models import VCF, ImportStatus
 
 
 def launch_task_for_vcf(gene_count_type, vcf):
@@ -53,5 +53,5 @@ class Command(BaseCommand):
             vcf = VCF.objects.get(pk=vcf_id)
             launch_task_for_vcf(gene_count_type, vcf)
         if all_vcfs:
-            for vcf in VCF.objects.all():
+            for vcf in VCF.objects.filter(import_status=ImportStatus.SUCCESS):
                 launch_task_for_vcf(gene_count_type, vcf)
