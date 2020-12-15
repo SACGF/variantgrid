@@ -7,7 +7,7 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin, \
     GuardianPermissionsMixin
 from patients.models_enums import Sex
-from snpdb.models import ImportStatus, Cohort, CohortSample, Sample
+from snpdb.models import ImportStatus, Cohort, CohortSample, Sample, SomalierRelate
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):
@@ -87,7 +87,7 @@ def validate(records):
     errors_list = []
     # Make sure there is at least 1 sample
     if len(records) < 1:
-        errors_list.apped("There must be at least 1 record")
+        errors_list.append("There must be at least 1 record")
 
     any_affected = False
     for r in records:
@@ -143,6 +143,10 @@ class CohortSamplePedFileRecord(models.Model):
     pedigree = models.ForeignKey(Pedigree, on_delete=CASCADE)
     cohort_sample = models.ForeignKey(CohortSample, on_delete=CASCADE)
     ped_file_record = models.ForeignKey(PedFileRecord, on_delete=CASCADE)
+
+
+class SomalierPedigreeRelate(SomalierRelate):
+    pedigree = models.OneToOneField(Pedigree, on_delete=CASCADE)
 
 
 class PedigreeInheritance:

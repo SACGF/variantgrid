@@ -1,6 +1,7 @@
 from enum import Enum
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
 
 
 class ImportSource:
@@ -261,3 +262,12 @@ class VCFInfoTypes:
         (CHARACTER, 'Character'),
         (STRING, 'String'),
     ]
+
+
+class SuperPopulationCode(models.TextChoices):
+    """ https://www.internationalgenome.org/category/population/ """
+    AFR = "A", "African"
+    AMR = "M", "Ad Mixed American"
+    EAS = "E", "East Asian"
+    EUR = "U", "European"
+    SAS = "S", "South Asian"

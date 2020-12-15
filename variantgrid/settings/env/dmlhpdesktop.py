@@ -68,6 +68,9 @@ PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID = 1054
 PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = True
 PUBLIC_SAMPLE_GENE_MATRIX_TYPE = 'Damage'
 
+SOMALIER["enabled"] = True
+SOMALIER["annotation_base_dir"] = ANNOTATION_REFERENCE_BASE_DIR
+
 #CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.test.genome.network"
 
 #DEBUG = False
@@ -107,12 +110,18 @@ if _SHARIANT_MODE:
                                "classification_import_tool": True})
 
 elif _SAPATHOLOGY_MODE:
+
+    SAPATH_APP = 'sapath.apps.SapathConfig'
+    INSTALLED_APPS += [SAPATH_APP]
+
     PATHOLOGY_TEST_EXTERNAL_CODE = "SAPOrderNumber"
     SAPATHOLOGY_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "sapathology_static")
-    STATICFILES_DIRS = (SAPATHOLOGY_STATIC_FILES_DIR,) + STATICFILES_DIRS
+    if os.path.exists(SAPATHOLOGY_STATIC_FILES_DIR):
+        STATICFILES_DIRS = (SAPATHOLOGY_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
     SAPATHOLOGY_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/sapathology_templates")
-    TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
+    if os.path.exists(SAPATHOLOGY_TEMPLATES_DIR):
+        TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
 
     INITIAL_USER_DATA_PREFIX_KWARGS = {"prefix": '/tau',
                                        "replacement": '\\\\frgeneseq01.imvs.sa.gov.au\\tau'}
@@ -127,8 +136,6 @@ elif _SAPATHOLOGY_MODE:
 
     PATHOLOGY_TEST_EXTERNAL_CODE = "SAPOrderNumber"
     PATHOLOGY_TEST_CASE_EXTERNAL_CODE = "HelixID"
-    INSTALLED_APPS.append("sapath")
-
 
 elif _RUNX1_MODE:
 

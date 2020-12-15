@@ -680,6 +680,26 @@ PUBLIC_PATHS = [
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 
+
+# Somalier config - see https://github.com/brentp/somalier
+
+SOMALIER = {
+    "enabled": False,
+    "vcf_base_dir": os.path.join(PRIVATE_DATA_ROOT, "somalier"),  # Private data
+    "report_base_dir": os.path.join(MEDIA_ROOT, "somalier"),  # Static files served by Nginx
+    "annotation_base_dir": os.path.join(ANNOTATION_BASE_DIR, "somalier"),
+    "annotation": {  # All annotation paths relative to "annotation_base_dir"
+        "command": "somalier",
+        "ancestry_labels": "ancestry-labels-1kg.tsv",
+        "ancestry_somalier_dir": "1kg-somalier",
+        "sites": {
+            "GRCh37": "sites.GRCh37.vcf.gz",
+            "GRCh38": "sites.hg38.vcf.gz",
+        },
+    },
+}
+
+
 # @see https://github.com/SACGF/variantgrid/wiki/URL---Menu-configuration
 # Before URLs are registered, the URLS_APP_REGISTER and URLS_NAME_REGISTER are looked up
 # To make a whitelist - change the default to False, then add overrides, eg 'url_name' : True for allowed
