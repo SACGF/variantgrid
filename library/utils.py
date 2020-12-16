@@ -356,11 +356,11 @@ class ModelUtilsMixin:
         raise ValueError(f'Expected {cls.__name__} or str or int, got {value}')
 
 
-def execute_cmd(cmd: list):
+def execute_cmd(cmd: list) -> Tuple[int, Optional[str], Optional[str]]:
     if settings.POPEN_SHELL:
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
-        pipes = subprocess.Popen(command, shell=True)
+        pipes = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         logging.info('Completed')
     else:
         pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

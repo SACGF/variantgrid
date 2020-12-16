@@ -4,7 +4,7 @@ from typing import List
 import pandas as pd
 
 from library.utils import invert_dict
-from pedigree.ped.import_ped import PED_COLUMNS, SEX_LOOKUP
+from pedigree.ped.ped_file_utils import SEX_LOOKUP, PED_COLUMNS
 
 
 def write_ped_from_df(filename, df: pd.DataFrame, family_code=None):

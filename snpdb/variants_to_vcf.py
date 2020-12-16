@@ -1,3 +1,6 @@
+from bgzip import BGZipWriter
+
+from snpdb.models import VCF, Zygosity
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
 
 
@@ -67,3 +70,39 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
 def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict):
     header_lines = get_vcf_header_from_contigs(genome_build, info_dict=info_dict)
     return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict)
+
+
+def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None):
+    qs = vcf.get_variant_qs(original_qs)
+    ca = vcf.cohort.cohort_genotype_collection.cohortgenotype_alias
+    qs = qs.filter(**{f"{ca}__filters__isnull": True})  # Somalier only uses PASS by default
+    columns = ["id", "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq",
+               f"{ca}__samples_zygosity", f"{ca}__samples_allele_depth",
+               f"{ca}__samples_read_depth", f"{ca}__samples_allele_frequency"]
+    qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
+
+    vcf_format = "GT:AD:DP"
+    samples = list(vcf.sample_set.order_by("pk").values_list("vcf_sample_name", flat=True))
+    header_lines = get_vcf_header_from_contigs(vcf.genome_build, samples=samples)
+
+    with open(exported_vcf_filename, "wb") as raw:
+        with BGZipWriter(raw) as f:
+            for line in header_lines:
+                line_bytes = (line + '\n').encode()
+                f.write(line_bytes)
+
+            values = qs.values_list(*columns)
+            for pk, chrom, position, ref, alt, samples_zygosity, allele_depth, read_depth, allele_frequency in values:
+                samples_list = []
+                for z, ad, dp, af in zip(samples_zygosity, allele_depth, read_depth, allele_frequency):
+                    gt = Zygosity.get_genotype(z)
+                    ref_depth = round(dp * (100 - af) / 100)
+                    ad = f"{ref_depth},{ad}"
+                    sample = ":".join((str(s) for s in (gt, ad, dp)))
+                    samples_list.append(sample)
+
+                row = [chrom, str(position), str(pk), ref, alt or ref, '.', '.', '.', vcf_format] + samples_list
+                line = '\t'.join(row)
+                line_bytes = (line + '\n').encode()
+                f.write(line_bytes)
+

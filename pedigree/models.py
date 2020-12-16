@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import CASCADE
@@ -147,6 +149,12 @@ class CohortSamplePedFileRecord(models.Model):
 
 class SomalierPedigreeRelate(SomalierRelate):
     pedigree = models.OneToOneField(Pedigree, on_delete=CASCADE)
+
+    def get_samples(self) -> Iterable[Sample]:
+        return self.pedigree.get_samples()
+
+    def write_ped_file(self, filename):
+        pass
 
 
 class PedigreeInheritance:

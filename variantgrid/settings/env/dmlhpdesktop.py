@@ -69,7 +69,7 @@ PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = True
 PUBLIC_SAMPLE_GENE_MATRIX_TYPE = 'Damage'
 
 SOMALIER["enabled"] = True
-SOMALIER["annotation_base_dir"] = ANNOTATION_REFERENCE_BASE_DIR
+SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
 
 #CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.test.genome.network"
 
