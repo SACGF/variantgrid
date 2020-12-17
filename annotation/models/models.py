@@ -988,10 +988,6 @@ class MonarchDiseaseOntology(models.Model, OntologyMixin):
     name = models.TextField()
     definition = models.TextField(null=True)
 
-    # TODO: Mappings to all the other ontologies
-    # phenotype_mim = models.ForeignKey(MIMMorbid, on_delete=CASCADE)
-    # note the existance of MonarchDiseaseOntologyMIMMorbid though not sure a dedicated table is the best method
-
     @classmethod
     def expected_length(cls) -> int:
         return 7
@@ -999,7 +995,13 @@ class MonarchDiseaseOntology(models.Model, OntologyMixin):
     @property
     def url(self) -> str:
         # FIXME redundant to dbregex but don't want to reference that from this file
-        return f"https://ontology.dev.data.humancellatlas.org/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_{self.padded_id}"
+        return f"https://vm-monitor.monarchinitiative.org/disease/MONDO:{self.padded_id}"
+
+
+class MonarchDiseaseOntologyRelationship(models.Model):
+    subject = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE, related_name="subject")
+    object = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE, related_name="object")
+    relationship = models.TextField()
 
 
 class MonarchDiseaseOntologyGeneRelationship(models.Model):

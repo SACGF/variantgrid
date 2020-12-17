@@ -1,18 +1,17 @@
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, Set
 import re
 
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ValidationError
-from django.db.models import CASCADE, QuerySet, SET_NULL
+from django.db.models import CASCADE, QuerySet, SET_NULL, Q
+from django.db.models.functions import Length
 from django.dispatch import receiver
-from guardian.shortcuts import get_objects_for_user, assign_perm
+from guardian.shortcuts import assign_perm
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 from django.db import models
 
+from annotation.models import MonarchDiseaseOntology
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
     flag_types
@@ -20,7 +19,6 @@ from classification.regexes import db_ref_regexes, DbRefRegex, DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
-from library.guardian_utils import all_users_group
 from snpdb.models import Lab
 
 
@@ -62,10 +60,12 @@ class MultiCondition(models.TextChoices):
     CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
 
 
-@dataclass(frozen=True)
 class ResolvedCondition:
-    condition_xrefs: List[str]
-    condition_multi_operation: MultiCondition
+
+    def __init__(self):
+        from annotation.ontology_matching import OntologyMatching
+        self.condition_multi_operation = MultiCondition.NOT_DECIDED
+        self.condition_xrefs = OntologyMatching()
 
 
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
@@ -118,10 +118,11 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             else:
                 return self.parent.resolve_condition_xrefs
 
-        return ResolvedCondition(
-            condition_xrefs=self.condition_xrefs,
-            condition_multi_operation=self.condition_multi_operation
-        )
+        rc = ResolvedCondition()
+        rc.condition_multi_operation = self.condition_multi_operation
+        for term in self.condition_xrefs:
+            rc.condition_xrefs.select_term(term)
+        return rc
 
 
     @property
@@ -341,3 +342,4 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
         cl: Classification
         if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version)
+

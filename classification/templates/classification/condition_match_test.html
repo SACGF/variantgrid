@@ -1,0 +1,56 @@
+{% extends "uicore/page/base.html" %}
+{% load datatable_tags %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% block title %}Condition Matching{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <h3>Condition Match Testing</h3>
+        {% page_help_embedded title='Condition Match Testing' %}
+            <p>
+            Help will go here for matching text to conditions
+            </p>
+        {% end_page_help_embedded %}
+
+        <form method="GET">
+            {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
+            {% labelled label="Gene Symbol" %}<input class="form-control" style="max-width:300px" name="gene_symbol" value="{{ gene_symbol | default_if_none:'' }}" />
+                <span class="text-muted">(optional)</span>
+            {% endlabelled %}
+            <button class="btn btn-primary">Search</button>
+        </form>
+
+        {% if attempted %}
+            {% if auto_matches %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Term</th>
+                        <th>Score</th>
+                        <th>Calculation</th>
+                    </tr>
+                </thead>
+                {% for auto_match in auto_matches %}
+                    <tr>
+                        <td>{{ auto_match.match.id_str }} {{ auto_match.match.name }}</td>
+                        <td>{{ auto_match.score }}</td>
+                        <td>
+                            {% for part in auto_match.score_parts %}
+                                <div>{{ part.category }} | {{ part.calculation }} | {{ part.score }}</div>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+                <span class="no-results">No Results</span>
+            {% endif %}
+        {% endif %}
+    </div>
+{% endblock %}

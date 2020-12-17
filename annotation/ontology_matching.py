@@ -8,7 +8,7 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.models import MonarchDiseaseOntologyMIMMorbid, MonarchDiseaseOntologyGeneRelationship, \
-    MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology
+    MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology, MonarchDiseaseOntologyRelationship
 
 
 class OntologyContext:
@@ -127,7 +127,8 @@ class OntologyContextPanelApp(OntologyContext):
 
 class OntologyMeta:
 
-    # TODO support non-mondo
+
+    # FIXME, maybe we consolidate all ontologys into a single table
     # TODO if taken from a 3rd party they might have a name or description that we don't
     # could be done in meta if had to be?
     def __init__(self, term_id: str):
@@ -135,10 +136,18 @@ class OntologyMeta:
         self.name = None
         self.definition = None
 
+        self.object: MonarchDiseaseOntology = None
+        self.parent: MonarchDiseaseOntology = None
+
         if term_id.startswith(MonarchDiseaseOntology.PREFIX):
             if mondo := MonarchDiseaseOntology.objects.filter(pk=MonarchDiseaseOntology.id_as_int(term_id)).first():
+                self.object = mondo
                 self.name = mondo.name
                 self.definition = mondo.definition
+                parent_relationship: MonarchDiseaseOntologyRelationship
+                if parent_relationship := MonarchDiseaseOntologyRelationship.objects.filter(subject=mondo, relationship="is_a").first():
+                    self.parent = parent_relationship.object
+
         elif term_id.startswith(MIMMorbid.PREFIX):
             if omim := MIMMorbid.objects.filter(pk=MIMMorbid.id_as_int(term_id)).first():
                 self.name = omim.description
@@ -177,13 +186,25 @@ class OntologyMeta:
         sorted_names.sort()
         contexts = {key: self.contexts[key].as_json() for key in sorted_names}
 
-        return {
+        data = {
             "id": self.term_id,
             "title": self.name,
             "url": self.url,
             "definition": self.definition,
             "contexts": contexts
         }
+
+        if self.parent:
+            data["parent_id"] = self.parent.id_str
+            data["parent_title"] = self.parent.name
+            """
+            sibling_count = MonarchDiseaseOntologyRelationship.objects.filter(object=self.parent, relationship="is_a").count() - 1
+            child_count = MonarchDiseaseOntologyRelationship.objects.filter(object=self.object, relationship="is_a").count()
+
+            data["sibling_count"] = sibling_count
+            data["children_count"] = child_count
+            """
+        return data
 
 
 class OntologyMatching:
@@ -241,8 +262,14 @@ class OntologyMatching:
     def as_json(self) -> Dict:
         return [value.as_json() for value in self.term_map.values()]
 
+    def __iter__(self):
+        # TODO probably should sort as well
+        return iter(self.term_map.values())
+
 
 class SearchMondoText(APIView):
+
+    MONDO_PATTERN = re.compile("MONDO:[0-9]+")
 
     def get(self, request, **kwargs) -> Response:
 
@@ -252,7 +279,6 @@ class SearchMondoText(APIView):
         # gene_symbol = request.GET.get('gene_symbol')
         # a regular escape / gets confused for a URL divider
         urllib.parse.quote(search_term).replace('/', '%252F')
-
         selected = [term.strip() for term in (request.GET.get('selected') or '').split(",") if term.strip()]
         for term in selected:
             ontologyMatches.select_term(term)
@@ -267,27 +293,32 @@ class SearchMondoText(APIView):
                 # report_exc_info(extra_data={"gene_symbol": clinvar_export.gene_symbol.symbol})
                 # messages.add_message(request, messages.ERROR, "Could not connect to PanelApp")
 
-        # Call for Text Matches
-        try:
-            results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{search_term}', {
-                "prefix": "MONDO",
-                "rows": 6,
-                "minimal_tokenizer": "false",
-                "category": "disease"
-            }).json().get("docs")
+        if SearchMondoText.MONDO_PATTERN.match(search_term):
+            ontologyMatches.find_or_create(search_term)
 
-            for result in results:
-                o_id = result.get('id')
-                label = result.get('label')
-                if label:
-                    label = label[0]
+            # TODO add children
+        else:
+            # Call for Text Matches
+            try:
+                results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{search_term}', {
+                    "prefix": "MONDO",
+                    "rows": 6,
+                    "minimal_tokenizer": "false",
+                    "category": "disease"
+                }).json().get("docs")
 
-                onto = ontologyMatches.find_or_create(term_id=o_id)
-                if not onto.name:
-                    onto.name = label
-                onto.add_context(OntologyContextSearched())
-        except:
-            pass
-            # TODO communicate to the user couldn't search mondo text search
+                for result in results:
+                    o_id = result.get('id')
+                    label = result.get('label')
+                    if label:
+                        label = label[0]
+
+                    onto = ontologyMatches.find_or_create(term_id=o_id)
+                    if not onto.name:
+                        onto.name = label
+                    onto.add_context(OntologyContextSearched())
+            except:
+                pass
+                # TODO communicate to the user couldn't search mondo text search
 
         return Response(status=HTTP_200_OK, data=ontologyMatches.as_json())

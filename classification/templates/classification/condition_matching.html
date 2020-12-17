@@ -124,7 +124,24 @@
                 }
             }
             contexts.appendTo(row);
-            $('<td>', {class:'description-cell text-muted', html: highlightDescription(onto.definition)}).appendTo(row);
+            let description = $('<td>', {class:'description-cell text-muted' }).appendTo(row);
+            if (onto.parent_id) {
+                let parentLink = $('<a>', {class:'hover-link', text: `Parent: ${onto.parent_id} ${onto.parent_title}`});
+                parentLink.click(() => {
+                   searchMondo({
+                       searchText: onto.parent_id,
+                   })
+                });
+                $('<div>', {html:[
+                    parentLink
+                ]}).appendTo(description);
+            }
+            description.append(highlightDescription(onto.definition))
+            if (onto.sibling_count || onto.children_count) {
+                $('<div>', {html:[
+                    $('<a>', {text: `Siblings: ${onto.sibling_count}, Children: ${onto.children_count}`})
+                ]}).appendTo(description);
+            }
             return row;
         }
 
@@ -178,9 +195,7 @@
             let geneSymbol = data.geneSymbol;
             let selected = data.selected;
 
-            let text = $('#condition-search-text').val();
             let url = '{% url "api_mondo_search" %}';
-
             let resultsDom = $("#mp-results");
             resultsDom.LoadingOverlay('show');
 

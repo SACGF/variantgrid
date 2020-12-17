@@ -1,11 +1,12 @@
 import json
 import re
+from collections import defaultdict
 from typing import Optional
 
 from django.core.management import BaseCommand
 
 from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship, MIMMorbid, \
-    MonarchDiseaseOntologyMIMMorbid
+    MonarchDiseaseOntologyMIMMorbid, MonarchDiseaseOntologyRelationship
 from genes.models import GeneSymbol, GeneSymbolAlias
 
 ID_EXTRACT_P = re.compile(r"^.*\/([A-Z]+)_([0-9]+)$")
@@ -13,12 +14,13 @@ HGNC_EXTRACT_P = re.compile(r"http://identifiers.org/hgnc/([0-9]+)")
 OMIM_URL_P = re.compile(r"http://identifiers.org/omim/([0-9]+)")
 GENE_SYMBOL_SEARCH = re.compile(r"([A-Z][A-Z,0-9]{2,})")
 
-RELATIONS = {
+GENE_RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004025": "disease causes dysfunction of",
     "http://purl.obolibrary.org/obo/RO_0004001": "has material basis in gain of function germline mutation in",
     "http://purl.obolibrary.org/obo/RO_0004021": "disease has basis in disruption of",
     "http://purl.obolibrary.org/obo/RO_0004020": "disease has basis in dysfunction of"
 }
+
 MATCH_TYPES = {
     "http://www.w3.org/2004/02/skos/core#exactMatch": "exact",
     "http://www.w3.org/2004/02/skos/core#closeMatch": "close",
@@ -30,6 +32,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--file', required=True)
+        parser.add_argument('--test', action='store_true', default=False)
 
     def handle(self, *args, **options):
         data_file = None
@@ -39,12 +42,11 @@ class Command(BaseCommand):
 
         mondo_dict = dict()
         gene_dict = dict()
-        relation_counts = dict()
-        gene_relations = 0
+        mondo_relations = list()
+
         for graph in data_file.get("graphs", []):
+            print("Reviewing Nodes")
             for node in graph.get("nodes", []):
-                raw_id = None
-                type = None
                 if node.get("type") == "CLASS":
                     if node_id_full := node.get("id"):
                         if match := ID_EXTRACT_P.match(node_id_full):
@@ -101,26 +103,32 @@ class Command(BaseCommand):
                             gene_symbol = node.get("lbl")
                             gene_dict[node_id_full] = {"hgnc_id": match[1], "gene_symbol": gene_symbol}
 
+            print("Reviewing edges")
             for edge in graph.get("edges", []):
-                if mondo_sub := mondo_dict.get(edge.get("sub")):
-                    if gene_obj := gene_dict.get(edge.get("obj")):
-                        relationship = edge.get("pred")
-                        relationship = RELATIONS.get(relationship, relationship)
+                subject_id = edge.get("sub")
+                obj_id = edge.get("obj")
+                relationship = edge.get("pred")
+
+                if mondo_sub := mondo_dict.get(subject_id):
+                    if gene_obj := gene_dict.get(obj_id):
+                        relationship = GENE_RELATIONS.get(relationship, relationship)
                         mondo_sub.get("gene_relationships")[gene_obj.get("gene_symbol")] = relationship
-                        """
-                        mondo_sub.get("gene_relationships").append({
-                            "type": relationship,
-                            "gene_symbol": gene_obj.get("gene_symbol")
-                        })
-                        """
+
+                    elif mondo_obj := mondo_dict.get(subject_id):
+                        if mondo_subj := mondo_dict.get(obj_id):
+                            if relationship == "is_a":
+                                mondo_relations.append((mondo_obj, mondo_subj))
 
         mondo_list = list()
         mondo_gene_list = list()
         mondo_omim_list = list()
+        mondo_relation_list = list()
 
         text_only_mondo_count = 0
         text_only_gene_count = 0
 
+        print("Constructing objects")
+        print("Creating MONDOs and Gene Relationships")
         for mondo in mondo_dict.values():
 
             mondo_id = mondo.get("type_id")
@@ -176,15 +184,28 @@ class Command(BaseCommand):
                 )
                 mondo_omim_list.append(moim)
 
+        print("Creating MONDO relationships")
+        for relation in mondo_relations:
+            mdor = MonarchDiseaseOntologyRelationship(
+                subject_id=relation[0].get("type_id"),
+                object_id=relation[1].get("type_id"),
+                relationship="is_a"
+            )
+            mondo_relation_list.append(mdor)
+
         print(f"Found {text_only_mondo_count} mondo records with {text_only_gene_count} genes in description and no formal relationship")
-        print("About to update database")
 
-        MonarchDiseaseOntologyGeneRelationship.objects.all().delete()
-        MonarchDiseaseOntology.objects.all().delete()
-        MonarchDiseaseOntologyMIMMorbid.objects.all().delete()
+        if not options.get('test'):
+            print("About to update database")
 
-        MonarchDiseaseOntology.objects.bulk_create(mondo_list)
-        MonarchDiseaseOntologyGeneRelationship.objects.bulk_create(mondo_gene_list)
-        MonarchDiseaseOntologyMIMMorbid.objects.bulk_create(mondo_omim_list)
+            MonarchDiseaseOntologyRelationship.objects.all().delete()
+            MonarchDiseaseOntologyGeneRelationship.objects.all().delete()
+            MonarchDiseaseOntology.objects.all().delete()
+            MonarchDiseaseOntologyMIMMorbid.objects.all().delete()
 
-        print("Update complete")
+            MonarchDiseaseOntology.objects.bulk_create(mondo_list)
+            MonarchDiseaseOntologyGeneRelationship.objects.bulk_create(mondo_gene_list)
+            MonarchDiseaseOntologyMIMMorbid.objects.bulk_create(mondo_omim_list)
+            MonarchDiseaseOntologyRelationship.objects.bulk_create(mondo_relation_list)
+
+            print("Update complete")

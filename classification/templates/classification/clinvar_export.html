@@ -105,7 +105,11 @@
             {% labelled label="Condition Text" %}{{ clinvar_export.condition }}{% endlabelled %}
             {% labelled label="Condition Terms" %}
                 {% if condition_text_match %}
-                    {{ condition_text_match.resolve_condition_xrefs.condition_xrefs }}
+                    <div class="pills">
+                    {% for ontology in condition_text_match.resolve_condition_xrefs.condition_xrefs %}
+                        {% ontology ontology %}
+                    {% endfor %}
+                    </div>
                     <a class="btn btn-outline-primary" target="_blank" href="{% url 'condition_matching' pk=condition_text_match.condition_text.pk %}"><i class="fas fa-edit"></i></a>
                 {% else %}
                     <span class="text-danger">No condition matching found for this classification</span>
