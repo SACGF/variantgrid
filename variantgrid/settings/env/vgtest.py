@@ -57,3 +57,6 @@ URLS_NAME_REGISTER.update({"sequencing_data": False})
 
 VG_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "variantgrid_test_static")
 STATICFILES_DIRS = (VG_TEST_STATIC_FILES_DIR,) + STATICFILES_DIRS
+
+SOMALIER["enabled"] = True
+SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
