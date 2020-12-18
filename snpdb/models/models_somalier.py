@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 from typing import List, Iterable
 
 from django.conf import settings
@@ -28,7 +29,7 @@ class AbstractSomalierModel(TimeStampedModel):
     def get_sample_somalier_filenames(self) -> List[str]:
         return [AbstractSomalierModel.sample_filename(s) for s in self.get_samples()]
 
-    def execute(self, command: List[str]):
+    def execute(self, command: List[str], **kwargs):
         """ Executes code and handles saving errors """
 
         logging.info('About to call %s', " ".join(command))
@@ -36,7 +37,7 @@ class AbstractSomalierModel(TimeStampedModel):
         self.status = ProcessingStatus.PROCESSING
         self.save()
 
-        return_code, stdout, stderr = execute_cmd(command)
+        return_code, stdout, stderr = execute_cmd(command, **kwargs)
         if return_code != 0:
             self.error_exception = f"return_code: {return_code}. stdout: {stdout}, stderr: {stderr}"
             self.status = ProcessingStatus.ERROR
@@ -60,17 +61,18 @@ class SomalierVCFExtract(AbstractSomalierModel):
         cfg = SomalierConfig()
         return os.path.join(cfg["vcf_base_dir"], str(self.vcf.pk))
 
-    def _get_samples(self) -> Iterable[Sample]:
+    def get_samples(self) -> Iterable[Sample]:
         return self.vcf.sample_set.all().order_by("pk")
 
 
 class SomalierAncestryRun(AbstractSomalierModel):
     """ We do a run against a whole VCF """
     vcf_extract = models.OneToOneField(SomalierVCFExtract, on_delete=CASCADE)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False)  # code to hide directories in media_root
 
     def get_report_dir(self):
         cfg = SomalierConfig()
-        return cfg.ancestry_dir(f"vcf_{cfg}")
+        return cfg.ancestry_dir(self.uuid)
 
     def get_samples(self) -> Iterable[Sample]:
         return self.vcf_extract.get_samples()
@@ -89,7 +91,7 @@ class SomalierAncestry(TimeStampedModel):
 
 class SomalierRelate(AbstractSomalierModel):
     objects = InheritanceManager()
-    uuid = models.UUIDField()  # code to hide directories in media_root
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False)  # code to hide directories in media_root
 
     class Meta:
         abstract = True
@@ -139,7 +141,7 @@ class SomalierConfig:
         return self._annotation_dir(self.settings["annotation"][key])
 
     def report_dir(self, *args):
-        return os.path.join(self.settings["report_base_dir"], *args)
+        return os.path.join(self.settings["report_base_dir"], *map(str, args))
 
     def ancestry_dir(self, subdir):
         return self.report_dir("ancestry", subdir)

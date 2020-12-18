@@ -60,6 +60,7 @@ class SamplesListGrid(JqGridUserRowConfig):
               "vcf__name", "vcf__user__username", "vcf__uploadedvcf__uploaded_file__import_source",
               "samplestats__variant_count", "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
+              "somalierancestry__predicted_ancestry",
               "patient__first_name", "patient__last_name", "patient__sex", "patient__date_of_birth", "patient__date_of_death",
               "specimen__reference_id", "specimen__tissue", "specimen__collection_date"]
     colmodel_overrides = {
@@ -77,6 +78,7 @@ class SamplesListGrid(JqGridUserRowConfig):
         'mutationalsignature__id': {'hidden': True},
         'mutationalsignature__summary': {'label': 'Mutational Signature',
                                          'formatter': 'viewMutationalSignature'},
+        "somalierancestry__predicted_ancestry": {"label": "Predicted Ancestry"},
         'patient__last_name': {'label': 'Last Name'},
         'patient__sex': {'label': 'Sex'},
         'patient__date_of_birth': {'label': 'D.O.B.'},
