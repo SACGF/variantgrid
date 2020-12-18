@@ -33,16 +33,26 @@
                     <tr>
                         <th>Term</th>
                         <th>Score</th>
-                        <th>Calculation</th>
                     </tr>
                 </thead>
                 {% for auto_match in auto_matches %}
                     <tr>
-                        <td>{{ auto_match.match.id_str }} {{ auto_match.match.name }}</td>
-                        <td>{{ auto_match.score }}</td>
+                        <td width="30%">{{ auto_match.match.id_str }}<br/>
+                            {{ auto_match.match.name }}<br/>
+                            <span class="text-muted wy-text-small">{{ auto_match.match.definition }}</span>
+                        </td>
                         <td>
+                            <div class="row mb-1">
+                                <div class="col-1 text-right text-monospace border-bottom" style="font-weight: bold">
+                                    {{ auto_match.score | floatformat:0 }}
+                                </div>
+                                <div class="col-11"></div>
+                            </div>
                             {% for part in auto_match.score_parts %}
-                                <div>{{ part.category }} | {{ part.calculation }} | {{ part.score }}</div>
+                                <div class="row mb-1">
+                                    <div class="col-1 text-right text-monospace">{{ part.score | floatformat:0 }}</div>
+                                    <div class="col-11">{{ part.calculation }}</div>
+                                </div>
                             {% endfor %}
                         </td>
                     </tr>
