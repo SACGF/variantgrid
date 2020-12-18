@@ -39,7 +39,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     @staticmethod
     def normalize(text: str):
         text = text.lower()
-        text = re.sub("[,;.]", " ", text)  # replace , ; . with spaces
+        text = re.sub("[,;./]", " ", text)  # replace , ; . with spaces
         text = re.sub("[ ]{2,}", " ", text)  # replace multiple spaces with
         return text
 
