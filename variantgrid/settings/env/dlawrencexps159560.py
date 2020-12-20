@@ -78,10 +78,12 @@ if _SAPATHOLOGY_MODE:
     CELERY_IMPORTS += ('sapath.tasks.import_helix_task',)
     PATHOLOGY_TEST_REQUESTS_REDIRECT_URL = "sapathology_test_requests"
     SAPATHOLOGY_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "sapathology_static")
-    STATICFILES_DIRS = (SAPATHOLOGY_STATIC_FILES_DIR,) + STATICFILES_DIRS
+    if os.path.exists(SAPATHOLOGY_STATIC_FILES_DIR):
+        STATICFILES_DIRS = (SAPATHOLOGY_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
     SAPATHOLOGY_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/sapathology_templates")
-    TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
+    if os.path.exists(SAPATHOLOGY_TEMPLATES_DIR):
+        TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
 elif _SHARIANT_MODE:
     VARIANT_CLASSIFICATION_STATS_USE_SHARED = True  # False=Use visible to user. True = Shared
 
