@@ -17,7 +17,7 @@ from upload.tasks.import_ped_task import ImportPedTask
 from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, \
     ProcessGenotypeVCFDataTask, ImportGenotypeVCFSuccessTask, \
     UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
-    ImportCreateVCFModelForGenotypeVCFTask
+    ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
 from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
     ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask
 import pandas as pd
@@ -143,9 +143,12 @@ class GenotypeVCFImportFactory(AbstractVCFImportTaskFactory):
         return ProcessGenotypeVCFDataTask
 
     def get_post_data_insertion_classes(self):
-        return [VCFCheckAnnotationTask,
-                UpdateVariantZygosityCountsTask,
-                SampleLocusCountsTask]
+        classes = [VCFCheckAnnotationTask,
+                   UpdateVariantZygosityCountsTask,
+                   SampleLocusCountsTask]
+        if settings.SOMALIER.get("enabled"):
+            classes.append(SomalierVCFTask)
+        return classes
 
     def get_finish_task_classes(self):
         finish_task_classes = []

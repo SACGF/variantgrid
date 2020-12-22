@@ -1,6 +1,7 @@
 import logging
 import os
 import uuid
+from subprocess import CalledProcessError
 from typing import List, Iterable
 
 from django.conf import settings
@@ -32,7 +33,8 @@ class AbstractSomalierModel(TimeStampedModel):
     def execute(self, command: List[str], **kwargs):
         """ Executes code and handles saving errors """
 
-        logging.info('About to call %s', " ".join(command))
+        cmd = " ".join(command)
+        logging.info('About to call %s', cmd)
 
         self.status = ProcessingStatus.PROCESSING
         self.save()
@@ -46,12 +48,21 @@ class AbstractSomalierModel(TimeStampedModel):
         self.save()
 
         if return_code != 0:
-            raise RuntimeError(self.error_exception)
+            raise CalledProcessError(returncode=return_code, cmd=cmd, output=self.error_exception)
 
     @staticmethod
     def sample_filename(sample: Sample):
         vcf_dir = sample.vcf.somaliervcfextract.get_somalier_dir()
         return os.path.join(vcf_dir, sample.vcf_sample_name + ".somalier")
+
+    @staticmethod
+    def media_url(file_path):
+        # Need to use a slash, so that later joins don't have absolute path
+        media_root_with_slash = os.path.join(settings.MEDIA_ROOT, "")
+        if not file_path.startswith(media_root_with_slash):
+            raise ValueError(f"'{file_path}' must start with MEDIA_ROOT: {media_root_with_slash}")
+
+        return os.path.join(settings.MEDIA_URL, file_path[len(media_root_with_slash):])
 
 
 class SomalierVCFExtract(AbstractSomalierModel):
@@ -62,7 +73,16 @@ class SomalierVCFExtract(AbstractSomalierModel):
         return os.path.join(cfg["vcf_base_dir"], str(self.vcf.pk))
 
     def get_samples(self) -> Iterable[Sample]:
-        return self.vcf.sample_set.all().order_by("pk")
+        return self.vcf.sample_set.filter(no_dna_control=False).order_by("pk")
+
+
+class SomalierSampleExtract(models.Model):
+    vcf_extract = models.ForeignKey(SomalierVCFExtract, on_delete=CASCADE)
+    sample = models.OneToOneField(Sample, on_delete=CASCADE)
+    ref_count = models.IntegerField(default=0)
+    het_count = models.IntegerField(default=0)
+    hom_count = models.IntegerField(default=0)
+    unk_count = models.IntegerField(default=0)
 
 
 class SomalierAncestryRun(AbstractSomalierModel):
@@ -77,10 +97,15 @@ class SomalierAncestryRun(AbstractSomalierModel):
     def get_samples(self) -> Iterable[Sample]:
         return self.vcf_extract.get_samples()
 
+    @property
+    def url(self):
+        report_dir = self.get_report_dir()
+        return self.media_url(os.path.join(report_dir, "somalier-ancestry.somalier-ancestry.html"))
+
 
 class SomalierAncestry(TimeStampedModel):
     ancestry_run = models.ForeignKey(SomalierAncestryRun, on_delete=CASCADE)
-    sample = models.OneToOneField(Sample, on_delete=CASCADE)
+    sample_extract = models.OneToOneField(SomalierSampleExtract, on_delete=CASCADE)
     predicted_ancestry = models.CharField(max_length=1, choices=SuperPopulationCode.choices)
     EAS_prob = models.FloatField()
     AFR_prob = models.FloatField()
@@ -100,13 +125,18 @@ class SomalierRelate(AbstractSomalierModel):
         """ Sample IDs have to match samples provided in get_samples() """
         raise NotImplementedError()
 
+    @property
+    def url(self):
+        cfg = SomalierConfig()
+        return self.media_url(os.path.join(cfg.related_dir(self.uuid), "somalier.html"))
+
 
 class SomalierCohortRelate(SomalierRelate):
     cohort = models.OneToOneField(Cohort, on_delete=CASCADE)
     cohort_version = models.IntegerField()
 
     def get_samples(self) -> Iterable[Sample]:
-        return self.cohort.get_samples()
+        return self.cohort.get_samples().filter(no_dna_control=False)
 
     def write_ped_file(self, filename):
         write_unrelated_ped(filename, [s.vcf_sample_name for s in self.get_samples()])
@@ -128,6 +158,31 @@ class SomalierTrioRelate(SomalierRelate):
             proband_sex = patient.sex
         write_trio_ped(filename, proband, proband_sex,
                        father, self.trio.father_affected, mother, self.trio.mother_affected)
+
+
+class SomalierAllSamplesRelate(SomalierRelate):
+    pass
+
+
+class SomalierRelatePairs(models.Model):
+    relate = models.ForeignKey(SomalierAllSamplesRelate, on_delete=CASCADE)
+    # Sample A always has a lower PK than B
+    sample_a = models.OneToOneField(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_a")
+    sample_b = models.OneToOneField(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_b")
+    relatedness = models.FloatField()
+    ibs0 = models.IntegerField()
+    ibs2 = models.IntegerField()
+    hom_concordance = models.FloatField()
+    hets_a = models.IntegerField()
+    hets_b = models.IntegerField()
+    hets_ab = models.IntegerField()
+    shared_hets = models.IntegerField()
+    hom_alts_a = models.IntegerField()
+    hom_alts_b = models.IntegerField()
+    shared_hom_alts = models.IntegerField()
+    n = models.IntegerField()
+    x_ibs0 = models.IntegerField()
+    x_ibs2 = models.IntegerField()
 
 
 class SomalierConfig:
