@@ -70,6 +70,9 @@ _SAPATHOLOGY_MODE = False
 _SHARIANT_MODE = False
 _RUNX1_MODE = False
 
+SOMALIER["enabled"] = True
+# SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
+
 USE_OIDC = False
 
 if _SAPATHOLOGY_MODE:

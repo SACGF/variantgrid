@@ -60,14 +60,7 @@ def somalier_vcf_id(vcf_id: int):
 
 def _write_somalier_vcf(cfg: SomalierConfig, processing_dir, vcf_extract: SomalierVCFExtract):
     vcf = vcf_extract.vcf
-    sites_name = os.path.basename(cfg.get_sites(vcf.genome_build))
-    sites_vcf_kwargs = {"name": sites_name, "genome_build": vcf.genome_build}
-    try:
-        sites_vcf = VCF.objects.get(**sites_vcf_kwargs)
-    except VCF.DoesNotExist as dne:
-        print(f"Expected single VCF loaded via: {sites_vcf_kwargs}")
-        raise dne
-
+    sites_vcf = cfg.get_sites_vcf(vcf.genome_build)
     sites_qs = sites_vcf.get_variant_qs()
     exported_vcf_filename = os.path.join(processing_dir, f"vcf_{vcf.pk}.vcf.bgz")
     sample_zygosity_count = vcf_export_to_file(vcf, exported_vcf_filename, original_qs=sites_qs)
