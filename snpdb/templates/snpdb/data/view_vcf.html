@@ -251,10 +251,10 @@ table#sample-formset input[type="text"] {
         <li><a href="#details">Details</a></li>
         <li><a href="#vcf-stats">Stats</a></li>
         <li><a href="#vcf-info">VCF Info</a></li>
-        {% if vcf.cohort.somaliercohortrelate %}
+        {% if somalier_enabled and vcf.cohort.somaliercohortrelate %}
         <li><a href="#vcf-relate">Relate</a></li>
         {% endif %}
-        {% if vcf.somaliervcfextract.somalierancestryrun %}
+        {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
         <li><a href="#vcf-ancestry">Ancestry</a></li>
         {% endif %}
         {% if has_write_permission %}
@@ -437,12 +437,16 @@ table#sample-formset input[type="text"] {
             </p>
         </fieldset>
     </div>
+{% if somalier_enabled and vcf.cohort.somaliercohortrelate %}
     <div id="vcf-relate">
         <iframe width="100%" height="100%" src="{{ vcf.cohort.somaliercohortrelate.url }}"></iframe>
     </div>
+{% endif %}
+{% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
     <div id="vcf-ancestry">
         <iframe width="100%" height="100%" src="{{ vcf.somaliervcfextract.somalierancestryrun.url }}"></iframe>
     </div>
+{% endif %}
 </div>
 
     {% if vcf.import_status == 'S' and vcf.cohort %}
