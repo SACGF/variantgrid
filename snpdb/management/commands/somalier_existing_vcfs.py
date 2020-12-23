@@ -13,7 +13,7 @@ class Command(BaseCommand):
         if options.get("clear"):
             SomalierVCFExtract.objects.all().delete()
 
-        if settings.SOMALIER.get("enabled"):
+        if not settings.SOMALIER.get("enabled"):
             raise ValueError("settings.SOMALIER['enabled'] not enabled!")
 
         for vcf in VCF.objects.filter(somaliervcfextract__isnull=True):
