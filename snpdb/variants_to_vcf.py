@@ -76,8 +76,11 @@ def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_
     return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict)
 
 
-def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None) -> Dict[Sample, Counter]:
+def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample_name_func=None) -> Dict[Sample, Counter]:
     """ Returns dict of zygosity counts written to file """
+    if sample_name_func is None:
+        sample_name_func = lambda s: s.vcf_sample_name
+
     qs = vcf.get_variant_qs(original_qs)
     ca = vcf.cohort.cohort_genotype_collection.cohortgenotype_alias
     qs = qs.filter(**{f"{ca}__filters__isnull": True})  # Somalier only uses PASS by default
@@ -89,7 +92,7 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None) -> Dic
     vcf_format = "GT:AD:DP"
     samples = list(vcf.sample_set.order_by("pk"))
     sample_whitelist = [not s.no_dna_control for s in samples]  # Skip no DNA controls
-    vcf_sample_names = [s.vcf_sample_name for s, w in zip(samples, sample_whitelist) if w]
+    vcf_sample_names = [sample_name_func(s) for s, w in zip(samples, sample_whitelist) if w]
     header_lines = get_vcf_header_from_contigs(vcf.genome_build, samples=vcf_sample_names)
     sample_zygosity_count = [Counter() for _ in samples]
 

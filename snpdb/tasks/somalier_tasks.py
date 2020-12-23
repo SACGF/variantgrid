@@ -10,12 +10,12 @@ import celery
 import pandas as pd
 
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.log_utils import log_traceback
+from library.log_utils import log_traceback, get_traceback
 from library.utils import execute_cmd
 from patients.models_enums import Zygosity
 from snpdb.models import VCF, Cohort, Trio, SomalierVCFExtract, SomalierConfig, SomalierAncestryRun, \
     SomalierCohortRelate, SomalierRelate, SomalierTrioRelate, SomalierAncestry, SuperPopulationCode, \
-    SomalierSampleExtract, ProcessingStatus
+    SomalierSampleExtract, ProcessingStatus, SomalierAllSamplesRelate, AbstractSomalierModel, SomalierRelatePairs
 from snpdb.variants_to_vcf import vcf_export_to_file
 
 
@@ -63,7 +63,8 @@ def _write_somalier_vcf(cfg: SomalierConfig, processing_dir, vcf_extract: Somali
     sites_vcf = cfg.get_sites_vcf(vcf.genome_build)
     sites_qs = sites_vcf.get_variant_qs()
     exported_vcf_filename = os.path.join(processing_dir, f"vcf_{vcf.pk}.vcf.bgz")
-    sample_zygosity_count = vcf_export_to_file(vcf, exported_vcf_filename, original_qs=sites_qs)
+    sample_zygosity_count = vcf_export_to_file(vcf, exported_vcf_filename, original_qs=sites_qs,
+                                               sample_name_func=AbstractSomalierModel.sample_name)
     for sample, zy in sample_zygosity_count.items():
         ZYG_LOOKUP = {"ref_count": Zygosity.HOM_REF,
                       "het_count": Zygosity.HET,
@@ -92,7 +93,7 @@ def _somalier_ancestry(vcf_extract: SomalierVCFExtract):
     # Use TSV to write sample specific files
     df = pd.read_csv(ancestry_report_dir / "somalier-ancestry.somalier-ancestry.tsv", sep='\t', index_col=0)
     for sample_extract in vcf_extract.somaliersampleextract_set.all():
-        row = df.loc[sample_extract.sample.vcf_sample_name]
+        row = df.loc[AbstractSomalierModel.sample_name(sample_extract.sample)]
         predicted_ancestry = getattr(SuperPopulationCode, row["predicted_ancestry"])  # Get enum ie 'EAS'
         SomalierAncestry.objects.create(ancestry_run=ancestry_run,
                                         sample_extract=sample_extract,
@@ -104,7 +105,8 @@ def _somalier_ancestry(vcf_extract: SomalierVCFExtract):
                                         EUR_prob=row["EUR_prob"])
 
 
-def _somalier_relate(somalier_relate: SomalierRelate):
+def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
+    """ Returns path of relate output """
     cfg = SomalierConfig()
     somalier_bin = cfg.get_annotation("command")
     processing_dir = get_import_processing_dir(somalier_relate.pk, "somalier_relate")
@@ -118,6 +120,8 @@ def _somalier_relate(somalier_relate: SomalierRelate):
     somalier_relate.execute(command, cwd=somalier_relate_dir)
 
     shutil.rmtree(processing_dir)
+
+    return somalier_relate_dir
 
 
 @celery.task
@@ -134,4 +138,37 @@ def somalier_trio_relate(trio_id: int):
     _somalier_relate(relate)
 
 
-# TODO: Do for Pedigree
+@celery.task
+def somalier_all_samples():
+    MIN_RELATEDNESS = 0.2
+    MIN_SHARED_HET = 1000
+    MIN_SHARED_HOM = 1000
+
+    all_samples = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.PROCESSING)
+    try:
+        related_dir = _somalier_relate(all_samples)
+        pairs_filename = os.path.join(related_dir, "somalier.pairs.tsv")
+        df = pd.read_csv(pairs_filename, sep='\t')
+        shared_het_mask = df["shared_hets"] > MIN_SHARED_HET
+        shared_hom_mask = df["shared_hom_alts"] > MIN_SHARED_HOM
+        relateness_mask = df["relatedness"] > MIN_RELATEDNESS
+        df = df[shared_het_mask & shared_hom_mask & relateness_mask]
+
+        for _, row in df.iterrows():
+            row_data = dict(row)
+            row_data["relate"] = all_samples
+            row_data.pop("expected_relatedness")
+            # Sample_ids are at the start
+            sample_a_id = AbstractSomalierModel.sample_name_to_id(row_data.pop("#sample_a"))
+            sample_b_id = AbstractSomalierModel.sample_name_to_id(row_data.pop("sample_b"))
+
+            SomalierRelatePairs.objects.update_or_create(sample_a_id=sample_a_id, sample_b_id=sample_b_id,
+                                                         defaults=row_data)
+        all_samples.status = ProcessingStatus.SUCCESS
+    except Exception as e:
+        tb = get_traceback()
+        logging.error(tb)
+        all_samples.error_exception = tb
+        all_samples.status = ProcessingStatus.ERROR
+
+    all_samples.save()

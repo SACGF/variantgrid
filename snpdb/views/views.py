@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured
+from django.db.models import Q
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
@@ -60,7 +61,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead
+    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from upload.uploaded_file_type import retry_upload_pipeline
@@ -276,6 +277,9 @@ def view_sample(request, sample_id):
     sample_locus_count = list(SampleLocusCount.objects.filter(sample=sample).order_by("locus_count"))
     igv_data = get_igv_data(request.user, genome_build=sample.genome_build)
     patient_form = PatientForm(user=request.user)  # blank
+    related_samples = None
+    if settings.SOMALIER.get("enabled"):
+        related_samples = SomalierRelatePairs.objects.filter(Q(sample_a=sample) | Q(sample_b=sample))
 
     context = {'sample': sample,
                'samples': [sample],
@@ -284,7 +288,8 @@ def view_sample(request, sample_id):
                'patient_form': patient_form,
                'cohorts': cohorts,
                'has_write_permission': has_write_permission,
-               'igv_data': igv_data}
+               'igv_data': igv_data,
+               "related_samples": related_samples}
     return render(request, 'snpdb/data/view_sample.html', context)
 
 

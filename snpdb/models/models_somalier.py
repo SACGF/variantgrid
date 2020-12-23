@@ -7,12 +7,13 @@ from typing import List, Iterable
 from django.conf import settings
 from django.db import models
 from django.db.models import CASCADE
+from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
 from library.utils import execute_cmd
 from pedigree.ped.export_ped import write_unrelated_ped, write_trio_ped
-from snpdb.models import Sample, VCF, Cohort, Trio, SuperPopulationCode
+from snpdb.models import Sample, VCF, Cohort, Trio, SuperPopulationCode, ImportStatus
 from snpdb.models.models_enums import ProcessingStatus
 from patients.models_enums import Sex
 
@@ -51,9 +52,19 @@ class AbstractSomalierModel(TimeStampedModel):
             raise CalledProcessError(returncode=return_code, cmd=cmd, output=self.error_exception)
 
     @staticmethod
+    def sample_name(sample: Sample):
+        # Add PK as suffix so they're all unique
+        return f"{slugify(sample.vcf_sample_name)}_{sample.pk}"
+
+    @staticmethod
     def sample_filename(sample: Sample):
         vcf_dir = sample.vcf.somaliervcfextract.get_somalier_dir()
-        return os.path.join(vcf_dir, sample.vcf_sample_name + ".somalier")
+        return os.path.join(vcf_dir, AbstractSomalierModel.sample_name(sample) + ".somalier")
+
+    @staticmethod
+    def sample_name_to_id(sample_name: str):
+        """ Sample ID is stored at the end """
+        return sample_name.rsplit("_", 1)[-1]
 
     @staticmethod
     def media_url(file_path):
@@ -123,7 +134,7 @@ class SomalierRelate(AbstractSomalierModel):
 
     def write_ped_file(self, filename):
         """ Sample IDs have to match samples provided in get_samples() """
-        raise NotImplementedError()
+        write_unrelated_ped(filename, [AbstractSomalierModel.sample_name(s) for s in self.get_samples()])
 
     @property
     def url(self):
@@ -138,9 +149,6 @@ class SomalierCohortRelate(SomalierRelate):
     def get_samples(self) -> Iterable[Sample]:
         return self.cohort.get_samples().filter(no_dna_control=False)
 
-    def write_ped_file(self, filename):
-        write_unrelated_ped(filename, [s.vcf_sample_name for s in self.get_samples()])
-
 
 class SomalierTrioRelate(SomalierRelate):
     trio = models.OneToOneField(Trio, on_delete=CASCADE)
@@ -149,26 +157,30 @@ class SomalierTrioRelate(SomalierRelate):
         return self.trio.get_samples()
 
     def write_ped_file(self, filename):
-        proband_sample = self.trio.proband.sample
-        proband = proband_sample.vcf_sample_name
-        father = self.trio.father.sample.vcf_sample_name
-        mother = self.trio.mother.sample.vcf_sample_name
+        proband = AbstractSomalierModel.sample_name(self.trio.proband.sample)
+        father = AbstractSomalierModel.sample_name(self.trio.father.sample)
+        mother = AbstractSomalierModel.sample_name(self.trio.mother.sample)
         proband_sex = Sex.UNKNOWN
-        if patient := proband_sample.patient:
+        if patient := self.trio.proband.sample.patient:
             proband_sex = patient.sex
         write_trio_ped(filename, proband, proband_sex,
                        father, self.trio.father_affected, mother, self.trio.mother_affected)
 
 
 class SomalierAllSamplesRelate(SomalierRelate):
-    pass
+    def get_sample_somalier_filenames(self) -> List[str]:
+        cfg = SomalierConfig()
+        return [f"{cfg['vcf_base_dir']}/**/*.somalier"]  # Wild card
+
+    def get_samples(self) -> Iterable[Sample]:
+        return Sample.objects.filter(import_status=ImportStatus.SUCCESS)
 
 
 class SomalierRelatePairs(models.Model):
     relate = models.ForeignKey(SomalierAllSamplesRelate, on_delete=CASCADE)
     # Sample A always has a lower PK than B
-    sample_a = models.OneToOneField(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_a")
-    sample_b = models.OneToOneField(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_b")
+    sample_a = models.ForeignKey(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_a")
+    sample_b = models.ForeignKey(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_b")
     relatedness = models.FloatField()
     ibs0 = models.IntegerField()
     ibs2 = models.IntegerField()
@@ -183,6 +195,9 @@ class SomalierRelatePairs(models.Model):
     n = models.IntegerField()
     x_ibs0 = models.IntegerField()
     x_ibs2 = models.IntegerField()
+
+    class Meta:
+        unique_together = ('sample_a', 'sample_b')
 
 
 class SomalierConfig:
