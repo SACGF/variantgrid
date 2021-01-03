@@ -1,3 +1,4 @@
+"""
 import json
 import re
 from collections import defaultdict
@@ -209,3 +210,4 @@ class Command(BaseCommand):
             MonarchDiseaseOntologyRelationship.objects.bulk_create(mondo_relation_list)
 
             print("Update complete")
+"""

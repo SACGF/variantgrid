@@ -568,6 +568,7 @@ INSTALLED_APPS = [
     # Internal apps
     'analysis',
     'annotation.apps.AnnotationConfig',
+    'ontology',
     'eventlog',
     'expression',
     'flags',
