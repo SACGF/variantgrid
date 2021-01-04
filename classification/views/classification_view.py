@@ -286,7 +286,7 @@ class BulkInserter:
 
             json_data = record.as_json(ClassificationJsonParams(
                 version=record_ref.version,
-                include_data=include_data,
+                include_data=include_data or not save,
                 current_user=user,
                 flatten=flatten,
                 include_lab_config=data.pop('config', False),
