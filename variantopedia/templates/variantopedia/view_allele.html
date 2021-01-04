@@ -57,7 +57,7 @@
                 {% labelled label="Internal Allele ID" hint="tiny" %}{{ allele.id }}{% endlabelled %}
                 {% labelled label="Flags" hint="tiny" %}<div data-flags="{{allele.flag_collection_safe.id}}"></div>{% endlabelled %}
                 {% if allele.clingen_allele %}
-                    {% labelled label="ClinGen Cononical Allele ID" hint="tiny" %}
+                    {% labelled label="ClinGen Canonical Allele ID" hint="tiny" %}
                         <a class="hover-link" href="{{ allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
                     {% endlabelled %}
                     {% if user.is_superuser %}
