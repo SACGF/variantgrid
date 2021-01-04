@@ -317,7 +317,6 @@ class Gene(models.Model):
              print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
              print(ret)
 
-
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
         vta = self.varianttranscriptannotation_set.filter(version=variant_annotation_version, canonical=True).first()

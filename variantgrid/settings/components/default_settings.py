@@ -694,7 +694,7 @@ SOMALIER = {
         "ancestry_somalier_dir": "1kg-somalier",
         "sites": {
             "GRCh37": "sites.GRCh37.vcf.gz",  # No chr prefix on chromosome names
-            "GRCh38": "sites.hg38.nochr.vcf.gz", # No chr prefix on chromosome names
+            "GRCh38": "sites.hg38.nochr.vcf.gz",  # No chr prefix on chromosome names
         },
     },
 }

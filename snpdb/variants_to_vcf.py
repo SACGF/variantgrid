@@ -120,4 +120,3 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                 f.write(line_bytes)
 
     return {s: zc for s, zc, w in zip(samples, sample_zygosity_count, sample_whitelist) if w}
-

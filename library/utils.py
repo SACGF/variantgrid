@@ -358,7 +358,7 @@ class ModelUtilsMixin:
 
 def execute_cmd(cmd: list, **kwargs) -> Tuple[int, Optional[str], Optional[str]]:
     shell = kwargs.get("shell", settings.POPEN_SHELL)
-        
+
     if shell:
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
