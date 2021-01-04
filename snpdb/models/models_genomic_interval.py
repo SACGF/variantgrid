@@ -31,7 +31,7 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
     processed_file = models.TextField(null=True, blank=True)
     processed_records = models.IntegerField(null=True, blank=True)
     user = models.ForeignKey(User, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
     @lazy
     def num_intervals(self):

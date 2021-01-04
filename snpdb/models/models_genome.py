@@ -243,9 +243,9 @@ class Contig(models.Model):
         @see annotation.reference_contigs.get_assembly_report_df """
 
     name = models.TextField()
-    role = models.CharField(max_length=3, choices=SequenceRole.CHOICES)
+    role = models.CharField(max_length=3, choices=SequenceRole.choices)
     assigned_molecule = models.TextField(null=True, blank=True)  # unlocalised may know what chrom it's from
-    molecule_type = models.CharField(max_length=1, choices=AssemblyMoleculeType.CHOICES, null=True, blank=True)
+    molecule_type = models.CharField(max_length=1, choices=AssemblyMoleculeType.choices, null=True, blank=True)
     genbank_accession = models.TextField(null=True)
     refseq_accession = models.TextField(unique=True)
     ucsc_name = models.TextField(null=True)

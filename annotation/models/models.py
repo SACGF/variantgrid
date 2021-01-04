@@ -815,7 +815,7 @@ class ManualVariantEntryCollection(models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=CASCADE)
     created = models.DateTimeField(auto_now_add=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     celery_task = models.CharField(max_length=36, null=True)
 
     @staticmethod
@@ -1050,7 +1050,7 @@ class CachedWebResource(TimeStampedModel):
     """
     name = models.TextField(primary_key=True)
     description = models.TextField(blank=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
     @staticmethod
     def named_handler_factory(name, celery_task_class):

@@ -855,7 +855,7 @@ class GeneList(models.Model):
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     error_message = models.TextField(null=True, blank=True)
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)

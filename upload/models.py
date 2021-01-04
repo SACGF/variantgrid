@@ -52,7 +52,7 @@ class UploadedFile(TimeStampedModel):
                                      max_length=256, null=True)
     md5_hash = models.CharField(max_length=32, null=True)
     file_type = models.CharField(max_length=1, choices=UploadedFileTypes.CHOICES, null=True)
-    import_source = models.CharField(max_length=1, choices=ImportSource.CHOICES)
+    import_source = models.CharField(max_length=1, choices=ImportSource.choices)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
     visible = models.BooleanField(default=True)  # Set False to hide on upload page
@@ -94,7 +94,7 @@ class PipelineFailedJobTerminateEarlyException(Exception):
 
 class UploadPipeline(models.Model):
     INITIAL_PROGRESS_STATUS = "Processing"
-    status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES, default=ProcessingStatus.CREATED)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
     items_processed = BigIntegerField(null=True)
     processing_seconds_wall_time = models.IntegerField(null=True)
@@ -262,7 +262,7 @@ class UploadStep(models.Model):
     upload_pipeline = models.ForeignKey(UploadPipeline, on_delete=CASCADE)
     parent_upload_step = models.ForeignKey('self', null=True, related_name='substep_set', on_delete=CASCADE)
     sort_order = models.IntegerField()
-    status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES, default=ProcessingStatus.CREATED)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     # origin is used to indicate whether a step was from a import task factory where it will
     # be re-generated upon retry-import, or manually created (will be left alone and re-executed)
     origin = models.CharField(max_length=1, choices=UploadStepOrigin.CHOICES, default=UploadStepOrigin.IMPORT_TASK_FACTORY)
@@ -623,7 +623,7 @@ class UploadedGeneList(models.Model):
 class UploadedExpressionFile(models.Model):
     uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
     format = models.CharField(max_length=1, choices=ExpressionType.CHOICES)
-    annotation_level = models.CharField(max_length=1, choices=AnnotationLevel.CHOICES)
+    annotation_level = models.CharField(max_length=1, choices=AnnotationLevel.choices)
     cuff_diff_file = models.OneToOneField(CuffDiffFile, null=True, on_delete=CASCADE)
 
     def get_data(self):

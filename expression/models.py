@@ -13,8 +13,8 @@ from snpdb.models.models_enums import AnnotationLevel
 class CuffDiffFile(GuardianPermissionsAutoInitialSaveMixin, models.Model):
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField(null=False)
-    annotation_level = models.CharField(max_length=1, choices=AnnotationLevel.CHOICES)  # Gene or transcript
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    annotation_level = models.CharField(max_length=1, choices=AnnotationLevel.choices)  # Gene or transcript
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     sample_1 = models.TextField(null=False)
     sample_2 = models.TextField(null=False)
     imported_records = models.IntegerField(null=True)

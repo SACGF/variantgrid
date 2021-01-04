@@ -3,93 +3,55 @@ from enum import Enum
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 
+from library.utils import Constant
 
-class ImportSource:
+
+class ImportSource(models.TextChoices):
     """ Keeps track of where uploaded files came from """
 
-    API = 'A'
-    COMMAND_LINE = 'C'
-    SEQAUTO = 'S'
-    WEB = 'W'
-    WEB_UPLOAD = 'U'  # files put in settings.PRIVATE_DATA_ROOT
-    CHOICES = (
-        (API, 'API'),
-        (COMMAND_LINE, 'Command Line'),
-        (SEQAUTO, 'SeqAuto'),
-        (WEB, 'Web'),
-        (WEB_UPLOAD, 'Web Upload'),
-    )
+    API = 'A', 'API'
+    COMMAND_LINE = 'C', 'Command Line'
+    SEQAUTO = 'S', 'SeqAuto'
+    WEB = 'W', 'Web'
+    WEB_UPLOAD = 'U', 'Web Upload'  # files put in settings.PRIVATE_DATA_ROOT
 
 
-class ImportStatus:
-    CREATED = 'C'
-    IMPORTING = 'I'
-    REQUIRES_USER_INPUT = 'R'
-    ERROR = 'E'
-    SUCCESS = 'S'
-    MARKED_FOR_DELETION = 'M'
-    DELETING = 'D'
+class ImportStatus(models.TextChoices):
+    CREATED = 'C', 'created'
+    IMPORTING = 'I', 'importing'
+    REQUIRES_USER_INPUT = 'R', 'Requires user input'
+    ERROR = 'E', 'error'
+    SUCCESS = 'S', 'success'
+    MARKED_FOR_DELETION = 'M', "Marked For Deletion"
+    DELETING = 'D', 'Deleting'
 
-    CHOICES = (
-        (CREATED, 'created'),
-        (IMPORTING, 'importing'),
-        (REQUIRES_USER_INPUT, 'Requires user input'),
-        (ERROR, 'error'),
-        (SUCCESS, 'success'),
-        (MARKED_FOR_DELETION, "Marked For Deletion"),
-        (DELETING, 'Deleting'),
-    )
-    DELETION_STATES = [MARKED_FOR_DELETION, DELETING]
+    DELETION_STATES = Constant([e[0] for e in (MARKED_FOR_DELETION, DELETING)])
 
 
-class ProcessingStatus:
-    CREATED = 'C'
-    PROCESSING = 'P'
-    ERROR = 'E'
-    SUCCESS = 'S'
-    SKIPPED = 'K'
-    TERMINATED_EARLY = 'T'
-    TIMED_OUT = 'Z'
-    CHOICES = (
-        (CREATED, 'Created'),
-        (PROCESSING, 'Processing'),
-        (ERROR, 'Error'),
-        (SUCCESS, 'Success'),
-        (SKIPPED, 'Skipped'),
-        (TERMINATED_EARLY, 'Terminated Early'),
-        (TIMED_OUT, 'Timed Out')
-    )
+class ProcessingStatus(models.TextChoices):
+    CREATED = 'C', 'Created'
+    PROCESSING = 'P', 'Processing'
+    ERROR = 'E', 'Error'
+    SUCCESS = 'S', 'Success'
+    SKIPPED = 'K', 'Skipped'
+    TERMINATED_EARLY = 'T', 'Terminated Early'
+    TIMED_OUT = 'Z', 'Timed Out'
 
-    FINISHED_STATES = [
-        ERROR, SUCCESS, SKIPPED, TERMINATED_EARLY, TIMED_OUT
-    ]
+    FINISHED_STATES = Constant([e[0] for e in (ERROR, SUCCESS, SKIPPED, TERMINATED_EARLY, TIMED_OUT)])
 
 
-class AnnotationLevel:
-    TRANSCRIPT = 'T'
-    GENE = 'G'
-    CHOICES = (
-        (TRANSCRIPT, 'Transcript'),
-        (GENE, 'Gene Symbol')
-    )
+class AnnotationLevel(models.TextChoices):
+    TRANSCRIPT = 'T', 'Transcript'
+    GENE = 'G', 'Gene Symbol'
 
 
-class ColumnAnnotationLevel:
-    CLINVAR_LEVEL = 'C'
-    DATABASE_LEVEL = 'D'
-    GENE_LEVEL = 'G'
-    SAMPLE_LEVEL = 'S'
-    TRANSCRIPT_LEVEL = 'T'
-    VARIANT_LEVEL = 'V'
-
-    CHOICES = [
-        (CLINVAR_LEVEL, 'ClinVar'),
-        (DATABASE_LEVEL, 'Database'),
-        (GENE_LEVEL, 'Gene'),
-        (SAMPLE_LEVEL, 'Sample'),
-        (TRANSCRIPT_LEVEL, 'Transcript'),
-        (VARIANT_LEVEL, 'Variant'),
-    ]
+class ColumnAnnotationLevel(models.TextChoices):
+    CLINVAR_LEVEL = 'C', 'ClinVar'
+    DATABASE_LEVEL = 'D', 'Database'
+    GENE_LEVEL = 'G', 'Gene'
+    SAMPLE_LEVEL = 'S', 'Sample'
+    TRANSCRIPT_LEVEL = 'T', 'Transcript'
+    VARIANT_LEVEL = 'V', 'Variant'
 
 
 class BuiltInFilters:
@@ -120,95 +82,34 @@ class BuiltInFilters:
     DEFAULT_NODE_COUNT_FILTERS = [TOTAL, IMPACT_HIGH_OR_MODERATE, CLINVAR]
 
 
-class VariantsType:
-    UNKNOWN = 'U'
-    GERMLINE = 'G'
-    MIXED = 'M'
-    SOMATIC_ONLY = 'S'  # Eg Tumor/Normal subtraction
+class VariantsType(models.TextChoices):
+    UNKNOWN = 'U', 'Unknown'
+    GERMLINE = 'G', 'Germline'
+    MIXED = 'M', "Mixed (Single Sample)"
+    SOMATIC_ONLY = 'S', "Somatic only (Tumor minus normal)"
 
-    CHOICES = (
-        (UNKNOWN, 'Unknown'),
-        (GERMLINE, 'Germline'),
-        (MIXED, "Mixed (Single Sample)"),
-        (SOMATIC_ONLY, "Somatic only (Tumor minus normal)"),
-    )
-
-    SOMATIC_TYPES = [MIXED, SOMATIC_ONLY]
+    SOMATIC_TYPES = Constant([e[0] for e in (MIXED, SOMATIC_ONLY)])
 
 
-class SequenceRole:
-    ASSEMBLED_MOLECULE = 'AM'
-    UNLOCALIZED_SCAFFOLD = 'ULS'
-    UNPLACED_SCAFFOLD = 'UPS'
-    ALT_SCAFFOLD = 'ALT'
-    FIX_PATCH = 'FP'
-    NOVEL_PATCH = 'NP'
-
-    CHOICES = (
-        (ASSEMBLED_MOLECULE, "assembled-molecule"),
-        (UNLOCALIZED_SCAFFOLD, "unlocalized-scaffold"),
-        (UNPLACED_SCAFFOLD, "unplaced-scaffold"),
-        (ALT_SCAFFOLD, "alt-scaffold"),
-        (FIX_PATCH, "fix-patch"),
-        (NOVEL_PATCH, "novel-patch"),
-    )
+class SequenceRole(models.TextChoices):
+    ASSEMBLED_MOLECULE = 'AM', "assembled-molecule"
+    UNLOCALIZED_SCAFFOLD = 'ULS', "unlocalized-scaffold"
+    UNPLACED_SCAFFOLD = 'UPS', "unplaced-scaffold"
+    ALT_SCAFFOLD = 'ALT', "alt-scaffold"
+    FIX_PATCH = 'FP', "fix-patch"
+    NOVEL_PATCH = 'NP', "novel-patch"
 
 
-class AssemblyMoleculeType:
-    CHROMOSOME = 'C'
-    MITOCHONDRION = 'M'
-
-    CHOICES = (
-        (CHROMOSOME, "Chromosome"),
-        (MITOCHONDRION, "Mitochondrion"),
-    )
+class AssemblyMoleculeType(models.TextChoices):
+    CHROMOSOME = 'C', "Chromosome"
+    MITOCHONDRION = 'M', "Mitochondrion"
 
 
-class ClinGenAlleleRegistryErrorType:
-    # @see http://reg.clinicalgenome.org/doc/AlleleRegistry_1.01.xx_api_v1.pdf
-    NOT_FOUND = "F"
-    AUTHORIZATION_ERROR = "U"
-    INCORRECT_REQUEST = "Q"
-    HGVS_PARSING_ERROR = "H"
-    INCORRECT_HGVS_POSITION = "P"
-    INCORRECT_REFERENCE_ALLELE = "I"
-    NO_CONSISTENT_ALIGNMENT = "N"
-    UNKNOWN_CDS = "C"
-    UNKNOWN_GENE = "G"
-    UNKNOWN_REFERENCE_SEQUENCE = "R"
-    VCF_PARSING_ERROR = "V"
-    REQUEST_TOO_LARGE = "L"
-    INTERNAL_SERVER_ERROR = "E"
-
-    CHOICES = (
-        (NOT_FOUND, "NotFound"),
-        (AUTHORIZATION_ERROR, "AuthorizationError"),
-        (INCORRECT_REQUEST, "IncorrectRequest"),
-        (HGVS_PARSING_ERROR, "HgvsParsingError"),
-        (INCORRECT_HGVS_POSITION, "IncorrectHgvsPosition"),
-        (INCORRECT_REFERENCE_ALLELE, "IncorrectReferenceAllele"),
-        (NO_CONSISTENT_ALIGNMENT, "NoConsistentAlignment"),
-        (UNKNOWN_CDS, "UnknownCDS"),
-        (UNKNOWN_GENE, "UnknownGene"),
-        (UNKNOWN_REFERENCE_SEQUENCE, "UnknownReferenceSequence"),
-        (VCF_PARSING_ERROR, "VcfParsingError"),
-        (REQUEST_TOO_LARGE, "RequestTooLarge"),
-        (INTERNAL_SERVER_ERROR, "InternalServerError")
-    )
-
-
-class AlleleOrigin:
-    IMPORTED_TO_DATABASE = 'D'
-    IMPORTED_NORMALIZED = 'N'
-    LIFTOVER = 'L'
-    LIFTOVER_NORMALIZED = 'M'  # This probably shouldn't happen!
-
-    CHOICES = (
-        (IMPORTED_TO_DATABASE, 'Imported as this build'),
-        (IMPORTED_NORMALIZED, 'Imported (normalized)'),
-        (LIFTOVER, 'Liftover'),
-        (LIFTOVER_NORMALIZED, 'Liftover (normalized)'),
-    )
+class AlleleOrigin(models.TextChoices):
+    IMPORTED_TO_DATABASE = 'D', 'Imported as this build'
+    IMPORTED_NORMALIZED = 'N', 'Imported (normalized)'
+    LIFTOVER = 'L', 'Liftover'
+    LIFTOVER_NORMALIZED = 'M', 'Liftover (normalized)'  # This probably shouldn't happen!
 
     @staticmethod
     def variant_origin(variant):
@@ -223,16 +124,10 @@ class AlleleOrigin:
         return origin
 
 
-class AlleleConversionTool:
-    CLINGEN_ALLELE_REGISTRY = 'CA'
-    DBSNP = 'DB'
-    NCBI_REMAP = 'NR'
-
-    CHOICES = (
-        (CLINGEN_ALLELE_REGISTRY, "ClinGen Allele Registry"),
-        (DBSNP, "dbSNP API"),
-        (NCBI_REMAP, "NCBI Remap")
-    )
+class AlleleConversionTool(models.TextChoices):
+    CLINGEN_ALLELE_REGISTRY = 'CA', "ClinGen Allele Registry"
+    DBSNP = 'DB', "dbSNP API"
+    NCBI_REMAP = 'NR', "NCBI Remap"
 
     @classmethod
     def vcf_tuples_in_destination_build(cls, conversion_tool):
@@ -249,19 +144,12 @@ class ClinGenAlleleExternalRecordType(Enum):
 
 
 # Integer, Float, Flag, Character, and String.
-class VCFInfoTypes:
-    INTEGER = 'I'
-    FLOAT = 'F'
-    FLAG = 'B'  # Boolean
-    CHARACTER = 'C'
-    STRING = 'S'
-    CHOICES = [
-        (INTEGER, 'Integer'),
-        (FLOAT, 'Float'),
-        (FLAG, 'Flag'),
-        (CHARACTER, 'Character'),
-        (STRING, 'String'),
-    ]
+class VCFInfoTypes(models.TextChoices):
+    INTEGER = 'I', 'Integer'
+    FLOAT = 'F', 'Float'
+    FLAG = 'B', 'Flag'  # B for Boolean
+    CHARACTER = 'C', 'Character'
+    STRING = 'S', 'String'
 
 
 class SuperPopulationCode(models.TextChoices):

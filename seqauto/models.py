@@ -1288,7 +1288,7 @@ class GoldReference(models.Model):
     """ Represents stats collected against a set of gold sequencing runs """
     enrichment_kit = models.OneToOneField(EnrichmentKit, on_delete=CASCADE)
     created = models.DateTimeField(auto_now_add=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     error_exception = models.TextField(null=True)
 
     def __str__(self):

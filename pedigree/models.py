@@ -16,7 +16,7 @@ class PedFile(GuardianPermissionsMixin, models.Model):
     """ See http://www.helsinki.fi/~tsjuntun/autogscan/pedigreefile.html """
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
     def __str__(self):
         name = f"({self.pk}) {self.name}"

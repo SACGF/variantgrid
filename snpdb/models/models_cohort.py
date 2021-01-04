@@ -43,7 +43,7 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         Data is stored in CohortGenotype rows, which are partitioned by CohortGenotypeCollection """
     name = models.TextField()
     version = models.IntegerField(null=False, default=0)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     vcf = models.OneToOneField(VCF, null=True, on_delete=CASCADE)
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort

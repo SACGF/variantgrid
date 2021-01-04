@@ -205,7 +205,7 @@ class AlleleMergeLog(TimeStampedModel):
     """ Keep track of calls to Allele.merge() """
     old_allele = models.ForeignKey(Allele, related_name="old_allele_merge", on_delete=CASCADE)
     new_allele = models.ForeignKey(Allele, related_name="new_allele_merge", on_delete=CASCADE)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.CHOICES)
+    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     success = models.BooleanField(default=True)
     message = models.TextField(null=True)
 
@@ -458,8 +458,8 @@ class VariantAllele(TimeStampedModel):
     variant = models.OneToOneField(Variant, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
-    origin = models.CharField(max_length=1, choices=AlleleOrigin.CHOICES)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.CHOICES)
+    origin = models.CharField(max_length=1, choices=AlleleOrigin.choices)
+    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     error = models.JSONField(null=True)  # Only set on error
 
     def needs_clinvar_call(self):
@@ -477,7 +477,7 @@ class VariantCollection(RelatedModelsPartitionModel):
     PARTITION_LABEL_TEXT = "variant_collection"
     name = models.TextField(null=True)
     count = models.IntegerField(null=True)
-    status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES, default=ProcessingStatus.CREATED)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
 
     @property
     def variant_collection_alias(self):
@@ -526,7 +526,7 @@ class Liftover(TimeStampedModel):
         The VCF (in genome_build build) is set in UploadedFile for the UploadPipeline """
     user = models.ForeignKey(User, on_delete=CASCADE)
     allele_source = models.ForeignKey(AlleleSource, on_delete=CASCADE)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.CHOICES)
+    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     source_vcf = models.TextField(null=True)
     source_genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE,
                                             related_name="liftover_source_genome_build")

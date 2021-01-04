@@ -19,7 +19,7 @@ from patients.models_enums import Sex
 
 
 class AbstractSomalierModel(TimeStampedModel):
-    status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES, default=ProcessingStatus.CREATED)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     error_exception = models.TextField(null=True, blank=True)
 
     class Meta:
