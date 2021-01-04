@@ -249,8 +249,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     user = models.ForeignKey(User, on_delete=PROTECT)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=False, default=ShareLevel.LAB.key)
-    annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=SET_NULL)  # Null means OUTSIDE of VariantGrid
-    clinical_context = models.ForeignKey('ClinicalContext', null=True, on_delete=SET_NULL)
+    annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True, on_delete=SET_NULL)  # Null means OUTSIDE of VariantGrid
+    clinical_context = models.ForeignKey('ClinicalContext', null=True, blank=True, on_delete=SET_NULL)
     lab_record_id = models.TextField(blank=True, null=True)
     evidence = models.JSONField(null=False, blank=True, default=empty_dict)
     withdrawn = models.BooleanField(default=False)
