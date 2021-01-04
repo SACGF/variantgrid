@@ -18,7 +18,9 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
     shariant = OAuthConnector.shariant_oauth_connector()
 
     required_build = config.get('genome_build', 'GRCh37')
-    params = {'share_level': 'public', 'type': 'json', 'build': required_build}
+    params = {'share_level': 'public',
+              'type': 'json',
+              'build': required_build}
 
     exclude_labs = config.get('exclude_labs', None)
     if exclude_labs:
@@ -59,6 +61,11 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         lab_group_name = meta.get('lab_id')
 
         lab = Lab.objects.filter(group_name=lab_group_name).first()
+
+        # in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
+        if lab and not lab.external:
+            return None
+
         if not lab:
             parts = lab_group_name.split('/')
             org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
@@ -70,10 +77,6 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                 country='Australia',
                 external=True,
             )
-
-        #in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
-        if lab.external:
-            return None
 
         record = {
             "id": record.get('id'),
@@ -97,7 +100,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
 
         def records():
             nonlocal skipped
-            for record in ijson.items(response.raw, 'records.item'):
+            for record in ijson.items(response.content, 'records.item'):
                 make_json_safe_in_place(record)
                 mapped = shariant_download_to_upload(evidence_keys, record)
                 if mapped:

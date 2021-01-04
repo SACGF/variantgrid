@@ -25,6 +25,7 @@ def insert_nones(data: Dict) -> Dict:
             data[key] = None
     return data
 
+
 def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
     config = sync_destination.config
     shariant = OAuthConnector.shariant_oauth_connector()

@@ -18,13 +18,13 @@ def make_code_friendly(text: str) -> str:
 
 class LabAdmin(admin.ModelAdmin):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'classification_config')
+    list_display = ('name', 'group_name', 'organization', 'external', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
-        ('Submissions', {'fields': ('classification_config', 'upload_location',)})
+        ('Submissions', {'fields': ('classification_config', 'upload_location', 'external')})
     )
 
     def get_form(self, request, obj=None, **kwargs):
