@@ -46,7 +46,7 @@ class VariantTranscriptSelections:
         self.transcript_data.sort(key=operator.itemgetter(*sort_order), reverse=True)
 
     def get_annotation_consortium_display(self):
-        return dict(AnnotationConsortium.CHOICES).get(self.annotation_consortium)
+        return dict(AnnotationConsortium.choices).get(self.annotation_consortium)
 
     @lazy
     def variant_transcript_annotations_dict(self):
@@ -204,7 +204,7 @@ class VariantTranscriptSelections:
                 has_other_annotation_consortium_transcripts = True
 
         if has_other_annotation_consortium_transcripts:
-            ac_dict = dict(AnnotationConsortium.CHOICES)
+            ac_dict = dict(AnnotationConsortium.choices)
             self.other_annotation_consortium_transcripts_warning = f"""
 This system only annotates {ac_dict[self.annotation_consortium]} transcripts. You may select
 {ac_dict[other_annotation_consortium]} transcripts, but they will not be auto-populated with transcript annotation"""

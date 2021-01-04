@@ -1,34 +1,19 @@
-class AnnotationConsortium:
-    REFSEQ = "R"
-    ENSEMBL = 'E'
-
-    CHOICES = (
-        (REFSEQ, "RefSeq"),
-        (ENSEMBL, "Ensembl"),
-    )
+from django.db import models
 
 
-class HGNCStatus:
-    APPROVED = 'A'
-    SYMBOL_WITHDRAWN = 'S'
-    ENTRY_WITHDRAWN = 'E'
-
-    CHOICES = (
-        (APPROVED, 'Approved'),
-        (SYMBOL_WITHDRAWN, 'Symbol Withdrawn'),
-        (ENTRY_WITHDRAWN, 'Entry Withdrawn'),
-    )
+class AnnotationConsortium(models.TextChoices):
+    REFSEQ = "R", "RefSeq"
+    ENSEMBL = "E", "Ensembl"
 
 
-class GeneSymbolAliasSource:
-    NCBI = 'N'
-    UCSC = "U"
-    HGNC = 'H'
-    MANUAL = 'M'
+class HGNCStatus(models.TextChoices):
+    APPROVED = 'A', 'Approved'
+    SYMBOL_WITHDRAWN = 'S', 'Symbol Withdrawn'
+    ENTRY_WITHDRAWN = 'E', 'Entry Withdrawn'
 
-    CHOICES = (
-        (NCBI, 'NCBI'),
-        (UCSC, 'UCSC'),
-        (HGNC, 'HGNC'),
-        (MANUAL, 'Manual'),
-    )
+
+class GeneSymbolAliasSource(models.TextChoices):
+    NCBI = "N", 'NCBI'
+    UCSC = "U", 'UCSC'
+    HGNC = "H", 'HGNC'
+    MANUAL = "M", 'Manual'

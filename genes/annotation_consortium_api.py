@@ -8,7 +8,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 def transcript_exists(genome_build: GenomeBuild, identifier, version) -> Tuple[str, bool]:
-    ac_labels = dict(AnnotationConsortium.CHOICES)
+    ac_labels = dict(AnnotationConsortium.choices)
     if identifier.startswith("ENST"):
         return ac_labels[AnnotationConsortium.ENSEMBL], ensembl_transcript_exists(genome_build, identifier, version)
     return ac_labels[AnnotationConsortium.REFSEQ], refseq_transcript_exists(identifier, version)

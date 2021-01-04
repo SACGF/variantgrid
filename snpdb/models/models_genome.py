@@ -161,7 +161,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     @property
     def annotation_consortium(self):
-        consortia_dict = invert_dict(dict(AnnotationConsortium.CHOICES))
+        consortia_dict = invert_dict(dict(AnnotationConsortium.choices))
         try:
             ac_str = self.settings["annotation_consortium"]
             return consortia_dict[ac_str]
@@ -276,7 +276,7 @@ class GenomeFasta(models.Model):
     index_filename = models.TextField()
     index_md5sum = models.TextField()
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
     class ContigNotInFastaError(ValueError):
         pass

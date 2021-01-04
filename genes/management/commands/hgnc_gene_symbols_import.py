@@ -23,7 +23,7 @@ REFSEQ_IDS = "RefSeq IDs"
 
 
 def insert_hgnc_data(hgnc_import, df):
-    hgnc_status_lookup = invert_dict(dict(HGNCStatus.CHOICES))
+    hgnc_status_lookup = invert_dict(dict(HGNCStatus.choices))
     hgnc_gene_names = []
     gene_symbols = []
     gene_symbol_aliases = []

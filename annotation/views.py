@@ -103,7 +103,7 @@ def _get_build_annotation_details(build_contigs, genome_build):
             genes_and_transcripts = _get_gene_and_transcript_stats(genome_build, genome_build.annotation_consortium)
             annotation_details["genes_and_transcripts"] = genes_and_transcripts
 
-            annotation_consortia = dict(AnnotationConsortium.CHOICES)
+            annotation_consortia = dict(AnnotationConsortium.choices)
             other_consortia = set(annotation_consortia.keys()) - {genome_build.annotation_consortium}
             other_gene_annotation = {}
             for other_ac in other_consortia:
@@ -167,7 +167,7 @@ def annotation(request):
 
     gene_symbol_alias_counts = get_field_counts(GeneSymbolAlias.objects.all(), "source")
     if gene_symbol_alias_counts:
-        source_display = dict(GeneSymbolAliasSource.CHOICES)
+        source_display = dict(GeneSymbolAliasSource.choices)
         gene_symbol_alias_counts = {source_display[k]: v for k, v in gene_symbol_alias_counts.items()}
 
     mim_counts = MIMMorbid.objects.all().count()
