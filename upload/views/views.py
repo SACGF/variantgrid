@@ -52,7 +52,7 @@ def uploadedfile_dict(uploaded_file):
     except:
         size = None
 
-    file_type_dict = dict(UploadedFileTypes.CHOICES)
+    file_type_dict = dict(UploadedFileTypes.choices)
     file_type = file_type_dict.get(uploaded_file.file_type)
     data_url, upload_data = get_url_and_data_for_uploaded_file_data(uploaded_file)
     time_since = timesince(uploaded_file.created)

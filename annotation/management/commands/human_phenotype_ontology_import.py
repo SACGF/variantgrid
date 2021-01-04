@@ -103,7 +103,7 @@ def create_hpo_synonyms(ot):
     start = time.time()
 
     scope_dict = {}
-    for k, v in HPOSynonymScope.CHOICES:
+    for k, v in HPOSynonymScope.choices:
         scope_dict[v.upper()] = k
 
     hpo_synonyms = []

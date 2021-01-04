@@ -9,7 +9,7 @@ import operator
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models.models import HumanProteinAtlasTissueSample, \
     HumanProteinAtlasAnnotation
-from annotation.models.models_enums import HumanProteinAtlasAbundance
+from annotation.models.models_enums import HumanProteinAtlasAbundance, DetectedHumanProteinAtlasAbundance
 from genes.models import Gene
 
 
@@ -18,7 +18,7 @@ class TissueNode(AnalysisNode):
     UNIPROTKB = 1
 
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, null=True, blank=True, on_delete=SET_NULL)
-    min_abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.DETECTED_CHOICES, default=HumanProteinAtlasAbundance.LOW)
+    min_abundance = models.CharField(max_length=1, choices=DetectedHumanProteinAtlasAbundance.choices, default=DetectedHumanProteinAtlasAbundance.LOW)
     text_tissue = models.TextField(null=True, blank=True)
     accordion_panel = models.IntegerField(default=0)
     disabled = True  # Needs to be made per-genome build see Issue #9

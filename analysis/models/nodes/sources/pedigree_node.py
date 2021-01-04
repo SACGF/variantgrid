@@ -11,7 +11,7 @@ from pedigree.models import Pedigree, PedigreeInheritance, CohortSamplePedFileRe
 
 class PedigreeNode(AbstractCohortBasedNode):
     pedigree = models.ForeignKey(Pedigree, null=True, on_delete=SET_NULL)
-    inheritance_model = models.CharField(max_length=2, choices=PedigreeInheritance.CHOICES)
+    inheritance_model = models.CharField(max_length=2, choices=PedigreeInheritance.choices)
     require_zygosity = models.BooleanField(default=True)
     min_inputs = 0
     max_inputs = 0

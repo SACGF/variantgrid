@@ -123,7 +123,7 @@ def view_seqauto_run(request, seqauto_run_id):
     file_type_counts = qs.values("file_type").annotate(file_type_count=Count("file_type"))
     pbs_script_counts = []
 
-    sft_dict = dict(SequencingFileType.CHOICES)
+    sft_dict = dict(SequencingFileType.choices)
 
     for file_type, file_type_count in file_type_counts.values_list("file_type", "file_type_count"):
         file_type_name = sft_dict[file_type]
@@ -509,14 +509,13 @@ def qc_column_historical_graph(request, qc_column_id, graph_type, enrichment_kit
         raise ValueError(msg)
     graph_class_name = full_class_name(graph_class)
 
-    enrichment_kit_separation_dict = dict(QCGraphEnrichmentKitSeparationChoices.CHOICES)
+    enrichment_kit_separation_dict = dict(QCGraphEnrichmentKitSeparationChoices.choices)
     if enrichment_kit_separation not in enrichment_kit_separation_dict:
         valid_separation = ','.join(enrichment_kit_separation_dict.keys())
         msg = f"QCColumn enrichment_kit_separation '{enrichment_kit_separation}' Unknown (should be '{valid_separation}')"
         raise ValueError(msg)
 
-    show_enrichment_kit = QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT.get(enrichment_kit_separation, False)
-    if not show_enrichment_kit:
+    if not enrichment_kit_separation.show_enrichment_kit():
         enrichment_kit_id = None
 
     use_percent = json.loads(use_percent)  # Boolean
@@ -525,7 +524,7 @@ def qc_column_historical_graph(request, qc_column_id, graph_type, enrichment_kit
 
 
 def sequencing_run_qc_graph(request, sequencing_run_id, qc_compare_type):
-    qc_compare_types_dict = dict(QCCompareType.CHOICES)
+    qc_compare_types_dict = dict(QCCompareType.choices)
     if qc_compare_type not in qc_compare_types_dict:
         msg = f"Unknown QCCompareType '{qc_compare_type}'"
         raise ValueError(msg)
@@ -536,7 +535,7 @@ def sequencing_run_qc_graph(request, sequencing_run_id, qc_compare_type):
 
 
 def sequencing_run_qc_json_graph(request, sequencing_run_id, qc_compare_type):
-    qc_compare_types_dict = dict(QCCompareType.CHOICES)
+    qc_compare_types_dict = dict(QCCompareType.choices)
     if qc_compare_type not in qc_compare_types_dict:
         msg = f"Unknown QCCompareType '{qc_compare_type}'"
         raise ValueError(msg)
@@ -567,7 +566,7 @@ def qc_exec_summary_graph(request, qc_exec_summary_id, qc_compare_type):
 
 
 def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
-    qc_compare_types_dict = dict(QCCompareType.CHOICES)
+    qc_compare_types_dict = dict(QCCompareType.choices)
     if qc_compare_type not in qc_compare_types_dict:
         msg = f"Unknown QCCompareType '{qc_compare_type}'"
         raise ValueError(msg)

@@ -59,7 +59,7 @@ class Command(BaseCommand):
         else:
             max_previously_existing_citation_id = 0
 
-        citation_sources = invert_dict(dict(CitationSource.CHOICES))
+        citation_sources = invert_dict(dict(CitationSource.choices))
         new_citations_by_key = {}
         for _, row in df.iterrows():
             #print("row: %s" % row)

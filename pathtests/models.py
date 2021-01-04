@@ -145,7 +145,7 @@ class ActivePathologyTestVersion(models.Model):
 
 class PathologyTestGeneModificationRequest(TimeStampedModel):
     pathology_test_version = models.ForeignKey(PathologyTestVersion, on_delete=CASCADE)
-    outcome = models.CharField(max_length=1, choices=PathologyTestGeneModificationOutcome.CHOICES, default=PathologyTestGeneModificationOutcome.PENDING)
+    outcome = models.CharField(max_length=1, choices=PathologyTestGeneModificationOutcome.choices, default=PathologyTestGeneModificationOutcome.PENDING)
     operation = models.CharField(max_length=1, choices=ModificationOperation.CHOICES)
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=CASCADE)
@@ -172,9 +172,9 @@ class Case(ExternallyManagedModel):
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
     report_date = models.DateTimeField(null=True, blank=True)
     details = models.TextField(blank=True)
-    status = models.CharField(max_length=1, choices=CaseState.CHOICES, default=CaseState.OPEN)
-    workflow_status = models.CharField(max_length=2, choices=CaseWorkflowStatus.CHOICES, default=CaseWorkflowStatus.NA)
-    investigation_type = models.CharField(max_length=1, choices=InvestigationType.CHOICES, default=InvestigationType.SINGLE_SAMPLE)
+    status = models.CharField(max_length=1, choices=CaseState.choices, default=CaseState.OPEN)
+    workflow_status = models.CharField(max_length=2, choices=CaseWorkflowStatus.choices, default=CaseWorkflowStatus.NA)
+    investigation_type = models.CharField(max_length=1, choices=InvestigationType.choices, default=InvestigationType.SINGLE_SAMPLE)
 
     def get_absolute_url(self):
         return reverse("view_case", kwargs={"pk": self.pk})

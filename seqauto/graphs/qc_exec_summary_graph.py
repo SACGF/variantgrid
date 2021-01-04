@@ -28,7 +28,7 @@ class QCExecSummaryGraph(CacheableGraph):
         self.sequencing_run = self.qc_exec_summary.sequencing_run
         self.qc_compare_type = qc_compare_type
         self.bp_color = QCExecSummaryGraph.BOXPLOT_COLORS.get(self.qc_compare_type, QCExecSummaryGraph.DEFAULT_BOXPLOT_COLOR)
-        qc_types_dict = dict(QCCompareType.CHOICES)
+        qc_types_dict = dict(QCCompareType.choices)
         self.type_name = qc_types_dict[qc_compare_type]
 
     def get_params_hash(self):

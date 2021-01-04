@@ -51,7 +51,7 @@ class UploadedFile(TimeStampedModel):
     uploaded_file = models.FileField(storage=PrivateUploadStorage(),
                                      max_length=256, null=True)
     md5_hash = models.CharField(max_length=32, null=True)
-    file_type = models.CharField(max_length=1, choices=UploadedFileTypes.CHOICES, null=True)
+    file_type = models.CharField(max_length=1, choices=UploadedFileTypes.choices, null=True)
     import_source = models.CharField(max_length=1, choices=ImportSource.choices)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
@@ -265,7 +265,7 @@ class UploadStep(models.Model):
     status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     # origin is used to indicate whether a step was from a import task factory where it will
     # be re-generated upon retry-import, or manually created (will be left alone and re-executed)
-    origin = models.CharField(max_length=1, choices=UploadStepOrigin.CHOICES, default=UploadStepOrigin.IMPORT_TASK_FACTORY)
+    origin = models.CharField(max_length=1, choices=UploadStepOrigin.choices, default=UploadStepOrigin.IMPORT_TASK_FACTORY)
     items_to_process = models.IntegerField(null=True)
     items_processed = models.IntegerField(null=True)
     error_message = models.TextField()
@@ -274,9 +274,9 @@ class UploadStep(models.Model):
     output_filename = models.TextField()
     start_date = models.DateTimeField(null=True)
     end_date = models.DateTimeField(null=True)
-    task_type = models.CharField(max_length=1, choices=UploadStepTaskType.CHOICES)
-    pipeline_stage = models.CharField(max_length=1, choices=VCFPipelineStage.CHOICES, null=True)
-    pipeline_stage_dependency = models.CharField(max_length=1, choices=VCFPipelineStage.CHOICES, null=True)
+    task_type = models.CharField(max_length=1, choices=UploadStepTaskType.choices)
+    pipeline_stage = models.CharField(max_length=1, choices=VCFPipelineStage.choices, null=True)
+    pipeline_stage_dependency = models.CharField(max_length=1, choices=VCFPipelineStage.choices, null=True)
     script = models.TextField()
     child_script = models.TextField(null=True)
     import_variant_table = models.TextField(null=True, blank=True)
@@ -491,7 +491,7 @@ class BackendVCF(models.Model):
 
 class VCFImportInfo(models.Model):
     objects = InheritanceManager()
-    severity = models.CharField(max_length=1, choices=VCFImportInfoSeverity.CHOICES, default=VCFImportInfoSeverity.WARNING)
+    severity = models.CharField(max_length=1, choices=VCFImportInfoSeverity.choices, default=VCFImportInfoSeverity.WARNING)
     upload_step = models.ForeignKey(UploadStep, on_delete=CASCADE)
     accepted_date = models.DateTimeField(null=True)
     has_more_details = False
@@ -622,7 +622,7 @@ class UploadedGeneList(models.Model):
 
 class UploadedExpressionFile(models.Model):
     uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    format = models.CharField(max_length=1, choices=ExpressionType.CHOICES)
+    format = models.CharField(max_length=1, choices=ExpressionType.choices)
     annotation_level = models.CharField(max_length=1, choices=AnnotationLevel.choices)
     cuff_diff_file = models.OneToOneField(CuffDiffFile, null=True, on_delete=CASCADE)
 
@@ -730,7 +730,7 @@ def uploaded_clinvar_citations_post_delete_handler(sender, instance, **kwargs):
 
 class UploadSettings(models.Model):
     user = models.OneToOneField(User, on_delete=CASCADE)
-    time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.CHOICES, default=TimeFilterMethod.RECORDS)
+    time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.choices, default=TimeFilterMethod.RECORDS)
     time_filter_value = models.IntegerField(default=5)
     show_all = models.BooleanField(default=False)  # By default hide visible=False (liftover etc)
 

@@ -328,7 +328,7 @@ def view_version_diff(request, version_diff_id):
 
 
 def variant_annotation_runs(request):
-    as_display = dict(AnnotationStatus.CHOICES)
+    as_display = dict(AnnotationStatus.choices)
 
     genome_build_field_counts = {}
     genome_build_summary = {}

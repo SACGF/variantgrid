@@ -1208,7 +1208,7 @@ class CanonicalTranscript(models.Model):
 
 class GeneCoverageCollection(models.Model):
     path = models.TextField()
-    data_state = models.CharField(max_length=1, choices=DataState.CHOICES)
+    data_state = models.CharField(max_length=1, choices=DataState.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     @staticmethod

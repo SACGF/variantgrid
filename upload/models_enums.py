@@ -1,91 +1,51 @@
-class UploadedFileTypes:
-    BED = 'B'
-    CLINVAR = 'L'
-    CLINVAR_CITATIONS = 'T'
-    CUFFDIFF = 'C'
-    GENE_LIST = 'G'
-    GENE_COVERAGE = 'O'
-    LIFTOVER = 'I'
-    PATIENT_RECORDS = 'R'
-    PED = 'P'
-    VCF = 'V'
-    VCF_INSERT_VARIANTS_ONLY = 'Y'
-    VARIANT_CLASSIFICATIONS = 'S'
-
-    CHOICES = (
-        (BED, 'BED'),
-        (CLINVAR, 'Clinvar'),
-        (CLINVAR_CITATIONS, 'Clinvar Citations'),
-        (CUFFDIFF, 'CuffDiff'),
-        (GENE_LIST, 'Gene List'),
-        (GENE_COVERAGE, 'Gene Coverage'),
-        (LIFTOVER, 'Liftover'),
-        (PED, 'Pedigree'),
-        (PATIENT_RECORDS, 'Patient Records'),
-        (VCF, 'VCF'),
-        (VCF_INSERT_VARIANTS_ONLY, 'VCF - Insert variants only (no samples etc)'),
-        (VARIANT_CLASSIFICATIONS, 'Variant Classifications'),
-    )
+from django.db import models
 
 
-class UploadStepTaskType:
-    CELERY = 'C'
-    SQL = 'Q'
-    TOOL = 'T'
-    CHOICES = (
-        (CELERY, 'Celery'),
-        (SQL, 'SQL'),
-        (TOOL, 'Tool'),
-    )
+class UploadedFileTypes(models.TextChoices):
+    BED = 'B', 'BED'
+    CLINVAR = 'L', 'Clinvar'
+    CLINVAR_CITATIONS = 'T', 'Clinvar Citations'
+    CUFFDIFF = 'C', 'CuffDiff'
+    GENE_LIST = 'G', 'Gene List'
+    GENE_COVERAGE = 'O', 'Gene Coverage'
+    LIFTOVER = 'I', 'Liftover'
+    PED = 'P', 'Pedigree'
+    PATIENT_RECORDS = 'R', 'Patient Records'
+    VCF = 'V', 'VCF'
+    VCF_INSERT_VARIANTS_ONLY = 'Y', 'VCF - Insert variants only (no samples etc)'
+    VARIANT_CLASSIFICATIONS = 'S', 'Variant Classifications'
 
 
-class VCFPipelineStage:
+class UploadStepTaskType(models.TextChoices):
+    CELERY = 'C', 'Celery'
+    SQL = 'Q', 'SQL'
+    TOOL = 'T', 'Tool'
+
+
+class VCFPipelineStage(models.TextChoices):
     """ Some jobs can only run when we've moved to a certain stage of the pipeline """
 
-    INSERT_UNKNOWN_VARIANTS = 'U'
-    DATA_INSERTION = 'D'
-    ANNOTATION_COMPLETE = 'A'
-    FINISH = 'F'
-
-    CHOICES = (
-        (INSERT_UNKNOWN_VARIANTS, 'Insert Unknown Variants'),
-        (DATA_INSERTION, 'Data Insertion'),
-        (ANNOTATION_COMPLETE, 'Annotation Complete'),
-        (FINISH, 'Finish'),
-    )
+    INSERT_UNKNOWN_VARIANTS = 'U', 'Insert Unknown Variants'
+    DATA_INSERTION = 'D', 'Data Insertion'
+    ANNOTATION_COMPLETE = 'A', 'Annotation Complete'
+    FINISH = 'F', 'Finish'
 
 
-class ExpressionType:
-    CUFFDIFF = 'C'
-    EDGE_R = 'E'
-    CHOICES = (
-        (CUFFDIFF, 'CuffDiff'),
-        #(EDGE_R, 'EdgeR'),
-    )
+class ExpressionType(models.TextChoices):
+    CUFFDIFF = 'C', 'CuffDiff'
+    # EDGE_R = 'E', 'EdgeR'
 
 
-class TimeFilterMethod:
-    DAYS = 'D'
-    RECORDS = 'R'
-    CHOICES = (
-        (DAYS, "days"),
-        (RECORDS, "records"),
-    )
+class TimeFilterMethod(models.TextChoices):
+    DAYS = 'D', "days"
+    RECORDS = 'R', "records"
 
 
-class VCFImportInfoSeverity:
-    WARNING = 'W'
-    ERROR = 'E'
-
-    CHOICES = [(WARNING, 'WARNING'),
-               (ERROR, 'ERROR')]
+class VCFImportInfoSeverity(models.TextChoices):
+    WARNING = 'W', 'WARNING'
+    ERROR = 'E', 'ERROR'
 
 
-class UploadStepOrigin:
-    USER_ADDITION = 'A'
-    IMPORT_TASK_FACTORY = 'I'
-
-    CHOICES = [
-        (USER_ADDITION, "User Addition"),
-        (IMPORT_TASK_FACTORY, "Import Task Factory"),
-    ]
+class UploadStepOrigin(models.TextChoices):
+    USER_ADDITION = 'A', "User Addition"
+    IMPORT_TASK_FACTORY = 'I', "Import Task Factory"

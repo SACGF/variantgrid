@@ -39,7 +39,7 @@ from variantgrid.celery import app
 class SeqAutoRun(TimeStampedModel):
     """ Represents a scan and loading of data from backend system """
 
-    status = models.CharField(max_length=1, choices=SeqAutoRunStatus.CHOICES, default=SeqAutoRunStatus.CREATED)
+    status = models.CharField(max_length=1, choices=SeqAutoRunStatus.choices, default=SeqAutoRunStatus.CREATED)
     task_id = models.CharField(max_length=36, null=True)
     scan_start = models.DateTimeField(null=True)
     create_models_start = models.DateTimeField(null=True)
@@ -97,7 +97,7 @@ class SeqAutoRunEvent(models.Model):
     """ These are messages created by SeqAutoRun """
     seqauto_run = models.ForeignKey(SeqAutoRun, on_delete=CASCADE)
     severity = models.CharField(max_length=1, choices=LogLevel.CHOICES)
-    file_type = models.CharField(max_length=1, choices=SequencingFileType.CHOICES, null=True)
+    file_type = models.CharField(max_length=1, choices=SequencingFileType.choices, null=True)
     message = models.TextField(null=True)
 
     def __str__(self):
@@ -107,7 +107,7 @@ class SeqAutoRunEvent(models.Model):
 class SequencerModel(models.Model):
     model = models.TextField(primary_key=True)
     manufacturer = models.ForeignKey(Manufacturer, null=True, on_delete=CASCADE)
-    data_naming_convention = models.CharField(max_length=1, choices=DataGeneration.CHOICES)
+    data_naming_convention = models.CharField(max_length=1, choices=DataGeneration.choices)
 
     @property
     def css_class(self):
@@ -170,7 +170,7 @@ class EnrichmentKit(models.Model):
     """ A lab method to enrich a sample (eg Capture Panel or Amplicon etc) """
     name = models.TextField()
     version = models.IntegerField(default=1)
-    enrichment_kit_type = models.CharField(max_length=1, choices=EnrichmentKitType.CHOICES, null=True)
+    enrichment_kit_type = models.CharField(max_length=1, choices=EnrichmentKitType.choices, null=True)
     manufacturer = models.ForeignKey(Manufacturer, null=True, on_delete=CASCADE)
     bed_file = models.TextField(null=True, blank=True)  # Original manifest bed
     genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
@@ -347,7 +347,7 @@ class SequencingRun(models.Model):
     hidden = models.BooleanField(default=False)
     experiment = models.ForeignKey(Experiment, null=True, on_delete=SET_NULL)
     enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)  # Sequencing Run can be all one enrichment_kit, or SequencingSample can have own enrichment_kits
-    data_state = models.CharField(max_length=1, choices=DataState.CHOICES)  # This is for the SequencingRun directory
+    data_state = models.CharField(max_length=1, choices=DataState.choices)  # This is for the SequencingRun directory
     has_basecalls = models.BooleanField(default=False)
     has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
@@ -446,7 +446,7 @@ class SeqAutoFile(models.Model):
     path = models.TextField()
     # last modified - Stores stat st_mtime - time of last modification - only used for classes that can reload
     file_last_modified = models.FloatField(default=0.0)
-    data_state = models.CharField(max_length=1, choices=DataState.CHOICES)
+    data_state = models.CharField(max_length=1, choices=DataState.choices)
     error_exception = models.TextField(null=True)
     #hash = models.TextField() ???
 
@@ -639,7 +639,7 @@ class IlluminaFlowcellQC(SeqAutoFile, SampleSheetPropertiesMixin):
 class ReadQ30(models.Model):
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, on_delete=CASCADE)
     sequencer_read_id = models.IntegerField()  # Eg HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
-    read = models.CharField(max_length=2, choices=SequencerRead.CHOICES)
+    read = models.CharField(max_length=2, choices=SequencerRead.choices)
     percent = models.FloatField()
     is_index = models.BooleanField(default=False)
 
@@ -659,7 +659,7 @@ class IlluminaIndexQC(models.Model):
 class Fastq(SeqAutoFile, SequencingSamplePropertiesMixin):
     sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
     name = models.TextField()  # from path
-    read = models.CharField(max_length=2, choices=PairedEnd.CHOICES)
+    read = models.CharField(max_length=2, choices=PairedEnd.choices)
 
     def get_common_pair_name_and_read(self):
         name = os.path.basename(self.path)
@@ -1380,7 +1380,7 @@ class JobScript(models.Model):
     seqauto_run = models.ForeignKey(SeqAutoRun, on_delete=CASCADE)
     path = models.TextField()  # script
     out_file = models.TextField(null=True)
-    file_type = models.CharField(max_length=1, choices=SequencingFileType.CHOICES)
+    file_type = models.CharField(max_length=1, choices=SequencingFileType.choices)
     sample_sheet = models.ForeignKey(SampleSheet, null=True, on_delete=CASCADE)
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, null=True, on_delete=CASCADE)
     fastqc = models.ForeignKey(FastQC, null=True, on_delete=CASCADE)
@@ -1390,7 +1390,7 @@ class JobScript(models.Model):
     combined_vcf_file = models.ForeignKey(SampleSheetCombinedVCFFile, null=True, on_delete=CASCADE)
     qc = models.ForeignKey(QC, null=True, on_delete=CASCADE)
     job_id = models.TextField(null=True)
-    job_status = models.CharField(max_length=1, choices=JobScriptStatus.CHOICES, default=JobScriptStatus.CREATED)
+    job_status = models.CharField(max_length=1, choices=JobScriptStatus.choices, default=JobScriptStatus.CREATED)
     return_code = models.IntegerField(null=True)
 
     def get_record(self):

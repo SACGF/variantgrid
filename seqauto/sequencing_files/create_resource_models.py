@@ -992,7 +992,7 @@ def create_resource_models(seqauto_run, seqauto_file_types_and_scripts):
         SequencingFileType.QC: process_qc
     }
     results = {}
-    sft = dict(SequencingFileType.CHOICES)
+    sft = dict(SequencingFileType.choices)
 
     for file_type, script_name in seqauto_file_types_and_scripts:
         output_filename = os.path.join(seqauto_run.scan_resources_dir, "%s.txt" % name_from_filename(script_name))

@@ -163,7 +163,7 @@ def ekey_from_vg_column_formatters():
         'pfam_protein_domain': domain_to_pfam,
         "literature": pubmed_formatter,
         "sift": get_choices_formatter(SIFTPrediction.CHOICES),
-        "variant_class": get_choices_formatter(VariantClass.CHOICES),
+        "variant_class": get_choices_formatter(VariantClass.choices),
     }
 
 

@@ -157,13 +157,9 @@ class SomalierPedigreeRelate(SomalierRelate):
         pass
 
 
-class PedigreeInheritance:
-    AUTOSOMAL_RECESSIVE = 'R'
-    AUTOSOMAL_DOMINANT = 'D'
-    CHOICES = (
-        (AUTOSOMAL_RECESSIVE, 'Auto. Recessive'),
-        (AUTOSOMAL_DOMINANT, 'Auto. Dominant'),
-    )
+class PedigreeInheritance(models.TextChoices):
+    AUTOSOMAL_RECESSIVE = 'R', 'Auto. Recessive'
+    AUTOSOMAL_DOMINANT = 'D', 'Auto. Dominant'
 
 
 def create_automatch_pedigree(user, ped_file_family, cohort):

@@ -123,7 +123,7 @@ class ClinVar(models.Model):
     clinvar_allele_id = models.IntegerField()
     clinvar_preferred_disease_name = models.TextField(null=True, blank=True)
     clinvar_disease_database_name = models.TextField(null=True, blank=True)
-    clinvar_review_status = models.CharField(max_length=1, choices=ClinVarReviewStatus.CHOICES)
+    clinvar_review_status = models.CharField(max_length=1, choices=ClinVarReviewStatus.choices)
     clinical_significance = models.TextField(null=True, blank=True)  # Multiple values of above
     highest_pathogenicity = models.IntegerField(default=0)  # Highest of clinical_significance
     clinvar_clinical_sources = models.TextField(null=True, blank=True)
@@ -155,7 +155,7 @@ class ClinVarCitationsCollection(models.Model):
 
 
 class Citation(models.Model):
-    citation_source = models.CharField(max_length=1, choices=CitationSource.CHOICES)
+    citation_source = models.CharField(max_length=1, choices=CitationSource.choices)
     citation_id = models.TextField()
 
     class Meta:
@@ -268,12 +268,12 @@ class EnsemblGeneAnnotation(models.Model):
     phenotypes_from_ensembl = models.TextField(null=True)
     omim_phenotypes = models.TextField(null=True)
     gene_biotype = models.TextField(null=True)
-    status = models.CharField(max_length=1, choices=TranscriptStatus.CHOICES, null=True)
+    status = models.CharField(max_length=1, choices=TranscriptStatus.choices, null=True)
     chromosome_name = models.TextField(null=True)
     start_position = models.IntegerField(null=True)
     end_position = models.IntegerField(null=True)
     band = models.TextField(null=True)
-    strand = models.CharField(max_length=1, choices=GenomicStrand.CHOICES, null=True)
+    strand = models.CharField(max_length=1, choices=GenomicStrand.choices, null=True)
     percentage_gc_content = models.FloatField(null=True)
     transcript_count = models.IntegerField(null=True)
     in_cancer_gene_census = models.BooleanField(null=True)
@@ -324,18 +324,18 @@ class HumanProteinAtlasAnnotation(models.Model):
     version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, on_delete=CASCADE)
     gene = models.ForeignKey(Gene, on_delete=CASCADE)  # Always Ensembl
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, on_delete=CASCADE)
-    abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.CHOICES)
+    abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.choices)
 
 
 class ColumnVEPField(models.Model):
     """ For VariantAnnotation/Transcript columns derived from VEP fields """
     column = models.TextField(unique=True)
     variant_grid_column = models.OneToOneField(VariantGridColumn, null=True, on_delete=SET_NULL)
-    category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.CHOICES)
+    category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
     source_field_processing_description = models.TextField(null=True)
-    vep_plugin = models.CharField(max_length=1, choices=VEPPlugin.CHOICES, null=True)
-    vep_custom = models.CharField(max_length=1, choices=VEPCustom.CHOICES, null=True)
+    vep_plugin = models.CharField(max_length=1, choices=VEPPlugin.choices, null=True)
+    vep_custom = models.CharField(max_length=1, choices=VEPCustom.choices, null=True)
     source_field_has_custom_prefix = models.BooleanField(default=False)
 
     @property
@@ -444,7 +444,7 @@ class AnnotationRangeLock(models.Model):
 
 
 class AnnotationRun(TimeStampedModel):
-    status = models.CharField(max_length=1, choices=AnnotationStatus.CHOICES, default=AnnotationStatus.CREATED)
+    status = models.CharField(max_length=1, choices=AnnotationStatus.choices, default=AnnotationStatus.CREATED)
     annotation_range_lock = models.OneToOneField(AnnotationRangeLock, null=True, on_delete=CASCADE)
     # task_id is used as a lock to prevent multiple Celery jobs from executing same job
     task_id = models.CharField(max_length=36, null=True)
@@ -710,8 +710,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     overlapping_symbols = models.TextField(null=True, blank=True)
 
     somatic = models.BooleanField(null=True, blank=True)
-    variant_class = models.CharField(max_length=2, choices=VariantClass.CHOICES, null=True, blank=True)
-    vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.CHOICES, null=True, blank=True)
+    variant_class = models.CharField(max_length=2, choices=VariantClass.choices, null=True, blank=True)
+    vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.choices, null=True, blank=True)
 
     GNOMAD_FIELDS = {
         GnomADPopulation.AFRICAN_AFRICAN_AMERICAN: 'gnomad_afr_af',
@@ -1078,7 +1078,7 @@ class DiseaseValidity(models.Model):
     mondo = models.ForeignKey(MonarchDiseaseOntology, null=True, on_delete=SET_NULL)
     hpo_synonym = models.ForeignKey(HPOSynonym, null=True, on_delete=SET_NULL)
     mim_morbid_alias = models.ForeignKey(MIMMorbidAlias, null=True, on_delete=SET_NULL)
-    classification = models.CharField(max_length=1, choices=ClinGenClassification.CHOICES)
+    classification = models.CharField(max_length=1, choices=ClinGenClassification.choices)
     date = models.DateField(null=True)
     validity_summary_url = models.TextField()
 

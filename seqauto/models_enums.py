@@ -1,163 +1,101 @@
 # Using own file to stop circular dependencies in illuminate_report
+from django.db import models
+
+from library.utils import Constant
 
 
-class DataState:
-    NON_EXISTENT = 'N'
-    DELETED = 'D'
-    RUNNING = 'R'
-    SKIPPED = 'S'
-    ERROR = 'E'
-    COMPLETE = 'C'
-
-    CHOICES = (
-        (NON_EXISTENT, 'Non Existent'),
-        (DELETED, 'Deleted'),
-        (RUNNING, 'Running'),
-        (SKIPPED, 'Skipped'),
-        (ERROR, 'Error'),
-        (COMPLETE, 'Complete'),
-    )
+class DataState(models.TextChoices):
+    NON_EXISTENT = 'N', 'Non Existent'
+    DELETED = 'D', 'Deleted'
+    RUNNING = 'R', 'Running'
+    SKIPPED = 'S', 'Skipped'
+    ERROR = 'E', 'Error'
+    COMPLETE = 'C', 'Complete'
 
     @staticmethod
     def should_create_new_record(data_state):
         return data_state not in [DataState.DELETED, DataState.SKIPPED]
 
 
-class QCGraphEnrichmentKitSeparationChoices:
-    ALL_ENRICHMENT_KITS = 'A'
-    SEPARATED_ENRICHMENT_KITS = 'S'
-    SELECTED_ENRICHMENT_KIT = 'O'
+class QCGraphEnrichmentKitSeparationChoices(models.TextChoices):
+    ALL_ENRICHMENT_KITS = 'A', 'All Enrichment Kits'
+    SEPARATED_ENRICHMENT_KITS = 'S', 'Separated Enrichment Kit'
+    SELECTED_ENRICHMENT_KIT = 'O', 'User selected Enrichment Kit'
 
-    CHOICES = (
-        (ALL_ENRICHMENT_KITS, 'All Enrichment Kits'),
-        (SEPARATED_ENRICHMENT_KITS, 'Separated Enrichment Kit'),
-        (SELECTED_ENRICHMENT_KIT, 'User selected Enrichment Kit'),
-    )
+    SHOW_ENRICHMENT_KIT = Constant({SELECTED_ENRICHMENT_KIT: True})
 
-    SHOW_ENRICHMENT_KIT = {SELECTED_ENRICHMENT_KIT: True}
+    def show_enrichment_kit(self):
+        return QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT.get(self.value)
 
 
-class QCGraphType:
-    LINE_GRAPH = 'L'
-    BOX_PLOT = 'B'
-
-    CHOICES = (
-        (LINE_GRAPH, 'Line Graph'),
-        (BOX_PLOT, 'Box Plot'),
-    )
+class QCGraphType(models.TextChoices):
+    LINE_GRAPH = 'L', 'Line Graph'
+    BOX_PLOT = 'B', 'Box Plot'
 
 
-class QCGraphTypes2:
-    BOX_PLOT = 'B'
-    BAR_CHART = 'A'
-
-    CHOICES = (
-        (BOX_PLOT, 'Box Plot'),
-        (BAR_CHART, 'Bar Chart'),
-    )
+class QCGraphTypes2(models.TextChoices):
+    BOX_PLOT = 'B', 'Box Plot'
+    BAR_CHART = 'A', 'Bar Chart'
 
 
-class QCCompareType:
-    GOLD_ENRICHMENT_KIT_RUNS = 'G'
-    ENRICHMENT_KIT = 'P'
-    SEQUENCER = 'S'
-    ALL_RUNS = 'A'
-    SEQUENCING_RUN = 'R'
+class QCCompareType(models.TextChoices):
+    GOLD_ENRICHMENT_KIT_RUNS = 'G', 'Gold Enrichment Kit Runs'
+    ENRICHMENT_KIT = 'P', 'Enrichment Kit'
+    SEQUENCER = 'S', 'Sequencer'
+    ALL_RUNS = 'A', 'All Runs'
+    SEQUENCING_RUN = 'R', 'SequencingRun'
 
-    ENRICHMENT_KIT_TYPES = (GOLD_ENRICHMENT_KIT_RUNS, ENRICHMENT_KIT)
-    CHOICES = (
-        (GOLD_ENRICHMENT_KIT_RUNS, 'Gold Enrichment Kit Runs'),
-        (ENRICHMENT_KIT, 'Enrichment Kit'),
-        (SEQUENCER, 'Sequencer'),
-        (ALL_RUNS, 'All Runs'),
-        (SEQUENCING_RUN, 'SequencingRun'),
-    )
+    ENRICHMENT_KIT_TYPES = Constant((GOLD_ENRICHMENT_KIT_RUNS, ENRICHMENT_KIT))
 
 
-class SequencingFileType:
-    SAMPLE_SHEET = 'S'
-    ILLUMINA_FLOWCELL_QC = 'I'
-    FASTQ = 'U'  # Unmapped
-    FASTQC = 'F'
-    BAM = 'B'
-    FLAGSTATS = 'T'
-    VCF = 'V'
-    COMBINED_VCF = 'C'
-    QC = 'Q'
-    DATA_MIGRATION = 'M'
-
-    CHOICES = (
-        (SAMPLE_SHEET, 'SampleSheet'),
-        (ILLUMINA_FLOWCELL_QC, 'Illumina_Flowcell_QC'),
-        (FASTQ, 'FastQ'),
-        (FASTQC, 'FastQC'),
-        (BAM, 'Bam'),
-        (FLAGSTATS, 'Flagstats'),
-        (VCF, 'VCF'),
-        (COMBINED_VCF, 'CombinedVCF'),
-        (QC, 'QC'),
-        (DATA_MIGRATION, "Data Migration")
-    )
+class SequencingFileType(models.TextChoices):
+    SAMPLE_SHEET = 'S', 'SampleSheet'
+    ILLUMINA_FLOWCELL_QC = 'I', 'Illumina_Flowcell_QC'
+    FASTQ = 'U', 'FastQ'  # Unmapped
+    FASTQC = 'F', 'FastQC'
+    BAM = 'B', 'Bam'
+    FLAGSTATS = 'T', 'Flagstats'
+    VCF = 'V', 'VCF'
+    COMBINED_VCF = 'C', 'CombinedVCF'
+    QC = 'Q', 'QC'
+    DATA_MIGRATION = 'M', "Data Migration"
 
 
-class JobScriptStatus:
-    CREATED = 'C'
-    SUBMITTED = 'S'
-    FINISHED = 'F'
-
-    CHOICES = (
-        (CREATED, 'Created'),
-        (SUBMITTED, 'Submitted'),
-        (FINISHED, 'Finished'),
-    )
+class JobScriptStatus(models.TextChoices):
+    CREATED = 'C', 'Created'
+    SUBMITTED = 'S', 'Submitted'
+    FINISHED = 'F', 'Finished'
 
 
-class DataGeneration:
-    HISEQ = 'H'
-    MISEQ = 'M'
-
-    CHOICES = (
-        (HISEQ, 'HiSeq'),
-        (MISEQ, 'MiSeq'),
-    )
+class DataGeneration(models.TextChoices):
+    HISEQ = 'H', 'HiSeq'
+    MISEQ = 'M', 'MiSeq'
 
 
-class PairedEnd:
+class PairedEnd(models.TextChoices):
     R1 = "R1"
     R2 = "R2"
-    CHOICES = ((R1, "R1"),
-               (R2, "R2"))
 
 
-class SequencerRead:
+class SequencerRead(models.TextChoices):
+    R1 = "R1"
+    R2 = "R2"
     I1 = "I1"
     I2 = "I2"
-    CHOICES = PairedEnd.CHOICES + ((I1, I1), (I2, I2))
 
 
-class SeqAutoRunStatus:
-    CREATED = 'c'
-    SCANNING_FILES = 's'
-    CREATE_MODELS = 'm'
-    SCRIPTS_AND_JOBS = 'j'
-    FINISHED = 'F'
-    ERROR = 'E'
-    CHOICES = [
-        (CREATED, "Created"),
-        (SCANNING_FILES, "Scanning Files"),
-        (CREATE_MODELS, "Create Models"),
-        (FINISHED, "Finished"),
-        (ERROR, "Error"),
-    ]
+class SeqAutoRunStatus(models.TextChoices):
+    CREATED = 'c', "Created"
+    SCANNING_FILES = 's', "Scanning Files"
+    CREATE_MODELS = 'm', "Create Models"
+    SCRIPTS_AND_JOBS = 'j', "Scripts and Jobs"
+    FINISHED = 'F', "Finished"
+    ERROR = 'E', "Error"
 
-    COMPLETED_STATES = [FINISHED, ERROR]
+    COMPLETED_STATES = Constant([FINISHED, ERROR])
 
 
-class EnrichmentKitType:
-    AMPLICON = 'A'
-    CAPTURE = 'C'
-    VIRTUAL = 'V'
-
-    CHOICES = ((AMPLICON, 'Amplicon'),
-               (CAPTURE, 'Capture'),
-               (VIRTUAL, 'Virtual'))
+class EnrichmentKitType(models.TextChoices):
+    AMPLICON = 'A', 'Amplicon'
+    CAPTURE = 'C', 'Capture'
+    VIRTUAL = 'V', 'Virtual'
