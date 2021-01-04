@@ -261,6 +261,7 @@ const VCForm = (function() {
             let wrapper = $('<div>', {class:'mt-4'});
             wrapper.append($('<h5>', {text: 'Actions'}));
             let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
+            /*
             {
                 let butt = $('<button>', {class: 'btn btn-primary btn-lg', html: '<i class="far fa-check-circle"></i> Submit', title: 'Submit unsaved changes', click: this.submit.bind(this), type:'button'});
                 if (this.record.withdrawn) {
@@ -278,6 +279,7 @@ const VCForm = (function() {
                 }
                 butt.appendTo(buttons);
             }
+             */
             {
                 let butt = $('<button>', {class: 'btn btn-primary btn-lg', html: '<i class="fas fa-upload"></i> Share', title: 'Share', click: this.share.bind(this)});
                 if (this.record.withdrawn) {
@@ -314,6 +316,9 @@ const VCForm = (function() {
                 
                 butt.appendTo(buttons);
             }
+
+            buttons.append($('<div>'));
+
             return wrapper;
         },
         
