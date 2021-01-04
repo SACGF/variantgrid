@@ -110,6 +110,10 @@ def version(request):
     return render(request, 'version.html', context)
 
 
+def changelog(request):
+    return render(request, 'changelog.html')
+
+
 #@cache_page(WEEK_SECS)
 @login_not_required
 def external_help(request):
