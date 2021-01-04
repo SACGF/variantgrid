@@ -21,6 +21,7 @@ from eventlog.models import Event, create_event
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk
 from library.enums.log_level import LogLevel
+from library.git import Git
 from library.log_utils import report_exc_info, log_traceback
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
@@ -110,7 +111,8 @@ def dashboard(request):
 
     user_has_cases = cases_for_user(request.user).exists()
 
-    context = {'user_has_cases': user_has_cases,
+    context = {'git': Git(settings.BASE_DIR),
+               'user_has_cases': user_has_cases,
                'sample_enrichment_kits_df': sample_enrichment_kits_df,
                "latest_sequencing_vcfs": latest_sequencing_vcfs}
     return render(request, "variantopedia/dashboard.html", context)
