@@ -30,7 +30,7 @@ class SyncRun(TimeStampedModel):
     An instance of
     """
     destination = models.ForeignKey(SyncDestination, on_delete=CASCADE)
-    status = models.CharField(max_length=1, choices=SyncStatus.CHOICES, null=False)
+    status = models.CharField(max_length=1, choices=SyncStatus.choices, null=False)
     meta = models.JSONField(null=True, blank=True, default=None)
 
     def __str__(self):
