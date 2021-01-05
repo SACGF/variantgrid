@@ -29,7 +29,7 @@ class Command(BaseCommand):
 
         if shutdown:
             date_time = timezone.now() + datetime.timedelta(minutes=shutdown)
-            sm = SiteMessage.objects.create(message="The system will soon be shut down",
+            sm = SiteMessage.objects.create(message="The system will be shut down for maintenance",
                                             log_level=LogLevel.WARNING,
                                             date_time=date_time)
             print(f"Added message: '{sm}'")
