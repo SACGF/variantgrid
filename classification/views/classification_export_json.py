@@ -1,6 +1,7 @@
 import json
+from datetime import datetime
 from typing import Optional
-
+from lazy import lazy
 from classification.models.classification import ClassificationModification
 from classification.models import ClassificationJsonParams
 from classification.views.classification_export_utils import ExportFormatter,\
@@ -22,13 +23,16 @@ class ExportFormatterJSON(ExportFormatter):
     def footer(self) -> str:
         return '\n]}'
 
-    def to_row(self, vcm: ClassificationModification) -> Optional[str]:
-        params = ClassificationJsonParams(current_user=self.user,
+    @lazy
+    def json_params(self) -> ClassificationJsonParams:
+        return ClassificationJsonParams(current_user=self.user,
                                                  include_data=True,
                                                  api_version=2,
                                                  strip_complicated=True,
                                                  include_messages=False)
-        json_values = vcm.as_json(params)
+
+    def to_row(self, vcm: ClassificationModification) -> Optional[str]:
+        json_values = vcm.as_json(self.json_params)
         if 'fatal_error' in json_values:
             return None
 

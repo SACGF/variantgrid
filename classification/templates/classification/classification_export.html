@@ -78,6 +78,11 @@
             params.exclude_orgs = orgArrayString;
         }
 
+        let since = $("input[name='since']").val().trim();
+        if (since.length) {
+            params.since = since;
+        }
+
         let paramParts = [];
         for (let [key, value] of Object.entries(params)) {
             paramParts.push(`${key}=${encodeURIComponent(value)}`);
@@ -186,6 +191,10 @@
                 </div>
             {% endif %}
         {% endfor %}
+    {% endlabelled %}
+    {% labelled label="Since" %}
+        <input class="form-control" type="text" name="since" placeholder="YYYY-MM-DD or <number of days>" />
+        <div class="text-muted">Optional - Filter out classifications that haven't changed since this date e.g. 2020-01-06</div>
     {% endlabelled %}
     {% labelled label="Organistion exclusion" %}
         {% for org in orgs %}
