@@ -860,7 +860,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    value = cautious_attempt_html_to_text(value)
+                    if not value.startswith("http"): # this makes beautiful soap angry thinking we're asking it to go to the URL
+                        value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
                 if results := db_ref_regexes.search(value, default_regex=_key_to_regex.get(e_key.key)):

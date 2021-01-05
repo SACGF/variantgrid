@@ -1,3 +1,5 @@
+from datetime import datetime
+from dateutil import tz
 from typing import Optional, Dict
 
 import ijson
@@ -25,6 +27,18 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
     exclude_labs = config.get('exclude_labs', None)
     if exclude_labs:
         params['exclude_labs'] = ','.join(exclude_labs)
+
+    exclude_orgs = config.get('exclude_orgs', None)
+    if exclude_orgs:
+        params['exclude_orgs'] = ','.join(exclude_orgs)
+
+    if not full_sync:
+        last_download: SyncRun
+        if last_download := SyncRun.objects.filter(destination=sync_destination, status=SyncStatus.SUCCESS).order_by('-created').first():
+            if meta := last_download.meta:
+                if since_str := meta.get('server_date'):
+                    since = datetime.strptime(since_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=tz.UTC).timestamp()
+                    params['since'] = str(since)
 
     def sanitize_data(known_keys: EvidenceKeyMap, data: dict, source_url: str) -> dict:
         skipped_keys = []
@@ -93,6 +107,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                                 params=params,
                                 stream=True)
 
+        last_modified = response.headers.get('Last-Modified')
         evidence_keys = EvidenceKeyMap()
 
         count = 0
@@ -119,8 +134,10 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
 
         run.status = SyncStatus.SUCCESS
         run.meta = {
+            "params": params,
             "records_upserted": count,
-            "records_skipped": skipped
+            "records_skipped": skipped,
+            "server_date": last_modified
         }
         run.save()
     finally:

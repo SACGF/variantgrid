@@ -348,7 +348,6 @@ class ExportFormatter(BaseExportFormatter):
         else:
             return True
 
-
     def passes_flag_check(self, vcm: ClassificationModification) -> bool:
         outstanding_warning = Flag.objects.filter(
             collection_id=vcm.classification.flag_collection_id,
