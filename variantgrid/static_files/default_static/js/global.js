@@ -368,6 +368,7 @@ const JS_DATE_FORMAT_DETAILED = 'YYYY-MM-DD HH:mm:ss ZZ';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'lll';
 function convertTimestamps() {
+    $.timeago.settings.allowFuture = true;
     $.timeago.settings.strings = {
         prefixAgo: null,
         prefixFromNow: null,

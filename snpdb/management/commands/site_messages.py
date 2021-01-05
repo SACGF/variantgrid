@@ -2,6 +2,7 @@ import datetime
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from library.enums.log_level import LogLevel
 from snpdb.models import SiteMessage
 
 
@@ -28,7 +29,8 @@ class Command(BaseCommand):
 
         if shutdown:
             date_time = timezone.now() + datetime.timedelta(minutes=shutdown)
-            sm = SiteMessage.objects.create(message="The system will soon be shut down soon (approx: %(time_away)s)",
+            sm = SiteMessage.objects.create(message="The system will soon be shut down",
+                                            log_level=LogLevel.WARNING,
                                             date_time=date_time)
             print(f"Added message: '{sm}'")
 
