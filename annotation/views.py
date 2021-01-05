@@ -167,8 +167,7 @@ def annotation(request):
 
     gene_symbol_alias_counts = get_field_counts(GeneSymbolAlias.objects.all(), "source")
     if gene_symbol_alias_counts:
-        source_display = dict(GeneSymbolAliasSource.choices)
-        gene_symbol_alias_counts = {source_display[k]: v for k, v in gene_symbol_alias_counts.items()}
+        gene_symbol_alias_counts = {GeneSymbolAliasSource(k).label: v for k, v in gene_symbol_alias_counts.items()}
 
     mim_counts = MIMMorbid.objects.all().count()
     mim_alias_counts = MIMMorbidAlias.objects.all().count()

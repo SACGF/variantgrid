@@ -46,7 +46,7 @@ class VariantTranscriptSelections:
         self.transcript_data.sort(key=operator.itemgetter(*sort_order), reverse=True)
 
     def get_annotation_consortium_display(self):
-        return dict(AnnotationConsortium.choices).get(self.annotation_consortium)
+        return AnnotationConsortium(self.annotation_consortium).label
 
     @lazy
     def variant_transcript_annotations_dict(self):

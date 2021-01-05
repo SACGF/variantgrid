@@ -393,7 +393,7 @@ def node_snp_matrix(request, node_id, node_version, conversion, significant_figu
     elif conversion == SNPMatrix.COLS_PERCENT:
         df = pandas_utils.get_columns_percent_dataframe(counts_df)
 
-    conversion_description = dict(SNPMatrix.choices)[conversion]
+    conversion_description = SNPMatrix(conversion).label
 
     context = {"node_id": node_id,
                "node_version": node_version,
@@ -748,7 +748,6 @@ def analyses_variant_tags(request, genome_build_name=None):
 
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
-    as_display = dict(NodeStatus.choices)
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
     summary_data = Counter()
@@ -756,7 +755,7 @@ def view_analysis_issues(request):
         summary = NodeStatus.get_summary_state(status)
         summary_data[summary] += count
 
-    field_counts = {as_display[k]: v for k, v in field_counts.items()}
+    field_counts = {NodeStatus(k).label: v for k, v in field_counts.items()}
     context = {"nodes_status_summary": summary_data,
                "field_counts": field_counts}
     return render(request, 'analysis/view_analysis_issues.html', context)

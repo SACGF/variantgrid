@@ -488,8 +488,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     @staticmethod
     def flatten_errors(errors):
-        nes_display = dict(NodeErrorSource.choices)
-        return [f"{nes_display[nes]}: {error}" for nes, error in errors]
+        return [f"{NodeErrorSource(nes).label}: {error}" for nes, error in errors]
 
     @staticmethod
     def get_status_from_errors(errors):

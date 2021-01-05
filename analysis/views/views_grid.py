@@ -184,10 +184,7 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names):  # , get
 def _get_column_vcf_info():
     column_vcf_info = {}
     for cvi in ColumnVCFInfo.objects.all().values('column__variant_column', 'info_id', 'number', 'type', 'description'):
-        lookup = dict(VCFInfoTypes.choices)
-        type_display = lookup[cvi['type']]
-        cvi['type'] = type_display
-
+        cvi['type'] = VCFInfoTypes(cvi['type']).label
         index = cvi['column__variant_column']
         column_vcf_info[index] = cvi
     return column_vcf_info

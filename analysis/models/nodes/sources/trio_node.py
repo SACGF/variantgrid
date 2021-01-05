@@ -146,7 +146,7 @@ class TrioNode(AbstractCohortBasedNode):
         return "TODO: method summary"
 
     def get_node_name(self):
-        name_parts = [dict(TrioInheritance.choices)[self.inheritance]]
+        name_parts = [TrioInheritance(self.inheritance).label]
         if not self.require_zygosity:
             name_parts.append(' (non strict)')
 

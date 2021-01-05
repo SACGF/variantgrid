@@ -23,9 +23,8 @@ class VariantGridColumn(models.Model):
 
     def get_css_classes(self):
         css_classes = ["user-column"]
-        annotation_dict = dict(ColumnAnnotationLevel.choices)
-        annotation_level_class = annotation_dict.get(self.annotation_level)
-        if annotation_level_class:
+        if self.annotation_level:
+            annotation_level_class = ColumnAnnotationLevel(self.annotation_level).label
             css_classes.append("%s-column" % annotation_level_class.lower())
         return " ".join(css_classes)
 

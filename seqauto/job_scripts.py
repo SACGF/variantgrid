@@ -61,8 +61,7 @@ def create_bash_script(name, filename, out_file, command, cores, mem, job_script
 
 
 def get_job_data(seqauto_run, file_type, qs):
-    sft = dict(SequencingFileType.choices)
-    logging.info("Create PBS Scripts for %s", sft[file_type])
+    logging.info("Create PBS Scripts for %s", SequencingFileType(file_type).label)
     job_data = {}
     pattern = COMMAND_PATTERNS.get(file_type)
     cores = CORES.get(file_type, DEFAULT_CORES)

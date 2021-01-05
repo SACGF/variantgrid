@@ -52,8 +52,6 @@ def uploadedfile_dict(uploaded_file):
     except:
         size = None
 
-    file_type_dict = dict(UploadedFileTypes.choices)
-    file_type = file_type_dict.get(uploaded_file.file_type)
     data_url, upload_data = get_url_and_data_for_uploaded_file_data(uploaded_file)
     time_since = timesince(uploaded_file.created)
 
@@ -63,7 +61,7 @@ def uploadedfile_dict(uploaded_file):
         'size': size,
         'user': uploaded_file.user.get_full_name(),
         'time_since': f"{time_since} ago",
-        'file_type': file_type,
+        'file_type': UploadedFileTypes(uploaded_file.file_type).label,
         'file_type_code': uploaded_file.file_type,
         'data_url': data_url,
         'deleteUrl': reverse('jfu_delete', kwargs={'pk': uploaded_file.pk}),
