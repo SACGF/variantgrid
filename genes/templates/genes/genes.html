@@ -4,35 +4,13 @@
 {% block title %}Genes{% endblock title %}
 {% block submenu_page_content %}
 <style>
-    .filter-container {
-        height: 30px;
-        line-height: 30px;
-    }
-
-    .filter-label {
-      float: left;
-      margin: 0px 10px 0px 0px;
-      color: #707070;
-    }
-
-    .filter-status {
-      float: left;
-      margin: 0;
-      list-style: none;
-    }
-
-    .filter-status>li {
-      float: left;
-      margin-right: 10px;
-    }
-
     .horizontal-fields {
         margin: 6px 0 6px 0;
     }
 </style>
 <script>
-    searchVisible = false;
-    gridExtraFilters = {};
+    let searchVisible = false;
+    let gridExtraFilters = {};
     
     function showSearch() {
         searchVisible = true;
@@ -40,7 +18,7 @@
     }
 
     function getExtraFilters() {
-        var extraFilters = '';
+        let extraFilters = '';
         if (gridExtraFilters) {
             extraFilters = JSON.stringify(gridExtraFilters);
         }
@@ -50,7 +28,7 @@
     function filterGrid(extra_filters) {
         gridExtraFilters = extra_filters || {};
 
-        var versionId = $("#id_version").val();
+        let versionId = $("#id_version").val();
         gridExtraFilters['version'] = versionId;    
 
         var grid = $("#gene-annotation-versions-grid");
@@ -60,7 +38,7 @@
     function getExportUrl(exportUrl) {
         console.log("getExportUrl:" + getExportUrl);
     
-        var extraFilters = getExtraFilters();
+        let extraFilters = getExtraFilters();
         if (extraFilters) {
             exportUrl += '?extra_filters=' + extraFilters;
         }
@@ -85,7 +63,7 @@
         });
 
         $('#id_gene').change(function() {
-            var geneId = $("#id_gene").val();
+            let geneId = $("#id_gene").val();
             window.location = Urls.view_gene(geneId);
         });
     });
