@@ -1,6 +1,6 @@
 from django.template import Library
 
-from snpdb.models import UserSettings
+from snpdb.models import UserSettings, GenomeBuild
 
 register = Library()
 
@@ -9,12 +9,15 @@ register = Library()
 def genome_build_url_arg(user, url_name, genome_build):
     """ Generates links for user to switch page to their active genome builds
         url_name - must take a parameter 'genome_build_name' """
+
     user_settings = UserSettings.get_for_user(user)
-    has_other_genome_builds = user_settings.get_genome_builds().exclude(pk=genome_build.pk).exists()
+    builds_with_annotation = GenomeBuild.builds_with_annotation()
+    other_genome_builds_exist = builds_with_annotation.exclude(pk=genome_build.pk).exists()
 
     return {
         "url_name": url_name,
         "genome_build": genome_build,
+        "builds_with_annotation": builds_with_annotation,
         "user_settings": user_settings,
-        "has_other_genome_builds": has_other_genome_builds,
+        "other_genome_builds_exist": other_genome_builds_exist,
     }

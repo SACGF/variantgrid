@@ -59,26 +59,6 @@ def genes(request, genome_build_name=None):
     return render(request, 'genes/genes.html', context)
 
 
-def _get_latest_gene_version_for_user_settings(source, gene_versions, user_settings: UserSettings) -> GeneVersion:
-    """ returns latest GeneVersion using default_genome_build, falling back on other user settings builds """
-
-    if not gene_versions.exists():
-        raise ValueError(f"{source} does not have any GeneVersions!")
-
-    genome_builds = user_settings.get_genome_builds()
-    user_build_gene_versions = gene_versions.filter(genome_build__in=genome_builds).order_by("-version")
-    if not user_build_gene_versions.exists():
-        user_builds = ", ".join([str(gb) for gb in genome_builds])
-        supported_builds = ", ".join(gene_versions.values_list("genome_build", flat=True).distinct())
-        msg = f"{source} has no GeneVersions for user genome builds: {user_builds} - supported: {supported_builds}"
-        raise ValueError(msg)
-
-    gene_version = user_build_gene_versions.filter(genome_build=user_settings.default_genome_build).first()
-    if not gene_version:
-        gene_version = user_build_gene_versions.first()  # Try another build
-    return gene_version
-
-
 def view_gene(request, gene_id):
     gene = get_object_or_404(Gene, pk=gene_id)
 
@@ -154,7 +134,9 @@ def view_gene_symbol(request, gene_symbol):
         # This page is shown using the users default genome build
         # However - it's possible the gene doesn't exist for a particular genome build.
         # If gene has a version for a build in user settings, use that and show a warning message
-        gene_version = _get_latest_gene_version_for_user_settings(f"GeneSymbol: {gene_symbol}", gene_versions, user_settings)
+        gene_version = gene_versions.filter(genome_build=user_settings.default_genome_build).first()
+        if not gene_version:
+            gene_version = gene_versions.first()  # Try another build
         genome_build = gene_version.genome_build
         if genome_build != user_settings.default_genome_build:
             messages.add_message(request, messages.WARNING,

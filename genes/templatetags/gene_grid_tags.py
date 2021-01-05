@@ -5,7 +5,7 @@ from django.template import Library
 from annotation.forms import HPOSynonymForm, MIMAliasForm
 from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, GeneSymbolForm, \
     GeneAnnotationReleaseForm, panel_app_server_autocomplete_form_factory
-from genes.models import GeneInfo, GeneListCategory, PanelAppServer
+from genes.models import GeneInfo, GeneListCategory, PanelAppServer, GeneAnnotationRelease
 from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
 from pathtests.models import PathologyTest
 from seqauto.forms import EnrichmentKitForm
@@ -29,7 +29,6 @@ def gene_grid(context, columns_from_url=None,
               show_custom_gene_form: bool = True,
               show_help: bool = True):
     user = context["user"]
-    user_settings = UserSettings.get_for_user(user)
 
     # Load system defaults
     if default_enrichment_kits is None:
@@ -40,7 +39,7 @@ def gene_grid(context, columns_from_url=None,
         initial_columns.extend(columns_from_url.split("/"))
 
     if show_gene_annotation_release:
-        gene_annotation_releases = user_settings.get_gene_annotation_releases()
+        gene_annotation_releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
         initial_columns.extend([f"gene-annotation-release-{release.pk}" for release in gene_annotation_releases])
 
     data_columns = []

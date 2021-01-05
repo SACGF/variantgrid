@@ -291,8 +291,7 @@ class AnalysesGrid(JqGridUserRowConfig):
         super().__init__(user)
         fields = self.get_field_names()
 
-        user_settings = UserSettings.get_for_user(user)
-        self.genome_builds = list(user_settings.get_genome_builds())
+        self.genome_builds = list(GenomeBuild.builds_with_annotation())
         if len(self.genome_builds) > 1:
             fields.append("genome_build")
         user_grid_config = UserGridConfig.get(user, self.caption)

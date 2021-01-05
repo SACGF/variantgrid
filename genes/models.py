@@ -713,6 +713,16 @@ class GeneAnnotationRelease(models.Model):
         return Gene.objects.filter(annotation_consortium=self.annotation_consortium,
                                    geneversion__releasegeneversion__release=self)
 
+    @staticmethod
+    def get_for_latest_annotation_versions_for_builds() -> List['GeneAnnotationRelease']:
+        """ """
+        gene_annotation_releases = []
+        for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
+            vav = genome_build.latest_variant_annotation_version
+            if vav.gene_annotation_release:
+                gene_annotation_releases.append(vav.gene_annotation_release)
+        return gene_annotation_releases
+
     def __str__(self):
         return f"{self.genome_build.name}/{self.get_annotation_consortium_display()} - v{self.version}"
 

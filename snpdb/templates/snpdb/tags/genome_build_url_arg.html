@@ -1,4 +1,4 @@
-{%  if has_other_genome_builds %}
+{%  if other_genome_builds_exist %}
     <style>
     ul.horizontal {
         list-style-type: none;
@@ -16,7 +16,7 @@
     <div>
     <ul class="horizontal">
         <li><b>GenomeBuild:</b></li>
-    {% for gb in user_settings.get_genome_builds %}
+    {% for gb in builds_with_annotation %}
         <li class="genome-build-{{ gb.name }}">
             <a href="{% url url_name gb.name %}">{{ gb }}</a>
         </li>

@@ -4,8 +4,7 @@ from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm
 import logging
 from library.genomics.bed_file import BedFileReader
-from snpdb.models import GenomicIntervalsCollection, ImportStatus, \
-    GenomicIntervalsCategory, GenomeBuild, UserSettings
+from snpdb.models import GenomicIntervalsCollection, ImportStatus, GenomicIntervalsCategory, GenomeBuild
 from upload.models import UploadedBed
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app
@@ -45,8 +44,7 @@ class ImportBedFileTask(ImportTask):
         """ Attempt to get from:
             * track (header)
             * filename
-            * if user only has 1 genome build
-        """
+            * if user only has 1 genome build """
         bf_reader = BedFileReader(bed_filename)
         genome_build_name = bf_reader.get_genome_build_name()
         if genome_build_name:
@@ -56,9 +54,8 @@ class ImportBedFileTask(ImportTask):
         if genome_build:
             return genome_build
 
-        # If user has exactly 1 genome build, use that
-        user_settings = UserSettings.get_for_user(user)
-        genome_builds = list(user_settings.get_genome_builds())
+        # If server has exactly 1 genome build, use that
+        genome_builds = list(GenomeBuild.builds_with_annotation())
         if len(genome_builds) == 1:
             return genome_builds[0]
         return None
