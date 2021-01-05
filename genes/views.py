@@ -29,7 +29,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
     GeneSymbolForm
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
-    CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
+    CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
     PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
