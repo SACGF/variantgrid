@@ -52,7 +52,7 @@ def parse_since(since_str: str) -> datetime:
         if amount > 100000 and not unit:
             return datetime.utcfromtimestamp(float(since_str)).replace(tzinfo=timezone.utc)
 
-        since = datetime.utcnow()
+        since = datetime.utcnow().replace(tzinfo=timezone.utc)
         if not unit or unit == 'd':
             since -= timedelta(days=amount)
         elif unit == 'm':
