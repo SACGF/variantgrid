@@ -84,7 +84,7 @@ class Allele(FlagsMixin, models.Model):
         if genome_build:
             va = vas.filter(genome_build=genome_build).first()
             if not va and not best_attempt:
-                raise ValueError(f'Could not find a variant in allele {self.id} for build {genome_build.name}')
+                raise ValueError(f'Could not find a variant in allele {self.id} for build {genome_build}')
         if not va:
             va = vas.first()
         if va:
@@ -546,7 +546,7 @@ class Liftover(TimeStampedModel):
         source = ""
         if self.source_genome_build:
             source = f"from {self.source_genome_build.name} "
-        return f"Liftover {source}to {self.genome_build.name} via {self.get_conversion_tool_display()}"
+        return f"Liftover {source}to {self.genome_build} via {self.get_conversion_tool_display()}"
 
 
 class LiftoverError(models.Model):

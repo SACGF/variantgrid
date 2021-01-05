@@ -15,7 +15,7 @@
     <td><a href="{% url 'view_sample' trio.proband.sample.pk %}">{{ trio.proband }}</a>
 
 {% if trio.genomekaryomappingcounts  %}
-    <tr><th>Whole sample counts ({{ trio.genomekaryomappingcounts.trio.genome_build.name }})
+    <tr><th>Whole sample counts ({{ trio.genomekaryomappingcounts.trio.genome_build }})
         <td>{% genome_karyomapping_counts_summary trio.genomekaryomappingcounts %}
 {% endif %}
 </table>

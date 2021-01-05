@@ -231,10 +231,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return annotation_version.variant_annotation_version.assembly
 
     def __str__(self):
-        name = self.name
-        if self.alias:
-            name += f" (aka {self.alias})"
-        return name
+        return self.name
 
 
 class Contig(models.Model):

@@ -111,7 +111,7 @@ def _get_mim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
     return mim_and_hpo_for_gene
 
 
-def view_gene_symbol(request, gene_symbol):
+def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     # determines if this gene symbol might ONLY be an alias
     if gene_symbol.endswith(gene_symbol_withdrawn_str):
         raise Http404('Withdrawn GeneSymbols not valid')
@@ -122,8 +122,8 @@ def view_gene_symbol(request, gene_symbol):
         aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
         aliases.update(gene.get_symbols().exclude(symbol=gene_symbol))
 
-    user_settings = UserSettings.get_for_user(request.user)
-    genome_build = user_settings.default_genome_build
+    desired_genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
+    genome_build = desired_genome_build
 
     has_classified_variants = False
     has_observed_variants = False
@@ -134,13 +134,13 @@ def view_gene_symbol(request, gene_symbol):
         # This page is shown using the users default genome build
         # However - it's possible the gene doesn't exist for a particular genome build.
         # If gene has a version for a build in user settings, use that and show a warning message
-        gene_version = gene_versions.filter(genome_build=user_settings.default_genome_build).first()
+        gene_version = gene_versions.filter(genome_build=desired_genome_build).first()
         if not gene_version:
             gene_version = gene_versions.first()  # Try another build
         genome_build = gene_version.genome_build
-        if genome_build != user_settings.default_genome_build:
-            messages.add_message(request, messages.WARNING,
-                                 f"This symbol is not associated with any genes in your default build, viewing in build {genome_build}")
+        if genome_build != desired_genome_build:
+            msg = f"This symbol is not associated with any genes in build {desired_genome_build}, viewing in build {genome_build}"
+            messages.add_message(request, messages.WARNING, msg)
 
         gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build, traverse_aliases=True)
         gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)

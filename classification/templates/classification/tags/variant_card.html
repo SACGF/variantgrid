@@ -3,7 +3,7 @@
 {% load tz %}
 {% if variant_allele %}
     <div data-variant_id="{{ variant_allele.variant.pk }}" class="card">
-        <div class="card-header"><a href="{% url 'view_variant' variant_allele.variant.pk %}">{{ variant_allele.genome_build.name }}</a></div>
+        <div class="card-header"><a href="{% url 'view_variant' variant_allele.variant.pk %}">{{ variant_allele.genome_build }}</a></div>
         <div class="card-body">
             {% if variant_show_canonical_hgvs %}
                 {% labelled label='Canonical c.HGVS' value_css="variant-c-hgvs" hint="tiny" %}{{ variant_allele.variant.canonical_c_hgvs }}{% endlabelled %}
@@ -37,7 +37,7 @@
     </div>
 {% else %}
     <div class="card">
-        <div class="card-header">{{ genome_build.name }}</div>
+        <div class="card-header">{{ genome_build }}</div>
         <div class="card-body">
         {% if user.is_superuser and liftover_error_qs.exists %}
             {% for liftover_error in liftover_error_qs %}

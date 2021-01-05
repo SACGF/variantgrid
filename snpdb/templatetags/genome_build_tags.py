@@ -1,4 +1,7 @@
+from typing import TypedDict
+
 from django.template import Library
+from django.urls import reverse
 
 from snpdb.models import UserSettings, GenomeBuild
 
@@ -6,18 +9,25 @@ register = Library()
 
 
 @register.inclusion_tag("snpdb/tags/genome_build_url_arg.html")
-def genome_build_url_arg(user, url_name, genome_build):
+def genome_build_url_arg(genome_build, url_name, **url_kwargs):
     """ Generates links for user to switch page to their active genome builds
         url_name - must take a parameter 'genome_build_name' """
 
-    user_settings = UserSettings.get_for_user(user)
     builds_with_annotation = GenomeBuild.builds_with_annotation()
     other_genome_builds_exist = builds_with_annotation.exclude(pk=genome_build.pk).exists()
 
+    class BuildUrlDict(TypedDict):
+        genome_build: GenomeBuild
+        active: bool
+        url: str
+
+    build_urls = []
+    for gb in builds_with_annotation:
+        url = reverse(url_name, kwargs={"genome_build_name": gb.name, **url_kwargs})
+        css_class = "active" if gb == genome_build else ""
+        build_urls.append({"genome_build": gb, "url": url, "css_class": css_class})
+
     return {
-        "url_name": url_name,
-        "genome_build": genome_build,
-        "builds_with_annotation": builds_with_annotation,
-        "user_settings": user_settings,
+        "build_urls": build_urls,
         "other_genome_builds_exist": other_genome_builds_exist,
     }
