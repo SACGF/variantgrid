@@ -1,3 +1,5 @@
+from typing import List
+
 from django.db import models
 
 from library.utils import Constant
@@ -58,10 +60,10 @@ class CitationSource(models.TextChoices):
     NCBI_BOOKSHELF = 'N', 'NCBIBookShelf'
     PUBMED_CENTRAL = 'C', 'PubMedCentral'
 
-    CODES = Constant({'PubMed': PUBMED,
-                      'PMID': PUBMED,
-                      'NCBIBookShelf': NCBI_BOOKSHELF,
-                      'PubMedCentral': PUBMED_CENTRAL})
+    CODES = Constant({'PubMed': PUBMED[0],
+                      'PMID': PUBMED[0],
+                      'NCBIBookShelf': NCBI_BOOKSHELF[0],
+                      'PubMedCentral': PUBMED_CENTRAL[0]})
 
 
 class TranscriptStatus(models.TextChoices):
@@ -179,26 +181,37 @@ class ClinVarReviewStatus(models.TextChoices):
     PRACTICE_GUIDELINE = "P", "Practice guideline"
 
     STARS = Constant({
-        NO_ASSERTION_PROVIDED: 0,
-        NO_ASSERTION_CRITERIA_PROVIDED: 0,
-        NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT: 0,
-        CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS: 1,
-        CRITERIA_PROVIDED_SINGLE_SUBMITTER: 1,
-        CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS: 2,
-        REVIEWED_BY_EXPERT_PANEL: 3,
-        PRACTICE_GUIDELINE: 4,
+        NO_ASSERTION_PROVIDED[0]: 0,
+        NO_ASSERTION_CRITERIA_PROVIDED[0]: 0,
+        NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0]: 0,
+        CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0]: 1,
+        CRITERIA_PROVIDED_SINGLE_SUBMITTER[0]: 1,
+        CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0]: 2,
+        REVIEWED_BY_EXPERT_PANEL[0]: 3,
+        PRACTICE_GUIDELINE[0]: 4,
     })
 
     VCF_MAPPINGS = Constant({
-        'no_assertion_provided': NO_ASSERTION_PROVIDED,
-        'no_assertion_criteria_provided': NO_ASSERTION_CRITERIA_PROVIDED,
-        'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT,
-        'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS,
-        'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER,
-        'criteria_provided,_multiple_submitters,_no_conflicts': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS,
-        'reviewed_by_expert_panel': REVIEWED_BY_EXPERT_PANEL,
-        'practice_guideline': PRACTICE_GUIDELINE,
+        'no_assertion_provided': NO_ASSERTION_PROVIDED[0],
+        'no_assertion_criteria_provided': NO_ASSERTION_CRITERIA_PROVIDED[0],
+        'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],
+        'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
+        'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],
+        'criteria_provided,_multiple_submitters,_no_conflicts': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0],
+        'reviewed_by_expert_panel': REVIEWED_BY_EXPERT_PANEL[0],
+        'practice_guideline': PRACTICE_GUIDELINE[0],
     })
+
+    def stars(self):
+        return ClinVarReviewStatus.STARS[self.value]
+
+    @staticmethod
+    def statuses_gte_stars(min_stars: int) -> List['ClinVarReviewStatus']:
+        statuses = []
+        for rs, stars in ClinVarReviewStatus.STARS.items():
+            if stars >= min_stars:
+                statuses.append(rs)
+        return statuses
 
 
 class ManualVariantEntryType(models.TextChoices):

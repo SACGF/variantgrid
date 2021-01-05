@@ -22,7 +22,7 @@ class QCGraphEnrichmentKitSeparationChoices(models.TextChoices):
     SEPARATED_ENRICHMENT_KITS = 'S', 'Separated Enrichment Kit'
     SELECTED_ENRICHMENT_KIT = 'O', 'User selected Enrichment Kit'
 
-    SHOW_ENRICHMENT_KIT = Constant({SELECTED_ENRICHMENT_KIT: True})
+    SHOW_ENRICHMENT_KIT = Constant({SELECTED_ENRICHMENT_KIT[0]: True})
 
     def show_enrichment_kit(self):
         return QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT.get(self.value)

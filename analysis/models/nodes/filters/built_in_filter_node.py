@@ -20,10 +20,7 @@ class BuiltInFilterNode(AnalysisNode):
         return dict(BuiltInFilters.FILTER_CHOICES)[self.built_in_filter]
 
     def get_clinvar_stars_q(self):
-        review_statuses = []
-        for rs, stars in ClinVarReviewStatus.STARS.items():
-            if stars >= self.min_clinvar_stars:
-                review_statuses.append(rs)
+        review_statuses = ClinVarReviewStatus.statuses_gte_stars(self.min_clinvar_stars)
         return Q(clinvar__clinvar_review_status__in=review_statuses)
 
     def _get_node_q(self) -> Optional[Q]:

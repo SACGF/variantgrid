@@ -133,7 +133,7 @@ class ClinVar(models.Model):
 
     @property
     def stars(self):
-        return ClinVarReviewStatus.STARS[self.clinvar_review_status]
+        return ClinVarReviewStatus(self.clinvar_review_status).stars()
 
     def get_origin_display(self):
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
