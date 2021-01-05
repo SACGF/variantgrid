@@ -8,9 +8,6 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 # import all the base settings #
 ROLLBAR['enabled'] = False
 
-#SAPATH_APP = 'sapath.apps.SapathConfig'
-#INSTALLED_APPS += [SAPATH_APP]
-
 USE_DJANGO_DEBUG_TOOLBAR = False
 if USE_DJANGO_DEBUG_TOOLBAR:
     INSTALLED_APPS += ['debug_toolbar']
