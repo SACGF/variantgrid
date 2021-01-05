@@ -16,9 +16,8 @@ from annotation.models.models_enums import ManualVariantEntryType
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
 from snpdb import models
-from snpdb.models import VCF, Sample, Cohort, VARIANT_PATTERN, \
-    DBSNP_PATTERN, UserContact, Tag, UserSettings, GenomicIntervalsCollection, ImportStatus, \
-    SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
+from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
+    ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
     OrganizationUserSettingsOverride
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild

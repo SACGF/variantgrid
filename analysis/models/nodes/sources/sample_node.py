@@ -12,7 +12,7 @@ from analysis.models.nodes.cohort_mixin import SampleMixin
 from annotation.models import SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, \
     SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter, \
     SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter
-from genes.models import SampleGeneList, ActiveSampleGeneList
+from genes.models import SampleGeneList
 from patients.models_enums import Zygosity
 from snpdb.models import SampleStats, SampleStatsPassingFilter, Sample
 from snpdb.models.models_enums import BuiltInFilters

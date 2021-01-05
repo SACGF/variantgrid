@@ -22,7 +22,7 @@ from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from patients.models import FakeData, Patient, Specimen
-from patients.models_enums import Sex, Zygosity
+from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
