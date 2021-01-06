@@ -19,7 +19,7 @@ class ByDestinationFilter(admin.SimpleListFilter):
 
 
 class SyncDestinationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'config')
+    list_display = ('name', 'config', 'enabled')
 
     def run_sync(self, request, queryset):
         for sync_destination in queryset:

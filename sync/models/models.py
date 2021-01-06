@@ -16,6 +16,7 @@ class SyncDestination(models.Model):
 
     name = models.TextField(null=False, unique=True)
     config = models.JSONField(null=False, blank=True, default=empty_dict)
+    enabled = models.BooleanField(null=False, blank=True, default=True)
 
     def run(self, full_sync: bool = False):
         from sync.sync_runner import run_sync

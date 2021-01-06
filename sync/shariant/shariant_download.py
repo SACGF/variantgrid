@@ -44,7 +44,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         skipped_keys = []
         sanitized = {}
         for key, blob in data.items():
-            if key == 'owner':
+            if key == 'owner' or key == 'source_id':
                 pass
             elif known_keys.get(key).is_dummy:
                 skipped_keys.append(key)
