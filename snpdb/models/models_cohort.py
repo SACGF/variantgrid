@@ -331,7 +331,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         # For https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
         return self.get_packed_index_by_sample_id[sample_id]  # 0 based
 
-    def get_zygosity_q(self, sample_zygosities: dict, sample_require_zygosity: dict = None, exclude=False):
+    def get_zygosity_q(self, sample_zygosities: dict, sample_require_zygosity: dict = None, exclude=False) -> Q:
         """ sample_zygosities = {sample : zygosities_set}
             sample_require_zygosity = {sample : True/False} - defaults to True
             exclude - invert query (not equals)
