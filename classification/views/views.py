@@ -155,7 +155,8 @@ class AutopopulateView(APIView):
 
         key_to_order = dict()
         index = 1
-        for ekey in EvidenceKeyMap().all_keys:
+        # TODO should probably know the lab with EvidenceKeys
+        for ekey in EvidenceKeyMap.instance().all_keys:
             key_to_order[ekey.key] = index
             index = index + 1
 
@@ -549,7 +550,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
 def evidence_keys(request, external_page=True, max_share_level=None):
     """ public page to display EKey details """
 
-    context = {'keys': EvidenceKeyMap.cached().all_keys}
+    context = {'keys': EvidenceKeyMap.instance().all_keys}
 
     if external_page:
         context.update({

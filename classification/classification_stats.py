@@ -93,7 +93,7 @@ def get_grouped_classification_counts(user: User,
 
 
 def get_criteria_counts(user: User, evidence_field: str) -> Dict[str, List[Dict]]:
-    acmg_labels = dict((e.key, e.pretty_label) for e in EvidenceKeyMap().acmg_criteria())
+    acmg_labels = dict((e.key, e.pretty_label) for e in EvidenceKeyMap.instance().acmg_criteria())
     n = len(acmg_labels)
     acmg_met_not_met_by_significance = defaultdict(lambda: (np.zeros(n), np.zeros(n), np.zeros(n)))
     total_clinical_significance = Counter()

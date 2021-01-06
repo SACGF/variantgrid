@@ -7,6 +7,6 @@ from classification.models.evidence_key import EvidenceKeyMap
 class EvidenceKeysView(APIView):
 
     def get(self, request, **kwargs) -> Response:
-        key_map = EvidenceKeyMap()
+        key_map = EvidenceKeyMap.instance()
         data = [k.to_json() for k in key_map.all_keys]
         return Response(status=HTTP_200_OK, data=data)

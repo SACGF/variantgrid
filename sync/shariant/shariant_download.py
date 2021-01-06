@@ -108,7 +108,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                                 stream=True)
 
         last_modified = response.headers.get('Last-Modified')
-        evidence_keys = EvidenceKeyMap()
+        evidence_keys = EvidenceKeyMap.instance()
 
         count = 0
         skipped = 0

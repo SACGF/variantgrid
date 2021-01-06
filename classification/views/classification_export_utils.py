@@ -222,7 +222,7 @@ class AlleleGroup:
         for c_hgvs, vcms in by_transcript.items():
             yield c_hgvs, vcms
 
-    def iter_c_hgvs_versionless_transcripts(self) -> Iterable[Tuple[CHGVS, VariantWithChgvs]]:
+    def iter_c_hgvs_versionless_transcripts(self) -> Iterable[Tuple[CHGVS, List[VariantWithChgvs]]]:
         by_versionless_transcript: Dict[str, TranscriptGroup] = defaultdict(TranscriptGroup)
 
         for vcm in self.data:
@@ -283,7 +283,7 @@ class ExportFormatter(BaseExportFormatter):
 
     @lazy
     def ekeys(self) -> EvidenceKeyMap:
-        return EvidenceKeyMap.cached()
+        return EvidenceKeyMap.instance()
 
     def generate_filename(self,
         prefix: str = 'classifications',

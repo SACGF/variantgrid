@@ -18,9 +18,10 @@ from classification.models.classification_utils import ClassificationJsonParams
 
 SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary']
 
+
 def insert_nones(data: Dict) -> Dict:
-    for ekey in EvidenceKeyMap().all_keys:
-        key = ekey.key
+    for e_key in EvidenceKeyMap.instance().all_keys:
+        key = e_key.key
         if key not in data:
             data[key] = None
     return data

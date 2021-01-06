@@ -88,7 +88,7 @@ class AutopopulateData:
     @property
     def summary(self) -> str:
         sums = []
-        ekeys = EvidenceKeyMap()
+        ekeys = EvidenceKeyMap.instance()
         flattened = self.flatten()
         sums.append(f'The following fields were auto-populated by {Site.objects.get_current().name}')
         for ap in flattened:

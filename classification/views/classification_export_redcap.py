@@ -115,7 +115,7 @@ def export_redcap_definition(output):
                 '([' + REDCAP_PREFIX + 'clinical_significance' + suffix + '])'
         csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'var_des' + suffix, form_name=form_name, section_header='', field_type='descriptive', label='Variant' + str(idx + 1) + ': ' + label, logic=show_if).row())
 
-    key_map = EvidenceKeyMap()
+    key_map = EvidenceKeyMap.instance()
     for idx in range(repeat_count):
         suffix = '_' + str(idx + 1)
         show_if = '[%scount] >= %s' % (REDCAP_PREFIX, str(idx + 1))
@@ -246,7 +246,7 @@ class ExportFormatterRedcap(ExportFormatter):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ekeys = EvidenceKeyMap()
+        self.ekeys = EvidenceKeyMap.instance()
         self.used_key_arrays = []
         self.group_on = 'redcap_record_id'
 

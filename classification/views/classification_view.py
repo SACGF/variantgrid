@@ -27,6 +27,7 @@ from classification.models.classification import ClassificationProcessError, \
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.tasks.classification_import_task import process_classification_import_task
 
+
 class BulkInserter:
 
     def __init__(self, user: User, api_version=1, force_publish=False):
@@ -316,7 +317,7 @@ class ClassificationView(APIView):
     api_version = 1
 
     @staticmethod
-    def verify_source(data) -> Optional[str]:
+    def verify_source(data) -> SubmissionSource:
         source = SubmissionSource(data.pop('source', SubmissionSource.API))
         if not source.is_valid_user_source():
             raise ValueError('Illegal value for source, should be "' + SubmissionSource.API.value + '" or "' + SubmissionSource.FORM.value + '"')
