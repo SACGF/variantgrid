@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.conf import settings
 from django.db import models
@@ -55,6 +55,13 @@ class IntersectionNode(AnalysisNode):
     @property
     def use_cache(self):
         return super().use_cache or self.valid_selected_genomic_intervals_collection()
+
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
+        if self.genomic_intervals_collection:
+            errors.extend(self._get_genome_build_errors("genomic_intervals_collection",
+                                                        self.genomic_intervals_collection.genome_build))
+        return errors
 
     def _get_node_q(self) -> Optional[Q]:
         q = None
@@ -140,8 +147,10 @@ class IntersectionNode(AnalysisNode):
         # HGVS name is validated in IntersectionNodeForm, and linked to a variant if one is found
         # But it's possible a variant isn't there at form save time, but will appear later
         # Thus if hgvs_name is set, but hgvs_variant isn't - recheck in save (eg re-connected to diff source node)
-        if self.hgvs_name and not self.hgvs_variant:
-            self.hgvs_variant = get_hgvs_variant(self.hgvs_name, self.analysis.genome_build)
+        if self.hgvs_name:
+            # May need to re-match if analysis template was different genome build
+            if self.hgvs_variant is None or self.hgvs_variant.genome_build != self.analysis.genome_build:
+                self.hgvs_variant = get_hgvs_variant(self.hgvs_name, self.analysis.genome_build)
         return super().save(**kwargs)
 
     def save_clone(self):

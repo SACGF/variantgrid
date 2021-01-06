@@ -379,13 +379,14 @@ class AnalysisTemplateRun(TimeStampedModel):
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)  # Created new analysis
 
     @staticmethod
-    def create(analysis_template: AnalysisTemplate, user: User = None):
+    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None):
         if user is None:
             user = admin_bot()
 
         template_version = analysis_template.active
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
+        analysis.genome_build = genome_build
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments

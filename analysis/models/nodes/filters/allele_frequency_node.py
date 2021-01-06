@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.db import models
 from django.db.models import Q
@@ -12,8 +12,8 @@ from snpdb.models import Sample
 class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     sample = models.ForeignKey(Sample, null=True, on_delete=SET_NULL)
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.sample:
             errors.append("No sample selected.")
         return errors

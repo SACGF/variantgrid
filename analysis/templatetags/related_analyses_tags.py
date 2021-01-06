@@ -96,7 +96,7 @@ def related_analyses_for_pedigree(context, pedigree):
 
 
 @register.inclusion_tag("analysis/tags/analysis_templates_tag.html", takes_context=True)
-def analysis_templates_tag(context, autocomplete_field=True, has_somatic_sample=False, requires_sample_gene_list=None,
+def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_somatic_sample=False, requires_sample_gene_list=None,
                            **kwargs):
     user = context["user"]
     single_model_args = {"sample", "cohort", "trio", "pedigree"}
@@ -134,6 +134,7 @@ def analysis_templates_tag(context, autocomplete_field=True, has_somatic_sample=
 
     flattened_uuid = str(uuid.uuid4()).replace("-", "_")
     return {
+        "genome_build": genome_build,
         "flattened_uuid": flattened_uuid,
         "autocomplete_field": autocomplete_field,
         "analysis_template_form": AnalysisTemplateForm(prefix=flattened_uuid),

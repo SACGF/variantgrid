@@ -169,10 +169,12 @@ class TrioNode(AbstractCohortBasedNode):
     def get_node_class_label():
         return 'Trio'
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.trio:
             errors.append("No trio selected")
+        else:
+            errors.extend(self._get_genome_build_errors("trio", self.trio.genome_build))
         return errors
 
     def _get_cohorts_and_sample_visibility_for_node(self):

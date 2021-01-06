@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.conf import settings
 from django.db import models
@@ -189,8 +189,8 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
                 gene_sample_coverage_and_uncovered.append((sample, gene_coverage_collection, uncovered_genes))
         return gene_sample_coverage_and_uncovered
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         for gene_list in self.get_gene_lists():
             if gene_list.import_status != ImportStatus.SUCCESS:
                 errors.append(f"{gene_list}: {gene_list.error_message}")

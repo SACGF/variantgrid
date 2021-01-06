@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.db import models
 from django.db.models import Q
@@ -74,10 +74,12 @@ class PedigreeNode(AbstractCohortBasedNode):
     def get_node_class_label():
         return "Pedigree"
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.pedigree:
             errors.append("No pedigree selected.")
+        else:
+            errors.extend(self._get_genome_build_errors("pedigree", self.pedigree.genome_build))
 
         return errors
 

@@ -22,7 +22,7 @@
 </ul>
 {% endif %}
 {% if analysis_template_form %}
-    <form id="analysis-template-form-{{ flattened_uuid }}" method="post" action="{% url 'create_analysis_from_template' %}">
+    <form id="analysis-template-form-{{ flattened_uuid }}" method="post" action="{% url 'create_analysis_from_template' genome_build.name %}">
         {% csrf_token %}
         <input name="tag_uuid" type="hidden" value="{{ flattened_uuid }}">
         {% for name, value in hidden_inputs.items %}

@@ -28,7 +28,8 @@ from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_coun
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
-from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, ProcessingStatus
+from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, ProcessingStatus, \
+    GenomeBuild
 from snpdb.variant_collection import write_sql_to_variant_collection
 from classification.models import Classification, post_delete
 from variantgrid.celery import app
@@ -460,7 +461,17 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Used in create node dropdown """
         raise NotImplementedError()
 
-    def _get_configuration_errors(self):
+    def _get_genome_build_errors(self, field_name, field_genome_build: GenomeBuild) -> List:
+        """ Used to quickly add errors about genome build mismatches
+            This only happens in templates (ran template on sample with different build than hardcoded data)
+            In normal analyses, autocomplete restrictions should not allow you to configure data from other builds """
+        errors = []
+        if field_genome_build != self.analysis.genome_build:
+            msg = f"{field_name} genome build: {field_genome_build} different from analysis build: {self.analysis.genome_build}"
+            errors.append(msg)
+        return errors
+
+    def _get_configuration_errors(self) -> List:
         return []
 
     def get_parents_and_errors(self):

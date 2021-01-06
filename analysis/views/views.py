@@ -51,7 +51,7 @@ from library.utils import full_class_name, defaultdict_to_dict
 from pedigree.models import Pedigree
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant
+    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant, GenomeBuild
 from variantgrid.celery import app
 import numpy as np
 import pandas as pd
@@ -134,14 +134,15 @@ def view_active_node(analysis, active_node=None):
 
 
 @require_POST
-def create_analysis_from_template(request):
+def create_analysis_from_template(request, genome_build_name):
     data = request.POST.dict()
     tag_uuid = data.pop("tag_uuid")
     analysis_template_key = f"{tag_uuid}-analysis_template"
     analysis_template_name = data.pop(analysis_template_key)
     analysis_template = AnalysisTemplate.get_for_user(request.user, analysis_template_name)
 
-    template_run = AnalysisTemplateRun.create(analysis_template, user=request.user)
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=request.user)
     template_run.populate_arguments(data)
     populate_analysis_from_template_run(template_run)
 

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -19,8 +19,8 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
     zygosity = models.CharField(max_length=1, choices=ZygosityNodeZygosity.CHOICES, null=True)
     exclude = models.BooleanField(default=False)
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.sample:
             errors.append("No sample selected.")
         return errors

@@ -11,7 +11,7 @@ urlpatterns = [
     perm_path('<int:analysis_id>/', views.view_analysis, name='analysis'),
     perm_path('<int:analysis_id>/<int:active_node_id>/', views.view_analysis, name='analysis_node'),
     perm_path('clone_analysis/<int:analysis_id>/', views_json.clone_analysis, name='clone_analysis'),
-    perm_path('create_analysis_from_template', views.create_analysis_from_template, name='create_analysis_from_template'),
+    perm_path('create_analysis_from_template/<genome_build_name>', views.create_analysis_from_template, name='create_analysis_from_template'),
     perm_path('trio_wizard/<int:cohort_id>/<int:sample1_id>/<int:sample2_id>/<int:sample3_id>/', views.trio_wizard, name='trio_wizard'),
 
     # Templates
