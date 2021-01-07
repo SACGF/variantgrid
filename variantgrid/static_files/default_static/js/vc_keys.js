@@ -435,13 +435,13 @@ EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
 
 function replaceAll(originalString, find, replace) {
   return originalString.replace(new RegExp(find, 'g'), replace);
-};
+}
 
 EKeys.fixDescription = function(htmlText) {
     htmlText = htmlText.trim();
     htmlText = replaceAll(htmlText, /(<br>|<br\/>|<br \/>)/gm, '\n');
     htmlText = replaceAll(htmlText, /^\s+$/gm, '');
-    htmlText = replaceAll(htmlText, /\n{3,}/gm, '\n\n');
+    htmlText = replaceAll(htmlText, /[\n\r]{3,}/gm, '\n\n');
     let html = $('<span>', {html: htmlText});
     html.find('p').each(function() {
         let $this = $(this);
@@ -453,8 +453,7 @@ EKeys.fixDescription = function(htmlText) {
         }
     });
     return html;
-}
-
+};
 
 SpecialEKeys = {};
 SpecialEKeys.ASSERTION_METHOD = 'assertion_method';
