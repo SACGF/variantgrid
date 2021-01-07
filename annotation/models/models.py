@@ -387,22 +387,6 @@ class VariantAnnotationVersion(SubVersionPartition):
     sift = models.TextField()
     dbnsfp = models.TextField()
 
-    def get_annotation_status_info_for_variant(self, variant):
-        """ returns (annotation_status_display, time_since_last_modified) """
-        qs = self.annotationrangelock_set.filter(min_variant__pk__gte=variant.pk,
-                                                 max_variant__pk__lte=variant.pk)
-        annotation_range_lock = qs.order_by("pk").last()
-        annotation_status_display = "No annotation"
-        time_since_last_modified = "n/a"
-        if annotation_range_lock:
-            try:
-                annotation_run = annotation_range_lock.annotationrun
-                annotation_status_display = annotation_run.get_status_display()
-                time_since_last_modified = timesince(annotation_run.modified)
-            except AnnotationRun.DoesNotExist:
-                pass
-        return annotation_status_display, time_since_last_modified
-
     @staticmethod
     def latest(genome_build):
         return VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date").last()

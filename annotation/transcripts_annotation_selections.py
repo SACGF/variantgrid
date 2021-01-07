@@ -1,14 +1,16 @@
 from django.conf import settings
 from django.forms.models import model_to_dict
+from django.utils.timesince import timesince
 from lazy import lazy
 import operator
 
-from annotation.models import VEPSkippedReason
+from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
-    InvalidAnnotationVersionError, VariantTranscriptAnnotation
+    InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion
 from genes.models_enums import AnnotationConsortium
+from library.log_utils import report_event
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 
@@ -33,6 +35,7 @@ class VariantTranscriptSelections:
         self.variant_annotation = None
         self.gene_annotations = {}
         self.transcript_data = []  # See docstring in _populate for details
+        self.warning_messages = []
         self.error_messages = []
         self.initial_transcript_id = None
         self._populate(variant, annotation_version, initial_transcript_id, initial_transcript_column)
@@ -140,8 +143,22 @@ class VariantTranscriptSelections:
                         if gene_annotation:
                             self.gene_annotations[vsta.gene_id] = model_to_dict(gene_annotation)
         except VariantAnnotation.DoesNotExist:
-            msg = f"Couldn't find VariantAnnotation for {variant}, VariantAnnotationVersion {vav}"
-            self.error_messages.append(msg)
+            # Probably due to variant being annotated - in that case show a warning message
+            ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=variant.genome_build,
+                                              annotation_range_lock__min_variant__gte=variant.pk,
+                                              annotation_range_lock__max_variant__lte=variant.pk).first()
+            if ar:
+                if ar.status in (AnnotationStatus.ERROR, AnnotationStatus.FINISHED):
+                    msg = f"Annotation for variant {variant} failed (Annotation run: {ar.get_status_display()})"
+                    self.error_messages.append(msg)
+                    report_event(name='variant classification download')
+                else:
+                    msg = f"This variant has not yet been annotated. Last status: {ar.get_status_display()} ({timesince(ar.modified)} ago)"
+                    self.error_messages.append(msg)
+            else:
+                # Some other failure
+                msg = f"Couldn't find VariantAnnotation for {variant}, VariantAnnotationVersion {vav}"
+                self.error_messages.append(msg)
         except InvalidAnnotationVersionError as e:
             self.error_messages.append(str(e))
 

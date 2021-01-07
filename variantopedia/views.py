@@ -398,6 +398,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
             vts = VariantTranscriptSelections(variant, variant.genome_build, annotation_version)
             variant_annotation = vts.variant_annotation
+            for w_msg in vts.warning_messages:
+                messages.add_message(request, messages.WARNING, w_msg)
+
             for e_msg in vts.error_messages:
                 messages.add_message(request, messages.ERROR, e_msg)
 
@@ -422,11 +425,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
     modified_normalised_variants = variant.modifiedimportedvariant_set.all().filter(old_variant__isnull=False)
     modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
-
-    if annotation_version and not vts:
-        status_info = annotation_version.variant_annotation_version.get_annotation_status_info_for_variant(variant)
-        msg = "Variant has not yet been annotated. Last status was '%s' (%s ago)" % status_info
-        messages.add_message(request, messages.WARNING, msg)
 
     try:
         va = variant.variantallele
