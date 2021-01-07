@@ -154,7 +154,7 @@ class VariantTranscriptSelections:
                     report_event(name='variant classification download')
                 else:
                     msg = f"This variant has not yet been annotated. Last status: {ar.get_status_display()} ({timesince(ar.modified)} ago)"
-                    self.error_messages.append(msg)
+                    self.warning_messages.append(msg)
             else:
                 # Some other failure
                 msg = f"Couldn't find VariantAnnotation for {variant}, VariantAnnotationVersion {vav}"

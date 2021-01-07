@@ -778,6 +778,7 @@ POPEN_SHELL = True  # For vcf split - todo put back...
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages
 
+# @see https://docs.djangoproject.com/en/3.1/ref/settings/#message-tags
 MESSAGE_TAGS = {
     messages.DEBUG: 'alert-info',
     messages.INFO: 'alert-info',
