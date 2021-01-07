@@ -22,7 +22,6 @@ from snpdb.models.models_user_settings import UserSettings
 from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
-from classification.views.classification_export_clinvar import ExportFormatterClinvar
 from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_json import ExportFormatterJSON
 from classification.views.classification_export_keys import ExportFormatterKeys
@@ -84,13 +83,11 @@ def export_view(request: HttpRequest) -> Response:
     format_keys = {'id': 'keys', 'name': 'Evidence Keys Report', 'admin_only': True}
     format_mvl = {'id': 'mvl', 'name': 'MVL'}
     format_csv = {'id': 'csv', 'name': 'CSV'}
-    format_clinvar_xml = {'id': 'clinvar', 'name': 'Clinvar XML', 'admin_only': True}
     format_json = {'id': 'json', 'name': 'JSON'}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
     format_vcf = {'id': 'vcf', 'name': 'VCF'}
     #format_errors = {'id': 'errors', 'name': 'Liftover Errors'}
     formats = [
-        format_clinvar_xml,
         format_keys,
         format_csv,
         format_json,
@@ -283,8 +280,6 @@ class ClassificationApiExportView(APIView):
             formatter = ExportFormatterVCF(encoding=encoding, **formatter_kwargs)
         elif file_format == 'csv':
             formatter = ExportFormatterCSV(pretty=pretty, **formatter_kwargs)
-        elif file_format == 'clinvar':
-            formatter = ExportFormatterClinvar(**formatter_kwargs)
         elif file_format == 'keys':
             formatter = ExportFormatterKeys(qs=qs)
 
@@ -298,28 +293,6 @@ def _single_classification_mod_qs(request, record_id) -> QuerySet:
     vcm = ClassificationRef.init_from_obj(request.user, record_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
     return qs
-
-
-def clinvar_xml(request, record_id) -> HttpResponseBase:
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'clinvar',
-            'record_id': record_id,
-            'refer': 'classification form',
-            'approx_count': 1
-        }
-    )
-
-    vcm = ClassificationRef.init_from_obj(request.user, record_id).modification
-    qs = _single_classification_mod_qs(request, record_id)
-    genome_build = UserSettings.get_for_user(request.user).default_genome_build
-
-    start_part = vcm.classification.friendly_label.replace('/', '-')
-    date_part = str(vcm.created.astimezone(tz=timezone.get_default_timezone()).strftime("%Y-%m-%d"))
-    filename = f'{start_part} - {date_part} clinvar.xml'
-    return ExportFormatterClinvar(user=request.user, filename_override=filename, genome_build=genome_build, qs=qs).export(as_attachment=False)
 
 
 @not_minified_response
