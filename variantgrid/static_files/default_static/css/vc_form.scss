@@ -364,6 +364,8 @@ table.diff {
         }
         .card-body {
             min-height: 200px;
+            max-height: 600px;
+            overflow-y: hidden;
             background-color: #eef;
         }
     }
@@ -502,7 +504,7 @@ tr.template-download {
         & > * {
             flex-grow:1;
             flex-shrink:1;
-            width: 30%;
+            width: 48%;
         }
         > * {
             height: 40px;
@@ -516,6 +518,9 @@ tr.template-download {
     }
     .citation {
         overflow-wrap: break-word;
+    }
+    h5 {
+        font-size: 1.15rem;
     }
 }
 

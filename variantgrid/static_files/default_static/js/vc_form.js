@@ -78,11 +78,6 @@ const VCForm = (function() {
             }
             this.dataUpdated();
         },
-
-        clinvar() {
-            window.open(window.location.href + '/clinvar.xml');
-            return false;
-        },
         
         csv() {
             window.open(window.location.href + '/classification.csv');
@@ -135,9 +130,11 @@ const VCForm = (function() {
             if (!this.record.can_write || this.alwaysAsterix) {
                 this.searchAsterix();
             } else {
+                /*
                 window.setTimeout(() => {
                     $('#vc-form .collapse').first().collapse('show');
                 });
+                */
             }
         },
         
@@ -146,17 +143,10 @@ const VCForm = (function() {
         },
                 
         generateExportButtons() {
-            let wrapper = $('<div>', {html: $('<h5>', 'Export as')});
+            let wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
             let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
             let csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
             csvButton.appendTo(buttons);
-            
-            let clinvarButton = $('<button>', {class:'btn btn-outline-primary btn-lg', html: '<i class="far fa-file-code"></i> Clinvar', click: () => {this.clinvar()}});
-            if (this.hasErrors()) {
-                clinvarButton.attr('title', "Please fix errors before creating Clinvar export");
-                clinvarButton = disableButton(clinvarButton);
-            }
-            clinvarButton.appendTo(buttons);
 
             if (this.reportEnabled) {
                 let reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', html: '<i class="far fa-file"></i> Report', click: () => {this.report()}});
@@ -261,27 +251,9 @@ const VCForm = (function() {
             let wrapper = $('<div>', {class:'mt-4'});
             wrapper.append($('<h5>', {text: 'Actions'}));
             let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
-            /*
+
             {
-                let butt = $('<button>', {class: 'btn btn-primary btn-lg', html: '<i class="far fa-check-circle"></i> Submit', title: 'Submit unsaved changes', click: this.submit.bind(this), type:'button'});
-                if (this.record.withdrawn) {
-                    butt.attr('title', 'Classification Withdrawn, un-withdraw before submitting');
-                    butt = disableButton(butt);
-                } else if (this.hasSendingStatus) {
-                    butt.attr('title', 'Saving... Please wait');
-                    butt = disableButton(butt);
-                } else if (this.hasErrors()) {
-                    butt.attr('title', 'Submit: Errors must be fixed before submitting');
-                    butt = disableButton(butt);
-                } else if (!this.record.has_changes) {
-                    butt.attr('title', 'Submit: There are no outstanding changes to submit');
-                    butt = disableButton(butt);
-                }
-                butt.appendTo(buttons);
-            }
-             */
-            {
-                let butt = $('<button>', {class: 'btn btn-primary btn-lg', html: '<i class="fas fa-upload"></i> Share', title: 'Share', click: this.share.bind(this)});
+                let butt = $('<button>', {class: 'btn btn-primary btn-lg', html: '<i class="fas fa-upload"></i> Submit', title: 'Submit/Share', click: this.share.bind(this)});
                 if (this.record.withdrawn) {
                     butt.attr('title', 'Classification Withdrawn, un-withdraw before sharing');
                     butt = disableButton(butt);
@@ -316,8 +288,6 @@ const VCForm = (function() {
                 
                 butt.appendTo(buttons);
             }
-
-            buttons.append($('<div>'));
 
             return wrapper;
         },
@@ -1276,9 +1246,9 @@ const VCForm = (function() {
                             summaryDom.attr('text', ref.summary);
                         }
                     } else if (ref.internal_id) {
-                        $('<div>', {class: 'ref-summary my-1', text: 'See citations at bottom'}).appendTo(refDom);
+                        $('<div>', {class: 'ref-summary ml-1 my-1 d-inline', text: 'See citations for more info'}).appendTo(refDom);
                     } else {
-                        $('<div>', {class: 'ref-summary my-1', text: 'No summary available'}).appendTo(refDom);
+                        $('<div>', {class: 'ref-summary ml-1 my-1 d-inline', text: 'No summary available'}).appendTo(refDom);
                     }
                 }
             }
@@ -1321,6 +1291,22 @@ const VCForm = (function() {
                     ]);
                 }
             }
+
+            let fontSize = 13;
+            jHelp.css({'font-size': fontSize, 'max-height': 600});
+            while (this.helpOverflowAmount() > 0 && fontSize > 10) {
+                fontSize--;
+                jHelp.css({'font-size': fontSize});
+            }
+            if (this.helpOverflowAmount() > 0) {
+                jHelp.css({'max-height': jHelp[0].scrollHeight});
+            }
+
+        },
+
+        helpOverflowAmount: function() {
+            let box = jHelp[0];
+            return box.scrollHeight - box.clientHeight;
         },
         
         promptNote: function(key) {
