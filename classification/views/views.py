@@ -41,7 +41,7 @@ from classification.classification_stats import get_grouped_classification_count
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.forms import EvidenceKeyForm
 from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus
+    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -269,7 +269,7 @@ def view_classification(request, record_id):
                'asterix_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW,
                'existing_files': existing_files,
                'other_classifications_summary': other_classifications_summary,
-               'report_enabled': not not vc.lab.organization.classification_report_template,
+               'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
                'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
                }
     return render(request, 'classification/classification.html', context)

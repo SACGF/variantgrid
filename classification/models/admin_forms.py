@@ -494,3 +494,13 @@ class ConditionAliasAdmin(ModelAdminBasics):
     auto_match.short_description = "Attempt auto match"
 
     actions = ["export_as_csv", auto_match]
+
+
+class ClassificationReportTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'modified')
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget(),
+            'template': admin.widgets.AdminTextareaWidget()
+        }, **kwargs)

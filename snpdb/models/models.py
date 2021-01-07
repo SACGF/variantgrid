@@ -161,7 +161,6 @@ class Organization(models.Model):
     short_name = models.TextField(blank=False, null=True)  # Don't use for anything other than human labels
     group_name = models.TextField(blank=True, null=True, unique=True)
     classification_config = models.JSONField(null=True, blank=True)
-    classification_report_template = models.TextField(null=True, blank=True)
     active = models.BooleanField(default=True, blank=True)
 
     class Meta:

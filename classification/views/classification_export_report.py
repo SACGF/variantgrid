@@ -10,7 +10,7 @@ from classification.enums.classification_enums import SpecialEKeys
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.classification import ClassificationModification, \
     Classification
-from classification.models import ClassificationJsonParams
+from classification.models import ClassificationJsonParams, ClassificationReportTemplate
 from classification.views.classification_export_utils import ExportFormatter
 
 
@@ -41,7 +41,8 @@ class ExportFormatterReport(ExportFormatter):
             # only support 1 record for now
             break
 
-        template_str = org.classification_report_template or f'No report template has been configured for {org.name}'
+        report = ClassificationReportTemplate.preferred_template_for(vcm)
+        template_str = report.template or 'No report template has been configured'
         django_engine = engines['django']
         template = django_engine.from_string(template_str)
         content = template.render({'record': row_datas[0]})
