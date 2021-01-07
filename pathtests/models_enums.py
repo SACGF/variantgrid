@@ -9,7 +9,7 @@ class CaseState(models.TextChoices):
     CLOSED_SOLVED = 'S', 'solved'
     CLOSED_UNSOLVED = 'U', 'unsolved'
 
-    CLOSED_STATES = Constant((CLOSED_SOLVED, CLOSED_UNSOLVED))
+    CLOSED_STATES = Constant((CLOSED_SOLVED[0], CLOSED_UNSOLVED[0]))
 
 
 class CaseWorkflowStatus(models.TextChoices):

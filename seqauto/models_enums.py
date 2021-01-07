@@ -45,7 +45,7 @@ class QCCompareType(models.TextChoices):
     ALL_RUNS = 'A', 'All Runs'
     SEQUENCING_RUN = 'R', 'SequencingRun'
 
-    ENRICHMENT_KIT_TYPES = Constant((GOLD_ENRICHMENT_KIT_RUNS, ENRICHMENT_KIT))
+    ENRICHMENT_KIT_TYPES = Constant((GOLD_ENRICHMENT_KIT_RUNS[0], ENRICHMENT_KIT[0]))
 
 
 class SequencingFileType(models.TextChoices):
@@ -92,7 +92,7 @@ class SeqAutoRunStatus(models.TextChoices):
     FINISHED = 'F', "Finished"
     ERROR = 'E', "Error"
 
-    COMPLETED_STATES = Constant([FINISHED, ERROR])
+    COMPLETED_STATES = Constant([FINISHED[0], ERROR[0]])
 
 
 class EnrichmentKitType(models.TextChoices):
