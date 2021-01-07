@@ -164,7 +164,7 @@ class PopulationNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Population Node"
+        return "Population"
 
 
 class PopulationNodeGnomADPopulation(models.Model):

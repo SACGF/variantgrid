@@ -65,4 +65,4 @@ class BuiltInFilterNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Built In Filter Node"
+        return "Built In Filter"

@@ -194,7 +194,7 @@ class VennNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Venn Intersection"
+        return "Venn"
 
 
 class VennNodeCache(models.Model):

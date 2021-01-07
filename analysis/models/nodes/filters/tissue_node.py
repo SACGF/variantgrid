@@ -78,4 +78,4 @@ class TissueNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Tissue Node"
+        return "Tissue Expression"

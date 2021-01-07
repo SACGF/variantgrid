@@ -147,4 +147,4 @@ class DamageNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Damage Node"
+        return "Damage"
