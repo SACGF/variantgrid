@@ -1,5 +1,6 @@
 {% extends menu_analysis_base %}
 {% load static %}
+{% load tz %}
 {% block title %}Analysis Template: {{ analysis_template  }}{% endblock title %}
 
 {% block submenu_page_content %}
@@ -7,15 +8,36 @@
     <h3>{{ analysis_template  }}</h3>
 
     <div>
-    <a href="{% url 'analysis' analysis_template.analysis.pk %}">Open analysis</a>
+        <a href="{% url 'analysis' analysis_template.analysis.pk %}">Edit Analysis Template</a>
     </div>
 
     <p>
     {%  if analysis_template.analysistemplateversion_set.exists %}
+        <h4>Historical versions:</h4>
+
         <table>
+            <tr>
+                <th>Version</th>
+                <th>Created</th>
+                <th>Active</th>
+                <th>Autocomplete</th>
+                <th>Links</th>
+                <th>Requires Somatic</th>
+                <th>Requires Sample Gene List</th>
+            </tr>
         {% for atv in analysis_template.analysistemplateversion_set.all %}
             <tr>
-                <td>{{ atv }}</td>
+                <td>
+                    <a href="{% url 'analysis' atv.analysis_snapshot.pk %}">v.{{ atv.version }}</a>
+                </td>
+                <td>
+                    {{ atv.created | localtime }}
+                </td>
+                <td>{{ atv.active }}</td>
+                <td>{{ atv.appears_in_autocomplete }}</td>
+                <td>{{ atv.appears_in_links }}</td>
+                <td>{{ atv.requires_sample_somatic }}</td>
+                <td>{{ atv.requires_sample_gene_list }}</td>
             </tr>
         {% endfor %}
 
