@@ -1388,6 +1388,7 @@ const VCForm = (function() {
 
             let infoDiv = $('<i/>', {
                 id: `explain-${key}`,
+                title: 'This field has a custom description. Click on it and view the blue help box for details.',
                 class: `fas fa-info-circle text-muted explain`,
             });
             if (!hasExplain) {
