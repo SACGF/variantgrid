@@ -4,11 +4,9 @@ from dataclasses import dataclass
 from avatar.templatetags.avatar_tags import avatar_url
 from collections import OrderedDict, defaultdict
 
-from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q, QuerySet
 from django.db.models.deletion import SET_NULL, CASCADE
 from django_extensions.db.models import TimeStampedModel
 from typing import Optional, List, Tuple, Dict, Set
@@ -341,6 +339,17 @@ class UserSettings:
         else:
             genome_build = user_settings.default_genome_build
         return genome_build
+
+    @staticmethod
+    def get_lab_and_error(user: User) -> Tuple[Optional[Lab], Optional[str]]:
+        lab_error = None
+        lab = None
+        user_settings = UserSettings.get_for_user(user)
+        try:
+            lab = user_settings.get_lab()
+        except ValueError as ve:
+            lab_error = str(ve)
+        return lab, lab_error
 
     @property
     def classification_issue_count(self) -> int:

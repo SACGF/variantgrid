@@ -465,17 +465,6 @@ def view_classification_file_attachment_thumbnail(request, pk):
     return view_classification_file_attachment(request, pk, thumbnail=True)
 
 
-def _get_lab_and_error(user: User):
-    lab_error = None
-    lab = None
-    user_settings = UserSettings.get_for_user(user)
-    try:
-        lab = user_settings.get_lab()
-    except ValueError as ve:
-        lab_error = str(ve)
-    return lab, lab_error
-
-
 def create_classification_for_variant(request, variant_id, transcript_id=None):
     if not Classification.can_create_via_web_form(request.user):
         raise PermissionDenied('User cannot create classifications via web form')
@@ -492,7 +481,7 @@ def create_classification_for_variant(request, variant_id, transcript_id=None):
                                       variant.genome_build,
                                       initial_transcript_id=transcript_id,
                                       add_other_annotation_consortium_transcripts=True)
-    lab, lab_error = _get_lab_and_error(request.user)
+    lab, lab_error = UserSettings.get_lab_and_error(request.user)
 
     consensus = ClassificationConsensus(variant, request.user)
 
@@ -511,7 +500,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     sample_autocomplete_form = SampleChoiceForm(genome_build=genome_build)
     sample_autocomplete_form.fields['sample'].required = False
-    lab, lab_error = _get_lab_and_error(request.user)
+    lab, lab_error = UserSettings.get_lab_and_error(request.user)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
     kind, transcript_accession = get_kind_and_transcript_accession_from_invalid_hgvs(hgvs_string)

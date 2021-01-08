@@ -1,4 +1,5 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
+{% load ui_utils %}
 {% load settings_tags %}
 {% load variant_transcript_select_tags %}
 
@@ -156,7 +157,20 @@
     Classify variants tagged with 
     <span class="tagged-{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}"><span class="user-tag-colored">{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}</span></span>:
 
-    {% if requires_classification_data %}
+    {% if lab %}
+        <p>Classfiying using Lab: {{ lab }}</p>
+    {% endif %}
+
+    {% labelled label="For lab" %}
+        {% if lab %}{{ lab.name }}{% endif %}
+        {% if lab_error %}
+        <div class='alert alert-danger'>{{ lab_error }}<br/><a target="_blank" href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
+        {% endif %}
+    {% endlabelled %}
+    {% if lab_error %}
+        <br/>
+        <div>Please fix all errors before creating a classification.</div>
+    {% elif requires_classification_data %}
         <table id='requires-classification-table'>
             <tr><th>Variant <th>Transcript <th>Sample <td>
         {% for variant_tag, variant_summary, single_transcript_label, single_transcript_id, vts, single_sample, sample_form in requires_classification_data %}
