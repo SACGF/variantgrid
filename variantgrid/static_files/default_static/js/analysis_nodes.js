@@ -619,17 +619,19 @@ function setupNodes(nodes_selector, readOnly) {
 		attachVariantCounters(nodes_selector, nodeCountTypes);
 	}
 	
-	nodes_selector.each(function() {
-		// test global if we should assign
-		var nodeClass = $(this).attr("node_class");
-		var node_help = NODE_HELP[nodeClass];
+	if (Object.keys(NODE_HELP).length) { // Empty if no tooltips
+		nodes_selector.each(function () {
+			// test global if we should assign
+			let nodeClass = $(this).attr("node_class");
+			let node_help = NODE_HELP[nodeClass];
 
-        if (SHOW_NODE_IDS_IN_TOOLTIPS) {
-            var nodeId = $(this).attr('node_id');
-		    node_help += " (node #" + nodeId + ")";
-		}
-		$(this).attr('title', node_help);
-	});
+			if (SHOW_NODE_IDS_IN_TOOLTIPS) {
+				let nodeId = $(this).attr('node_id');
+				node_help += " (node #" + nodeId + ")";
+			}
+			$(this).attr('title', node_help);
+		});
+	}
 
 	if (!readOnly) {
 		setupNodeModifications(nodes_selector);

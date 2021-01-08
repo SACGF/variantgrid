@@ -58,7 +58,6 @@ urlpatterns = [
 
     perm_path('diff/', views.view_classification_diff, name='classification_diff'),
     perm_path('redcap_data_dictionary.csv', classification_export_view.redcap_data_dictionary, name='redcap_data_dictionary'),
-    perm_path('classification/<record_id>/clinvar.xml', classification_export_view.clinvar_xml, name='classification_clinvar_xml'),
     perm_path('classification/<record_id>/classification.csv', classification_export_view.record_csv, name='classification_csv'),
     perm_path('classification/<record_id>/report.html', classification_export_view.template_report, name='view_template_report'),
     perm_path('classification/<record_id>/history', views.classification_history, name='classification_history'),

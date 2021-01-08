@@ -105,7 +105,7 @@ def published(sender,
     if first_publish or change_share_level or diff_keys or at_least_minor_diffs:
         diff_str = None
         if diff_keys:
-            ekeys = EvidenceKeyMap.cached()
+            ekeys = EvidenceKeyMap.instance()
             diff_labels = [ekeys.get(key).pretty_label for key in diff_keys]
             diff_labels.sort()
             diff_str = ', '.join(diff_labels)

@@ -22,7 +22,7 @@ def store_clingen_gene_validity_curations_from_web(cached_web_resource):
     r = requests.get(CLINGEN_DISEASE_CSV_URL)
     df = read_clingen_csv(r.text)
 
-    clingen_disease_validity_lookup = invert_dict(dict(ClinGenClassification.CHOICES))
+    clingen_disease_validity_lookup = invert_dict(dict(ClinGenClassification.choices))
     genes_set = set()
 
     clingen_curator = GeneDiseaseCurator.objects.create(name='ClinGen',

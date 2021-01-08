@@ -1,0 +1,90 @@
+{% extends "uicore/page/base.html" %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block title %}Changelog{% endblock %}
+
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        <h3>Changelog</h3>
+        <div class="card">
+            <div class="card-header">VariantGrid 3.0</div>
+            <div class="card-body">
+                <h4>General</h4>
+                <ul>
+                    <li>Cleaner appearance, mobile friendly</li>
+                    <li>Support for multiple genome builds (GRCh37 and GRCh38)</li>
+                    {% if sapath_enabled %}
+                    <li>Logins now use Windows/HAD user/passwords</li>
+                    {% endif %}
+                </ul>
+
+                <h4>Analysis</h4>
+                <ul>
+                    <li>Users can create/modify their own analysis templates</li>
+                    <li>Show tags from other analyses</li>
+                    <li>Node editor forms catch errors before saving</li>
+                    <li>Analyses can be locked (via analysis settings) and set to read-only</li>
+                    <li>Damage Node - can use 3 out of 4 damage prediction programs</li>
+                    <li>Trio - comp. het. Zygosities fix - 1 from each parent. Handle overlapping genes</li>
+                </ul>
+
+                <h4>Annotation</h4>
+                <ul>
+                    <li>Now uses VEP - see <a class="hover-link" href="{% url 'view_annotation_descriptions' %}">column descriptions</a> and <a class="hover-link" href="{% url 'about_new_vep_columns' %}">column changes</a></li>
+                    <li>Support for RefSeq transcripts / annotations</li>
+                    <li>Genes/Transcripts are versioned</li>
+                    <li>GeneList symbol matching done against a release (symbols change over time)</li>
+                </ul>
+
+                <h4>Classification</h4>
+                <ul>
+                    <li>Added several new Quick Links</li>
+                </ul>
+
+                <h4>Gene Grid</h4>
+                <ul>
+                    <li>Shows what GeneID is matched for a Gene Annotation Release</li>
+                    <li>Added PanelApp Australia</li>
+                </ul>
+
+                <h4>Gene Page</h4>
+                <ul>
+                    <li>Hotspot graphs</li>
+                    <li>PanelApp</li>
+                </ul>
+
+                <h4>Lab / Organization Pages</h4>
+                <ul>
+                    <li>Activity overview</li>
+                    <li>Admins can change default settings for orgs/labs</li>
+                </ul>
+
+                <h4>Sample / VCF</h4>
+                <ul>
+                    <li>Sample GeneList</li>
+                    <li><a class="hover-link" target="_blank" href="https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-020-00761-2">Somalier</a> - tool to check sample relatedness</li>
+                </ul>
+
+                <h4>Search</h4>
+                <ul>
+                    <li>Gene Symbol search works across aliases and other genome builds</li>
+                </ul>
+
+                <h4>Tagging</h4>
+                <ul>
+                    <li>Tags grouped together by variant</li>
+                </ul>
+
+                <h4>Variant Details</h4>
+                <ul>
+                    <li>Cleaned and re-arranged page</li>
+                    <li>Nearby Classifications</li>
+                    <li>Allele Frequency Histogram</li>
+                    <li>Samples with variant grid loads much faster</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

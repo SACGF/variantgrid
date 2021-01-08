@@ -22,7 +22,7 @@ from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from patients.models import FakeData, Patient, Specimen
-from patients.models_enums import Sex, Zygosity
+from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
@@ -50,7 +50,7 @@ class VCF(models.Model):
     project = models.ForeignKey(Project, null=True, blank=True, on_delete=SET_NULL)
     user = models.ForeignKey(User, on_delete=CASCADE)
     genotype_samples = models.IntegerField()
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     fake_data = models.ForeignKey(FakeData, null=True, blank=True, on_delete=CASCADE)
     header = models.TextField(null=True)
     source = models.TextField(blank=True)
@@ -209,9 +209,9 @@ class Sample(SortByPKMixin, models.Model):
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     # TODO: A sample may have >1 specimens (eg tumor/normal subtraction)
     specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     bam_file_path = models.TextField(null=True, blank=True)
-    variants_type = models.CharField(max_length=1, choices=VariantsType.CHOICES, default=VariantsType.UNKNOWN)
+    variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 
     @property
     def genome_build(self):
@@ -376,7 +376,7 @@ class SampleTag(models.Model):
 class AbstractVariantStats(models.Model):
     """ Base class used for Cohort/Sample stats
         @see also annotation.models.models_sample_stats """
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variant_count = models.IntegerField(default=0)
     snp_count = models.IntegerField(default=0)
     insertions_count = models.IntegerField(default=0)
@@ -458,7 +458,7 @@ class AbstractSampleStats(AbstractVariantStats):
             elif hom_het_ratio > 0.8:
                 sex = Sex.MALE
 
-        return dict(Sex.choices)[sex]
+        return Sex(sex).label
 
 
 class SampleStats(AbstractSampleStats):
@@ -497,7 +497,7 @@ class VCFSourceSettings(models.Model):
 
 class VCFBedIntersection(models.Model):
     name = models.TextField()
-    status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES, default=ProcessingStatus.CREATED)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     error_exception = models.TextField(null=True, blank=True)
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
     genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, on_delete=CASCADE)

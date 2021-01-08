@@ -143,7 +143,7 @@ class BulkVEPVCFAnnotationInserter:
             'gnomad_popmax': str.upper,  # nfe -> NFE
             "hgnc_id": format_hgnc_id,
             "sift": format_vep_sift_to_choice,
-            "variant_class": get_choice_formatter_func(VariantClass.CHOICES),
+            "variant_class": get_choice_formatter_func(VariantClass.choices),
             'fathmm_pred_most_damaging': get_most_damaging_func(FATHMMPrediction),
             'impact': get_choice_formatter_func(PathogenicityImpact.CHOICES),
             'interpro_domain': remove_empty_multiples,

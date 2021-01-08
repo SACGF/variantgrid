@@ -1,5 +1,6 @@
 from django.contrib import admin
 from unidecode import unidecode
+
 from snpdb.models import Organization, Lab
 import re
 
@@ -18,13 +19,13 @@ def make_code_friendly(text: str) -> str:
 
 class LabAdmin(admin.ModelAdmin):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'classification_config')
+    list_display = ('name', 'group_name', 'organization', 'external', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
-        ('Submissions', {'fields': ('classification_config', 'upload_location',)})
+        ('Submissions', {'fields': ('classification_config', 'upload_location', 'external')})
     )
 
     def get_form(self, request, obj=None, **kwargs):
@@ -70,7 +71,7 @@ class OrganizationAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'short_name', 'group_name', 'active')}),
-        ('Submissions', {'fields': ('classification_config', 'classification_report_template')})
+        ('Submissions', {'fields': ('classification_config', )})
     )
 
     def fix_group_name(self, request, queryset):
@@ -98,6 +99,7 @@ class OrganizationAdmin(admin.ModelAdmin):
             'group_name': admin.widgets.AdminTextInputWidget()
 
         }, **kwargs)
+
 
 # The JSONEditor has a bug in it that stops patternProperties
 # from being useful. Specifically if you try to add arbitrary properties

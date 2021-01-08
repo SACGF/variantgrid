@@ -14,7 +14,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         uploaded_file_type = options['uploaded_file_type']
 
-        uft_dict = dict(UploadedFileTypes.CHOICES)
+        uft_dict = dict(UploadedFileTypes.choices)
         uft_description = uft_dict.get(uploaded_file_type)
         if uft_description is None:
             script_name = os.path.basename(__file__)

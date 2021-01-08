@@ -11,3 +11,4 @@ from classification.models.variant_models import *
 from classification.models.condition_text_matching import *
 from classification.models.clinvar_export_models import *
 from classification.models.admin_forms import *
+from classification.models.classification_report_models import *

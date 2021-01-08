@@ -99,7 +99,7 @@ class HPOEdge(edge_factory(HumanPhenotypeOntology, concrete=False)):
 class HPOSynonym(models.Model):
     hpo = models.ForeignKey(HumanPhenotypeOntology, on_delete=CASCADE)
     name = models.TextField()
-    scope = models.CharField(max_length=1, choices=HPOSynonymScope.CHOICES)
+    scope = models.CharField(max_length=1, choices=HPOSynonymScope.choices)
 
     class Meta:
         unique_together = ('hpo', 'name')

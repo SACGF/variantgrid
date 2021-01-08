@@ -19,7 +19,7 @@ class ByDestinationFilter(admin.SimpleListFilter):
 
 
 class SyncDestinationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'config')
+    list_display = ('name', 'config', 'enabled')
 
     def run_sync(self, request, queryset):
         for sync_destination in queryset:
@@ -37,12 +37,12 @@ class SyncDestinationAdmin(admin.ModelAdmin):
 
 
 class SyncRunAdmin(admin.ModelAdmin):
-    list_display = ('id', 'destination', 'created')
+    list_display = ('id', 'destination', 'created', 'status', 'meta')
     list_filter = (ByDestinationFilter,)
 
 
 class ClassificationModificationSyncRecordAdmin(admin.ModelAdmin):
-    list_display = ('id', 'run', 'created', 'classification_modification')
+    list_display = ('id', 'run', 'created', 'classification_modification', 'success', 'meta')
 
 
 admin.site.register(models.SyncDestination, SyncDestinationAdmin)

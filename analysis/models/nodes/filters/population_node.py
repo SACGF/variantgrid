@@ -64,7 +64,9 @@ class PopulationNode(AnalysisNode):
                 and_q.append(q_pop)
 
         if self.gnomad_hom_alt_max is not None:
-            and_q.append(Q(variantannotation__gnomad_hom_alt__lte=self.gnomad_hom_alt_max))
+            q_hom_alt_lt = Q(variantannotation__gnomad_hom_alt__lte=self.gnomad_hom_alt_max)
+            q_hom_alt_null = Q(variantannotation__gnomad_hom_alt__isnull=True)
+            and_q.append(q_hom_alt_lt | q_hom_alt_null)
 
         # Internal filters
         if self.use_internal_counts:
@@ -162,7 +164,7 @@ class PopulationNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Population Node"
+        return "Population"
 
 
 class PopulationNodeGnomADPopulation(models.Model):

@@ -112,7 +112,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             logging.warning("No annotation set for plugin: %s", vep_plugin)
 
     # Custom
-    for vep_custom, prefix in dict(VEPCustom.CHOICES).items():
+    for vep_custom, prefix in dict(VEPCustom.choices).items():
         try:
             cfg = vc[prefix.lower()]  # annotation settings are lower case
             cmd.extend(_get_custom_params_list(vep_custom, prefix, cfg))

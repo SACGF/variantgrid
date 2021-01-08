@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import CASCADE
@@ -7,14 +9,14 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin, \
     GuardianPermissionsMixin
 from patients.models_enums import Sex
-from snpdb.models import ImportStatus, Cohort, CohortSample, Sample
+from snpdb.models import ImportStatus, Cohort, CohortSample, Sample, SomalierRelate
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):
     """ See http://www.helsinki.fi/~tsjuntun/autogscan/pedigreefile.html """
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
     def __str__(self):
         name = f"({self.pk}) {self.name}"
@@ -87,7 +89,7 @@ def validate(records):
     errors_list = []
     # Make sure there is at least 1 sample
     if len(records) < 1:
-        errors_list.apped("There must be at least 1 record")
+        errors_list.append("There must be at least 1 record")
 
     any_affected = False
     for r in records:
@@ -145,13 +147,19 @@ class CohortSamplePedFileRecord(models.Model):
     ped_file_record = models.ForeignKey(PedFileRecord, on_delete=CASCADE)
 
 
-class PedigreeInheritance:
-    AUTOSOMAL_RECESSIVE = 'R'
-    AUTOSOMAL_DOMINANT = 'D'
-    CHOICES = (
-        (AUTOSOMAL_RECESSIVE, 'Auto. Recessive'),
-        (AUTOSOMAL_DOMINANT, 'Auto. Dominant'),
-    )
+class SomalierPedigreeRelate(SomalierRelate):
+    pedigree = models.OneToOneField(Pedigree, on_delete=CASCADE)
+
+    def get_samples(self) -> Iterable[Sample]:
+        return self.pedigree.get_samples()
+
+    def write_ped_file(self, filename):
+        pass
+
+
+class PedigreeInheritance(models.TextChoices):
+    AUTOSOMAL_RECESSIVE = 'R', 'Auto. Recessive'
+    AUTOSOMAL_DOMINANT = 'D', 'Auto. Dominant'
 
 
 def create_automatch_pedigree(user, ped_file_family, cohort):

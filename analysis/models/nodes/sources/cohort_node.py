@@ -13,7 +13,7 @@ from analysis.models import GroupOperation, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import Zygosity, SimpleZygosity
-from snpdb.models import Cohort, CohortSample, VariantsType
+from snpdb.models import Cohort, CohortSample, VariantsType, GenomeBuild
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
@@ -204,11 +204,12 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def get_node_class_label():
         return "Cohort"
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.cohort:
             errors.append("No cohort selected.")
         else:
+            errors.extend(self._get_genome_build_errors("cohort", self.cohort.genome_build))
             try:
                 self.cohort.cohort_genotype_collection
             except:

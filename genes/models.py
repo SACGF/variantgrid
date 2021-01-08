@@ -66,7 +66,7 @@ class HGNCGeneNames(models.Model):
     hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
     approved_symbol = models.TextField()
     approved_name = models.TextField()
-    status = models.CharField(max_length=1, choices=HGNCStatus.CHOICES)
+    status = models.CharField(max_length=1, choices=HGNCStatus.choices)
     previous_symbols = models.TextField()
     synonyms = models.TextField()
     refseq_ids = models.TextField()
@@ -156,7 +156,7 @@ class GeneSymbolAlias(TimeStampedModel):
     """
     alias = models.TextField(unique=True)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.CHOICES)
+    source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.choices)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     description = models.TextField(null=True)
 
@@ -258,7 +258,7 @@ class GeneAnnotationImport(TimeStampedModel):
 
         Many gene/transcript versions are shared among GTF annotations, so a GeneVersion/TranscriptVersion is only
         created the first time it's seen (linked back to input which created it via 'import_source') """
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     filename = models.TextField()
 
@@ -270,7 +270,7 @@ class Gene(models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
     @property
     def is_legacy(self):
@@ -316,7 +316,6 @@ class Gene(models.Model):
         if ret:
              print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
              print(ret)
-
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
@@ -413,7 +412,7 @@ TranscriptParts = namedtuple('TranscriptParts', ['identifier', 'version'])
 class Transcript(models.Model):
     """ A stable identifier - has versions with actual transcript details """
     identifier = models.TextField(primary_key=True)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
     def get_absolute_url(self):
         kwargs = {"transcript_id": self.identifier}
@@ -703,7 +702,7 @@ class GeneAnnotationRelease(models.Model):
         This release can be set on a VariantAnnotationVersion to be able to get genes/transcripts from a VEP build
     """
     version = models.IntegerField()
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     gene_annotation_import = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
 
@@ -713,6 +712,16 @@ class GeneAnnotationRelease(models.Model):
     def get_genes(self):
         return Gene.objects.filter(annotation_consortium=self.annotation_consortium,
                                    geneversion__releasegeneversion__release=self)
+
+    @staticmethod
+    def get_for_latest_annotation_versions_for_builds() -> List['GeneAnnotationRelease']:
+        """ """
+        gene_annotation_releases = []
+        for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
+            vav = genome_build.latest_variant_annotation_version
+            if vav.gene_annotation_release:
+                gene_annotation_releases.append(vav.gene_annotation_release)
+        return gene_annotation_releases
 
     def __str__(self):
         return f"{self.genome_build.name}/{self.get_annotation_consortium_display()} - v{self.version}"
@@ -856,7 +865,7 @@ class GeneList(models.Model):
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     error_message = models.TextField(null=True, blank=True)
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
@@ -1176,7 +1185,7 @@ class CanonicalTranscriptCollection(TimeStampedModel):
     description = models.TextField(blank=True)
     filename = models.TextField(blank=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     file_md5sum = models.TextField()
 
     @staticmethod
@@ -1209,7 +1218,7 @@ class CanonicalTranscript(models.Model):
 
 class GeneCoverageCollection(models.Model):
     path = models.TextField()
-    data_state = models.CharField(max_length=1, choices=DataState.CHOICES)
+    data_state = models.CharField(max_length=1, choices=DataState.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     @staticmethod

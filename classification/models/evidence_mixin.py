@@ -1,9 +1,6 @@
-from enum import Enum
 from functools import total_ordering
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
-
 from lazy import lazy
-
 from annotation.models import Citation, CitationSource
 from genes.hgvs import CHGVS
 from library.log_utils import report_message
@@ -12,18 +9,6 @@ from snpdb.models import GenomeBuild
 from classification.enums import SpecialEKeys, CriteriaEvaluation
 from django.conf import settings
 import re
-
-VCStoreValue = Dict[str, Any]
-VCPatchValue = Union[None, Dict[str, Any]]
-VCStore = Dict[str, VCStoreValue]
-VCPatch = Dict[str, VCPatchValue]
-
-
-class VCBlobKeys(Enum):
-    VALUE = "value"
-    NOTE = "note"
-    DB_REFS = "db_refs"
-    EXPLAIN = "explain"
 
 
 class VCDbRefDict(TypedDict, total=False):
@@ -40,6 +25,12 @@ class VCBlobDict(TypedDict, total=False):
     note: str
     explain: str
     db_refs: List[VCDbRefDict]
+
+
+VCStoreValue = VCBlobDict
+VCPatchValue = Union[None, VCStoreValue]
+VCStore = Dict[str, VCStoreValue]
+VCPatch = Dict[str, VCPatchValue]
 
 
 @total_ordering
@@ -121,7 +112,7 @@ class EvidenceMixin:
         return GenomeBuild.get_name_or_alias(build_name)
 
     @lazy
-    def db_refs(self) -> List[VCDbRefDict]:
+    def db_refs(self) -> List[Dict]:
         all_db_refs = []
         for blob in self._evidence.values():
             db_refs = blob.get('db_refs')
@@ -146,7 +137,7 @@ class EvidenceMixin:
     def criteria_strength_summary(self, ekeys: Optional['EvidenceKeyMap'] = None, only_acmg: bool = False) -> str:
         if ekeys is None:
             from classification.models import EvidenceKeyMap
-            ekeys = EvidenceKeyMap()
+            ekeys = EvidenceKeyMap.instance()
 
         criteria: List[CriteriaStrength] = []
         for ek in ekeys.criteria():

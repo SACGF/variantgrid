@@ -224,7 +224,7 @@ class KaryotypeCounts(models.Model):
 class GenomeKaryomappingCounts(KaryotypeCounts, models.Model):
     """ Full sample (eg panel/exome not necessarily WGS) """
     trio = models.OneToOneField(Trio, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
     @property
     def relatedness_summary(self):

@@ -210,6 +210,13 @@ $(document).ready(function() {
                     <b>Analysis locked</b> - you cannot change samples.</div>
                 {% endif %}
 
+                <h4>
+                    {{ node.get_node_class_label }}
+                    <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
+                        <i title="Help docs on this node" class="fas fa-book"></i>
+                    </a>
+                </h4>
+
 			{% endblock node_filter_info %}
 			{% block content %}{% endblock content %}
 		</div>

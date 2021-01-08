@@ -1,6 +1,6 @@
 {% extends menu_data_base %}
 {% load static %}
-
+{% load js_tags %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -20,6 +20,11 @@
     {% load help_tags %}
     {% page_help user 'variantopedia/dashboard_help' 'Help' %}
     {% endcomment %}
+
+        <div class="mt-4">
+            Code last modified: {% timestamp git.last_modified_date time_ago=True %}, see
+            <a href="{% url 'changelog' %}">changelog</a>.
+        </div>
 
     {% if sapath_enabled %}
         {% if user_has_cases %}

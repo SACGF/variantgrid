@@ -300,11 +300,8 @@ class Searcher:
             self.can_create = False
 
         user_settings = UserSettings.get_for_user(user)
-        genome_build_preferred = user_settings.default_genome_build
-        genome_build_all = user_settings.get_genome_builds()
-
-        self.genome_build_preferred = genome_build_preferred
-        self.genome_build_all = genome_build_all
+        self.genome_build_preferred = user_settings.default_genome_build
+        self.genome_build_all = GenomeBuild.builds_with_annotation()
 
     def search(self) -> SearchResults:
         search_results = SearchResults(genome_build_preferred=self.genome_build_preferred)

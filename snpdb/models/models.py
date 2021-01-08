@@ -161,7 +161,6 @@ class Organization(models.Model):
     short_name = models.TextField(blank=False, null=True)  # Don't use for anything other than human labels
     group_name = models.TextField(blank=True, null=True, unique=True)
     classification_config = models.JSONField(null=True, blank=True)
-    classification_report_template = models.TextField(null=True, blank=True)
     active = models.BooleanField(default=True, blank=True)
 
     class Meta:
@@ -444,18 +443,3 @@ class SiteMessage(models.Model):
             site_message_str = json.dumps(site_message_dict)
             cache.set(SITE_MESSAGE_KEY, site_message_str, timeout=30)
         return site_message_dict
-
-    def __str__(self):
-        """ Will be shut down at 2019-01-07 04:29:18+00:00 be ready that is in 48 seconds from now """
-        params = defaultdict(str)
-        if self.date_time:
-            params["date_time"] = self.date_time
-            now = timezone.now()
-            in_the_past = now > self.date_time
-            if in_the_past:
-                description = "overdue by %s"
-            else:
-                description = "%s from now"
-            params["time_away"] = description % timesince(now, self.date_time, reversed=in_the_past)
-
-        return self.message % params

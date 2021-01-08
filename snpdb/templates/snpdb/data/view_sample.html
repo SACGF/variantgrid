@@ -5,6 +5,7 @@
 {% load help_tags %}
 {% load js_tags %}
 {% load vcf_import_info_tags %}
+{% load tz %}
 
 {% block title %}{{ sample.name }}{% endblock %}
 {% block head %}
@@ -122,6 +123,9 @@ $(document).ready(function() {
         <li><a href="#details">Details</a></li>
         {% if sample.samplestats.import_status == 'S' %}
         <li><a href="#sample-stats">Stats</a></li>
+        {% if somalier_enabled and sample.somaliersampleextract.somalierancestry %}
+            <li><a href="#sample-ancestry">Ancestry</a></li>
+        {% endif %}
         <li><a href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
         {% endif %}
         {% if sample.import_status == 'S' or sample.import_status == 'A' %}
@@ -244,10 +248,108 @@ $(document).ready(function() {
         {% endif %}
     </div>
 	{% endif %}
- 
+     {% if somalier_enabled %}
+        {% with ancestry=sample.somaliersampleextract.somalierancestry %}
+            {% if ancestry %}
+                <div id="sample-ancestry">
+                    <p>
+                        Prediction by <a href="https://github.com/brentp/somalier">Somalier</a>
+                    </p>
+                    <table>
+                        <tr>
+                            <th>Predicted</th>
+                            <th>AFR prob</th>
+                            <th>AMR prob</th>
+                            <th>EAS prob</th>
+                            <th>EUR prob</th>
+                            <th>SAS prob</th>
+                        </tr>
+                        <tr>
+                            <td>{{ ancestry.get_predicted_ancestry_display }}</td>
+                            <td>{{ ancestry.AFR_prob }}</td>
+                            <td>{{ ancestry.AMR_prob }}</td>
+                            <td>{{ ancestry.EAS_prob }}</td>
+                            <td>{{ ancestry.EUR_prob }}</td>
+                            <td>{{ ancestry.SAS_prob }}</td>
+                        </tr>
+                    </table>
+
+                    <h3>Extract</h3>
+                    <table>
+                        <tr>
+                            <th>Date</th>
+                            <td>{{ sample.somaliersampleextract.vcf_extract.created | localtime }}</td>
+                        </tr>
+                        <tr>
+                            <th>REF count</th>
+                            <td>{{ sample.somaliersampleextract.ref_count }}</td>
+                        </tr>
+                        <tr>
+                            <th>HET count</th>
+                            <td>{{ sample.somaliersampleextract.het_count }}</td>
+                        </tr>
+                        <tr>
+                            <th>HOM count</th>
+                            <td>{{ sample.somaliersampleextract.hom_count }}</td>
+                        </tr>
+                    </table>
+                </div>
+            {% endif %}
+        {% endwith %}
+    {% endif %}
+
+
     {% related_data_for_samples samples show_sample_info=False %}
     {% related_analyses_for_samples samples show_sample_info=False %}
 
+    {% if somalier_enabled and related_samples.exists %}
+        <h3>Related Samples</h3>
+        <p>Relatedness of 0.5 is a parent/child or sibling.</p>
+        <table>
+            <tr>
+                <th>Sample</th>
+                <th>relatedness</th>
+                <th>ibs0</th>
+                <th>ibs2</th>
+                <th>hom_concordance</th>
+                <th>hets_a</th>
+                <th>hets_b</th>
+                <th>hets_ab</th>
+                <th>shared_hets</th>
+                <th>hom_alts_a</th>
+                <th>hom_alts_b</th>
+                <th>shared_hom_alts</th>
+                <th>N</th>
+                <th>x_ibs0</th>
+                <th>x_ibs2</th>
+            </tr>
+            {% for rp in related_samples %}
+                <tr>
+                    <td>
+                        {% if rp.sample_a == sample %}
+                            <a href="{% url 'view_sample' rp.sample_b.pk %}">{{ rp.sample_b }}</a>
+                        {% else %}
+                            <a href="{% url 'view_sample' rp.sample_a.pk %}">{{ rp.sample_a }}</a>
+                        {% endif %}
+                    </td>
+                    <td>{{ rp.relatedness }}</td>
+                    <td>{{ rp.ibs0 }}</td>
+                    <td>{{ rp.ibs2 }}</td>
+                    <td>{{ rp.hom_concordance }}</td>
+                    <td>{{ rp.hets_a }}</td>
+                    <td>{{ rp.hets_b }}</td>
+                    <td>{{ rp.hets_ab }}</td>
+                    <td>{{ rp.shared_hets }}</td>
+                    <td>{{ rp.hom_alts_a }}</td>
+                    <td>{{ rp.hom_alts_b }}</td>
+                    <td>{{ rp.shared_hom_alts }}</td>
+                    <td>{{ rp.n }}</td>
+                    <td>{{ rp.x_ibs0 }}</td>
+                    <td>{{ rp.x_ibs2 }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
     </div>
 <div id="error-dialog" class="no-close" title="Error">
 </div>

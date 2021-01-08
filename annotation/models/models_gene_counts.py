@@ -148,7 +148,7 @@ class GeneValueCount(models.Model):
 class CohortGeneCounts(models.Model):
     variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     gene_count_type = models.ForeignKey(GeneCountType, on_delete=CASCADE)
-    processing_status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES,
+    processing_status = models.CharField(max_length=1, choices=ProcessingStatus.choices,
                                          default=ProcessingStatus.CREATED)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     cohort_version = models.IntegerField()

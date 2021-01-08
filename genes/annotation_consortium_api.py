@@ -8,10 +8,9 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 def transcript_exists(genome_build: GenomeBuild, identifier, version) -> Tuple[str, bool]:
-    ac_labels = dict(AnnotationConsortium.CHOICES)
     if identifier.startswith("ENST"):
-        return ac_labels[AnnotationConsortium.ENSEMBL], ensembl_transcript_exists(genome_build, identifier, version)
-    return ac_labels[AnnotationConsortium.REFSEQ], refseq_transcript_exists(identifier, version)
+        return AnnotationConsortium.ENSEMBL.label, ensembl_transcript_exists(genome_build, identifier, version)
+    return AnnotationConsortium.REFSEQ.label, refseq_transcript_exists(identifier, version)
 
 
 def ensembl_transcript_exists(genome_build: GenomeBuild, identifier, version=None):

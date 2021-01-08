@@ -21,7 +21,7 @@ class MutationalSignatureCalculator(SoftwareVersion):
 class MutationalSignature(models.Model):
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
     calculator = models.ForeignKey(MutationalSignatureCalculator, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     summary = models.TextField()
     mean = ArrayField(FloatField(), null=True)
     num_snps = models.IntegerField(null=True)

@@ -88,7 +88,7 @@ class AutopopulateData:
     @property
     def summary(self) -> str:
         sums = []
-        ekeys = EvidenceKeyMap()
+        ekeys = EvidenceKeyMap.instance()
         flattened = self.flatten()
         sums.append(f'The following fields were auto-populated by {Site.objects.get_current().name}')
         for ap in flattened:
@@ -163,7 +163,7 @@ def ekey_from_vg_column_formatters():
         'pfam_protein_domain': domain_to_pfam,
         "literature": pubmed_formatter,
         "sift": get_choices_formatter(SIFTPrediction.CHOICES),
-        "variant_class": get_choices_formatter(VariantClass.CHOICES),
+        "variant_class": get_choices_formatter(VariantClass.choices),
     }
 
 

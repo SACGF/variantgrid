@@ -189,7 +189,7 @@ class PhenotypeNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Phenotype Node"
+        return "Phenotype"
 
 
 class PhenotypeNodeHPO(models.Model):

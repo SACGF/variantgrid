@@ -347,11 +347,12 @@ VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW = False  # if true, when view classi
 
 VARIANT_CLASSIFICATION_DASHBOARD_SIZE = 50
 VARIANT_CLASSIFICATION_RECLASSIFICATION_EMAIL = True
-VARIANT_CLASSIFICATION_ID_FILTER = False
+VARIANT_CLASSIFICATION_ID_FILTER = True
 VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME = True
 VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN = True  # Should Allele origin (e.g. germline/somatic) be shown on the grid
 VARIANT_CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. True = Shared
 VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS = True
+VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID = True
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
 VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = True
@@ -361,7 +362,6 @@ VARIANT_CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT = True  # Can create pur
 
 VARIANT_CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID = False
 VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH = 100  # Used for MVL export, for general display limit is 10
 
 PATHOLOGY_TESTS_ENABLED = False
@@ -376,7 +376,6 @@ PEDIGREE_MADELINE2_COMMAND = None  # Install https://madeline.med.umich.edu/made
 INITIAL_USER_DATA_PREFIX_KWARGS = {}  # Create UserDataPrefix object to setup IGV for new users
 
 USER_SETTINGS_SHOW_GROUPS = True
-USER_SETTINGS_SHOW_BUILDS = True  # If false, user can still choose preferred build, but can't ignore builds
 
 REDIS_PIPELINE_SIZE = 100000
 SQL_BATCH_INSERT_SIZE = 50000
@@ -681,6 +680,26 @@ PUBLIC_PATHS = [
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 
+
+# Somalier config - see https://github.com/brentp/somalier
+
+SOMALIER = {
+    "enabled": False,
+    "vcf_base_dir": os.path.join(PRIVATE_DATA_ROOT, "somalier"),  # Private data
+    "report_base_dir": os.path.join(MEDIA_ROOT, "somalier"),  # Static files served by Nginx
+    "annotation_base_dir": os.path.join(ANNOTATION_BASE_DIR, "somalier"),
+    "annotation": {  # All annotation paths relative to "annotation_base_dir"
+        "command": "somalier",
+        "ancestry_labels": "ancestry-labels-1kg.tsv",
+        "ancestry_somalier_dir": "1kg-somalier",
+        "sites": {
+            "GRCh37": "sites.GRCh37.vcf.gz",  # No chr prefix on chromosome names
+            "GRCh38": "sites.hg38.nochr.vcf.gz",  # No chr prefix on chromosome names
+        },
+    },
+}
+
+
 # @see https://github.com/SACGF/variantgrid/wiki/URL---Menu-configuration
 # Before URLs are registered, the URLS_APP_REGISTER and URLS_NAME_REGISTER are looked up
 # To make a whitelist - change the default to False, then add overrides, eg 'url_name' : True for allowed
@@ -761,6 +780,7 @@ POPEN_SHELL = True  # For vcf split - todo put back...
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages
 
+# @see https://docs.djangoproject.com/en/3.1/ref/settings/#message-tags
 MESSAGE_TAGS = {
     messages.DEBUG: 'alert-info',
     messages.INFO: 'alert-info',

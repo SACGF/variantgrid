@@ -16,6 +16,7 @@ class SyncDestination(models.Model):
 
     name = models.TextField(null=False, unique=True)
     config = models.JSONField(null=False, blank=True, default=empty_dict)
+    enabled = models.BooleanField(null=False, blank=True, default=True)
 
     def run(self, full_sync: bool = False):
         from sync.sync_runner import run_sync
@@ -30,7 +31,7 @@ class SyncRun(TimeStampedModel):
     An instance of
     """
     destination = models.ForeignKey(SyncDestination, on_delete=CASCADE)
-    status = models.CharField(max_length=1, choices=SyncStatus.CHOICES, null=False)
+    status = models.CharField(max_length=1, choices=SyncStatus.choices, null=False)
     meta = models.JSONField(null=True, blank=True, default=None)
 
     def __str__(self):

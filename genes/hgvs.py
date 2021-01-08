@@ -56,6 +56,10 @@ def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> List[st
 
 
 class CHGVS:
+    """
+    Technically this is HGVS now as it will accept c. p. g. n. etc
+    """
+
     def __init__(self, full_c_hgvs: str, transcript: str = None):
         if transcript:
             transcript = transcript.upper()
@@ -66,7 +70,7 @@ class CHGVS:
         self.gene = None
         self.overrode_transcript = True
 
-        c_regex = re.compile('(.*?)(?:[(](.*?)[)])?:(c.*)')
+        c_regex = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
         match = c_regex.match(full_c_hgvs)
         if match:
             self.gene = match[2]
@@ -83,9 +87,12 @@ class CHGVS:
             self.raw_c = full_c_hgvs
 
     def with_gene_symbol(self, gene_symbol: str) -> 'CHGVS':
-        self.gene = gene_symbol
-        new_full_chgvs = f'{self.transcript}({self.gene}):{self.raw_c}'
-        return CHGVS(new_full_chgvs)
+        if self.transcript:
+            new_full_chgvs = f'{self.transcript}({gene_symbol}):{self.raw_c}'
+            return CHGVS(new_full_chgvs)
+        else:
+            # if there's no transcript we're invalid, not much we can do
+            return self
 
     def without_transcript_version(self) -> 'CHGVS':
         if self.transcript_parts:

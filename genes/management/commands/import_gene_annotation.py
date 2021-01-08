@@ -38,7 +38,7 @@ class Command(BaseCommand):
         self.known_transcript_versions_by_transcript_id = defaultdict(dict)
 
     def add_arguments(self, parser):
-        consortia = [ac[1] for ac in AnnotationConsortium.CHOICES]
+        consortia = [ac[1] for ac in AnnotationConsortium.choices]
         builds = [gb.name for gb in GenomeBuild.builds_with_annotation()]
 
         parser.add_argument('--genome-build', choices=builds, required=True)
@@ -60,7 +60,7 @@ class Command(BaseCommand):
         genepred_filenames = options["genePred"]
 
         genome_build = GenomeBuild.get_name_or_alias(build_name)
-        ac_dict = invert_dict(dict(AnnotationConsortium.CHOICES))
+        ac_dict = invert_dict(dict(AnnotationConsortium.choices))
         annotation_consortium = ac_dict[annotation_consortium_name]
 
         # gff/genePred sanity checks

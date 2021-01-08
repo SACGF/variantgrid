@@ -76,7 +76,7 @@
     <div class="container">
         <h3>QC Coverage</h3>
         {% load genome_build_tags %}
-        {% genome_build_url_arg user 'genome_build_qc_coverage' genome_build %}
+        {% genome_build_url_arg genome_build 'genome_build_qc_coverage' %}
 
         <form id="new-gene-list-form" method="post">
             {% csrf_token %}

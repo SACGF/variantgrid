@@ -1,4 +1,5 @@
 beautifulsoup4
+bgzip
 Bio
 celery
 ConfigArgParse
@@ -35,7 +36,6 @@ HTSeq
 ijson
 kombu
 lazy
-lxml
 Markdown
 matplotlib
 mozilla_django_oidc

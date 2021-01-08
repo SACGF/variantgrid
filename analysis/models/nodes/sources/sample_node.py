@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -12,7 +12,7 @@ from analysis.models.nodes.cohort_mixin import SampleMixin
 from annotation.models import SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, \
     SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter, \
     SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter
-from genes.models import SampleGeneList, ActiveSampleGeneList
+from genes.models import SampleGeneList
 from patients.models_enums import Zygosity
 from snpdb.models import SampleStats, SampleStatsPassingFilter, Sample
 from snpdb.models.models_enums import BuiltInFilters
@@ -183,10 +183,12 @@ class SampleNode(SampleMixin, AnalysisNode):
     def get_node_class_label():
         return "Sample"
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.sample:
             errors.append("No sample selected.")
+        else:
+            errors.extend(self._get_genome_build_errors("sample", self.sample.genome_build))
         return errors
 
     def get_rendering_args(self):

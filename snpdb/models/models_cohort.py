@@ -43,7 +43,7 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         Data is stored in CohortGenotype rows, which are partitioned by CohortGenotypeCollection """
     name = models.TextField()
     version = models.IntegerField(null=False, default=0)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     vcf = models.OneToOneField(VCF, null=True, on_delete=CASCADE)
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort
@@ -331,7 +331,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         # For https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
         return self.get_packed_index_by_sample_id[sample_id]  # 0 based
 
-    def get_zygosity_q(self, sample_zygosities: dict, sample_require_zygosity: dict = None, exclude=False):
+    def get_zygosity_q(self, sample_zygosities: dict, sample_require_zygosity: dict = None, exclude=False) -> Q:
         """ sample_zygosities = {sample : zygosities_set}
             sample_require_zygosity = {sample : True/False} - defaults to True
             exclude - invert query (not equals)

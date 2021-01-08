@@ -11,26 +11,18 @@
 {% block css %}
     div.generated-graph {
         width: auto !important;
-        height: auto !important;
         overflow: visible !important;
     }
 
     div.generated-graph img {
         width: 100%;
+        max-height: 100%;
     }
 
     .ped-family-container {
         margin-bottom: 20px;
     }
 
-	table.ped-family-table {
-		border-collapse: collapse;
-	}
-	
-	table.ped-family-table td, table.ped-family-table th {
-		border: 1px solid black;
-		padding: 5px;
-	}
 {% endblock css %}
 
 {% block jsdocumentready %}
@@ -83,7 +75,7 @@
 		<div class="ped-family-container" id="family-{{family.name}}">
 			<h3>Pedigree: {{ family.name }}</h3>
 			
-			<table class='ped-family-table'>
+			<table class='table'>
 				<tr>
 				<th>Sample
 				<th>Father

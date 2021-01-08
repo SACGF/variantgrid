@@ -1,27 +1,10 @@
-{%  if has_other_genome_builds %}
-    <style>
-    ul.horizontal {
-        list-style-type: none;
-    }
-
-    ul.horizontal li {
-        margin: 5px;
-        float: left;
-    }
-
-    .genome-build-{{  genome_build.name }} {
-        font-weight: bold;
-    }
-    </style>
-    <div>
-    <ul class="horizontal">
-        <li><b>GenomeBuild:</b></li>
-    {% for gb in user_settings.get_genome_builds %}
-        <li class="genome-build-{{ gb.name }}">
-            <a href="{% url url_name gb.name %}">{{ gb }}</a>
-        </li>
-    {%  endfor %}
-    </ul>
-    <div class="clear"></div>
+{%  if other_genome_builds_exist %}
+<div class="btn-group" data-toggle="buttons">
+    {% for bu in build_urls %}
+        <a href="{{ bu.url }}"
+           class="btn btn-outline-secondary {{ bu.css_class }}">
+            {{ bu.genome_build }}
+        </a>
+    {% endfor %}
 </div>
 {%  endif %}

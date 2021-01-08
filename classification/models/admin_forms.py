@@ -116,7 +116,7 @@ class ClassificationUserFilter(admin.SimpleListFilter):
 
 class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
     title = 'Imported Genome Build Filter'
-    parameter_name = 'user'
+    parameter_name = 'genome_build'
     default_value = None
 
     def lookups(self, request, model_admin):
@@ -124,8 +124,8 @@ class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
         return [(build.pk, build.name) for build in builds]
 
     def queryset(self, request, queryset):
-        if self.value():
-            substring = GenomeBuild.objects.get(pk=self.value()).name
+        if value := self.value():
+            substring = GenomeBuild.objects.get(pk=value).name
             return queryset.filter(evidence__genome_build__value__istartswith=substring)
         return queryset
 
@@ -460,6 +460,16 @@ class EvidenceKeyAdmin(admin.ModelAdmin):
             'options': JSONEditorWidget(options_schema, True),
             'examples': JSONEditorWidget(examples_schema, True),
 
+        }, **kwargs)
+
+
+class ClassificationReportTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'modified')
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget(),
+            'template': admin.widgets.AdminTextareaWidget()
         }, **kwargs)
 
 

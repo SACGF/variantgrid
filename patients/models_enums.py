@@ -93,7 +93,7 @@ class Sex(models.TextChoices):
     UNKNOWN = 'U', 'unknown'
     MALE = 'M', 'male'
     FEMALE = 'F', 'female'
-    FILLED_IN_CHOICES = Constant((MALE, FEMALE))
+    FILLED_IN_CHOICES = Constant((MALE[0], FEMALE[0]))
 
     @staticmethod
     def string_to_sex(s):

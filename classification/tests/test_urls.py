@@ -53,7 +53,6 @@ class Test(URLTestCase):
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             # ('classification_diff', {"GET_PARAMS": {"history": classification.pk}}, 200),
             # ('classification_diff', {"GET_PARAMS": {"record_ids": f"[{classification.pk}]"}}, 200),
-            # ('classification_clinvar_xml', record_kwargs, 200),
             # ('classification_csv', record_kwargs, 200),
             # ('view_template_report', record_kwargs, 200),
             ('classification_history', record_kwargs, 200),

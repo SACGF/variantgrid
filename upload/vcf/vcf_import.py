@@ -174,11 +174,11 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
         if no_dna_control_sample_pattern and no_dna_control_sample_pattern.findall(sample_name):
             no_dna_control = True
 
-        sample = Sample.objects.create(vcf=vcf,
-                                       vcf_sample_name=sample_name,
-                                       name=sample_name,
-                                       no_dna_control=no_dna_control,
-                                       import_status=ImportStatus.IMPORTING)
+        Sample.objects.create(vcf=vcf,
+                              vcf_sample_name=sample_name,
+                              name=sample_name,
+                              no_dna_control=no_dna_control,
+                              import_status=ImportStatus.IMPORTING)
 
     if backend_vcf:
         link_samples_and_vcfs_to_sequencing(backend_vcf)

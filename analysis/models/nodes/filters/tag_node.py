@@ -37,7 +37,7 @@ class TagNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Tag Filter"
+        return "Tags"
 
     def _get_method_summary(self):
         return f"Tagged {self.tag.id}"

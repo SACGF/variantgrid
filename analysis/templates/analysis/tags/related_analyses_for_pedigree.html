@@ -2,7 +2,7 @@
 {% block create_analyses %}
 
     {% load related_analyses_tags %}
-    {% analysis_templates_tag pedigree=pedigree %}
+    {% analysis_templates_tag pedigree.genome_build pedigree=pedigree %}
 
 {% endblock create_analyses %}
     

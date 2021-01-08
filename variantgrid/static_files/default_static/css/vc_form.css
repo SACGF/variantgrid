@@ -328,6 +328,8 @@ table.diff tbody tr .explain-icon {
 }
 #vc-extras #vcform-help .card-body {
   min-height: 200px;
+  max-height: 600px;
+  overflow-y: hidden;
   background-color: #eef;
 }
 #vc-extras .share-icon {
@@ -449,7 +451,7 @@ tr.template-download .toggle {
 #vc-form .btn-toolbar > * {
   flex-grow: 1;
   flex-shrink: 1;
-  width: 30%;
+  width: 48%;
 }
 #vc-form .btn-toolbar > * {
   height: 40px;
@@ -462,6 +464,9 @@ tr.template-download .toggle {
 }
 #vc-form .citation {
   overflow-wrap: break-word;
+}
+#vc-form h5 {
+  font-size: 1.15rem;
 }
 
 #vc-extras {

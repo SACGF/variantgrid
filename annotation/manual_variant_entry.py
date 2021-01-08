@@ -2,12 +2,12 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 import os
 
+from annotation.models import ManualVariantEntryType
 from annotation.models.models import ManualVariantEntryCollection, ManualVariantEntry
-from annotation.tasks.process_manual_variants_task import ManualVariantsPostInsertTask
+from annotation.tasks.process_manual_variants_task import ManualVariantsPostInsertTask, get_manual_variant_tuples
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
 from library.vcf_utils import write_vcf_from_tuples
-from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ImportSource
 from upload.models import UploadPipeline, UploadedFile, UploadStep, \
@@ -35,16 +35,22 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
     variants_list = []
     for i, line in enumerate(variants_text.split('\n')):
         line = line.strip()
+        entry_type = ManualVariantEntry.get_entry_type(line)
         kwargs = {"manual_variant_entry_collection": mvec,
                   "line_number": i + 1,
-                  "entry_text": line}
+                  "entry_text": line,
+                  "entry_type": entry_type}
 
-        if variant_tuple := Variant.get_tuple_from_string(line, mvec.genome_build):
-            variants_list.append(variant_tuple)
-        else:
-            kwargs["error_message"] = f"Couldn't convert '{line}' to tuple"
+        if entry_type == ManualVariantEntryType.UNKNOWN:
+            kwargs["error_message"] = f"Couldn't determine type of '{line}'"
+        mve = ManualVariantEntry.objects.create(**kwargs)
 
-        ManualVariantEntry.objects.create(**kwargs)
+        if entry_type != ManualVariantEntryType.UNKNOWN:
+            try:
+                variants_list.extend(get_manual_variant_tuples(mve))
+            except ValueError as ve:
+                mve.error_message = f"Error parsing {entry_type}: '{ve}'"
+                mve.save()
 
     # Because we need to normalise / insert etc, it's easier just to write a VCF
     # and run through upload pipeline

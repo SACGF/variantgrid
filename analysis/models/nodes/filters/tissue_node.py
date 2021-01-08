@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -9,7 +9,7 @@ import operator
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models.models import HumanProteinAtlasTissueSample, \
     HumanProteinAtlasAnnotation
-from annotation.models.models_enums import HumanProteinAtlasAbundance
+from annotation.models.models_enums import HumanProteinAtlasAbundance, DetectedHumanProteinAtlasAbundance
 from genes.models import Gene
 
 
@@ -18,13 +18,13 @@ class TissueNode(AnalysisNode):
     UNIPROTKB = 1
 
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, null=True, blank=True, on_delete=SET_NULL)
-    min_abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.DETECTED_CHOICES, default=HumanProteinAtlasAbundance.LOW)
+    min_abundance = models.CharField(max_length=1, choices=DetectedHumanProteinAtlasAbundance.choices, default=DetectedHumanProteinAtlasAbundance.LOW)
     text_tissue = models.TextField(null=True, blank=True)
     accordion_panel = models.IntegerField(default=0)
     disabled = True  # Needs to be made per-genome build see Issue #9
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if self.analysis.annotation_version.human_protein_atlas_version is None:
             msg = "To use the TissueNode you must use an AnnotationVersion with human_protein_atlas_version not equal to None. <a href='javascript:analysisSettings()'>Open Analysis Settings</a>"
             errors.append(msg)
@@ -78,4 +78,4 @@ class TissueNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Tissue Node"
+        return "Tissue Expression"

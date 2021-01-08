@@ -52,15 +52,28 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return name
 
     @lazy
+    def template(self):
+        """ Works for both a template and a snapshot """
+        try:
+            return self.analysistemplate
+        except AnalysisTemplate.DoesNotExist:
+            try:
+                return self.analysistemplateversion.template
+            except AnalysisTemplateVersion.DoesNotExist:
+                return None
+
+    @lazy
     def last_lock(self):
         return self.analysislock_set.order_by("pk").last()
 
     def is_locked(self):
-        return self.last_lock and self.last_lock.locked
+        is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
+        return is_snapshot or (self.last_lock and self.last_lock.locked)
 
     def can_unlock(self, user):
         """ Use parent to see if we have Guardian permissions to write """
-        return super().can_write(user)
+        is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
+        return (not is_snapshot) and super().can_write(user)
 
     def lock_history(self):
         return self.analysislock_set.order_by("pk")
@@ -68,9 +81,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def can_write(self, user):
         """ Disable modification when locked """
         if super().can_write(user):
-            if self.last_lock:
-                return not self.last_lock.locked
-            return True
+            return not self.is_locked()
         return False
 
     def get_absolute_url(self):
@@ -379,13 +390,14 @@ class AnalysisTemplateRun(TimeStampedModel):
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)  # Created new analysis
 
     @staticmethod
-    def create(analysis_template: AnalysisTemplate, user: User = None):
+    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None):
         if user is None:
             user = admin_bot()
 
         template_version = analysis_template.active
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
+        analysis.genome_build = genome_build
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments

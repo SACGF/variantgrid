@@ -78,6 +78,7 @@ let Citations = (function() {
                     this.dbRefs.push(dbRef);
                 }
             }
+
             this.render();
             this.request();
         },
@@ -185,10 +186,14 @@ let Citations = (function() {
         render() {
             if (this.dom) {
                 this.dom.empty();
-                for (let dbRef of this.dbRefs) {
-                    let citDom = $('<div>', {class: 'citation'});
-                    this.renderDbRefState(dbRef, citDom);
-                    this.dom.append(citDom);
+                if (this.dbRefs.length) {
+                    for (let dbRef of this.dbRefs) {
+                        let citDom = $('<div>', {class: 'citation'});
+                        this.renderDbRefState(dbRef, citDom);
+                        this.dom.append(citDom);
+                    }
+                } else {
+                    $('<span>', {text: 'No citations detected', class: 'no-value'}).appendTo(this.dom);
                 }
             } else {
                 for (let dbRef of this.dbRefs) {

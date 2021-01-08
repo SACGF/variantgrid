@@ -18,7 +18,7 @@ AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
 
-#SYNC_DETAILS = get_shariant_sync_secrets()
+SYNC_DETAILS = get_shariant_sync_secrets()
 
 COMPRESS_ENABLED = False
 BASH_ZCAT = 'gzcat'
@@ -300,5 +300,6 @@ VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH = True
 
 ANNOTATION_CACHED_WEB_RESOURCES = []
 SITE_MESSAGE = "This is the setting site message"
+VARIANT_CLASSIFICATION_MATCH_VARIANTS = False
 
 PREFER_ALLELE_LINKS = True

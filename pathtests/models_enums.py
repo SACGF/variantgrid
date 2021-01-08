@@ -1,85 +1,47 @@
-class CaseState:
-    OPEN = 'O'
-    NO_TEST = 'N'
-    CLOSED_SOLVED = 'S'
-    CLOSED_UNSOLVED = 'U'
+from django.db import models
 
-    CHOICES = (
-        (OPEN, 'open'),
-        (NO_TEST, 'No Test'),
-        (CLOSED_SOLVED, 'solved'),
-        (CLOSED_UNSOLVED, 'unsolved')
-    )
-
-    CLOSED_STATES = (CLOSED_SOLVED, CLOSED_UNSOLVED)
+from library.utils import Constant
 
 
-class CaseWorkflowStatus:
-    NA = 'NA'
-    SAMPLE_PROCESSING = 'SP'
-    LIBRARY_PREP_COMPLETE = "LP"
-    SEQUENCING_COMPLETE = "SC"
-    VCF_READY = "VR"
-    ANALYSIS_COMPLETE = 'AC'
-    REPORTING = 'RP'
+class CaseState(models.TextChoices):
+    OPEN = 'O', 'open'
+    NO_TEST = 'N', 'No Test'
+    CLOSED_SOLVED = 'S', 'solved'
+    CLOSED_UNSOLVED = 'U', 'unsolved'
 
-    CHOICES = (
-        (NA, "N/A"),
-        (SAMPLE_PROCESSING, "Sample Processing"),
-        (LIBRARY_PREP_COMPLETE, "Library Prep Complete"),
-        (SEQUENCING_COMPLETE, "Sequencing Complete"),
-        (VCF_READY, "VCF Ready"),
-        (ANALYSIS_COMPLETE, "Analysis Complete"),
-        (REPORTING, "Reporting"),
-    )
+    CLOSED_STATES = Constant((CLOSED_SOLVED[0], CLOSED_UNSOLVED[0]))
 
 
-class InvestigationType:
-    SINGLE_SAMPLE = 'S'
-    TRIO = 'T'
-    COHORT = 'C'
-
-    CHOICES = (
-        (SINGLE_SAMPLE, 'Single Sample'),
-        (TRIO, 'Trio'),
-        (COHORT, 'Cohort')
-    )
+class CaseWorkflowStatus(models.TextChoices):
+    NA = 'NA', "N/A"
+    SAMPLE_PROCESSING = 'SP', "Sample Processing"
+    LIBRARY_PREP_COMPLETE = "LP", "Library Prep Complete"
+    SEQUENCING_COMPLETE = "SC", "Sequencing Complete"
+    VCF_READY = "VR", "VCF Ready"
+    ANALYSIS_COMPLETE = 'AC', "Analysis Complete"
+    REPORTING = 'RP', "Reporting"
 
 
-class PathologyTestGeneModificationOutcome:
-    PENDING = 'P'
-    ACCEPTED = 'A'
-    REJECTED = 'R'
-    CHOICES = (
-        (PENDING, 'Pending'),
-        (ACCEPTED, 'Accepted'),
-        (REJECTED, 'Rejected'),
-    )
+class InvestigationType(models.TextChoices):
+    SINGLE_SAMPLE = 'S', 'Single Sample'
+    TRIO = 'T', 'Trio'
+    COHORT = 'C', 'Cohort'
 
 
-class ClinicalSetting:
-    DIAGNOSTIC_TEST = 'D'
-    PREDICTIVE_TEST = 'P'
-    CARRIER_TEST = 'C'
-    PRENATAL = 'N'
-
-    CHOICES = (
-        ('', 'n/a'),
-        (DIAGNOSTIC_TEST, 'Diagnostic Test'),
-        (PREDICTIVE_TEST, 'Predictive Test'),
-        (CARRIER_TEST, 'Carrier Test'),
-        (PRENATAL, 'Prenatal'),
-    )
+class PathologyTestGeneModificationOutcome(models.TextChoices):
+    PENDING = 'P', 'Pending'
+    ACCEPTED = 'A', 'Accepted'
+    REJECTED = 'R', 'Rejected'
 
 
-class PathologyTestType:
-    COMMON_MUTATION_SCREEN = 'C'
-    FULL_GENE_MUTATION_ANALYSIS = 'F'
-    KNOWN_FAMILIAL_MUTATIONS = 'K'
+class ClinicalSetting(models.TextChoices):
+    DIAGNOSTIC_TEST = 'D', 'Diagnostic Test'
+    PREDICTIVE_TEST = 'P', 'Predictive Test'
+    CARRIER_TEST = 'C', 'Carrier Test'
+    PRENATAL = 'N', 'Prenatal'
 
-    CHOICES = (
-        ('', 'n/a'),
-        (COMMON_MUTATION_SCREEN, 'Common mutation screen'),
-        (FULL_GENE_MUTATION_ANALYSIS, 'Full gene mutation analysis'),
-        (KNOWN_FAMILIAL_MUTATIONS, 'Known familial mutation(s)'),
-    )
+
+class PathologyTestType(models.TextChoices):
+    COMMON_MUTATION_SCREEN = 'C', 'Common mutation screen'
+    FULL_GENE_MUTATION_ANALYSIS = 'F', 'Full gene mutation analysis'
+    KNOWN_FAMILIAL_MUTATIONS = 'K', 'Known familial mutation(s)'

@@ -65,9 +65,9 @@
 
 {% block submenu_page_content %}
     {% load genome_build_tags %}
-    {% genome_build_url_arg user 'genome_build_analyses_variant_tags' genome_build %}
+    {% genome_build_url_arg genome_build 'genome_build_analyses_variant_tags' %}
 
-    <h3>Analyses Variant Tags ({{ genome_build }})</h3>
+    <h3>Analyses Variant Tags</h3>
 
     {% if tag_counts %}
         <div id='tag-top-bar'> Click to filter:

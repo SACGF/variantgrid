@@ -4,6 +4,12 @@
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     <script src="{% static 'js/include_jqgrid.js' %}"></script>
+    <style>
+        /* Fix for grid being 100% size for some unknown reason after bootstrap */
+        #gbox_genotype-grid .ui-jqgrid-bdiv {
+            height: auto !important;
+        }
+    </style>
 
     <div id='locus' class="container">
         <h4>Locus</h4>
@@ -190,7 +196,6 @@
                           {name:'phred_likelihood',index:'phred_likelihood', label: 'Phred Likelihood', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},
                 ],
                 caption: "Variant Genotypes",
-                height: 'auto',
                 autowidth: true,
                 rowNum: 20,
                 pager: 'genotype-grid-pager',

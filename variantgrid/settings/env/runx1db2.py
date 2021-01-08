@@ -86,6 +86,3 @@ URLS_NAME_REGISTER.update({
     # patients
     "cases": False,
 })
-
-VARIANT_CLASSIFICATION_ID_FILTER = True
-VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID = True

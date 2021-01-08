@@ -25,8 +25,7 @@ class SequencingRunQCGraph(CacheableGraph):
         self.sequencing_run_id = sequencing_run_id
         self.qc_compare_type = qc_compare_type
         self.bp_color = SequencingRunQCGraph.BOXPLOT_COLORS.get(self.qc_compare_type, SequencingRunQCGraph.DEFAULT_BOXPLOT_COLOR)
-        qc_types_dict = dict(QCCompareType.CHOICES)
-        self.type_name = qc_types_dict[qc_compare_type]
+        self.type_name = QCCompareType(qc_compare_type).label
 
     @lazy
     def sequencing_run(self):

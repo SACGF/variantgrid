@@ -83,8 +83,8 @@ class AlleleOverlap:
         return sorted({vcm.best_hgvs(self.genome_build) for vcm in self.vcms})
 
     @lazy
-    def is_multiple_labs_shared(self):
-        labs: Set[str] = set()
+    def is_multiple_labs_shared(self) -> bool:
+        labs: Set[int] = set()
         for vcm in self.vcms:
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and CS_TO_NUMBER.get(clin_sig):
@@ -144,7 +144,8 @@ class AlleleOverlap:
             all_relevant_vcids.extend(vcids)
 
         # find the last published classification modifications for the relevant variants
-        vcid_vc: Dict[int, Classification] = dict()
+        vcid_vc: Dict[int, ClassificationModification] = dict()
+        vc: ClassificationModification
         for vc in ClassificationModification.latest_for_user(user=user, published=True) \
                 .filter(classification_id__in=all_relevant_vcids) \
                 .select_related('classification', 'classification__clinical_context',
