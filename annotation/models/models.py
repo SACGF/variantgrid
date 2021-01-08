@@ -1001,12 +1001,6 @@ class MonarchDiseaseOntology(models.Model, OntologyMixin):
         return f"https://vm-monitor.monarchinitiative.org/disease/MONDO:{self.padded_id}"
 
 
-class MonarchDiseaseOntologyRelationship(models.Model):
-    subject = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE, related_name="subject")
-    object = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE, related_name="object")
-    relationship = models.TextField()
-
-
 class MonarchDiseaseOntologyGeneRelationship(models.Model):
     mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
     relationship = models.TextField()

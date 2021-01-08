@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.db import models
 from django.db.models import PROTECT, CASCADE
 from model_utils.models import TimeStampedModel
@@ -39,13 +41,16 @@ class OntologyRelation(models.TextChoices):
 class OntologyImport(TimeStampedModel):
     ontology_set = models.CharField(max_length=5, choices=OntologySet.choices)
     filename = models.TextField()
+    context = models.TextField()
     hash = models.TextField()
-    notes = models.TextField()
+    processed_date = models.DateTimeField(auto_created=True)
+    completed = models.BooleanField(default=False)
 
 
 class OntologyTerm(TimeStampedModel):
+
     """
-    Term as it should be referenced <prefix>:<zero padded index> e.g.
+    id is Term as it should be referenced <prefix>:<zero padded index> e.g.
     MONDO:0000043, OMIM:0000343
     """
     id = models.TextField(primary_key=True)
@@ -71,6 +76,20 @@ class OntologyTermRelation(TimeStampedModel):
     dest_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
     relation = models.CharField(max_length=10, choices=OntologyRelation.choices)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
+
+    @staticmethod
+    def parent_of(source_term: OntologyTerm) -> Optional[OntologyTerm]:
+        if relationship := OntologyTermRelation.objects.filter(source_term=source_term, relation="is_a").first():
+            return relationship.dest_term
+        return None
+
+    @staticmethod
+    def mondo_version_of(term: OntologyTerm) -> Optional[OntologyTerm]:
+        if term.ontology_set == OntologySet.MONDO:
+            return term
+        if relationship := OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_set=OntologySet.MONDO).first():
+            return relationship.dest_term
+        return None
 
 
 class OntologyTermGeneRelation(TimeStampedModel):

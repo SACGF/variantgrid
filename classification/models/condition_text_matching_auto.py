@@ -7,19 +7,18 @@ from typing import Optional, List, Dict, Set, Iterable
 
 import requests
 import re
-from django.db.models import Q, Case, When
+from django.db.models import Q
 from django.db.models.functions import Length
-from django.db.models.lookups import IContains
 from lazy import lazy
 
-from annotation.models import MonarchDiseaseOntology, MonarchDiseaseOntologyGeneRelationship, \
-    MonarchDiseaseOntologyRelationship
-from classification.models import ConditionTextMatch, ConditionText
+from classification.models import ConditionText
 from genes.models import GeneSymbol
-
+from ontology.models import OntologyTermGeneRelation, OntologyTermRelation, OntologyTerm, OntologySet
+from ontology.panel_app_ontology import get_or_fetch_gene_relations
 
 SKIP_TERMS = {"", "disease", "disorder", "the", "a", "an", "and", "or", "for", "the", "type"}
 SUB_TYPE = re.compile("[0-9]+[a-z]?")
+
 
 def tokenize_condition_text(text: str):
     text = text.replace(";", " ").replace("-", " ").lower()
@@ -32,6 +31,7 @@ class CheckAPI(Enum):
     NEVER = 0
     IF_NO_LOCAL = 1
     ALWAYS = 2
+
 
 @dataclass
 class MatchRequest:
@@ -50,6 +50,7 @@ class GeneAssociationLevel(Enum):
     PARENT = 1
     DIRECT = 2
 
+
 @dataclass
 class ScorePart:
     calculation: str
@@ -58,18 +59,17 @@ class ScorePart:
 
 class AutoMatchScore:
 
-    def __init__(self, match: MonarchDiseaseOntology, request: MatchRequest):
+    def __init__(self, match: OntologyTerm, request: MatchRequest):
         self.match = match
         self.request = request
 
         self.mondo_gene_association = GeneAssociationLevel.NONE
-        self.mondo_gene_association_child: Optional[MonarchDiseaseOntology] = None
+        self.mondo_gene_association_child: Optional[OntologyTerm] = None
         if request.gene_symbol:
             self.mondo_gene_association = GeneAssociationLevel.MISSING
 
         self.score_parts = None
         self.score = None
-
 
     def calculate(self):
         score = 0.0
@@ -100,7 +100,7 @@ class AutoMatchScore:
             ))
         elif self.mondo_gene_association == GeneAssociationLevel.PARENT:
             score_parts.append(ScorePart(
-                calculation=f"Child term {self.mondo_gene_association_child.id_str} has {self.request.gene_symbol.symbol} association",
+                calculation=f"Child term {self.mondo_gene_association_child.id} has {self.request.gene_symbol.symbol} association",
                 score=75.0
             ))
         elif self.mondo_gene_association == GeneAssociationLevel.MISSING:
@@ -143,7 +143,7 @@ class AutoMatchScores:
 
     def __init__(self, request: MatchRequest):
         self.request = request
-        self.score_dict: Dict[MonarchDiseaseOntology, AutoMatchScore] = dict()
+        self.score_dict: Dict[OntologyTerm, AutoMatchScore] = dict()
 
     def __getitem__(self, item) -> AutoMatchScore:
         if existing := self.score_dict.get(item):
@@ -158,6 +158,10 @@ class AutoMatchScores:
 
 
 def attempt_auto_match_for_text(request: MatchRequest) -> List[AutoMatchScore]:
+    """
+    TODO do we even want to entertain matching non MONDO for this?
+    right now we only include it
+    """
     search_terms = request.tokenized_text
 
     if not search_terms:
@@ -166,8 +170,8 @@ def attempt_auto_match_for_text(request: MatchRequest) -> List[AutoMatchScore]:
     # this currently requires all words to be present
     qs = reduce(operator.and_, [Q(name__icontains=term) for term in search_terms])
 
-    matches_qs = MonarchDiseaseOntology.objects.filter(qs).order_by(Length('name').asc())  # find the smallest match that matches all the words
-    match: MonarchDiseaseOntology
+    matches_qs = OntologyTerm.objects.filter(qs).filter(ontology_set=OntologySet.MONDO).order_by(Length('name').asc())  # find the smallest match that matches all the words
+    match: OntologyTerm
 
     scored_match_dict = AutoMatchScores(request=request)
 
@@ -192,20 +196,20 @@ def attempt_auto_match_for_text(request: MatchRequest) -> List[AutoMatchScore]:
             if label:
                 label = label[0]
 
-            if api_match := MonarchDiseaseOntology.objects.filter(id=MonarchDiseaseOntology.id_as_int(o_id)).first():
+            if api_match := OntologyTerm.objects.filter(id=o_id).first():
                 scored_match_dict[api_match]
 
     if request.gene_symbol:
-        for relationship in MonarchDiseaseOntologyGeneRelationship.objects.filter(gene_symbol=request.gene_symbol):
-            gene_match = relationship.mondo
-            scorer = scored_match_dict[gene_match]
+        relationship: OntologyTermGeneRelation
+        for relationship in get_or_fetch_gene_relations(gene_symbol=request.gene_symbol):
+            gene_match_term = relationship.term
+            scorer = scored_match_dict[gene_match_term]
             scorer.mondo_gene_association = GeneAssociationLevel.DIRECT
 
-            for parent_relationship in MonarchDiseaseOntologyRelationship.objects.filter(subject=gene_match, relationship="is_a"):
-                gene_match_parent = parent_relationship.object
+            if gene_match_parent := OntologyTermRelation.parent_of(source_term=gene_match_term):
                 scorer = scored_match_dict[gene_match_parent]
                 scorer.mondo_gene_association = GeneAssociationLevel.PARENT
-                scorer.mondo_gene_association_child = gene_match
+                scorer.mondo_gene_association_child = gene_match_term
 
     values = list(scored_match_dict.values())
     for value in values:

@@ -6,9 +6,8 @@ import requests
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
-
-from annotation.models import MonarchDiseaseOntologyMIMMorbid, MonarchDiseaseOntologyGeneRelationship, \
-    MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology, MonarchDiseaseOntologyRelationship
+from ontology.models import OntologyTerm, OntologyTermRelation, OntologySet
+from ontology.panel_app_ontology import get_or_fetch_gene_relations
 
 
 class OntologyContext:
@@ -133,38 +132,11 @@ class OntologyMeta:
     # could be done in meta if had to be?
     def __init__(self, term_id: str):
         self.term_id = term_id
-        self.name = None
-        self.definition = None
-
-        self.object: MonarchDiseaseOntology = None
-        self.parent: MonarchDiseaseOntology = None
-
-        if term_id.startswith(MonarchDiseaseOntology.PREFIX):
-            if mondo := MonarchDiseaseOntology.objects.filter(pk=MonarchDiseaseOntology.id_as_int(term_id)).first():
-                self.object = mondo
-                self.name = mondo.name
-                self.definition = mondo.definition
-                parent_relationship: MonarchDiseaseOntologyRelationship
-                if parent_relationship := MonarchDiseaseOntologyRelationship.objects.filter(subject=mondo, relationship="is_a").first():
-                    self.parent = parent_relationship.object
-
-        elif term_id.startswith(MIMMorbid.PREFIX):
-            if omim := MIMMorbid.objects.filter(pk=MIMMorbid.id_as_int(term_id)).first():
-                self.name = omim.description
-            if mondo_mim := MonarchDiseaseOntologyMIMMorbid.objects.filter(omim_id=MIMMorbid.id_as_int(term_id)).select_related("mondo").first():
-                mondo: MonarchDiseaseOntology = mondo_mim.mondo
-                if not self.name:
-                    self.name = mondo.name
-                self.definition = f"(Taken from synonym {mondo.id_str})\n{mondo.definition}"
-        elif term_id.startswith(HumanPhenotypeOntology.PREFIX):
-            if hpo := HumanPhenotypeOntology.objects.filter(pk=HumanPhenotypeOntology.id_as_int(term_id)).first():
-                self.name = hpo.name
-                self.definition = hpo.definition
-
-        # FIXME can we do this in a method on Mondo?
-        if self.definition:
-            self.definition = self.definition.replace(".nn", ".\n")
-
+        self.term: Optional[OntologyTerm] = None
+        self.parent: Optional[OntologyTerm] = None
+        if term := OntologyTerm.objects.filter(id=term_id).first():
+            self.object = term
+            self.parent = OntologyTermRelation.parent_of(term)
         self.contexts: Dict[str, OntologyContext] = dict()
 
     def add_context(self, context: OntologyContext):
@@ -175,8 +147,9 @@ class OntologyMeta:
 
     @property
     def url(self):
-        # don't want to use class definitions as an instance might not exist
+        # don't want to use OntologyTerm definitions as entry might not exist
         # FIXME handle other types
+        # FIXME can we share the URLs between db_regexes and here?
         if self.term_id.startswith("MONDO"):
             return f'https://vm-monitor.monarchinitiative.org/disease/{self.term_id}'
         return None
@@ -188,14 +161,17 @@ class OntologyMeta:
 
         data = {
             "id": self.term_id,
-            "title": self.name,
             "url": self.url,
-            "definition": self.definition,
             "contexts": contexts
         }
+        if self.term:
+            data["title"] = self.term.name
+            data["definition"] = self.term.definition
+        else:
+            data["title"] = "Not stored locally"
 
         if self.parent:
-            data["parent_id"] = self.parent.id_str
+            data["parent_id"] = self.parent.id
             data["parent_title"] = self.parent.name
             """
             sibling_count = MonarchDiseaseOntologyRelationship.objects.filter(object=self.parent, relationship="is_a").count() - 1
@@ -209,6 +185,11 @@ class OntologyMeta:
 
 class OntologyMatching:
 
+    # FIXME use the auto_matching!
+    # FIXME use the auto_matching!
+    # FIXME use the auto_matching!
+
+
     PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
 
     def __init__(self):
@@ -221,37 +202,24 @@ class OntologyMatching:
             self.term_map[term_id] = mondo
         return mondo
 
-    def populate_panel_app_remote(self, gene_symbol: str):
-        results = requests.get(f'https://panelapp.agha.umccr.org/api/v1/genes/{gene_symbol}/').json().get(
-            "results")
-
-        for panel_app_result in results:
-            phenotype_row: str
-            for phenotype_row in panel_app_result.get("phenotypes", []):
-                for omim_match in OntologyMatching.PANEL_APP_OMIM.finditer(phenotype_row):
-                    omim_id = int(omim_match[1])
-                    if mondo_id := MonarchDiseaseOntologyMIMMorbid.objects.filter(omim_id=omim_id).values_list(
-                            "mondo_id", flat=True).first():
-                        mondo_meta = self.find_or_create(MonarchDiseaseOntology.int_as_id(mondo_id))
-                        mondo_meta.add_context(OntologyContextPanelApp(
-                            gene_symbol=gene_symbol,
-                            omim_id=omim_id,
-                            phenotype_row=phenotype_row,
-                            evidence=panel_app_result.get('evidence') or []
-                        ))
-
-    def populate_monarch_local(self, gene_symbol: str):
-        gene_relationships = MonarchDiseaseOntologyGeneRelationship.objects.filter(
-            gene_symbol=gene_symbol)
-
-        mdgr: MonarchDiseaseOntologyGeneRelationship
-        for mdgr in gene_relationships:
-            self.find_or_create(term_id=MonarchDiseaseOntology.int_as_id(mdgr.mondo_id)).add_context(
-                OntologyContextMonarchLink(
-                    gene_symbol=gene_symbol,
-                    relation=mdgr.relationship
-                )
-            )
+    def populate_relationships(self, gene_symbol: str):
+        relationships = get_or_fetch_gene_relations(gene_symbol=gene_symbol)
+        for relationship in relationships:
+            # always convert to MONDO for now
+            if mondo_term := OntologyTermRelation.mondo_version_of(relationship.term):
+                mondo_meta = self.find_or_create(mondo_term.id)
+                if relationship.relation == OntologySet.PANEL_APP_AU:
+                    mondo_meta.add_context(OntologyContextPanelApp(
+                        gene_symbol=gene_symbol,
+                        omim_id=relationship.term_id,
+                        phenotype_row=relationship.extra.get("phenotype_row"),
+                        evidence=relationship.extra.get("evidence")
+                    ))
+                else:
+                    mondo_meta.add_context(OntologyContextMonarchLink(
+                        gene_symbol=gene_symbol,
+                        relation=relationship.relation
+                    ))
 
     def select_term(self, term):
         self.find_or_create(term).add_context(OntologyContextSelected())
@@ -284,14 +252,7 @@ class SearchMondoText(APIView):
             ontologyMatches.select_term(term)
 
         if gene_symbol := request.GET.get('gene_symbol'):
-            ontologyMatches.populate_monarch_local(gene_symbol)
-            try:
-                ontologyMatches.populate_panel_app_remote(gene_symbol)
-            except:
-                # TODO communicate to the user couldn't search panel app
-                pass
-                # report_exc_info(extra_data={"gene_symbol": clinvar_export.gene_symbol.symbol})
-                # messages.add_message(request, messages.ERROR, "Could not connect to PanelApp")
+            ontologyMatches.populate_relationships(gene_symbol)
 
         if SearchMondoText.MONDO_PATTERN.match(search_term):
             ontologyMatches.find_or_create(search_term)

@@ -1,12 +1,13 @@
+import enum
 import json
 import re
-from collections import defaultdict
+from datetime import timedelta, datetime, timezone
 from typing import Optional, Dict, List, Iterable
-
-from celery.worker.state import requests
 from django.core.management import BaseCommand
 from django.db import transaction
-
+from lazy import lazy
+from model_utils.models import now
+from django.utils import timezone
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.file_utils import file_md5sum
 from ontology.models import OntologyImport, OntologySet, OntologyTerm, OntologyTermRelation, OntologyTermGeneRelation, \
@@ -31,18 +32,68 @@ MATCH_TYPES = {
     "http://www.w3.org/2004/02/skos/core#narrowMatch": OntologyRelation.NARROW
 }
 
+class OntologyBuilderDataUpToDateException(Exception):
+    pass
+
 
 class OntologyBuilder:
     """
     Not the most efficient way of getting data in (no bulk inserts are used)
     But simplest way to update existing values and create new ones
     """
+    class BuildState(enum.IntEnum):
+        """
+        Bit overkill but returning a boolean from a few methods results in unclear
+        """
+        NO_UPDATE_REQUIRED = 0
+        UPDATE_REQUIRED = 1
 
-    def __init__(self, filename: str, ontology_set: OntologySet, hash: str):
-        self.ontology_import = OntologyImport.objects.create(ontology_set=OntologySet.MONDO, filename=filename, hash=hash)
-        self.all_gene_symbols: Dict[str, GeneSymbol] = dict()
-        for gene_symbol in GeneSymbol.objects.all():
-            self.all_gene_symbols[gene_symbol.symbol] = gene_symbol
+    def __init__(self, filename: str, context: str, ontology_set: OntologySet):
+        self.filename = filename.split("/")[-1]
+        self.ontology_set = ontology_set
+        self.context = context
+        self.data_hash = None
+        self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(ontology_set=ontology_set, context=context, completed=True).order_by('-modified').first()
+        self.insert_count = 0
+        self.update_count = 0
+        self.delete_count = 0
+
+    def ensure_old(self, max_age: timedelta):
+        """
+        Raises OntologyBuilderDataUpToDateException if data is up to date
+        """
+        if self.previous_import:
+            if self.previous_import.processed_date > datetime.now(tz=timezone.get_default_timezone()) - max_age:
+                raise OntologyBuilderDataUpToDateException()
+
+    def ensure_hash_changed(self, data_hash: str):
+        self.data_hash = data_hash
+        if self.previous_import and self.previous_import.hash == data_hash:
+            self.previous_import.processed_date = now
+            self.previous_import.save()
+            raise OntologyBuilderDataUpToDateException()
+
+    def complete(self, purge_old=True):
+        """
+        Returns how many old relationships were deleted from a previous run
+        """
+        if purge_old:
+            for model in [OntologyTermGeneRelation, OntologyTermRelation, OntologyTerm]:
+                count, _ = model.objects.filter(from_import__context=self.context, from_import__ontology_set=self.ontology_set).exclude(from_import=self._ontology_import).delete()
+                self.delete_count += count
+
+        self._ontology_import.completed = True
+        self._ontology_import.save()
+
+    @lazy
+    def _ontology_import(self) -> OntologyImport:
+        return OntologyImport.objects.create(ontology_set=self.ontology_set, context=self.context, filename=self.filename, processed_date=now, hash=self.data_hash)
+
+    def _count(self, created: bool):
+        if created:
+            self.insert_count += 1
+        else:
+            self.update_count += 1
 
     def add_term(self, term_id: str, name: str = None, definition: str = None, extra: Dict = None, stub: bool = False) -> OntologyTerm:
 
@@ -51,15 +102,16 @@ class OntologyBuilder:
         ontology_set = parts[0]
         ontology_index = int(parts[1])
 
-        if ontology_set != OntologySet.MONDO:
-            if existing := OntologyTerm.objects.filter(id=term_id).exclude(from_import__ontology_set=OntologySet.MONDO).first():
-                return existing # we've already imported from another file, don't import this stub
-
         if stub:
             if existing := OntologyTerm.objects.filter(id=term_id).first():
-                return existing
+                existing_import = existing.from_import
+                # don't override an existing record with a stub
+                if existing_import.context != self.context or existing_import.ontology_set != self.ontology_set:
+                    return existing
+                # but if the old data is a stub from the same kind of import, update the from_import
+                # so we don't purge it
 
-        term, _ = OntologyTerm.objects.update_or_create(
+        term, created = OntologyTerm.objects.update_or_create(
             id=term_id,
             defaults={
                 "ontology_set": ontology_set,
@@ -67,54 +119,61 @@ class OntologyBuilder:
                 "name": name,
                 "definition": definition,
                 "extra": extra,
-                "from_import": self.ontology_import
+                "from_import": self._ontology_import
             }
         )
+        self._count(created)
         return term
 
-    def add_gene_relation(self, term_id: str, gene_symbol_str: str, relation: str) -> Optional[OntologyTermGeneRelation]:
+    def add_gene_relation(self, term_id: str, gene_symbol_str: str, relation: str, extra = None) -> Optional[OntologyTermGeneRelation]:
         """
         Overrides any previous relationship - only one term -> gene relationship can exist regardless of the relation
         If the gene symbol doesn't exist, nothing will happen
         """
-        if gene_symbol := self.all_gene_symbols.get(gene_symbol_str):
+        if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol_str).first():
             key = f"{term_id}/{gene_symbol_str}"
-            relation_obj, _ = OntologyTermGeneRelation.objects.update_or_create(
+            relation_obj, created = OntologyTermGeneRelation.objects.update_or_create(
                 term=self.add_term(term_id=term_id, stub=True),
                 gene_symbol=gene_symbol,
+                relation=relation,
                 defaults={
-                    "from_import": self.ontology_import,
-                    "relation": relation
+                    "extra": extra,
+                    "from_import": self._ontology_import
                 }
             )
+            self._count(created)
             return relation_obj
 
         print(f"Could not find gene symbol {gene_symbol_str}")
         return None
 
     def add_ontology_relation(self, source_term_id: str, dest_term_id: str, relation: str):
-        relation, _ = OntologyTermRelation.objects.get_or_create(
+        relation, created = OntologyTermRelation.objects.get_or_create(
             source_term=self.add_term(term_id=source_term_id, stub=True),
             dest_term=self.add_term(term_id=dest_term_id, stub=True),
             relation=relation,
             defaults={
-                "from_import": self.ontology_import
+                "from_import": self._ontology_import
             }
         )
+        self._count(created)
         return relation
 
 
 @transaction.atomic
-def load_mondo(filename: str):
-    print("This may take a few minutes")
+def load_mondo(filename: str, force: bool):
 
     data_file = None
     with open(filename, 'r') as json_file:
         data_file = json.load(json_file)
 
-    hash = file_md5sum(filename)
+    file_hash = file_md5sum(filename)
 
-    ontology_builder = OntologyBuilder(filename=filename, ontology_set=OntologySet.MONDO, hash=hash)
+    ontology_builder = OntologyBuilder(filename=filename, context="mondo_file", ontology_set=OntologySet.MONDO)
+    if not force:
+        ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+
+    print("This may take a few minutes")
     node_to_gene_symbol: [str, str] = dict()
     node_to_mondo: [str, str] = dict()
     count = 0
@@ -142,6 +201,9 @@ def load_mondo(filename: str):
                             synonyms = list()
 
                             defn = meta.get("definition", {}).get("val")
+                            if defn:
+                                defn = defn.replace(".nn", ".\n")
+
                             # if defn:
                             #    genes_mentioned = genes_mentioned.union(
                             #        set(GENE_SYMBOL_SEARCH.findall(defn)))
@@ -204,45 +266,24 @@ def load_mondo(filename: str):
                             dest_term_id=mondo_obj_id,
                             relation=OntologyRelation.IS_A
                         )
+    print("Purging old data")
+    ontology_builder.complete()
 
+    print(f"Records inserted: {ontology_builder.insert_count}")
+    print(f"Records updated: {ontology_builder.update_count}")
+    print(f"Records deleted: {ontology_builder.delete_count}")
 
-def load_panelapp_au(gene_symbols: Iterable[GeneSymbol]):
-    # TODO merge this with the other panel app loading code
-    # can't pre-emptively do all of this - way too many gene symbols
-    # so then how do we track what we've already asked for that's given us zero results
-    ontology_builder = OntologyBuilder(filename="https://panelapp.agha.umccr.org/api/v1/genes/", ontology_set=OntologySet.PANEL_APP_AU, hash="-")
-
-    PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
-
-    for gene_symbol in gene_symbols:
-        results = requests.get(f'https://panelapp.agha.umccr.org/api/v1/genes/{gene_symbol.symbol}/').json().get(
-            "results")
-
-        for panel_app_result in results:
-            phenotype_row: str
-            for phenotype_row in panel_app_result.get("phenotypes", []):
-                # TODO look for terms other than OMIM
-                for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
-                    omim_id = int(omim_match[1])  # not always a valid id
-
-                    # do we duplicate this for MONDO?
-                    ontology_builder.add_gene_relation(
-                        term_id=OntologySet.index_to_id(OntologySet.OMIM, omim_id),
-                        gene_symbol_str=gene_symbol.symbol,
-                        relation=OntologySet.PANEL_APP_AU,
-                        extra={
-                            "phenotype_row": phenotype_row,
-                            "evidence": panel_app_result.get('evidence') or []
-                        }
-                    )
-        print(gene_symbol.symbol)
 
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        parser.add_argument('--force', action="store_true")
         parser.add_argument('--mondo_json', required=True)
 
     @transaction.atomic
     def handle(self, *args, **options):
         if filename := options.get("mondo_json"):
-            load_mondo(filename)
+            try:
+                load_mondo(filename, force=options.get("force"))
+            except OntologyBuilderDataUpToDateException:
+                print("File hash is the same as last import")
