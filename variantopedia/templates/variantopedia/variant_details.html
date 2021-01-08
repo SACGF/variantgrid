@@ -136,7 +136,8 @@ function populateVariantAllele(data) {
     let allele = $("#allele");
     if (data.allele) {
         let alleleUrl = Urls.view_allele(data.allele.id);
-        let alleleLink = $("<a>", {class:'hover-link', href: alleleUrl}).append(data.allele.__str__);
+        let title = `Builds: ${data.allele.build_names}`;
+        let alleleLink = $("<a>", {class:'hover-link', href: alleleUrl, title: title}).append(data.allele.__str__);
         allele.html(alleleLink);
     } else {
         allele.text("-");

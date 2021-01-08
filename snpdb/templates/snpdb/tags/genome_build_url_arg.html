@@ -2,6 +2,7 @@
 <div class="btn-group">
     {% for bu in build_urls %}
         <a href="{{ bu.url }}"
+           title="{% if bu.active %}Coordinates are in {{ bu.genome_build }}{% else %}Display coordinates as {{ bu.genome_build }}{% endif %}"
            class="btn btn-outline-secondary {{ bu.css_class }}">
             {{ bu.genome_build }}
         </a>

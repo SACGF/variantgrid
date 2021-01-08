@@ -3,20 +3,19 @@
 {% load tz %}
 {% if variant_allele %}
     <div data-variant_id="{{ variant_allele.variant.pk }}" class="card">
-        <div class="card-header"><a href="{% url 'view_variant' variant_allele.variant.pk %}">{{ variant_allele.genome_build }}</a></div>
+        <div class="card-header">{{ variant_allele.genome_build }}</div>
         <div class="card-body">
             {% if variant_show_canonical_hgvs %}
                 {% labelled label='Canonical c.HGVS' value_css="variant-c-hgvs" hint="tiny" %}{{ variant_allele.variant.canonical_c_hgvs }}{% endlabelled %}
             {% endif %}
             {% labelled label='Variant Coordinate' value_css="variant-coordinate" hint="tiny" %}
-                {{ variant_allele.variant }}
+                <a href="{% url 'view_variant' variant_allele.variant.pk %}">{{ variant_allele.variant }}</a>
                 {% if variant_allele.variant.is_abbreviated %}
                     <a class="ml-2" data-toggle="collapse" href="#variant-coordinate-{{ variant_allele.pk }}">Show all bases</a>
                     <div class="collapse" id="variant-coordinate-{{ variant_allele.pk }}">
                         {{ variant_allele.variant.full_string  }}
                     </div>
                 {% endif %}
-
             {% endlabelled %}
             {% if user.is_superuser and variant_allele.error %}
                 {% labelled label="Error" value_clss="variant-coordinate" hint="tiny" %}{{ variant_allele.error | jsonify }}{% endlabelled %}

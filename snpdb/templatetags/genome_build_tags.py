@@ -19,13 +19,15 @@ def genome_build_url_arg(genome_build, url_name, **url_kwargs):
     class BuildUrlDict(TypedDict):
         genome_build: GenomeBuild
         active: bool
+        css_class: str
         url: str
 
     build_urls = []
     for gb in builds_with_annotation:
         url = reverse(url_name, kwargs={"genome_build_name": gb.name, **url_kwargs})
-        css_class = "active" if gb == genome_build else ""
-        build_urls.append({"genome_build": gb, "url": url, "css_class": css_class})
+        active = gb == genome_build
+        css_class = "active" if active else ""
+        build_urls.append({"genome_build": gb, "active": active, "url": url, "css_class": css_class})
 
     return {
         "build_urls": build_urls,
