@@ -51,3 +51,6 @@ PEDIGREE_MADELINE2_COMMAND = "madeline2"
 
 # Lock down menu - hide some VariantGrid urls / menu
 URLS_NAME_REGISTER.update({"sequencing_data": False})
+
+SOMALIER["enabled"] = True
+SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
