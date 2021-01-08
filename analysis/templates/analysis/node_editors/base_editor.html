@@ -84,7 +84,7 @@ function switch_node_data(activeTabLinkId) {
 
 function load_column_summary() {
 	var column = $("select#id_column", "form#column-summary-form").val();
-	var base_url = "{% url 'node_column_summary' node.pk node.version extra_filters 'COLUMN' 3 %}";
+	var base_url = "{% url 'node_column_summary' node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
 	var url = base_url.replace('COLUMN', column); 
 	var nodeDataSummary = $("#node-data-summary");
 
@@ -132,7 +132,7 @@ function load_node_graph() {
 	var graph_type = $("#id_graph_type", graph_node_form).val();
 	var cmap = $("#id_cmap", graph_node_form).val();
 
-	var base_url = "{% url 'node_data_graph' node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
+	var base_url = "{% url 'node_data_graph' node.analysis.version node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
 	var url = base_url.replace('GRAPH_TYPE', graph_type).replace('CMAP', cmap);
 	var nodeDataGraph = $("#node-data-graphs");
 	nodeDataGraph.html("Loading...");
@@ -194,7 +194,7 @@ $(document).ready(function() {
                 {% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
 			{% endif %}
 			{% if node_debug_tab %}
-    		    <li><a id='tab-link-debug' href="{% url 'node_debug' node.pk node.version extra_filters %}">Debug</a></li>
+    		    <li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
 			{% endif %}
 			{% block node_editor_tab_links_end %}{% endblock node_editor_tab_links_end %}
 	  	</ul>
@@ -209,6 +209,13 @@ $(document).ready(function() {
                     <img id='locked-warning-icon' src="{% static 'icons/warning.png' %}" />
                     <b>Analysis locked</b> - you cannot change samples.</div>
                 {% endif %}
+
+                <h4>
+                    {{ node.get_node_class_label }}
+                    <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
+                        <i title="Help docs on this node" class="fas fa-book"></i>
+                    </a>
+                </h4>
 
 			{% endblock node_filter_info %}
 			{% block content %}{% endblock content %}

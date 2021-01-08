@@ -83,8 +83,8 @@ class AlleleOverlap:
         return sorted({vcm.best_hgvs(self.genome_build) for vcm in self.vcms})
 
     @lazy
-    def is_multiple_labs_shared(self):
-        labs: Set[str] = set()
+    def is_multiple_labs_shared(self) -> bool:
+        labs: Set[int] = set()
         for vcm in self.vcms:
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and CS_TO_NUMBER.get(clin_sig):
@@ -124,14 +124,14 @@ class AlleleOverlap:
         classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id',
                                                                                                           'variant')
         variant_to_vcids: Dict[int, List[int]] = defaultdict(list)
-        for (classification_id, variant_id) in classification_variant_ids_qs:
+        for classification_id, variant_id in classification_variant_ids_qs:
             variant_to_vcids[variant_id].append(classification_id)
 
         # find all alleles for those variants, then merge the variant id to classification ids to be an allele id to classification ids
         variant_allele_qs = VariantAllele.objects.filter(variant_id__in=variant_to_vcids.keys()).values_list('variant',
                                                                                                              'allele')
         allele_to_vcids: Dict[int, List[int]] = defaultdict(list)
-        for (variant_id, allele_id) in variant_allele_qs:
+        for variant_id, allele_id in variant_allele_qs:
             allele_to_vcids[allele_id].extend(variant_to_vcids[variant_id])
 
         # only consider allele ids associated to 2 or more variant classifications
@@ -144,7 +144,8 @@ class AlleleOverlap:
             all_relevant_vcids.extend(vcids)
 
         # find the last published classification modifications for the relevant variants
-        vcid_vc: Dict[int, Classification] = dict()
+        vcid_vc: Dict[int, ClassificationModification] = dict()
+        vc: ClassificationModification
         for vc in ClassificationModification.latest_for_user(user=user, published=True) \
                 .filter(classification_id__in=all_relevant_vcids) \
                 .select_related('classification', 'classification__clinical_context',

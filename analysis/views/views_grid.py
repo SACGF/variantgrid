@@ -30,8 +30,8 @@ class NodeGridHandler(NodeJSONGetView):
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
 class NodeGridConfig(NodeJSONGetView):
 
-    def _get_data(self, request, node_id, version_id, extra_filters):
-        node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=version_id)
+    def _get_data(self, request, analysis_version, node_id, node_version, extra_filters):
+        node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=node_version)
         errors = node.get_errors()
 
         if errors:
@@ -184,10 +184,7 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names):  # , get
 def _get_column_vcf_info():
     column_vcf_info = {}
     for cvi in ColumnVCFInfo.objects.all().values('column__variant_column', 'info_id', 'number', 'type', 'description'):
-        lookup = dict(VCFInfoTypes.CHOICES)
-        type_display = lookup[cvi['type']]
-        cvi['type'] = type_display
-
+        cvi['type'] = VCFInfoTypes(cvi['type']).label
         index = cvi['column__variant_column']
         column_vcf_info[index] = cvi
     return column_vcf_info

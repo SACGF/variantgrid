@@ -291,6 +291,21 @@
                                Not installed
                            {% endif %}
                         {% endlabelled %}
+                        {% if somalier_enabled %}
+                            {% labelled label="Somalier" %}
+                                {% if details.somalier %}
+                                    {{ details.somalier }}
+                                {% elif user.is_superuser %}
+                                    <span class="admin-only">
+                                        <div class='install-instructions'>
+                                            Upload the Somalier sites VCF for {{ build_name }}.
+                                        </div>
+                                   </span>
+                               {% else %}
+                                   Not installed
+                               {% endif %}
+                            {% endlabelled %}
+                        {% endif %}
                     </div>
             </div>
         {% endfor %}
@@ -420,6 +435,28 @@
                         Not installed
                     {% endif %}
                 {% endlabelled %}
+                {% if somalier_enabled %}
+                    {% labelled label="Somalier" %}
+                        {% if somalier %}
+                            {{ somalier }}
+                        {% elif user.is_superuser %}
+                            <span class="admin-only">
+                                <div class='install-instructions'>
+                                <P>
+                                    Change install dir in settings.SOMALIER
+                                <code>
+                                    mkdir /data/annotation/somalier
+                                    cd /data/annotation/somalier
+                                    ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
+                                </code>
+                                </p>
+                                </div>
+                            </span>
+                        {% else %}
+                            Not installed
+                        {% endif %}
+                    {% endlabelled %}
+                {% endif %}
                 {% for cwr in cached_web_resources %}
                     {% labelled label=cwr.name %}
                         <div class='cached-web-resource-container'>

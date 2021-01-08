@@ -19,7 +19,7 @@ from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_
 class VCFListGrid(JqGridUserRowConfig):
     model = VCF
     caption = 'VCFs'
-    fields = ["id", "name", "date", "import_status", "user__username", "source",
+    fields = ["id", "name", "date", "import_status", "genome_build", "user__username", "source",
               "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
@@ -56,9 +56,11 @@ class VCFListGrid(JqGridUserRowConfig):
 class SamplesListGrid(JqGridUserRowConfig):
     model = Sample
     caption = 'Samples'
-    fields = ["id", "name", "import_status", "variants_type",
+    fields = ["id", "name", "vcf__date", "import_status", "vcf__genome_build__name", "variants_type",
               "vcf__name", "vcf__user__username", "vcf__uploadedvcf__uploaded_file__import_source",
-              "mutationalsignature__id", "mutationalsignature__summary", "samplestats__variant_count",
+              "samplestats__variant_count", "sample_gene_list_count", "activesamplegenelist__id",
+              "mutationalsignature__id", "mutationalsignature__summary",
+              "somaliersampleextract__somalierancestry__predicted_ancestry",
               "patient__first_name", "patient__last_name", "patient__sex", "patient__date_of_birth", "patient__date_of_death",
               "specimen__reference_id", "specimen__tissue", "specimen__collection_date"]
     colmodel_overrides = {
@@ -68,17 +70,20 @@ class SamplesListGrid(JqGridUserRowConfig):
                  'formatter_kwargs': {"icon_css_class": "sample-icon",
                                       "url_name": "view_sample",
                                       "url_object_column": "id"}},
-        'vcf__name': {'label': 'VCF Name'},
         'import_status': {'formatter': 'viewImportStatus'},
+        "vcf__genome_build__name": {"label": "Genome Build"},
+        'vcf__name': {'label': 'VCF Name'},
+        "sample_gene_list_count": {'name': 'sample_gene_list_count', 'label': '# Sample GeneLists',
+                                   "model_field": False, "formatter": "viewSampleGeneList", 'sorttype': 'int'},
+        'activesamplegenelist__id': {'hidden': True},
         'mutationalsignature__id': {'hidden': True},
         'mutationalsignature__summary': {'label': 'Mutational Signature',
                                          'formatter': 'viewMutationalSignature'},
+        "somaliersampleextract__somalierancestry__predicted_ancestry": {"label": "Predicted Ancestry"},
         'patient__last_name': {'label': 'Last Name'},
         'patient__sex': {'label': 'Sex'},
         'patient__date_of_birth': {'label': 'D.O.B.'},
         'patient__date_of_death': {'hidden': True},
-        'vcf__user__username': {'label': 'Owner', 'width': 50},
-        'vcf__uploadedvcf__uploaded_file__import_source': {'width': 55},
         'samplestats__variant_count': {'label': 'Variant Count', 'width': 50},
         "specimen__reference_id": {'label': 'Specimen'}
     }
@@ -104,6 +109,18 @@ class SamplesListGrid(JqGridUserRowConfig):
             mut_sig_colmodel['hidden'] = True
             self._overrides['mutationalsignature__summary'] = mut_sig_colmodel
 
+        if not queryset.filter(somaliersampleextract__somalierancestry__isnull=False).exists():
+            somalier_ancestry_colmodel = self._overrides.get('somaliersampleextract__somalierancestry__predicted_ancestry', {})
+            somalier_ancestry_colmodel['hidden'] = True
+            self._overrides['somaliersampleextract__somalierancestry__predicted_ancestry'] = somalier_ancestry_colmodel
+
+        if not queryset.filter(samplegenelist__isnull=False).exists():
+            sample_gene_list_count = self._overrides.get('sample_gene_list_count', {})
+            sample_gene_list_count['hidden'] = True
+            self._overrides['sample_gene_list_count'] = sample_gene_list_count
+
+        annotation_kwargs = {"sample_gene_list_count": Count("samplegenelist", distinct=True)}
+        queryset = queryset.annotate(**annotation_kwargs)
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
         self.extra_config.update({'shrinkToFit': False,
                                   'sortname': 'id',
@@ -212,13 +229,14 @@ class TriosListGrid(JqGridUserRowConfig):
 class GenomicIntervalsListGrid(JqGridUserRowConfig):
     model = GenomicIntervalsCollection
     caption = 'Genomic Intervals'
-    fields = ["id", "name", "user__username", "import_status"]
+    fields = ["id", "name", "import_status", "genome_build__name", "user__username"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {'formatter': 'linkFormatter',
                  'formatter_kwargs': {"icon_css_class": "bed-icon",
                                       "url_name": "view_genomic_intervals",
                                       "url_object_column": "id"}},
+        "genome_build__name": {"label": "Genome Build"},
         'user__username': {'label': 'Uploaded by'}
     }
 

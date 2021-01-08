@@ -98,7 +98,7 @@ def parse_choice(choices, row, column, validation_messages):
     if choice_string in choice_dict:
         return choice_string
 
-    reverse_choice_dict = {b.upper(): a for (a, b) in choices}
+    reverse_choice_dict = {b.upper(): a for a, b in choices}
     value = reverse_choice_dict.get(choice_string)
 
     if value is None:
@@ -166,7 +166,7 @@ def create_patient(patient_import, first_name, last_name, sex, date_of_birth, us
 def set_fields_if_blank(obj, field_values):
     """ returns true if change """
     changed = False
-    for (k, v) in field_values.items():
+    for k, v in field_values.items():
         existing_value = getattr(obj, k)
         if existing_value:
             changed = True
@@ -188,7 +188,7 @@ def process_record(patient_records, record_id, row):
     last_name = row[PatientColumns.PATIENT_LAST_NAME]
     date_of_birth = parse_date(row, PatientColumns.DATE_OF_BIRTH, validation_messages)
     date_of_death = parse_date(row, PatientColumns.DATE_OF_DEATH, validation_messages)
-    sex = parse_choice(Sex.CHOICES, row, PatientColumns.SEX, validation_messages)
+    sex = parse_choice(Sex.choices, row, PatientColumns.SEX, validation_messages)
     affected = parse_boolean(row, PatientColumns.AFFECTED, validation_messages)
     consanguineous = parse_boolean(row, PatientColumns.CONSANGUINEOUS, validation_messages)
     patient_phenotype = row[PatientColumns.PATIENT_PHENOTYPE]
@@ -207,8 +207,8 @@ def process_record(patient_records, record_id, row):
     specimen_collected_by = row[PatientColumns.SPECIMEN_COLLECTED_BY]
     specimen_collection_date = parse_date(row, PatientColumns.SPECIMEN_COLLECTION_DATE, validation_messages)
     specimen_received_date = parse_date(row, PatientColumns.SPECIMEN_RECEIVED_DATE, validation_messages)
-    specimen_mutation_type = parse_choice(Mutation.CHOICES, row, PatientColumns.SPECIMEN_MUTATION_TYPE, validation_messages)
-    specimen_nucleic_acid_source = parse_choice(NucleicAcid.CHOICES, row, PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE, validation_messages)
+    specimen_mutation_type = parse_choice(Mutation.choices, row, PatientColumns.SPECIMEN_MUTATION_TYPE, validation_messages)
+    specimen_nucleic_acid_source = parse_choice(NucleicAcid.choices, row, PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE, validation_messages)
     specimen_age_at_collection = row[PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE]
 
     sample_id = row[PatientColumns.SAMPLE_ID] or None
@@ -274,7 +274,7 @@ def process_record(patient_records, record_id, row):
                       "consanguineous": consanguineous}
 
     patient_modified = False
-    for (patient_field, field_value) in PATIENT_FIELDS.items():
+    for patient_field, field_value in PATIENT_FIELDS.items():
         if field_value:
             setattr(patient, patient_field, field_value)
             description = f"Set {patient_field} to {field_value}"
@@ -287,7 +287,7 @@ def process_record(patient_records, record_id, row):
 
     PHENOTYPE_FIELDS = {"phenotype": patient_phenotype}
 
-    for (phenotype_field, phenotype_value) in PHENOTYPE_FIELDS.items():
+    for phenotype_field, phenotype_value in PHENOTYPE_FIELDS.items():
         if phenotype_value:
             updated_phenotype = None
             existing_value = getattr(patient, phenotype_field)
@@ -436,7 +436,7 @@ def import_patient_records(patient_records):
 
     items_processed = 0
     patients_to_check_for_phenotype_matches = []
-    for (i, row) in df.iterrows():
+    for i, row in df.iterrows():
         logging.info("import_patient_records, process_record: %s", i)
         patient_with_phenotype = process_record(patient_records, i, row)
         if patient_with_phenotype:

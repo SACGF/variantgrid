@@ -14,7 +14,7 @@ class VariantGridColumn(models.Model):
         Normally, we take a Variant queryset and get values queryset using "variant_column" """
     grid_column_name = models.TextField(primary_key=True)
     variant_column = models.TextField()
-    annotation_level = models.CharField(max_length=1, choices=ColumnAnnotationLevel.CHOICES, null=True)
+    annotation_level = models.CharField(max_length=1, choices=ColumnAnnotationLevel.choices, null=True)
     width = models.IntegerField(null=True)
     label = models.TextField()
     description = models.TextField()
@@ -23,9 +23,8 @@ class VariantGridColumn(models.Model):
 
     def get_css_classes(self):
         css_classes = ["user-column"]
-        annotation_dict = dict(ColumnAnnotationLevel.CHOICES)
-        annotation_level_class = annotation_dict.get(self.annotation_level)
-        if annotation_level_class:
+        if self.annotation_level:
+            annotation_level_class = ColumnAnnotationLevel(self.annotation_level).label
             css_classes.append("%s-column" % annotation_level_class.lower())
         return " ".join(css_classes)
 
@@ -38,7 +37,7 @@ class ColumnVCFInfo(models.Model):
     info_id = models.TextField(primary_key=True)
     column = models.OneToOneField(VariantGridColumn, on_delete=CASCADE)
     number = models.IntegerField(null=True, blank=True)
-    type = models.CharField(max_length=1, choices=VCFInfoTypes.CHOICES)
+    type = models.CharField(max_length=1, choices=VCFInfoTypes.choices)
     description = models.TextField(null=True)
 
     def __str__(self):

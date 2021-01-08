@@ -24,9 +24,13 @@ from snpdb.models.models_enums import BuiltInFilters
 
 
 class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
+    # Changing some analysis settings alters node editors/grids - and we need to increment version to expire node cache
+    VERSION_BUMP_FIELDS = ["custom_columns_collection", "default_sort_by_column"]
+
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    version = models.IntegerField(default=0)  # By bumping this we can invalidate node caches
     # TODO: Remove 'analysis_type' by creating legacy 'AnalysisTemplateSnapshot'
-    analysis_type = models.CharField(max_length=1, choices=AnalysisType.CHOICES, null=True, blank=True)
+    analysis_type = models.CharField(max_length=1, choices=AnalysisType.choices, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
@@ -39,7 +43,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=SET_NULL)
     lock_input_sources = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
-    template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.CHOICES, null=True, blank=True)
+    template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.choices, null=True, blank=True)
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"
@@ -48,15 +52,28 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return name
 
     @lazy
+    def template(self):
+        """ Works for both a template and a snapshot """
+        try:
+            return self.analysistemplate
+        except AnalysisTemplate.DoesNotExist:
+            try:
+                return self.analysistemplateversion.template
+            except AnalysisTemplateVersion.DoesNotExist:
+                return None
+
+    @lazy
     def last_lock(self):
         return self.analysislock_set.order_by("pk").last()
 
     def is_locked(self):
-        return self.last_lock and self.last_lock.locked
+        is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
+        return is_snapshot or (self.last_lock and self.last_lock.locked)
 
     def can_unlock(self, user):
         """ Use parent to see if we have Guardian permissions to write """
-        return super().can_write(user)
+        is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
+        return (not is_snapshot) and super().can_write(user)
 
     def lock_history(self):
         return self.analysislock_set.order_by("pk")
@@ -64,9 +81,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def can_write(self, user):
         """ Disable modification when locked """
         if super().can_write(user):
-            if self.last_lock:
-                return not self.last_lock.locked
-            return True
+            return not self.is_locked()
         return False
 
     def get_absolute_url(self):
@@ -316,17 +331,18 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         return qs.filter(deleted=False)
 
     @staticmethod
-    def filter(user: User, sample_somatic=False, sample_gene_list=False, class_name=None, atv_kwargs=None):
+    def filter(user: User, requires_sample_somatic=None, requires_sample_gene_list=None, class_name=None, atv_kwargs=None):
+        """ requires_sample_somatic/requires_sample_gene_list - leave None for all """
         if atv_kwargs is None:
             atv_kwargs = {}
 
         template_versions_qs = AnalysisTemplateVersion.objects.filter(active=True, **atv_kwargs)
 
-        if not sample_somatic:
-            template_versions_qs = template_versions_qs.exclude(requires_sample_somatic=True)
+        if requires_sample_somatic is not None:
+            template_versions_qs = template_versions_qs.filter(requires_sample_somatic=requires_sample_somatic)
 
-        if not sample_gene_list:
-            template_versions_qs = template_versions_qs.exclude(requires_sample_gene_list=True)
+        if requires_sample_gene_list is not None:
+            template_versions_qs = template_versions_qs.filter(requires_sample_gene_list=requires_sample_gene_list)
 
         if class_name:
             # Restrict to template versions who's variables are all of class_name
@@ -374,13 +390,14 @@ class AnalysisTemplateRun(TimeStampedModel):
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)  # Created new analysis
 
     @staticmethod
-    def create(analysis_template: AnalysisTemplate, user: User = None):
+    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None):
         if user is None:
             user = admin_bot()
 
         template_version = analysis_template.active
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
+        analysis.genome_build = genome_build
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments

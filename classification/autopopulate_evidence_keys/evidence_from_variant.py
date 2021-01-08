@@ -88,7 +88,7 @@ class AutopopulateData:
     @property
     def summary(self) -> str:
         sums = []
-        ekeys = EvidenceKeyMap()
+        ekeys = EvidenceKeyMap.instance()
         flattened = self.flatten()
         sums.append(f'The following fields were auto-populated by {Site.objects.get_current().name}')
         for ap in flattened:
@@ -163,7 +163,7 @@ def ekey_from_vg_column_formatters():
         'pfam_protein_domain': domain_to_pfam,
         "literature": pubmed_formatter,
         "sift": get_choices_formatter(SIFTPrediction.CHOICES),
-        "variant_class": get_choices_formatter(VariantClass.CHOICES),
+        "variant_class": get_choices_formatter(VariantClass.choices),
     }
 
 
@@ -429,7 +429,7 @@ def get_evidence_fields_from_variant_query(
     columns.update([e['col'] for e in evidence_variant_columns.values()])
     values = qs.values(*columns).get()
 
-    for (evidence_key, variant_data) in evidence_variant_columns.items():
+    for evidence_key, variant_data in evidence_variant_columns.items():
         variant_column = variant_data['col']
         immutable = variant_data['immutable']
         value = values.get(variant_column)
@@ -466,22 +466,8 @@ def get_literature(clinvar):
 
 
 def get_gnomad_oe_lof_summary(transcript_version: TranscriptVersion):
-    """ GnomADGeneConstraint uses Ensembl gene/transcripts - so load the most specific
-        possible (transcript, gene, then symbol) """
-    qs = GnomADGeneConstraint.objects.all()
-
-    ggc = None
-    if transcript_version.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
-        # May be able to get via transcript or gene
-        ggc = qs.filter(transcript=transcript_version.transcript).first()
-        if ggc is None:
-            ggc = qs.filter(gene=transcript_version.gene).first()
-
-    if ggc is None:  # Fall back on matching via symbol
-        ggc = qs.filter(gene_symbol=transcript_version.gene_version.gene_symbol).first()
-
     oe_lof_summary = None
-    if ggc:
+    if ggc := GnomADGeneConstraint.get_for_transcript_version(transcript_version):
         oe_lof_summary = ggc.oe_lof_summary
     return oe_lof_summary
 

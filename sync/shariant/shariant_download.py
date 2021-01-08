@@ -1,3 +1,5 @@
+from datetime import datetime
+from dateutil import tz
 from typing import Optional, Dict
 
 import ijson
@@ -18,17 +20,31 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
     shariant = OAuthConnector.shariant_oauth_connector()
 
     required_build = config.get('genome_build', 'GRCh37')
-    params = {'share_level': 'public', 'type': 'json', 'build': required_build}
+    params = {'share_level': 'public',
+              'type': 'json',
+              'build': required_build}
 
     exclude_labs = config.get('exclude_labs', None)
     if exclude_labs:
         params['exclude_labs'] = ','.join(exclude_labs)
 
+    exclude_orgs = config.get('exclude_orgs', None)
+    if exclude_orgs:
+        params['exclude_orgs'] = ','.join(exclude_orgs)
+
+    if not full_sync:
+        last_download: SyncRun
+        if last_download := SyncRun.objects.filter(destination=sync_destination, status=SyncStatus.SUCCESS).order_by('-created').first():
+            if meta := last_download.meta:
+                if since_str := meta.get('server_date'):
+                    since = datetime.strptime(since_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=tz.UTC).timestamp()
+                    params['since'] = str(since)
+
     def sanitize_data(known_keys: EvidenceKeyMap, data: dict, source_url: str) -> dict:
         skipped_keys = []
         sanitized = {}
         for key, blob in data.items():
-            if key == 'owner':
+            if key == 'owner' or key == 'source_id':
                 pass
             elif known_keys.get(key).is_dummy:
                 skipped_keys.append(key)
@@ -59,6 +75,11 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         lab_group_name = meta.get('lab_id')
 
         lab = Lab.objects.filter(group_name=lab_group_name).first()
+
+        # in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
+        if lab and not lab.external:
+            return None
+
         if not lab:
             parts = lab_group_name.split('/')
             org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
@@ -70,10 +91,6 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                 country='Australia',
                 external=True,
             )
-
-        #in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
-        if lab.external:
-            return None
 
         record = {
             "id": record.get('id'),
@@ -90,14 +107,15 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                                 params=params,
                                 stream=True)
 
-        evidence_keys = EvidenceKeyMap()
+        last_modified = response.headers.get('Last-Modified')
+        evidence_keys = EvidenceKeyMap.instance()
 
         count = 0
         skipped = 0
 
         def records():
             nonlocal skipped
-            for record in ijson.items(response.raw, 'records.item'):
+            for record in ijson.items(response.content, 'records.item'):
                 make_json_safe_in_place(record)
                 mapped = shariant_download_to_upload(evidence_keys, record)
                 if mapped:
@@ -116,8 +134,10 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
 
         run.status = SyncStatus.SUCCESS
         run.meta = {
+            "params": params,
             "records_upserted": count,
-            "records_skipped": skipped
+            "records_skipped": skipped,
+            "server_date": last_modified
         }
         run.save()
     finally:

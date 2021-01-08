@@ -54,5 +54,5 @@ class Command(BaseCommand):
 
         if skipped_contigs_stats_file:
             with open(skipped_contigs_stats_file, "w") as f:
-                for (contig, count) in skipped_contigs.items():
+                for contig, count in skipped_contigs.items():
                     f.write('%s\t%d\n' % (contig, count))

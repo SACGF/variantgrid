@@ -46,3 +46,8 @@ python3.8 ${VG_DIR}/manage.py import_gene_annotation --genome-build=GRCh38 --rep
 python3.8 ${VG_DIR}/manage.py import_gene_annotation --genome-build=GRCh38 --replace --annotation-consortium=RefSeq \
   --gff GCF_000001405.39_GRCh38.p13_genomic.109.20200815.gff.gz \
   --genePred GCF_000001405.39_GRCh38.p13_genomic.109.20200815.genePred
+
+python3.8 ${VG_DIR}/manage.py import_gene_annotation --genome-build=GRCh38 --replace --annotation-consortium=RefSeq \
+  --gff GCF_000001405.39_GRCh38.p13_genomic.109.20201120.gff.gz \
+  --genePred GCF_000001405.39_GRCh38.p13_genomic.109.20201120.genePred
+

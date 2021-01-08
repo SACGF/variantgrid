@@ -272,7 +272,7 @@ class VariantGrid(JqGridSQL):
 class AnalysesGrid(JqGridUserRowConfig):
     model = Analysis
     caption = 'Analyses'
-    fields = ["id", "name", "analysis_type", "description", "modified", "user__username", "analysislock__locked"]
+    fields = ["id", "name", "modified", "genome_build", "analysis_type", "description", "user__username", "analysislock__locked"]
     colmodel_overrides = {
         'id': {"hidden": True},
         'name': {"width": 400,
@@ -282,7 +282,6 @@ class AnalysesGrid(JqGridUserRowConfig):
                                       "url_object_column": "id"}},
         "analysis_type": {"label": "Type"},
         "user__username": {'label': 'Created by'},
-        "modified": {'label': 'Modified'},
         "analysislock__locked": {"hidden": True},
     }
 
@@ -291,10 +290,11 @@ class AnalysesGrid(JqGridUserRowConfig):
         super().__init__(user)
         fields = self.get_field_names()
 
-        user_settings = UserSettings.get_for_user(user)
-        self.genome_builds = list(user_settings.get_genome_builds())
-        if len(self.genome_builds) > 1:
-            fields.append("genome_build")
+        self.genome_builds = list(GenomeBuild.builds_with_annotation())
+        if len(self.genome_builds) == 1:  # No need to show
+            genome_build_colmodel = self._overrides.get('genome_build', {})
+            genome_build_colmodel['hidden'] = True
+            self._overrides['genome_build'] = genome_build_colmodel
         user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
             qs = Analysis.filter_for_user(user)
@@ -307,13 +307,6 @@ class AnalysesGrid(JqGridUserRowConfig):
         self.queryset = qs.values(*fields)
         self.extra_config.update({'sortname': 'modified',
                                   'sortorder': 'desc'})
-
-    def get_colmodels(self, remove_server_side_only=False):
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        if len(self.genome_builds) > 1:
-            extra = {'index': 'genome_build', 'name': 'genome_build', 'label': 'Genome Build', 'sorttype': 'str'}
-            colmodels.append(extra)
-        return colmodels
 
 
 class AnalysisTemplatesGrid(JqGridUserRowConfig):
@@ -369,7 +362,7 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
     colmodel_overrides = {
         'id': {'hidden': True},
         "variant__id": {"hidden": True},
-        "variant__variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene', 'formatter': 'geneLinkFormatter'},
+        "variant__variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
         "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
         "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},
         "analysis__id": {'hidden': True},
@@ -431,16 +424,21 @@ class TaggedVariantGrid(AbstractVariantGrid):
     colmodel_overrides = {
         'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
         'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
+        "variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene',
+                                                                             'formatter': 'geneSymbolNewWindowLink'},
     }
 
     def __init__(self, user, genome_build_name, extra_filters=None):
         super().__init__(user)
 
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
             analyses_queryset = Analysis.filter_for_user(user)
         else:
             analyses_queryset = Analysis.objects.filter(user=user)
+
+        analyses_queryset = analyses_queryset.filter(genome_build=genome_build)
         tags_qs = VariantTag.objects.filter(analysis__in=analyses_queryset)
         if extra_filters:
             tag_id = extra_filters.get("tag")
@@ -448,7 +446,6 @@ class TaggedVariantGrid(AbstractVariantGrid):
                 tag = Tag.objects.get(pk=tag_id)
                 tags_qs = tags_qs.filter(tag=tag)
 
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         qs = get_variant_queryset_for_latest_annotation_version(genome_build)
         qs = qs.filter(varianttag__in=tags_qs)
 
@@ -471,10 +468,10 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         "Percent": {"formatter": "number"},
     }
 
-    def __init__(self, user, node_id, version_id, extra_filters, variant_column, significant_figures):
+    def __init__(self, user, node_id, node_version, extra_filters, variant_column, significant_figures):
         super().__init__()
 
-        self.node = get_node_subclass_or_404(user, node_id, version=version_id)
+        self.node = get_node_subclass_or_404(user, node_id, version=node_version)
         grid = VariantGrid(user, self.node, extra_filters)
         cm = grid.get_column_colmodel(variant_column)
         grid_column_name = cm["label"]
@@ -541,7 +538,7 @@ class AnalysisNodeIssuesGrid(JqGridUserRowConfig):
 class KaromappingAnalysesGrid(JqGridUserRowConfig):
     model = KaryomappingAnalysis
     caption = 'Karomapping Analyses'
-    fields = ['id', 'name', 'user__username', 'created', 'modified', 'trio__name', 'trio__proband__sample__name']
+    fields = ['id', 'name', 'modified', "trio__cohort__genome_build", 'user__username', 'trio__name', 'trio__proband__sample__name']
 
     colmodel_overrides = {
         'id': {"hidden": True},
@@ -549,8 +546,8 @@ class KaromappingAnalysesGrid(JqGridUserRowConfig):
                  'formatter': 'linkFormatter',
                  'formatter_kwargs': {"url_name": "view_karyomapping_analysis",
                                       "url_object_column": "id"}},
+        "trio__cohort__genome_build": {"label": "Genome Build"},
         "user__username": {'label': 'Created by'},
-        "modified": {'label': 'Modified'},
         "trio__name": {"label": "Trio"},
         "trio__proband__sample__name": {"label": "Proband"}
     }

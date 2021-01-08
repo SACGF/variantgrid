@@ -13,7 +13,7 @@ class UploadStepStatusFilter(admin.SimpleListFilter):
     default_value = None
 
     def lookups(self, request, model_admin):
-        return ProcessingStatus.CHOICES
+        return ProcessingStatus.choices
 
     def queryset(self, request, queryset):
         if self.value():

@@ -41,7 +41,7 @@ from classification.classification_stats import get_grouped_classification_count
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.forms import EvidenceKeyForm
 from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus
+    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -155,7 +155,8 @@ class AutopopulateView(APIView):
 
         key_to_order = dict()
         index = 1
-        for ekey in EvidenceKeyMap().all_keys:
+        # TODO should probably know the lab with EvidenceKeys
+        for ekey in EvidenceKeyMap.instance().all_keys:
             key_to_order[ekey.key] = index
             index = index + 1
 
@@ -193,9 +194,9 @@ def create_classification(request):
         sample = None
 
     classification = create_classification_for_sample_and_variant_objects(request.user, sample,
-                                                                                          variant, genome_build,
-                                                                                          refseq_transcript_accession=refseq_transcript_accession,
-                                                                                          ensembl_transcript_accession=ensembl_transcript_accession)
+                                                                          variant, genome_build,
+                                                                          refseq_transcript_accession=refseq_transcript_accession,
+                                                                          ensembl_transcript_accession=ensembl_transcript_accession)
     if evidence_json:
         evidence = json.loads(evidence_json)
         classification.patch_value(
@@ -249,8 +250,8 @@ def view_classification(request, record_id):
     other_classifications_summary = ref.record.get_other_classifications_summary_for_variant(request.user)
 
     record = ref.as_json(ClassificationJsonParams(current_user=request.user,
-                                                         include_data=True,
-                                                         include_lab_config=True))
+                                                  include_data=True,
+                                                  include_lab_config=True))
 
     # default to the natural build of the classification
     genome_build = None
@@ -268,7 +269,7 @@ def view_classification(request, record_id):
                'asterix_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW,
                'existing_files': existing_files,
                'other_classifications_summary': other_classifications_summary,
-               'report_enabled': not not vc.lab.organization.classification_report_template,
+               'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
                'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
                }
     return render(request, 'classification/classification.html', context)
@@ -404,7 +405,7 @@ def classification_file_upload(request, classification_id):
         uploaded_file = upload_receive(request)
 
         vc_attachment = ClassificationAttachment(classification=classification,
-                                                        file=uploaded_file)
+                                                 file=uploaded_file)
         vc_attachment.save()
 
         file_dict = vc_attachment.get_file_dict()
@@ -464,17 +465,6 @@ def view_classification_file_attachment_thumbnail(request, pk):
     return view_classification_file_attachment(request, pk, thumbnail=True)
 
 
-def _get_lab_and_error(user: User):
-    lab_error = None
-    lab = None
-    user_settings = UserSettings.get_for_user(user)
-    try:
-        lab = user_settings.get_lab()
-    except ValueError as ve:
-        lab_error = str(ve)
-    return lab, lab_error
-
-
 def create_classification_for_variant(request, variant_id, transcript_id=None):
     if not Classification.can_create_via_web_form(request.user):
         raise PermissionDenied('User cannot create classifications via web form')
@@ -491,7 +481,7 @@ def create_classification_for_variant(request, variant_id, transcript_id=None):
                                       variant.genome_build,
                                       initial_transcript_id=transcript_id,
                                       add_other_annotation_consortium_transcripts=True)
-    lab, lab_error = _get_lab_and_error(request.user)
+    lab, lab_error = UserSettings.get_lab_and_error(request.user)
 
     consensus = ClassificationConsensus(variant, request.user)
 
@@ -510,7 +500,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     sample_autocomplete_form = SampleChoiceForm(genome_build=genome_build)
     sample_autocomplete_form.fields['sample'].required = False
-    lab, lab_error = _get_lab_and_error(request.user)
+    lab, lab_error = UserSettings.get_lab_and_error(request.user)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
     kind, transcript_accession = get_kind_and_transcript_accession_from_invalid_hgvs(hgvs_string)
@@ -549,7 +539,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
 def evidence_keys(request, external_page=True, max_share_level=None):
     """ public page to display EKey details """
 
-    context = {'keys': EvidenceKeyMap.cached().all_keys}
+    context = {'keys': EvidenceKeyMap.instance().all_keys}
 
     if external_page:
         context.update({

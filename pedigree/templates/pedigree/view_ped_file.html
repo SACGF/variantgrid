@@ -11,26 +11,18 @@
 {% block css %}
     div.generated-graph {
         width: auto !important;
-        height: auto !important;
         overflow: visible !important;
     }
 
     div.generated-graph img {
         width: 100%;
+        max-height: 100%;
     }
 
     .ped-family-container {
         margin-bottom: 20px;
     }
 
-	table.ped-family-table {
-		border-collapse: collapse;
-	}
-	
-	table.ped-family-table td, table.ped-family-table th {
-		border: 1px solid black;
-		padding: 5px;
-	}
 {% endblock css %}
 
 {% block jsdocumentready %}
@@ -60,7 +52,6 @@
 {% endblock jsdocumentready %}
 
 {% block submenu_page_content %}
-
 	<div id="ped_file">
 		<h3>PED file: {{ ped_file.name }}</h3>
 			<table>
@@ -83,14 +74,16 @@
 		<div class="ped-family-container" id="family-{{family.name}}">
 			<h3>Pedigree: {{ family.name }}</h3>
 			
-			<table class='ped-family-table'>
-				<tr>
-				<th>Sample
-				<th>Father
-				<th>Mother
-				<th>Sex
-				<th>Affected
-				</tr>
+			<table class='table'>
+                <thead>
+                    <tr>
+                    <th>Sample
+                    <th>Father
+                    <th>Mother
+                    <th>Sex
+                    <th>Affected
+                    </tr>
+                </thead>
 			{% for record in family.pedfilerecord_set.all %}
 				<tr>
 				<td>{{ record.sample }}
@@ -120,7 +113,7 @@
 
 			{% if family.pedigree_set.exists %}
 			     <h3>Pedigrees from this Pedigree</h3>
-			     <table>
+			     <table class="table">
                 {% for pedigree in family.pedigree_set.all %}
                     <tr><td><a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
                 {% endfor %}

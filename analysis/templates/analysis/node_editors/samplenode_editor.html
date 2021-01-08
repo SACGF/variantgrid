@@ -64,9 +64,9 @@
 {% block node_filter_info %}
     {{ block.super }}
 
-    {% if sample.qc_gene_list and node.restrict_to_qc_gene_list %}
+    {% if node.sample_gene_list and node.restrict_to_qc_gene_list %}
         <div>
-        <span id='restrict-to-qc-gene-listmessage'>Sample restricted to QC GeneList ({{ sample.qc_gene_list }}) (see Genes tab for details)</span>
+        <span id='restrict-to-qc-gene-listmessage'>Sample restricted to GeneList ({{ node.sample_gene_list.gene_list }}) (see Genes tab for details)</span>
         </div>
     {% endif %}
 
@@ -126,19 +126,29 @@ table.zygosity-table tr.top-header th {
         {{ hidden }}
     {% endfor %}
     <div>
-		<b>Sample:</b>
-		
-		{% if node.analysis.lock_input_sources %}
-            {{ sample }}
-        {% else %}
-            {{ form.sample }}
-		{% endif %}
-		
-		<a class="cross-link" id="sample-link" target='_blank'>View Sample</a></td>
-        {% if sample.qc_gene_list and form.restrict_to_qc_gene_list %}
         <div>
-            <span id='qc-gene-list'> <b>Restrict to Sample QC Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
+            <b>Sample:</b>
+
+            {% if node.analysis.lock_input_sources and node.analysis.template_type is None %}
+                {{ sample }}
+            {% else %}
+                {{ form.sample }}
+            {% endif %}
+
+            <a class="cross-link" id="sample-link" target='_blank'>View Sample</a>
         </div>
+
+        {% if node.analysis.template_type %}
+            <!-- We never set this manually, but show so it can be set as an analysis variable via template -->
+            <div>
+                <span id='sample-gene-list'> <b>Sample Gene List:</b> {{ form.sample_gene_list }} </span>
+            </div>
+        {% endif %}
+
+        {% if node.analysis.template_type or form.restrict_to_qc_gene_list %}
+            <div>
+                <span id='qc-gene-list'> <b>Restrict to Sample Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
+            </div>
         {% endif %}
         <div>
             {% load vcf_locus_filter_tags %}

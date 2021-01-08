@@ -1,14 +1,19 @@
 {% if analysis_template_links.exists %}
 <script>
-    function createAnalysis(analysis_template_id) {
-        let atForm = $("form#analysis-template-form");
-        setAutocompleteValue($("#id_analysis_template", atForm), analysis_template_id, "");
+    function createAnalysis_{{ flattened_uuid }}(analysis_template_id) {
+        let atForm = $("form#analysis-template-form-{{ flattened_uuid }}");
+        let templateField = $("#id_{{ flattened_uuid }}-analysis_template", atForm);
+        {% if autocomplete_field %}
+        setAutocompleteValue(templateField, analysis_template_id, "");
+        {% else %}
+            templateField.val(analysis_template_id);
+        {% endif %}
         atForm.submit();
     }
 </script>
 <ul>
     {% for analysis_template in analysis_template_links %}
-    <li><a href="javascript:createAnalysis({{ analysis_template.pk }})">
+    <li><a href="javascript:createAnalysis_{{ flattened_uuid }}({{ analysis_template.pk }})">
             Perform {{ analysis_template.name }}
         </a>
         {{ analysis_template.description|safe }}
@@ -17,13 +22,16 @@
 </ul>
 {% endif %}
 {% if analysis_template_form %}
-    <form id="analysis-template-form" method="post" action="{% url 'create_analysis_from_template' %}">
+    <form id="analysis-template-form-{{ flattened_uuid }}" method="post" action="{% url 'create_analysis_from_template' genome_build.name %}">
         {% csrf_token %}
+        <input name="tag_uuid" type="hidden" value="{{ flattened_uuid }}">
         {% for name, value in hidden_inputs.items %}
             <input name="{{ name }}" type="hidden" value="{{ value }}">
         {% endfor %}
         {{ analysis_template_form }}
         {{ analysis_template_form.media }}
-        <button id="run-analysis-template" class="btn btn-outline-primary">Create analysis from template</button>
+        {%  if autocomplete_field %}
+            <button id="run-analysis-template" class="btn btn-outline-primary">Create analysis from template</button>
+        {% endif %}
     </form>
 {% endif %}

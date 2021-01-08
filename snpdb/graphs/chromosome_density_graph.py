@@ -7,6 +7,7 @@ from library.database_utils import get_queryset_select_from_where_parts
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosomes
 from library.utils import sha1_str
+from patients.models_enums import Zygosity
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models import Sample, Variant
 import numpy as np
@@ -136,7 +137,7 @@ class SampleChromosomeDensityGraph(AbstractChromosomeDensityGraph):
 
     def get_queryset(self):
         qs = self.sample.get_variant_qs()
-        qs = qs.filter(Variant.get_no_reference_q())
+        qs = qs.filter(Variant.get_no_reference_q(), **{f"{self.zygosity_alias}__in": Zygosity.VARIANT})
         return qs
 
     def get_genome_build(self):

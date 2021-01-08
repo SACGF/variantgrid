@@ -16,7 +16,7 @@ def match_patterns_in_file(source, patterns, mandatory):
     i = 0
     for line in source:
         i += 1
-        for (name, pattern) in patterns.items():
+        for name, pattern in patterns.items():
             match_obj = re.search(pattern, line)
             if match_obj:
                 data[name] = match_obj
@@ -24,7 +24,7 @@ def match_patterns_in_file(source, patterns, mandatory):
 
     if mandatory:
         num_lines = i
-        for (name, pattern) in patterns.items():
+        for name, pattern in patterns.items():
             if not data.get(name):
                 error_str = f"Pattern: {name} = {pattern} had no matches (searched {num_lines} lines)"
                 raise ValueError(error_str)

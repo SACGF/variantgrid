@@ -72,12 +72,12 @@ def get_sequencing_run_data(sequencing_run, qc_compare_type, include_passed_sequ
     non_null_kwargs = {"%s__isnull" % f: False for f in values}
 
     for data in flowcell_qc_qs.filter(**non_null_kwargs).values(*values):
-        for (k, v) in data.items():
+        for k, v in data.items():
             run_data[k].append(v)
 
     read_q30_qs = ReadQ30.objects.filter(illumina_flowcell_qc__sample_sheet__sequencing_run__in=sequencing_runs_ids, read__in=PAIRED_END_READS)
     read_q30_qs = read_q30_qs.order_by("illumina_flowcell_qc__sample_sheet__sequencing_run__name")
-    for (read, percent) in read_q30_qs.values_list("read", "percent"):
+    for read, percent in read_q30_qs.values_list("read", "percent"):
         run_data[get_q30_col_name(read)].append(percent)
 
     return run_data
@@ -100,7 +100,7 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
     non_null_kwargs = {"%s__isnull" % f: False for f in coverage_columns}
 
     for data in qc_exec_qs.filter(**non_null_kwargs).values(*values):
-        for (k, v) in data.items():
+        for k, v in data.items():
             run_data[k].append(v)
 
     return run_data

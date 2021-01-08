@@ -31,6 +31,18 @@ function formatField(select, formatFunc) {
     $(select).html(formattedContent);
 }
 
+function gnomadGeneConstraintRetrieval(content) {
+    // Need to put 2 hidden gnomad gene constraint fields into 1 link
+    let method = $('#gnomad_gene_constraint_method').text();
+    let url = $('#gnomad_gene_constraint_url').text();
+    let retrievalSummary = "-";
+    if (method && url) {
+        retrievalSummary = $("<a>", {target: "_blank", href: url}).text(method);
+    }
+    return retrievalSummary;
+}
+
+
 
 function transcriptFunc(transcriptId, data) {
     let transcriptInfoTable = $('#transcript-info');
@@ -56,6 +68,7 @@ function transcriptFunc(transcriptId, data) {
 
     formatField($("#cosmic_id"), cosmicLink);
     formatField($("#cosmic_legacy_id"), cosmicLink);
+    formatField($("#gnomad_gene_constraint_retrieval"), gnomadGeneConstraintRetrieval);
 }
 
 
@@ -136,7 +149,8 @@ function populateVariantAllele(data) {
     let allele = $("#allele");
     if (data.allele) {
         let alleleUrl = Urls.view_allele(data.allele.id);
-        let alleleLink = $("<a>", {class:'hover-link', href: alleleUrl}).append(data.allele.__str__);
+        let title = `Builds: ${data.allele.build_names}`;
+        let alleleLink = $("<a>", {class:'hover-link', href: alleleUrl, title: title}).append(data.allele.__str__);
         allele.html(alleleLink);
     } else {
         allele.text("-");
@@ -585,6 +599,19 @@ $(document).ready(function() {
                 <div class="col-md-6 mt-4">
                     {% load gene_disease_tags %}
                     {% gene_disease variant_annotation.transcript_version.gene_version.gene_symbol %}
+                </div>
+                <div class="col-md-6 mt-4">
+                    <div class="card">
+                        <div class="card-header">gnomAD Gene Constraints</div>
+                        <div class="card-body">
+                            {% labelled label="LOF summary" id='gnomad_gene_constraint_oe_lof_summary' %}{% endlabelled %}
+                            <div class="hidden">
+                                {% labelled id='gnomad_gene_constraint_method' %}{% endlabelled %}
+                                {% labelled label="Url" id='gnomad_gene_constraint_url' %}{% endlabelled %}
+                            </div>
+                            {% labelled label="Retrieved Via" id='gnomad_gene_constraint_retrieval' %}{% endlabelled %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

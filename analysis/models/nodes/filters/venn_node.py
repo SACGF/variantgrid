@@ -22,7 +22,7 @@ class VennNode(AnalysisNode):
     LEFT_PARENT = 'left'
     RIGHT_PARENT = 'right'
 
-    set_operation = models.CharField(max_length=1, choices=SetOperations.CHOICES, default=SetOperations.INTERSECTION)
+    set_operation = models.CharField(max_length=1, choices=SetOperations.choices, default=SetOperations.INTERSECTION)
     # We need to keep track of which is left/right but use the original DAG
     # as we need to use existing code to go through graph
     left_parent = models.ForeignKey(AnalysisNode, null=True, related_name='left_parent_node', on_delete=SET_NULL)
@@ -109,14 +109,7 @@ class VennNode(AnalysisNode):
         return a, b
 
     def get_venn_flag(self):
-        return [t[0] for t in SetOperations.CHOICES].index(self.set_operation)
-
-    def _get_node_q(self) -> Optional[Q]:
-        if self.set_operation == SetOperations.NONE:
-            return self.q_none()
-
-        q = self.get_cached_q()
-        return q
+        return [t[0] for t in SetOperations.choices].index(self.set_operation)
 
     def get_cache_task_args_objs_set(self, force_cache=False):
         """ Override from AnalysisNode - returns Celery tasks which are called
@@ -201,7 +194,7 @@ class VennNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Venn Intersection"
+        return "Venn"
 
 
 class VennNodeCache(models.Model):

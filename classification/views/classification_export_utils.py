@@ -1,19 +1,18 @@
 import collections
-import csv
-import re
 from collections import defaultdict
+from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query import QuerySet
 from django.http.response import StreamingHttpResponse
-import io
 from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
 
 from django.utils.timezone import now
 from lazy import lazy
 from pytz import timezone
 
+from flags.models import FlagComment
 from flags.models.enums import FlagStatus
 from flags.models.models import Flag
 from genes.hgvs import CHGVS
@@ -190,6 +189,9 @@ class AlleleGroup:
         self.source = source
 
     def filter_out_transcripts(self, transcripts: Set[str]) -> List[ClassificationModification]:
+        """
+        Returns ClassificationModificats there weren't included due to errors
+        """
         passes: List[ClassificationModification] = []
         fails: List[ClassificationModification] = []
 
@@ -220,7 +222,7 @@ class AlleleGroup:
         for c_hgvs, vcms in by_transcript.items():
             yield c_hgvs, vcms
 
-    def iter_c_hgvs_versionless_transcripts(self) -> Iterable[Tuple[CHGVS, VariantWithChgvs]]:
+    def iter_c_hgvs_versionless_transcripts(self) -> Iterable[Tuple[CHGVS, List[VariantWithChgvs]]]:
         by_versionless_transcript: Dict[str, TranscriptGroup] = defaultdict(TranscriptGroup)
 
         for vcm in self.data:
@@ -256,15 +258,18 @@ class ExportFormatter(BaseExportFormatter):
     def version(self):
         return '1.0'
 
-    def __init__(self, genome_build: GenomeBuild, qs: QuerySet, user: User = None):
+    def __init__(self, genome_build: GenomeBuild, qs: QuerySet, user: User = None, since: datetime = None):
         self.genome_build = genome_build
         self.used_contigs = set()
         self.user = user
         self.allele_groups = []
+        self.since = since
 
         self.error_message_ids = dict()
         self.raw_qs = qs
+        self.started = datetime.utcnow()
         self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
+
         super().__init__()
 
     @property
@@ -278,7 +283,7 @@ class ExportFormatter(BaseExportFormatter):
 
     @lazy
     def ekeys(self) -> EvidenceKeyMap:
-        return EvidenceKeyMap.cached()
+        return EvidenceKeyMap.instance()
 
     def generate_filename(self,
         prefix: str = 'classifications',
@@ -323,6 +328,25 @@ class ExportFormatter(BaseExportFormatter):
         if transcripts:
             failed_ids = [vcm.id for vcm in allele_group.filter_out_transcripts(transcripts)]
             self.record_errors(failed_ids, f'transcript across genome builds requires confirmation')
+
+    def passes_since_check(self, ag: AlleleGroup) -> bool:
+        if self.since:
+            cm: ClassificationModification
+            for cm in ag.data:
+                if cm.modified > self.since:
+                    return True
+
+            # no modifications passed the check, but maybe a flag has changed on the allele of classifications
+            flag_collection_ids = list()
+            flag_collection_ids.append( Allele.objects.values_list("flag_collection_id", flat=True).first() )
+            for cm in ag.data:
+                flag_collection_ids.append(cm.classification.flag_collection_id)
+
+            if FlagComment.objects.filter(flag__collection_id__in=flag_collection_ids, created__gt=self.since).exists():
+                return True
+
+        else:
+            return True
 
     def passes_flag_check(self, vcm: ClassificationModification) -> bool:
         outstanding_warning = Flag.objects.filter(
@@ -412,7 +436,7 @@ class ExportFormatter(BaseExportFormatter):
             allele_group.data = [vcm for vcm in self.qs.filter(classification__variant__in=allele_group.variant_ids) if self.passes_flag_check(vcm)]
             self.filter_mismatched_transcripts(allele_group)
 
-            if allele_group.data:
+            if allele_group.data and self.passes_since_check(allele_group):
                 yield allele_group
 
     def row_iterator(self) -> Iterable[AlleleGroup]:
@@ -478,6 +502,9 @@ class ExportFormatter(BaseExportFormatter):
                 yield footer
 
         response = StreamingHttpResponse(iter_allele_to_row(), content_type=self.content_type())
+        modified_str = self.started.strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
+
+        response['Last-Modified'] = modified_str
         if as_attachment:
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
         return response

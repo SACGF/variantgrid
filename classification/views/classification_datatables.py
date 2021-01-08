@@ -207,7 +207,7 @@ class ClassificationDatatableConfig(DatatableConfig):
 
     @lazy
     def id_columns(self) -> List[str]:
-        keys = EvidenceKeyMap.cached()
+        keys = EvidenceKeyMap.instance()
         return [ekey.key for ekey in keys.all_keys if '_id' in ekey.key and
                    ekey.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
 
@@ -249,8 +249,8 @@ class ClassificationDatatableConfig(DatatableConfig):
             filters.append(id_filter_q)
 
         # We want to filter using the genes set via variant annotation
-        genes: Iterable[Gene] = None
-        symbols: Iterable[str] = None
+        genes: Optional[Iterable[Gene]] = None
+        symbols: Optional[Iterable[str]] = None
         gene_id = self.get_query_param('gene')
         if gene_id:
             if gene := Gene.objects.filter(pk=gene_id).first():

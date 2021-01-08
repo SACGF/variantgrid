@@ -20,7 +20,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
 import logging
 import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
@@ -36,8 +36,7 @@ from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
-from classification.enums import ClinicalSignificance, \
-    SubmissionSource, ShareLevel, SpecialEKeys, \
+from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
     CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
 from classification.models.best_hgvs import BestHGVS
 from classification.models.evidence_key import EvidenceKeyValueType, \
@@ -71,22 +70,6 @@ class VCBlobKeys(Enum):
     NOTE = "note"
     DB_REFS = "db_refs"
     EXPLAIN = "explain"
-
-
-class VCDbRefDict(TypedDict, total=False):
-    id: str
-    db: str
-    idx: Union[str, int]
-    url: str
-    summary: str
-    internal_id: int
-
-
-class VCBlobDict(TypedDict, total=False):
-    value: Any
-    note: str
-    explain: str
-    db_refs: List[VCDbRefDict]
 
 
 class ClassificationProcessError(Exception):
@@ -249,8 +232,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     user = models.ForeignKey(User, on_delete=PROTECT)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=False, default=ShareLevel.LAB.key)
-    annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=SET_NULL)  # Null means OUTSIDE of VariantGrid
-    clinical_context = models.ForeignKey('ClinicalContext', null=True, on_delete=SET_NULL)
+    annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True, on_delete=SET_NULL)  # Null means OUTSIDE of VariantGrid
+    clinical_context = models.ForeignKey('ClinicalContext', null=True, blank=True, on_delete=SET_NULL)
     lab_record_id = models.TextField(blank=True, null=True)
     evidence = models.JSONField(null=False, blank=True, default=empty_dict)
     withdrawn = models.BooleanField(default=False)
@@ -552,7 +535,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @staticmethod
     def summarize_evidence_weights(evidence: dict, ekeys: Optional[EvidenceKeyMap] = None) -> str:
         if ekeys is None:
-            ekeys = EvidenceKeyMap()
+            ekeys = EvidenceKeyMap.instance()
         evidence_strings = []
         weights = {}
         for ekey in ekeys.all_keys:
@@ -756,7 +739,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @lazy
     def evidence_keys(self) -> EvidenceKeyMap:
-        return EvidenceKeyMap(lab=self.lab)
+        return EvidenceKeyMap.instance(lab=self.lab)
 
     def process_entry(self, cell: VCDataCell, source: str):
         """
@@ -769,7 +752,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # we often get escaped > sent to us as part of
             value = value.replace('&gt;', '>').replace('&lt;', '<')
 
-        if value is None and e_key.mandatory and not e_key.exclude_namespace:
+        if value is None and e_key.mandatory and not e_key.exclude_namespace and not self.lab.external:
+            # only provide mandatory validation for internal labs
+            # don't want to dirty up imported read only classifications with errors
             cell.add_validation(code=ValidationCode.MANDATORY, severity='error', message='Missing mandatory value')
 
         # if we got an array of values
@@ -860,7 +845,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    value = cautious_attempt_html_to_text(value)
+                    if not value.startswith("http"): # this makes beautiful soap angry thinking we're asking it to go to the URL
+                        value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
                 if results := db_ref_regexes.search(value, default_regex=_key_to_regex.get(e_key.key)):
@@ -1081,9 +1067,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
         key_dict: EvidenceKeyMap = self.evidence_keys
-        use_evidence = VCDataDict(copy.deepcopy(self.evidence))  # make a deep copy so we don't accidentally mutate teh data
 
-        patch = VCDataDict(EvidenceMixin.to_patch(patch))
+        use_evidence = VCDataDict(copy.deepcopy(self.evidence), evidence_keys=self.evidence_keys)  # make a deep copy so we don't accidentally mutate the data
+        patch = VCDataDict(data=EvidenceMixin.to_patch(patch), evidence_keys=self.evidence_keys) # the patch we're going to apply ontop of the evidence
 
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
@@ -1199,7 +1185,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         # now only include the values in the patch that
         # are diff to existing values
         diffs_only_patch = {}
-        diffs_only_patch_data = VCDataDict(diffs_only_patch)
+        diffs_only_patch_data = VCDataDict(data=diffs_only_patch, evidence_keys=self.evidence_keys)
 
         for cell in patch.cells():
             existing = use_evidence[cell.e_key]
@@ -1535,7 +1521,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if data and params.fix_data_types:
             # currently just fixes data types to multiselect array
             # should fix more data types and move the logic out of as_json so it can be done for other datatypes
-            e_keys = EvidenceKeyMap.cached()
+            e_keys = EvidenceKeyMap.instance()
             for key, blob in data.items():
                 if e_keys.get(key).value_type == EvidenceKeyValueType.MULTISELECT:
                     value = blob.get('value')
@@ -2026,7 +2012,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
         seen_classifications = set()
         latest_version_ids = set()
-        for (vcm_id, vc_id) in qs:
+        for vcm_id, vc_id in qs:
             if vc_id not in seen_classifications:
                 latest_version_ids.add(vcm_id)
                 seen_classifications.add(vc_id)
@@ -2173,7 +2159,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             return True
 
         # we only care about changes to actual keys
-        e_keys = EvidenceKeyMap.cached()
+        e_keys = EvidenceKeyMap.instance()
         self_evidence = self.evidence
         other_evidence = other.evidence
 
@@ -2224,7 +2210,7 @@ class ClassificationConsensus:
 
     @lazy
     def consensus_patch(self) -> VCPatch:
-        keys = EvidenceKeyMap.cached()
+        keys = EvidenceKeyMap.instance()
         if not self.vcm:
             return {}
 

@@ -40,7 +40,7 @@ def qc_columns(apps, schema_editor):
     illumina_qc = QCType.objects.create(name='IlluminaFlowcellQC',
                                         qc_object_path='bam_file__unaligned_reads__sequencing_sample__sample_sheet__illuminaflowcellqc')
 
-    for (field, name) in ILLUMINA_QC:
+    for field, name in ILLUMINA_QC:
         QCColumn.objects.create(qc_type=illumina_qc,
                                 name=name,
                                 field=field)
@@ -56,7 +56,7 @@ def qc_columns(apps, schema_editor):
                                     qc_object_path='bam_file__unaligned_reads__fastq_r2__fastqc')
 
     for fastqc in [fastqc1, fastqc2]:
-        for (field, name) in FASTQC:
+        for field, name in FASTQC:
             QCColumn.objects.create(qc_type=fastqc,
                                     name=name,
                                     field=field)
@@ -71,7 +71,7 @@ def qc_columns(apps, schema_editor):
                                       qc_object_path='bam_file__flagstats',
                                       total_field='total')
 
-    for (field, name) in FLAGSTATS:
+    for field, name in FLAGSTATS:
         QCColumn.objects.create(qc_type=flagstats,
                                 name=name,
                                 field=field)
@@ -93,10 +93,8 @@ def qc_columns(apps, schema_editor):
     exec_summary_qc = QCType.objects.create(name='ExecSummaryQC',
                                             qc_object_path='qcexecsummary')
 
-    for (field, name) in EXEC_SUMMARY_QC:
-        QCColumn.objects.create(qc_type=exec_summary_qc,
-                                name=name,
-                                field=field)
+    for field, name in EXEC_SUMMARY_QC:
+        QCColumn.objects.create(qc_type=exec_summary_qc, name=name, field=field)
 
 
 class Migration(migrations.Migration):

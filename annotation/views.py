@@ -1,4 +1,6 @@
-from typing import List
+import subprocess
+from subprocess import check_output
+from typing import List, Optional
 
 from collections import defaultdict, Counter
 from django.conf import settings
@@ -36,8 +38,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
-from snpdb.models import VariantGridColumn
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF
 
 
 def get_build_contigs():
@@ -102,7 +103,7 @@ def _get_build_annotation_details(build_contigs, genome_build):
             genes_and_transcripts = _get_gene_and_transcript_stats(genome_build, genome_build.annotation_consortium)
             annotation_details["genes_and_transcripts"] = genes_and_transcripts
 
-            annotation_consortia = dict(AnnotationConsortium.CHOICES)
+            annotation_consortia = dict(AnnotationConsortium.choices)
             other_consortia = set(annotation_consortia.keys()) - {genome_build.annotation_consortium}
             other_gene_annotation = {}
             for other_ac in other_consortia:
@@ -127,8 +128,19 @@ def _get_build_annotation_details(build_contigs, genome_build):
             annotation_details["clinvar"] = f"{clinvar_counts} ClinVar records"
 
         clinvar_counts = av.get_clinvar().count()
-        annotation_details["ok"] = all([reference_ok, genes_and_transcripts, gene_annotation_release,
-                                        ensembl_counts, clinvar_counts])
+        annotation_sub_components = [reference_ok, genes_and_transcripts, gene_annotation_release,
+                                     ensembl_counts, clinvar_counts]
+        if settings.SOMALIER.get("enabled"):
+            somalier_cfg = SomalierConfig()
+            try:
+                vcf = somalier_cfg.get_sites_vcf(genome_build)
+                annotation_details["somalier"] = f"Sites VCF: {vcf.name}"
+                somalier = True
+            except VCF.DoesNotExist:
+                somalier = None
+            annotation_sub_components.append(somalier)
+
+        annotation_details["ok"] = all(annotation_sub_components)
     return annotation_details
 
 
@@ -155,8 +167,7 @@ def annotation(request):
 
     gene_symbol_alias_counts = get_field_counts(GeneSymbolAlias.objects.all(), "source")
     if gene_symbol_alias_counts:
-        source_display = dict(GeneSymbolAliasSource.CHOICES)
-        gene_symbol_alias_counts = {source_display[k]: v for k, v in gene_symbol_alias_counts.items()}
+        gene_symbol_alias_counts = {GeneSymbolAliasSource(k).label: v for k, v in gene_symbol_alias_counts.items()}
 
     mim_counts = MIMMorbid.objects.all().count()
     mim_alias_counts = MIMMorbidAlias.objects.all().count()
@@ -194,6 +205,10 @@ def annotation(request):
     if hpa_counts:
         hpa_counts_annotation = f"{hpa_counts} HPA entries"
 
+    somalier = None
+    if somalier_enabled := settings.SOMALIER.get("enabled"):
+        somalier = _verify_somalier_config()
+
     # These are empty/None if not set.
     annotations_ok = [all(builds_ok),
                       clinvar_citations,
@@ -202,6 +217,8 @@ def annotation(request):
                       human_phenotype_ontology_import,
                       mondo_import,
                       hgnc_gene_symbols_import]
+    if somalier_enabled:
+        annotations_ok.append(somalier)
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header
 
     cached_web_resources = []
@@ -222,9 +239,22 @@ def annotation(request):
                "hpa_counts_annotation": hpa_counts_annotation,
                "num_annotation_columns": VariantGridColumn.objects.count(),
                "cached_web_resources": cached_web_resources,
-               "python_command": settings.PYTHON_COMMAND}
-
+               "python_command": settings.PYTHON_COMMAND,
+               "somalier": somalier}
     return render(request, "annotation/annotation.html", context)
+
+
+def _verify_somalier_config() -> Optional[str]:
+    somalier_cfg = SomalierConfig()
+    somalier_bin = somalier_cfg.get_annotation("command")
+    somalier = None
+    try:
+        somalier_output = check_output([somalier_bin], stderr=subprocess.STDOUT)
+        somalier = somalier_output.decode().split("\n", 1)[0]
+    except:
+        log_traceback()
+
+    return somalier
 
 
 @require_POST
@@ -279,7 +309,7 @@ def version_diffs(request):
                       ('Variant', VariantAnnotationVersion, VariantAnnotationVersionDiff)]
 
     version_levels = []
-    for (name, version_klass, version_diff_klass) in VERSION_LEVELS:
+    for name, version_klass, version_diff_klass in VERSION_LEVELS:
         version_levels.append((name, get_last_2(version_klass, version_diff_klass)))
     context = {"version_levels": version_levels}
     return render(request, "annotation/version_diffs.html", context)
@@ -297,7 +327,7 @@ def view_version_diff(request, version_diff_id):
 
 
 def variant_annotation_runs(request):
-    as_display = dict(AnnotationStatus.CHOICES)
+    as_display = dict(AnnotationStatus.choices)
 
     genome_build_field_counts = {}
     genome_build_summary = {}

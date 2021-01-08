@@ -12,6 +12,7 @@ from seqauto.signals import backend_vcf_import_success_signal
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
+from snpdb.tasks.somalier_tasks import somalier_vcf_id, somalier_all_samples
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
     create_variant_zygosity_counts
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
@@ -140,6 +141,14 @@ class SampleLocusCountsTask(ImportVCFStepTask):
         do_sample_locus_count_for_vcf_id(uploaded_vcf.vcf.pk)
 
 
+class SomalierVCFTask(ImportVCFStepTask):
+
+    def process_items(self, upload_step):
+        uploaded_vcf = upload_step.get_uploaded_vcf()
+        somalier_vcf_id(uploaded_vcf.vcf.pk)
+        somalier_all_samples()
+
+
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
@@ -191,4 +200,5 @@ CalculateVCFStatsTask = app.register_task(CalculateVCFStatsTask())
 CalculateMutationalSignaturesForSampleTask = app.register_task(CalculateMutationalSignaturesForSampleTask())
 UpdateVariantZygosityCountsTask = app.register_task(UpdateVariantZygosityCountsTask())
 SampleLocusCountsTask = app.register_task(SampleLocusCountsTask())
+SomalierVCFTask = app.register_task(SomalierVCFTask())
 ImportGenotypeVCFSuccessTask = app.register_task(ImportGenotypeVCFSuccessTask())

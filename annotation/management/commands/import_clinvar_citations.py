@@ -59,9 +59,9 @@ class Command(BaseCommand):
         else:
             max_previously_existing_citation_id = 0
 
-        citation_sources = invert_dict(dict(CitationSource.CHOICES))
+        citation_sources = invert_dict(dict(CitationSource.choices))
         new_citations_by_key = {}
-        for (_, row) in df.iterrows():
+        for _, row in df.iterrows():
             #print("row: %s" % row)
             cs = row[CITATION_SOURCE]
             citation_source = citation_sources[cs]
@@ -83,7 +83,7 @@ class Command(BaseCommand):
 
         # Insert ClinVar citations
         rows = []
-        for (_, row) in df.iterrows():
+        for _, row in df.iterrows():
             cs = row[CITATION_SOURCE]
             citation_source = citation_sources[cs]
 

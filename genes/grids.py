@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
@@ -8,7 +9,7 @@ from annotation.models.models import EnsemblGeneAnnotation, AnnotationVersion, \
     EnsemblGeneAnnotationVersion
 from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
-    GeneListGeneSymbol
+    GeneListGeneSymbol, GeneAnnotationRelease
 from library.django_utils import get_model_fields
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -56,10 +57,14 @@ class GeneListsGrid(JqGridUserRowConfig):
             else:
                 queryset = queryset.filter(category__isnull=True)
 
-        self.queryset = queryset.values(*self.get_field_names())
+        queryset = queryset.annotate(num_genes=Count("genelistgenesymbol"))
+        field_names = self.get_field_names() + ["num_genes"]
+        self.queryset = queryset.values(*field_names)
 
     def get_colmodels(self, remove_server_side_only=False):
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
+        gene_list_genes_colmodel = {'index': 'num_genes', 'name': 'num_genes', 'label': '# gene symbols'}
+        colmodels += [gene_list_genes_colmodel]
         if self.show_category:
             for cm in colmodels:
                 if cm['index'] == 'category__name':
@@ -79,11 +84,10 @@ class GeneListGenesGrid(JqGridUserRowConfig):
         super().__init__(user)
         gene_list = GeneList.get_for_user(user, gene_list_id, success_only=False)
         queryset = self.model.objects.filter(gene_list=gene_list)
-        user_settings = UserSettings.get_for_user(user)
 
         annotation_kwargs = {}
         self.annotation_field_labels = {}
-        for release in user_settings.get_gene_annotation_releases():
+        for release in GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds():
             field_name = f"release_{release.pk}"
             self.annotation_field_labels[field_name] = str(release)
             annotation_kwargs[field_name] = StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True,

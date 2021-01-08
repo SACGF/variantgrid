@@ -297,17 +297,10 @@ class EvidenceKey(TimeStampedModel):
 class EvidenceKeyMap:
 
     @staticmethod
-    @timed_cache(ttl=60)
     def cached_key(key: str) -> EvidenceKey:
-        return EvidenceKey.objects.get(pk=key)
+        return EvidenceKeyMap.instance().get(key)
 
     @staticmethod
-    @timed_cache(ttl=60)
-    def cached() -> 'EvidenceKeyMap':
-        return EvidenceKeyMap()
-
-    @staticmethod
-    @timed_cache(ttl=60)
     def _ordered_keys() -> List[EvidenceKey]:
         # sort in code (rather than sql) as pretty_label isn't available normally
         key_entries = list(EvidenceKey.objects.all())
@@ -326,6 +319,15 @@ class EvidenceKeyMap:
             ordered_by_category_key_entries.extend(category_key_entries)
 
         return ordered_by_category_key_entries
+
+    @staticmethod
+    @timed_cache(ttl=60)
+    def instance(lab: Lab = None):
+        return EvidenceKeyMap(lab=lab)
+
+    @staticmethod
+    def cached() -> 'EvidenceKeyMap':
+        return EvidenceKeyMap.instance()
 
     def __init__(self, lab: Lab = None):
         """
@@ -570,7 +572,7 @@ class VCDataCell:
         """
         Given two dictionaries, returns only the entries that have changed
         :param dest: Another dict
-        :param ignore_omitted: If a key name is in here, and if a value is in dest, but not in self, don't make any mention of it,
+        :param ignore_if_omitted: If a key name is in here, and if a value is in dest, but not in self, don't make any mention of it,
         otherwise it will be set to None.
         :return: The differences
         """
@@ -622,11 +624,11 @@ class VCDataDict:
     Represents an entire patch or base set of data for EvidenceKeys
     """
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: Dict[str, Any], evidence_keys: EvidenceKeyMap):
         if not isinstance(data, dict):
             raise ValueError('Data must be of type dict')
         self.data = data
-        self.e_keys = EvidenceKeyMap.cached()
+        self.e_keys = evidence_keys
 
     def __str__(self):
         return str(self.data)

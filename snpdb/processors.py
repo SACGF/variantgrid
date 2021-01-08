@@ -24,6 +24,7 @@ def settings_context_processor(request):
         'site': Site.objects.get_current(),
         'site_messages': SiteMessage.get_site_messages(),
         'site_name': settings.SITE_NAME,
+        'somalier_enabled': settings.SOMALIER.get("enabled", False),
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
         'url_name': request.resolver_match.url_name,

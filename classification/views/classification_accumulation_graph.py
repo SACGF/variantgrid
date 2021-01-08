@@ -22,7 +22,7 @@ class ClassificationSummary:
     at: datetime
     allele_id: int
     classification_id: int
-    clinical_significance: str
+    clinical_significance: Optional[str]
     withdrawn: Optional[bool] = None
     org_name: Optional[str] = None
 
@@ -133,7 +133,7 @@ class ClassificationAccumulationGraph:
     @staticmethod
     def withdrawn_iterable():
 
-        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, str]] = dict()
+        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, Optional[str]]] = dict()
 
         flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
             .order_by("created") \

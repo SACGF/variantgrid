@@ -1,19 +1,18 @@
-
-# 1st bash at creating/populating running new analysis templates
 from django.contrib.auth.models import User
 
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplate, AnalysisTemplateRun, \
     AnalysisTemplateRunArgument, SampleAnalysisTemplateRun
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
 from library.guardian_utils import add_public_group_read_permission
-from snpdb.models import Sample
+from snpdb.models import Sample, GenomeBuild
 
 
 def run_analysis_template(analysis_template: AnalysisTemplate,
+                          genome_build: GenomeBuild,
                           user: User = None,
                           **kwargs) -> AnalysisTemplateRun:
 
-    template_run = AnalysisTemplateRun.create(analysis_template, user=user)
+    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=user)
     template_run.populate_arguments(kwargs)
     populate_analysis_from_template_run(template_run)
     return template_run
@@ -68,7 +67,7 @@ def get_sample_analysis(sample: Sample, analysis_template: AnalysisTemplate) -> 
                                                      analysis_template_run__template_version__version=analysis_template.latest_version())
         return satr.analysis_template_run.analysis
     except SampleAnalysisTemplateRun.DoesNotExist:
-        at_run = run_analysis_template(analysis_template, sample=sample)
+        at_run = run_analysis_template(analysis_template, sample.genome_build, sample=sample)
         at_run.analysis.visible = False
         at_run.analysis.save()
         add_public_group_read_permission(at_run.analysis)

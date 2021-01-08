@@ -11,7 +11,7 @@ from snpdb.models import GenomeBuild, AnnotationConsortium
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
-        consortia = [ac[1] for ac in AnnotationConsortium.CHOICES]
+        consortia = [ac[1] for ac in AnnotationConsortium.choices]
         builds = [gb.name for gb in GenomeBuild.builds_with_annotation()]
 
         parser.add_argument('--genome-build', choices=builds, required=True)
@@ -23,7 +23,7 @@ class Command(BaseCommand):
         build_name = options["genome_build"]
         filename = options['filename']
 
-        ac_dict = invert_dict(dict(AnnotationConsortium.CHOICES))
+        ac_dict = invert_dict(dict(AnnotationConsortium.choices))
         annotation_consortium = ac_dict[annotation_consortium_name]
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         collection = create_canonical_transcript_collection(genome_build, annotation_consortium, filename)

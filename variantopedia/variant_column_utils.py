@@ -21,7 +21,7 @@ def get_variant_annotation_data(variant, annotation_version, columns_qs):
     variant_columns_dict = qs.filter(pk=variant.pk).values(*all_columns)[0]
 
     variant_data = []
-    for (grid_column_name, variant_column, description) in column_data:
+    for grid_column_name, variant_column, description in column_data:
         row = (grid_column_name, description, variant_columns_dict[variant_column])
         variant_data.append(row)
     return variant_data
@@ -60,7 +60,7 @@ def get_gene_annotation_column_data(ensembl_gene_annotation) -> List[GeneAnnotat
     variant_data: Dict[str, GeneAnnotationColumnData] = dict()
 
     description: str
-    for (grid_column_name, variant_column, description) in column_data:
+    for grid_column_name, variant_column, description in column_data:
         gene_annotation_column = variant_to_gene_annotation_column(variant_column)
         value = gene_columns_dict[gene_annotation_column]
 

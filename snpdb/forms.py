@@ -11,12 +11,13 @@ from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
+from annotation.models import ManualVariantEntry
+from annotation.models.models_enums import ManualVariantEntryType
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
 from snpdb import models
-from snpdb.models import VCF, Sample, Cohort, VARIANT_PATTERN, \
-    DBSNP_PATTERN, UserContact, Tag, UserSettings, GenomicIntervalsCollection, ImportStatus, \
-    SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
+from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
+    ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
     OrganizationUserSettingsOverride
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
@@ -293,11 +294,6 @@ class BlankNullBooleanSelect(NullBooleanSelect):
 
 class SettingsOverrideForm(BaseModelForm):
     """ Warning: This hides some fields (in _hide_unused_fields) so not all fields from model will exist """
-    genome_builds = forms.MultipleChoiceField(
-        required=False,
-        widget=forms.CheckboxSelectMultiple,
-    )
-
     class Meta:
         model = models.SettingsOverride
         fields = "__all__"
@@ -312,16 +308,7 @@ class SettingsOverrideForm(BaseModelForm):
                                                                        attrs={'data-placeholder': 'Column...'})}
 
     def __init__(self, *args, **kwargs):
-        instance = kwargs.get("instance")
-        initial = kwargs.get("initial") or {}
-        kwargs["initial"] = initial
-        if instance and instance.pk:
-            usgb_set = instance.settingsgenomebuild_set
-            genome_builds = set(usgb_set.all().values_list("genome_build", flat=True))
-            initial["genome_builds"] = list(genome_builds)
-
         super().__init__(*args, **kwargs)
-        self.fields['genome_builds'].choices = GenomeBuild.get_choices()
         self.fields['columns'].queryset = models.CustomColumnsCollection.objects.filter(user__isnull=True)  # public
         self.fields['default_genome_build'].queryset = GenomeBuild.builds_with_annotation()
         self.fields['email_weekly_updates'].label = 'Email regular updates'
@@ -349,35 +336,6 @@ class SettingsOverrideForm(BaseModelForm):
         for f, visible in field_visibility.items():
             if f in self.fields and not visible:
                 del self.fields[f]
-
-        if not settings.USER_SETTINGS_SHOW_BUILDS:
-            del self.fields['genome_builds']
-
-    def save(self, commit=True):
-        settings_override = super().save(commit=commit)
-        if commit and settings.USER_SETTINGS_SHOW_BUILDS:
-            usgb_set = settings_override.settingsgenomebuild_set
-            old_genome_builds = set(usgb_set.all().values_list("genome_build", flat=True))
-            new_genome_builds = set(self.cleaned_data['genome_builds'])
-
-            if settings_override.default_genome_build:
-                # Always use default if set
-                new_genome_builds.add(settings_override.default_genome_build.name)
-
-            if new_genome_builds != old_genome_builds:
-                added = new_genome_builds - old_genome_builds
-                removed = old_genome_builds - new_genome_builds
-
-                if added:
-                    for build_name in added:
-                        genome_build = GenomeBuild.objects.get(name=build_name)
-                        usgb_set.create(genome_build=genome_build)
-
-                if removed:
-                    for build_name in removed:
-                        usgb_set.filter(genome_build__name=build_name).delete()
-
-        return settings_override
 
 
 class OrganizationUserSettingsOverrideForm(SettingsOverrideForm):
@@ -474,8 +432,8 @@ class ManualVariantEntryForm(forms.Form):
         if variants_text:
             for line in variants_text.split('\n'):
                 line = line.strip()
-                if not (DBSNP_PATTERN.match(line) or VARIANT_PATTERN.match(line)):
-                    msg = f"'{line}' does not match dbSNP or variant patterns"
+                if ManualVariantEntry.get_entry_type(line) == ManualVariantEntryType.UNKNOWN:
+                    msg = f"'{line}' does not match known patterns"
                     if " " in line:
                         msg += " (remember to only enter one variant per line)"
                     raise forms.ValidationError(msg)
@@ -512,7 +470,7 @@ class UserSettingsGenomeBuildMixin:
         kwargs["initial"] = initial
         super().__init__(*args, **kwargs)
 
-        genome_builds_qs = user_settings.get_genome_builds()
+        genome_builds_qs = GenomeBuild.builds_with_annotation()
         build_field = self.fields['genome_build']
         build_field.queryset = genome_builds_qs
         if genome_builds_qs.count() < 2:

@@ -1,4 +1,5 @@
-from typing import Optional, List
+from abc import ABC, abstractmethod
+from typing import Optional, List, Set, Tuple
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -11,14 +12,137 @@ from patients.models_enums import Zygosity, Sex
 from snpdb.models import Trio, Sample
 
 
-class TrioNode(AbstractCohortBasedNode):
-    trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
-    inheritance = models.CharField(max_length=1, choices=TrioInheritance.CHOICES, default=TrioInheritance.RECESSIVE)
-    require_zygosity = models.BooleanField(default=True)
-
+class AbstractTrioInheritance(ABC):
+    """ Do inheritance filtering in subclasses to keep filters/methods consistent """
     NO_VARIANT = {Zygosity.MISSING, Zygosity.HOM_REF}  # 2 different het would be "missing" (as has no ref)
     HAS_VARIANT = {Zygosity.HET, Zygosity.HOM_ALT}
     UNAFFECTED_AND_AFFECTED_ZYGOSITIES = [NO_VARIANT, HAS_VARIANT]
+
+    def __init__(self, node: 'TrioNode'):
+        self.node = node
+
+    def _get_zyg_q(self, cohort_genotype_collection, trio_zyg_data) -> Q:
+        """ trio_zyg_data = tuple of mum_zyg_set, dad_zyg_set, proband_zyg_set """
+        mother_sample = self.node.trio.mother.sample
+        father_sample = self.node.trio.father.sample
+        proband_sample = self.node.trio.proband.sample
+
+        mum_dad_proband = [mother_sample, father_sample, proband_sample]
+        sample_zygosities_dict = dict(zip(mum_dad_proband, trio_zyg_data))
+        sample_require_zygosity_dict = {mother_sample: self.node.require_zygosity,
+                                        father_sample: self.node.require_zygosity,
+                                        proband_sample: True}  # 947 - Always require zygosity for Proband
+        return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_require_zygosity_dict)
+
+
+    @staticmethod
+    def _zygosity_options(zyg: Set, allow_unknown=False):
+        if allow_unknown:
+            zyg.add(Zygosity.UNKNOWN_ZYGOSITY)
+        zyg.discard(Zygosity.MISSING)  # Implementation detail - don't show to user
+        return ", ".join(sorted([Zygosity.display(z) for z in zyg]))
+
+    def get_zygosities_method(self, mum_z: Set, dad_z: Set, proband_z: Set):
+        proband = self._zygosity_options(proband_z)
+        mum = self._zygosity_options(mum_z, not self.node.require_zygosity)
+        dad = self._zygosity_options(dad_z, not self.node.require_zygosity)
+        filters = {"Proband": proband, "Mother": mum, "Father": dad}
+        return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
+
+    @abstractmethod
+    def get_q(self) -> Q:
+        pass
+
+    @abstractmethod
+    def get_method(self) -> str:
+        pass
+
+
+class SimpleTrioInheritance(AbstractTrioInheritance):
+    @abstractmethod
+    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+        pass
+
+    def get_q(self) -> Q:
+        cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
+        return self._get_zyg_q(cohort_genotype_collection, self._get_mum_dad_proband_zygosities())
+
+    def get_method(self) -> str:
+        return self.get_zygosities_method(*self._get_mum_dad_proband_zygosities())
+
+
+class Recessive(SimpleTrioInheritance):
+    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+        return {Zygosity.HET}, {Zygosity.HET}, {Zygosity.HOM_ALT}
+
+
+class Dominant(SimpleTrioInheritance):
+    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+        mother_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.mother_affected)]
+        father_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.father_affected)]
+        return mother_zyg, father_zyg, self.HAS_VARIANT
+
+
+class Denovo(SimpleTrioInheritance):
+    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+        return self.NO_VARIANT, self.NO_VARIANT, self.HAS_VARIANT
+
+
+class ProbandHet(SimpleTrioInheritance):
+    """ Equivalent of SampleNode, but in TrioNode so analysis templates only need to have Trio as argument """
+    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+        return set(), set(), {Zygosity.HET}
+
+
+class XLinkedRecessive(SimpleTrioInheritance):
+    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+        return {Zygosity.HET}, set(), {Zygosity.HOM_ALT}
+
+    def get_q(self) -> Q:
+        return super().get_q() & Q(locus__contig__name='X')  # will work for hg19 and GRCh38
+
+    def get_method(self) -> str:
+        return super().get_method() + " and contig name = 'X'"
+
+
+class CompHet(AbstractTrioInheritance):
+    def _mum_but_not_dad(self):
+        return {Zygosity.HET}, self.NO_VARIANT, {Zygosity.HET}
+
+    def _dad_but_not_mum(self):
+        return self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}
+
+    def get_q(self) -> Q:
+        cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
+
+        parent = self.node.get_single_parent()
+        mum_but_not_dad = self._get_zyg_q(cohort_genotype_collection, self._mum_but_not_dad())
+        dad_but_not_mum = self._get_zyg_q(cohort_genotype_collection, self._dad_but_not_mum())
+        comp_het_q = mum_but_not_dad | dad_but_not_mum
+
+        # Need to pass in kwargs in case we have parent (eg Venn node) that doesn't have same cohort annotation kwargs
+        annotation_kwargs = self.node.get_annotation_kwargs()
+
+        def get_parent_genes(q):
+            qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
+            return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
+
+        common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
+        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(common_genes)
+        return parent.get_q() & comp_het_q & comp_het_genes
+
+    def get_method(self) -> str:
+        mum1, dad1, _ = self._mum_but_not_dad()
+        mum_but_not_dad = self.get_zygosities_method(mum1, dad1, set())
+        mum2, dad2, _ = self._dad_but_not_mum()
+        dad_but_not_mum = self.get_zygosities_method(mum2, dad2, set())
+        return f"Proband: HET, and >=2 hits from genes where ({mum_but_not_dad}) OR ({dad_but_not_mum})"
+
+
+class TrioNode(AbstractCohortBasedNode):
+    trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
+    inheritance = models.CharField(max_length=1, choices=TrioInheritance.choices, default=TrioInheritance.RECESSIVE)
+    require_zygosity = models.BooleanField(default=True)
 
     @property
     def min_inputs(self):
@@ -65,88 +189,36 @@ class TrioNode(AbstractCohortBasedNode):
     def modifies_parents(self):
         return self.trio is not None
 
+    def _inhertiance_factory(self):
+        inhertiance_classes = {
+            TrioInheritance.COMPOUND_HET: CompHet,
+            TrioInheritance.RECESSIVE: Recessive,
+            TrioInheritance.DOMINANT: Dominant,
+            TrioInheritance.DENOVO: Denovo,
+            TrioInheritance.PROBAND_HET: ProbandHet,
+            TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive
+        }
+        klass = inhertiance_classes[TrioInheritance(self.inheritance)]
+        return klass(self)
+
     def _get_node_q(self) -> Optional[Q]:
         cohort, q = self.get_cohort_and_q()
         if cohort:
-            cohort_genotype_collection = cohort.cohort_genotype_collection
-            if self.inheritance == TrioInheritance.COMPOUND_HET:
-                parent = self.get_single_parent()
-                q &= self.get_compound_het_q(cohort_genotype_collection, parent)
-            else:
-                if self.inheritance == TrioInheritance.RECESSIVE:
-                    q &= self.get_recessive_q(cohort_genotype_collection)
-                elif self.inheritance == TrioInheritance.DOMINANT:
-                    q &= self.get_dominant_q(cohort_genotype_collection)
-                elif self.inheritance == TrioInheritance.DENOVO:
-                    q &= self.get_denovo_q(cohort_genotype_collection)
-                elif self.inheritance == TrioInheritance.PROBAND_HET:
-                    q &= self.get_proband_het_q(cohort_genotype_collection)
-                elif self.inheritance == TrioInheritance.XLINKED_RECESSIVE:
-                    q &= self.get_xlinked_recessive_q(cohort_genotype_collection)
-
+            inheritance = self._inhertiance_factory()
+            q &= inheritance.get_q()
             q &= self.get_vcf_locus_filters_q()
         return q
 
-    def get_zyg_q(self, cohort_genotype_collection, trio_zyg_data):
-        """ trio_zyg_data = tuple of mum_zyg_set, dad_zyg_set, proband_zyg_set """
-        mother_sample = self.trio.mother.sample
-        father_sample = self.trio.father.sample
-        proband_sample = self.trio.proband.sample
-
-        mum_dad_proband = [mother_sample, father_sample, proband_sample]
-        sample_zygosities_dict = dict(zip(mum_dad_proband, trio_zyg_data))
-        sample_require_zygosity_dict = {mother_sample: self.require_zygosity,
-                                        father_sample: self.require_zygosity,
-                                        proband_sample: True}  # 947 - Always require zygosity for Proband
-
-        return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_require_zygosity_dict)
-
-    def get_recessive_q(self, cohort_genotype_collection):
-        zyg_data = ({Zygosity.HET}, {Zygosity.HET}, {Zygosity.HOM_ALT})
-        return self.get_zyg_q(cohort_genotype_collection, zyg_data)
-
-    def get_compound_het_q(self, cohort_genotype_collection, parent):
-
-        mum_but_not_dad = self.get_zyg_q(cohort_genotype_collection, ({Zygosity.HET}, self.NO_VARIANT, {Zygosity.HET}))
-        dad_but_not_mum = self.get_zyg_q(cohort_genotype_collection, (self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}))
-        comp_het_q = mum_but_not_dad | dad_but_not_mum
-        # Need to pass in kwargs in case we have parent (eg Venn node) that doesn't have same cohort annotation kwargs
-        annotation_kwargs = self.get_annotation_kwargs()
-
-        def get_parent_genes(q):
-            qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
-            return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
-
-        common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
-        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(common_genes)
-        return parent.get_q() & comp_het_q & comp_het_genes
-
-    def get_dominant_q(self, cohort_genotype_collection):
-        mother_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.trio.mother_affected)]
-        father_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.trio.father_affected)]
-        zyg_data = (mother_zyg, father_zyg, self.HAS_VARIANT)
-
-        return self.get_zyg_q(cohort_genotype_collection, zyg_data)
-
-    def get_denovo_q(self, cohort_genotype_collection):
-        zyg_data = (self.NO_VARIANT, self.NO_VARIANT, self.HAS_VARIANT)
-        return self.get_zyg_q(cohort_genotype_collection, zyg_data)
-
-    def get_proband_het_q(self, cohort_genotype_collection):
-        """ Equivalent of SampleNode, but in TrioNode so analysis templates only need to have Trio as argument """
-        zyg_data = ({}, {}, {Zygosity.HET})
-        return self.get_zyg_q(cohort_genotype_collection, zyg_data)
-
-    def get_xlinked_recessive_q(self, cohort_genotype_collection):
-        q_x = Q(locus__contig__name='X')  # will work for hg19 and GRCh38
-        zyg_data = ({Zygosity.HET}, {}, {Zygosity.HOM_ALT})
-        return q_x & self.get_zyg_q(cohort_genotype_collection, zyg_data)
-
     def _get_method_summary(self):
-        return "TODO: method summary"
+        if self._get_cohort():
+            inheritance = self._inhertiance_factory()
+            method = inheritance.get_method()
+        else:
+            method = "No cohort selected"
+        return method
 
     def get_node_name(self):
-        name_parts = [dict(TrioInheritance.CHOICES)[self.inheritance]]
+        name_parts = [TrioInheritance(self.inheritance).label]
         if not self.require_zygosity:
             name_parts.append(' (non strict)')
 
@@ -169,10 +241,12 @@ class TrioNode(AbstractCohortBasedNode):
     def get_node_class_label():
         return 'Trio'
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.trio:
             errors.append("No trio selected")
+        else:
+            errors.extend(self._get_genome_build_errors("trio", self.trio.genome_build))
         return errors
 
     def _get_cohorts_and_sample_visibility_for_node(self):

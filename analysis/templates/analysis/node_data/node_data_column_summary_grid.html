@@ -12,7 +12,7 @@ jQuery.extend($.fn.fmatter , {
 });
 
 function download_dataframe_grid() {
-	window.location = "{% url 'node_column_summary_grid' node_id=node_id version_id=version_id extra_filters=extra_filters variant_column=grid_column_name significant_figures=significant_figures op='download' %}";
+	window.location = "{% url 'node_column_summary_grid' node_id=node_id node_version=node_version extra_filters=extra_filters variant_column=grid_column_name significant_figures=significant_figures op='download' %}";
 }
 
 
@@ -53,11 +53,11 @@ function setupDataFrameGrid(config_url, nodeId, versionId, on_load_function, on_
 {% endblock javascript %}
 
 {% block docreadyjs %}
-		var grid_url = "{% url 'node_column_summary_grid' node_id=node_id version_id=version_id extra_filters=extra_filters variant_column=grid_column_name significant_figures=significant_figures op='config' %}";
+		var grid_url = "{% url 'node_column_summary_grid' node_id=node_id node_version=node_version extra_filters=extra_filters variant_column=grid_column_name significant_figures=significant_figures op='config' %}";
 		var myGridLoadSuccess = function() {
 			$(".loading-message").hide();
 		};
-		setupDataFrameGrid(grid_url, {{ node_id }}, {{ version_id }}, myGridLoadSuccess, on_error_function);
+		setupDataFrameGrid(grid_url, {{ node_id }}, {{ node_version }}, myGridLoadSuccess, on_error_function);
 {% endblock docreadyjs %}
 
 

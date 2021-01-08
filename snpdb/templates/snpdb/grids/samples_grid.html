@@ -32,6 +32,13 @@
         }
         return importStatus;
     },
+    viewSampleGeneList: function(cellvalue, options, rowObject) {
+        let activeIcon = "";
+        if (rowObject.activesamplegenelist__id) {
+            activeIcon = `<div title="Active GeneList" class="left icon16 check-mark-green"></div>`;
+        }
+        return `<span>${activeIcon}${cellvalue}</span>`;
+    },
     viewMutationalSignature : function(mutSigSummary, options, rowObject) {
         var mutSigLink = '';
         var mutationalSignatureId = rowObject.mutationalsignature__id;

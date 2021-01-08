@@ -25,8 +25,7 @@ class SequencingRunQCGraph(CacheableGraph):
         self.sequencing_run_id = sequencing_run_id
         self.qc_compare_type = qc_compare_type
         self.bp_color = SequencingRunQCGraph.BOXPLOT_COLORS.get(self.qc_compare_type, SequencingRunQCGraph.DEFAULT_BOXPLOT_COLOR)
-        qc_types_dict = dict(QCCompareType.CHOICES)
-        self.type_name = qc_types_dict[qc_compare_type]
+        self.type_name = QCCompareType(qc_compare_type).label
 
     @lazy
     def sequencing_run(self):
@@ -97,7 +96,7 @@ class SequencingRunQCGraph(CacheableGraph):
         num_rows = len(values)
         num_cols = 1
 
-        for (i, (column_name, column_values)) in enumerate(values):
+        for i, (column_name, column_values) in enumerate(values):
             ax = figure.add_subplot(num_rows, num_cols, i + 1)
             run_value = sequencing_run_qc[column_name]
             self.plot_enrichment_kit(ax, column_name, column_values, run_value)

@@ -24,6 +24,7 @@ urlpatterns = [
     path('messages/', include('django_messages.urls')),
     path('external_help', views.external_help, name='external_help'),
     path('version', views.version, name='version'),
+    path('changelog', views.changelog, name='changelog'),
     path('keycloak_admin', views.keycloak_admin, name='keycloak_admin'),
     path('terms/', include('termsandconditions.urls')),
     path('__debug__/', include(debug_toolbar.urls)),

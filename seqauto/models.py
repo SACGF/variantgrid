@@ -14,7 +14,7 @@ import re
 import shutil
 
 from genes.models import CanonicalTranscriptCollection, GeneListCategory, \
-    CustomTextGeneList, GeneList, GeneCoverageCollection, Transcript, GeneSymbol
+    CustomTextGeneList, GeneList, GeneCoverageCollection, Transcript, GeneSymbol, SampleGeneList
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
@@ -37,7 +37,7 @@ from variantgrid.celery import app
 class SeqAutoRun(TimeStampedModel):
     """ Represents a scan and loading of data from backend system """
 
-    status = models.CharField(max_length=1, choices=SeqAutoRunStatus.CHOICES, default=SeqAutoRunStatus.CREATED)
+    status = models.CharField(max_length=1, choices=SeqAutoRunStatus.choices, default=SeqAutoRunStatus.CREATED)
     task_id = models.CharField(max_length=36, null=True)
     scan_start = models.DateTimeField(null=True)
     create_models_start = models.DateTimeField(null=True)
@@ -95,7 +95,7 @@ class SeqAutoRunEvent(models.Model):
     """ These are messages created by SeqAutoRun """
     seqauto_run = models.ForeignKey(SeqAutoRun, on_delete=CASCADE)
     severity = models.CharField(max_length=1, choices=LogLevel.CHOICES)
-    file_type = models.CharField(max_length=1, choices=SequencingFileType.CHOICES, null=True)
+    file_type = models.CharField(max_length=1, choices=SequencingFileType.choices, null=True)
     message = models.TextField(null=True)
 
     def __str__(self):
@@ -105,7 +105,7 @@ class SeqAutoRunEvent(models.Model):
 class SequencerModel(models.Model):
     model = models.TextField(primary_key=True)
     manufacturer = models.ForeignKey(Manufacturer, null=True, on_delete=CASCADE)
-    data_naming_convention = models.CharField(max_length=1, choices=DataGeneration.CHOICES)
+    data_naming_convention = models.CharField(max_length=1, choices=DataGeneration.choices)
 
     @property
     def css_class(self):
@@ -168,7 +168,7 @@ class EnrichmentKit(models.Model):
     """ A lab method to enrich a sample (eg Capture Panel or Amplicon etc) """
     name = models.TextField()
     version = models.IntegerField(default=1)
-    enrichment_kit_type = models.CharField(max_length=1, choices=EnrichmentKitType.CHOICES, null=True)
+    enrichment_kit_type = models.CharField(max_length=1, choices=EnrichmentKitType.choices, null=True)
     manufacturer = models.ForeignKey(Manufacturer, null=True, on_delete=CASCADE)
     bed_file = models.TextField(null=True, blank=True)  # Original manifest bed
     genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
@@ -345,7 +345,7 @@ class SequencingRun(models.Model):
     hidden = models.BooleanField(default=False)
     experiment = models.ForeignKey(Experiment, null=True, on_delete=SET_NULL)
     enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)  # Sequencing Run can be all one enrichment_kit, or SequencingSample can have own enrichment_kits
-    data_state = models.CharField(max_length=1, choices=DataState.CHOICES)  # This is for the SequencingRun directory
+    data_state = models.CharField(max_length=1, choices=DataState.choices)  # This is for the SequencingRun directory
     has_basecalls = models.BooleanField(default=False)
     has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
@@ -442,7 +442,9 @@ class SequencingRunModification(models.Model):
 
 class SeqAutoFile(models.Model):
     path = models.TextField()
-    data_state = models.CharField(max_length=1, choices=DataState.CHOICES)
+    # last modified - Stores stat st_mtime - time of last modification - only used for classes that can reload
+    file_last_modified = models.FloatField(default=0.0)
+    data_state = models.CharField(max_length=1, choices=DataState.choices)
     error_exception = models.TextField(null=True)
     #hash = models.TextField() ???
 
@@ -635,7 +637,7 @@ class IlluminaFlowcellQC(SeqAutoFile, SampleSheetPropertiesMixin):
 class ReadQ30(models.Model):
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, on_delete=CASCADE)
     sequencer_read_id = models.IntegerField()  # Eg HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
-    read = models.CharField(max_length=2, choices=SequencerRead.CHOICES)
+    read = models.CharField(max_length=2, choices=SequencerRead.choices)
     percent = models.FloatField()
     is_index = models.BooleanField(default=False)
 
@@ -655,7 +657,7 @@ class IlluminaIndexQC(models.Model):
 class Fastq(SeqAutoFile, SequencingSamplePropertiesMixin):
     sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
     name = models.TextField()  # from path
-    read = models.CharField(max_length=2, choices=PairedEnd.CHOICES)
+    read = models.CharField(max_length=2, choices=PairedEnd.choices)
 
     def get_common_pair_name_and_read(self):
         name = os.path.basename(self.path)
@@ -1073,7 +1075,8 @@ class QC(SeqAutoFile, SequencingSamplePropertiesMixin):
 class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
     """ This represents a text file containing genes which will be used for initial pass and QC filters """
     qc = models.ForeignKey(QC, on_delete=CASCADE)
-    custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
+    custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=SET_NULL)
+    sample_gene_list = models.ForeignKey(SampleGeneList, null=True, on_delete=SET_NULL)
 
     @property
     def sequencing_sample(self):
@@ -1086,13 +1089,15 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
 
     def load_from_file(self, seqauto_run, **kwargs):
         from genes.custom_text_gene_list import create_custom_text_gene_list
-
         with open(self.path) as f:
             custom_gene_list_text = f.read()
-            custom_text_gene_list = CustomTextGeneList(name=f"{self.qc} gene list", text=custom_gene_list_text)
+            custom_text_gene_list = CustomTextGeneList(name=f"QC GeneList for {self.sequencing_sample.sample_name}",
+                                                       text=custom_gene_list_text)
             custom_text_gene_list.save()
             seqauto_user = get_seqauto_user()
             create_custom_text_gene_list(custom_text_gene_list, seqauto_user, GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
+            custom_text_gene_list.gene_list.locked = True
+            custom_text_gene_list.gene_list.save()
             # TODO: Verify gene list is good otherwise create SeqAutoRunEvent
 
             if custom_text_gene_list.gene_list.import_status != ImportStatus.SUCCESS:
@@ -1107,7 +1112,19 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
                                                    severity=LogLevel.ERROR)
 
             self.custom_text_gene_list = custom_text_gene_list
+
+        try:
+            # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
+            sample = self.sequencing_sample.samplefromsequencingsample.sample
+            self.create_and_assign_sample_gene_list(sample)  # Also saves
+        except SampleFromSequencingSample.DoesNotExist:
             self.save()
+
+    def create_and_assign_sample_gene_list(self, sample: Sample):
+        logging.info(f"QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
+        self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
+                                                                     gene_list=self.custom_text_gene_list.gene_list)[0]
+        self.save()
 
 
 class QCExecSummary(SeqAutoFile, SequencingSamplePropertiesMixin):
@@ -1269,7 +1286,7 @@ class GoldReference(models.Model):
     """ Represents stats collected against a set of gold sequencing runs """
     enrichment_kit = models.OneToOneField(EnrichmentKit, on_delete=CASCADE)
     created = models.DateTimeField(auto_now_add=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     error_exception = models.TextField(null=True)
 
     def __str__(self):
@@ -1361,7 +1378,7 @@ class JobScript(models.Model):
     seqauto_run = models.ForeignKey(SeqAutoRun, on_delete=CASCADE)
     path = models.TextField()  # script
     out_file = models.TextField(null=True)
-    file_type = models.CharField(max_length=1, choices=SequencingFileType.CHOICES)
+    file_type = models.CharField(max_length=1, choices=SequencingFileType.choices)
     sample_sheet = models.ForeignKey(SampleSheet, null=True, on_delete=CASCADE)
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, null=True, on_delete=CASCADE)
     fastqc = models.ForeignKey(FastQC, null=True, on_delete=CASCADE)
@@ -1371,7 +1388,7 @@ class JobScript(models.Model):
     combined_vcf_file = models.ForeignKey(SampleSheetCombinedVCFFile, null=True, on_delete=CASCADE)
     qc = models.ForeignKey(QC, null=True, on_delete=CASCADE)
     job_id = models.TextField(null=True)
-    job_status = models.CharField(max_length=1, choices=JobScriptStatus.CHOICES, default=JobScriptStatus.CREATED)
+    job_status = models.CharField(max_length=1, choices=JobScriptStatus.choices, default=JobScriptStatus.CREATED)
     return_code = models.IntegerField(null=True)
 
     def get_record(self):
@@ -1419,7 +1436,7 @@ class SequencingInfo(models.Model):
     paper_name = models.TextField(blank=True, null=True)
     year_published = models.IntegerField(null=True)
     enrichment_kit = models.ForeignKey(EnrichmentKit, on_delete=CASCADE, blank=True, null=True)
-    sequencer = models.ForeignKey(Sequencer, on_delete=models.CASCADE, blank=True, null=True)
+    sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE, blank=True, null=True)
     seq_details = models.TextField(blank=True, null=True)
     file_type = models.TextField(blank=True, null=True)
     file_count = models.IntegerField(blank=True, default=0)

@@ -123,11 +123,8 @@ def view_seqauto_run(request, seqauto_run_id):
     file_type_counts = qs.values("file_type").annotate(file_type_count=Count("file_type"))
     pbs_script_counts = []
 
-    sft_dict = dict(SequencingFileType.CHOICES)
-
-    for (file_type, file_type_count) in file_type_counts.values_list("file_type", "file_type_count"):
-        file_type_name = sft_dict[file_type]
-        pbs_script_counts.append((file_type_name, file_type_count))
+    for file_type, file_type_count in file_type_counts.values_list("file_type", "file_type_count"):
+        pbs_script_counts.append((SequencingFileType(file_type).label, file_type_count))
 
     if seqauto_run.error_exception:
         status = messages.ERROR
@@ -323,7 +320,6 @@ def view_qc(request, qc_id):
     form = forms.QCFileForm(instance=qc)
 
     historical_exec_summaries = list(qc.qcexecsummary_set.all())
-    qc_gene_list = qc.qcgenelist_set.order_by("pk").last()
 
     try:
         gene_coverage_collection = qc.qcgenecoverage.gene_coverage_collection
@@ -333,7 +329,6 @@ def view_qc(request, qc_id):
     context = {"qc": qc,
                'form': form,
                "historical_exec_summaries": historical_exec_summaries,
-               "qc_gene_list": qc_gene_list,
                "gene_coverage": gene_coverage_collection}
     return render(request, 'seqauto/view_qc.html', context)
 
@@ -353,12 +348,13 @@ def view_qc_exec_summary_tab(request, qc_id):
         except:
             ref_range = None
 
-        for (description, field) in EXEC_STATS_LOOKUP:
+        for description, field in EXEC_STATS_LOOKUP:
             exec_data = getattr(exec_summary, field)
             if field.startswith("percent_") and exec_data is None:
                 continue
 
-            (reference_min, reference_max) = ('', '')
+            reference_min = ''
+            reference_max = ''
             if ref_range:
                 r = getattr(ref_range, field, None)
                 if r is not None:
@@ -386,10 +382,8 @@ def view_qc_exec_summary_tab(request, qc_id):
 
 def view_qc_gene_list_tab(request, qc_id):
     qc = get_object_or_404(QC, pk=qc_id)
-    qc_gene_list = qc.qcgenelist_set.order_by("pk").last()
 
-    context = {"qc": qc,
-               "qc_gene_list": qc_gene_list}
+    context = {"qc": qc}
     return render(request, 'seqauto/tabs/view_qc_gene_list_tab.html', context)
 
 
@@ -512,14 +506,13 @@ def qc_column_historical_graph(request, qc_column_id, graph_type, enrichment_kit
         raise ValueError(msg)
     graph_class_name = full_class_name(graph_class)
 
-    enrichment_kit_separation_dict = dict(QCGraphEnrichmentKitSeparationChoices.CHOICES)
+    enrichment_kit_separation_dict = dict(QCGraphEnrichmentKitSeparationChoices.choices)
     if enrichment_kit_separation not in enrichment_kit_separation_dict:
         valid_separation = ','.join(enrichment_kit_separation_dict.keys())
         msg = f"QCColumn enrichment_kit_separation '{enrichment_kit_separation}' Unknown (should be '{valid_separation}')"
         raise ValueError(msg)
 
-    show_enrichment_kit = QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT.get(enrichment_kit_separation, False)
-    if not show_enrichment_kit:
+    if not QCGraphEnrichmentKitSeparationChoices(enrichment_kit_separation).show_enrichment_kit():
         enrichment_kit_id = None
 
     use_percent = json.loads(use_percent)  # Boolean
@@ -528,18 +521,14 @@ def qc_column_historical_graph(request, qc_column_id, graph_type, enrichment_kit
 
 
 def sequencing_run_qc_graph(request, sequencing_run_id, qc_compare_type):
-    qc_compare_types_dict = dict(QCCompareType.CHOICES)
-    if qc_compare_type not in qc_compare_types_dict:
-        msg = f"Unknown QCCompareType '{qc_compare_type}'"
-        raise ValueError(msg)
-
+    _ = QCCompareType(qc_compare_type)  # Check valid
     graph_class_name = full_class_name(SequencingRunQCGraph)
     cached_graph = graphcache.async_graph(graph_class_name, sequencing_run_id, qc_compare_type)
     return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
 
 
 def sequencing_run_qc_json_graph(request, sequencing_run_id, qc_compare_type):
-    qc_compare_types_dict = dict(QCCompareType.CHOICES)
+    qc_compare_types_dict = dict(QCCompareType.choices)
     if qc_compare_type not in qc_compare_types_dict:
         msg = f"Unknown QCCompareType '{qc_compare_type}'"
         raise ValueError(msg)
@@ -570,10 +559,7 @@ def qc_exec_summary_graph(request, qc_exec_summary_id, qc_compare_type):
 
 
 def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
-    qc_compare_types_dict = dict(QCCompareType.CHOICES)
-    if qc_compare_type not in qc_compare_types_dict:
-        msg = f"Unknown QCCompareType '{qc_compare_type}'"
-        raise ValueError(msg)
+    _ = QCCompareType(qc_compare_type)  # Check valid
 
     def get_label(sequencing_run_name, sample_name):
         return f"{sequencing_run_name}__newline__{sample_name}"
@@ -588,7 +574,7 @@ def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
     current_label = get_label(qc_exec_summary.sequencing_run.name, qc_exec_summary.sample_name)
     sequencing_run_names = qc_exec_summary_data[sequencing_run_column]
     sample_names = qc_exec_summary_data["qc__bam_file__unaligned_reads__sequencing_sample__sample_name"]
-    labels = [get_label(sr, ss) for (sr, ss) in zip(sequencing_run_names, sample_names)]
+    labels = [get_label(sr, ss) for sr, ss in zip(sequencing_run_names, sample_names)]
     qc_exec_summary_data["label"] = labels
 
     context = {"current_label": current_label,

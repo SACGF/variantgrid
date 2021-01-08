@@ -6,7 +6,7 @@
     </ul>
 
     {% load related_analyses_tags %}
-    {% analysis_templates_tag trio=trio %}
+    {% analysis_templates_tag trio.genome_build trio=trio %}
 
 {% endif %}
 {% endblock create_analyses %}

@@ -28,8 +28,7 @@ class QCExecSummaryGraph(CacheableGraph):
         self.sequencing_run = self.qc_exec_summary.sequencing_run
         self.qc_compare_type = qc_compare_type
         self.bp_color = QCExecSummaryGraph.BOXPLOT_COLORS.get(self.qc_compare_type, QCExecSummaryGraph.DEFAULT_BOXPLOT_COLOR)
-        qc_types_dict = dict(QCCompareType.CHOICES)
-        self.type_name = qc_types_dict[qc_compare_type]
+        self.type_name = QCCompareType(qc_compare_type).label
 
     def get_params_hash(self):
         """ This uses get_values_list rather than just hashing params as the underlying DB may have changed """
@@ -97,7 +96,7 @@ class QCExecSummaryGraph(CacheableGraph):
         num_rows = len(self.get_columns())
         num_cols = 1
 
-        for (i, (column_name, column_values)) in enumerate(values):
+        for i, (column_name, column_values) in enumerate(values):
             ax = figure.add_subplot(num_rows, num_cols, i+1)
             run_value = exec_summary_qc[column_name]
             self.plot_enrichment_kit(ax, column_name, column_values, run_value)

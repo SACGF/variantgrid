@@ -12,7 +12,7 @@ class PatientForm(forms.ModelForm):
     population = forms.MultipleChoiceField(
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        choices=PopulationGroup.CHOICES,
+        choices=PopulationGroup.choices,
     )
 
     class Meta:

@@ -60,7 +60,7 @@ class AbstractBulkVCFProcessor:
 
     def process_modified_imported_variants(self, variant_ids_by_hash):
         modified_imported_variants = []
-        for (variant_hash, modified_imported_variants_tuple) in zip(self.modified_imported_variant_hashes, self.modified_imported_variants):
+        for variant_hash, modified_imported_variants_tuple in zip(self.modified_imported_variant_hashes, self.modified_imported_variants):
             variant_id = variant_ids_by_hash[variant_hash]
             modified_imported_variants.append((self.preprocess_vcf_import_info.pk, variant_id) + modified_imported_variants_tuple)
 

@@ -96,8 +96,10 @@ class Test(URLTestCase):
 
         grid_column_name = "variantannotation__transcript_version__gene_version__gene_symbol"
         analysis_params = {"analysis_id": cls.analysis.pk}
-        node_version_params = {"node_id": cls.node.pk, "version_id": cls.node.version}
-        node_editor_params = {**node_version_params, "extra_filters": "default"}
+        node_version_params = {"node_id": cls.node.pk, "node_version": cls.node.version}
+        analysis_version_and_node_version_params = {**node_version_params,
+                                                    "analysis_version": cls.analysis.version,
+                                                    "extra_filters": "default"}
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('analysis', {"analysis_id": cls.analysis.pk}, 200),
@@ -106,13 +108,15 @@ class Test(URLTestCase):
             # ('analysis_templates_list', {"analysis_template_id": cls.analysis.pk}, 200),
 
             # Node editor
-            ('node_view', node_editor_params, 200),
-            ('node_debug', node_editor_params, 200),
+            ('node_view', analysis_version_and_node_version_params, 200),
+            ('node_debug', analysis_version_and_node_version_params, 200),
 
             ('node_doc', {"node_id": cls.node.pk}, 200),
             ('node_load', {"node_id": cls.node.pk}, 302),
 
-            ('node_column_summary', {**node_editor_params,
+            ('node_column_summary', {**node_version_params,
+                                     "analysis_version": cls.analysis.version,
+                                     "extra_filters": "default",
                                      "grid_column_name": grid_column_name,
                                      "significant_figures": 2}, 200),
             ('node_snp_matrix', {**node_version_params,
@@ -128,9 +132,9 @@ class Test(URLTestCase):
             ('analysis_input_samples', analysis_params, 200),
 
             # Node data
-            ('node_data_grid', node_editor_params, 200),
-            ('node_async_wait', node_editor_params, 200),
-            ('node_errors', node_editor_params, 200),
+            ('node_data_grid', analysis_version_and_node_version_params, 200),
+            ('node_async_wait', analysis_version_and_node_version_params, 200),
+            ('node_errors', analysis_version_and_node_version_params, 200),
             ('node_method_description', node_version_params, 200),
 
             ('view_karyomapping_analysis', {"pk": cls.karyomapping_analysis.pk}, 200),

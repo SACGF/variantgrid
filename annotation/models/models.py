@@ -26,7 +26,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
-    VEPCustom, ClinVarReviewStatus, VEPSkippedReason
+    VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
 from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
@@ -34,7 +34,7 @@ from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
 from patients.models_enums import GnomADPopulation
-from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF
+from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -123,7 +123,7 @@ class ClinVar(models.Model):
     clinvar_allele_id = models.IntegerField()
     clinvar_preferred_disease_name = models.TextField(null=True, blank=True)
     clinvar_disease_database_name = models.TextField(null=True, blank=True)
-    clinvar_review_status = models.CharField(max_length=1, choices=ClinVarReviewStatus.CHOICES)
+    clinvar_review_status = models.CharField(max_length=1, choices=ClinVarReviewStatus.choices)
     clinical_significance = models.TextField(null=True, blank=True)  # Multiple values of above
     highest_pathogenicity = models.IntegerField(default=0)  # Highest of clinical_significance
     clinvar_clinical_sources = models.TextField(null=True, blank=True)
@@ -133,7 +133,7 @@ class ClinVar(models.Model):
 
     @property
     def stars(self):
-        return ClinVarReviewStatus.STARS[self.clinvar_review_status]
+        return ClinVarReviewStatus(self.clinvar_review_status).stars()
 
     def get_origin_display(self):
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
@@ -155,7 +155,7 @@ class ClinVarCitationsCollection(models.Model):
 
 
 class Citation(models.Model):
-    citation_source = models.CharField(max_length=1, choices=CitationSource.CHOICES)
+    citation_source = models.CharField(max_length=1, choices=CitationSource.choices)
     citation_id = models.TextField()
 
     class Meta:
@@ -175,7 +175,7 @@ class Citation(models.Model):
     @staticmethod
     def citations_from_text(text):
         """ returns a list of (unsaved) Citation objects from text """
-        citation_source_codes = dict({k.lower(): v for (k, v) in CitationSource.CODES.items()})
+        citation_source_codes = dict({k.lower(): v for k, v in CitationSource.CODES.items()})
         regex_pattern = r"(%s):\s*(\d+)" % '|'.join(citation_source_codes)
         pattern = re.compile(regex_pattern, flags=re.IGNORECASE)  # @UndefinedVariable
 
@@ -268,12 +268,12 @@ class EnsemblGeneAnnotation(models.Model):
     phenotypes_from_ensembl = models.TextField(null=True)
     omim_phenotypes = models.TextField(null=True)
     gene_biotype = models.TextField(null=True)
-    status = models.CharField(max_length=1, choices=TranscriptStatus.CHOICES, null=True)
+    status = models.CharField(max_length=1, choices=TranscriptStatus.choices, null=True)
     chromosome_name = models.TextField(null=True)
     start_position = models.IntegerField(null=True)
     end_position = models.IntegerField(null=True)
     band = models.TextField(null=True)
-    strand = models.CharField(max_length=1, choices=GenomicStrand.CHOICES, null=True)
+    strand = models.CharField(max_length=1, choices=GenomicStrand.choices, null=True)
     percentage_gc_content = models.FloatField(null=True)
     transcript_count = models.IntegerField(null=True)
     in_cancer_gene_census = models.BooleanField(null=True)
@@ -324,18 +324,18 @@ class HumanProteinAtlasAnnotation(models.Model):
     version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, on_delete=CASCADE)
     gene = models.ForeignKey(Gene, on_delete=CASCADE)  # Always Ensembl
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, on_delete=CASCADE)
-    abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.CHOICES)
+    abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.choices)
 
 
 class ColumnVEPField(models.Model):
     """ For VariantAnnotation/Transcript columns derived from VEP fields """
     column = models.TextField(unique=True)
     variant_grid_column = models.OneToOneField(VariantGridColumn, null=True, on_delete=SET_NULL)
-    category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.CHOICES)
+    category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
     source_field_processing_description = models.TextField(null=True)
-    vep_plugin = models.CharField(max_length=1, choices=VEPPlugin.CHOICES, null=True)
-    vep_custom = models.CharField(max_length=1, choices=VEPCustom.CHOICES, null=True)
+    vep_plugin = models.CharField(max_length=1, choices=VEPPlugin.choices, null=True)
+    vep_custom = models.CharField(max_length=1, choices=VEPCustom.choices, null=True)
     source_field_has_custom_prefix = models.BooleanField(default=False)
 
     @property
@@ -363,7 +363,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = [REPRESENTATIVE_TRANSCRIPT_ANNOTATION, TRANSCRIPT_ANNOTATION, VARIANT_GENE_OVERLAP]
 
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     # GeneAnnotationRelease - imported GTF we can use to get gene/transcript versions that match VEP
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, null=True, on_delete=CASCADE)
     last_checked_date = models.DateTimeField(null=True)
@@ -386,22 +386,6 @@ class VariantAnnotationVersion(SubVersionPartition):
     regbuild = models.TextField()
     sift = models.TextField()
     dbnsfp = models.TextField()
-
-    def get_annotation_status_info_for_variant(self, variant):
-        """ returns (annotation_status_display, time_since_last_modified) """
-        qs = self.annotationrangelock_set.filter(min_variant__pk__gte=variant.pk,
-                                                 max_variant__pk__lte=variant.pk)
-        annotation_range_lock = qs.order_by("pk").last()
-        annotation_status_display = "No annotation"
-        time_since_last_modified = "n/a"
-        if annotation_range_lock:
-            try:
-                annotation_run = annotation_range_lock.annotationrun
-                annotation_status_display = annotation_run.get_status_display()
-                time_since_last_modified = timesince(annotation_run.modified)
-            except AnnotationRun.DoesNotExist:
-                pass
-        return annotation_status_display, time_since_last_modified
 
     @staticmethod
     def latest(genome_build):
@@ -444,7 +428,7 @@ class AnnotationRangeLock(models.Model):
 
 
 class AnnotationRun(TimeStampedModel):
-    status = models.CharField(max_length=1, choices=AnnotationStatus.CHOICES, default=AnnotationStatus.CREATED)
+    status = models.CharField(max_length=1, choices=AnnotationStatus.choices, default=AnnotationStatus.CREATED)
     annotation_range_lock = models.OneToOneField(AnnotationRangeLock, null=True, on_delete=CASCADE)
     # task_id is used as a lock to prevent multiple Celery jobs from executing same job
     task_id = models.CharField(max_length=36, null=True)
@@ -510,9 +494,9 @@ class AnnotationRun(TimeStampedModel):
             qs = get_queryset_for_annotation_version(klass, annotation_version)
             qs.filter(annotation_run=self).delete()
 
-    def delete(self, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         self.delete_related_objects()
-        super().delete(**kwargs)
+        super().delete(using=using, keep_parents=keep_parents)
 
     def set_task_log(self, key, value):
         assert self.task_id is not None
@@ -680,7 +664,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
     topmed_af = models.FloatField(null=True, blank=True)
     gnomad_filtered = models.BooleanField(null=True, blank=True)
-    gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.CHOICES, null=True, blank=True)
+    gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.choices, null=True, blank=True)
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
@@ -710,8 +694,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     overlapping_symbols = models.TextField(null=True, blank=True)
 
     somatic = models.BooleanField(null=True, blank=True)
-    variant_class = models.CharField(max_length=2, choices=VariantClass.CHOICES, null=True, blank=True)
-    vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.CHOICES, null=True, blank=True)
+    variant_class = models.CharField(max_length=2, choices=VariantClass.choices, null=True, blank=True)
+    vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.choices, null=True, blank=True)
 
     GNOMAD_FIELDS = {
         GnomADPopulation.AFRICAN_AFRICAN_AMERICAN: 'gnomad_afr_af',
@@ -815,7 +799,7 @@ class ManualVariantEntryCollection(models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=CASCADE)
     created = models.DateTimeField(auto_now_add=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     celery_task = models.CharField(max_length=36, null=True)
 
     @staticmethod
@@ -839,10 +823,29 @@ class ManualVariantEntry(models.Model):
     manual_variant_entry_collection = models.ForeignKey(ManualVariantEntryCollection, on_delete=CASCADE)
     line_number = models.IntegerField()
     entry_text = models.TextField()
+    entry_type = models.CharField(max_length=1, choices=ManualVariantEntryType.choices, default=ManualVariantEntryType.UNKNOWN)
     error_message = models.TextField(blank=True, null=True)  # Set if any error...
+
     @property
     def unique_created_variants(self):
         return self.createdmanualvariant_set.distinct('variant_id').all()
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.manual_variant_entry_collection.genome_build
+
+    @staticmethod
+    def get_entry_type(line: str) -> ManualVariantEntryType:
+        HGVS_MINIMAL_PATTERN = re.compile(r"[^:].+:(c|g|p)\..*\d+.*")
+        MATCHERS = {
+            DBSNP_PATTERN: ManualVariantEntryType.DBSNP,
+            HGVS_MINIMAL_PATTERN: ManualVariantEntryType.HGVS,
+            VARIANT_PATTERN: ManualVariantEntryType.VARIANT,
+        }
+        for k, v in MATCHERS.items():
+            if k.match(line):
+                return v
+        return ManualVariantEntryType.UNKNOWN
 
 
 class CreatedManualVariant(models.Model):
@@ -991,7 +994,7 @@ class MonarchDiseaseOntology(models.Model):
     def mondo_id_as_int(mondo_text) -> int:
         if isinstance(mondo_text, int):
             return mondo_text
-        """ MONDO:0005045 -> 0005045 """
+        # MONDO:0005045 -> 0005045
         return int(mondo_text.split(":")[1])
 
     @property
@@ -1031,7 +1034,7 @@ class CachedWebResource(TimeStampedModel):
     """
     name = models.TextField(primary_key=True)
     description = models.TextField(blank=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
     @staticmethod
     def named_handler_factory(name, celery_task_class):
@@ -1059,7 +1062,7 @@ class DiseaseValidity(models.Model):
     mondo = models.ForeignKey(MonarchDiseaseOntology, null=True, on_delete=SET_NULL)
     hpo_synonym = models.ForeignKey(HPOSynonym, null=True, on_delete=SET_NULL)
     mim_morbid_alias = models.ForeignKey(MIMMorbidAlias, null=True, on_delete=SET_NULL)
-    classification = models.CharField(max_length=1, choices=ClinGenClassification.CHOICES)
+    classification = models.CharField(max_length=1, choices=ClinGenClassification.choices)
     date = models.DateField(null=True)
     validity_summary_url = models.TextField()
 

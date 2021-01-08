@@ -26,9 +26,11 @@
                 <div class="card-header">Create</div>
                 <div class="card-body">
                     <p>
-                        Enter one variant per line as either "chrom:pos ref>alt" eg:
+                        Enter one variant per line as in "chrom:pos ref>alt", dbSNP or HGVS format eg:
                         <pre>
                         1:169519049 T>C
+                        NM_000492.3(CFTR):c.1438G>T
+                        rs6025
                         </pre>
                     </p>
                     {% csrf_token %}

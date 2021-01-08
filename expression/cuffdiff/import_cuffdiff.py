@@ -40,7 +40,7 @@ def insert_cuffdiff_records(cuff_diff_file, df):
     inserted = 0
 
     records = []
-    for (test_id, row) in df.iterrows():
+    for test_id, row in df.iterrows():
         cdr = CuffDiffRecord(cuff_diff_file=cuff_diff_file,
                              test_id=test_id,
                              reference_id=row[0],

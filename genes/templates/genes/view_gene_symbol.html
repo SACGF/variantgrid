@@ -9,6 +9,9 @@
 {% load user_tag_color_tags %}
 {% load wiki_tags %}
 {% load datatable_tags %}
+{% load gene_disease_tags %}
+{% load gnomad_gene_constraint_tags %}
+{% load panel_app_tags %}
 {% block title %}{{ gene_symbol }}{% endblock title %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
@@ -137,6 +140,9 @@
 {% endblock head %}
 {% block content %}
 	<div class="container">
+        {% load genome_build_tags %}
+        {% genome_build_url_arg genome_build 'view_gene_symbol_genome_build' gene_symbol=gene_symbol %}
+
         <h3>Gene Symbol : {{ gene_symbol }}</h3>
         {% if show_annotation %}
             {% page_help_embedded page_id='genes/view_gene_symbol_help' title='View Gene Symbol' %}
@@ -261,8 +267,13 @@
                 {% endif %}
             </div>
 
-            {% load gene_disease_tags %}
             {% gene_disease gene_symbol %}
+
+            {% gnomad_gene_constraint gene_symbol %}
+
+            {% for server in panel_app_servers %}
+                {% panel_app_gene_evidence server gene_symbol %}
+            {% endfor %}
 
             {% if mim_and_hpo_for_gene %}
                 <h4>OMIM and Human Phenotype Ontology</h4>

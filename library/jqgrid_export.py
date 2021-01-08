@@ -58,7 +58,7 @@ def grid_export_csv(basename, colmodels, items):
         yield pseudo_buffer.value
         for obj in items:
             row = {}
-            for (k, value) in obj.items():
+            for k, value in obj.items():
                 index = labels.get(k)
                 if index:
                     row[index] = value

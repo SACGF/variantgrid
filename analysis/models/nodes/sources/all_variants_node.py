@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional
+from typing import Optional, List
 
 from django.conf import settings
 from django.db import models
@@ -52,8 +52,8 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         method_summary = f"{class_name}, date={self.modified}, max_variant={max_id}"
         return method_summary
 
-    def _get_configuration_errors(self):
-        errors = []
+    def _get_configuration_errors(self) -> List:
+        errors = super()._get_configuration_errors()
         if not self.max_variant:
             errors.append("Not Saved")
         return errors

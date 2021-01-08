@@ -11,6 +11,7 @@ urlpatterns = [
     perm_path('genes/<genome_build_name>', views.genes, name='genome_build_genes'),
     perm_path('view_gene/<gene_id>', views.view_gene, name='view_gene'),
     perm_path('view_gene_symbol/<gene_symbol>', views.view_gene_symbol, name='view_gene_symbol'),
+    perm_path('view_gene_symbol/<gene_symbol>/<genome_build_name>', views.view_gene_symbol, name='view_gene_symbol_genome_build'),
     perm_path('view_gene_annotation_history/<genome_build_name>/<gene_symbol>', views.view_gene_annotation_history, name='view_gene_annotation_history'),
     perm_path('view_transcript/<transcript_id>', views.view_transcript, name='view_transcript'),
     perm_path('view_transcript_version/<transcript_id>/<int:version>', views.view_transcript_version, name='view_transcript_version'),
@@ -27,6 +28,7 @@ urlpatterns = [
     perm_path('gene_grid/<path:columns_from_url>', views.gene_grid, name='passed_gene_grid'),
     perm_path('gene_grid', views.gene_grid, name='gene_grid'),
     perm_path('canonical_transcripts', views.canonical_transcripts, name='canonical_transcripts'),
+    perm_path('sample_gene_lists_tab/<int:sample_id>', views.sample_gene_lists_tab, name='sample_gene_lists_tab'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_symbol>',
               views.HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_id>',
@@ -71,13 +73,13 @@ rest_urlpatterns = [
     perm_path('api/gene_list/create', views_rest.CreateGeneListView.as_view(), name='api_create_gene_list'),
     perm_path('api/gene_list/<pk>', views_rest.GeneListView.as_view(), name='api_view_gene_list'),
     perm_path('api/named_gene_list/<category__name>/<name>', views_rest.NamedGeneListView.as_view(), name='api_named_gene_list'),
-    perm_path('api/panel_app/gene_evidence/<gene_symbol>', views_rest.PanelAppGeneEvidenceView.as_view(), name='api_panel_app_gene_evidence'),
+    perm_path('api/panel_app/gene_evidence/<int:server_id>/<gene_symbol>', views_rest.PanelAppGeneEvidenceView.as_view(), name='api_panel_app_gene_evidence'),
     perm_path('api/gene/batch_info', views_rest.BatchGeneInfoView.as_view(), name='api_batch_gene_info'),
     perm_path('api/gene_annotation_release/<int:release_id>/batch', views_rest.BatchGeneIdentifierForReleaseView.as_view(), name='api_batch_gene_identifiers_for_release'),
     perm_path('api/gene/info/<gene_symbol>', views_rest.GeneInfoView.as_view(), name='api_gene_info'),
     perm_path('api/text_to_gene_list', views_rest.TextToGeneListView.as_view(), name='api_text_to_gene_list'),
     perm_path('api/gene_annotation_release/<int:pk>', views_rest.GeneAnnotationReleaseView.as_view(), name='api_gene_annotation_release'),
-
+    perm_path('api/sample_gene_list/<int:pk>', views_rest.SampleGeneListView.as_view(), name='api_sample_gene_list'),
 
 ]
 urlpatterns += format_suffix_patterns(rest_urlpatterns)

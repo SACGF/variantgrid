@@ -67,7 +67,7 @@ class NodeVariantNode(template.Node):
 
         node_variant = defaultdict(dict)
         node_variant_qs = NodeVariant.objects.filter(node__analysis=analysis).values_list('node_id', 'variant_id')
-        for (node_id, variant_id) in node_variant_qs:
+        for node_id, variant_id in node_variant_qs:
             node_variant[node_id][variant_id] = 1
         return json.dumps(node_variant)
 

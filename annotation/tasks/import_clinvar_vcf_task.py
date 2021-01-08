@@ -6,7 +6,7 @@ from annotation.vcf_files.import_clinvar_vcf import import_clinvar_vcf, \
     check_can_import_clinvar
 from upload.models import UploadedClinVarVersion
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
-from upload.vcf.vcf_import import vcf_detect_genome_build_from_filename
+from upload.vcf.vcf_import import vcf_detect_genome_build
 from variantgrid.celery import app
 
 
@@ -16,7 +16,7 @@ class ImportCreateVersionForClinVarVCFTask(ImportVCFStepTask):
     def process_items(self, upload_step):
         check_can_import_clinvar(upload_step.uploaded_file.user)
         filename = upload_step.input_filename
-        genome_build = vcf_detect_genome_build_from_filename(filename)
+        genome_build = vcf_detect_genome_build(filename)
 
         upload_step.uploaded_file.store_md5_hash()
         kwargs = {"md5_hash": upload_step.uploaded_file.md5_hash,

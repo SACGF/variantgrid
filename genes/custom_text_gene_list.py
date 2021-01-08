@@ -23,12 +23,7 @@ def create_custom_text_gene_list(custom_text_gene_list, username, gene_list_cate
 
     gene_list_kwargs = {}
     if gene_list_category_name:
-        category, created = GeneListCategory.objects.get_or_create(name=gene_list_category_name)
-        if created:
-            category.hidden = hidden
-            category.save()
-
-        gene_list_kwargs["category"] = category
+        gene_list_kwargs["category"] = GeneListCategory.get_or_create_category(gene_list_category_name, hidden)
 
     gene_list = GeneList.objects.create(name=custom_text_gene_list.name,
                                         user=user,

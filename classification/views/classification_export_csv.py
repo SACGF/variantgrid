@@ -3,7 +3,6 @@ import io
 from typing import Optional
 
 from genes.hgvs import CHGVS
-from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.views.classification_export_utils import ExportFormatter, \

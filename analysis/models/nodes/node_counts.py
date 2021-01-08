@@ -69,7 +69,7 @@ def get_node_count_colors(css_property):
         css_property of "color" = [('ClinVar', {color: #ff0000}), etc] """
 
     node_count_colors = []
-    for (label, color) in BuiltInFilters.COLORS:
+    for label, color in BuiltInFilters.COLORS:
         node_count_colors.append((label, {css_property: color}))
 
     return node_count_colors
@@ -120,7 +120,7 @@ def get_node_counts_and_labels_dict(node):
         partition_names = node.analysis.annotation_version.get_partition_names()
 
         select_columns = []
-        for (count_type, column_string) in COUNTS.items():
+        for count_type, column_string in COUNTS.items():
             column_string %= partition_names
             column_string += " as " + get_count_alias(count_type)
             select_columns.append(column_string)

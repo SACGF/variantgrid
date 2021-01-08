@@ -89,7 +89,9 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
         $("#analysis-variables").show();
     }
 
-    var centerLayoutParams = {};
+    var centerLayoutParams = {
+        minWidth: 200,
+    };
     if (!readOnly) {
         centerLayoutParams.onresize = resizePanel;  // save panel widths
     }
@@ -334,7 +336,7 @@ function lockNodeField(nodeId, field, lock) {
     $("#id_" + field, nodeFieldWrapper).attr("disabled", lock);
 }
 
-function addAnalysisVariableButton(nodeId, field) {
+function addAnalysisVariableButton(nodeId, field, readOnly) {
     const ANALYSIS_VARIABLES_HELP_DIV = $("#analysis-variables-help");
     const NODE_CONTAINER_CLASS = "analysis-variable-node";
     const ANALYSIS_VARIABLE_CLASS = "analysis-variable";
@@ -365,20 +367,23 @@ function addAnalysisVariableButton(nodeId, field) {
     if (fieldAnalysisVariable.length === 0) {
         let attrDict = {"field": field};
         fieldAnalysisVariable = $("<button />").addClass("btn btn-primary-outline").addClass(ANALYSIS_VARIABLE_CLASS).attr(attrDict).html(field);
-        fieldAnalysisVariable.click(function() {
-            function removeVariableButton() {
-                nodeFieldSet.delete(field);
-                // TODO: Also node
-                fieldAnalysisVariable.remove();
-                // If empty, remove node container
-                if ($("." + ANALYSIS_VARIABLE_CLASS, existingNodeContainer).length === 0) {
-                    existingNodeContainer.remove();
-                    node.removeClass("variable-node");
+        if (!readOnly) {
+            fieldAnalysisVariable.click(function () {
+                function removeVariableButton() {
+                    nodeFieldSet.delete(field);
+                    // TODO: Also node
+                    fieldAnalysisVariable.remove();
+                    // If empty, remove node container
+                    if ($("." + ANALYSIS_VARIABLE_CLASS, existingNodeContainer).length === 0) {
+                        existingNodeContainer.remove();
+                        node.removeClass("variable-node");
+                    }
+                    lockNodeField(nodeId, field, false);
                 }
-                lockNodeField(nodeId, field, false);
-            }
-            analysisVariable(nodeId, field, 'del', removeVariableButton);
-        });
+
+                analysisVariable(nodeId, field, 'del', removeVariableButton);
+            });
+        }
         existingNodeContainer.append(fieldAnalysisVariable);
     }
 }
@@ -413,10 +418,10 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
     });
 }
 
-function addInitialAnalysisVariables(analysisVariablesArray) {
+function addInitialAnalysisVariables(analysisVariablesArray, readOnly) {
     for (let i=0 ; i<analysisVariablesArray.length; ++i) {
         let av = analysisVariablesArray[i];
-        addAnalysisVariableButton(av[0], av[1]);
+        addAnalysisVariableButton(av[0], av[1], readOnly);
     }
 }
 

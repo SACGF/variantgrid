@@ -14,14 +14,14 @@
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
-var labels = {{ labels | jsonify }};
-var bootstrap = {{ sorted_bootstrap_transposed | jsonify }};
+let labels = {{ labels | jsonify }};
+let bootstrapMatrix = {{ sorted_bootstrap_transposed | jsonify }};
 
-var mutation_types = {{ mutation_types | jsonify }};
-var mutation_type_counts = {{ mutation_type_counts | jsonify }};
+let mutation_types = {{ mutation_types | jsonify }};
+let mutation_type_counts = {{ mutation_type_counts | jsonify }};
 
 function plotMutationalSignatures(width, height) {
-    var data = getBoxDataFromLabelsMatrix(labels, bootstrap);
+    var data = getBoxDataFromLabelsMatrix(labels, bootstrapMatrix);
     var layout = defaultLayout("Mutational Signatures", width, height);
     layout["showlegend"] = false;
     Plotly.newPlot("bootstrap-data-graph", data, layout);

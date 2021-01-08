@@ -1,4 +1,6 @@
 from collections import defaultdict
+
+from django.db.models import Q
 from django.template import Library
 from operator import itemgetter
 
@@ -51,10 +53,10 @@ def related_data_for_samples(context, samples, show_sample_info=True):
             if cohort.import_status == ImportStatus.SUCCESS:
                 cohorts_and_samples_list[cohort].append(sample.name)
 
-                for trio in cohort.trio_set.all():
+                for trio in cohort.trio_set.filter(Q(mother=cs) | Q(father=cs) | Q(proband=cs)):
                     trios_and_samples_list[trio].append(sample.name)
 
-            for pedigree in cohort.pedigree_set.all():
+            for pedigree in cohort.pedigree_set.filter(cohortsamplepedfilerecord__cohort_sample=cs).distinct():
                 pedigrees_and_samples_list[pedigree].append(sample.name)
 
     cohorts_and_samples = summarise_samples(cohorts_and_samples_list, show_sample_info)

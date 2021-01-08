@@ -10,7 +10,7 @@ def get_bam_paths_and_user_data_paths(user, bam_file_paths):
     bam_paths_and_user_data_paths = OrderedDict()
     for from_bam in bam_file_paths:
         to_bam = from_bam
-        for (prefix, replacement) in replace_dict.items():
+        for prefix, replacement in replace_dict.items():
             if to_bam.startswith(prefix):
                 to_bam = to_bam.replace(prefix, replacement)
                 break

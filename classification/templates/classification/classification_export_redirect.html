@@ -32,6 +32,7 @@
             {% labelled label="Genome Build" %}{{ build }}{% endlabelled %}
             {% labelled label="Share Level" %}{{ share_level }}{% endlabelled %}
             {% labelled label="Selection" %}{{ include_details }}{% endlabelled %}
+            {% labelled label="Since" %}{{ since }}{% endlabelled %}
             {% labelled label="Format" %}{{ format }}{% endlabelled %}
             {% if the_rest %}
                 {% for key, value in the_rest.items %}

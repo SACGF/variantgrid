@@ -11,14 +11,17 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
-from django.db import models
+from django.db import models, IntegrityError, transaction
 from django.db.models import Min, Max, QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
 from django.db.models.query_utils import Q
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
+from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
@@ -63,7 +66,7 @@ class HGNCGeneNames(models.Model):
     hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
     approved_symbol = models.TextField()
     approved_name = models.TextField()
-    status = models.CharField(max_length=1, choices=HGNCStatus.CHOICES)
+    status = models.CharField(max_length=1, choices=HGNCStatus.choices)
     previous_symbols = models.TextField()
     synonyms = models.TextField()
     refseq_ids = models.TextField()
@@ -153,7 +156,7 @@ class GeneSymbolAlias(TimeStampedModel):
     """
     alias = models.TextField(unique=True)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.CHOICES)
+    source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.choices)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     description = models.TextField(null=True)
 
@@ -255,7 +258,7 @@ class GeneAnnotationImport(TimeStampedModel):
 
         Many gene/transcript versions are shared among GTF annotations, so a GeneVersion/TranscriptVersion is only
         created the first time it's seen (linked back to input which created it via 'import_source') """
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     filename = models.TextField()
 
@@ -265,8 +268,9 @@ class GeneAnnotationImport(TimeStampedModel):
 
 class Gene(models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
+    FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
     @property
     def is_legacy(self):
@@ -303,6 +307,15 @@ class Gene(models.Model):
         if annotation_consortium:
             qs = qs.filter(annotation_consortium=annotation_consortium)
         return set(qs.values_list("identifier", flat=True))
+
+    @staticmethod
+    def delete_orphaned_fake_genes():
+        used_genes = TranscriptVersion.objects.filter(gene_version__gene__identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).values_list("gene_version__gene")
+        qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
+        ret = qs.delete()
+        if ret:
+             print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
+             print(ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
@@ -399,7 +412,7 @@ TranscriptParts = namedtuple('TranscriptParts', ['identifier', 'version'])
 class Transcript(models.Model):
     """ A stable identifier - has versions with actual transcript details """
     identifier = models.TextField(primary_key=True)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
     def get_absolute_url(self):
         kwargs = {"transcript_id": self.identifier}
@@ -552,7 +565,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if exists:
             raise MissingTranscript(f"Transcript '{identifier}' valid but missing from our (build: {genome_build}) database.")
         accession = TranscriptVersion.get_accession(identifier, version)
-        raise BadTranscript(f"The transcript '{accession}' does not exist in the {annotation_consortium} database.")
+        raise BadTranscript(f"The transcript '{accession}' does not exist in the {genome_build} {annotation_consortium} database.")
 
     @staticmethod
     def get_refgene(genome_build: GenomeBuild, transcript_name, best_attempt=True):
@@ -689,7 +702,7 @@ class GeneAnnotationRelease(models.Model):
         This release can be set on a VariantAnnotationVersion to be able to get genes/transcripts from a VEP build
     """
     version = models.IntegerField()
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     gene_annotation_import = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
 
@@ -699,6 +712,16 @@ class GeneAnnotationRelease(models.Model):
     def get_genes(self):
         return Gene.objects.filter(annotation_consortium=self.annotation_consortium,
                                    geneversion__releasegeneversion__release=self)
+
+    @staticmethod
+    def get_for_latest_annotation_versions_for_builds() -> List['GeneAnnotationRelease']:
+        """ """
+        gene_annotation_releases = []
+        for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
+            vav = genome_build.latest_variant_annotation_version
+            if vav.gene_annotation_release:
+                gene_annotation_releases.append(vav.gene_annotation_release)
+        return gene_annotation_releases
 
     def __str__(self):
         return f"{self.genome_build.name}/{self.get_annotation_consortium_display()} - v{self.version}"
@@ -789,6 +812,14 @@ class GeneListCategory(models.Model):
     description = models.TextField()
 
     @staticmethod
+    def get_or_create_category(category_name, hidden=False):
+        category, created = GeneListCategory.objects.get_or_create(name=category_name)
+        if created:
+            category.hidden = hidden
+            category.save()
+        return category
+
+    @staticmethod
     def _get_pathology_test_gene_category(category_name, set_company=False):
         """ Requires settings.COMPANY to be set """
         category = None
@@ -834,7 +865,7 @@ class GeneList(models.Model):
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     error_message = models.TextField(null=True, blank=True)
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
@@ -898,7 +929,7 @@ class GeneList(models.Model):
 
         warning_list = []
         prefix = None
-        for (w, num) in warnings.items():
+        for w, num in warnings.items():
             if num:
                 if prefix is None:
                     prefix = "There were " if num > 1 else "There was "
@@ -1053,6 +1084,47 @@ class CustomTextGeneList(models.Model):
         return f"CustomTextGeneList for '{text}': {self.gene_list}"
 
 
+class SampleGeneList(TimeStampedModel):
+    """ There can be multiple SampleGeneLists per sample, but only 1 active one.
+        If multiple exist, the active one must be set manually """
+    sample = models.ForeignKey(Sample, on_delete=CASCADE)
+    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
+    visible = models.BooleanField(default=True, blank=False)
+
+    class Meta:
+        unique_together = ('sample', 'gene_list')
+        ordering = ['created']
+
+    def __str__(self):
+        s = f"{self.sample}: {localtime(self.modified)}"
+        if not self.visible:
+            s += " (hidden)"
+        return s
+
+
+@receiver(post_save, sender=SampleGeneList)
+def sample_gene_list_created(sender, instance, created, **kwargs):
+    if created:
+        sample = instance.sample
+        if SampleGeneList.objects.filter(sample=sample).count() > 1:
+            # Multiple exist, so need to set manually
+            ActiveSampleGeneList.objects.filter(sample=sample).delete()
+        else:
+            try:
+                with transaction.atomic():
+                    # There can only be 1 - if this works it's active
+                    ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
+            except IntegrityError:
+                ActiveSampleGeneList.objects.filter(sample=sample).delete()
+
+
+class ActiveSampleGeneList(TimeStampedModel):
+    """ Use 1-to-1 to enforce there's only 1 in DB
+        (as compared to an "active" flag on SampleGeneList) """
+    sample = models.OneToOneField(Sample, on_delete=CASCADE)
+    sample_gene_list = models.ForeignKey(SampleGeneList, on_delete=CASCADE)
+
+
 class GeneListWiki(Wiki):
     gene_list = models.OneToOneField(GeneList, on_delete=CASCADE)
 
@@ -1064,6 +1136,9 @@ class PanelAppServer(models.Model):
     name = models.TextField(unique=True)
     url = models.TextField(unique=True)
     icon_css_class = models.TextField()
+
+    def __str__(self):
+        return self.name
 
 
 class PanelAppPanel(models.Model):
@@ -1110,7 +1185,7 @@ class CanonicalTranscriptCollection(TimeStampedModel):
     description = models.TextField(blank=True)
     filename = models.TextField(blank=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     file_md5sum = models.TextField()
 
     @staticmethod
@@ -1143,7 +1218,7 @@ class CanonicalTranscript(models.Model):
 
 class GeneCoverageCollection(models.Model):
     path = models.TextField()
-    data_state = models.CharField(max_length=1, choices=DataState.CHOICES)
+    data_state = models.CharField(max_length=1, choices=DataState.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     @staticmethod
@@ -1192,7 +1267,7 @@ class GeneCoverageCollection(models.Model):
 
         known_transcript_ids = Transcript.known_transcript_ids(canonical_transcript_collection.genome_build,
                                                                canonical_transcript_collection.annotation_consortium)
-        for (_, row) in gene_coverage_df.iterrows():
+        for _, row in gene_coverage_df.iterrows():
             original_gene_symbol = row["gene"]
             original_transcript_id = row["transcript"]
 
@@ -1301,12 +1376,59 @@ class GnomADGeneConstraint(models.Model):
     oe_lof_upper = models.FloatField(null=True)
     # There are dozens of other fields we could add...
 
+    GNOMAD_BASE_URL = "https://gnomad.broadinstitute.org"
+
+    @property
+    def transcript_url(self):
+        return f"{self.GNOMAD_BASE_URL}/transcript/{self.transcript_id}"
+
+    @property
+    def gene_url(self):
+        return f"{self.GNOMAD_BASE_URL}/gene/{self.gene_id}"
+
+    @property
+    def gene_symbol_url(self):
+        return f"{self.GNOMAD_BASE_URL}/gene/{self.gene_symbol_id}"
+
     @property
     def oe_lof_summary(self):
         summary = "n/a"
         if self.oe_lof is not None:
             summary = f"{self.oe_lof} ({self.oe_lof_lower} - {self.oe_lof_upper})"
         return summary
+
+    @staticmethod
+    def get_for_transcript_version(transcript_version: TranscriptVersion) -> Optional['GnomADGeneConstraint']:
+        """ GnomADGeneConstraint uses Ensembl gene/transcripts - so load the most specific
+            possible (transcript, gene, then symbol) """
+        return GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(transcript_version)[0]
+
+    @staticmethod
+    def get_for_transcript_version_with_method_and_url(transcript_version: TranscriptVersion) \
+            -> Tuple[Optional['GnomADGeneConstraint'], Optional[str], Optional[str]]:
+        """ GnomADGeneConstraint uses Ensembl gene/transcripts - so load the most specific
+            possible (transcript, gene, then symbol) """
+        ggc = None
+        method = None
+        url = None
+        qs = GnomADGeneConstraint.objects.all()
+        if transcript_version.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
+            # May be able to get via transcript or gene
+            if ggc := qs.filter(transcript=transcript_version.transcript).first():
+                url = ggc.transcript_url
+                method = "transcript"
+
+            if ggc is None:
+                if ggc := qs.filter(gene=transcript_version.gene).first():
+                    url = ggc.gene_url
+                    method = "gene"
+
+        if ggc is None:
+            if ggc := qs.filter(gene_symbol=transcript_version.gene_version.gene_symbol).first():
+                url = ggc.gene_symbol_url
+                method = "gene symbol"
+        return ggc, method, url
+
 
 
 class ProteinDomain(models.Model):

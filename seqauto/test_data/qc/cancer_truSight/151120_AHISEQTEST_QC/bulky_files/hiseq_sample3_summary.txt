@@ -1,4 +1,4 @@
-Sample	hiseq_sample2	Gold
+Sample	hiseq_sample3	Gold
 %bp20x_GOI	100.00	
 %bp10x_GOI	100.00	
 MeanDepth_GOI	262.84	211.83 - 324.80

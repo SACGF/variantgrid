@@ -42,7 +42,7 @@ function gridComplete() {
 	}
 	
 	$("input.variant-select").click(selectVariant);
-	var unique_code = "{{ node_id }}_{{ version_id }}";
+	var unique_code = "{{ node_id }}_{{ node_version }}";
 	registerComponent(unique_code, GRID);
 }
 
@@ -61,17 +61,17 @@ function getBams() {
 {% endblock javascript %}
 
 {% block docreadyjs %}
-		var node_view_url = "{% url 'node_view' node_id version_id extra_filters %}";
+		var node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
 		load_node_editor(node_view_url);
 
 		// Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back 
-		var grid_url = "{% url 'node_grid_config' node_id version_id extra_filters %}";
-		var unique_code = "{{ node_id }}_{{ version_id }}";
-		setupGrid(grid_url, {{ node_id }}, {{ version_id }}, unique_code, gridComplete, gridLoadError, on_error_function);
+		var grid_url = "{% url 'node_grid_config' analysis_version node_id node_version extra_filters %}";
+		var unique_code = "{{ node_id }}_{{ node_version }}";
+		setupGrid(grid_url, {{ node_id }}, {{ node_version }}, unique_code, gridComplete, gridLoadError, on_error_function);
 {% endblock docreadyjs %}
 
 {% block content %}
-<div id="{{ node_id }}_{{ version_id }}">
+<div id="{{ node_id }}_{{ node_version }}">
 	<div id='node-data-grid' class='node-data'>
 	<table id='grid-{{ node_id }}' class='grid'>
 	</table>

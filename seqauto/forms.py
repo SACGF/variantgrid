@@ -16,11 +16,11 @@ class QCCompareTypeForm(forms.Form):
         column_choices = [(x, x) for x in columns]
         self.fields['column'].choices = column_choices
         if compare_against:
-            filtered_choices = [(k, v) for (k, v) in QCCompareType.CHOICES if k in compare_against]
+            filtered_choices = [(k, v) for k, v in QCCompareType.choices if k in compare_against]
             self.fields['compare_against'].choices = filtered_choices
 
-    compare_against = forms.ChoiceField(choices=QCCompareType.CHOICES)
-    graph_type = forms.ChoiceField(choices=QCGraphTypes2.CHOICES)
+    compare_against = forms.ChoiceField(choices=QCCompareType.choices)
+    graph_type = forms.ChoiceField(choices=QCGraphTypes2.choices)
     column = forms.ChoiceField()
 
 
@@ -59,9 +59,9 @@ class QCColumnForm(BaseDeclareForm):
                                        widget=autocomplete.ModelSelect2(url='qc_column_autocomplete',
                                                                         forward=['qc_type'],
                                                                         attrs={'data-placeholder': 'Column...'}))
-    enrichment_kit_separation = forms.ChoiceField(choices=QCGraphEnrichmentKitSeparationChoices.CHOICES)
+    enrichment_kit_separation = forms.ChoiceField(choices=QCGraphEnrichmentKitSeparationChoices.choices)
     enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all())
-    qc_graph_type = forms.ChoiceField(choices=QCGraphType.CHOICES, label='QC graph type')
+    qc_graph_type = forms.ChoiceField(choices=QCGraphType.choices, label='QC graph type')
 
 
 class EnrichmentKitForm(forms.Form):

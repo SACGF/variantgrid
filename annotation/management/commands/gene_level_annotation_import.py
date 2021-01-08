@@ -92,7 +92,7 @@ class Command(BaseCommand):
                                        geneversion__genome_build=genome_build).distinct()
         ensembl_genes_for_build = set(genes_qs.values_list("identifier", flat=True))
         if not ensembl_genes_for_build:
-            raise ValueError(f"No genes for build {genome_build.name} - you need to import them first!")
+            raise ValueError(f"No genes for build {genome_build} - you need to import them first!")
 
         if created or replace:
             annotation_version.filename = filename
@@ -107,7 +107,7 @@ class Command(BaseCommand):
         df = df_nan_to_none(df)
         records = []
 
-        transcript_status_lookup = {v: k for (k, v) in TranscriptStatus.CHOICES}
+        transcript_status_lookup = {v: k for k, v in TranscriptStatus.choices}
 
         self.stdout.write("Parsing rows...")
         unmatched_genes = 0

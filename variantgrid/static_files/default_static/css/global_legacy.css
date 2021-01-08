@@ -1146,7 +1146,7 @@ a.clinical-context {
   background-image: url(/static/icons/IGV_64.png);
 }
 
-.hiseq-2500 {
+.hiseq-2000, .hiseq-2500 {
   background-image: url(/static/icons/sequencers/hiseq_icon.png);
 }
 
@@ -1224,6 +1224,10 @@ a.clinical-context {
 
 .show-grid-icon {
   background-image: url(/static/icons/noun_Datatable_935839.png);
+}
+
+.check-mark-green {
+  background-image: url(/static/icons/check-mark-green.svg);
 }
 
 .gene {

@@ -210,7 +210,7 @@
 
             {% page_help user 'seqauto/sequencing_run_samples_help' 'Sequencing Run Samples' %}
 		
-            <table>		      
+            <table class="table">
             <tr><th>Name <th>Sample <th>Patient
             {% if has_sequencing_sample_data %}
                 <th>Data
@@ -395,7 +395,7 @@
                     {% csrf_token %}
                     <div><b>Bad:</b> {{ sequencing_run_form.bad }} - Bad runs aren't counted in statistics (eg QC box-plots)</div>
                     <div><b>Hidden:</b> {{ sequencing_run_form.hidden }} - Hide run from sequencing runs grid</div>
-                    <input id='sequencing-run-form-save' type="submit" value='save' />
+                    <input id='sequencing-run-form-save' class="btn btn-primary" type="submit" value='save' />
                 </form>
             </div>
              <div>
@@ -403,11 +403,11 @@
                  <div id='delete-confirm-box' style="display: none">
                      <p>Are you sure you want to delete {{ sequencing_run }}
                      <div>
-                         <button id='delete-object' class="ui-button ui-widget ui-corner-all" type='button'>
-                             <span class="ui-icon ui-icon-trash"></span>Delete {{ sequencing_run }}
+                         <button id='delete-object' class="btn btn-outline-danger" type='button'>
+                             Delete {{ sequencing_run }}
                          </button>
-                         <button id='no-delete' type='button'>
-                             <span class="ui-icon ui-icon-cancel"></span>No
+                         <button id='no-delete' class="btn btn-secondary" type='button'>
+                             No
                          </button>
                      </div>
                  </div>

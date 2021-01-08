@@ -4,11 +4,9 @@ from dataclasses import dataclass
 from avatar.templatetags.avatar_tags import avatar_url
 from collections import OrderedDict, defaultdict
 
-from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q, QuerySet
 from django.db.models.deletion import SET_NULL, CASCADE
 from django_extensions.db.models import TimeStampedModel
 from typing import Optional, List, Tuple, Dict, Set
@@ -43,7 +41,7 @@ class UserDataPrefix(models.Model):
     @staticmethod
     def get_replace_dict(user):
         replace_dict = {}
-        for (prefix, replacement) in user.userdataprefix_set.values_list("prefix", "replacement"):
+        for prefix, replacement in user.userdataprefix_set.values_list("prefix", "replacement"):
             replace_dict[prefix] = replacement
         return replace_dict
 
@@ -305,11 +303,6 @@ class UserSettings:
                 if val is not None:
                     override_source[f] = source
                     override_values[f] = val
-
-            sgb = so.settingsgenomebuild_set
-            if sgb.exists():
-                override_source["genome_builds"] = source
-                override_values["genome_builds"] = ", ".join(sgb.values_list("genome_build", flat=True))
         return override_source, override_values
 
     def get_lab(self):
@@ -330,30 +323,6 @@ class UserSettings:
                 raise ValueError(msg)
         return lab
 
-    def get_genome_builds(self) -> QuerySet:
-        if not settings.USER_SETTINGS_SHOW_BUILDS:
-            return GenomeBuild.builds_with_annotation()
-
-        # Make sure default build comes through, even if form has never saved/created UserSettingsGenomeBuild objects
-        q_default = Q(pk=self.default_genome_build.pk)
-        # In override order get last configuration
-        genome_builds = []
-        for so in reversed(self._settings_overrides):  # Just need last override
-            sgb = so.settingsgenomebuild_set
-            if sgb.exists():
-                genome_builds = sgb.values_list("genome_build")
-
-        q_selected = Q(pk__in=genome_builds)
-        return GenomeBuild.objects.filter(q_default | q_selected)
-
-    def get_gene_annotation_releases(self) -> List['GeneAnnotationRelease']:
-        gene_annotation_releases = []
-        for genome_build in self.get_genome_builds().order_by("name"):
-            vav = genome_build.latest_variant_annotation_version
-            if vav.gene_annotation_release:
-                gene_annotation_releases.append(vav.gene_annotation_release)
-        return gene_annotation_releases
-
     def get_node_count_settings_collection(self) -> Optional['NodeCountSettingsCollection']:
         for so in reversed(self._settings_overrides):  # Just need last override
             try:
@@ -370,6 +339,17 @@ class UserSettings:
         else:
             genome_build = user_settings.default_genome_build
         return genome_build
+
+    @staticmethod
+    def get_lab_and_error(user: User) -> Tuple[Optional[Lab], Optional[str]]:
+        lab_error = None
+        lab = None
+        user_settings = UserSettings.get_for_user(user)
+        try:
+            lab = user_settings.get_lab()
+        except ValueError as ve:
+            lab_error = str(ve)
+        return lab, lab_error
 
     @property
     def classification_issue_count(self) -> int:
@@ -396,11 +376,6 @@ class SettingsInitialGroupPermission(models.Model):
         global_settings = GlobalSettings.objects.get()
         SettingsInitialGroupPermission.objects.get_or_create(settings=global_settings,
                                                              group=group, read=True, write=False)
-
-
-class SettingsGenomeBuild(models.Model):
-    settings = models.ForeignKey(SettingsOverride, on_delete=CASCADE)
-    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
 
 class NodeCountSettingsCollection(models.Model):

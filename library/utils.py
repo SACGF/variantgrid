@@ -62,7 +62,7 @@ def sha1_str(s):
 
 
 def invert_dict(source_dict):
-    return {v: k for (k, v) in source_dict.items()}
+    return {v: k for k, v in source_dict.items()}
 
 
 def invert_dict_of_lists(source_dict):
@@ -356,14 +356,16 @@ class ModelUtilsMixin:
         raise ValueError(f'Expected {cls.__name__} or str or int, got {value}')
 
 
-def execute_cmd(cmd: list):
-    if settings.POPEN_SHELL:
+def execute_cmd(cmd: list, **kwargs) -> Tuple[int, Optional[str], Optional[str]]:
+    shell = kwargs.get("shell", settings.POPEN_SHELL)
+
+    if shell:
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
-        pipes = subprocess.Popen(command, shell=True)
+        pipes = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
         logging.info('Completed')
     else:
-        pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
 
     std_out, std_err = pipes.communicate()
     return pipes.returncode, std_out.decode() if std_out else None, std_err.decode() if std_err else None
@@ -525,3 +527,14 @@ class IteratableStitcher:
 
     def __iter__(self):
         return self._IteratorStitcher(iteratables=self.iterables, comparison=self.comparison)
+
+
+class Constant:
+    """ Used for creating non-enum properties in Enums
+        From https://stackoverflow.com/a/18035135 """
+    def __init__(self, value):
+        self.value = value
+    def __get__(self, *args):
+        return self.value
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, self.value)

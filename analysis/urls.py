@@ -11,7 +11,7 @@ urlpatterns = [
     perm_path('<int:analysis_id>/', views.view_analysis, name='analysis'),
     perm_path('<int:analysis_id>/<int:active_node_id>/', views.view_analysis, name='analysis_node'),
     perm_path('clone_analysis/<int:analysis_id>/', views_json.clone_analysis, name='clone_analysis'),
-    perm_path('create_analysis_from_template', views.create_analysis_from_template, name='create_analysis_from_template'),
+    perm_path('create_analysis_from_template/<genome_build_name>', views.create_analysis_from_template, name='create_analysis_from_template'),
     perm_path('trio_wizard/<int:cohort_id>/<int:sample1_id>/<int:sample2_id>/<int:sample3_id>/', views.trio_wizard, name='trio_wizard'),
 
     # Templates
@@ -19,15 +19,15 @@ urlpatterns = [
     perm_path('analysis_template/<pk>/list/', views.analysis_templates_list, name='analysis_templates_list'),
 
     # Node editor
-    perm_path('node/view/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_view, name='node_view'),
+    perm_path('node/view/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_view, name='node_view'),
     perm_path('node_update/<int:node_id>/', views_json.NodeUpdate.as_view(), name='node_update'),
-    perm_path('node_debug/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_debug, name='node_debug'),
+    perm_path('node_debug/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_debug, name='node_debug'),
     perm_path('node_doc/<int:node_id>/', views.node_doc, name='node_doc'),
     perm_path('node_load/<int:node_id>/', views.node_load, name='node_load'),
     perm_path('node_cancel_load/<int:node_id>/', views.node_cancel_load, name='node_cancel_load'),
-    perm_path('node/column_summary/<int:node_id>/<int:version_id>/<slug:extra_filters>/<slug:grid_column_name>/<int:significant_figures>/', views.node_column_summary, name='node_column_summary'),
-    perm_path('node/node_snp_matrix/<int:node_id>/<int:version_id>/<slug:conversion>/<int:significant_figures>/', views.node_snp_matrix, name='node_snp_matrix'),
-    perm_path('node/graph/<int:node_id>/<int:version_id>/<slug:graph_type_id>/<slug:cmap>/', views.node_data_graph, name='node_data_graph'),
+    perm_path('node/column_summary/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/<slug:grid_column_name>/<int:significant_figures>/', views.node_column_summary, name='node_column_summary'),
+    perm_path('node/node_snp_matrix/<int:node_id>/<int:node_version>/<slug:conversion>/<int:significant_figures>/', views.node_snp_matrix, name='node_snp_matrix'),
+    perm_path('node/graph/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:graph_type_id>/<slug:cmap>/', views.node_data_graph, name='node_data_graph'),
     perm_path('node/cohort_zygosity_filters/<int:cohort_node_id>/<int:cohort_id>/', views.cohort_zygosity_filters, name='cohort_zygosity_filters'),
     perm_path('node/vcf_locus_filters/<int:node_id>/<int:vcf_id>/', views.vcf_locus_filters, name='vcf_locus_filters'),
     perm_path('node/sample_vcf_locus_filters/<int:node_id>/<int:sample_id>/', views.sample_vcf_locus_filters, name='sample_vcf_locus_filters'),
@@ -67,20 +67,20 @@ urlpatterns = [
     perm_path('create_classification_from_variant_tag/<int:analysis_id>/<int:sample_id>/<int:variant_tag_id>/', views_json.create_classification_from_variant_tag, name='create_classification_from_variant_tag'),
 
     # Node Data (bottom right window)
-    perm_path('node_data_grid/cfg/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_data_grid, name='node_data_grid'),
-    perm_path('node_async_wait/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_async_wait, name='node_async_wait'),
-    perm_path('node_errors/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views.node_errors, name='node_errors'),
-    perm_path('node_method_description/<int:node_id>/<int:version_id>', views.node_method_description, name='node_method_description'),
+    perm_path('node_data_grid/cfg/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_data_grid, name='node_data_grid'),
+    perm_path('node_async_wait/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_async_wait, name='node_async_wait'),
+    perm_path('node_errors/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_errors, name='node_errors'),
+    perm_path('node_method_description/<int:node_id>/<int:node_version>', views.node_method_description, name='node_method_description'),
 
     # Analysis templates
     perm_path('templates/variable/<int:node_id>/', views_json.analysis_template_variable, name='analysis_template_variable'),
 
     # Grids
     perm_path('node_grid/export/', views_grid.node_grid_export, name='node_grid_export'),
-    perm_path('node_grid/cfg/<int:node_id>/<int:version_id>/<slug:extra_filters>/', views_grid.NodeGridConfig.as_view(), name='node_grid_config'),
+    perm_path('node_grid/cfg/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views_grid.NodeGridConfig.as_view(), name='node_grid_config'),
     perm_path('node_grid/handler/', views_grid.NodeGridHandler.as_view(), name='node_grid_handler'),
 
-    perm_path('node_column_summary/grid/<int:node_id>/<int:version_id>/<slug:extra_filters>/<slug:variant_column>/<int:significant_figures>/<slug:op>/', JQGridView.as_view(grid=NodeColumnSummaryGrid, csv_download=True), name='node_column_summary_grid'),
+    perm_path('node_column_summary/grid/<int:node_id>/<int:node_version>/<slug:extra_filters>/<slug:variant_column>/<int:significant_figures>/<slug:op>/', JQGridView.as_view(grid=NodeColumnSummaryGrid, csv_download=True), name='node_column_summary_grid'),
     perm_path('analyses/grid/<slug:op>/', JQGridView.as_view(grid=AnalysesGrid, delete_row=True), name='analyses_grid'),
     perm_path('analysis_templates/grid/<slug:op>/', JQGridView.as_view(grid=AnalysisTemplatesGrid, delete_row=True), name='analysis_templates_grid'),
     perm_path('tags/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AnalysesVariantTagsGrid, delete_row=True), name='analyses_variant_tags_grid'),

@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.auth.models import User
 import unittest
 
@@ -5,7 +7,7 @@ from annotation.fake_annotation import get_fake_annotation_version, create_fake_
 from annotation.models import CachedWebResource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, GeneCoverage, GeneList, PanelAppPanel, \
-    GeneListCategory, Gene, CanonicalTranscript, GeneListGeneSymbol
+    GeneListCategory, Gene, CanonicalTranscript, GeneListGeneSymbol, PanelAppServer
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from seqauto.models_enums import DataState
@@ -86,11 +88,14 @@ class Test(URLTestCase):
                                                                   import_status=ImportStatus.SUCCESS)[0]
 
         cwr = CachedWebResource.objects.get_or_create(name="Fake PanelAppPanels", import_status=ImportStatus.SUCCESS)[0]
-        cls.panel_app_panel = PanelAppPanel.objects.get_or_create(pk=42,
+
+        server = PanelAppServer.objects.order_by("pk").first()
+        cls.panel_app_panel = PanelAppPanel.objects.get_or_create(server=server,
+                                                                  panel_id=42,
                                                                   cached_web_resource=cwr,
                                                                   disease_group='Tumour syndromes',
                                                                   disease_sub_group='Tumour syndromes',
-                                                                  name='Adult solid tumours for rare disease',
+                                                                  name='Blah blah blah',
                                                                   current_version='1.20')[0]
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
@@ -164,8 +169,10 @@ class Test(URLTestCase):
 
     def testAutocompleteUrls(self):
         """ Autocompletes w/o permissions """
+        panel_app_forward = json.dumps({"server_id": self.panel_app_panel.server_id})
         AUTOCOMPLETE_URLS = [
-            ('panel_app_panel_autocomplete', self.panel_app_panel, {"q": self.panel_app_panel.name}),
+            ('panel_app_panel_autocomplete', self.panel_app_panel, {"q": self.panel_app_panel.name,
+                                                                    "forward": panel_app_forward}),
             ('gene_autocomplete', self.gene, {"q": self.gene_symbol}),
             ('transcript_autocomplete', self.transcript, {"q": self.transcript.identifier}),
             ('gene_symbol_autocomplete', self.gene_symbol, {"q": self.gene_symbol}),

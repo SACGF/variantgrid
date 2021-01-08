@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured
+from django.db.models import Q
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
@@ -60,7 +61,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead
+    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from upload.uploaded_file_type import retry_upload_pipeline
@@ -169,7 +170,7 @@ def bulk_group_permissions(request, class_name):
 
     if request.method == 'POST':
         all_forms = []
-        for (_, permission_forms) in objects_and_forms:
+        for _, permission_forms in objects_and_forms:
             all_forms.extend(permission_forms)
         valid = all([pf.is_valid() for pf in all_forms])
         if valid:
@@ -276,6 +277,9 @@ def view_sample(request, sample_id):
     sample_locus_count = list(SampleLocusCount.objects.filter(sample=sample).order_by("locus_count"))
     igv_data = get_igv_data(request.user, genome_build=sample.genome_build)
     patient_form = PatientForm(user=request.user)  # blank
+    related_samples = None
+    if settings.SOMALIER.get("enabled"):
+        related_samples = SomalierRelatePairs.objects.filter(Q(sample_a=sample) | Q(sample_b=sample))
 
     context = {'sample': sample,
                'samples': [sample],
@@ -284,7 +288,8 @@ def view_sample(request, sample_id):
                'patient_form': patient_form,
                'cohorts': cohorts,
                'has_write_permission': has_write_permission,
-               'igv_data': igv_data}
+               'igv_data': igv_data,
+               "related_samples": related_samples}
     return render(request, 'snpdb/data/view_sample.html', context)
 
 
@@ -721,7 +726,7 @@ def view_custom_columns(request, custom_columns_collection_id):
     if request.method == "POST":
 
         def update_user_columns(id_list, active):
-            for (i, col) in enumerate(id_list):
+            for i, col in enumerate(id_list):
                 column = variant_grid_columns[col]
                 CustomColumn.objects.update_or_create(custom_columns_collection=ccc, column=column,
                                                       defaults={"sort_order": i})
@@ -1092,7 +1097,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     pass
 
             FIELDS = ["gene__geneversion__gene_symbol", "value__rgb", "value__show_counts", "count"]
-            for (gene_symbol, rgb, show_counts, count) in gvc_qs.values_list(*FIELDS):
+            for gene_symbol, rgb, show_counts, count in gvc_qs.values_list(*FIELDS):
                 gene_link = gene_links_lookup[gene_symbol]
                 color_df.loc[gene_link, sample_name] = rgb
                 if show_counts:

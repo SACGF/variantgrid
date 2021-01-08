@@ -1,14 +1,16 @@
 from django.conf import settings
 from django.forms.models import model_to_dict
+from django.utils.timesince import timesince
 from lazy import lazy
 import operator
 
-from annotation.models import VEPSkippedReason
+from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
-    InvalidAnnotationVersionError, VariantTranscriptAnnotation
+    InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion
+from genes.models import TranscriptVersion, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
+from library.log_utils import report_event
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 
@@ -16,6 +18,9 @@ from snpdb.models.models_genome import GenomeBuild
 class VariantTranscriptSelections:
     ENSEMBL_TRANSCRIPT = "ensembl_transcript_accession"
     GENE_SYMBOL = "gene_symbol"
+    GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY = "gnomad_gene_constraint_oe_lof_summary"
+    GNOMAD_GENE_CONSTRAINT_METHOD = "gnomad_gene_constraint_method"
+    GNOMAD_GENE_CONSTRAINT_URL = "gnomad_gene_constraint_url"
     REFSEQ_TRANSCRIPT = "refseq_transcript_accession"
     REPRESENTATIVE = "representative"
 
@@ -33,6 +38,7 @@ class VariantTranscriptSelections:
         self.variant_annotation = None
         self.gene_annotations = {}
         self.transcript_data = []  # See docstring in _populate for details
+        self.warning_messages = []
         self.error_messages = []
         self.initial_transcript_id = None
         self._populate(variant, annotation_version, initial_transcript_id, initial_transcript_column)
@@ -46,7 +52,7 @@ class VariantTranscriptSelections:
         self.transcript_data.sort(key=operator.itemgetter(*sort_order), reverse=True)
 
     def get_annotation_consortium_display(self):
-        return dict(AnnotationConsortium.CHOICES).get(self.annotation_consortium)
+        return AnnotationConsortium(self.annotation_consortium).label
 
     @lazy
     def variant_transcript_annotations_dict(self):
@@ -102,6 +108,12 @@ class VariantTranscriptSelections:
                     data["transcript_id"] = transcript_id
                     break
 
+            ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
+            if ggc:
+                data[self.GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY] = ggc.oe_lof_summary
+                data[self.GNOMAD_GENE_CONSTRAINT_METHOD] = ggc_method
+                data[self.GNOMAD_GENE_CONSTRAINT_URL] = ggc_url
+
             is_representative = bool(representative_transcript and representative_transcript == obj.transcript)
             data[self.REPRESENTATIVE] = is_representative
 
@@ -140,8 +152,22 @@ class VariantTranscriptSelections:
                         if gene_annotation:
                             self.gene_annotations[vsta.gene_id] = model_to_dict(gene_annotation)
         except VariantAnnotation.DoesNotExist:
-            msg = f"Couldn't find VariantAnnotation for {variant}, VariantAnnotationVersion {vav}"
-            self.error_messages.append(msg)
+            # Probably due to variant being annotated - in that case show a warning message
+            ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=variant.genome_build,
+                                              annotation_range_lock__min_variant__gte=variant.pk,
+                                              annotation_range_lock__max_variant__lte=variant.pk).first()
+            if ar:
+                if ar.status in (AnnotationStatus.ERROR, AnnotationStatus.FINISHED):
+                    msg = f"Annotation for variant {variant} failed (Annotation run: {ar.get_status_display()})"
+                    self.error_messages.append(msg)
+                    report_event(name='variant classification download')
+                else:
+                    msg = f"This variant has not yet been annotated. Last status: {ar.get_status_display()} ({timesince(ar.modified)} ago)"
+                    self.warning_messages.append(msg)
+            else:
+                # Some other failure
+                msg = f"Couldn't find VariantAnnotation for {variant}, VariantAnnotationVersion {vav}"
+                self.error_messages.append(msg)
         except InvalidAnnotationVersionError as e:
             self.error_messages.append(str(e))
 
@@ -204,7 +230,7 @@ class VariantTranscriptSelections:
                 has_other_annotation_consortium_transcripts = True
 
         if has_other_annotation_consortium_transcripts:
-            ac_dict = dict(AnnotationConsortium.CHOICES)
+            ac_dict = dict(AnnotationConsortium.choices)
             self.other_annotation_consortium_transcripts_warning = f"""
 This system only annotates {ac_dict[self.annotation_consortium]} transcripts. You may select
 {ac_dict[other_annotation_consortium]} transcripts, but they will not be auto-populated with transcript annotation"""

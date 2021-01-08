@@ -22,7 +22,7 @@ from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from patients.models import FakeData, Patient, Specimen
-from patients.models_enums import Sex, Zygosity
+from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
@@ -50,7 +50,7 @@ class VCF(models.Model):
     project = models.ForeignKey(Project, null=True, blank=True, on_delete=SET_NULL)
     user = models.ForeignKey(User, on_delete=CASCADE)
     genotype_samples = models.IntegerField()
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     fake_data = models.ForeignKey(FakeData, null=True, blank=True, on_delete=CASCADE)
     header = models.TextField(null=True)
     source = models.TextField(blank=True)
@@ -209,9 +209,9 @@ class Sample(SortByPKMixin, models.Model):
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     # TODO: A sample may have >1 specimens (eg tumor/normal subtraction)
     specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     bam_file_path = models.TextField(null=True, blank=True)
-    variants_type = models.CharField(max_length=1, choices=VariantsType.CHOICES, default=VariantsType.UNKNOWN)
+    variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 
     @property
     def genome_build(self):
@@ -321,7 +321,6 @@ class Sample(SortByPKMixin, models.Model):
         qs = qs.annotate(**annotation_kwargs)
         filter_kwargs = {
             f"{self.cohort_genotype_collection.cohortgenotype_alias}__isnull": False,  # Inner join to CohortGenotype
-            f"{self.zygosity_alias}__in": Zygosity.VARIANT,
         }
         return qs.filter(**filter_kwargs)
 
@@ -352,27 +351,6 @@ class Sample(SortByPKMixin, models.Model):
         return sample
 
     @lazy
-    def qc(self):
-        try:
-            return self.samplefromsequencingsample.sequencing_sample.get_single_qc()
-        except:
-            return None
-
-    @lazy
-    def qc_gene_list(self):
-        qc = self.qc
-        gene_list = None
-        if qc:
-            try:
-                qc_gene_list = qc.qcgenelist_set.get()
-                ctgl = qc_gene_list.custom_text_gene_list
-                if ctgl:
-                    gene_list = ctgl.gene_list
-            except:
-                pass
-        return gene_list
-
-    @lazy
     def sequencing_run(self):
         try:
             return self.samplefromsequencingsample.sequencing_run
@@ -398,7 +376,7 @@ class SampleTag(models.Model):
 class AbstractVariantStats(models.Model):
     """ Base class used for Cohort/Sample stats
         @see also annotation.models.models_sample_stats """
-    import_status = models.CharField(max_length=1, choices=ImportStatus.CHOICES, default=ImportStatus.CREATED)
+    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variant_count = models.IntegerField(default=0)
     snp_count = models.IntegerField(default=0)
     insertions_count = models.IntegerField(default=0)
@@ -480,7 +458,7 @@ class AbstractSampleStats(AbstractVariantStats):
             elif hom_het_ratio > 0.8:
                 sex = Sex.MALE
 
-        return dict(Sex.CHOICES)[sex]
+        return Sex(sex).label
 
 
 class SampleStats(AbstractSampleStats):
@@ -519,7 +497,7 @@ class VCFSourceSettings(models.Model):
 
 class VCFBedIntersection(models.Model):
     name = models.TextField()
-    status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES, default=ProcessingStatus.CREATED)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     error_exception = models.TextField(null=True, blank=True)
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
     genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, on_delete=CASCADE)
@@ -536,6 +514,8 @@ class VCFBedIntersection(models.Model):
                       'right_padding': settings.DEFAULT_ENRICHMENT_KIT_RIGHT_PADDING}
 
             pbi = VCFBedIntersection.objects.get(**kwargs)
+        except VCFBedIntersection.DoesNotExist:
+            pass
         except:
             log_traceback()
             pbi = None

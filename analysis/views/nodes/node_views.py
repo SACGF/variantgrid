@@ -270,7 +270,7 @@ class VennNodeView(NodeView):
             a_name = "incorrectly configured"
             b_name = "incorrectly configured"
 
-        venn_choices = [t[0] for t in SetOperations.CHOICES]
+        venn_choices = [t[0] for t in SetOperations.choices]
         context["venn_choices"] = venn_choices
         context["a_name"] = a_name
         context["b_name"] = b_name

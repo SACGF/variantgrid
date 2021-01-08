@@ -56,7 +56,7 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
 
     known_transcript_ids = Transcript.known_transcript_ids(genome_build, annotation_consortium)
     canonical_transcript_list = []
-    for (original_gene_symbol, original_transcript_id) in gene_exon_series:
+    for original_gene_symbol, original_transcript_id in gene_exon_series:
         gene_symbol_id = gene_matcher.get_gene_symbol_id(original_gene_symbol)
         if original_transcript_id in known_transcript_ids:
             transcript = original_transcript_id

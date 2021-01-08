@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from genes.models import GeneInfo, GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
-    GeneAnnotationRelease
+    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList
 from snpdb.models import Company
 from snpdb.serializers import UserSerializer
 
@@ -78,3 +78,17 @@ class GeneInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = GeneInfo
         fields = ('name', 'description', 'icon_css_class')
+
+
+class SampleGeneListSerializer(serializers.ModelSerializer):
+    active = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SampleGeneList
+        fields = ('pk', 'visible', 'active')
+
+    def get_active(self, obj):
+        try:
+            return obj.sample.activesamplegenelist.sample_gene_list == obj
+        except ActiveSampleGeneList.DoesNotExist:
+            return False

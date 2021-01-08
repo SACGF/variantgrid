@@ -1,8 +1,6 @@
 from functools import total_ordering
-from typing import Dict, Any, Mapping, Optional, Union, List
-
+from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
 from lazy import lazy
-
 from annotation.models import Citation, CitationSource
 from genes.hgvs import CHGVS
 from library.log_utils import report_message
@@ -12,8 +10,25 @@ from classification.enums import SpecialEKeys, CriteriaEvaluation
 from django.conf import settings
 import re
 
-VCStoreValue = Dict[str, Any]
-VCPatchValue = Union[None, Dict[str, Any]]
+
+class VCDbRefDict(TypedDict, total=False):
+    id: str
+    db: str
+    idx: Union[str, int]
+    url: str
+    summary: str
+    internal_id: int
+
+
+class VCBlobDict(TypedDict, total=False):
+    value: Any
+    note: str
+    explain: str
+    db_refs: List[VCDbRefDict]
+
+
+VCStoreValue = VCBlobDict
+VCPatchValue = Union[None, VCStoreValue]
 VCStore = Dict[str, VCStoreValue]
 VCPatch = Dict[str, VCPatchValue]
 
@@ -122,7 +137,7 @@ class EvidenceMixin:
     def criteria_strength_summary(self, ekeys: Optional['EvidenceKeyMap'] = None, only_acmg: bool = False) -> str:
         if ekeys is None:
             from classification.models import EvidenceKeyMap
-            ekeys = EvidenceKeyMap()
+            ekeys = EvidenceKeyMap.instance()
 
         criteria: List[CriteriaStrength] = []
         for ek in ekeys.criteria():

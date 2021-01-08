@@ -5,7 +5,8 @@ from typing import Dict, Any, Optional, DefaultDict
 from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 
-from classification.models import ClassificationModification, EvidenceKey, VCBlobDict, EvidenceKeyMap
+from classification.models import ClassificationModification, EvidenceKey, EvidenceKeyMap
+from classification.models.evidence_mixin import VCBlobDict
 from classification.views.classification_export_utils import ExportFormatter, AlleleGroup, \
     BaseExportFormatter
 
@@ -158,7 +159,7 @@ class ExportFormatterKeys(BaseExportFormatter):
 
         super().__init__(*args, **kwargs)
 
-        for e_key in EvidenceKeyMap.cached().all_keys:
+        for e_key in EvidenceKeyMap.instance().all_keys:
             self.key_counters[e_key.key] = KeyCount(e_key=e_key)
 
     def process(self):

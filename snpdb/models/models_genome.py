@@ -161,7 +161,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     @property
     def annotation_consortium(self):
-        consortia_dict = invert_dict(dict(AnnotationConsortium.CHOICES))
+        consortia_dict = invert_dict(dict(AnnotationConsortium.choices))
         try:
             ac_str = self.settings["annotation_consortium"]
             return consortia_dict[ac_str]
@@ -231,10 +231,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return annotation_version.variant_annotation_version.assembly
 
     def __str__(self):
-        name = self.name
-        if self.alias:
-            name += f" (aka {self.alias})"
-        return name
+        return self.name
 
 
 class Contig(models.Model):
@@ -243,9 +240,9 @@ class Contig(models.Model):
         @see annotation.reference_contigs.get_assembly_report_df """
 
     name = models.TextField()
-    role = models.CharField(max_length=3, choices=SequenceRole.CHOICES)
+    role = models.CharField(max_length=3, choices=SequenceRole.choices)
     assigned_molecule = models.TextField(null=True, blank=True)  # unlocalised may know what chrom it's from
-    molecule_type = models.CharField(max_length=1, choices=AssemblyMoleculeType.CHOICES, null=True, blank=True)
+    molecule_type = models.CharField(max_length=1, choices=AssemblyMoleculeType.choices, null=True, blank=True)
     genbank_accession = models.TextField(null=True)
     refseq_accession = models.TextField(unique=True)
     ucsc_name = models.TextField(null=True)
@@ -276,7 +273,7 @@ class GenomeFasta(models.Model):
     index_filename = models.TextField()
     index_md5sum = models.TextField()
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.CHOICES)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
     class ContigNotInFastaError(ValueError):
         pass

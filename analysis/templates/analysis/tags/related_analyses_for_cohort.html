@@ -7,7 +7,7 @@
     </ul>
 
     {% load related_analyses_tags %}
-    {% analysis_templates_tag cohort=cohort %}
+    {% analysis_templates_tag cohort.genome_build cohort=cohort %}
 
 {% endif %}
 {% endblock create_analyses %}

@@ -84,7 +84,7 @@ class Allele(FlagsMixin, models.Model):
         if genome_build:
             va = vas.filter(genome_build=genome_build).first()
             if not va and not best_attempt:
-                raise ValueError(f'Could not find a variant in allele {self.id} for build {genome_build.name}')
+                raise ValueError(f'Could not find a variant in allele {self.id} for build {genome_build}')
         if not va:
             va = vas.first()
         if va:
@@ -161,13 +161,14 @@ class Allele(FlagsMixin, models.Model):
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
             other_allele.variantallele_set.update(allele=self, conversion_tool=conversion_tool)
 
+    @property
+    def build_names(self) -> str:
+        return ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
+
     def __str__(self):
         name = f"Allele {self.pk}"
         if self.clingen_allele:
             name += f" ({self.clingen_allele})"
-
-        builds = ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
-        name += f" ({builds})"
         return name
 
     def validate(self, liftover_complete=True):
@@ -205,7 +206,7 @@ class AlleleMergeLog(TimeStampedModel):
     """ Keep track of calls to Allele.merge() """
     old_allele = models.ForeignKey(Allele, related_name="old_allele_merge", on_delete=CASCADE)
     new_allele = models.ForeignKey(Allele, related_name="new_allele_merge", on_delete=CASCADE)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.CHOICES)
+    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     success = models.BooleanField(default=True)
     message = models.TextField(null=True)
 
@@ -227,10 +228,10 @@ class Sequence(models.Model):
     seq_md5_hash = models.CharField(max_length=32, unique=True)
     length = models.IntegerField()
 
-    def save(self, *args, **kwargs):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.seq_md5_hash:
             self.seq_md5_hash = md5sum_str(self.seq)
-        super().save(*args, **kwargs)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     @staticmethod
     def abbreviate(s: str, max_length: int = 20):
@@ -458,8 +459,8 @@ class VariantAllele(TimeStampedModel):
     variant = models.OneToOneField(Variant, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
-    origin = models.CharField(max_length=1, choices=AlleleOrigin.CHOICES)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.CHOICES)
+    origin = models.CharField(max_length=1, choices=AlleleOrigin.choices)
+    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     error = models.JSONField(null=True)  # Only set on error
 
     def needs_clinvar_call(self):
@@ -477,7 +478,7 @@ class VariantCollection(RelatedModelsPartitionModel):
     PARTITION_LABEL_TEXT = "variant_collection"
     name = models.TextField(null=True)
     count = models.IntegerField(null=True)
-    status = models.CharField(max_length=1, choices=ProcessingStatus.CHOICES, default=ProcessingStatus.CREATED)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
 
     @property
     def variant_collection_alias(self):
@@ -526,7 +527,7 @@ class Liftover(TimeStampedModel):
         The VCF (in genome_build build) is set in UploadedFile for the UploadPipeline """
     user = models.ForeignKey(User, on_delete=CASCADE)
     allele_source = models.ForeignKey(AlleleSource, on_delete=CASCADE)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.CHOICES)
+    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     source_vcf = models.TextField(null=True)
     source_genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE,
                                             related_name="liftover_source_genome_build")
@@ -546,7 +547,7 @@ class Liftover(TimeStampedModel):
         source = ""
         if self.source_genome_build:
             source = f"from {self.source_genome_build.name} "
-        return f"Liftover {source}to {self.genome_build.name} via {self.get_conversion_tool_display()}"
+        return f"Liftover {source}to {self.genome_build} via {self.get_conversion_tool_display()}"
 
 
 class LiftoverError(models.Model):

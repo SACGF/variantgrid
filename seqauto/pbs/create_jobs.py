@@ -35,7 +35,7 @@ def create_jobs_and_launch_script(seqauto_run, launch_file_types):
             SequencingFileType.DATA_MIGRATION: set([b.unaligned_reads.sequencing_sample.sample_sheet for b in bams])}
 
     job_data_by_file_type = defaultdict(dict)
-    for (file_type, qs) in data.items():
+    for file_type, qs in data.items():
         s = get_job_data(seqauto_run, file_type, qs)
         job_data_by_file_type[file_type].update(s)
 

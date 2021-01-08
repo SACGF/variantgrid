@@ -7,6 +7,7 @@ from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.views.nodes.node_view import NodeView
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from genes.hgvs import HGVSMatcher
+from snpdb.models import UserSettings
 from snpdb.models.models import Tag
 from classification.models.classification import Classification
 
@@ -22,6 +23,10 @@ class TagNodeView(NodeView):
         else:
             requires_classification_data = _get_requires_classification_data(self.object.analysis, self.request.user)
         context["requires_classification_data"] = requires_classification_data
+
+        lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
+        context["lab"] = lab
+        context["lab_error"] = lab_error
         return context
 
 

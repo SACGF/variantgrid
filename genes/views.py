@@ -9,6 +9,7 @@ from django.db.models.query_utils import Q
 from django.forms.models import model_to_dict
 from django.http.response import JsonResponse, Http404
 from django.shortcuts import render, get_object_or_404
+from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -28,13 +29,14 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
     GeneSymbolForm
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
-    CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, GeneVersion, \
-    PfamSequenceIdentifier, gene_symbol_withdrawn_str
+    CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
+    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList
+from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
 from seqauto.models import EnrichmentKit
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection
+from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
@@ -55,26 +57,6 @@ def genes(request, genome_build_name=None):
                "gene_form": GeneForm(),
                "version_form": version_form}
     return render(request, 'genes/genes.html', context)
-
-
-def _get_latest_gene_version_for_user_settings(source, gene_versions, user_settings: UserSettings) -> GeneVersion:
-    """ returns latest GeneVersion using default_genome_build, falling back on other user settings builds """
-
-    if not gene_versions.exists():
-        raise ValueError(f"{source} does not have any GeneVersions!")
-
-    genome_builds = user_settings.get_genome_builds()
-    user_build_gene_versions = gene_versions.filter(genome_build__in=genome_builds).order_by("-version")
-    if not user_build_gene_versions.exists():
-        user_builds = ", ".join([str(gb) for gb in genome_builds])
-        supported_builds = ", ".join(gene_versions.values_list("genome_build", flat=True).distinct())
-        msg = f"{source} has no GeneVersions for user genome builds: {user_builds} - supported: {supported_builds}"
-        raise ValueError(msg)
-
-    gene_version = user_build_gene_versions.filter(genome_build=user_settings.default_genome_build).first()
-    if not gene_version:
-        gene_version = user_build_gene_versions.first()  # Try another build
-    return gene_version
 
 
 def view_gene(request, gene_id):
@@ -129,7 +111,7 @@ def _get_mim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
     return mim_and_hpo_for_gene
 
 
-def view_gene_symbol(request, gene_symbol):
+def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     # determines if this gene symbol might ONLY be an alias
     if gene_symbol.endswith(gene_symbol_withdrawn_str):
         raise Http404('Withdrawn GeneSymbols not valid')
@@ -140,8 +122,8 @@ def view_gene_symbol(request, gene_symbol):
         aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
         aliases.update(gene.get_symbols().exclude(symbol=gene_symbol))
 
-    user_settings = UserSettings.get_for_user(request.user)
-    genome_build = user_settings.default_genome_build
+    desired_genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
+    genome_build = desired_genome_build
 
     has_classified_variants = False
     has_observed_variants = False
@@ -152,11 +134,13 @@ def view_gene_symbol(request, gene_symbol):
         # This page is shown using the users default genome build
         # However - it's possible the gene doesn't exist for a particular genome build.
         # If gene has a version for a build in user settings, use that and show a warning message
-        gene_version = _get_latest_gene_version_for_user_settings(f"GeneSymbol: {gene_symbol}", gene_versions, user_settings)
+        gene_version = gene_versions.filter(genome_build=desired_genome_build).first()
+        if not gene_version:
+            gene_version = gene_versions.first()  # Try another build
         genome_build = gene_version.genome_build
-        if genome_build != user_settings.default_genome_build:
-            messages.add_message(request, messages.WARNING,
-                                 f"This symbol is not associated with any genes in your default build, viewing in build {genome_build}")
+        if genome_build != desired_genome_build:
+            msg = f"This symbol is not associated with any genes in build {desired_genome_build}, viewing in build {genome_build}"
+            messages.add_message(request, messages.WARNING, msg)
 
         gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build, traverse_aliases=True)
         gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
@@ -202,6 +186,7 @@ def view_gene_symbol(request, gene_symbol):
         "gene_level_columns": gene_level_columns,
         "genome_build": genome_build,
         "has_classified_variants": has_classified_variants,
+        "panel_app_servers": PanelAppServer.objects.order_by("pk"),
         "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
         "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
         "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
@@ -295,7 +280,7 @@ def view_transcript_version(request, transcript_id, version):
         transcripts_by_build[genome_build_id] = t
 
     differences = []
-    for (a, b) in combinations(transcripts_by_build.keys(), 2):
+    for a, b in combinations(transcripts_by_build.keys(), 2):
         t_a = transcripts_by_build[a]
         t_b = transcripts_by_build[b]
         diff = t_a.get_differences(t_b)
@@ -453,7 +438,7 @@ def get_coverage_stats(base_gene_coverage_qs, filter_q, fields):
 
     values = defaultdict(list)
     for data in gene_coverage_qs.values(*fields):
-        for (k, v) in data.items():
+        for k, v in data.items():
             values[k].append(v)
     return values
 
@@ -491,6 +476,38 @@ def qc_gene_list_coverage_graphs(request, genome_build_name, gene_list_id):
     gene_list = GeneList.get_for_user(request.user, gene_list_id)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     return gene_coverage_graphs(request, genome_build, gene_list.get_gene_names())
+
+
+def sample_gene_lists_tab(request, sample_id):
+    sample = Sample.get_for_user(request.user, sample_id)
+
+    create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user,
+                                                    initial={"name": "Sample Gene List"})
+    if request.method == "POST":
+        if create_gene_list_form.is_valid():
+            custom_text_gene_list = create_gene_list_form.save()
+            category = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
+            gene_list = custom_text_gene_list.gene_list
+            gene_list.category = category
+            gene_list.save()
+            SampleGeneList.objects.create(sample=sample, gene_list=gene_list)
+
+    sample_gene_lists_data = []
+    gene_grid_arg_list = []
+    for sgl in sample.samplegenelist_set.all():
+        sample_gene_lists_data.append(SampleGeneListSerializer(sgl).data)
+        gene_grid_arg_list.append(f"gene-list-{sgl.gene_list_id}")
+
+    if gene_grid_arg_list:
+        gene_grid_url = reverse("passed_gene_grid", kwargs={"columns_from_url": "/".join(gene_grid_arg_list)})
+    else:
+        gene_grid_url = None
+
+    context = {"sample": sample,
+               "gene_grid_url": gene_grid_url,
+               "create_gene_list_form": create_gene_list_form,
+               "sample_gene_lists_data": sample_gene_lists_data}
+    return render(request, 'genes/sample_gene_lists_tab.html', context)
 
 
 class HotspotGraphView(TemplateView):

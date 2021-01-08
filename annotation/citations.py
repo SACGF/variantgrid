@@ -127,7 +127,7 @@ def create_cached_citations_from_entrez(entrez_db, cvcs_to_query: List[Citation]
     try:
         h = Entrez.efetch(db=entrez_db, id=ids, rettype='medline', retmode='text')
         records = Medline.parse(h)
-        for (cvc, record) in zip(cvcs_to_query, records):
+        for cvc, record in zip(cvcs_to_query, records):
             cc = cache_citation(cvc, record)
             try:
                 citations_by_cvc_id[cvc.pk] = get_citation_from_cached_citation(cc)

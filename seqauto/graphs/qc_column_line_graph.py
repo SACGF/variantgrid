@@ -53,7 +53,7 @@ class QCColumnLineGraph(CacheableGraph):
         x = []
         y = []
         x_labels = []
-        for (i, values) in enumerate(self.get_values_list()):
+        for i, values in enumerate(self.get_values_list()):
             date_string = values[0]
             value = values[1]
             x.append(i+1)

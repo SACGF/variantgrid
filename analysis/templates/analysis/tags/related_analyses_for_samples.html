@@ -4,7 +4,7 @@
     {% for sample in samples %}
         {% if sample.import_status == 'S' %}
             {% load related_analyses_tags %}
-            {% analysis_templates_tag sample_somatic=sample.is_somatic sample_gene_list=sample.qc_gene_list sample=sample %}
+            {% analysis_templates_tag sample.genome_build has_somatic_sample=sample.is_somatic sample_gene_list=sample.activesamplegenelist.sample_gene_list sample=sample %}
         {% else %}
             This sample has import_status of <b>{{ sample.get_import_status_display }}</b> - it can not be analysed.
         {% endif %}

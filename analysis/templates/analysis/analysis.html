@@ -111,9 +111,9 @@
 		layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections, analysisReadOnly);
 		loadInitialGridEditor();
         setNumVariantTags(false);
-        {% if analysis.analysistemplate %}
-        setupAnalysisTemplateTopBar({{ analysis.analysistemplate.pk }});
-        addInitialAnalysisVariables(analysisVariablesArray);
+        {% if analysis.template %}
+        setupAnalysisTemplateTopBar({{ analysis.template.pk }});
+        addInitialAnalysisVariables(analysisVariablesArray, analysisReadOnly);
         {% endif %}
 
 		$(document).bind('keydown', function(event) {
@@ -133,22 +133,31 @@
 
 {% block content %}
     <div id="analysis-outer-container" class="ui-layout-center">
-    {% if analysis.analysistemplate %}
+    {% if analysis.template %}
         <div id="analysis-variables" class="hidden ui-layout-north">
             <div id="analysis-template-info" class="left">
-                <div id="analysis-template-name">Template: {{ analysis.analysistemplate }}</div>
+                <div id="analysis-template-name">
+                    {% if analysis.template_type == 'S' %}Snapshot of{% endif %}
+                    Template: {{ analysis.template }}
+                </div>
                 <div id="analysis-template-version">
                     <div>
                         <label class="label" for="id_analysis_name_template">Analysis name pattern:</label>
                         <input id="id_analysis_name_template" name="analysis_name_template"
-                               value="{{ analysis.analysistemplate.default_name_template }}" />
+                               {% if analysis.analysistemplateversion %}readonly{% endif %}
+                               value="{{ analysis.template.default_name_template }}" />
                     </div>
 
                     <div>
-                        <label>Latest Version:</label> <span id="latest-template-version">{{ analysis.analysistemplate.latest_version }}</span>
+                        {% if analysis.template_type == 'S' %}
+                        <label>Version:</label> <span>{{ analysis.analysistemplateversion.version }}</span>
+                        {% else %}
+                        <label>Latest Version:</label> <span id="latest-template-version">{{ analysis.template.latest_version }}</span>
                         <button id="analysis-template-save-version" class="btn btn-outline-primary">save version</button>
+                        {% endif %}
+
                         <span>
-                            <a href="{%  url 'analysis_templates_list' analysis.analysistemplate.pk %}" target="_blank">View saved templates</a>
+                            <a href="{%  url 'analysis_templates_list' analysis.template.pk %}" target="_blank">View saved templates</a>
                         </span>
                     </div>
                 </div>
@@ -156,8 +165,10 @@
             <div id='insert-analysis-variables-before-here'></div>
             <div id='analysis-variables-help' class="left">
                 <b>Analysis Variables</b> - these fields are set from external data when creating an analysis
+                {% if analysis.template_type == 'T' %}
                 <div><b>Add:</b>Click <span id="av-example-add-button"></span> inside a node.</div>
                 <div><b>Remove:</b>Click the <span class="analysis-variable" id="av-example-button">variable</span> in this window.</div>
+                {% endif %}
             </div>
             <div class="clear"></div>
         </div>

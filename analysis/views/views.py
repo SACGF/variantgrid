@@ -31,7 +31,7 @@ from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
     AnalysisTemplateRun, AnalysisLock, Analysis
-from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus
+from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
@@ -48,11 +48,10 @@ from library.database_utils import run_sql
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
-from patients.models_enums import TrioSample
 from pedigree.models import Pedigree
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
-    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant
+    Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant, GenomeBuild
 from variantgrid.celery import app
 import numpy as np
 import pandas as pd
@@ -135,13 +134,15 @@ def view_active_node(analysis, active_node=None):
 
 
 @require_POST
-def create_analysis_from_template(request):
-    analysis_template_name = request.POST["analysis_template"]
+def create_analysis_from_template(request, genome_build_name):
+    data = request.POST.dict()
+    tag_uuid = data.pop("tag_uuid")
+    analysis_template_key = f"{tag_uuid}-analysis_template"
+    analysis_template_name = data.pop(analysis_template_key)
     analysis_template = AnalysisTemplate.get_for_user(request.user, analysis_template_name)
 
-    template_run = AnalysisTemplateRun.create(analysis_template, user=request.user)
-    data = request.POST.dict()
-    data.pop("analysis_template")
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=request.user)
     template_run.populate_arguments(data)
     populate_analysis_from_template_run(template_run)
 
@@ -190,7 +191,7 @@ def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
             def get_cohort_sample(sample):
                 return cohort.cohortsample_set.get(sample=sample)
 
-            for (s, p) in zip(samples, people):
+            for s, p in zip(samples, people):
                 if p == TrioSample.FATHER:
                     father_cs = get_cohort_sample(s)
                 elif p == TrioSample.MOTHER:
@@ -251,12 +252,12 @@ NODE_DISPATCHER = get_node_views_by_class()
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_view(request, node_id, version_id, extra_filters):
+def node_view(request, analysis_version, node_id, node_version, extra_filters):
     """ So we don't fill up urls with lots of different views, just come here and dispatch
         to subclasses of NodeView in analysis.views.nodes based on the model field """
-    node = get_node_subclass_or_404(request.user, node_id, version=version_id)
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     view = NODE_DISPATCHER[node.__class__]
-    return view(request, pk=node_id, version_id=version_id, extra_filters=extra_filters)
+    return view(request, pk=node_id, version_id=node_version, extra_filters=extra_filters)
 
 
 def get_node_sql(grid):
@@ -275,8 +276,8 @@ def get_node_sql(grid):
 @not_minified_response
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_debug(request, node_id, version_id, extra_filters):
-    node = get_node_subclass_or_404(request.user, node_id, version=version_id)
+def node_debug(request, analysis_version, node_id, node_version, extra_filters):
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     model_name = node._meta.label
     node_serializers = AnalysisNodeSerializer.get_node_serializers()
     serializer = node_serializers.get(model_name, AnalysisNodeSerializer)
@@ -315,11 +316,12 @@ def node_doc(request, node_id):
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_data_grid(request, node_id, version_id, extra_filters):
+def node_data_grid(request, analysis_version, node_id, node_version, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id)
     template = 'analysis/node_data/node_data_grid.html'
-    context = {"node_id": node_id,
-               "version_id": version_id,
+    context = {"analysis_version": analysis_version,
+               "node_id": node_id,
+               "node_version": node_version,
                "extra_filters": extra_filters,
                "bams_dict": node.get_bams_dict()}
     return render(request, template, context)
@@ -327,8 +329,8 @@ def node_data_grid(request, node_id, version_id, extra_filters):
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_column_summary(request, node_id, version_id, extra_filters, grid_column_name, significant_figures):
-    node = get_node_subclass_or_404(request.user, node_id, version=version_id)
+def node_column_summary(request, analysis_version, node_id, node_version, extra_filters, grid_column_name, significant_figures):
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
 
     grid = VariantGrid(request.user, node, extra_filters)
     cm = grid.get_column_colmodel(grid_column_name)
@@ -337,7 +339,7 @@ def node_column_summary(request, node_id, version_id, extra_filters, grid_column
     quantitative = sorttype in ['float', 'int']
 
     context = {"node_id": node.id,
-               "version_id": node.version,
+               "node_version": node.version,
                "extra_filters": extra_filters}
 
     if quantitative:
@@ -371,8 +373,8 @@ def get_snp_matrix_counts(user: User, node_id, version_id):
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_snp_matrix(request, node_id, version_id, conversion, significant_figures):
-    counts_df = get_snp_matrix_counts(request.user, node_id, version_id)
+def node_snp_matrix(request, node_id, node_version, conversion, significant_figures):
+    counts_df = get_snp_matrix_counts(request.user, node_id, node_version)
     total = counts_df.sum().sum()
     ti = tv = ti_tv_ratio = None
     if total:
@@ -392,10 +394,10 @@ def node_snp_matrix(request, node_id, version_id, conversion, significant_figure
     elif conversion == SNPMatrix.COLS_PERCENT:
         df = pandas_utils.get_columns_percent_dataframe(counts_df)
 
-    conversion_description = dict(SNPMatrix.CHOICES)[conversion]
+    conversion_description = SNPMatrix(conversion).label
 
     context = {"node_id": node_id,
-               "version_id": version_id,
+               "node_version": node_version,
                'counts_df': counts_df,
                'conversion_description': conversion_description,
                'other_df': df,
@@ -410,12 +412,12 @@ def node_snp_matrix(request, node_id, version_id, conversion, significant_figure
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_data_graph(request, node_id, version_id, graph_type_id, cmap):
+def node_data_graph(request, analysis_version, node_id, node_version, graph_type_id, cmap):
     context = {"node_id": node_id,
-               "version_id": version_id,
+               "node_version": node_version,
                "extra_filters": None}
 
-    node = get_node_subclass_or_404(request.user, node_id, version=version_id)
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     poll_url = reverse(node_graph, kwargs={"node_id": node.id, "graph_type_id": graph_type_id, "cmap": cmap})
     context["poll_url"] = poll_url
     template = 'analysis/node_data/node_data_graph.html'
@@ -424,11 +426,12 @@ def node_data_graph(request, node_id, version_id, graph_type_id, cmap):
 
 @cache_page(HOUR_SECS)
 @vary_on_cookie
-def node_async_wait(request, node_id, version_id, extra_filters):
+def node_async_wait(request, analysis_version, node_id, node_version, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id)
 
-    context = {"node_id": node_id,
-               "version_id": version_id,
+    context = {"analysis_version": analysis_version,
+               "node_id": node_id,
+               "node_version": node_version,
                "node": node,
                "extra_filters": extra_filters}
 
@@ -438,10 +441,11 @@ def node_async_wait(request, node_id, version_id, extra_filters):
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_errors(request, node_id, version_id, extra_filters):
-    node = get_node_subclass_or_404(request.user, node_id, version=version_id)
-    context = {"node_id": node_id,
-               "version_id": version_id,
+def node_errors(request, analysis_version, node_id, node_version, extra_filters):
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    context = {"analysis_version": analysis_version,
+               "node_id": node_id,
+               "node_version": node_version,
                "node": node,
                "errors": node.get_errors(flat=True),
                "extra_filters": extra_filters,
@@ -459,8 +463,9 @@ def node_load(request, node_id):
     try:
         node = get_node_subclass_or_non_fatal_exception(request.user, node_id)
         extra_filters = request.GET.get("extra_filters", "default")
-        kwargs = {"node_id": node.id,
-                  "version_id": node.version,
+        kwargs = {"analysis_version": node.analysis.version,
+                  "node_id": node.id,
+                  "node_version": node.version,
                   "extra_filters": extra_filters}
         if NodeStatus.is_error(node.status):
             view_name = "node_errors"
@@ -692,6 +697,9 @@ def analysis_settings_lock(request, analysis_id):
         raise PermissionDenied(f"You do not have write access to {analysis.pk}")
     lock = json.loads(request.POST["lock"])
     AnalysisLock.objects.create(analysis=analysis, locked=lock, user=request.user, date=timezone.now())
+    # Bump version to expire cache
+    analysis.version += 1
+    analysis.save()
     return redirect(analysis)  # Reload
 
 
@@ -721,8 +729,8 @@ def analysis_input_samples(request, analysis_id):
     return render(request, 'analysis/analysis_input_samples.html', context)
 
 
-def node_method_description(request, node_id, version_id):
-    node = get_node_subclass_or_404(request.user, node_id, version=version_id)
+def node_method_description(request, node_id, node_version):
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     nodes = AnalysisNode.depth_first(node)
 
     context = {"node": node,
@@ -741,7 +749,6 @@ def analyses_variant_tags(request, genome_build_name=None):
 
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
-    as_display = dict(NodeStatus.CHOICES)
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
     summary_data = Counter()
@@ -749,7 +756,7 @@ def view_analysis_issues(request):
         summary = NodeStatus.get_summary_state(status)
         summary_data[summary] += count
 
-    field_counts = {as_display[k]: v for k, v in field_counts.items()}
+    field_counts = {NodeStatus(k).label: v for k, v in field_counts.items()}
     context = {"nodes_status_summary": summary_data,
                "field_counts": field_counts}
     return render(request, 'analysis/view_analysis_issues.html', context)
@@ -779,7 +786,7 @@ def view_mutational_signature(request, pk):
     mutation_types = []
     mutation_type_counts = []
 
-    for (mutation_type, count) in mut_count_qs.values_list("mutation_type", "count"):
+    for mutation_type, count in mut_count_qs.values_list("mutation_type", "count"):
         mutation_types.append(mutation_type)
         mutation_type_counts.append(count)
 

@@ -64,7 +64,7 @@ class Command(BaseCommand):
         df = df.dropna(subset=['Pipeline Primary Key'])
 
         # Insert Parent Child Relationships
-        for (_, row) in df.iterrows():
+        for _, row in df.iterrows():
             if row.notnull()[PARENT_NODE]:
                 try:
                     parent_node_id = SoftwarePipelineNode.objects.get(name=row[PARENT_NODE],  # @UndefinedVariable

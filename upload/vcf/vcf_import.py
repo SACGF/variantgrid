@@ -16,7 +16,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from library.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant,\
     cyvcf2_get_contig_lengths_dict
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, \
-    VCFFromSequencingRun, SampleFromSequencingSample
+    VCFFromSequencingRun, SampleFromSequencingSample, QCGeneList
 from seqauto.signals import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
     Cohort, CohortSample, UserSettings, VCFSourceSettings
@@ -174,11 +174,11 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
         if no_dna_control_sample_pattern and no_dna_control_sample_pattern.findall(sample_name):
             no_dna_control = True
 
-        sample = Sample.objects.create(vcf=vcf,
-                                       vcf_sample_name=sample_name,
-                                       name=sample_name,
-                                       no_dna_control=no_dna_control,
-                                       import_status=ImportStatus.IMPORTING)
+        Sample.objects.create(vcf=vcf,
+                              vcf_sample_name=sample_name,
+                              name=sample_name,
+                              no_dna_control=no_dna_control,
+                              import_status=ImportStatus.IMPORTING)
 
     if backend_vcf:
         link_samples_and_vcfs_to_sequencing(backend_vcf)
@@ -358,7 +358,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
 
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
 
-        for (sequencing_sample, sample) in samples_by_sequencing_sample.items():
+        for sequencing_sample, sample in samples_by_sequencing_sample.items():
             bam_file = sequencing_sample.get_single_bam()
             if bam_file:
                 sample.bam_file_path = bam_file.path
@@ -377,6 +377,12 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
             except SampleFromSequencingSample.DoesNotExist:
                 SampleFromSequencingSample.objects.create(sample=sample,
                                                           sequencing_sample=sequencing_sample)
+
+            # Link any QCGeneLists
+            for qcgl in QCGeneList.objects.filter(qc__bam_file__unaligned_reads__sequencing_sample=sequencing_sample,
+                                                  custom_text_gene_list__gene_list__isnull=False,
+                                                  sample_gene_list__isnull=True).distinct():
+                qcgl.create_and_assign_sample_gene_list(sample)
 
 
 def create_import_success_message(vcf):
@@ -421,7 +427,7 @@ class ContigMismatchException(GenomeBuildDetectionException):
     pass
 
 
-def vcf_detect_genome_build_from_filename(vcf_filename):
+def vcf_detect_genome_build(vcf_filename):
     vcf_reader = cyvcf2.VCF(vcf_filename)
     return vcf_detect_genome_build_from_header(vcf_reader)
 

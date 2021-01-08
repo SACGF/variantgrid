@@ -21,6 +21,7 @@ from eventlog.models import Event, create_event
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk
 from library.enums.log_level import LogLevel
+from library.git import Git
 from library.log_utils import report_exc_info, log_traceback
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
@@ -110,7 +111,8 @@ def dashboard(request):
 
     user_has_cases = cases_for_user(request.user).exists()
 
-    context = {'user_has_cases': user_has_cases,
+    context = {'git': Git(settings.BASE_DIR),
+               'user_has_cases': user_has_cases,
                'sample_enrichment_kits_df': sample_enrichment_kits_df,
                "latest_sequencing_vcfs": latest_sequencing_vcfs}
     return render(request, "variantopedia/dashboard.html", context)
@@ -396,6 +398,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
             vts = VariantTranscriptSelections(variant, variant.genome_build, annotation_version)
             variant_annotation = vts.variant_annotation
+            for w_msg in vts.warning_messages:
+                messages.add_message(request, messages.WARNING, w_msg)
+
             for e_msg in vts.error_messages:
                 messages.add_message(request, messages.ERROR, e_msg)
 
@@ -420,11 +425,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
     modified_normalised_variants = variant.modifiedimportedvariant_set.all().filter(old_variant__isnull=False)
     modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
-
-    if annotation_version and not vts:
-        status_info = annotation_version.variant_annotation_version.get_annotation_status_info_for_variant(variant)
-        msg = "Variant has not yet been annotated. Last status was '%s' (%s ago)" % status_info
-        messages.add_message(request, messages.WARNING, msg)
 
     try:
         va = variant.variantallele

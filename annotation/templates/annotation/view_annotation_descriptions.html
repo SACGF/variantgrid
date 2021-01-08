@@ -28,10 +28,6 @@
             min-width: 250px;
         }
 
-        .vep-source-field {
-            display: none;
-        }
-
         .vep-category {
             color: #fff;
             border-radius: 5px;
@@ -92,18 +88,6 @@
         .vep-category-V {
         }
     </style>
-    <script>
-        $(document).ready(() => {
-            fixLinks();
-            $("#show-vep").change(function () {
-                if ($(this).is(":checked")) {
-                    $(".vep-source-field").show();
-                } else {
-                    $(".vep-source-field").hide();
-                }
-            });
-        });
-    </script>
 {% endblock head %}
 {% block content %}
     <div class="container">
@@ -124,41 +108,47 @@
             </div>
             <!-- Hardcode Sample level special fields -->
             <div class="card-body">
-                {% labelled label="Sample Zygosity" %}Zygosity call (HET/HOM_ALT/REF or Unknown){% endlabelled %}
+                <table class='annotations-table table'>
+                    <tr>
+                        <th>Sample Zygosity</th>
+                        <td>Zygosity call (HET/HOM_ALT/REF or Unknown)</td>
+                    </tr>
+                    <tr>
+                        <th>AD (Allele Depth)</th>
+                        <td>
+                            Unfiltered allele depth, the number of reads that support each of the reported alleles. All reads at the position
+                            (including reads that did not pass the variant caller’s filters) are included in this number, except reads that were
+                            considered uninformative. Reads are considered uninformative when they do not provide enough statistical evidence
+                            to support one allele over another.
+                        </td>
+                    </tr>
 
-                {% labelled label="AD (Allele Depth)" %}
-                    Unfiltered allele depth, the number of reads that support each of the reported alleles. All reads at the position
-                    (including reads that did not pass the variant caller’s filters) are included in this number, except reads that were
-                    considered uninformative. Reads are considered uninformative when they do not provide enough statistical evidence
-                    to support one allele over another.
-                {% endlabelled %}
+                    <tr>
+                        <th>AF (Allele Frequency)</th>
+                        <td>Calculated for each allele as <code>100.0 * AD / (sum of all AD for that locus)</code></td>
+                    </tr>
 
-                {% labelled label="AF (Allele Frequency)" %}
-                Calculated for each allele as <code>100.0 * AD / (sum of all AD for that locus)</code>
-                {% endlabelled %}
+                    <tr>
+                        <th>DP (Depth)</th>
+                        <td>
+                            Filtered depth, at the sample level. This gives you the number of filtered reads that support each of the reported alleles.
+                            You can check the variant caller’s documentation to see which filters are applied by default. Only reads that passed the variant
+                            caller’s filters are included in this number. However, unlike the AD calculation, uninformative reads are included in DP.
+                        </td>
+                    </tr>
 
-                {% labelled label="DP (Depth)" %}
-                    Filtered depth, at the sample level. This gives you the number of filtered reads that support each of the reported alleles.
-                    You can check the variant caller’s documentation to see which filters are applied by default. Only reads that passed the variant
-                    caller’s filters are included in this number. However, unlike the AD calculation, uninformative reads are included in DP.</span>
-                {% endlabelled %}
+                    <tr>
+                        <th>GQ (Genotype Quality)</th>
+                        <td>
+                            Genotype Quality, the Phred-scaled marginal (or unconditional) probability of the called genotype.
+                        </td>
+                    </tr>
 
-                {% labelled label="GQ (Genotype Quality)" %}
-                    Genotype Quality, the Phred-scaled marginal (or unconditional) probability of the called genotype.
-                {% endlabelled %}
-
-                {% labelled label="PL (Phred Likelihood)" %}
-                    Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification
-                {% endlabelled %}
-
-        {% comment %}
-            {% for v in variantgrid_columns_by_annotation_level.S %}
-                <tr class='annotation-row'>
-                    <th>{{ v.pk }}
-                    <td>{{ v.description | safe }}
-                </tr>
-            {% endfor %}
-        {% endcomment %}
+                    <tr>
+                        <th>PL (Phred Likelihood)</th>
+                        <td>Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification</td>
+                    </tr>
+                </table>
             </div>
         </div>
 
@@ -168,19 +158,14 @@
                 <div class="annotation-level-title"><b>Database</b> Internal database stats</div>
             </div>
             <div class="card-body">
+                <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.D %}
-                    {% labelled label=v.pk %}{{ v.description }}{% endlabelled %}
+                    <tr>
+                        <th>{{ v.pk }}</th>
+                        <td>{{ v.description | safe }}</td>
+                    </tr>
                 {% endfor %}
-            </div>
-        </div>
-
-        <div class="card mt-4">
-            <div class="card-header"><h5>Settings</h5></div>
-            <div class="card-body">
-                {% labelled label="" %}
-                    <input id='show-vep' type='checkbox' class="form-check-input">
-                    <label for="show-vep" class="form-check-label">Show Ensembl Variant Effect Predictor source fields</label>
-                {% endlabelled %}
+                </table>
             </div>
         </div>
 
@@ -292,9 +277,14 @@
                 <div class="annotation-level-title"><b>ClinVar</b> Clinical Variants from <a class="hover-link" target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/intro/">NCBI</a></div>
             </div>
             <div class="card-body">
+                <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.C %}
-                    {% labelled label=v.pk %}{{ v.description | safe }}{% endlabelled %}
+                    <tr>
+                        <th>{{ v.pk }}</th>
+                        <td>{{ v.description | safe }}</td>
+                    </tr>
                 {% endfor %}
+                </table>
             </div>
         </div>
 
@@ -304,8 +294,12 @@
                 <div class="annotation-level-title"><b>Gene Level</b> Per-gene information, matched via gene associated with variant's assigned ensembl_transcript_id</div>
             </div>
             <div class="card-body">
+                <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.G %}
-                    {% labelled label=v.pk %}{{ v.description | safe }}{% endlabelled %}
+                    <tr>
+                        <th>{{ v.pk }}</th>
+                        <td>{{ v.description | safe }}</td>
+                    </tr>
                 {% endfor %}
             </div>
         </div>

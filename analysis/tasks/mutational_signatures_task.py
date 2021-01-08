@@ -52,7 +52,7 @@ def calculate_mutational_signature(sample_id):
 
     labels = ms.get_mutation_type_labels()
     counts = ms.ObservedRawFrequency
-    for (mutation_type, count) in zip(labels, counts):
+    for mutation_type, count in zip(labels, counts):
         MutationalSignatureMutationCount.objects.create(mutational_signature=mutational_signature,
                                                         mutation_type=mutation_type,
                                                         count=count)
@@ -90,7 +90,7 @@ def get_raw_mut_index_list_for_sample(fasta_reference, mut_index, sample):
 
         start_ = position - 1
         end_ = position + 1
-        context = fasta_reference[chrom][start_ - 1:end_]
+        context = fasta_reference[chrom][start_ - 1:end_].upper()
         mutkey = f"{context}_{alt}"
         if mutkey not in mut_index:
             invkey = invert_muttype(mutkey)
