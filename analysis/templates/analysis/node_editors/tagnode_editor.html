@@ -157,10 +157,6 @@
     Classify variants tagged with 
     <span class="tagged-{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}"><span class="user-tag-colored">{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}</span></span>:
 
-    {% if lab %}
-        <p>Classfiying using Lab: {{ lab }}</p>
-    {% endif %}
-
     {% labelled label="For lab" %}
         {% if lab %}{{ lab.name }}{% endif %}
         {% if lab_error %}
