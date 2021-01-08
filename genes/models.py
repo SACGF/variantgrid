@@ -1376,12 +1376,59 @@ class GnomADGeneConstraint(models.Model):
     oe_lof_upper = models.FloatField(null=True)
     # There are dozens of other fields we could add...
 
+    GNOMAD_BASE_URL = "https://gnomad.broadinstitute.org"
+
+    @property
+    def transcript_url(self):
+        return f"{self.GNOMAD_BASE_URL}/transcript/{self.transcript_id}"
+
+    @property
+    def gene_url(self):
+        return f"{self.GNOMAD_BASE_URL}/gene/{self.gene_id}"
+
+    @property
+    def gene_symbol_url(self):
+        return f"{self.GNOMAD_BASE_URL}/gene/{self.gene_symbol_id}"
+
     @property
     def oe_lof_summary(self):
         summary = "n/a"
         if self.oe_lof is not None:
             summary = f"{self.oe_lof} ({self.oe_lof_lower} - {self.oe_lof_upper})"
         return summary
+
+    @staticmethod
+    def get_for_transcript_version(transcript_version: TranscriptVersion) -> Optional['GnomADGeneConstraint']:
+        """ GnomADGeneConstraint uses Ensembl gene/transcripts - so load the most specific
+            possible (transcript, gene, then symbol) """
+        return GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(transcript_version)[0]
+
+    @staticmethod
+    def get_for_transcript_version_with_method_and_url(transcript_version: TranscriptVersion) \
+            -> Tuple[Optional['GnomADGeneConstraint'], Optional[str], Optional[str]]:
+        """ GnomADGeneConstraint uses Ensembl gene/transcripts - so load the most specific
+            possible (transcript, gene, then symbol) """
+        ggc = None
+        method = None
+        url = None
+        qs = GnomADGeneConstraint.objects.all()
+        if transcript_version.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
+            # May be able to get via transcript or gene
+            if ggc := qs.filter(transcript=transcript_version.transcript).first():
+                url = ggc.transcript_url
+                method = "transcript"
+
+            if ggc is None:
+                if ggc := qs.filter(gene=transcript_version.gene).first():
+                    url = ggc.gene_url
+                    method = "gene"
+
+        if ggc is None:
+            if ggc := qs.filter(gene_symbol=transcript_version.gene_version.gene_symbol).first():
+                url = ggc.gene_symbol_url
+                method = "gene symbol"
+        return ggc, method, url
+
 
 
 class ProteinDomain(models.Model):

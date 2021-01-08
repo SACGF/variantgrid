@@ -21,7 +21,7 @@
         <div>
             <ul class='list-group'>
                 {% for dvg in gene_symbol.genediseasevalidity_set.all %}
-                    <a href='{{ dvg.disease_validity.validity_summary_url }}' class="list-group-item list-grou-action">
+                    <a href='{{ dvg.disease_validity.validity_summary_url }}' class="list-group-item list-group-action">
                         <b>{{ dvg.disease_validity.mondo.name }}</b> {% if dvg.disease_validity.mondo.description %}({{ dvg.disease_validity.mondo.description }}){% endif %} - {{ dvg.disease_validity.get_classification_display }}. ({{ dvg.disease_validity.sop }}, {{ dvg.disease_validity.date }})
                     </a>
                 {% endfor %}
