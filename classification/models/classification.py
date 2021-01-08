@@ -20,7 +20,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
 import logging
 import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
@@ -36,8 +36,7 @@ from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
-from classification.enums import ClinicalSignificance, \
-    SubmissionSource, ShareLevel, SpecialEKeys, \
+from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
     CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
 from classification.models.best_hgvs import BestHGVS
 from classification.models.evidence_key import EvidenceKeyValueType, \

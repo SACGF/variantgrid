@@ -194,9 +194,9 @@ def create_classification(request):
         sample = None
 
     classification = create_classification_for_sample_and_variant_objects(request.user, sample,
-                                                                                          variant, genome_build,
-                                                                                          refseq_transcript_accession=refseq_transcript_accession,
-                                                                                          ensembl_transcript_accession=ensembl_transcript_accession)
+                                                                          variant, genome_build,
+                                                                          refseq_transcript_accession=refseq_transcript_accession,
+                                                                          ensembl_transcript_accession=ensembl_transcript_accession)
     if evidence_json:
         evidence = json.loads(evidence_json)
         classification.patch_value(
@@ -250,8 +250,8 @@ def view_classification(request, record_id):
     other_classifications_summary = ref.record.get_other_classifications_summary_for_variant(request.user)
 
     record = ref.as_json(ClassificationJsonParams(current_user=request.user,
-                                                         include_data=True,
-                                                         include_lab_config=True))
+                                                  include_data=True,
+                                                  include_lab_config=True))
 
     # default to the natural build of the classification
     genome_build = None
@@ -405,7 +405,7 @@ def classification_file_upload(request, classification_id):
         uploaded_file = upload_receive(request)
 
         vc_attachment = ClassificationAttachment(classification=classification,
-                                                        file=uploaded_file)
+                                                 file=uploaded_file)
         vc_attachment.save()
 
         file_dict = vc_attachment.get_file_dict()
