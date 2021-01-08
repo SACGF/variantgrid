@@ -76,7 +76,9 @@ where classification_classification.variant_id in (
 SELECT_TAGGED_SQL = """
 select string_agg(coalesce(analysis_varianttag.tag_id, 'U'), '|')
 from analysis_varianttag
-where analysis_varianttag.variant_id in (
+where
+analysis_varianttag.variant_id = snpdb_variant.id
+or analysis_varianttag.variant_id in (
     select snpdb_variantallele.variant_id
     from snpdb_variantallele
     where
