@@ -466,22 +466,8 @@ def get_literature(clinvar):
 
 
 def get_gnomad_oe_lof_summary(transcript_version: TranscriptVersion):
-    """ GnomADGeneConstraint uses Ensembl gene/transcripts - so load the most specific
-        possible (transcript, gene, then symbol) """
-    qs = GnomADGeneConstraint.objects.all()
-
-    ggc = None
-    if transcript_version.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
-        # May be able to get via transcript or gene
-        ggc = qs.filter(transcript=transcript_version.transcript).first()
-        if ggc is None:
-            ggc = qs.filter(gene=transcript_version.gene).first()
-
-    if ggc is None:  # Fall back on matching via symbol
-        ggc = qs.filter(gene_symbol=transcript_version.gene_version.gene_symbol).first()
-
     oe_lof_summary = None
-    if ggc:
+    if ggc := GnomADGeneConstraint.get_for_transcript_version(transcript_version):
         oe_lof_summary = ggc.oe_lof_summary
     return oe_lof_summary
 

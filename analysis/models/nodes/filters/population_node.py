@@ -41,7 +41,7 @@ class PopulationNode(AnalysisNode):
         return self.percent != self.EVERYTHING
 
     def modifies_parents(self):
-        return any([self.filtering_by_population, self.use_internal_counts])
+        return any([self.filtering_by_population, self.gnomad_hom_alt_max, self.use_internal_counts])
 
     def _get_node_q(self) -> Optional[Q]:
         and_q = []

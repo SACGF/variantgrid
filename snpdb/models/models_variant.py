@@ -161,13 +161,14 @@ class Allele(FlagsMixin, models.Model):
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
             other_allele.variantallele_set.update(allele=self, conversion_tool=conversion_tool)
 
+    @property
+    def build_names(self) -> str:
+        return ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
+
     def __str__(self):
         name = f"Allele {self.pk}"
         if self.clingen_allele:
             name += f" ({self.clingen_allele})"
-
-        builds = ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
-        name += f" ({builds})"
         return name
 
     def validate(self, liftover_complete=True):

@@ -8,7 +8,7 @@ from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
     InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion
+from genes.models import TranscriptVersion, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
 from library.log_utils import report_event
 from snpdb.models import Variant
@@ -18,6 +18,9 @@ from snpdb.models.models_genome import GenomeBuild
 class VariantTranscriptSelections:
     ENSEMBL_TRANSCRIPT = "ensembl_transcript_accession"
     GENE_SYMBOL = "gene_symbol"
+    GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY = "gnomad_gene_constraint_oe_lof_summary"
+    GNOMAD_GENE_CONSTRAINT_METHOD = "gnomad_gene_constraint_method"
+    GNOMAD_GENE_CONSTRAINT_URL = "gnomad_gene_constraint_url"
     REFSEQ_TRANSCRIPT = "refseq_transcript_accession"
     REPRESENTATIVE = "representative"
 
@@ -104,6 +107,13 @@ class VariantTranscriptSelections:
                 if transcript_id:
                     data["transcript_id"] = transcript_id
                     break
+
+            if obj.transcript_version:
+                ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
+                if ggc:
+                    data[self.GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY] = ggc.oe_lof_summary
+                    data[self.GNOMAD_GENE_CONSTRAINT_METHOD] = ggc_method
+                    data[self.GNOMAD_GENE_CONSTRAINT_URL] = ggc_url
 
             is_representative = bool(representative_transcript and representative_transcript == obj.transcript)
             data[self.REPRESENTATIVE] = is_representative

@@ -46,7 +46,8 @@ def analysis_node_versions(request, analysis_id):
 
 class NodeUpdate(NodeJSONPostView):
 
-    def _get_data(self, request, node_id, **kwargs):
+    def _get_data(self, request, *args, **kwargs):
+        node_id = kwargs["node_id"]
         op = request.POST["op"]
         params = json.loads(request.POST['params'])
         # Load subclass, need to use OO to handle adding/deleting and save
@@ -327,8 +328,8 @@ def create_classification_from_variant_tag(request, analysis_id, sample_id, vari
         genome_build = None
 
     classification = create_classification_for_sample_and_variant_objects(request.user, sample,
-                                                                                          variant_tag.variant,
-                                                                                          genome_build, **kwargs)
+                                                                          variant_tag.variant,
+                                                                          genome_build, **kwargs)
     AnalysisClassification.objects.create(analysis=analysis, classification=classification)
     data = {"classification_id": classification.pk}
     return JsonResponse(data)
