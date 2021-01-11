@@ -8,8 +8,6 @@ from typing import Union, Optional
 
 from django.utils.safestring import mark_safe
 
-from annotation.ontology_matching import OntologyMeta
-from genes.models import GeneSymbol
 from snpdb.models import VariantAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -321,10 +319,3 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
     context = dict(data)
     context['css'] = css
     return context
-
-
-# TODO should ontologyMetas just be converted to VCDbRefDicts to be rendered by the above?
-# this tag does provide name a bit more detail though
-@register.inclusion_tag("classification/tags/ontology_entry.html")
-def ontology(data: OntologyMeta):
-    return {"ontology": data}

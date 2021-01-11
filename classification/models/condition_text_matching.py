@@ -19,6 +19,7 @@ from classification.regexes import db_ref_regexes, DbRefRegex, DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
+from ontology.ontology_matching import OntologyMatching, normalize_condition_text
 from snpdb.models import Lab
 
 
@@ -38,10 +39,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     @staticmethod
     def normalize(text: str):
-        text = text.lower()
-        text = re.sub("[,;./]", " ", text)  # replace , ; . with spaces
-        text = re.sub("[ ]{2,}", " ", text)  # replace multiple spaces with
-        return text
+        return normalize_condition_text(text)
 
     def __str__(self):
         return self.normalized_text
@@ -63,7 +61,6 @@ class MultiCondition(models.TextChoices):
 class ResolvedCondition:
 
     def __init__(self):
-        from annotation.ontology_matching import OntologyMatching
         self.condition_multi_operation = MultiCondition.NOT_DECIDED
         self.condition_xrefs = OntologyMatching()
 

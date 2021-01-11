@@ -142,6 +142,29 @@
                     $('<a>', {text: `Siblings: ${onto.sibling_count}, Children: ${onto.children_count}`})
                 ]}).appendTo(description);
             }
+
+            let scoreDetail = $('<div>');
+            for (let score_part of onto.scores) {
+                let score = score_part.score.toFixed(0);
+                if (score_part.score > 0) {
+                    score = "+" + score;
+                }
+                let paddingCount = 3 - score.length;
+                for (let i=0; i < paddingCount; i++) {
+                    score = '&nbsp;' + score;
+                }
+
+                $('<div>', {class:'mt-2',
+                    html: [
+                        $('<span>', {class: 'text-monospace', html: score}),
+                        $('<span>', {text: " : " + score_part.description})
+                    ]
+                }).appendTo(scoreDetail);
+            }
+
+            let scoreCell = $('<td>', {class:'text-monospace text-right', 'data-toggle': 'popover', 'title': 'score', 'data-content': scoreDetail.prop('outerHTML')}).appendTo(row);
+            $('<div>', {text: onto.score.toFixed(0)}).appendTo(scoreCell);
+
             return row;
         }
 
@@ -156,21 +179,10 @@
         function renderOntologies(ontos) {
             ontos.sort((a, b) => {
                 let scoreOnto = (onto) => {
-                    let score = 0;
-                    if (onto.contexts["referenced"]) {
-                        score += 100;
-                    }
+                    let score = onto.score;
+                    // put the selected terms at the top regardless of score
                     if (onto.contexts["selected"]) {
                         score += 1000;
-                    }
-                    if (onto.contexts["PanelApp AU"]) {
-                        score += 3;
-                    }
-                    if (onto.contexts["Monarch"]) {
-                        score += 2;
-                    }
-                    if (onto.contexts["searched"]) {
-                        score += 1;
                     }
                     return score;
                 }
@@ -419,6 +431,7 @@
                                 <th class="term-cell">Term</th>
                                 <th class="relevance-cell">Relevance</th>
                                 <th>Description</th>
+                                <th>Score</th>
                             </tr>
                         </thead>
                         <tbody></tbody>

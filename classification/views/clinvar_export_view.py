@@ -8,7 +8,6 @@ from guardian.shortcuts import get_objects_for_user
 from gunicorn.config import User
 
 from annotation.models import MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology
-from annotation.ontology_matching import OntologyMatching, OntologyContextSimilarMatch
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, EvidenceKeyMap, MultiCondition, ConditionTextMatch
 from classification.regexes import db_ref_regexes

@@ -5,21 +5,29 @@ from django.db.models import PROTECT, CASCADE
 from model_utils.models import TimeStampedModel
 
 from genes.models import GeneSymbol
+from library.utils import Constant
 
 
 class OntologySet(models.TextChoices):
-    MONDO = "MONDO", "MONDO"
-    OMIM = "OMIM", "OMIM"
-    HPO = "HPO", "HPO"
+    MONDO = "MONDO"
+    OMIM = "OMIM"
+    HPO = "HPO"
+
+    EXPECTED_LENGTHS = Constant({
+        MONDO: 7,
+        OMIM: 6,
+        HPO: 7
+    })
+
+    URLS = Constant({
+        MONDO: "https://vm-monitor.monarchinitiative.org/disease/MONDO:${1}",
+        OMIM: "http://www.omim.org/entry/${1}",
+        HPO: "https://hpo.jax.org/app/browse/term/HP:${1}"
+    })
 
     @staticmethod
     def index_to_id(ontology_set: 'OntologySet', index: int):
-        EXPECTED_LENGTHS = {
-            OntologySet.MONDO: 7,
-            OntologySet.OMIM: 6,
-            OntologySet.HPO: 7
-        }
-        expected_length = EXPECTED_LENGTHS.get(ontology_set, 0)
+        expected_length = OntologySet.EXPECTED_LENGTHS.get(ontology_set, 0)
         num_part = str(index).rjust(expected_length, '0')
         return f"{ontology_set}:{num_part}"
 
@@ -39,6 +47,7 @@ class OntologyRelation(models.TextChoices):
 
 
 class OntologyImport(TimeStampedModel):
+    #TODO maybe work out better name than ontology_set
     ontology_set = models.CharField(max_length=5, choices=OntologySet.choices)
     filename = models.TextField()
     context = models.TextField()
@@ -64,6 +73,39 @@ class OntologyTerm(TimeStampedModel):
     class Meta:
         unique_together = ("ontology_set", "index")
 
+    @property
+    def is_stub(self):
+        return self._state.adding
+
+    @staticmethod
+    def get_or_stub(id_str: str) -> 'OntologyTerm':
+        parts = id_str.split(":")
+        if len(parts) != 2:
+            raise ValueError(f"Can not convert {id_str} to a proper id")
+
+        prefix = OntologySet(parts[0])
+        num_part = int(parts[1])
+        clean_id = OntologySet.index_to_id(prefix, num_part)
+
+        if existing := OntologyTerm.objects.filter(id=clean_id).first():
+            return existing
+
+        return OntologyTerm(
+            id=clean_id,
+            ontology_set=prefix,
+            index=num_part,
+            name="Not stored locally"
+        )
+
+    @property
+    def padded_index(self) -> str:
+        expected_length = OntologySet.EXPECTED_LENGTHS[self.ontology_set]
+        return str(self.index).rjust(expected_length, '0')
+
+    @property
+    def url(self):
+        return OntologySet.URLS[self.ontology_set].replace("${1}", self.padded_index)
+
 
 class OntologyTermRelation(TimeStampedModel):
     """
@@ -79,7 +121,7 @@ class OntologyTermRelation(TimeStampedModel):
 
     @staticmethod
     def parent_of(source_term: OntologyTerm) -> Optional[OntologyTerm]:
-        if relationship := OntologyTermRelation.objects.filter(source_term=source_term, relation="is_a").first():
+        if relationship := OntologyTermRelation.objects.filter(source_term=source_term, relation=OntologyRelation.IS_A).first():
             return relationship.dest_term
         return None
 
@@ -87,7 +129,17 @@ class OntologyTermRelation(TimeStampedModel):
     def mondo_version_of(term: OntologyTerm) -> Optional[OntologyTerm]:
         if term.ontology_set == OntologySet.MONDO:
             return term
-        if relationship := OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_set=OntologySet.MONDO).first():
+        # Mondo will always be the source term
+        if relationship := OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_set=OntologySet.MONDO, relation=OntologyRelation.EXACT).first():
+            return relationship.dest_term
+        return None
+
+    @staticmethod
+    def omim_version_of(term: OntologyTerm) -> Optional[OntologyTerm]:
+        if term.ontology_set == OntologySet.OMIM:
+            return term
+        # Mondo will always be the source term
+        if relationship := OntologyTermRelation.objects.filter(dest_term__ontology_set=OntologySet.OMIM, source_term=term, relation=OntologyRelation.EXACT).first():
             return relationship.dest_term
         return None
 

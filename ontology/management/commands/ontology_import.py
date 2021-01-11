@@ -17,6 +17,7 @@ ID_EXTRACT_P = re.compile(r"^.*\/([A-Z]+)_([0-9]+)$")
 HGNC_EXTRACT_P = re.compile(r"http://identifiers.org/hgnc/([0-9]+)")
 OMIM_URL_P = re.compile(r"http://identifiers.org/omim/([0-9]+)")
 GENE_SYMBOL_SEARCH = re.compile(r"([A-Z][A-Z,0-9]{2,})")
+OMIM_P = re.compile("OMIM:[0-9]+")
 
 GENE_RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004025": "disease causes dysfunction of",
@@ -172,6 +173,8 @@ def load_mondo(filename: str, force: bool):
     ontology_builder = OntologyBuilder(filename=filename, context="mondo_file", ontology_set=OntologySet.MONDO)
     if not force:
         ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    else:
+        ontology_builder.data_hash=file_hash
 
     print("This may take a few minutes")
     node_to_gene_symbol: [str, str] = dict()
@@ -209,6 +212,22 @@ def load_mondo(filename: str, force: bool):
                             #        set(GENE_SYMBOL_SEARCH.findall(defn)))
                             if synonyms := meta.get("synonyms"):
                                 extra["synonyms"] = synonyms
+                                for synonym in synonyms:
+                                    pred = synonym.get("pred")
+                                    if pred == "hasExactSynonym":
+                                        val = synonym.get("val")
+                                        for xref in synonym.get("xrefs", []):
+                                            if OMIM_P.match(xref):
+                                                ontology_builder.add_term(
+                                                    term_id=xref,
+                                                    name=val,
+                                                    stub=True
+                                                )
+                                                ontology_builder.add_ontology_relation(
+                                                    source_term_id=full_id,
+                                                    dest_term_id=xref,
+                                                    relation=OntologyRelation.EXACT
+                                                )
 
                             # for synonym in meta.get("synonyms", []):
                             #    synonym_value = synonym.get("val")
@@ -244,7 +263,12 @@ def load_mondo(filename: str, force: bool):
                         node_to_gene_symbol[node_id_full] = gene_symbol
 
         print("Reviewing edges")
+        count = 0
         for edge in graph.get("edges", []):
+            count += 1
+            if count % 1000 == 0:
+                print(f"Processing edge {count}")
+
             subject_id: str = edge.get("sub")
             obj_id: str = edge.get("obj")
             relationship = edge.get("pred")
@@ -272,6 +296,8 @@ def load_mondo(filename: str, force: bool):
     print(f"Records inserted: {ontology_builder.insert_count}")
     print(f"Records updated: {ontology_builder.update_count}")
     print(f"Records deleted: {ontology_builder.delete_count}")
+
+    print("Commiting...")
 
 
 class Command(BaseCommand):
