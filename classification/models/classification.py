@@ -845,7 +845,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    if not value.startswith("http"): # this makes beautiful soap angry thinking we're asking it to go to the URL
+                    if not value.startswith("http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
                         value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
@@ -1069,7 +1069,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence), evidence_keys=self.evidence_keys)  # make a deep copy so we don't accidentally mutate the data
-        patch = VCDataDict(data=EvidenceMixin.to_patch(patch), evidence_keys=self.evidence_keys) # the patch we're going to apply ontop of the evidence
+        patch = VCDataDict(data=EvidenceMixin.to_patch(patch), evidence_keys=self.evidence_keys)  # the patch we're going to apply ontop of the evidence
 
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs

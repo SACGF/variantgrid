@@ -34,7 +34,6 @@ class AbstractTrioInheritance(ABC):
                                         proband_sample: True}  # 947 - Always require zygosity for Proband
         return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_require_zygosity_dict)
 
-
     @staticmethod
     def _zygosity_options(zyg: Set, allow_unknown=False):
         if allow_unknown:

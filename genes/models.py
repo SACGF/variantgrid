@@ -1430,7 +1430,6 @@ class GnomADGeneConstraint(models.Model):
         return ggc, method, url
 
 
-
 class ProteinDomain(models.Model):
     """ For custom domains, can be used to override PFam - used in TranscriptVersion.get_domains() """
     name = models.TextField(unique=True)
