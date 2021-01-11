@@ -26,8 +26,7 @@ urlpatterns = [
     perm_path('activity', views.activity, name='activity'),
     perm_path('activity/<str:latest_timestamp>', views.activity, name='activity_dated'),
     perm_path('classifications', views.classifications, name='classifications'),
-    perm_path('create_for_variant/<int:variant_id>', views.create_classification_for_variant, name='create_classification_for_variant'),
-    perm_path('create_for_variant_and_transcript/<int:variant_id>/<transcript_id>', views.create_classification_for_variant, name='create_classification_for_variant_and_transcript'),
+    perm_path('create_for_variant/<int:variant_id>', views.CreateClassificationForVariantView.as_view(), name='create_classification_for_variant'),
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),

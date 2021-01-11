@@ -70,6 +70,8 @@ class TagNode(AnalysisNode):
 
 
 class VariantTag(TimeStampedModel):
+    """ A tag in an analysis. Has create create/delete signal handlers:
+        @see analysis.signals.signal_handlers._update_analysis_on_variant_tag_change """
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)

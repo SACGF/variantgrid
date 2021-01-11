@@ -185,7 +185,7 @@
     <a class="hover-link my-2" href="{% url 'view_variant' variant.pk %}">Back to variant page for {{ variant }}.</a>
     {% page_help 'classification/create_classification_for_variant_help' 'Transcript Choice' %}
 
-    <form action="{% url 'create_classification' %}" class="classification-form" method="POST">
+    <form action="{{ form_post_url }}" class="classification-form" method="POST">
         {% csrf_token %}
         <input type='hidden' class='auto-pop-field' id='variant_id' name="variant_id" value="{{ variant.pk }}" />
         <input type='hidden' class='auto-pop-field' id='genome_build_name' name="genome_build_name" value="{{ variant.genome_build.pk }}" />
@@ -200,6 +200,9 @@
                 <div class='value select-transcript-container'>
                 {% variant_transcript_select transcript_select_jquery='#select-transcript-container' vts=vts transcript_func='transcriptFunc' empty_transcript_option="None/other transcript (set in classification form)" %}
                 </div>
+
+                {% block classification_form_extra_content %}
+                {% endblock %}
 
                 {% labelled label="Sample" %}
                     <div class='value'>

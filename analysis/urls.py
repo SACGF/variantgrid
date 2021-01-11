@@ -63,8 +63,11 @@ urlpatterns = [
     perm_path('column_summary_boxplot/<int:node_id>/<label>/<slug:variant_column>/', views.column_summary_boxplot, name='column_summary_boxplot'),
     perm_path('analysis/<int:analysis_id>/set_variant_tag/', views_json.set_variant_tag, name='set_variant_tag'),
     perm_path('set_variant_selected/<int:node_id>/', views_json.set_variant_selected, name='set_variant_selected'),
-    perm_path('create_classification_from_variant_tag/<int:analysis_id>/<int:sample_id>/<int:variant_tag_id>/<transcript_id>/', views_json.create_classification_from_variant_tag, name='create_classification_with_transcript_from_variant_tag'),
-    perm_path('create_classification_from_variant_tag/<int:analysis_id>/<int:sample_id>/<int:variant_tag_id>/', views_json.create_classification_from_variant_tag, name='create_classification_from_variant_tag'),
+
+    perm_path('classification/create_for_variant_tag/<int:variant_tag_id>', views.CreateClassificationForVariantTagView.as_view(),
+              name='create_classification_for_variant_tag'),
+    perm_path('create_classification_for_analysis/<int:analysis_id>',
+              views.create_classification_for_analysis, name='create_classification_for_analysis'),
 
     # Node Data (bottom right window)
     perm_path('node_data_grid/cfg/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_data_grid, name='node_data_grid'),

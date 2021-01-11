@@ -22,18 +22,20 @@ import inspect
 import logging
 
 from htmlmin.decorators import not_minified_response
+from lazy import lazy
 
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
 from analysis.exceptions import NonFatalNodeError
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, AnalysisChoiceForm
+from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, AnalysisChoiceForm, \
+    InputSamplesForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
     AnalysisTemplateRun, AnalysisLock, Analysis
 from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
 from analysis.models.mutational_signatures import MutationalSignature
-from analysis.models.nodes.analysis_node import NodeVCFFilter
+from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import NodeHelp
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
@@ -42,6 +44,7 @@ from analysis.views.analysis_permissions import get_analysis_or_404, get_node_su
     get_node_subclass_or_non_fatal_exception
 from analysis.views.nodes.node_view import NodeView
 from annotation.models.models import MutationalSignatureInfo
+from classification.views.views import create_classification_object, CreateClassificationForVariantView
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.database_utils import run_sql
@@ -797,3 +800,49 @@ def view_mutational_signature(request, pk):
                "mutation_type_counts": mutation_type_counts,
                "sorted_data": sorted_data}
     return render(request, 'analysis/view_mutational_signature.html', context)
+
+
+class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
+    template_name = "analysis/create_classification_for_variant_tag.html"
+
+    def _get_variant(self):
+        return self.variant_tag.variant
+
+    def _get_form_post_url(self) -> str:
+        return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis.pk})
+
+    def _get_sample_form(self):
+        # If we have a node with input samples, use that. Otherwise fall back on default (all samples)
+        form = None
+        if self.variant_tag.node:
+            if samples := list(self.variant_tag.node.get_samples()):
+                form = InputSamplesForm(samples=samples)
+                form.fields['sample'].required = False
+
+        if form is None:
+            form = super()._get_sample_form()
+        return form
+
+    @lazy
+    def variant_tag(self):
+        variant_tag_id = self.kwargs["variant_tag_id"]
+        variant_tag = get_object_or_404(VariantTag, pk=variant_tag_id)
+        variant_tag.analysis.check_can_view(self.request.user)
+        return variant_tag
+
+    def get_context_data(self, *args, **kwargs):
+        context = super().get_context_data(*args, **kwargs)
+        context["variant_tag"] = self.variant_tag
+        return context
+
+
+@require_POST
+def create_classification_for_analysis(request, analysis_id):
+    classification = create_classification_object(request)
+    analysis = Analysis.get_for_user(request.user, pk=analysis_id, write=True)
+    AnalysisClassification.objects.create(analysis=analysis, classification=classification)
+
+    # Remove "Requires classification" tag
+    VariantTag.objects.filter(variant=classification.variant, analysis=analysis,
+                              tag_id=settings.TAG_REQUIRES_CLASSIFICATION).delete()
+    return redirect(classification)

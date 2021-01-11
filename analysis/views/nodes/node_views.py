@@ -4,8 +4,9 @@ import json
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
-    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TissueNodeForm, TrioNodeForm, \
+    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
     VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm
+from analysis.models import TagNode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -239,6 +240,11 @@ class PopulationNodeView(NodeView):
 class SelectedInParentNodeView(NodeView):
     model = SelectedInParentNode
     form_class = SelectedInParentNodeForm
+
+
+class TagNodeView(NodeView):
+    model = TagNode
+    form_class = TagNodeForm
 
 
 class TissueNodeView(NodeView):
