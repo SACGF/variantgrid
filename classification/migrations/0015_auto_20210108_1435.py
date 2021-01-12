@@ -93,18 +93,22 @@ class Migration(migrations.Migration):
             },
             bases=(models.Model, library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin),
         ),
-        migrations.AlterUniqueTogether(
-            name='conditionalias',
-            unique_together=None,
-        ),
-        migrations.RemoveField(
-            model_name='conditionalias',
-            name='lab',
-        ),
-        migrations.RemoveField(
-            model_name='conditionalias',
-            name='updated_by',
-        ),
+
+        # we're going to delete the model anyway, not sure why these were all generated
+        
+        # migrations.AlterUniqueTogether(
+        #     name='conditionalias',
+        #     unique_together=None,
+        # ),
+        # migrations.RemoveField(
+        #     model_name='conditionalias',
+        #     name='lab',
+        # ),
+        # migrations.RemoveField(
+        #     model_name='conditionalias',
+        #     name='updated_by',
+        # ),
+
         migrations.DeleteModel(
             name='ConditionAliasSearchCache',
         ),
