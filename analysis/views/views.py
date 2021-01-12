@@ -838,16 +838,24 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(*args, **kwargs)
         context["variant_tag"] = self.variant_tag
+
+        if not self.variant_tag.analysis.can_write(self.request.user):
+            read_only_message = "You have read-only access to this analysis. You can create a classification but it " \
+                                f"will not be linked to the analysis and the {settings.TAG_REQUIRES_CLASSIFICATION} " \
+                                f"tag will not be deleted."
+            messages.add_message(self.request, messages.WARNING, read_only_message)
         return context
 
 
 @require_POST
 def create_classification_for_analysis(request, analysis_id):
     classification = create_classification_object(request)
-    analysis = Analysis.get_for_user(request.user, pk=analysis_id, write=True)
-    AnalysisClassification.objects.create(analysis=analysis, classification=classification)
+    analysis = Analysis.get_for_user(request.user, pk=analysis_id)
 
-    # Remove "Requires classification" tag
-    VariantTag.objects.filter(variant=classification.variant, analysis=analysis,
-                              tag_id=settings.TAG_REQUIRES_CLASSIFICATION).delete()
+    if analysis.can_write(request.user):
+        AnalysisClassification.objects.create(analysis=analysis, classification=classification)
+
+        # Remove "Requires classification" tag
+        VariantTag.objects.filter(variant=classification.variant, analysis=analysis,
+                                  tag_id=settings.TAG_REQUIRES_CLASSIFICATION).delete()
     return redirect(classification)
