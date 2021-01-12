@@ -33,6 +33,12 @@ MATCH_TYPES = {
     "http://www.w3.org/2004/02/skos/core#narrowMatch": OntologyRelation.NARROW
 }
 
+"""
+TODO - this runs pretty slow (due to many redundant update_or_create) calls.
+Rework it so we can keep a cache of everything already updated or created this run
+
+"""
+
 @transaction.atomic
 def load_mondo(filename: str, force: bool):
 
