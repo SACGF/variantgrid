@@ -1,8 +1,22 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
-{% load ui_utils %}
+{% load classification_tags %}
+{% load datatable_tags %}
+{% load js_tags %}
 {% load settings_tags %}
+{% load tz %}
+{% load ui_utils %}
+{% block node_editor_not_visible_tab_links %}
+    <li><a href="#tag-classification">Classifications</a></li>
+{% endblock node_editor_not_visible_tab_links %}
 
-{% block docreadyjs %}
+{% block content %}
+<script>
+function classificationFilter(data, type) {
+    data.analysis_id = "{{ node.analysis_id }}";
+    // Object.assign(data, geneClassificationsGridParams);
+}
+
+$(document).ready(function() {
     var tagNodeForm = $("form#tag-node-form");
     ajaxForm(tagNodeForm);
 	var tagSelect = $("select#id_tag");
@@ -14,16 +28,23 @@
 		}
 	});
 
-    // $("#node-editor-tabs").tabs({"disabled" : [1]});
+    {%  if not requires_classification_tags %}
+        {% if not node.analysis.analysisclassification_set.exists %}
+            $("#node-editor-tabs").tabs({"disabled" : [1]});
+        {% endif %}
+    {% endif %}
 
-{% endblock docreadyjs %}
+    EKeys.load().then(() => {
+        {% datatable_definition table_config=datatable_config table_id='tag-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
+        let vcDatatable = $('#tag-datatable');
+        vcDatatable.on('draw.dt', () => {
+            Flags.instance.init({userId: '{{user.id}}'});
+        });
+    });
 
-{% block node_editor_not_visible_tab_links %}
-    <li><a href="#tag-classification">Classifications</a></li>
-{% endblock node_editor_not_visible_tab_links %}
 
-
-{% block content %}
+});
+</script>
 <div>
 	<form id="tag-node-form" method="post" action="{{ request.path }}">
         {% csrf_token %}
@@ -51,15 +72,34 @@
 {% block node_editor_not_visible_tab %}
 <div id='tag-classification'>
 
-    <p>
-    Classify variants tagged with
-    <span class="tagged-{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}"><span class="user-tag-colored">{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}</span></span>:
-    </p>
+    {% if requires_classification_tags %}
+        <p>
+        Classify variants tagged with
+        <span class="tagged-{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}"><span class="user-tag-colored">{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}</span></span>:
+        </p>
 
-    TODO: List classifications with a create classification from tag button
+        <table class="table">
+            <tr><th>Classify</th><th>Variant</th><th>Gene</th><th>Username</th><th>Date</th>
+
+        {% for vt in requires_classification_tags %}
+            <tr>
+                <td>
+                    <a target="_blank" class="btn btn-primary" href="{% url 'create_classification_for_variant_tag' vt.pk %}">
+                        <i class="fas fa-plus-circle"></i> New Classification
+                    </a>
+                </td>
+                <td>{{ vt.variant.canonical_c_hgvs }}</td>
+                <td>{{ vt.variant.canonical_transcript_annotation.transcript_version.gene_version.gene_symbol }}</td>
+                <td>{{ vt.user }}</td>
+                <td>{{ vt.created | localtime }}</td>
+            </tr>
+        {% endfor %}
+        </table>
+    {% endif %}
 
     {% if node.analysis.analysisclassification_set.exists %}
-        Classifications exist for this analysis! TODO: display data grid
+        <h3>Classifications for this analysis</h3>
+        {% datatable datatable_config 'tag-datatable' class_name='classification-table' %}
     {% endif %}
 
 </div>

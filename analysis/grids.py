@@ -411,7 +411,7 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
         before_colmodels = [{'index': 'variant_string',
                              'name': 'variant_string',
                              'label': 'Variant',
-                             'formatter': 'formatVariantString'}]
+                             'formatter': 'formatVariantTagFirstColumn'}]
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         return before_colmodels + colmodels
 

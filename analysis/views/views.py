@@ -812,14 +812,19 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
         return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis.pk})
 
     def _get_sample_form(self):
-        # If we have a node with input samples, use that. Otherwise fall back on default (all samples)
-        form = None
+        # If we have a node with input samples, use that. Then fall back on all samples in analysis.
+        # Otherwise fall back on default (all samples in DB visible to user)
+        samples = None
         if self.variant_tag.node:
-            if samples := list(self.variant_tag.node.get_samples()):
-                form = InputSamplesForm(samples=samples)
-                form.fields['sample'].required = False
+            samples = self.variant_tag.node.get_subclass().get_samples()
 
-        if form is None:
+        if not samples:
+            samples = self.variant_tag.analysis.get_samples()
+
+        if samples:
+            form = InputSamplesForm(samples=samples)
+            form.fields['sample'].required = False
+        else:
             form = super()._get_sample_form()
         return form
 
