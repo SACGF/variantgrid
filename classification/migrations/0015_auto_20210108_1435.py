@@ -92,27 +92,5 @@ class Migration(migrations.Migration):
                 'unique_together': {('condition_text', 'gene_symbol', 'mode_of_inheritance', 'classification')},
             },
             bases=(models.Model, library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin),
-        ),
-
-        # we're going to delete the model anyway, not sure why these were all generated
-        
-        # migrations.AlterUniqueTogether(
-        #     name='conditionalias',
-        #     unique_together=None,
-        # ),
-        # migrations.RemoveField(
-        #     model_name='conditionalias',
-        #     name='lab',
-        # ),
-        # migrations.RemoveField(
-        #     model_name='conditionalias',
-        #     name='updated_by',
-        # ),
-
-        migrations.DeleteModel(
-            name='ConditionAliasSearchCache',
-        ),
-        migrations.DeleteModel(
-            name='ConditionAlias',
-        ),
+        )
     ]
