@@ -149,7 +149,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
         AbstractNodeCountSettings.save_count_configs_from_array(record_set, node_counts_array)
 
-    def get_samples(self) -> Sequence[Sample]:
+    def get_samples(self) -> List[Sample]:
         samples = set()
         for node in self.analysisnode_set.filter(analysisnode_parent__isnull=True).select_subclasses():
             samples.update(node.get_samples_from_node_only_not_ancestors())

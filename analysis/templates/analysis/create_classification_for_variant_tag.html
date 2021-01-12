@@ -1,0 +1,32 @@
+{% extends "classification/create_classification_for_variant.html" %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load user_tag_color_tags %}
+{% block classification_form_extra_content %}
+    {% render_tag_styles_and_formatter %}
+    {% labelled label="Variant Tag" %}
+        <div>
+            <table id='tags-table' class="table">
+                <thead>
+                    <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th>
+                </thead>
+                <tr>
+                    <td><span class='grid-tag tagged-{{ variant_tag.tag }}' title='Tagged as {{ variant_tag.tag }}' tag_id='{{ variant_tag.tag }}'><span class='user-tag-colored'>{{ variant_tag.tag }}</span></span></td>
+                    <td>
+                        {% if variant_tag.node %}
+                            <a class='hover-link' target="_blank" href="{% url 'analysis_node' variant_tag.analysis.pk variant_tag.node.pk %}">{{ variant_tag.analysis }}</a>
+                        {% else %}
+                            <a class='hover-link' target="_blank" href="{% url 'analysis' variant_tag.analysis.pk %}">{{ variant_tag.analysis }}</a>
+                        {% endif %}
+                    </td>
+                    <td>{{ variant_tag.user }}</td>
+                    <td>{% timestamp variant_tag.created %}</td>
+                </tr>
+            </table>
+
+            Classifying variant tag above. Samples below are from the analysis node the tag was created in.
+        </div>
+
+    {% endlabelled %}
+
+{% endblock %}

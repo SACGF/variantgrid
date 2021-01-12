@@ -179,29 +179,16 @@ def set_variant_tag(request, analysis_id):
     tag_id = request.POST['tag_id']
     op = request.POST['op']
 
-    dirty_tags = set()
     tag = get_object_or_404(Tag, pk=tag_id)
     if op == 'add':
         variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
                                                                 analysis=analysis, user=request.user)
         variant_tag.node_id = node_id
         variant_tag.save()
-        if created:
-            dirty_tags.add(tag_id)
     elif op == 'del':
         # Deletion of tags is for analysis (all users)
         VariantTag.objects.filter(variant_id=variant_id, analysis=analysis, tag=tag).delete()
-        dirty_tags.add(tag_id)
 
-    # Bump versions so cache will expire
-    if dirty_tags:
-        tag_filter = Q(tag__isnull=True) | Q(tag__in=dirty_tags)
-        # TagNode doesn't have any output, so no need to check children
-        for node in TagNode.objects.filter(analysis=analysis).filter(tag_filter):
-            node.queryset_dirty = True
-            node.save()
-
-    update_nodes(analysis.pk)
     return JsonResponse({})
 
 
@@ -307,32 +294,6 @@ def nodes_status(request, analysis_id):
         data["counts"] = get_node_counts(node_id, version, data["count"])
         node_status_list.append(data)
     return JsonResponse({"node_status": node_status_list})
-
-
-def create_classification_from_variant_tag(request, analysis_id, sample_id, variant_tag_id, transcript_id=None):
-    """ Created from a 'RequiresClassification' VariantTag """
-    analysis = get_analysis_or_404(request.user, analysis_id)
-    sample = Sample.get_for_user(request.user, sample_id)
-    variant_tag = get_object_or_404(VariantTag, pk=variant_tag_id, analysis_id=analysis_id)
-
-    kwargs = {"annotation_version": analysis.annotation_version}
-    # Put transcript_id into either refseq/ensembl kwargs
-    if transcript_id:
-        genome_build = analysis.annotation_version.genome_build
-        transcript_version = TranscriptVersion.filter_by_accession(transcript_id, genome_build=genome_build).first()
-        if transcript_version.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
-            kwargs["refseq_transcript_accession"] = transcript_version.accession
-        elif transcript_version.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
-            kwargs["ensembl_transcript_accession"] = transcript_version.accession
-    else:
-        genome_build = None
-
-    classification = create_classification_for_sample_and_variant_objects(request.user, sample,
-                                                                          variant_tag.variant,
-                                                                          genome_build, **kwargs)
-    AnalysisClassification.objects.create(analysis=analysis, classification=classification)
-    data = {"classification_id": classification.pk}
-    return JsonResponse(data)
 
 
 @require_POST

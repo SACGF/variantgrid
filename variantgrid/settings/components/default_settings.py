@@ -565,7 +565,7 @@ INSTALLED_APPS = [
     #    'debug_toolbar',
     #    'debug_panel',
     # Internal apps
-    'analysis',
+    'analysis.apps.AnalysisConfig',
     'annotation.apps.AnnotationConfig',
     'ontology',
     'eventlog',

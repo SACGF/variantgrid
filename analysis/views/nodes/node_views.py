@@ -1,11 +1,13 @@
+from django.conf import settings
 from django.http.response import HttpResponse
 import json
 
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
-    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TissueNodeForm, TrioNodeForm, \
+    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
     VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm
+from analysis.models import TagNode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -27,6 +29,7 @@ from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
 from annotation.models import MIMMorbidAlias, HPOSynonym
+from classification.views.classification_datatables import ClassificationDatatableConfig
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
 from snpdb.models.models_variant import Variant
@@ -240,6 +243,16 @@ class SelectedInParentNodeView(NodeView):
     model = SelectedInParentNode
     form_class = SelectedInParentNodeForm
 
+
+class TagNodeView(NodeView):
+    model = TagNode
+    form_class = TagNodeForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["datatable_config"] = ClassificationDatatableConfig(self.request)
+        context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(tag=settings.TAG_REQUIRES_CLASSIFICATION)
+        return context
 
 class TissueNodeView(NodeView):
     model = TissueNode

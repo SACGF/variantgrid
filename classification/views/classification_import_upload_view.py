@@ -1,4 +1,3 @@
-
 import os
 
 from django.contrib.auth.models import User
@@ -7,7 +6,7 @@ from django.shortcuts import render
 from django.views import View
 
 from library.log_utils import report_event
-from snpdb.models import UserSettings, Lab
+from snpdb.models import Lab
 
 
 class FileUploadView(View):
