@@ -7,7 +7,7 @@ from lazy import lazy
 from model_utils.models import now
 
 from genes.models import GeneSymbol
-from ontology.models import OntologyTermRelation, OntologyTermGeneRelation, OntologyTerm, OntologyImport, OntologySet
+from ontology.models import OntologyTermRelation, OntologyTermGeneRelation, OntologyTerm, OntologyImport, OntologyService
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -26,12 +26,12 @@ class OntologyBuilder:
         NO_UPDATE_REQUIRED = 0
         UPDATE_REQUIRED = 1
 
-    def __init__(self, filename: str, context: str, ontology_set: OntologySet):
+    def __init__(self, filename: str, context: str, ontology_service: OntologyService):
         self.filename = filename.split("/")[-1]
-        self.ontology_set = ontology_set
+        self.ontology_service = ontology_service
         self.context = context
         self.data_hash = None
-        self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(ontology_set=ontology_set, context=context, completed=True).order_by('-modified').first()
+        self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(ontology_service=ontology_service, context=context, completed=True).order_by('-modified').first()
         self.insert_count = 0
         self.update_count = 0
         self.delete_count = 0
@@ -58,7 +58,7 @@ class OntologyBuilder:
         """
         if purge_old:
             for model in [OntologyTermGeneRelation, OntologyTermRelation, OntologyTerm]:
-                olds = model.objects.filter(from_import__context=self.context, from_import__ontology_set=self.ontology_set).exclude(from_import=self._ontology_import)
+                olds = model.objects.filter(from_import__context=self.context, from_import__ontology_service=self.ontology_service).exclude(from_import=self._ontology_import)
                 for old in olds[0:3]:
                     print(f"This appears old {old}")
 
@@ -71,7 +71,7 @@ class OntologyBuilder:
 
     @lazy
     def _ontology_import(self) -> OntologyImport:
-        return OntologyImport.objects.create(ontology_set=self.ontology_set, context=self.context, filename=self.filename, processed_date=now, hash=self.data_hash)
+        return OntologyImport.objects.create(ontology_service=self.ontology_service, context=self.context, filename=self.filename, processed_date=now, hash=self.data_hash)
 
     def _count(self, created: bool):
         if created:
@@ -84,7 +84,7 @@ class OntologyBuilder:
         if stub:
             if existing := OntologyTerm.objects.filter(id=term_id).first():
                 existing_import = existing.from_import
-                if existing_import.context != self.context or existing_import.ontology_set != self.ontology_set:
+                if existing_import.context != self.context or existing_import.ontology_service != self.ontology_service:
                     # record was imported by a different process, so leave it alone
                     # e.g. it was imported via an OMIM miport but we're just referencing a stub value
                     # now from a MONDO import.
@@ -95,11 +95,11 @@ class OntologyBuilder:
                     return existing
 
         parts = term_id.split(":")
-        ontology_set = parts[0]
+        ontology_service = parts[0]
         ontology_index = int(parts[1])
 
         defaults = {
-            "ontology_set": ontology_set,
+            "ontology_service": ontology_service,
             "index": ontology_index,
             "from_import": self._ontology_import
         }
@@ -142,7 +142,7 @@ class OntologyBuilder:
         return None
 
     def add_ontology_relation(self, source_term_id: str, dest_term_id: str, relation: str):
-        relation, created = OntologyTermRelation.objects.get_or_create(
+        relation, created = OntologyTermRelation.objects.update_or_create(
             source_term=self.add_term(term_id=source_term_id, stub=True),
             dest_term=self.add_term(term_id=dest_term_id, stub=True),
             relation=relation,

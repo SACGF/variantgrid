@@ -5,8 +5,13 @@ from django.core.management import BaseCommand
 from django.db import transaction
 
 from library.file_utils import file_md5sum
-from ontology.models import OntologySet, OntologyRelation
+from ontology.models import OntologyService, OntologyRelation
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
+
+"""
+MONDO import file can be found http://www.obofoundry.org/ontology/mondo.html
+Importing it will provide MONDO and OMIM terms
+"""
 
 ID_EXTRACT_P = re.compile(r"^.*\/([A-Z]+)_([0-9]+)$")
 HGNC_EXTRACT_P = re.compile(r"http://identifiers.org/hgnc/([0-9]+)")
@@ -37,7 +42,7 @@ def load_mondo(filename: str, force: bool):
 
     file_hash = file_md5sum(filename)
 
-    ontology_builder = OntologyBuilder(filename=filename, context="mondo_file", ontology_set=OntologySet.MONDO)
+    ontology_builder = OntologyBuilder(filename=filename, context="mondo_file", ontology_service=OntologyService.MONDO)
     if not force:
         ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     else:

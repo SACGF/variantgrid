@@ -8,7 +8,7 @@ import requests
 from django.db.models import Q
 from django.db.models.functions import Length
 
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologySet
+from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService
 from ontology.panel_app_ontology import get_or_fetch_gene_relations
 
 
@@ -308,7 +308,7 @@ class OntologyMatching:
                 # always convert to MONDO for now
                 mondo_term = relationship.term
                 mondo_meta = self.find_or_create(relationship.term_id)
-                if relationship.relation == OntologySet.PANEL_APP_AU:
+                if relationship.relation == OntologyService.PANEL_APP_AU:
                     mondo_meta.add_context(OntologyContextPanelApp(
                         gene_symbol=gene_symbol,
                         omim_id=relationship.term_id,
@@ -373,7 +373,7 @@ class OntologyMatching:
             # Client search
             # this currently requires all words to be present
             search_terms = set(tokenize_condition_text(search_text))
-            qs = OntologyTerm.objects.filter(ontology_set=OntologySet.MONDO)
+            qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
             qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
             qs = qs.order_by(Length('name')).values_list("id", flat=True)
             for result in qs[0:20]:

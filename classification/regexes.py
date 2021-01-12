@@ -8,7 +8,7 @@ from annotation.models.models import Citation
 from annotation.models.models_enums import CitationSource
 from library.log_utils import report_message
 from classification.external_database_ref_lookup import externalDatabaseRefLookupInstance
-from ontology.models import OntologySet
+from ontology.models import OntologyService
 
 
 class MatchType(Enum):
@@ -63,12 +63,12 @@ class DbRegexes:
     CLINVAR = DbRefRegex(db="Clinvar", prefixes="VariationID", link="https://www.ncbi.nlm.nih.gov/clinvar/variation/${1}")
     COSMIC = DbRefRegex(db="COSMIC", prefixes="COSM", link="https://cancer.sanger.ac.uk/cosmic/mutation/overview?id=${1}")
     GTR = DbRefRegex(db="GTR", prefixes="GTR", link="https://www.ncbi.nlm.nih.gov/gtr/tests/${1}/overview/")
-    HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link=OntologySet.URLS[OntologySet.HPO], expected_length=OntologySet.EXPECTED_LENGTHS[OntologySet.HPO])
+    HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link=OntologyService.URLS[OntologyService.HPO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HPO])
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
-    MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologySet.URLS[OntologySet.MONDO], expected_length=OntologySet.EXPECTED_LENGTHS[OntologySet.MONDO])
+    MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologyService.URLS[OntologyService.MONDO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.MONDO])
     NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
-    OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link=OntologySet.URLS[OntologySet.OMIM], expected_length=OntologySet.EXPECTED_LENGTHS[OntologySet.OMIM])
+    OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link=OntologyService.URLS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
     PMC = DbRefRegex(db="PMC", prefixes="PMCID", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}")
     PUBMED = DbRefRegex(db="PubMed", prefixes=["PubMed", "PMID", "PubMedCentral"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)

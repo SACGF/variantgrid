@@ -9,8 +9,14 @@ from model_utils.models import TimeStampedModel
 from genes.models import GeneSymbol
 from library.utils import Constant
 
+"""
+A series of models that currently stores the combination of MONDO and OMIM (with support for HPO if we add an importer to it).
+MONDO is given preferrential treatment (e.g. if there's an established relationship between an OMIM term and a gene symbol,
+the relationship is actually stored against the MONDO equivilant of the OMIM term).
+"""
 
-class OntologySet(models.TextChoices):
+
+class OntologyService(models.TextChoices):
     MONDO = "MONDO", "MONDO"
     OMIM = "OMIM", "OMIM"
     HPO = "HPO", "HPO"
@@ -28,10 +34,10 @@ class OntologySet(models.TextChoices):
     })
 
     @staticmethod
-    def index_to_id(ontology_set: 'OntologySet', index: int):
-        expected_length = OntologySet.EXPECTED_LENGTHS.get(ontology_set, 0)
+    def index_to_id(ontology_service: 'OntologyService', index: int):
+        expected_length = OntologyService.EXPECTED_LENGTHS.get(ontology_service, 0)
         num_part = str(index).rjust(expected_length, '0')
-        return f"{ontology_set}:{num_part}"
+        return f"{ontology_service}:{num_part}"
 
     PANEL_APP_AU = "PAAU", "PanelApp AU"
 
@@ -49,8 +55,7 @@ class OntologyRelation(models.TextChoices):
 
 
 class OntologyImport(TimeStampedModel):
-    # TODO maybe work out better name than ontology_set
-    ontology_set = models.CharField(max_length=5, choices=OntologySet.choices)
+    ontology_service = models.CharField(max_length=5, choices=OntologyService.choices)
     filename = models.TextField()
     context = models.TextField()
     hash = models.TextField()
@@ -65,7 +70,7 @@ class OntologyTerm(TimeStampedModel):
     MONDO:0000043, OMIM:0000343
     """
     id = models.TextField(primary_key=True)
-    ontology_set = models.CharField(max_length=5, choices=OntologySet.choices)
+    ontology_service = models.CharField(max_length=5, choices=OntologyService.choices)
     index = models.IntegerField()
     name = models.TextField(null=True, blank=True)  # should only be null if we're using it as a placeholder reference
     definition = models.TextField(null=True, blank=True)
@@ -76,7 +81,7 @@ class OntologyTerm(TimeStampedModel):
         return self.id
 
     class Meta:
-        unique_together = ("ontology_set", "index")
+        unique_together = ("ontology_service", "index")
 
     def get_absolute_url(self):
         return reverse('ontology_term', kwargs={"term": self.url_safe_id})
@@ -95,28 +100,28 @@ class OntologyTerm(TimeStampedModel):
         if len(parts) != 2:
             raise ValueError(f"Can not convert {id_str} to a proper id")
 
-        prefix = OntologySet(parts[0])
+        prefix = OntologyService(parts[0])
         num_part = int(parts[1])
-        clean_id = OntologySet.index_to_id(prefix, num_part)
+        clean_id = OntologyService.index_to_id(prefix, num_part)
 
         if existing := OntologyTerm.objects.filter(id=clean_id).first():
             return existing
 
         return OntologyTerm(
             id=clean_id,
-            ontology_set=prefix,
+            ontology_service=prefix,
             index=num_part,
             name="Not stored locally"
         )
 
     @property
     def padded_index(self) -> str:
-        expected_length = OntologySet.EXPECTED_LENGTHS[self.ontology_set]
+        expected_length = OntologyService.EXPECTED_LENGTHS[self.ontology_service]
         return str(self.index).rjust(expected_length, '0')
 
     @property
     def url(self):
-        return OntologySet.URLS[self.ontology_set].replace("${1}", self.padded_index)
+        return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
 
 
 class OntologyTermRelation(TimeStampedModel):
@@ -162,19 +167,19 @@ class OntologyTermRelation(TimeStampedModel):
 
     @staticmethod
     def mondo_version_of(term: OntologyTerm) -> Optional[OntologyTerm]:
-        if term.ontology_set == OntologySet.MONDO:
+        if term.ontology_service == OntologyService.MONDO:
             return term
         # Mondo will always be the source term
-        if relationship := OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_set=OntologySet.MONDO, relation=OntologyRelation.EXACT).first():
+        if relationship := OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO, relation=OntologyRelation.EXACT).first():
             return relationship.source_term
         return None
 
     @staticmethod
     def omim_version_of(term: OntologyTerm) -> Optional[OntologyTerm]:
-        if term.ontology_set == OntologySet.OMIM:
+        if term.ontology_service == OntologyService.OMIM:
             return term
         # Mondo will always be the source term
-        if relationship := OntologyTermRelation.objects.filter(dest_term__ontology_set=OntologySet.OMIM, source_term=term, relation=OntologyRelation.EXACT).first():
+        if relationship := OntologyTermRelation.objects.filter(dest_term__ontology_service=OntologyService.OMIM, source_term=term, relation=OntologyRelation.EXACT).first():
             return relationship.dest_term
         return None
 
