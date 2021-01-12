@@ -32,13 +32,13 @@
         <div class="row">
             <div class="col-12 col-lg-6" id="gene-versions">
                 <div class="card">
-                    <div class="card-header">Gene ID Versions</div>
+                    <div class="card-header">Gene Versions</div>
                     <div class="card-body">
                         <table class="table">
                             <thead>
                             <tr>
                                 <th></th>
-                                {% for genome_build_id in genome_build_ids %}
+                                {% for genome_build_id in gene_genome_build_ids %}
                                     <th>{{ genome_build_id }}</th>
                                 {% endfor %}
                             </tr>
@@ -67,24 +67,40 @@
 
             <div class="col-12 col-lg-6 mt-4 mt-lg-0" id="transcripts">
                 <div class="card">
-                    <div class="card-header">Transcripts</div>
+                    <div class="card-header">Transcript Versions</div>
                     <div class="card-body card-body-list">
-                        <ul class="list-group">
-                            {% for identifier, versions_biotype in transcripts.items %}
-                                <li class="list-group-item">
-                                    <a class="hover-link" href="{% url 'view_transcript' identifier %}">{{ identifier }}
-                                        {% if versions_biotype.1 %}
-                                            ({{ versions_biotype.1 }})
-                                        {% endif %}
-                                    </a>
-                                    {% for version in versions_biotype.0 %}
-                                        {% if version %}
-                                            <a class="d-inline-block mx-2 hover-link" href="{% url 'view_transcript_version' identifier version %}">v.{{ version }}</a>
-                                        {% endif %}
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th>Transcript ID</th>
+                                {% if has_biotype %}
+                                    <th>Biotype</th>
+                                {% endif %}
+                                {% for genome_build_id in transcript_genome_build_ids %}
+                                    <th>{{ genome_build_id }}</th>
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for version_data in transcript_versions %}
+                                <tr>
+                                    <td>
+                                        <a class="hover-link" href="{% url 'view_transcript' version_data.0 %}">{{ version_data.0 }}</a>
+                                    </td>
+                                    {% if has_biotype %}
+                                        <td>{{ version_data.1 }}</td>
+                                    {% endif %}
+                                    {% for tv_set in version_data.2 %}
+                                        <td>
+                                            {% for tv in tv_set %}
+                                                <a class="d-inline-block mx-2 hover-link" href="{% url 'view_transcript_version' tv.transcript_id tv.version %}">v.{{ tv.version }}</a>
+                                            {% endfor %}
+                                        </td>
                                     {% endfor %}
-                                </li>
+                                </tr>
                             {% endfor %}
-                        </ul>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

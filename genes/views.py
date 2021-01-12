@@ -65,37 +65,48 @@ def view_gene(request, gene_id):
     gene_versions_by_build = defaultdict(dict)
 
     versions = set()
-    for tv in gene.geneversion_set.order_by("version"):
-        genome_build_id = tv.genome_build.pk
-        version = tv.version or 0  # 0 = unknown
-        gene_versions_by_build[genome_build_id][version] = tv
-        versions.add(version)
+    for gv in gene.geneversion_set.order_by("version"):
+        genome_build_id = gv.genome_build.pk
+        gene_versions_by_build[genome_build_id][gv.version] = gv
+        versions.add(gv.version)
 
-    genome_build_ids = sorted(gene_versions_by_build.keys())
+    gene_genome_build_ids = sorted(gene_versions_by_build.keys())
     gene_versions = []
     for version in sorted(versions):
         data = [version]
-        for genome_build_id in genome_build_ids:
+        for genome_build_id in gene_genome_build_ids:
             gv = gene_versions_by_build.get(genome_build_id, {}).get(version)
             data.append(gv)
         gene_versions.append(data)
 
-    transcript_versions = defaultdict(OrderedSet)
+    transcript_versions_by_id_and_build = defaultdict(lambda: defaultdict(OrderedSet))
+    transcript_genome_build_ids = set()
     transcript_biotype = defaultdict(set)
     for tv in TranscriptVersion.objects.filter(gene_version__gene=gene).order_by("transcript_id", "version"):
-        transcript_versions[tv.transcript_id].add(tv.version)
-        if tv.biotype:
-            transcript_biotype[tv.transcript_id].add(tv.biotype)
-    transcripts = {}
-    for transcript_id, versions in transcript_versions.items():
-        biotype = ", ".join(transcript_biotype.get(transcript_id, []))
-        transcripts[transcript_id] = (versions, biotype)
+        transcript_genome_build_ids.add(tv.genome_build_id)
+        transcript_versions_by_id_and_build[tv.transcript_id][tv.genome_build_id].add(tv)
+        transcript_biotype[tv.transcript_id].add(tv.biotype)
+
+    transcript_genome_build_ids = sorted(transcript_genome_build_ids)
+    transcript_versions = []  # ID, biotype, [[GRCh37 versions...], [GRCh38 versions]]
+    has_biotype = False
+    for transcript_id, biotype_set in transcript_biotype.items():
+        biotype = ", ".join(sorted(b for b in biotype_set if b is not None))
+        if biotype:
+            has_biotype = True
+        build_versions = []
+        for genome_build_id in transcript_genome_build_ids:
+            tv_set = transcript_versions_by_id_and_build[transcript_id].get(genome_build_id, [])
+            build_versions.append(tv_set)
+        transcript_versions.append([transcript_id, biotype, build_versions])
 
     context = {
         "gene": gene,
-        "genome_build_ids": genome_build_ids,
+        "gene_genome_build_ids": gene_genome_build_ids,
         "gene_versions": gene_versions,
-        "transcripts": transcripts,
+        "has_biotype": has_biotype,
+        "transcript_versions": transcript_versions,
+        "transcript_genome_build_ids": transcript_genome_build_ids,
     }
     return render(request, "genes/view_gene.html", context)
 
