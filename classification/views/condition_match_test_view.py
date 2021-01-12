@@ -2,9 +2,8 @@ from typing import Optional
 
 from django.contrib import messages
 from django.shortcuts import render
-
-from classification.models.condition_text_matching_auto import MatchRequest, attempt_auto_match_for_text
 from genes.models import GeneSymbol
+from ontology.ontology_matching import OntologyMatching
 
 
 def condition_match_test_view(request):
@@ -22,13 +21,8 @@ def condition_match_test_view(request):
                 messages.add_message(request, messages.WARNING, f"Could not find Gene Symbol '{gene_symbol_str}'")
                 valid = False
         if valid:
-            match_request = MatchRequest(
-                text=condition_text,
-                gene_symbol=gene_symbol
-            )
-            auto_matches = attempt_auto_match_for_text(match_request)
+            auto_matches = OntologyMatching.from_search(condition_text, gene_symbol)
             attempted = True
-
 
     context = {
         "condition_text": condition_text,

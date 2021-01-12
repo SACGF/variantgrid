@@ -1,11 +1,13 @@
-import urllib
-from dataclasses import dataclass
-from typing import Dict, Optional, List, Any, Set
+import operator
 import re
+from dataclasses import dataclass
+from functools import reduce
+from typing import Dict, Optional, List, Any, Set
+
 import requests
-from rest_framework.response import Response
-from rest_framework.status import HTTP_200_OK
-from rest_framework.views import APIView
+from django.db.models import Q
+from django.db.models.functions import Length
+
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologySet
 from ontology.panel_app_ontology import get_or_fetch_gene_relations
 
@@ -157,7 +159,8 @@ class OntologyMeta:
         self.scores: List[OntologyMatchScorePart] = list()
 
         if not self.term.is_stub:
-            self.parent = OntologyTermRelation.parent_of(self.term)
+            # FIXME multiple parents are valid
+            self.parent = OntologyTermRelation.parents_of(self.term).first()
         self.contexts: Dict[str, OntologyContext] = dict()
 
     @property
@@ -209,7 +212,9 @@ SKIP_TERMS = {"", "disease", "disorder", "the", "a", "an", "and", "or", "for", "
 SUB_TYPE = re.compile("[0-9]+[a-z]?")
 
 
-def tokenize_condition_text(text: str):
+def tokenize_condition_text(text: str) -> Set[str]:
+    if text is None:
+        return set()
     text = text.replace(";", " ").replace("-", " ").lower()
     tokens = [token.strip() for token in text.split(" ")]
     tokens = [token for token in tokens if token not in SKIP_TERMS]
@@ -217,14 +222,16 @@ def tokenize_condition_text(text: str):
 
 
 def pretty_set(s: Set[str]) -> str:
-    l = list(s)
-    l = sorted(l)
-    l = [f'"{w}"' for w in l]
-    text = ", ".join(l)
+    tokens = list(s)
+    tokens = sorted(tokens)
+    tokens = [f'"{tok}"' for tok in tokens]
+    text = ", ".join(tokens)
     return text
 
 
 def normalize_condition_text(text: str):
+    if text is None:
+        return None
     text = text.lower()
     text = re.sub("[,;./]", " ", text)  # replace , ; . with spaces
     text = re.sub("[ ]{2,}", " ", text)  # replace multiple spaces with
@@ -271,8 +278,8 @@ class OntologyMatching:
                 superfluous_words = match_terms.difference(search_terms)
                 missing_words = search_terms.difference(match_terms)
 
-                missing_word_ratio = float(len(missing_words)) / float(len(match_terms))
-                superfluous_word_ratio = float(len(superfluous_words)) / float(len(match_terms))
+                missing_word_ratio = 0 if not match_terms else (float(len(missing_words)) / float(len(match_terms)))
+                superfluous_word_ratio =  0 if not match_terms else (float(len(superfluous_words)) / float(len(match_terms)))
 
                 if missing_word_ratio:
                     mondo.add_score(OntologyMatchScorePart(
@@ -289,7 +296,7 @@ class OntologyMatching:
                 if superfluous_words and not self.gene_symbol:
                     for word in superfluous_words:
                         if SUB_TYPE.match(word):
-                            mondo.add_score.append(OntologyMatchScorePart(
+                            mondo.add_score(OntologyMatchScorePart(
                                 "Superfluous words includes subtype \"{word}\"",
                                 20.0
                             ))
@@ -299,29 +306,31 @@ class OntologyMatching:
             relationships = get_or_fetch_gene_relations(gene_symbol=gene_symbol)
             for relationship in relationships:
                 # always convert to MONDO for now
-                if mondo_term := OntologyTermRelation.mondo_version_of(relationship.term):
-                    mondo_meta = self.find_or_create(mondo_term.id)
-                    if relationship.relation == OntologySet.PANEL_APP_AU:
-                        mondo_meta.add_context(OntologyContextPanelApp(
-                            gene_symbol=gene_symbol,
-                            omim_id=relationship.term_id,
-                            phenotype_row=relationship.extra.get("phenotype_row"),
-                            evidence=relationship.extra.get("evidence")
-                        ))
-                    else:
-                        mondo_meta.add_context(OntologyContextMonarchLink(
-                            gene_symbol=gene_symbol,
-                            relation=relationship.relation
-                        ))
-                    mondo_meta.add_score(OntologyMatchScorePart(
-                        "Established gene relationship", 50.0
+                mondo_term = relationship.term
+                mondo_meta = self.find_or_create(relationship.term_id)
+                if relationship.relation == OntologySet.PANEL_APP_AU:
+                    mondo_meta.add_context(OntologyContextPanelApp(
+                        gene_symbol=gene_symbol,
+                        omim_id=relationship.term_id,
+                        phenotype_row=relationship.extra.get("phenotype_row"),
+                        evidence=relationship.extra.get("evidence")
                     ))
+                else:
+                    mondo_meta.add_context(OntologyContextMonarchLink(
+                        gene_symbol=gene_symbol,
+                        relation=relationship.relation
+                    ))
+                mondo_meta.add_score(OntologyMatchScorePart(
+                    "Established gene relationship", 50.0
+                ))
 
-                    if parent_term := OntologyTermRelation.parent_of(mondo_term):
-                        parent_meta = self.find_or_create(parent_term.id)
-                        parent_meta.add_context(OntologContextChildGeneRelationship(
-                            child_term_id=mondo_term.id
-                        ))
+                for parent_term in OntologyTermRelation.parents_of(mondo_term):
+                    parent_meta = self.find_or_create(parent_term.id)
+                    parent_meta.add_context(OntologContextChildGeneRelationship(
+                        child_term_id=mondo_term.id
+                    ))
+                    # FIXME don't rely on magic string for the name of the contexts
+                    if "Monarch" not in mondo_meta.contexts and "PanelApp AU" not in mondo_meta.contexts:
                         mondo_meta.add_score(OntologyMatchScorePart(
                             "Parent of term with established gene relationship", 25.0
                         ))
@@ -339,7 +348,7 @@ class OntologyMatching:
     def searched_term(self, term: str):
         self.find_or_create(term).add_context(OntologyContextSearched())
 
-    def as_json(self) -> Dict:
+    def as_json(self) -> Any:
         return [value.as_json() for value in self.term_map.values()]
 
     def __iter__(self):
@@ -361,6 +370,15 @@ class OntologyMatching:
             ontology_matches.find_or_create(search_text)
 
         else:
+            # Client search
+            # this currently requires all words to be present
+            search_terms = set(tokenize_condition_text(search_text))
+            qs = OntologyTerm.objects.filter(ontology_set=OntologySet.MONDO)
+            qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
+            qs = qs.order_by(Length('name')).values_list("id", flat=True)
+            for result in qs[0:20]:
+                ontology_matches.searched_term(result)
+
             # ALSO, do client side search
             if server_search:
                 try:
@@ -391,16 +409,3 @@ class OntologyMatching:
         ontology_matches.apply_word_match_score()
         return ontology_matches
 
-class SearchMondoText(APIView):
-
-    def get(self, request, **kwargs) -> Response:
-
-        search_term = request.GET.get('search_term') or ''
-        gene_symbol = request.GET.get('gene_symbol')
-
-        urllib.parse.quote(search_term).replace('/', '%252F') # a regular escape / gets confused for a URL divider
-        selected = [term.strip() for term in (request.GET.get('selected') or '').split(",") if term.strip()]
-
-        ontology_matches = OntologyMatching.from_search(search_text=search_term, gene_symbol=gene_symbol, selected=selected, server_search=True)
-
-        return Response(status=HTTP_200_OK, data=ontology_matches.as_json())

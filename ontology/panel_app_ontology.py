@@ -1,12 +1,13 @@
+import re
 from datetime import timedelta
 from typing import Union, Iterable
-import re
 
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
+from library.log_utils import report_message
 from library.utils import md5sum_str
-from ontology.management.commands.ontology_import import OntologyBuilder, OntologyBuilderDataUpToDateException
-from ontology.models import OntologySet, OntologyTermGeneRelation
+from ontology.models import OntologySet, OntologyTermGeneRelation, OntologyTerm, OntologyTermRelation
+from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 
 def get_or_fetch_gene_relations(gene_symbol: Union[GeneSymbol, str]) -> Iterable[OntologyTermGeneRelation]:
@@ -34,18 +35,24 @@ def get_or_fetch_gene_relations(gene_symbol: Union[GeneSymbol, str]) -> Iterable
             for phenotype_row in panel_app_result.get("phenotypes", []):
                 # TODO look for terms other than OMIM
                 for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
-                    omim_id = int(omim_match[1])  # not always a valid id
-
-                    # do we duplicate this for MONDO?
-                    ontology_builder.add_gene_relation(
-                        term_id=OntologySet.index_to_id(OntologySet.OMIM, omim_id),
-                        gene_symbol_str=gene_symbol.symbol,
-                        relation=OntologySet.PANEL_APP_AU,
-                        extra={
-                            "phenotype_row": phenotype_row,
-                            "evidence": panel_app_result.get('evidence') or []
-                        }
-                    )
+                    found_mondo = False
+                    omim_int = int(omim_match[1])  # not always a valid id
+                    omim_id = OntologySet.index_to_id(OntologySet.OMIM, omim_int)
+                    if omim_term := OntologyTerm.objects.filter(id=omim_id).first():
+                        if mondo_term := OntologyTermRelation.mondo_version_of(omim_term):
+                            # do we duplicate this for MONDO?
+                            ontology_builder.add_gene_relation(
+                                term_id=mondo_term.id,
+                                gene_symbol_str=gene_symbol.symbol,
+                                relation=OntologySet.PANEL_APP_AU,
+                                extra={
+                                    "phenotype_row": phenotype_row,
+                                    "evidence": panel_app_result.get('evidence') or []
+                                }
+                            )
+                            found_mondo = True
+                    if not found_mondo:
+                        report_message(f"Could not find a MONDO equiv of {omim_id} related to PanelApp {gene_symbol.symbol}")
 
         ontology_builder.complete()
 

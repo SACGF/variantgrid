@@ -148,7 +148,7 @@ class LabelledValueTag(template.Node):
             div_id = f"id=\"{complete_id}\""
             for_id = f"for=\"{complete_id}\""
 
-        if output == "":
+        if output == "" or output == "None":
             output = "<span class=\"no-value\">-</span>"
         elif LabelledValueTag.big_zero.match(output):
             output = f"<span class=\"zero-value\">{output}</span>"

@@ -108,7 +108,7 @@
                 {% if condition_text_match %}
                     <div class="pills">
                     {% for ontology in condition_text_match.resolve_condition_xrefs.condition_xrefs %}
-                        {% ontology ontology %}
+                        {% ontology_meta ontology %}
                     {% endfor %}
                     </div>
                     <a class="btn btn-outline-primary" target="_blank" href="{% url 'condition_matching' pk=condition_text_match.condition_text.pk %}"><i class="fas fa-edit"></i></a>

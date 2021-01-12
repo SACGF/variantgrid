@@ -1,0 +1,44 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load ontology_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% load js_tags %}
+{% load ui_tabs_builder %}
+{% block title %}{{ term.id }}{% endblock title %}
+{% block content %}
+    <div class="container">
+        <div class="card">
+            <div class="card-header">{{ term.id }}</div>
+            <div class="card-body">
+                {% labelled label="Name" %}{{ term.name }}{% endlabelled %}
+                {% labelled label="Definition" value_css="white-space:pre-wrap" %}{{ term.definition }}{% endlabelled %}
+                {% labelled label="URL" %}
+                    <a href="{{ term.url }}" class="external-link hover-link">{{ term.url }}</a>
+                {% endlabelled %}
+                {% if not term.is_stub %}
+                    {% labelled label="Last imported" %}{{ term.from_import.processed_date }}{% endlabelled %}
+                {% endif %}
+                <hr/>
+                {% labelled label="Gene Relationships" %}
+                    Note that some gene relationships are lazily loaded and may not appear here yet.<br/>
+                    {% for relationship in gene_relations %}
+                        This -> {{ relationship.relation }} -> {{ relationship.gene_symbol }}<br/>
+                    {% endfor %}
+                {% endlabelled %}
+                {% if relationships %}
+                    <hr/>
+                    {% labelled label="Relationships" %}
+                        {% for relationship in relationships %}
+                            <div>
+                            {% if relationship.source_term == term %}<span class="text-muted">THIS</span>{% else %}{% ontology_term relationship.source_term %}{% endif %}
+                            <div style="min-width:80px" class="text-center d-inline-block">{{ relationship.relation_display }}</div>
+                            {% if relationship.dest_term == term %}<span class="text-muted">THIS</span>{% else %}{% ontology_term relationship.dest_term %}{% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endlabelled %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

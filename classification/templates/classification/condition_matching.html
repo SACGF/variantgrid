@@ -281,6 +281,11 @@
                         " ",
                         $('<span>', {class: 'hover-detail text-muted', text: `${context.phenotype_row}`, title: evidence})
                 ]});
+            } else if (title == "parent_of_gene_relation") {
+                return $('<div>', {html: [
+                            $(`<i class="fas fa-circle text-success"></i>`),
+                            $('<span>', {text: `Child has established relation to gene symbol` })
+                        ]});
             } else {
                 return $("<div>", {text: title});
             }
