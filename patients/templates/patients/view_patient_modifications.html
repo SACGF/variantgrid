@@ -1,7 +1,7 @@
 {% load tz %}
 
-<div id="modifications">
-    <table>
+<div class="container" id="modifications">
+    <table class="table">
     <tr><th>User <th> Date <th> Description <th> Origin
     {% for pm in patient_modifications %}
     <tr><td>{{ pm.user }}

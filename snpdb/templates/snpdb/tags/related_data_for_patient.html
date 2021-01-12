@@ -3,10 +3,11 @@
 {{ block.super }}
 {% load related_data_tags %}
 
-<div id="samples">
-    <h3>Samples for patient:</h3>
+<div id="samples" class="container">
+    <h4>Samples for patient:</h4>
     {% if samples %}
-        <table>
+        <table class="table">
+            <thead>
             <tr>
             <th>ID
             <th>Sample Name
@@ -14,6 +15,8 @@
             <th>VCF date
             <th>Tissue
             </tr>
+            </thead>
+            <tbody>
         {% for sample in samples %}
             <tr> 
             <td><a href="{% url 'view_sample' sample.pk %}">{{ sample.pk }}</a>
@@ -23,14 +26,16 @@
             <td>{{ sample.tissue }}
             </tr>
         {% endfor %}
+        </tbody>
         </table>
     {% else %}
     <p>There are no samples linked to this patient</p>
     {% endif %}
 
     {% if cases %}
-    <h3>Cases for patient:</h3>
-    <table>
+    <h4>Cases for patient:</h4>
+    <table class="table">
+        <thead>
         <tr>
             <th>Case</th>
             <th>Lead Scientist</th>
@@ -40,6 +45,8 @@
             <th>Workflow status</th>
             <th>Investigation type</th>
         </tr>
+        </thead>
+        <tbody>
         {% for case in cases %}
         <tr>
             <td><a href="{{ case.get_absolute_url }}">{{ case }}</a></td>
@@ -51,6 +58,7 @@
             <td>{{ case.get_investigation_type_display }}</td>
         </tr>
         {% endfor %}
+        </tbody>
     </table>
     {% endif %}
 

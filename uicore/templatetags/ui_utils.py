@@ -1,3 +1,4 @@
+import json
 from typing import Optional, Any
 
 from django import template
@@ -7,6 +8,20 @@ import re
 from django.utils.safestring import SafeString
 
 register = template.Library()
+
+@register.simple_tag(takes_context=True)
+def update_django_messages(context):
+    """
+    Use when you've loaded messages in an ajax tab, and need to update the page messages with save etc messages
+    """
+    message_json = []
+    if messages := context.get("messages"):
+        for message in messages:
+            tags = message.tags
+            text = str(message)
+            message_json.append({"tags": tags, "text": text});
+    message_json_string = json.dumps(message_json)
+    return SafeString(f"update_django_messages({message_json_string});")
 
 
 # Taken from https://www.caktusgroup.com/blog/2017/05/01/building-custom-block-template-tag/

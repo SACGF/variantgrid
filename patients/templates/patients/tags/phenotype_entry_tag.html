@@ -1,7 +1,7 @@
 <div id="phenotype-entry-{{ flattened_uuid }}">
 {% load static %}
 {% load js_tags %}
-{% load help_tags %}
+{% load ui_help %}
 <style>
 #patient-ontology .patient-ontology-term {
     color: #fff;
@@ -25,6 +25,9 @@
 #description-highlighted {
     float: left;
     margin: 5px;
+}
+span.select2-container {
+    min-width: auto !important;
 }
 
 </style>
@@ -241,26 +244,26 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
 })();
 </script>
 {% if show_page_help %}
-    {% page_help user 'patients/patient_phenotypes_help' 'Patient Phenotypes' %}
+    {% page_help 'patients/patient_phenotypes_help' 'Patient Phenotypes' %}
 {% endif %}
 {% if edit %}
 <div id='patient-ontology'>
     <table>
         <tr>
-            {% if hpo_form %}<td><div class='ontology-label hpo'>Human Phenotype Ontology</div></td>{% endif %}
-            {% if omim_form %}<td><div class='ontology-label omim'>OMIM</div></td>{% endif %}
-            {% if gene_form %}<td><div class='ontology-label gene'>Genes</div></td>{% endif %}
+            {% if hpo_form %}<td style="width:30%"><div class='ontology-label hpo'>Human Phenotype Ontology</div></td>{% endif %}
+            {% if omim_form %}<td style="width:30%"><div class='ontology-label omim'>OMIM</div></td>{% endif %}
+            {% if gene_form %}<td style="width:30%"><div class='ontology-label gene'>Genes</div></td>{% endif %}
         </tr>
         <tr>
-            {% if hpo_form %}<td class='hpo'> {{ hpo_form.hpo_synonym }} {{ hpo_form.media }}</td>{% endif %}
-            {% if omim_form %}<td class='omim'> {{ omim_form.mim_morbid_alias }}</td>{% endif %}
-            {% if gene_form %}<td class='gene'> {{ gene_form.gene }}</td>{% endif %}
+            {% if hpo_form %}<td style="width:30%"><div class="hpo">{{ hpo_form.hpo_synonym }} {{ hpo_form.media }}</div></td>{% endif %}
+            {% if omim_form %}<td style="width:30%"><div class='omim'>{{ omim_form.mim_morbid_alias }}</div></td>{% endif %}
+            {% if gene_form %}<td style="width:30%"><div class='gene'>{{ gene_form.gene }}</div></td>{% endif %}
         </tr>
     </table>
-    <div>
-        Auto-complete terms in boxes above, or type free text into the large box below.
-        <input id='new-terms-only' type='checkbox' checked='checked' /> Only add new terms.
-        (See Patient Phenotypes Guide in help)
+    <div class="my-2">
+        Auto-complete terms in boxes above, or type free text into the large box below.<br/>
+        <label for="new-terms-only"><input id='new-terms-only' type='checkbox' checked='checked' /> Only add new terms.
+        (See Patient Phenotypes Guide in help)</label>
     </div>
 </div>
 {% endif %}
