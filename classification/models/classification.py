@@ -1397,9 +1397,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
         return self.lab.group_name + '/' + patient_id
 
-    def as_json(self,
-                params: ClassificationJsonParams) -> dict:
-
+    def as_json(self, params: ClassificationJsonParams) -> dict:
         current_user = params.current_user
         include_data = params.include_data
         version = params.version
