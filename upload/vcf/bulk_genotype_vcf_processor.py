@@ -52,8 +52,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # Need to work out how to map CyVCF2GTType to PL index.
     # This ends up being the same for both ref/alt
     CYVCF_HAPLOID_PL_INDEX = [0, DOESNT_MATTER, DOESNT_MATTER, 1]
-    CYVCF_DIPLOID_PL_INDEX = [0, 1, DOESNT_MATTER, 2]
+    CYVCF_DIPLOID_PL_INDEX = [0, 1, DOESNT_MATTER]  # Unknown genotype (2) handled in special case of EMPTY_PL_ARRAY
     CYVCF_PL_INDEX_FOR_PLOIDY = [None, CYVCF_HAPLOID_PL_INDEX, CYVCF_DIPLOID_PL_INDEX]
+    EMPTY_PL_ARRAY = "{-1,-1,-1}"
 
     @staticmethod
     def get_vcf_importer_version():
@@ -179,8 +180,12 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 if self.vcf.phred_likelihood_field == BulkGenotypeVCFProcessor.GENOTYPE_LIKELIHOOD:
                     pl *= -10  # GQ = log10(P), PL = -10 log10(P)
 
-                # TODO - or if it's nan make it
-                pl[np.isnan(pl) | (pl < 0)] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                # Handle PL = '.' (all missing if unknown genotype)
+                missing = np.isnan(pl) | (pl < 0)
+                if missing.all():
+                    return self.EMPTY_PL_ARRAY
+
+                pl[missing] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE  # Handle individual PL array entry missing
                 pl_index_lookup = BulkGenotypeVCFProcessor.CYVCF_PL_INDEX_FOR_PLOIDY[variant.ploidy]
                 for i, gt in enumerate(variant.gt_types):
                     pl_index = pl_index_lookup[gt]
