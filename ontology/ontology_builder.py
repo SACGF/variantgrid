@@ -44,11 +44,21 @@ class OntologyBuilder:
         STUB = 1
         DETAILED = 2
 
-    def __init__(self, filename: str, context: str, ontology_service: OntologyService):
+    def __init__(self, filename: str, context: str, ontology_service: OntologyService, force_update: bool = False):
+        """
+        :filename: Name of the resource used, only used for logging purposes
+        :context: In what context are we inserting records (e.g. full file context, or partial panel app)
+        :ontology_service: Service that sources this data, but import is not restricted to this service
+        :force_update: If true, the ensure methods don't raise exceptions
+        """
+        self.start = datetime.now()
+        self.duration = None
         self.filename = filename.split("/")[-1]
         self.ontology_service = ontology_service
         self.context = context
         self.data_hash = None
+        self.force_update = force_update
+
         self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(ontology_service=ontology_service, context=context, completed=True).order_by('-modified').first()
         self.counters: Dict[Any, OperationCounter] = defaultdict(OperationCounter)
         self.created_cache: Dict[str, int] = dict()
@@ -61,12 +71,12 @@ class OntologyBuilder:
         Raises OntologyBuilderDataUpToDateException if data is up to date
         """
         if self.previous_import:
-            if self.previous_import.processed_date > datetime.now(tz=timezone.get_default_timezone()) - max_age:
+            if not self.force_update and self.previous_import.processed_date > datetime.now(tz=timezone.get_default_timezone()) - max_age:
                 raise OntologyBuilderDataUpToDateException()
 
     def ensure_hash_changed(self, data_hash: str):
         self.data_hash = data_hash
-        if self.previous_import and self.previous_import.hash == data_hash:
+        if not self.force_update and self.previous_import and self.previous_import.hash == data_hash:
             self.previous_import.processed_date = now
             self.previous_import.save()
             raise OntologyBuilderDataUpToDateException()
@@ -89,6 +99,12 @@ class OntologyBuilder:
 
         self._ontology_import.completed = True
         self._ontology_import.save()
+        self.duration = datetime.now() - self.start
+
+    def report(self):
+        print(f"Time taken {self.duration}")
+        for model, counter in self.counters.items():
+            print(f"{model} - {counter}")
 
     @lazy
     def _ontology_import(self) -> OntologyImport:
