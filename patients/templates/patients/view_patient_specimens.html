@@ -1,10 +1,13 @@
+{% load crispy_forms_tags %}
+{% load ui_help %}
+{% load ui_utils %}
 <div id="patient-specimens">
-    {% load help_tags %}
-    {% page_help user 'patients/view_patient_help2' 'Specimens Help' %}
+    {% page_help 'patients/view_patient_help2' 'Specimens Help' %}
     <script type="text/javascript">
         var targetParent = $("#patient-specimens").parent();
     
         $(document).ready(function() {
+            {% update_django_messages %}
             var options = {
                 target: targetParent,
             };
@@ -18,21 +21,19 @@
             $("#specimens-tab-link").html(title);
         });
     </script>
-    <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
-    	{% csrf_token %}
-    
-    	<table>
-            {{ specimen_formset.as_table }}
-    	</table>
-        <table>
-        {% if has_write_permission %}
-        <td><button id='save-button' class="btn btn-primary">Save</button></td>
-        <td><button id="reset-button" type='reset' class="btn btn-secondary">Reset</button></td>
-        {% else %}
-            You can view but not modify this patient.
-        {% endif %}
-        </tr>
-        </table>
-        {% include "messages/messages.html" %}
-    </form>
+    <div class="container">
+        <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
+            {% csrf_token %}
+            {% crispy specimen_formset form_helper.horizontal %}
+            <table>
+            {% if has_write_permission %}
+            <td><button id='save-button' class="btn btn-primary">Save</button></td>
+            <td><button id="reset-button" type='reset' class="btn btn-secondary">Reset</button></td>
+            {% else %}
+                You can view but not modify this patient.
+            {% endif %}
+            </tr>
+            </table>
+        </form>
+    </div>
 </div>

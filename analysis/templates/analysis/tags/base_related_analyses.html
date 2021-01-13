@@ -5,13 +5,14 @@
     <h3>Analyses</h3>
     
     <div id='create-analyses'>
-    <h4>Create Analysis:</h4>
+    <h4>Create Analysis</h4>
     {% block create_analyses %}
     {% endblock create_analyses %}
     </div>
     
     {% if analysis_details %}
-        <table class="styled">
+        <table class="table">
+            <thead>
             <tr>
             <th>Analysis
             <th>Type
@@ -19,7 +20,8 @@
             {% if show_sample_info %}
             <th>Samples
             {% endif %}
-        
+            </thead>
+            <tbody>
         {% for analysis, sample_info in analysis_details %}
             <tr> 
             <td><a href="{% url 'analysis' analysis.pk %}">{{ analysis }}</a>
@@ -29,6 +31,7 @@
             <td>{{ sample_info }}
             {% endif %}
         {% endfor %}
+            </tbody>
         </table>
     {% endif %}
 

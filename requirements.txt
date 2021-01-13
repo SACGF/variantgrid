@@ -62,7 +62,7 @@ scipy==1.5.2
 sqlparse==0.2.4
 toposort==1.5
 Unidecode==1.1.1
-django-crispy-forms==1.9.2
+django-crispy-forms==1.10.0
 # below are only required for environments directly integrating with s3
 # separate to django-amazon-ses
 boto3==1.14.51

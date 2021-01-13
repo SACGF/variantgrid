@@ -1,174 +1,134 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base.html" %}
 {% load static %}
-{% load help_tags %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
 {% load js_tags %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
+{% load ui_utils %}
 {% load phenotype_tags %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
-
 {% block title %}View Patient {{ patient }}{% endblock title %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+    ul#id_population li {
+        display: inline-block;
+        padding-left: 8px;
+        padding-right: 12px;
+        min-width: 230px;
+    }
+    ul#id_population li input {
+        margin-right: 4px;
+    }
 
-{% block css %}
-form#patient-form h3 {
-    text-align: left;
-}
+    #patient-phenotype-form-section {
+        margin-bottom: 10px;
+    }
 
-form#patient-form .label {
-    font-weight: bold;
-}
-
-form#patient-form .label:after {
-    content: ": "
-}
-
-ul#id_population li {
-    display: inline-block;
-    padding-left: 8px;
-    padding-right: 8px;
-}
-
-ul#id_population:first-of-type li:not(:last-of-type)::after {
-    color: #bbbbbb;
-    content: "|";
-    margin-left: 10px;
-    position: absolute;
-}
-
-ul#id_population:not(:first-of-type) li {
-    padding: 0 5px 0 5px;
-    margin-right: 10px;
-}
-
-#patient-phenotype-form-section {
-    margin-bottom: 10px;
-}
-
-{% if not has_write_permission %}
-#phenotype-container {
-    border: 1px solid gray;
-}
-{% endif %}
-{% endblock css %}
-
-{% block jshead %}
-function showFamilyPhenotype() {
-    $("#show-family-phenotype-container-link").hide();
-    $("#family-phenotype-container").slideDown();
-}
-{% endblock jshead %}
-
-{% block jsdocumentready %}
-	var form = $("form#patient-form");
-    $("#patient-tabs").tabs();
-    
-    // Patient Attachments
-    window.fileupload_ready = function() {
-        var $form = $('#fileupload');
-    {% if existing_files %}
-        var existingFiles = {{ existing_files | jsonify }};
-        $form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
-    {% endif %}
-    
     {% if not has_write_permission %}
-        $('.ui-button', '#fileupload').button( "option", "disabled", true );
-        $(".fileupload-buttonbar").remove();
+    #phenotype-container {
+        border: 1px solid gray;
+    }
     {% endif %}
-    };
-{% endblock jsdocumentready %}
+</style>
+<script>
+    function showFamilyPhenotype() {
+        $("#show-family-phenotype-container-link").hide();
+        $("#family-phenotype-container").slideDown();
+    }
+    $(document).ready(() => {
+        var form = $("form#patient-form");
+        $("#patient-tabs").tabs();
 
-{% block submenu_page_content %}
-<div id="patient-tabs">
-    <ul>
-    <li><a href="#patient">Patient</a></li>
-    {% if url_name_visible.view_patient_contact_tab %}
-    <li><a id="patient-contact-tab-link" href="{% url 'view_patient_contact_tab' patient.pk %}">Contact</a></li>
-    {% endif %}
-    <li><a id="specimens-tab-link" href="{% url 'view_patient_specimens' patient.pk %}">Specimens{{ specimens }}</a></li>
-    <li><a id="genes-tab-link" href="{% url 'view_patient_genes' patient.pk %}">Genes</a></li>
-    {% if has_write_permission %}
-    <li><a href="{% url 'group_permissions' 'patients.models.Patient' patient.pk %}">Sharing / Permissions</a></li>
-    <!-- Patient modification could show private info - only show to those with write access -->
-    <li><a href="{% url 'view_patient_modifications' patient.pk %}">Modifications</a></li>
-    {% endif %}
-    </ul>
-    <div id="patient">
-        <form id="patient-form" method="post">
-            {% csrf_token %}
-			<table>
-            {% if has_write_permission or show_read_only_patient_dob %}
-			<tr><td><span class='label'>{{ form.first_name.label }}</span>
-    			<td><span class='label'>{{ form.last_name.label }}</span>
-    			<td><span class='label'>{{ form.family_code.label }}</span>
-			<tr><td>{{ form.first_name }}
-			    <td>{{ form.last_name }}
-                <td>{{ form.family_code }}
-            <tr><td><span class='label'>{{ form.date_of_birth.label }}</span>
-                <td><span class='label'>{{ form.date_of_death.label }}</span>
-                <td><span class='label'>{{ form.sex.label }}</span>
-            <tr><td>{{ form.date_of_birth }}
-                <td>{{ form.date_of_death }}
-                <td>{{ form.sex }}
-            {% else %}
-            <tr><td><span class='label'>{{ form.first_name.label }}</span>
-                <td><span class='label'>{{ form.last_name.label }}</span>
-                <td><span class='label'>{{ form.family_code.label }}</span>
-                <td><span class='label'>{{ form.sex.label }}</span>
-                <td><span class='label'>Age</span>
-            <tr><td>{{ form.first_name }}
-                <td>{{ form.last_name }}
-                <td>{{ form.family_code }}
-                <td>{{ form.sex }}
-                <td><input type='text' value="{{ patient.age }}" disabled=true>
+        // Patient Attachments
+        window.fileupload_ready = function () {
+            var $form = $('#fileupload');
+            {% if existing_files %}
+                var existingFiles = {{ existing_files | jsonify }};
+                $form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
             {% endif %}
-            </table>
-            <div>
-                <h3>Population</h3>
-                {% page_help user 'patients/patient_population_help' 'Patient Population' %}
-                {{ form.population }}
-            </div>
-            <div>
-                <span class='label'>{{ form.consanguineous.label }}</span> {{ form.consanguineous }}
-            </div>
-            <div>
-                <h3>Phenotype:</h3>
-                
-                <div id='patient-phenotype-form-section'>
-                    <span class='label'>{{ form.affected.label }}</span> {{ form.affected }}
-                </div>
-                <div id="phenotype-container">
-                {% phenotype_entry form.phenotype patient.phenotype_description edit=has_write_permission %}
-                </div>
-            </div>
-            
-            {% include "messages/messages.html" %}
-            <div>
-            {% if has_write_permission %}
-                <button class="btn btn-primary">Save</button>
-                <button type='reset' class="btn btn-secondary">Reset</button>
-            {% else %}
-                You can view but not modify this patient. 
-            {% endif %}
-            </div>
-        </form>
-    </div>
-	</div>
 
-    {% if has_write_permission or existing_files %}
-    <div>
+            {% if not has_write_permission %}
+                $('.ui-button', '#fileupload').button("option", "disabled", true);
+                $(".fileupload-buttonbar").remove();
+            {% endif %}
+        };
+    });
+</script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        {% ui_register_tab_embedded label="Patient" tab_set="patients" %}
+            <form id="patient-form" method="post">
+                {% csrf_token %}
+                    {% labelled label=form.first_name.label %}{% crispy_field form.first_name %}{% endlabelled %}
+                    {% labelled label=form.last_name.label %}{% crispy_field form.last_name %}{% endlabelled %}
+                    {% labelled label=form.family_code.label %}{% crispy_field form.family_code %}{% endlabelled %}
+                    {% labelled label=form.sex.label %}{% crispy_field form.sex %}{% endlabelled %}
+                    {% if has_write_permission or show_read_only_patient_dob %}
+                        {% labelled label=form.date_of_birth.label %}{% crispy_field form.date_of_birth %}{% endlabelled %}
+                        {% labelled label=form.date_of_death.label %}{% crispy_field form.date_of_death %}{% endlabelled %}
+                    {% else %}
+                        {% labelled label="Age" %}{{ patient.age }}{% endlabelled %}
+                    {% endif %}
+                <div>
+                    {% page_help 'patients/patient_population_help' 'Patient Population' header_tag="h4" %}
+                    {{ form.population }}
+                </div>
+                {% labelled label=form.consanguineous.label %}{% crispy_field form.consanguineous %}{% endlabelled %}
+
+                <div>
+                    <h4>Phenotype</h4>
+                    <div id='patient-phenotype-form-section'>
+                        {% labelled label=form.affected.label %}{% crispy_field form.affected %}{% endlabelled %}
+                    </div>
+                    <div id="phenotype-container">
+                    {% phenotype_entry form.phenotype patient.phenotype_description edit=has_write_permission %}
+                    </div>
+                </div>
+
+                <div>
+                {% if has_write_permission %}
+                    <button class="btn btn-primary mr-2">Save</button>
+                    <button type='reset' class="btn btn-secondary">Reset</button>
+                {% else %}
+                    You can view but not modify this patient.
+                {% endif %}
+                </div>
+            </form>
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab label="Contact" url="view_patient_contact_tab" param=patient.pk url_check=True tab_set="patients" %}
+        {% ui_register_tab label="Specimens" url="view_patient_specimens" param=patient.pk url_check=True tab_set="patients"%}
+        {% ui_register_tab label="Genes" url="view_patient_genes" param=patient.pk url_check=True tab_set="patients" %}
         {% if has_write_permission %}
-        <h2>Upload Attachments</h2>
-        {% else %}
-        <h2>Attachments</h2>
+            {% ui_register_tab_embedded label="Sharing / Permissions" tab_set="patients" %}{% url "group_permissions" 'patients.models.Patient' patient.pk %}{% end_ui_register_tab_embedded %}
+            <!-- Patient modification could show private info - only show to those with write access -->
+            {% ui_register_tab label="Modifications" url="view_patient_modifications" param=patient.pk tab_set="patients" %}
         {% endif %}
-        <a name="upload-section"></a> 
-        <div id="jfu-container">
-                {% load jfutags %}
-                {% jfu 'patients/patient_file_upload.html' 'patient_file_upload' patient_id=patient.pk %}
+        </ul>
+        {% ui_render_tabs tab_set="patients" %}
+
+        <hr/>
+        {% if has_write_permission or existing_files %}
+        <div>
+            {% if has_write_permission %}
+            <h4>Upload Attachments</h4>
+            {% else %}
+            <h4>Attachments</h4>
+            {% endif %}
+            <a name="upload-section"></a>
+            <div id="jfu-container">
+                    {% load jfutags %}
+                    {% jfu 'patients/patient_file_upload.html' 'patient_file_upload' patient_id=patient.pk %}
+            </div>
         </div>
+        {% endif %}
+
+        {% related_data_for_patient patient %}
+        {% related_analyses_for_samples patient.get_samples show_sample_info=True %}
+
     </div>
-    {% endif %}
-
-    {% related_data_for_patient patient %}
-    {% related_analyses_for_samples patient.get_samples show_sample_info=True %}
-
-{% endblock submenu_page_content %}
+{% endblock content %}

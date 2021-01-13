@@ -48,7 +48,7 @@ class TabBuilder:
 def ui_register_tab(context, tab_set: str, label: str, url: str = None, param: Any = None,
                     url_check=False, active=False):
     if url_check:
-        if url not in context["url_name_visible"]:
+        if not context["url_name_visible"].get(url) == True:
             return ""
 
     tab_key = f"ui-tab-{tab_set}"

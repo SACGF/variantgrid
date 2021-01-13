@@ -343,6 +343,30 @@ function highlightImportStatus() {
     }
 }
 
+function update_django_messages(messages) {
+    if (messages.length === 0) {
+        return;
+    }
+    let messagesDom = $("#django-messages");
+    messagesDom.empty();
+    for (let message of messages) {
+        let text = message.text;
+        let timestamp = "";
+        if (text.indexOf("saved successfully") !== -1) {
+            let m = moment();
+            timestamp= $('<time>', {'class': 'float-right', 'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
+        }
+        $('<div>', {class: `alert ${message.tags}`, role:"alert", html:[
+            "<i class=\"fas fa-exclamation-circle\"></i>",
+            $('<span>', {text: text}),
+            timestamp
+        ]}).appendTo(messagesDom);
+    }
+    messagesDom.hide();
+    messagesDom.fadeIn('slow');
+    $('body').scrollTop(0); // needed when in phone size
+    $('.main-content').scrollTop(0); // needed when in desktop size
+}
 
 function createMessage(className, message) {
     let errorMessageUl = $("<ul/>", {class: "messages"});
@@ -374,6 +398,7 @@ function checkLoggedIn(loggedInHandler, loggedOutHandler) {
 }
 
 const JS_DATE_FORMAT_DETAILED = 'YYYY-MM-DD HH:mm:ss ZZ';
+const JS_DATE_FORMAT_SECONDS = 'YYYY-MM-DD HH:mm:ss';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'lll';
 function convertTimestamps() {
@@ -401,21 +426,25 @@ function convertTimestamps() {
     $('.convert-timestamp').each((index, elem) => {
         elem = $(elem);
         let unix = Number(elem.attr('data-timestamp'));
+        let m = moment();
         if (unix) {
-            let m = moment(unix * 1000);
-            if (elem.hasClass('time-ago')) {
-                let isFuture = moment().diff(m) < 0;
-                let newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.format(JS_DATE_FORMAT_DETAILED)});
-                if (isFuture) {
-                    newElement.addClass('future');
-                }
-                elem.replaceWith(newElement);
-                newElement.timeago();
-                newElement.tooltip();
-            } else {
-                let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
-                elem.replaceWith(newElement);
+            m = moment(unix * 1000);
+        }
+        if (elem.hasClass('time-ago')) {
+            let isFuture = moment().diff(m) < 0;
+            let newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.format(JS_DATE_FORMAT_DETAILED)});
+            if (isFuture) {
+                newElement.addClass('future');
             }
+            elem.replaceWith(newElement);
+            newElement.timeago();
+            newElement.tooltip();
+        } else if (elem.hasClass('seconds')) {
+            let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
+            elem.replaceWith(newElement);
+        } else {
+            let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
+            elem.replaceWith(newElement);
         }
     });
 }

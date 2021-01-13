@@ -12,7 +12,7 @@ register = Library()
 
 
 @register.inclusion_tag("uicore/tags/help.html")
-def page_help(page_id: str = None, title=None, show_title=True):
+def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3"):
     """
     Displays a heading and page help
     :param page_id: Used to determine the help page
@@ -41,6 +41,7 @@ def page_help(page_id: str = None, title=None, show_title=True):
         'page_title': title if show_title else None,
         'help_page_title': help_page_title,
         "page_help_html": page_help_html,
+        "header_tag": header_tag,
         "help_url": help_url}
 
 

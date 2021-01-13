@@ -1,27 +1,26 @@
+{% load crispy_forms_tags %}
+{% load js_tags %}
+{% load ui_utils %}
 <div id="patient-contact">
     <script type="text/javascript">
         var targetParent = $("#patient-contact").parent();
     
         $(document).ready(function() {
+            {% update_django_messages %}
             var options = {
                 target: targetParent,
             };
             $('form#patient-contact-form').ajaxForm(options);
         });
     </script>
-    <form id="patient-contact-form" method="post" action="{% url 'view_patient_contact_tab' patient.pk %}">
-        {% csrf_token %}
-    
-        <table>
-            {{ form.as_table }}
-            <tr><td>
+    <div class="container">
+        <form id="patient-contact-form" method="post" action="{% url 'view_patient_contact_tab' patient.pk %}">
+            {% crispy form form_helper.horizontal %}
             {% if has_write_permission %}
-                <button id='save-patient-contact-details' class="btn btn-primary">save</button>
+                <button id='save-patient-contact-details' class="btn btn-primary">Save</button>
             {% else %}
                 You can view but not modify this patient.
             {% endif %}
-            </tr>
-        </table>
-        {% include "messages/messages.html" %}
-    </form>
+        </form>
+    </div>
 </div>
