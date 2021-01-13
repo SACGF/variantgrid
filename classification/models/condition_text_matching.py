@@ -121,7 +121,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             rc.condition_xrefs.select_term(term)
         return rc
 
-
     @property
     def condition_matching_str(self) -> str:
         result = ''
@@ -339,4 +338,3 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
         cl: Classification
         if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version)
-

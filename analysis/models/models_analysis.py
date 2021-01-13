@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Tuple, Sequence, Dict, List
+from typing import Tuple, Dict, List
 
 from django.apps import apps
 from django.contrib.auth.models import User

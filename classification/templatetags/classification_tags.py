@@ -29,7 +29,7 @@ from classification.templatetags.js_tags import jsonify
 register = Library()
 
 @register.inclusion_tag("classification/tags/condition_match.html")
-def condition_match(condition_match: ConditionTextMatch, indent = 0):
+def condition_match(condition_match: ConditionTextMatch, indent=0):
     return {
         "condition_match": condition_match,
         "indent": indent + 1,

@@ -335,4 +335,3 @@ class ClassificationDatatableConfig(DatatableConfig):
             qs = qs.filter(q)
 
         return super().filter_queryset(qs)
-

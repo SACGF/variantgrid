@@ -106,7 +106,7 @@ class OntologyBuilder:
         parts = term_id.split(":")
         ontology_service = parts[0]
         ontology_index = int(parts[1])
-        
+
         OntologyTerm.objects.get_or_create(
             id=term_id,
             ontology_service=ontology_service,
@@ -133,7 +133,6 @@ class OntologyBuilder:
                     # now from a MONDO import.
                     self.created_cache[term_id] = OntologyBuilder.CreatedState.DETAILED
                     return
-
 
         parts = term_id.split(":")
         ontology_service = parts[0]

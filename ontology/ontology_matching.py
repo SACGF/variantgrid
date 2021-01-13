@@ -408,4 +408,3 @@ class OntologyMatching:
 
         ontology_matches.apply_word_match_score()
         return ontology_matches
-
