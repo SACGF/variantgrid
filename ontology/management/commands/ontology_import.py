@@ -1,3 +1,4 @@
+import datetime
 import json
 import re
 
@@ -41,7 +42,7 @@ Rework it so we can keep a cache of everything already updated or created this r
 
 @transaction.atomic
 def load_mondo(filename: str, force: bool):
-
+    start = datetime.datetime.now()
     data_file = None
     with open(filename, 'r') as json_file:
         data_file = json.load(json_file)
@@ -90,6 +91,17 @@ def load_mondo(filename: str, force: bool):
                             #        set(GENE_SYMBOL_SEARCH.findall(defn)))
                             if synonyms := meta.get("synonyms"):
                                 extra["synonyms"] = synonyms
+
+                            # make the term early so we don't have to create stubs for it if we find relationships
+                            ontology_builder.add_term(
+                                term_id=full_id,
+                                name=label,
+                                definition=defn,
+                                extra=extra if extra else None,
+                                primary_source=True
+                            )
+
+                            if synonyms:
                                 for synonym in synonyms:
                                     pred = synonym.get("pred")
                                     if pred == "hasExactSynonym":
@@ -100,7 +112,8 @@ def load_mondo(filename: str, force: bool):
                                                     term_id=xref,
                                                     name=label,
                                                     definition=f"Name copied from synonym {full_id}",
-                                                    stub=True
+                                                    extra=None,
+                                                    primary_source=False
                                                 )
                                                 ontology_builder.add_ontology_relation(
                                                     source_term_id=full_id,
@@ -113,13 +126,6 @@ def load_mondo(filename: str, force: bool):
                             # if synonym_value:
                             #    synonyms.append(synonym_value)
                             #    genes_mentioned = genes_mentioned.union(set(GENE_SYMBOL_SEARCH.findall(synonym_value)))
-
-                            ontology_builder.add_term(
-                                term_id=full_id,
-                                name=label,
-                                definition=defn,
-                                extra=extra if extra else None
-                            )
                             node_to_mondo[node_id_full] = full_id
 
                             for bp in meta.get("basicPropertyValues", []):
@@ -129,6 +135,13 @@ def load_mondo(filename: str, force: bool):
                                     pred = bp.get("pred")
                                     pred = MATCH_TYPES.get(pred, pred)
 
+                                    ontology_builder.add_term(
+                                        term_id=omim,
+                                        name=label,
+                                        definition=f"Name copied from synonym {full_id}",
+                                        extra=None,
+                                        primary_source=False
+                                    )
                                     ontology_builder.add_ontology_relation(
                                         source_term_id=full_id,
                                         dest_term_id=omim,
@@ -172,10 +185,12 @@ def load_mondo(filename: str, force: bool):
     print("Purging old data")
     ontology_builder.complete()
 
-    print(f"Records inserted: {ontology_builder.insert_count}")
-    print(f"Records updated: {ontology_builder.update_count}")
-    print(f"Records deleted: {ontology_builder.delete_count}")
+    for model, counter in ontology_builder.counters.items():
+        print(f"{model} - {counter}")
 
+    end = datetime.datetime.now()
+    diff = end - start
+    print(f"Processing took {diff}")
     print("Committing...")
 
 
