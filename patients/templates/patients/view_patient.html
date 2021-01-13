@@ -75,8 +75,7 @@
                         {% labelled label="Age" %}{{ patient.age }}{% endlabelled %}
                     {% endif %}
                 <div>
-                    <h4>Patient Population</h4>
-                    {% page_help 'patients/patient_population_help' 'Patient Population' show_title=False %}
+                    {% page_help 'patients/patient_population_help' 'Patient Population' header_tag="h4" %}
                     {{ form.population }}
                 </div>
                 {% labelled label=form.consanguineous.label %}{% crispy_field form.consanguineous %}{% endlabelled %}

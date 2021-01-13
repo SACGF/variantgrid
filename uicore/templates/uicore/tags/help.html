@@ -1,4 +1,4 @@
-{% if page_title %}<h3>{{ page_title }}</h3>{% endif %}
+{% if page_title %}<{{ header_tag }}>{{ page_title }}</{{ header_tag }}>{% endif %}
 {% if page_help_html %}
     <div class="accordion indicator-plus-before round-indicator mb-4">
         <div class="card">

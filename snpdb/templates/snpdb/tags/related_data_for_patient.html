@@ -3,8 +3,8 @@
 {{ block.super }}
 {% load related_data_tags %}
 
-<div id="samples" class="container">
-    <h4>Samples for patient:</h4>
+<div id="samples">
+    <h4>Samples for patient</h4>
     {% if samples %}
         <table class="table">
             <thead>
@@ -33,7 +33,7 @@
     {% endif %}
 
     {% if cases %}
-    <h4>Cases for patient:</h4>
+    <h4>Cases for patient</h4>
     <table class="table">
         <thead>
         <tr>
