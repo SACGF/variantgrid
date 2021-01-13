@@ -352,9 +352,11 @@ function update_django_messages(messages) {
             $('<span>', {text: text}),
             timestamp
         ]}).appendTo(messagesDom);
-        messagesDom.hide();
-        messagesDom.fadeIn('slow');
     }
+    messagesDom.hide();
+    messagesDom.fadeIn('slow');
+    $('body').scrollTop(0); // needed when in phone size
+    $('.main-content').scrollTop(0); // needed when in desktop size
 }
 
 function createMessage(className, message) {
