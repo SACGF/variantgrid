@@ -19,7 +19,7 @@ the relationship is actually stored against the MONDO equivilant of the OMIM ter
 class OntologyService(models.TextChoices):
     MONDO = "MONDO", "MONDO"
     OMIM = "OMIM", "OMIM"
-    HPO = "HPO", "HPO"
+    HPO = "HP", "HP"
 
     EXPECTED_LENGTHS: Dict[str, int] = Constant({
         MONDO[0]: 7,
@@ -52,6 +52,7 @@ class OntologyRelation(models.TextChoices):
     CLOSE = "close", "close"
     BROAD = "broad", "broad"
     NARROW = "narrow", "narrow"
+    FREQUENCY = "frequency", "has a frequency in"
 
 
 class OntologyImport(TimeStampedModel):
