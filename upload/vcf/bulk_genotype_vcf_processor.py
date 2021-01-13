@@ -52,9 +52,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # Need to work out how to map CyVCF2GTType to PL index.
     # This ends up being the same for both ref/alt
     CYVCF_HAPLOID_PL_INDEX = [0, DOESNT_MATTER, DOESNT_MATTER, 1]
-    CYVCF_DIPLOID_PL_INDEX = [0, 1, DOESNT_MATTER]  # Unknown genotype (2) handled in special case of EMPTY_PL_ARRAY
+    CYVCF_DIPLOID_PL_INDEX = [0, 1, DOESNT_MATTER, 2]
     CYVCF_PL_INDEX_FOR_PLOIDY = [None, CYVCF_HAPLOID_PL_INDEX, CYVCF_DIPLOID_PL_INDEX]
-    EMPTY_PL_ARRAY = "{-1,-1,-1}"
+    EMPTY_PL_ARRAY = "{-1,-1,-1}"  # Shortcut for PL = '.'
 
     @staticmethod
     def get_vcf_importer_version():
