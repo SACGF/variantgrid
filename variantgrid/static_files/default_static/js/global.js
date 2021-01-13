@@ -101,12 +101,21 @@ function setupAjaxTabs(element) {
     });
 }
 
+function setupListGroupCheckboxes() {
+    $('.list-group-checkbox').click(function(event) {
+        console.log("Clickity clickity");
+        $(this).find('input[type=radio]').prop("checked", true); //.trigger("click");
+        // return false;
+    });
+}
+
 function globalSetup() {
     convertTimestamps();
     setupAjaxTabs();
     handleAjaxErrors();
     setupTooltips();
     highlightImportStatus();
+    setupListGroupCheckboxes();
 
     $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
     $('.radio-row').click(event => {
@@ -594,6 +603,17 @@ TableFormat.detailRenderer = function ( api, rowIdx, columns ) {
     }
     return fieldset;
 };
+TableFormat.boolean = function(style, data, type, columns) {
+    console.log(data);
+    if (style == 'warning') {
+        if (data) {
+            return '<i class="fas fa-exclamation-circle"></i>';
+        }
+    } else {
+        return data ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="far fa-circle"></i>';
+    }
+    return null;
+}
 
 // Dialogs
 function createModalShell(id, title) {

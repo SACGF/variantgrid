@@ -6,6 +6,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         update_count = 0
 
+        allele: Allele
         for allele in Allele.objects.all():
             allele.validate()
 

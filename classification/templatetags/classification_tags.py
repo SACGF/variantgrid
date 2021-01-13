@@ -15,7 +15,7 @@ from snpdb.models.models_variant import Allele, Variant
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS
+from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceReportClassification
@@ -28,6 +28,13 @@ from classification.templatetags.js_tags import jsonify
 
 register = Library()
 
+@register.inclusion_tag("classification/tags/condition_match.html")
+def condition_match(condition_match: ConditionTextMatch, indent = 0):
+    return {
+        "condition_match": condition_match,
+        "indent": indent + 1,
+        "indent_px": (indent + 1) * 16 + 8
+    }
 
 @register.filter
 def ekey(val, key: str = None):
@@ -305,3 +312,10 @@ def variant_card(context, allele: Allele, build: GenomeBuild):
 def quick_link_data(variant: Variant):
     data = variant_link_info(variant)
     return jsonify(data)
+
+
+@register.inclusion_tag("classification/tags/db_ref.html")
+def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
+    context = dict(data)
+    context['css'] = css
+    return context

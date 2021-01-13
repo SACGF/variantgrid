@@ -163,7 +163,7 @@ class LabelledValueTag(template.Node):
             div_id = f"id=\"{complete_id}\""
             for_id = f"for=\"{complete_id}\""
 
-        if output == "":
+        if output == "" or output == "None":
             output = "<span class=\"no-value\">-</span>"
         elif LabelledValueTag.big_zero.match(output):
             output = f"<span class=\"zero-value\">{output}</span>"
@@ -197,6 +197,13 @@ def severity_icon(severity: str) -> str:
     else:  # debug
         return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
 
+
+@register.filter()
+def checked(test: bool) -> str:
+    if test:
+        return SafeString('checked="checked"')
+    else:
+        return ''
 
 class TagUtils:
 

@@ -1,0 +1,42 @@
+{% extends "uicore/page/base.html" %}
+{% load datatable_tags %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% block title %}Condition Matching{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <script>
+        $(document).ready(() => {
+            EKeys.load().then(() => {
+                {% datatable_definition table_config=datatable_config table_id='condition-text-datatable' url='condition_text_datatable' responsive=True %}
+            });
+        });
+        function idRenderer(data) {
+            let text = data.normalized_text;
+            let id = data.id;
+
+            let textDom;
+            if (!text) {
+                textDom = $('<span>', {class: 'no-value', text:'<blank>'});
+            } else {
+                textDom = $('<span>', {text: text});
+            }
+            // FIXME regenerate URLs
+            let aDom = $('<a>', {href:`/classification/condition_matching/${id}`, html: textDom});
+
+            return aDom.prop('outerHTML');
+        }
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <h3>Condition Matching Listing</h3>
+        {% page_help_embedded title='Condition Matching Listing' %}
+            <p>
+            Help will go here for matching text to conditions
+            </p>
+        {% end_page_help_embedded %}
+        {% datatable datatable_config 'condition-text-datatable' class_name='condition-text-datatable responsive sticky-header' %}
+    </div>
+{% endblock %}

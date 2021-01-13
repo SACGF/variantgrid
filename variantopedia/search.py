@@ -21,6 +21,7 @@ from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene,
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
+from ontology.models import OntologyTerm
 from patients.models import ExternalPK, Patient
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
@@ -37,7 +38,7 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
 HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":(c|g|p)\..*\d+")
-
+ONTOLOGY_PATTERN = re.compile(r"\w+:[0-9]+")
 
 class AbstractMetaVariant:
 
@@ -274,7 +275,8 @@ class Searcher:
             (SearchTypes.TRANSCRIPT, r"^(ENST|NM_)\d+\.?\d*$", search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
-            (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org)
+            (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org),
+            (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology)
         ]
 
         exclude_search_types = set()
@@ -424,6 +426,13 @@ def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbo
     gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
     aliases = [alias for alias in GeneSymbolAlias.objects.filter(alias__iexact=search_string).all() if alias.alias not in gene_symbol_strs]
     return gene_symbols + aliases
+
+
+def search_ontology(search_string: str, **kwargs) -> Optional[SearchResult]:
+    try:
+        return [SearchResult(OntologyTerm.get_or_stub(search_string))]
+    except:
+        return []
 
 
 def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:

@@ -13,7 +13,7 @@ from variantgrid import views
 admin.autodiscover()
 
 APPS_WITH_URLS = ["analysis", "annotation", "eventlog",
-                  "expression", "flags", "genes", "pathtests", "patients", "pedigree",
+                  "expression", "flags", "genes", "pathtests", "patients", "pedigree", "ontology",
                   "sapath", "seqauto", "snpdb", "upload", "classification", "variantopedia"]
 
 urlpatterns = [

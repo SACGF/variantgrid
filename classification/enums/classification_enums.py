@@ -68,6 +68,10 @@ class SpecialEKeys:
 
     # used for Clinvar export
     AFFECTED_STATUS = 'affected_status'
+    MODE_OF_INHERITANCE = 'mode_of_inheritance'
+    CURATION_CONTEXT = 'curation_context'
+    ASSERTION_METHOD = 'assertion_method'
+    PATIENT_PHENOTYPE = 'patient_phenotype'
     ORIGIN = 'origin'
     OWNER = 'owner'
     SOURCE_ID = 'source_id'

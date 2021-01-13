@@ -1,0 +1,476 @@
+{% extends "uicore/page/base.html" %}
+{% load datatable_tags %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load user_tags %}
+{% load ui_utils %}
+{% block title %}Condition Matching{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        tr.selected {
+            background-color: #ccffcc;
+        }
+        .condition-match-input::placeholder {
+            color: #bbb;
+        }
+    </style>
+    <script>
+        const gene_symbol = "{{ clinvar_export.gene_symbol }}";
+        const basicHighlight = ["autosomal", "x-linked", "recessive", "dominant", gene_symbol];
+        const basicHighlightStr = basicHighlight.join("|");
+        const highlightRegex = new RegExp(`(${basicHighlightStr})`, 'g');
+
+        function modalClosed() {
+            let id = $('#mp-id').val();
+
+            let selectedText = $('#mp-selected').val();
+            let {terms, _} = parseTermText(selectedText);
+
+            let finalText = terms.join(", ");
+            if (terms.length >= 2) {
+                let mode = $('[name=mp-multimode]:checked').val();
+                switch (mode) {
+                    case "U": finalText += "; uncertain"; break;
+                    case "C": finalText += "; co-occuring"; break;
+                    default: finalText += "; uncertain/co-occuring"; break;
+                }
+            }
+            let input = $(`#condition-match-${id}`);
+            input.val(finalText);
+            applyInheritRoot(input);
+        }
+
+        function parseTermText(text) {
+            let termText = null;
+            let join = 'X';
+
+            let parts = text.split(";");
+            if (parts.length == 2) {
+                termText = parts[0].trim();
+                join = parts[1].trim().toLowerCase();
+                if (join.includes('/')) {
+                    join = 'X';
+                } else if (join.includes('un')) {
+                    join = 'U';
+                } else if (join.includes('co')) {
+                    join = 'C';
+                }
+            } else {
+                termText = text;
+            }
+            let terms = termText.split(",").map(tt => tt.trim());
+
+            return {
+                terms,
+                join
+            }
+        }
+
+        function toggleTerm(fullText, term) {
+            let termArray = fullText.split(",").map(tt => tt.trim()).filter(tt => tt.length);
+            let termDict = {};
+            for (let term of termArray) {
+                termDict[term] = true;
+            }
+            if (termDict[term]) {
+                delete termDict[term];
+            } else {
+                termDict[term] = true;
+            }
+            let termList = Object.keys(termDict);
+            if (termList.length > 0) {
+                termList.sort();
+                return termList.join(", ");
+            } else {
+                return '';
+            }
+        }
+
+        function highlightDescription(description) {
+            if (!description) {
+                return description;
+            }
+            return description.replace(highlightRegex, "<b>$1</b>")
+        }
+
+        function idSafe(id) {
+            return id.replace(":", "-");
+        }
+
+        function ontologyTr(onto) {
+            let row = $('<tr>', {id: `result-${idSafe(onto.id)}`, class: 'onto-row'});
+            let toggleButton = $('<button>', {class:'btn btn-outline-primary', text:'Toggle'}).click(() => {
+                let fullText = $('#mp-selected').val();
+                let newText = toggleTerm(fullText, onto.id);
+                $('#mp-selected').val(newText);
+                updateOntoRowSelections();
+            });
+
+            $('<td>', {html:toggleButton}).appendTo(row);
+
+             $('<td>', {class: 'term-cell', html:[
+                $('<a>', {class: 'external-link', target:'blank', href:onto.url, text:onto.id}),
+                $('<br>'),
+                onto.title
+            ]}).appendTo(row);
+
+            let contexts = $('<td>', {class: 'relevance-cell'});
+            for (let [title, context] of Object.entries(onto.contexts)) {
+                let contextBox = renderContext(title, context);
+                if (contextBox) {
+                    contextBox.appendTo(contexts);
+                }
+            }
+            contexts.appendTo(row);
+            let description = $('<td>', {class:'description-cell text-muted' }).appendTo(row);
+            if (onto.parent_id) {
+                let parentLink = $('<a>', {class:'hover-link', text: `Parent: ${onto.parent_id} ${onto.parent_title}`});
+                parentLink.click(() => {
+                   searchMondo({
+                       searchText: onto.parent_id,
+                   })
+                });
+                $('<div>', {html:[
+                    parentLink
+                ]}).appendTo(description);
+            }
+            description.append(highlightDescription(onto.definition))
+            if (onto.sibling_count || onto.children_count) {
+                $('<div>', {html:[
+                    $('<a>', {text: `Siblings: ${onto.sibling_count}, Children: ${onto.children_count}`})
+                ]}).appendTo(description);
+            }
+
+            let scoreDetail = $('<div>');
+            for (let score_part of onto.scores) {
+                let score = score_part.score.toFixed(0);
+                if (score_part.score > 0) {
+                    score = "+" + score;
+                }
+                let paddingCount = 3 - score.length;
+                for (let i=0; i < paddingCount; i++) {
+                    score = '&nbsp;' + score;
+                }
+
+                $('<div>', {class:'mt-2',
+                    html: [
+                        $('<span>', {class: 'text-monospace', html: score}),
+                        $('<span>', {text: " : " + score_part.description})
+                    ]
+                }).appendTo(scoreDetail);
+            }
+
+            let scoreCell = $('<td>', {class:'text-monospace text-right', 'data-toggle': 'popover', 'title': 'score', 'data-content': scoreDetail.prop('outerHTML')}).appendTo(row);
+            $('<div>', {text: onto.score.toFixed(0)}).appendTo(scoreCell);
+
+            return row;
+        }
+
+        function updateOntoRowSelections() {
+            $('.onto-row').removeClass('selected');
+            let allSelected = $('#mp-selected').val().split(',').map(t => t.trim()).filter(t => t.length > 0);
+            for (let selected of allSelected) {
+                $(`#result-${idSafe(selected)}`).addClass('selected');
+            }
+        }
+
+        function renderOntologies(ontos) {
+            ontos.sort((a, b) => {
+                let scoreOnto = (onto) => {
+                    let score = onto.score;
+                    // put the selected terms at the top regardless of score
+                    if (onto.contexts["selected"]) {
+                        score += 1000;
+                    }
+                    return score;
+                }
+                let score1 = scoreOnto(a);
+                let score2 = scoreOnto(b);
+                if (score1 == score2) {
+                    return (a.name || '').localeCompare((b.name || ''));
+                } else {
+                    return score2 - score1;
+                }
+            });
+
+            let tbody = $('#mp-results tbody');
+            tbody.empty();
+            for (let onto of ontos) {
+                ontologyTr(onto).appendTo(tbody);
+            }
+        }
+
+        function searchMondo(data) {
+            let searchText = data.searchText;
+            let geneSymbol = data.geneSymbol;
+            let selected = data.selected;
+
+            let url = '{% url "api_mondo_search" %}';
+            let resultsDom = $("#mp-results");
+            resultsDom.LoadingOverlay('show');
+
+            $.ajax({
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                data: {
+                    "search_term": searchText,
+                    "gene_symbol": geneSymbol,
+                    "selected": selected
+                },
+                url: url,
+                type: 'GET',
+                error: (call, status, text) => {
+                    resultsDom.LoadingOverlay('hide');
+                    resultsDom.find('tbody').empty().append($('<tr>', {html:
+                            $('<td>', {'col-span': 4, text: 'Error retrieving mondo terms'})
+                    }));
+                    console.log(status);
+                    console.log(text);
+                    // $('<div/>', {class:'no-value w-100 text-center', text:'Error Retrieving'}).appendTo(resultsDom);
+                    // FIXME show errors
+                },
+                success: async (results) => {
+                    resultsDom.LoadingOverlay('hide');
+                    renderOntologies(results);
+                    updateOntoRowSelections();
+                }
+            });
+        }
+
+        function renderContext(title, context) {
+            if (title == "selected") {
+                return null; // redundant to checkbox, so no need to show it here
+            }
+            if (title == "searched") {
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-secondary"></i>`),
+                        $('<span>', {text: "Text search" })
+                ]});
+            }
+            if (title == "referenced") {
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-dark"></i>`),
+                        $('<span>', {text: "Referenced in Condition Text" })
+                ]});
+            }
+            if (title == "similar_match") {
+                return $('<div>', {html: [
+                    $(`<i class="fas fa-circle text-primary"></i>`),
+                    $('<span>', {text: `Selected by another record for same text${context.matches_gene ? ' and gene symbol' : ''}` }),
+                    " ",
+                    // FIXME use URLS
+                    $('<a>', {href:`/classification/clinvar_export/${context.vce_id}`, target:"_blank", text:"View other export"})
+                ]});
+            }
+            if (title == "Monarch") {
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-success"></i>`),
+                        $('<span>', {text: title }),
+                        " ",
+                        $('<span>', {class: 'text-muted', text: `${context.relation} ${context.gene_symbol}`})
+                ]});
+            } else if (title == "PanelApp AU") {
+                let evidence = context.evidence.join(", ");
+                return $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-success"></i>`),
+                        $('<span>', {text: title }),
+                        " ",
+                        $('<span>', {class: 'hover-detail text-muted', text: `${context.phenotype_row}`, title: evidence})
+                ]});
+            } else if (title == "parent_of_gene_relation") {
+                return $('<div>', {html: [
+                            $(`<i class="fas fa-circle text-success"></i>`),
+                            $('<span>', {text: `Child has established relation to gene symbol` })
+                        ]});
+            } else {
+                return $("<div>", {text: title});
+            }
+        }
+
+        function triggerSearchMondo() {
+            let searchText = $('#mp-search-text').val();
+            let geneSymbol = $('#mp-gene-symbol').text();
+            let selected = $('#mp-selected').val();
+
+            searchMondo({
+                searchText,
+                geneSymbol,
+                selected
+            });
+        }
+
+        // on form
+        function applyInheritRoot(input) {
+            let this$ = $(input);
+            console.log(`Applying root ${this$.length}`)
+            let useValue = this$.val();
+            let checkValueOf = this$;
+
+            // we may have blanked out the value, and now actually need to apply a parent value
+            while (_.isEmpty(useValue)) {
+                let parentId = checkValueOf.attr('data-parent-id');
+                if (parentId) {
+                    checkValueOf = $(`input[data-id=${parentId}]`);
+                    if (!checkValueOf.length) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+                useValue = checkValueOf.val();
+            }
+            applyInherit(this$, useValue);
+        }
+
+        function applyInherit(input, parentValue) {
+            let input$ = $(input);
+            let val = input$.val();
+            let inputId = input$.attr('data-id');
+            let inheritValue = _.isEmpty(val) ? parentValue : val;
+            input$.attr('placeholder', inheritValue);
+
+            let children = $(`[data-parent-id=${inputId}]`);
+            for (let child of children) {
+                applyInherit(child, inheritValue);
+            }
+        }
+
+        $(document).ready(() => {
+            // should be actual root, and will then filter down to all children
+            applyInheritRoot($('[data-parent-id=None]'));
+
+            $('input[data-id]').keyup(function() {
+                applyInheritRoot(this);
+            });
+
+            // open MODAL
+
+            $('.mondo-picker').click(function () {
+                let mondoButton = $(this);
+                let geneSymbol = mondoButton.attr('data-gene-symbol');
+                let label = mondoButton.attr('data-label');
+                let inheritance = mondoButton.attr('data-mode-of-inheritance');
+                if (geneSymbol == '') {
+                    $('#mp-gene-symbol').text('-').addClass('no-value');
+                } else {
+                    $('#mp-gene-symbol').text(geneSymbol).removeClass('no-value');
+                }
+                let searchText = `{{ condition_text.normalized_text }} ${geneSymbol}`.trim();
+                let recordId = $(this).attr('data-id');
+                let selected = $(`#condition-match-${recordId}`).val();
+                let parsedMatch = parseTermText(selected);
+                $(`[name=mp-multimode][value=${parsedMatch.join}]`).trigger('click');
+
+                $('#mp-id').val(recordId);
+                $('#mp-search-text').val(`{{ condition_text.normalized_text }} ${geneSymbol}`.trim());
+                $('#mp-selection-title').text(label);
+                $('#mp-selected').val(parsedMatch.terms.join(", "));
+                if (inheritance == 'N/A') {
+                    $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'N/A'}));
+                } else if (inheritance == 'None') {
+                    $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'Not Specified'}));
+                } else {
+                    $('#mp-mode-of-inheritance').text(inheritance);
+                }
+                $('#mondoModal').modal('show');
+
+                triggerSearchMondo();
+                return false;
+            });
+
+            $('#mondoModal').on('hide.bs.modal', () => {
+                modalClosed();
+            });
+
+            $('#mp-search-button').click(() => {
+                triggerSearchMondo();
+            });
+
+            $('#mp-selected').change(() => {
+                updateOntoRowSelections();
+            })
+        });
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="modal fade" data-backdrop="static" id="mondoModal" tabindex="-1" aria-labelledby="mondoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mondoModalLabel">Mondo Picker for <span id="mp-selection-title">?</span></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input id="mp-id" type="hidden" />
+                    {% labelled label="Search Text" %}
+                        <div class="input-group">
+                            <input class="form-control" type="text" id="mp-search-text" />
+                            <span class="input-group-append"><button id="mp-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
+                        </div>
+                    {% endlabelled %}
+                    {% labelled label="Gene Symbol" %}<span id="mp-gene-symbol">None</span>{% endlabelled %}
+                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
+                    {% labelled label="Mutli-Mode" %}
+                        <div id="mp-multimode" >
+                            <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-n" value="X" checked="checked">?</label>
+                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-u" value="U">Uncertain</label>
+                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-c" value="C">Co-occuring</label>
+                            </div>
+                        </div>
+                        <div id="mp-singlemode" class="collapse no-value">N/A</div>
+                    {% endlabelled %}
+                    {% labelled label="Terms" %}<input class="form-control" id="mp-selected" />{% endlabelled %}
+
+                    <label>Select Relevant Ontology Terms Below</label>
+                    <table class="table" id="mp-results">
+                        <thead>
+                            <tr>
+                                <th>Toggle</th>
+                                <th class="term-cell">Term</th>
+                                <th class="relevance-cell">Relevance</th>
+                                <th>Description</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <form method="POST">
+            {% csrf_token %}
+            <a href="{% url 'condition_matchings' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all
+                Condition Texts</a>
+            <h3>Condition Matching</h3>
+            {% page_help_embedded title='Condition Matching' %}
+                <p>
+                    Help will go here for matching text to conditions
+                </p>
+            {% end_page_help_embedded %}
+            {% labelled label="Lab" %}{{ condition_text.lab.name }}{% endlabelled %}
+            {% labelled label="Text" %}{{ condition_text.normalized_text }}{% endlabelled %}
+            {% labelled label="Last Updated By" %}
+                {% if condition_text.last_edited_by %}
+                {% user condition_text.last_edited_by %}
+                {% else %}-{% endif %}
+            {% endlabelled %}
+            <ul class="list-group mt-4">
+                {% condition_match condition_match %}
+            </ul>
+            <input type="submit" class="btn btn-primary mt-4" value="Save Changes"></input>
+        </form>
+    </div>
+{% endblock %}

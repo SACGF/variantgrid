@@ -788,6 +788,9 @@ table.name-fields td:not(:first-of-type), table.name-fields th:not(:first-of-typ
 .pills a.selected {
   background-color: #ccccee;
 }
+.pills a:first-of-type {
+  margin-left: 0 !important;
+}
 
 .pills .pill {
   padding: 4px 8px 4px 8px;

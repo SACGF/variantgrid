@@ -55,6 +55,7 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     @param extra_data a JSON-isable dictionary of extra information
     @param persist_name Should this message be kept permanently, if so give it a name
     """
+    print(message)
     rollbar.report_message(message=message,
                            level=level,
                            request=request,

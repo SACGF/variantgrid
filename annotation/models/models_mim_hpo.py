@@ -4,12 +4,30 @@ from django_dag.models import edge_factory, node_factory
 
 from annotation.models.models_enums import HPOSynonymScope
 
-
 # MIM gives multiple names for disorders, separated by ";;". We store the 1st one as the name, and aliases in a 2nd table
-class MIMMorbid(models.Model):
+from annotation.ontology import OntologyMixin
+
+
+class MIMMorbid(models.Model, OntologyMixin):
     PREFIX = "OMIM:"
     accession = models.IntegerField(primary_key=True)
     description = models.TextField()
+
+    @property
+    def name(self) -> str:
+        """
+        Made to share duck typing with MONDO
+        """
+        return self.description
+
+    @property
+    def url(self) -> str:
+        # FIXME redundant to dbregex but don't want to reference that from this file
+        return f"http://www.omim.org/entry/{self.padded_id}"
+
+    @classmethod
+    def expected_length(cls) -> int:
+        return 6
 
     def get_genes(self):
         from genes.models import Gene
@@ -45,11 +63,20 @@ class MIMMorbidAlias(models.Model):
         return f"{self.accession} {self.name}"
 
 
-class HumanPhenotypeOntology(node_factory('HPOEdge')):
+class HumanPhenotypeOntology(node_factory('HPOEdge'), OntologyMixin):
     """ Inserted with PK = human phenotype ontology ID """
     PREFIX = "HP:"
     name = models.TextField(null=True)
     definition = models.TextField(null=True)
+
+    @property
+    def url(self) -> str:
+        # FIXME redundant to dbregex but don't want to reference that from this file
+        return f"https://hpo.jax.org/app/browse/term/HP:{self.padded_id}"
+
+    @classmethod
+    def expected_length(cls) -> int:
+        return 7
 
     @property
     def accession(self):

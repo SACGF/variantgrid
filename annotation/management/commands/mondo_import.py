@@ -36,7 +36,7 @@ def insert_owl_mondo(ot, phenotype_mim_ids):
 
         if term.id.startswith("MONDO"):
             try:
-                mondo_id = MonarchDiseaseOntology.mondo_id_as_int(term.id)
+                mondo_id = MonarchDiseaseOntology.id_as_int(term.id)
             except ValueError:
                 logging.info(f"Could not convert MONDO id '{term.id}' into int")
                 continue

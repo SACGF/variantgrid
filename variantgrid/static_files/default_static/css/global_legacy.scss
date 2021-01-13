@@ -817,6 +817,9 @@ table.name-fields {
     &.selected {
         background-color: #ccccee;
     }
+    &:first-of-type {
+        margin-left: 0 !important;
+    }
 }
 .pills .pill {
     padding: 4px 8px 4px 8px;

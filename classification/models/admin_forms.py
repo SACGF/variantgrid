@@ -12,8 +12,7 @@ from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.enums.classification_enums import EvidenceCategory, \
     SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionAlias, \
-    ConditionAliasStatus
+from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification
 from classification.models.classification import Classification, ClassificationImport
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.classification_import import process_classification_import
@@ -464,38 +463,6 @@ class EvidenceKeyAdmin(admin.ModelAdmin):
         }, **kwargs)
 
 
-class ConditionAliasStatusFilter(admin.SimpleListFilter):
-    title = 'Status Filter'
-    parameter_name = 'status'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return ConditionAliasStatus.choices
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(status=self.value())
-        return queryset
-
-
-class ConditionAliasAdmin(ModelAdminBasics):
-
-    list_display = ["pk", "lab", "source_text", "source_gene_symbol", "status", "records_affected", "aliases", "join_mode", "updated_by", "created"]
-    readonly_fields = ["pk", "lab"]
-    search_fields = ['source_text', 'source_gene_symbol', 'aliases']
-    list_filter = [ConditionAliasStatusFilter]
-
-    def auto_match(self, request, queryset):
-        ca: ConditionAlias
-        for ca in queryset:
-            attempt = ca.attempt_auto_match(update_record=True)
-            messages.add_message(request, messages.INFO, message=f"({ca.id}) -> {attempt}")
-
-    auto_match.short_description = "Attempt auto match"
-
-    actions = ["export_as_csv", auto_match]
-
-
 class ClassificationReportTemplateAdmin(admin.ModelAdmin):
     list_display = ('name', 'modified')
 
@@ -504,3 +471,15 @@ class ClassificationReportTemplateAdmin(admin.ModelAdmin):
             'name': admin.widgets.AdminTextInputWidget(),
             'template': admin.widgets.AdminTextareaWidget()
         }, **kwargs)
+
+
+class ConditionTextAdmin(ModelAdminBasics):
+    list_display = ["pk", "lab", "normalized_text"]
+
+
+class ConditionTextMatchAdmin(ModelAdminBasics):
+    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "created"]
+
+
+class ClinVarExportAdmin(ModelAdminBasics):
+    list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]

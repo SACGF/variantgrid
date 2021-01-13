@@ -586,3 +586,21 @@ table.as_table {
         content: "\f057";
     }
 }
+
+.list-group-small {
+    max-width: 300px;
+}
+.formatted-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.code {
+    font-family: monospace;
+    color: #444;
+    font-weight: 400;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 20px;
+    background-color: #eee;
+}

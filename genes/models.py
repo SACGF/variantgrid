@@ -1140,6 +1140,14 @@ class PanelAppServer(models.Model):
     def __str__(self):
         return self.name
 
+    @staticmethod
+    def australia_instance() -> 'PanelAppServer':
+        return PanelAppServer.objects.get(name="PanelApp Australia")
+
+    @staticmethod
+    def england_instance() -> 'PanelAppServer':
+        return PanelAppServer.objects.get(name="Genomics England PanelApp")
+
 
 class PanelAppPanel(models.Model):
     """ Name, used in autocomplete list, actual gene list retrieved by API call (panel_app.py)

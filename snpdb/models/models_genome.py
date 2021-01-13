@@ -62,6 +62,13 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return GenomeBuild.objects.get(name=settings.DEFAULT_BUILD)
 
     @staticmethod
+    def get_from_fuzzy_string(genome_build_str: str):
+        if "h37" in genome_build_str:
+            return GenomeBuild.grch37()
+        else:
+            return GenomeBuild.grch38()
+
+    @staticmethod
     @timed_cache(ttl=60)
     def get_name_or_alias(build_name):
         """ Get by insensitive name or alias """

@@ -336,8 +336,3 @@ class ClassificationDatatableConfig(DatatableConfig):
 
         return super().filter_queryset(qs)
 
-
-class ClassificationModificationDatatableView(BaseDatatableView):
-
-    def config_for_request(self, request):
-        return ClassificationDatatableConfig(request)

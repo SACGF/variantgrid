@@ -8,13 +8,13 @@ from variantgrid.celery import app
 
 class PanelAppEnglandPanelsWebResourceTask(CachedWebResourceTask):
     def _load_cached_web_resource(self, cached_web_resource):
-        panel_app_server = PanelAppServer.objects.get(name="Genomics England PanelApp")
+        panel_app_server = PanelAppServer.england_instance()
         store_panel_app_panels_from_web(panel_app_server, cached_web_resource)
 
 
 class PanelAppAustraliaPanelsWebResourceTask(CachedWebResourceTask):
     def _load_cached_web_resource(self, cached_web_resource):
-        panel_app_server = PanelAppServer.objects.get(name="PanelApp Australia")
+        panel_app_server = PanelAppServer.australia_instance()
         store_panel_app_panels_from_web(panel_app_server, cached_web_resource)
 
 

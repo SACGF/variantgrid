@@ -17,7 +17,7 @@ PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
 
 
 def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol):
-    url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
+    url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
     r = requests.get(url)
     data = r.json()
     return data.get("results")
