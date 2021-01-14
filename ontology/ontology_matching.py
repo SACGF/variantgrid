@@ -25,6 +25,16 @@ class OntologyContext:
         raise NotImplementedError("Ontology context must implement as_json")
 
 
+class MetaKeys:
+    SEARCHED = "searched"
+    REFERENCED = "referenced"
+    SELECTED = "selected"
+
+    MONDO_GENE_LINK = "Monarch"
+    PANELAPP_GENE_LINK = "PanelApp AU"
+    CHILD_GENE_LINK = "Child"
+
+
 class OntologyContextSearched(OntologyContext):
     """
     Indicates that this was found from doing a text search
@@ -33,7 +43,7 @@ class OntologyContextSearched(OntologyContext):
 
     @property
     def name(self):
-        return "searched"
+        return MetaKeys.SEARCHED
 
     # TODO might include search score in future
     def as_json(self) -> Any:
@@ -48,7 +58,7 @@ class OntologyContextDirectReference(OntologyContext):
 
     @property
     def name(self):
-        return "referenced"
+        return MetaKeys.REFERENCED
 
     def as_json(self) -> Any:
         return True
@@ -61,7 +71,7 @@ class OntologyContextSelected(OntologyContext):
 
     @property
     def name(self):
-        return "selected"
+        return MetaKeys.SELECTED
 
     def as_json(self) -> Any:
         return True
@@ -79,7 +89,7 @@ class OntologyContextMonarchLink(OntologyContext):
 
     @property
     def name(self):
-        return "Monarch"
+        return MetaKeys.MONDO_GENE_LINK
 
     def as_json(self) -> Dict:
         return {
@@ -105,7 +115,7 @@ class OntologyContextPanelApp(OntologyContext):
 
     @property
     def name(self):
-        return "PanelApp AU"
+        return MetaKeys.PANELAPP_GENE_LINK
 
     def as_json(self):
         sorted_evidence = list(set(self.evidence))
@@ -131,7 +141,7 @@ class OntologContextChildGeneRelationship(OntologyContext):
 
     @property
     def name(self):
-        return "parent_of_gene_relation"
+        return MetaKeys.CHILD_GENE_LINK
 
     def as_json(self):
         return {
@@ -302,6 +312,7 @@ class OntologyMatching:
                             ))
 
     def populate_relationships(self):
+        scores: Dict[str, OntologyMeta] = dict()
         if gene_symbol := self.gene_symbol:
             update_gene_relations(gene_symbol=gene_symbol)
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)
@@ -309,8 +320,9 @@ class OntologyMatching:
                 # always convert to MONDO for now
                 mondo_term = snake.leaf_term
                 mondo_meta = self.find_or_create(mondo_term.id)
+                scores[mondo_term.id] = mondo_meta
                 gene_relation = snake.paths[0]
-                gene_relationshpis_via = list()
+                gene_relationships_via = list()
                 if gene_relation.relation == OntologyRelation.PANEL_APP_AU:
                     mondo_meta.add_context(OntologyContextPanelApp(
                         gene_symbol=gene_symbol,
@@ -318,29 +330,34 @@ class OntologyMatching:
                         phenotype_row=gene_relation.extra.get("phenotype_row"),
                         evidence=gene_relation.extra.get("evidence")
                     ))
-                    gene_relationshpis_via.append("PanelApp AU")
                 else:
                     mondo_meta.add_context(OntologyContextMonarchLink(
                         gene_symbol=gene_symbol,
                         relation=gene_relation.relation
                     ))
-                    gene_relationshpis_via.append("Other")
-
-                gene_relationshpis_via_str = ", ".join(gene_relationshpis_via)
-                mondo_meta.add_score(OntologyMatchScorePart(
-                    f"Established gene relationship (through {gene_relationshpis_via_str})", 50.0
-                ))
 
                 for parent_term in OntologyTermRelation.parents_of(mondo_term):
                     parent_meta = self.find_or_create(parent_term.id)
+                    scores[parent_term.id] = parent_meta
                     parent_meta.add_context(OntologContextChildGeneRelationship(
                         child_term_id=mondo_term.id
                     ))
-                    # FIXME don't rely on magic string for the name of the contexts
-                    if "Monarch" not in mondo_meta.contexts and "PanelApp AU" not in mondo_meta.contexts:
-                        mondo_meta.add_score(OntologyMatchScorePart(
-                            "Parent of term with established gene relationship", 25.0
-                        ))
+
+        for meta in scores.values():
+            gene_relationships_via = set()
+            if MetaKeys.MONDO_GENE_LINK in meta.contexts:
+                gene_relationships_via.add("MONDO data")
+            if MetaKeys.PANELAPP_GENE_LINK in meta.contexts:
+                gene_relationships_via.add("PanelApp AU")
+            if gene_relationships_via:
+                gene_relationships_via_str = ", ".join(gene_relationships_via)
+                meta.add_score(OntologyMatchScorePart(
+                    f"Established gene relationship (through {gene_relationships_via_str})", 50.0
+                ))
+            elif MetaKeys.CHILD_GENE_LINK in meta.contexts:
+                meta.add_score(OntologyMatchScorePart(
+                    "Parent of term with established gene relationship", 25.0
+                ))
 
     def select_term(self, term: str):
         self.find_or_create(term).add_context(OntologyContextSelected())

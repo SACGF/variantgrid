@@ -23,6 +23,8 @@
                 {% if gene_relationships is not None %}
                     <hr/>
                     {% labelled label="Gene Relationships" %}
+                        <p class="text-muted">Note that Panel App relationships are only retrieved as needed, and might not be represented
+                        here yet.</p>
                         {% if not gene_relationships %}-{% endif %}
                         {% for snake in gene_relationships %}
                             <div>
@@ -36,7 +38,7 @@
                     {% endlabelled %}
                 {% endif %}
                 <hr/>
-                {% labelled label="Relationships" %}
+                {% labelled label="Direct Relationships" %}
                     {% if not relationships %}-{% endif %}
                     {% for relationship in relationships %}
                         <div>
