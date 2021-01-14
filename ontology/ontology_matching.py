@@ -8,7 +8,7 @@ import requests
 from django.db.models import Q
 from django.db.models.functions import Length
 
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake
+from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation
 from ontology.panel_app_ontology import update_gene_relations
 
 
@@ -311,7 +311,7 @@ class OntologyMatching:
                 mondo_meta = self.find_or_create(mondo_term.id)
                 gene_relation = snake.paths[0]
                 gene_relationshpis_via = list()
-                if gene_relation.relation == OntologyService.PANEL_APP_AU:
+                if gene_relation.relation == OntologyRelation.PANEL_APP_AU:
                     mondo_meta.add_context(OntologyContextPanelApp(
                         gene_symbol=gene_symbol,
                         omim_id=0, # TODO populate the OMIM ID
