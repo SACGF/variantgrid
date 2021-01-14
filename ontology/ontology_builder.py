@@ -120,7 +120,7 @@ class OntologyBuilder:
     def _count(self, model, created: bool):
         value = self.counters[model].count_op(created)
         self.total_count += 1
-        if self.total_count % 1000:
+        if self.total_count % 1000 == 0:
             print(f"Handled {self.total_count} records")
 
     def _add_term_stub(self, term_id: str):
