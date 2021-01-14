@@ -213,7 +213,7 @@ class OntologyTermRelation(TimeStampedModel):
 
     @staticmethod
     def relations_of(term: OntologyTerm) -> QuerySet:
-        return OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term), deleted_date__isnull=True).exclude(relation=OntologyRelation.IS_A)
+        return OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term), deleted_date__isnull=True)
 
 
 @dataclass
