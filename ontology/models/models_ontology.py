@@ -284,12 +284,13 @@ class OntologySnake:
                     if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
                         other_term = relation.other_end(snake.leaf_term)
                         if other_term not in seen:
-                            seen.add(other_term)
                             new_snake = snake.snake_step(relation)
                             if other_term.ontology_service == to_ontology:
                                 valid_snakes.append(new_snake)
+                                continue
                             elif len(new_snake.paths) <= max_depth:
                                 new_snakes.append(new_snake)
+                            seen.add(other_term)
         return valid_snakes
 
     @staticmethod
