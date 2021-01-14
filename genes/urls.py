@@ -58,6 +58,10 @@ urlpatterns = [
               JQGridView.as_view(grid=QCGeneCoverageGrid), name='gene_coverage_collection_gene_list_grid'),
     perm_path('uncovered_genes/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>', JQGridView.as_view(grid=UncoveredGenesGrid), name='uncovered_genes_grid'),
 
+    perm_path('autocomplete/PanelAppPanel/aus', views_autocomplete.PanelAppPanelAusAutocompleteView.as_view(),
+              name='panel_app_panel_aus_autocomplete'),
+    perm_path('autocomplete/PanelAppPanel/eng', views_autocomplete.PanelAppPanelEngAutocompleteView.as_view(),
+              name='panel_app_panel_eng_autocomplete'),
     perm_path('autocomplete/PanelAppPanel/', views_autocomplete.PanelAppPanelAutocompleteView.as_view(), name='panel_app_panel_autocomplete'),
     perm_path('autocomplete/Gene/', views_autocomplete.GeneAutocompleteView.as_view(), name='gene_autocomplete'),
     perm_path('autocomplete/Transcript/', views_autocomplete.TranscriptAutocompleteView.as_view(), name='transcript_autocomplete'),

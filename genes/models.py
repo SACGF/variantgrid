@@ -802,6 +802,7 @@ class GeneListCategory(models.Model):
     QC_COVERAGE_CUSTOM_TEXT = 'QCCoverageCustomText'
     PATHOLOGY_TEST = 'PathologyTest'
     PATHOLOGY_TEST_ORDER = 'PathologyTestOrder'
+    PANEL_APP_CACHE = 'PanelAppCache'
     GENE_INFO = "GeneInfo"
 
     name = models.TextField()
@@ -1149,15 +1150,15 @@ class PanelAppServer(models.Model):
         return PanelAppServer.objects.get(name="Genomics England PanelApp")
 
 
-class PanelAppPanel(models.Model):
-    """ Name, used in autocomplete list, actual gene list retrieved by API call (panel_app.py)
-        Cleared when cached web resource reloads """
+class PanelAppPanel(TimeStampedModel):
+    """ Populated from PanelApp cached web resource task, updated to latest version
+        It's not clear how PanelApp removes panels, so we don't do that. """
     server = models.ForeignKey(PanelAppServer, on_delete=CASCADE)
     panel_id = models.IntegerField()
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
     disease_group = models.TextField()
     disease_sub_group = models.TextField()
     name = models.TextField()
+    status = models.TextField()
     current_version = models.TextField()
 
     class Meta:
@@ -1170,6 +1171,15 @@ class PanelAppPanel(models.Model):
 class PanelAppPanelRelevantDisorders(models.Model):
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     name = models.TextField()
+
+
+class PanelAppPanelLocalCacheGeneList(TimeStampedModel):
+    panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
+    version = models.TextField()
+    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ("panel_app_panel", "version")
 
 
 class CachedThirdPartyGeneList(models.Model):

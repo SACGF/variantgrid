@@ -1,10 +1,11 @@
+from collections import defaultdict
+
 from django.conf import settings
 
 from analysis.forms.forms_nodes import GeneListNodeForm
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.views.nodes.node_view import NodeView
-from genes.models import GeneListCategory, GeneList, SampleGeneList
-from snpdb.models.models_vcf import Sample
+from genes.models import GeneListCategory, GeneList, SampleGeneList, PanelAppServer, PanelAppPanel
 
 
 class GeneListNodeView(NodeView):
@@ -17,6 +18,21 @@ class GeneListNodeView(NodeView):
             form_initial["custom_gene_list_text"] = self.object.custom_text_gene_list.text
         gene_list_ids = self.object.genelistnodegenelist_set.all().values_list("gene_list", flat=True)
         form_initial["gene_list"] = GeneList.objects.filter(pk__in=gene_list_ids)
+
+        pa_servers = {
+            "panel_app_panel_aus": PanelAppServer.australia_instance(),
+            "panel_app_panel_eng": PanelAppServer.england_instance(),
+        }
+        pa_panels = defaultdict(list)
+
+        for gln_pap in self.object.genelistnodepanelapppanel_set.all():
+            for form_name, server in pa_servers.items():
+                panel_app_panel = gln_pap.panel_app_panel_local_cache_gene_list.panel_app_panel
+                if panel_app_panel.server == server:
+                    pa_panels[form_name].append(panel_app_panel.pk)
+
+        for form_name, pa_panel_list in pa_panels.items():
+            form_initial[form_name] = PanelAppPanel.objects.filter(pk__in=pa_panel_list)
         return form_initial
 
     def get_context_data(self, **kwargs):

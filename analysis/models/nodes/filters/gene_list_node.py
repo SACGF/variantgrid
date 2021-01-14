@@ -13,7 +13,7 @@ from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol, SampleGeneList, \
-    ActiveSampleGeneList
+    ActiveSampleGeneList, PanelAppPanelLocalCacheGeneList
 from snpdb.models import Sample
 from snpdb.models.models_enums import ImportStatus
 
@@ -23,6 +23,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
     CUSTOM_GENE_LIST = 1
     SAMPLE_GENE_LIST = 2
     PATHOLOGY_TEST_GENE_LIST = 3
+    PANEL_APP_GENE_LIST = 4
 
     pathology_test_gene_list = models.ForeignKey(GeneList, null=True, blank=True, on_delete=SET_NULL,
                                                  related_name='pathology_test_gene_list')
@@ -47,6 +48,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
             lambda: [self.custom_text_gene_list.gene_list],
             lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
             lambda: [self.pathology_test_gene_list],
+            lambda: [gln_pap.gene_list for gln_pap in self.genelistnodepanelapppanel_set.all()],
         ]
         getter = GENE_LISTS[self.accordion_panel]
         return [gl for gl in getter() if gl is not None]
@@ -85,7 +87,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
 
         name = ''
         if self.modifies_parents():
-            if self.accordion_panel == self.SELECTED_GENE_LIST:
+            if self.accordion_panel in (self.SELECTED_GENE_LIST, self.PANEL_APP_GENE_LIST):
                 gene_list_names = [gl.name for gl in self.get_gene_lists()]
                 gene_list_names_str = "\n".join(gene_list_names)
                 if len(gene_list_names_str) <= MAX_NODE_NAME_LENGTH:
@@ -211,3 +213,12 @@ def post_delete_gene_list_node(sender, instance, *args, **kwargs):
 class GeneListNodeGeneList(models.Model):
     gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
+
+
+class GeneListNodePanelAppPanel(models.Model):
+    gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
+    panel_app_panel_local_cache_gene_list = models.ForeignKey(PanelAppPanelLocalCacheGeneList, on_delete=CASCADE)
+
+    @property
+    def gene_list(self):
+        return self.panel_app_panel_local_cache_gene_list.gene_list

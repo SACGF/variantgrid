@@ -31,7 +31,8 @@ from analysis.models.nodes.sources.trio_node import TrioNode
 from annotation.models.models_mim_hpo import MIMMorbidAlias, HPOSynonym
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList
+from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
+from genes.panel_app import get_local_cache_gene_list
 from library.forms import NumberInput
 from library.utils import md5sum_str
 from patients.models_enums import GnomADPopulation
@@ -313,6 +314,15 @@ class GeneListNodeForm(BaseNodeForm):
                                                widget=ModelSelect2Multiple(url='category_gene_list_autocomplete',
                                                                            attrs={'data-placeholder': 'Gene List...'},
                                                                            forward=(forward.Const(None, 'category'),)))
+    panel_app_panel_aus = forms.ModelMultipleChoiceField(required=False,
+                                                         queryset=PanelAppPanel.objects.all(),
+                                                         widget=autocomplete.ModelSelect2Multiple(url='panel_app_panel_aus_autocomplete',
+                                                                                                  attrs={'data-placeholder': 'Australian Genomics PanelApp panel...'}))
+
+    panel_app_panel_eng = forms.ModelMultipleChoiceField(required=False,
+                                                         queryset=PanelAppPanel.objects.all(),
+                                                         widget=autocomplete.ModelSelect2Multiple(url='panel_app_panel_eng_autocomplete',
+                                                                                                  attrs={'data-placeholder': 'Genomics England PanelApp panel...'}))
 
     class Meta:
         model = GeneListNode
@@ -363,6 +373,14 @@ class GeneListNodeForm(BaseNodeForm):
         gl_set.all().delete()
         for gene_list in self.cleaned_data["gene_list"]:
             gl_set.create(gene_list=gene_list)
+
+        # PanelAppPanel app objects are the same
+        pap_set = node.genelistnodepanelapppanel_set
+        pap_set.all().delete()
+        for form_name in ["panel_app_panel_aus", "panel_app_panel_eng"]:
+            for pap in self.cleaned_data[form_name]:
+                panel_app_panel_local_cache_gene_list = get_local_cache_gene_list(pap)
+                pap_set.create(panel_app_panel_local_cache_gene_list=panel_app_panel_local_cache_gene_list)
 
         if commit:
             node.save()

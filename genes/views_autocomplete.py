@@ -1,3 +1,5 @@
+import abc
+
 from django.db.models.functions.text import Length
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -9,17 +11,40 @@ from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 
 
-@method_decorator(cache_page(HOUR_SECS), name='dispatch')
-class PanelAppPanelAutocompleteView(AutocompleteView):
+class AbstractPanelAppPanelAutocompleteView(abc.ABC, AutocompleteView):
     fields = ['name']
 
+    @abc.abstractmethod
+    def _get_server(self):
+        pass
+
     def get_user_queryset(self, user):
-        server_id = self.forwarded.get('server_id', None)
         qs = PanelAppPanel.objects.all()
-        if server_id:
-            server = PanelAppServer.objects.get(pk=server_id)
+        if server := self._get_server():
             qs = qs.filter(server=server)
         return qs
+
+
+@method_decorator(cache_page(HOUR_SECS), name='dispatch')
+class PanelAppPanelAutocompleteView(AbstractPanelAppPanelAutocompleteView):
+    def _get_server(self):
+        # Passed server_id in forward
+        server = None
+        if server_id := self.forwarded.get('server_id', None):
+            server = PanelAppServer.objects.get(pk=server_id)
+        return server
+
+
+@method_decorator(cache_page(HOUR_SECS), name='dispatch')
+class PanelAppPanelAusAutocompleteView(AbstractPanelAppPanelAutocompleteView):
+    def _get_server(self):
+        return PanelAppServer.australia_instance()
+
+
+@method_decorator(cache_page(HOUR_SECS), name='dispatch')
+class PanelAppPanelEngAutocompleteView(AbstractPanelAppPanelAutocompleteView):
+    def _get_server(self):
+        return PanelAppServer.england_instance()
 
 
 @method_decorator(cache_page(WEEK_SECS), name='dispatch')

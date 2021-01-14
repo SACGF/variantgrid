@@ -4,11 +4,12 @@ from typing import Dict
 import requests
 from rest_framework.exceptions import NotFound
 
-from annotation.models import CachedWebResource
+from annotation.models import CachedWebResource, ImportStatus
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, FakeGeneList, PanelAppServer
+from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, FakeGeneList, PanelAppServer, \
+    PanelAppPanelLocalCacheGeneList, GeneList, GeneListCategory
 from genes.serializers import GeneListGeneSymbolSerializer
-
+from library.guardian_utils import admin_bot
 
 PANEL_APP_PREFIX = "panel-app-"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
@@ -23,8 +24,7 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
     return data.get("results")
 
 
-def get_panel_app_panel_as_gene_list_json(gene_list_id, panel_app_panel_id):
-    panel_app_panel = PanelAppPanel.objects.get(pk=panel_app_panel_id)
+def _get_panel_app_panel_url_and_json(panel_app_panel):
     url = panel_app_panel.server.url + PANEL_APP_GET_PANEL_API_BASE_PATH + str(panel_app_panel.panel_id)
     r = requests.get(url)
     json_data: Dict = r.json()
@@ -32,6 +32,13 @@ def get_panel_app_panel_as_gene_list_json(gene_list_id, panel_app_panel_id):
     if detail := json_data.get("detail"):
         if detail == "Not found.":
             raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({url})")
+
+    return url, json_data
+
+
+def get_panel_app_panel_as_gene_list_json(gene_list_id, panel_app_panel_id):
+    panel_app_panel = PanelAppPanel.objects.get(pk=panel_app_panel_id)
+    url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
 
     genes = json_data["genes"]
     name = json_data["name"]
@@ -68,6 +75,25 @@ def get_panel_app_panel_as_gene_list_json(gene_list_id, panel_app_panel_id):
     return data
 
 
+def _get_or_update_panel_app_panel(server, json_data):
+    pap, created = PanelAppPanel.objects.update_or_create(server=server,
+                                                          panel_id=json_data['id'],
+                                                          defaults={
+                                                              "disease_group": json_data['disease_group'],
+                                                              "disease_sub_group": json_data['disease_sub_group'],
+                                                              "name": json_data['name'],
+                                                              "status": json_data['status'],
+                                                              "current_version": json_data['version'],
+                                                          })
+
+    relevant_disorders = json_data['relevant_disorders']
+    pap.panelapppanelrelevantdisorders_set.exclude(name__in=relevant_disorders).delete()
+    for rd in relevant_disorders:
+        PanelAppPanelRelevantDisorders.objects.get_or_create(panel_app_panel=pap, name=rd)
+
+    return pap
+
+
 def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource: CachedWebResource):
     """ Used to build autocomplete list """
 
@@ -82,18 +108,46 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
         for result in data["results"]:
             num_panels += 1
-            pap = PanelAppPanel.objects.create(server=server,
-                                               panel_id=result['id'],
-                                               cached_web_resource=cached_web_resource,
-                                               disease_group=result['disease_group'],
-                                               disease_sub_group=result['disease_sub_group'],
-                                               name=result['name'],
-                                               current_version=result['version'])
+            _get_or_update_panel_app_panel(server, result)
 
-            relevant_disorders = result['relevant_disorders']
-            for rd in relevant_disorders:
-                PanelAppPanelRelevantDisorders.objects.create(panel_app_panel=pap,
-                                                              name=rd)
 
     cached_web_resource.description = f"{num_panels} panel app panels."
     cached_web_resource.save()
+
+
+def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCacheGeneList:
+    """ Gets or creates local cache of a panel app panel so it can be used as a GeneList """
+
+    try:
+        pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.get(panel_app_panel=panel_app_panel,
+                                                                    version=panel_app_panel.current_version)
+    except PanelAppPanelLocalCacheGeneList.DoesNotExist:
+        url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
+        genes = json_data["genes"]
+        name = json_data["name"]
+        version = json_data["version"]
+
+        # Record we had was out of date, update it so that next retrieval of cache works
+        if panel_app_panel.current_version != version:
+            _get_or_update_panel_app_panel(panel_app_panel.server, json_data)
+
+        category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
+        gene_matcher = GeneSymbolMatcher()
+        gene_list = GeneList.objects.create(category=category,
+                                            name=f"{name} v.{version}",
+                                            user=admin_bot(),
+                                            url=url)
+
+        gene_names_list = []
+        for gene_record in genes:
+            gene_symbol = gene_record["gene_data"]["gene_symbol"]
+            gene_names_list.append(gene_symbol)
+
+        gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
+        gene_list.import_status = ImportStatus.SUCCESS
+        gene_list.save()
+
+        pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.create(panel_app_panel=panel_app_panel,
+                                                                       version=version,
+                                                                       gene_list=gene_list)
+    return pap_gene_list
