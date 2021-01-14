@@ -1,7 +1,10 @@
 import logging
+from datetime import timedelta
 from typing import Dict
 
 import requests
+from django.conf import settings
+from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
 from annotation.models import CachedWebResource, ImportStatus
@@ -117,35 +120,41 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCacheGeneList:
     """ Gets or creates local cache of a panel app panel so it can be used as a GeneList """
 
-    try:
-        pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.get(panel_app_panel=panel_app_panel,
-                                                                    version=panel_app_panel.current_version)
-    except PanelAppPanelLocalCacheGeneList.DoesNotExist:
-        url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
-        genes = json_data["genes"]
-        name = json_data["name"]
-        version = json_data["version"]
+    # Attempt to use cache if recent and present, otherwise fall through and do a query
+    max_age = timedelta(days=settings.PANEL_APP_CACHE_DAYS)
+    if panel_app_panel.modified < timezone.now() - max_age:
+        try:
+            pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.get(panel_app_panel=panel_app_panel,
+                                                                        version=panel_app_panel.current_version)
+            return pap_gene_list
+        except PanelAppPanelLocalCacheGeneList.DoesNotExist:
+            pass
 
-        # Record we had was out of date, update it so that next retrieval of cache works
-        if panel_app_panel.current_version != version:
-            _get_or_update_panel_app_panel(panel_app_panel.server, json_data)
+    url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
+    genes = json_data["genes"]
+    name = json_data["name"]
+    version = json_data["version"]
 
-        category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
-        gene_matcher = GeneSymbolMatcher()
-        gene_list = GeneList.objects.create(category=category,
-                                            name=f"{name} v.{version}",
-                                            user=admin_bot(),
-                                            url=url)
-        gene_names_list = []
-        for gene_record in genes:
-            gene_symbol = gene_record["gene_data"]["gene_symbol"]
-            gene_names_list.append(gene_symbol)
+    # Record we had was out of date, update it so that next retrieval of cache works
+    if panel_app_panel.current_version != version:
+        _get_or_update_panel_app_panel(panel_app_panel.server, json_data)
 
-        gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
-        gene_list.import_status = ImportStatus.SUCCESS
-        gene_list.save()
+    category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
+    gene_matcher = GeneSymbolMatcher()
+    gene_list = GeneList.objects.create(category=category,
+                                        name=f"{name} v.{version}",
+                                        user=admin_bot(),
+                                        url=url)
+    gene_names_list = []
+    for gene_record in genes:
+        gene_symbol = gene_record["gene_data"]["gene_symbol"]
+        gene_names_list.append(gene_symbol)
 
-        pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.create(panel_app_panel=panel_app_panel,
-                                                                       version=version,
-                                                                       gene_list=gene_list)
+    gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
+    gene_list.import_status = ImportStatus.SUCCESS
+    gene_list.save()
+
+    pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.create(panel_app_panel=panel_app_panel,
+                                                                   version=version,
+                                                                   gene_list=gene_list)
     return pap_gene_list
