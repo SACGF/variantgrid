@@ -1,8 +1,9 @@
 import re
 from datetime import timedelta
-from typing import Union, Iterable, Optional
+from django.conf import settings
+from typing import Union
 
-from genes.models import GeneSymbol, PanelAppServer, HGNCGeneNames
+from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
 from library.utils import md5sum_str
 from ontology.models import OntologyService, OntologyTerm, OntologyRelation
@@ -21,7 +22,7 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
 
     ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol), ontology_service=OntologyService.PANEL_APP_AU)
     try:
-        ontology_builder.ensure_old(max_age=timedelta(days=30))
+        ontology_builder.ensure_old(max_age=timedelta(days=settings.PANEL_APP_CACHE_DAYS))
 
         PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
 
