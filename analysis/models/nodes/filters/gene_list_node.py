@@ -88,12 +88,13 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         name = ''
         if self.modifies_parents():
             if self.accordion_panel in (self.SELECTED_GENE_LIST, self.PANEL_APP_GENE_LIST):
+                filter_types = {self.SELECTED_GENE_LIST: "gene lists", self.PANEL_APP_GENE_LIST: "PanelApp"}
                 gene_list_names = [gl.name for gl in self.get_gene_lists()]
                 gene_list_names_str = "\n".join(gene_list_names)
                 if len(gene_list_names_str) <= MAX_NODE_NAME_LENGTH:
                     name = gene_list_names_str
                 else:
-                    name = f"{len(gene_list_names)} gene lists"
+                    name = f"{len(gene_list_names)} x {filter_types[self.accordion_panel]}"
 
                 if self.exclude:
                     name = "Exclude: " + name

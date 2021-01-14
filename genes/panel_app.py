@@ -110,7 +110,6 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
             num_panels += 1
             _get_or_update_panel_app_panel(server, result)
 
-
     cached_web_resource.description = f"{num_panels} panel app panels."
     cached_web_resource.save()
 
@@ -137,7 +136,6 @@ def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
                                             name=f"{name} v.{version}",
                                             user=admin_bot(),
                                             url=url)
-
         gene_names_list = []
         for gene_record in genes:
             gene_symbol = gene_record["gene_data"]["gene_symbol"]

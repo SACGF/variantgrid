@@ -1172,6 +1172,9 @@ class PanelAppPanelRelevantDisorders(models.Model):
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     name = models.TextField()
 
+    class Meta:
+        unique_together = ('panel_app_panel', 'name')
+
 
 class PanelAppPanelLocalCacheGeneList(TimeStampedModel):
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
