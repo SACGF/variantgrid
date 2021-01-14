@@ -268,7 +268,6 @@ def search(request):
         form = forms.SearchForm(request.GET)
 
     user_settings = UserSettings.get_for_user(request.user)
-    default_genome_build = user_settings.default_genome_build
 
     search_results: Optional[SearchResults] = None
     if form.is_valid() and form.cleaned_data['search']:

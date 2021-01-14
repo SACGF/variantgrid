@@ -107,7 +107,6 @@
                         {% if url_name_visible.genes %}
                             {% labelled label="Gene Symbol" %}
                                 1 word, case insensitive name match <span class="example">gata2</span>, <span class="example">GATA2</span>.<br/>
-                                Select "All builds" to view both RefSeq and Ensembl genes, otherwise it loads {{ build_annotation_descriptions }}
                             {% endlabelled %}
                             {% labelled label="Gene ID" %}
                                 <span class="example">ENSG00000179348</span>
@@ -115,6 +114,10 @@
                             {% labelled label="Transcript ID" %}
                                 <span class="example">NM_001080463</span> or with version <span class="example">NM_001080463.2</span>
                             {% endlabelled %}
+                            {% labelled label="Ontology" %}
+                                <span class="example">OMIM:616299</span> or <span class="example">HP:0001332</span> or <span class="example">MONDO:0002974</span>
+                            {% endlabelled %}
+
                         {% endif %}
                         {% if url_name_visible.patients %}
                             {% labelled label="Sample" %}
