@@ -83,7 +83,7 @@ class OntologyTerm(TimeStampedModel):
     name = models.TextField(null=True, blank=True)  # should only be null if we're using it as a placeholder reference
     definition = models.TextField(null=True, blank=True)
     extra = models.JSONField(null=True, blank=True)
-    from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, null=True, blank=True)
+    from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     def __str__(self):
         return self.id
