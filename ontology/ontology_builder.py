@@ -9,7 +9,7 @@ from lazy import lazy
 from model_utils.models import now
 
 from genes.models import GeneSymbol
-from ontology.models import OntologyTermRelation, OntologyTermGeneRelation, OntologyTerm, OntologyImport, OntologyService
+from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport, OntologyService
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -25,8 +25,10 @@ class OperationCounter:
     def count_op(self, created: bool):
         if created:
             self.inserts += 1
+            return self.inserts
         else:
             self.updates += 1
+            return self.updates
 
     def __str__(self) -> str:
         return f"Inserts {self.inserts}, Updates {self.updates}, Stale {self.deletes}"
@@ -44,7 +46,7 @@ class OntologyBuilder:
         STUB = 1
         DETAILED = 2
 
-    def __init__(self, filename: str, context: str, ontology_service: OntologyService, force_update: bool = False):
+    def __init__(self, filename: str, context: str, ontology_service: OntologyService, processor_version: int = 1, force_update: bool = False):
         """
         :filename: Name of the resource used, only used for logging purposes
         :context: In what context are we inserting records (e.g. full file context, or partial panel app)
@@ -56,10 +58,15 @@ class OntologyBuilder:
         self.filename = filename.split("/")[-1]
         self.ontology_service = ontology_service
         self.context = context
+        self.processor_version = processor_version
         self.data_hash = None
         self.force_update = force_update
 
         self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(ontology_service=ontology_service, context=context, completed=True).order_by('-modified').first()
+        if self.previous_import and self.previous_import.processor_version != self.processor_version:
+            self.previous_import = None  # if previous import was done with an older version of the import code, don't count it
+
+        self.total_count = 0
         self.counters: Dict[Any, OperationCounter] = defaultdict(OperationCounter)
         self.created_cache: Dict[str, int] = dict()
         self.gene_symbols: Dict[str, GeneSymbol] = dict()
@@ -88,14 +95,14 @@ class OntologyBuilder:
         Will also complain about other records not included in this import but wont delete them
         """
         if purge_old:
-            for model in [OntologyTermGeneRelation, OntologyTermRelation, OntologyTerm]:
+            for model in [OntologyTermRelation, OntologyTerm]:
                 olds = model.objects.filter(from_import__context=self.context, from_import__ontology_service=self.ontology_service).exclude(from_import=self._ontology_import)
                 for old in olds[0:3]:
                     print(f"This appears stale or might have just been stub with no extra information: {old}")
 
                 self.counters[model].deletes += olds.count()
-                if model == OntologyTermGeneRelation:  # there are the only things that should actually get marked as deleted
-                    olds.update(deletion_date=now, modified=now)
+                if model == OntologyTermRelation:  # there are the only things that should actually get marked as deleted
+                    olds.update(deleted_date=now, modified=now)
 
         self._ontology_import.completed = True
         self._ontology_import.save()
@@ -111,7 +118,10 @@ class OntologyBuilder:
         return OntologyImport.objects.create(ontology_service=self.ontology_service, context=self.context, filename=self.filename, processed_date=now, hash=self.data_hash)
 
     def _count(self, model, created: bool):
-        self.counters[model].count_op(created)
+        value = self.counters[model].count_op(created)
+        self.total_count += 1
+        if self.total_count % 1000:
+            print(f"Handled {self.total_count} records")
 
     def _add_term_stub(self, term_id: str):
         """
@@ -132,7 +142,7 @@ class OntologyBuilder:
         self.created_cache[term_id] = OntologyBuilder.CreatedState.STUB
         return term_id
 
-    def add_term(self, term_id: str, name: str, definition: str, extra: Dict, primary_source: bool):
+    def add_term(self, term_id: str, name: str, definition: Optional[str], extra: Dict = None, primary_source: bool = True):
         """
         Returns the term_id
         """
@@ -165,7 +175,7 @@ class OntologyBuilder:
             defaults["name"] = name
         if definition:
             defaults["definition"] = definition
-        if extra:
+        if extra is not None:
             defaults["extra"] = extra
 
         term, created = OntologyTerm.objects.update_or_create(
@@ -176,38 +186,21 @@ class OntologyBuilder:
         self.created_cache[term_id] = OntologyBuilder.CreatedState.DETAILED
         return term
 
-    def add_gene_relation(self, term_id: str, gene_symbol_str: str, relation: str, extra=None) -> Optional[OntologyTermGeneRelation]:
-        """
-        Overrides any previous relationship - only one term -> gene relationship can exist regardless of the relation
-        If the gene symbol doesn't exist, nothing will happen
-        """
-        if gene_symbol := self.gene_symbols.get(gene_symbol_str):
-            self._add_term_stub(term_id)
-            relation_obj, created = OntologyTermGeneRelation.objects.update_or_create(
-                term_id=term_id,
-                gene_symbol=gene_symbol,
-                relation=relation,
-                defaults={
-                    "extra": extra,
-                    "from_import": self._ontology_import
-                }
-            )
-            self._count(OntologyTermGeneRelation, created)
-            return relation_obj
-
-        print(f"Could not find gene symbol {gene_symbol_str}")
-        return None
-
-    def add_ontology_relation(self, source_term_id: str, dest_term_id: str, relation: str):
+    def add_ontology_relation(self, source_term_id: str, dest_term_id: str, relation: str, extra: Dict = None):
         self._add_term_stub(source_term_id)
         self._add_term_stub(dest_term_id)
+
+        defaults = {
+            "from_import": self._ontology_import
+        }
+        if extra is not None:
+            defaults["extra"] = extra
+
         relation, created = OntologyTermRelation.objects.update_or_create(
             source_term_id=source_term_id,
             dest_term_id=dest_term_id,
             relation=relation,
-            defaults={
-                "from_import": self._ontology_import
-            }
+            defaults=defaults
         )
         self._count(OntologyTermRelation, created)
         return relation

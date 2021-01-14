@@ -8,8 +8,8 @@ import requests
 from django.db.models import Q
 from django.db.models.functions import Length
 
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService
-from ontology.panel_app_ontology import get_or_fetch_gene_relations
+from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake
+from ontology.panel_app_ontology import update_gene_relations
 
 
 class OntologyContext:
@@ -303,25 +303,32 @@ class OntologyMatching:
 
     def populate_relationships(self):
         if gene_symbol := self.gene_symbol:
-            relationships = get_or_fetch_gene_relations(gene_symbol=gene_symbol)
-            for relationship in relationships:
+            update_gene_relations(gene_symbol=gene_symbol)
+            snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)
+            for snake in snakes:
                 # always convert to MONDO for now
-                mondo_term = relationship.term
-                mondo_meta = self.find_or_create(relationship.term_id)
-                if relationship.relation == OntologyService.PANEL_APP_AU:
+                mondo_term = snake.leaf_term
+                mondo_meta = self.find_or_create(mondo_term.id)
+                gene_relation = snake.paths[0]
+                gene_relationshpis_via = list()
+                if gene_relation.relation == OntologyService.PANEL_APP_AU:
                     mondo_meta.add_context(OntologyContextPanelApp(
                         gene_symbol=gene_symbol,
-                        omim_id=relationship.term_id,
-                        phenotype_row=relationship.extra.get("phenotype_row"),
-                        evidence=relationship.extra.get("evidence")
+                        omim_id=0, # TODO populate the OMIM ID
+                        phenotype_row=gene_relation.extra.get("phenotype_row"),
+                        evidence=gene_relation.extra.get("evidence")
                     ))
+                    gene_relationshpis_via.append("PanelApp AU")
                 else:
                     mondo_meta.add_context(OntologyContextMonarchLink(
                         gene_symbol=gene_symbol,
-                        relation=relationship.relation
+                        relation=gene_relation.relation
                     ))
+                    gene_relationshpis_via.append("Other")
+
+                gene_relationshpis_via_str = ", ".join(gene_relationshpis_via)
                 mondo_meta.add_score(OntologyMatchScorePart(
-                    "Established gene relationship", 50.0
+                    f"Established gene relationship (through {gene_relationshpis_via_str})", 50.0
                 ))
 
                 for parent_term in OntologyTermRelation.parents_of(mondo_term):

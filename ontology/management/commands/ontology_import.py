@@ -60,7 +60,7 @@ def load_mondo(filename: str, force: bool):
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
     print("This may take a few minutes")
-    node_to_gene_symbol: [str, str] = dict()
+    node_to_hgnc_id: [str, str] = dict()
     node_to_mondo: [str, str] = dict()
     count = 0
 
@@ -68,10 +68,6 @@ def load_mondo(filename: str, force: bool):
         print("Reviewing Nodes")
         for node in graph.get("nodes", []):
             if node.get("type") == "CLASS":
-
-                count += 1
-                if count % 1000 == 0:
-                    print(f"Processing node {count}")
 
                 if node_id_full := node.get("id"):
                     if match := ID_EXTRACT_P.match(node_id_full):
@@ -84,7 +80,6 @@ def load_mondo(filename: str, force: bool):
                         if meta := node.get("meta"):
                             label = node.get("lbl")
                             extra = dict()
-                            synonyms = list()
 
                             defn = meta.get("definition", {}).get("val")
                             if defn:
@@ -105,24 +100,23 @@ def load_mondo(filename: str, force: bool):
                                 primary_source=True
                             )
 
-                            if synonyms:
+                            if synonyms := meta.get("synonyms"):
                                 for synonym in synonyms:
                                     pred = synonym.get("pred")
                                     if pred == "hasExactSynonym":
-                                        val = synonym.get("val")
+                                        # val = synonym.get("val")
                                         for xref in synonym.get("xrefs", []):
                                             if OMIM_P.match(xref):
                                                 ontology_builder.add_term(
                                                     term_id=xref,
                                                     name=label,
                                                     definition=f"Name copied from synonym {full_id}",
-                                                    extra=None,
                                                     primary_source=False
                                                 )
                                                 ontology_builder.add_ontology_relation(
                                                     source_term_id=full_id,
                                                     dest_term_id=xref,
-                                                    relation=OntologyRelation.EXACT
+                                                    relation=OntologyRelation.EXACT,
                                                 )
 
                             # for synonym in meta.get("synonyms", []):
@@ -143,7 +137,6 @@ def load_mondo(filename: str, force: bool):
                                         term_id=omim,
                                         name=label,
                                         definition=f"Name copied from synonym {full_id}",
-                                        extra=None,
                                         primary_source=False
                                     )
                                     ontology_builder.add_ontology_relation(
@@ -155,26 +148,29 @@ def load_mondo(filename: str, force: bool):
                     # copy of id for gene symbol to gene symbol
                     elif match := HGNC_EXTRACT_P.match(node_id_full):
                         gene_symbol = node.get("lbl")
-                        # hgnc_id = match[1]
-                        node_to_gene_symbol[node_id_full] = gene_symbol
+                        hgnc_id = match[1]
+                        term_id = f"HGNC:{hgnc_id}"
+                        ontology_builder.add_term(
+                            term_id=f"HGNC:{hgnc_id}",
+                            name=gene_symbol,
+                            definition=None,
+                            primary_source=False
+                        )
+                        node_to_hgnc_id[node_id_full] = term_id
 
         print("Reviewing edges")
-        count = 0
         for edge in graph.get("edges", []):
-            count += 1
-            if count % 1000 == 0:
-                print(f"Processing edge {count}")
 
             subject_id: str = edge.get("sub")
             obj_id: str = edge.get("obj")
             relationship = edge.get("pred")
 
             if mondo_subject_id := node_to_mondo.get(subject_id):
-                if gene_symbol := node_to_gene_symbol.get(obj_id):
+                if hgnc_id := node_to_hgnc_id.get(obj_id):
                     relationship = GENE_RELATIONS.get(relationship, relationship)
-                    ontology_builder.add_gene_relation(
-                        term_id=mondo_subject_id,
-                        gene_symbol_str=gene_symbol,
+                    ontology_builder.add_ontology_relation(
+                        source_term_id=mondo_subject_id,
+                        dest_term_id=hgnc_id,
                         relation=relationship
                     )
 
@@ -205,11 +201,15 @@ def load_hpo(filename: str, force: bool):
     print("About to pronto the file")
     ot = pronto.Ontology(filename)
     print("Pronto complete")
+    scope_lookup = {v.upper(): k for k, v in HPOSynonymScope.choices}
+
     for term in ot.terms():
+        term_id = str(term.id)
+
         extra = None
         synonyms = []
         for synonym in term.synonyms:
-            scope = HPOSynonymScope(synonym.scope)
+            scope = scope_lookup[synonym.scope]
             synonyms.append({
                 "name": synonym.description,
                 "scope": scope
@@ -217,11 +217,11 @@ def load_hpo(filename: str, force: bool):
         if synonyms:
             extra = {"synonyms": synonyms}
 
-        if not term.id.startswith(OntologyService.HPO):
+        if not term_id.startswith(OntologyService.HPO):
             continue
 
         ontology_builder.add_term(
-            term_id=term.id,
+            term_id=term_id,
             name=term.name,
             extra=extra,
             definition=term.definition,
@@ -236,7 +236,7 @@ def load_hpo(filename: str, force: bool):
 
             ontology_builder.add_ontology_relation(
                 dest_term_id=term.id,
-                source_term_id=kid_term,
+                source_term_id=kid_term.id,
                 relation=OntologyRelation.IS_A
             )
     ontology_builder.complete()
@@ -244,31 +244,48 @@ def load_hpo(filename: str, force: bool):
     print("Committing...")
 
 
-@transaction.atomic
-def load_hpo_disease(filename: str, force: bool):
-    ontology_builder = OntologyBuilder(
-        filename=filename,
-        context="hpo_disease",
-        ontology_service=OntologyService.HPO,
-        force_update=force)
-    file_hash = file_md5sum(filename)
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
-    df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
-                     names=['disease_id', 'gene_symbol', 'gene_id', 'hpo_id', 'hpo_name'],
-                     dtype={"gene_id": int})
-    # TODO is gene_symbol, gene_id meant to come into play here?
-    gb = df.groupby(["hpo_id"])
-    for hpo_id, data in gb:
-        name = list(data["hpo_name"])[0]
-        ontology_builder.add_term(term_id=hpo_id, name=name, definition=None, extra=None, primary_source=False)
-        for disease_id in set(data["disease_id"]):
-            ontology_builder.add_ontology_relation(
-                source_term_id=hpo_id,
-                dest_term_id=disease_id,
-                relation=OntologyRelation.FREQUENCY  # TODO do we have more information than this?
-            )
-    ontology_builder.complete()
-    ontology_builder.report()
+# @transaction.atomic
+# def load_hpo_disease(filename: str, force: bool):
+#     ontology_builder = OntologyBuilder(
+#         filename=filename,
+#         context="hpo_disease",
+#         ontology_service=OntologyService.HPO,
+#         force_update=force)
+#     file_hash = file_md5sum(filename)
+#     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+#     df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
+#                      names=['disease_id', 'gene_symbol', 'gene_id', 'hpo_id', 'hpo_name'],
+#                      dtype={"gene_id": int})
+#     # TODO is gene_symbol, gene_id meant to come into play here?
+#     gb = df.groupby(["hpo_id"])
+#     for hpo_id, data in gb:
+#         name = list(data["hpo_name"])[0]
+#         ontology_builder.add_term(term_id=hpo_id, name=name, definition=None, extra=None, primary_source=False)
+#         for disease_id in set(data["disease_id"]):
+#             ontology_builder.add_ontology_relation(
+#                 source_term_id=hpo_id,
+#                 dest_term_id=disease_id,
+#                 relation=OntologyRelation.FREQUENCY  # TODO do we have more information than this?
+#             )
+#     gb = df.groupby(["gene_id"])
+#     for gene_id, data in gb:
+#         name = list(data["gene_symbol"])[0]
+#         hgnc_id = f"HGNC:{gene_id}"
+#         ontology_builder.add_term(
+#             term_id=f"HGNC:{gene_id}",
+#             name=name,
+#             definition=None,
+#             primary_source=False
+#         )
+#         for omim_id in set(data["disease_id"]):
+#             # TODO extra to provide more details about the association
+#             ontology_builder.add_ontology_relation(
+#                 source_term_id=omim_id,
+#                 dest_term_id=hgnc_id,
+#                 relation=OntologyRelation.FREQUENCY
+#             )
+#     ontology_builder.complete()
+#     ontology_builder.report()
 
 
 class Command(BaseCommand):
@@ -277,7 +294,7 @@ class Command(BaseCommand):
         parser.add_argument('--force', action="store_true")
         parser.add_argument('--mondo_json', required=False)
         parser.add_argument('--hpo_owl', required=False)
-        parser.add_argument('--hpo_to_omim', required=False)
+        # parser.add_argument('--hpo_to_omim', required=False)
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -292,8 +309,8 @@ class Command(BaseCommand):
                 load_hpo(filename, force)
             except OntologyBuilderDataUpToDateException:
                 print("HPO File hash is the same as last import")
-        if filename := options.get("hpo_to_omim"):
-            try:
-                load_hpo_disease(filename, force)
-            except OntologyBuilderDataUpToDateException:
-                print("HPO Disease hash is the same as last import")
+        # if filename := options.get("hpo_to_omim"):
+        #    try:
+        #        load_hpo_disease(filename, force)
+        #    except OntologyBuilderDataUpToDateException:
+        #        print("HPO Disease hash is the same as last import")

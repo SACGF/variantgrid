@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologyTermGeneRelation
+from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake
 from ontology.ontology_matching import OntologyMatching
 
 
@@ -33,10 +33,13 @@ class OntologyTermView(TemplateView):
         term_id = self.kwargs.get("term")
         term = OntologyTerm.get_or_stub(term_id)
         if not term.is_stub:
+            gene_relationships = None
+            if term.ontology_service != OntologyService.HGNC:
+                gene_relationships = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
             return {
                 "term": term,
-                "gene_relations": OntologyTermGeneRelation.relationship_for(term),
-                "relationships": OntologyTermRelation.all_relationships(term)
+                "gene_relationships": gene_relationships,
+                "relationships": OntologyTermRelation.relations_of(term)
             }
         else:
             messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")

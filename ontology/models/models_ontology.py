@@ -1,18 +1,19 @@
 import re
-from typing import Optional, List, Dict
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Set, Union, Tuple
 
 from django.db import models
-from django.db.models import PROTECT, CASCADE, QuerySet
+from django.db.models import PROTECT, CASCADE, QuerySet, Q
 from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, HGNCGeneNames
 from library.utils import Constant
 
 """
 A series of models that currently stores the combination of MONDO and OMIM (with support for HPO if we add an importer to it).
 MONDO is given preferrential treatment (e.g. if there's an established relationship between an OMIM term and a gene symbol,
-the relationship is actually stored against the MONDO equivilant of the OMIM term).
+the relationship is actually stored against the MONDO equivalent of the OMIM term).
 """
 
 
@@ -20,17 +21,21 @@ class OntologyService(models.TextChoices):
     MONDO = "MONDO", "MONDO"
     OMIM = "OMIM", "OMIM"
     HPO = "HP", "HP"
+    HGNC = "HGNC", "HGNC"
+    PANEL_APP_AU = "PAAU", "PanelApp AU"
 
     EXPECTED_LENGTHS: Dict[str, int] = Constant({
         MONDO[0]: 7,
         OMIM[0]: 6,
-        HPO[0]: 7
+        HPO[0]: 7,
+        HGNC[0]: 1  # HGNC ids aren't typically 0 padded, because they're not monsters
     })
 
     URLS: Dict[str, str] = Constant({
         MONDO[0]: "https://vm-monitor.monarchinitiative.org/disease/MONDO:${1}",
         OMIM[0]: "http://www.omim.org/entry/${1}",
-        HPO[0]: "https://hpo.jax.org/app/browse/term/HP:${1}"
+        HPO[0]: "https://hpo.jax.org/app/browse/term/HP:${1}",
+        HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}"
     })
 
     @staticmethod
@@ -39,20 +44,19 @@ class OntologyService(models.TextChoices):
         num_part = str(index).rjust(expected_length, '0')
         return f"{ontology_service}:{num_part}"
 
-    PANEL_APP_AU = "PAAU", "PanelApp AU"
 
+class OntologyRelation:
+    """
+    Common relationships
+    """
+    IS_A = "is_a"
+    EXACT = "exact"
+    CLOSE = "close"
+    BROAD = "broad"
+    NARROW = "narrow"
 
-class OntologyRelation(models.TextChoices):
-    IS_A = "is_a", "is a"
-    """
-    Alias relationship is our non-preferred term to preferred term
-    If it's between ontology sets, the dest term will always be MONDO
-    """
-    EXACT = "exact", "exact"
-    CLOSE = "close", "close"
-    BROAD = "broad", "broad"
-    NARROW = "narrow", "narrow"
-    FREQUENCY = "frequency", "has a frequency in"
+    FREQUENCY = "frequency"
+    PANEL_APP_AU = "panelappau"
 
 
 class OntologyImport(TimeStampedModel):
@@ -60,6 +64,7 @@ class OntologyImport(TimeStampedModel):
     filename = models.TextField()
     context = models.TextField()
     hash = models.TextField()
+    processor_version = models.IntegerField(default=1)
     processed_date = models.DateTimeField(auto_created=True)
     completed = models.BooleanField(default=False)
 
@@ -76,7 +81,7 @@ class OntologyTerm(TimeStampedModel):
     name = models.TextField(null=True, blank=True)  # should only be null if we're using it as a placeholder reference
     definition = models.TextField(null=True, blank=True)
     extra = models.JSONField(null=True, blank=True)
-    from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
+    from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, null=True, blank=True)
 
     def __str__(self):
         return self.id
@@ -94,6 +99,34 @@ class OntologyTerm(TimeStampedModel):
     @property
     def url_safe_id(self):
         return self.id.replace(":", "_")
+
+    @staticmethod
+    def get(id_str: str) -> 'OntologyTerm':
+        parts = re.split("[:|_]", id_str)
+        if len(parts) != 2:
+            raise ValueError(f"Can not convert {id_str} to a proper id")
+
+        prefix = OntologyService(parts[0])
+        num_part = int(parts[1])
+        clean_id = OntologyService.index_to_id(prefix, num_part)
+
+        return OntologyTerm.objects.filter(id=clean_id).first()
+
+    @staticmethod
+    def get_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> 'OntologyTerm':
+        if isinstance(gene_symbol, GeneSymbol):
+            gene_symbol = gene_symbol.symbol
+        if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, name=gene_symbol).first():
+            return gene_ontology
+        if hgnc := HGNCGeneNames.objects.filter(approved_symbol=gene_symbol).first():
+            term = OntologyTerm.objects.create(
+                id=f"HGNC:{hgnc.id}",
+                ontology_service=OntologyService.HGNC,
+                index=hgnc.id,
+                name=hgnc.approved_symbol
+            )
+            return term
+        raise ValueError(f"Cannot find HGNC for {gene_symbol}")
 
     @staticmethod
     def get_or_stub(id_str: str) -> 'OntologyTerm':
@@ -134,11 +167,23 @@ class OntologyTermRelation(TimeStampedModel):
     """
     source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject")
     dest_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
-    relation = models.CharField(max_length=10, choices=OntologyRelation.choices)
+    relation = models.TextField()
+    extra = models.JSONField(null=True, blank=True)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
+    deleted_date = models.DateTimeField(null=True, blank=True)
+
+    # note source/dest/relation aren't unique together due to the deleted date
+    # as in we can have multiple copies, up to code to try to not duplicate
 
     def __str__(self):
         return f"{self.source_term} -> ({self.relation}) -> {self.dest_term}"
+
+    def other_end(self, term: OntologyTerm) -> OntologyTerm:
+        if term == self.source_term:
+            return self.dest_term
+        elif term == self.dest_term:
+            return self.source_term
+        raise ValueError("Term was neither a source or dest term, can't find the other end")
 
     @property
     def relation_display(self):
@@ -157,42 +202,81 @@ class OntologyTermRelation(TimeStampedModel):
         children_ids = OntologyTermRelation.objects.filter(dest_term=term, relation=OntologyRelation.IS_A).values_list("source_term", flat=True)
         return OntologyTerm.objects.filter(id__in=children_ids).order_by("-id")
 
+    # TODO add options so a date can be provided
     @staticmethod
-    def all_relationships(term: OntologyTerm) -> List['OntologyTermRelation']:
+    def relations_of(term: OntologyTerm) -> QuerySet:
+        return OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term), deleted_date__isnull=True).exclude(relation=OntologyRelation.IS_A)
+
+
+@dataclass
+class OntologySnakeStep:
+    relation: OntologyTermRelation
+    dest_term: OntologyTerm
+
+class OntologySnake:
+
+    def __init__(self, source_term: OntologyTerm, leaf_term: Optional[OntologyTerm] = None,
+                 paths: Optional[List[OntologyTermRelation]] = None):
+        self.source_term = source_term
+        self.leaf_term = leaf_term or source_term
+        self.paths = paths or list()
+
+    def snake_step(self, relationship: OntologyTermRelation) -> 'OntologySnake':
+        new_leaf = relationship.other_end(self.leaf_term)
+        new_paths = list(self.paths)
+        new_paths.append(relationship)
+        return OntologySnake(source_term=self.source_term, leaf_term=new_leaf, paths=new_paths)
+
+    def show_steps(self) -> List[OntologySnakeStep]:
+        steps: List[Tuple[OntologyTermRelation, OntologyTerm]] = list()
+        node = self.source_term
+        for path in self.paths:
+            node = path.other_end(node)
+            steps.append(OntologySnakeStep(relation=path, dest_term=node))
+        return steps
+
+    @staticmethod
+    def snake_from(term: OntologyTerm, to_ontology: OntologyService, max_depth: int = 1) -> List['OntologySnake']:
         """
-        Need to convert QuerySet to list to ensure ordering of outgoing vs incoming relationships
+        Returns the smallest snake/path from source term to the desired OntologyService
+        Only follows "EXACT" relationships, and up to max_depth
+        Returns None if no path can be found
         """
-        outgoing = OntologyTermRelation.objects.filter(source_term=term).order_by('-dest_term__id').all()
-        incoming = OntologyTermRelation.objects.filter(dest_term=term).order_by('-source_term__id').all()
-        return list(outgoing) + list(incoming)
-
-    @staticmethod
-    def mondo_version_of(term: OntologyTerm) -> Optional[OntologyTerm]:
-        if term.ontology_service == OntologyService.MONDO:
-            return term
+        if term.ontology_service == to_ontology:
+            return OntologySnake(source_term=term)
         # Mondo will always be the source term
-        if relationship := OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO, relation=OntologyRelation.EXACT).first():
-            return relationship.source_term
-        return None
+        seen: Set[OntologyTerm] = set()
+        seen.add(term)
+        new_snakes: List[OntologySnake] = list([OntologySnake(source_term=term)])
+        valid_snakes: List[OntologySnake] = list()
+
+        # FIXME ensure we can't have two Genes in in our snake
+        while new_snakes:
+            snakes = list(new_snakes)
+            new_snakes = list()
+
+            all_leafs = [snake.leaf_term for snake in snakes]
+            all_relations = list(
+                OntologyTermRelation.objects.filter(Q(source_term__in=all_leafs) | Q(dest_term__in=all_leafs), deleted_date__isnull=True)\
+                    .exclude(relation=OntologyRelation.IS_A)\
+                    .select_related("source_term", "dest_term"))
+
+            print(f"Reviewing leafs {len(all_leafs)} resulting in {len(all_relations)} relationships")
+
+            for snake in snakes:
+                for relation in all_relations:
+                    if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
+                        other_term = relation.other_end(snake.leaf_term)
+                        if other_term not in seen:
+                            seen.add(other_term)
+                            new_snake = snake.snake_step(relation)
+                            if other_term.ontology_service == to_ontology:
+                                valid_snakes.append(new_snake)
+                            elif len(new_snake.paths) <= max_depth:
+                                new_snakes.append(new_snake)
+        return valid_snakes
 
     @staticmethod
-    def omim_version_of(term: OntologyTerm) -> Optional[OntologyTerm]:
-        if term.ontology_service == OntologyService.OMIM:
-            return term
-        # Mondo will always be the source term
-        if relationship := OntologyTermRelation.objects.filter(dest_term__ontology_service=OntologyService.OMIM, source_term=term, relation=OntologyRelation.EXACT).first():
-            return relationship.dest_term
-        return None
-
-
-class OntologyTermGeneRelation(TimeStampedModel):
-    term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    relation = models.TextField()
-    extra = models.JSONField(null=True, blank=True)
-    from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
-    deletion_date = models.DateTimeField(null=True, blank=True)
-
-    @staticmethod
-    def relationship_for(term: OntologyTerm) -> QuerySet:
-        return OntologyTermGeneRelation.objects.filter(term=term, deletion_date__isnull=True)
+    def terms_for_gene_symbol(gene_symbol: GeneSymbol, desired_ontology: OntologyService) -> List['OntologySnake']:
+        gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
+        return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology)
