@@ -135,9 +135,8 @@ def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
     name = json_data["name"]
     version = json_data["version"]
 
-    # Record we had was out of date, update it so that next retrieval of cache works
-    if panel_app_panel.current_version != version:
-        _get_or_update_panel_app_panel(panel_app_panel.server, json_data)
+    # Update panel_app_panel to latest (even if just bumping modified date)
+    _get_or_update_panel_app_panel(panel_app_panel.server, json_data)
 
     category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
     gene_matcher = GeneSymbolMatcher()
