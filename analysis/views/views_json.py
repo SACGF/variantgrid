@@ -1,5 +1,4 @@
 from django.db.models import Max
-from django.db.models.query_utils import Q
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
@@ -9,11 +8,11 @@ import random
 
 from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, AnalysisTemplateVersion
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisClassification, AnalysisEdge, NodeVersion
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
-from analysis.models.nodes.filters.tag_node import VariantTag, TagNode
+from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes, \
@@ -21,10 +20,7 @@ from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes
 from analysis.views.node_json_view import NodeJSONPostView
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
-from genes.models import TranscriptVersion
-from genes.models_enums import AnnotationConsortium
-from snpdb.models import Sample, Tag, BuiltInFilters
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import create_classification_for_sample_and_variant_objects
+from snpdb.models import Tag, BuiltInFilters
 
 
 @require_POST
