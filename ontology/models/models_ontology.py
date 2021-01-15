@@ -316,7 +316,7 @@ class OntologySnake:
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology)
 
     @staticmethod
-    def gene_symbol_for_term(term: Union[OntologyTerm, str]) -> QuerySet:
+    def gene_symbols_for_term(term: Union[OntologyTerm, str]) -> QuerySet:
         if isinstance(term, str):
             term = OntologyTerm.get_or_stub(term)
             if term.is_stub:
