@@ -396,7 +396,7 @@
                         grid[0].p.postData["extra_filters"] = getGeneVariantsGridExtraFilters;
                     }
                 </script>
-                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='initialHideFilter' %}
+                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False download_grid_json_as_csv=True gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='initialHideFilter' %}
             {% else %}
                 There are no variants for this gene.
             {% endif %}
