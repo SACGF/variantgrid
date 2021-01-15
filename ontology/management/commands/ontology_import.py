@@ -69,8 +69,6 @@ class TermId:
 @transaction.atomic
 def load_mondo(filename: str, force: bool):
     data_file = None
-    with open(filename, 'r') as json_file:
-        data_file = json.load(json_file)
 
     file_hash = file_md5sum(filename)
 
@@ -82,6 +80,9 @@ def load_mondo(filename: str, force: bool):
         processor_version=2)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+
+    with open(filename, 'r') as json_file:
+        data_file = json.load(json_file)
 
     print("This may take a few minutes")
     node_to_hgnc_id: [str, str] = dict()
