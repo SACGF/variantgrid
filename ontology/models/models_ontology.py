@@ -1,3 +1,4 @@
+import functools
 import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple
@@ -224,8 +225,24 @@ class OntologyTermRelation(TimeStampedModel):
         return OntologyTerm.objects.filter(id__in=children_ids).order_by("-id")
 
     @staticmethod
-    def relations_of(term: OntologyTerm) -> QuerySet:
-        return OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term))
+    def relations_of(term: OntologyTerm) -> List['OntologyTermRelation']:
+        def sort_relationships(rel1, rel2):
+            rel1source = rel1.source_term_id == term.id
+            rel2source = rel2.source_term_id == term.id
+            if rel1source != rel2source:
+                if rel1source:
+                    return -1
+                else:
+                    return 1
+            other1 = rel1.other_end(term)
+            other2 = rel2.other_end(term)
+            if other1.ontology_service != other2.ontology_service:
+                return -1 if other1.ontology_service < other2.ontology_service else 1
+            return -1 if other1.index < other2.index else 1
+
+        items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)).select_related("source_term", "dest_term"))
+        items.sort(key=functools.cmp_to_key(sort_relationships))
+        return items
 
 
 @dataclass
