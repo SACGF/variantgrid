@@ -4,6 +4,7 @@ import os
 import re
 from collections import namedtuple
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import total_ordering
 from typing import Tuple, Optional, Dict, List, Set
 
@@ -21,6 +22,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
+from django.utils import timezone
 from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
@@ -1163,6 +1165,12 @@ class PanelAppPanel(TimeStampedModel):
 
     class Meta:
         unique_together = ('server', 'panel_id')
+
+    @property
+    def cache_valid(self) -> bool:
+        # Attempt to use cache if recent and present, otherwise fall through and do a query
+        max_age = timedelta(days=settings.PANEL_APP_CACHE_DAYS)
+        return timezone.now() < self.modified + max_age
 
     def __str__(self):
         return self.name

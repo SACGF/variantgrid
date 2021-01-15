@@ -1,10 +1,7 @@
 import logging
-from datetime import timedelta
 from typing import Dict
 
 import requests
-from django.conf import settings
-from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
 from annotation.models import CachedWebResource, ImportStatus
@@ -121,14 +118,13 @@ def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
     """ Gets or creates local cache of a panel app panel so it can be used as a GeneList """
 
     # Attempt to use cache if recent and present, otherwise fall through and do a query
-    max_age = timedelta(days=settings.PANEL_APP_CACHE_DAYS)
-    if panel_app_panel.modified < timezone.now() - max_age:
-        try:
-            pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.get(panel_app_panel=panel_app_panel,
-                                                                        version=panel_app_panel.current_version)
-            return pap_gene_list
-        except PanelAppPanelLocalCacheGeneList.DoesNotExist:
-            pass
+    try:
+        existing = PanelAppPanelLocalCacheGeneList.objects.get(panel_app_panel=panel_app_panel,
+                                                               version=panel_app_panel.current_version)
+        if panel_app_panel.cache_valid:
+            return existing
+    except PanelAppPanelLocalCacheGeneList.DoesNotExist:
+        existing = None
 
     url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
     genes = json_data["genes"]
@@ -137,6 +133,9 @@ def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
 
     # Update panel_app_panel to latest (even if just bumping modified date)
     _get_or_update_panel_app_panel(panel_app_panel.server, json_data)
+
+    if existing and existing.version == version:
+        return existing  # cache still valid
 
     category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
     gene_matcher = GeneSymbolMatcher()
