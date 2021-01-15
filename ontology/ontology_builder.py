@@ -115,7 +115,13 @@ class OntologyBuilder:
 
     @lazy
     def _ontology_import(self) -> OntologyImport:
-        return OntologyImport.objects.create(ontology_service=self.ontology_service, context=self.context, filename=self.filename, processed_date=now, hash=self.data_hash)
+        return OntologyImport.objects.create(
+            ontology_service=self.ontology_service,
+            context=self.context,
+            filename=self.filename,
+            processed_date=now,
+            processor_version=self.processor_version,
+            hash=self.data_hash)
 
     def _count(self, model, created: bool):
         value = self.counters[model].count_op(created)
