@@ -7,8 +7,7 @@ from typing import List, Union, Match, Dict, Optional
 from annotation.models.models import Citation
 from annotation.models.models_enums import CitationSource
 from library.log_utils import report_message
-from classification.external_database_ref_lookup import externalDatabaseRefLookupInstance
-from ontology.models import OntologyService
+from ontology.models import OntologyService, OntologyTerm
 
 
 class MatchType(Enum):
@@ -64,6 +63,7 @@ class DbRegexes:
     COSMIC = DbRefRegex(db="COSMIC", prefixes="COSM", link="https://cancer.sanger.ac.uk/cosmic/mutation/overview?id=${1}")
     GTR = DbRefRegex(db="GTR", prefixes="GTR", link="https://www.ncbi.nlm.nih.gov/gtr/tests/${1}/overview/")
     HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link=OntologyService.URLS[OntologyService.HPO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HPO])
+    HGNC = DbRefRegex(db="HGNC", prefixes="HGNC", link=OntologyService.URLS[OntologyService.HGNC], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HGNC])
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
     MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologyService.URLS[OntologyService.MONDO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.MONDO])
     NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
@@ -87,15 +87,18 @@ class DbRefRegexResult:
         self.match = match
         self.internal_id = None
         self.summary = None
+
+        # this is where we check our database to see if we know what this reference is about
+        if self.db in OntologyService.VALID_ONTOLOGY_PREFIXES:
+            term_id = f"{self.db}:{self.idx}"
+            if term := OntologyTerm.objects.filter(id=term_id).first():
+                self.summary = term.name
         try:
-            # this is where we check our database to see if we know what this reference is about
-            self.summary = externalDatabaseRefLookupInstance.lookup(self.db, self.idx)
-            source = CitationSource.CODES.get(self.db)
-            if source:
+            if source := CitationSource.CODES.get(self.db):
                 citation, _ = Citation.objects.get_or_create(citation_source=source, citation_id=idx)
                 self.internal_id = citation.pk
         except:
-            report_message(message=f"Couldnt resolve external DB reference for {self.db}:{self.idx}")
+            report_message(message=f"Could not resolve external DB reference for {self.db}:{self.idx}")
 
     @property
     def id_fixed(self):

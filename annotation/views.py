@@ -38,6 +38,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
+from ontology.models import OntologyTerm, OntologyService, OntologyImport
 from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF
 
 
@@ -169,6 +170,8 @@ def annotation(request):
     if gene_symbol_alias_counts:
         gene_symbol_alias_counts = {GeneSymbolAliasSource(k).label: v for k, v in gene_symbol_alias_counts.items()}
 
+    # These are deprecated, but still report them until all code has moved on
+
     mim_counts = MIMMorbid.objects.all().count()
     mim_alias_counts = MIMMorbidAlias.objects.all().count()
     mim_gene_counts = MIMGene.objects.count()
@@ -185,6 +188,17 @@ def annotation(request):
     mondo_count = MonarchDiseaseOntology.objects.all().count()
     if mondo_count:
         mondo_import = f"Monarch Disease Ontology: {mondo_count} records."
+
+    # end deprecation
+
+    ontology_all_imported = True
+    ontology_stats = list()
+    for service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO]:
+        count = OntologyTerm.objects.filter(ontology_service=service).count()
+        if count == 0:
+            ontology_all_imported = False
+        last_import = OntologyImport.objects.filter(ontology_service=service).order_by('-created').first()
+        ontology_stats.append({"service": service, "count": count, "last_import": last_import})
 
     hgnc_gene_names_count = HGNCGeneNames.objects.all().count()
     if hgnc_gene_names_count:
@@ -211,6 +225,7 @@ def annotation(request):
 
     # These are empty/None if not set.
     annotations_ok = [all(builds_ok),
+                      ontology_all_imported,
                       clinvar_citations,
                       hpa_counts_annotation,
                       mim_import,
@@ -232,6 +247,7 @@ def annotation(request):
                "mim_import": mim_import,
                "human_phenotype_ontology_import": human_phenotype_ontology_import,
                "mondo_import": mondo_import,
+               "ontology_stats": ontology_stats,
                "hgnc_gene_symbols_import": hgnc_gene_symbols_import,
                "gene_symbol_alias_counts": gene_symbol_alias_counts,
                "diagnostic_gene_list": diagnostic_gene_list,

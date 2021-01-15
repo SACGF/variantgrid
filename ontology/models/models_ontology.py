@@ -36,6 +36,13 @@ class OntologyService(models.TextChoices):
         HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}"
     })
 
+    VALID_ONTOLOGY_PREFIXES: Set[str] = Constant({
+        MONDO[0],
+        OMIM[0],
+        HPO[0],
+        HGNC[0]
+    })
+
     @staticmethod
     def index_to_id(ontology_service: 'OntologyService', index: int):
         expected_length = OntologyService.EXPECTED_LENGTHS.get(ontology_service, 0)
