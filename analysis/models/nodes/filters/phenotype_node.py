@@ -8,6 +8,7 @@ import logging
 import operator
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from annotation.models import VariantTranscriptAnnotation
 from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, \
     MIMMorbidAlias
 from genes.models import Gene, GeneSymbol
@@ -96,7 +97,7 @@ class PhenotypeNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         qs_filters = []
         gene_qs = self.get_gene_qs()
-        qs_filters.append(Q(variantannotation__gene__in=gene_qs))
+        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs))
 
         text_phenotypes = (self.text_phenotype or '').split()
         if text_phenotypes:
