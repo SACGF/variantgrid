@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Set, Union, Tuple
 from django.db import models
 from django.db.models import PROTECT, CASCADE, QuerySet, Q
 from django.urls import reverse
-from model_utils.models import TimeStampedModel
+from model_utils.models import TimeStampedModel, now
 
 from genes.models import GeneSymbol, HGNCGeneNames
 from library.utils import Constant
@@ -67,6 +67,8 @@ class OntologyRelation:
 
     FREQUENCY = "frequency"
     PANEL_APP_AU = "panelappau"
+    DISEASE_ASSOCIATION = "disease association" # used by OMIM_ALL_FREQUENCIES
+    ALL_FREQUENCY = "frequency" # used by OMIM_ALL_FREQUENCIES
 
 
 class OntologyImport(TimeStampedModel):
@@ -126,11 +128,22 @@ class OntologyTerm(TimeStampedModel):
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, name=gene_symbol).first():
             return gene_ontology
         if hgnc := HGNCGeneNames.objects.filter(approved_symbol=gene_symbol).first():
+            # every term needs an import
+            o_import = OntologyImport.objects.create(
+                ontology_service=OntologyService.HGNC,
+                filename="HGNC Aliases",
+                context="adhoc_hgnc",
+                hash="N/A",
+                processor_version=1,
+                processed_date=now,
+                completed=True)
+
             term = OntologyTerm.objects.create(
                 id=f"HGNC:{hgnc.id}",
                 ontology_service=OntologyService.HGNC,
                 index=hgnc.id,
-                name=hgnc.approved_symbol
+                name=hgnc.approved_symbol,
+                from_import=o_import
             )
             return term
         raise ValueError(f"Cannot find HGNC for {gene_symbol}")

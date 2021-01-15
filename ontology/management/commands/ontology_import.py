@@ -10,7 +10,7 @@ from django.db import transaction
 
 from annotation.models import HPOSynonymScope
 from library.file_utils import file_md5sum
-from ontology.models import OntologyService, OntologyRelation
+from ontology.models import OntologyService, OntologyRelation, OntologyTerm
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 
@@ -339,48 +339,58 @@ def load_hpo(filename: str, force: bool):
     print("Committing...")
 
 
-# @transaction.atomic
-# def load_hpo_disease(filename: str, force: bool):
-#     ontology_builder = OntologyBuilder(
-#         filename=filename,
-#         context="hpo_disease",
-#         ontology_service=OntologyService.HPO,
-#         force_update=force)
-#     file_hash = file_md5sum(filename)
-#     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
-#     df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
-#                      names=['disease_id', 'gene_symbol', 'gene_id', 'hpo_id', 'hpo_name'],
-#                      dtype={"gene_id": int})
-#     # TODO is gene_symbol, gene_id meant to come into play here?
-#     gb = df.groupby(["hpo_id"])
-#     for hpo_id, data in gb:
-#         name = list(data["hpo_name"])[0]
-#         ontology_builder.add_term(term_id=hpo_id, name=name, definition=None, extra=None, primary_source=False)
-#         for disease_id in set(data["disease_id"]):
-#             ontology_builder.add_ontology_relation(
-#                 source_term_id=hpo_id,
-#                 dest_term_id=disease_id,
-#                 relation=OntologyRelation.FREQUENCY  # TODO do we have more information than this?
-#             )
-#     gb = df.groupby(["gene_id"])
-#     for gene_id, data in gb:
-#         name = list(data["gene_symbol"])[0]
-#         hgnc_id = f"HGNC:{gene_id}"
-#         ontology_builder.add_term(
-#             term_id=f"HGNC:{gene_id}",
-#             name=name,
-#             definition=None,
-#             primary_source=False
-#         )
-#         for omim_id in set(data["disease_id"]):
-#             # TODO extra to provide more details about the association
-#             ontology_builder.add_ontology_relation(
-#                 source_term_id=omim_id,
-#                 dest_term_id=hgnc_id,
-#                 relation=OntologyRelation.FREQUENCY
-#             )
-#     ontology_builder.complete()
-#     ontology_builder.report()
+@transaction.atomic
+def load_hpo_disease(filename: str, force: bool):
+    ontology_builder = OntologyBuilder(
+        filename=filename,
+        context="hpo_disease",
+        ontology_service=OntologyService.HPO,
+        processor_version=2,
+        force_update=force)
+    file_hash = file_md5sum(filename)
+    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
+                     names=['disease_id', 'gene_symbol', 'gene_id', 'hpo_id', 'hpo_name'],
+                     dtype={"gene_id": int})
+
+    by_hpo = df.groupby(["hpo_id"])
+    for hpo_id, by_hpo_data in by_hpo:
+        # make HPO stubs in case HPO import hasn't happened yet
+        hpo_name = by_hpo_data["hpo_name"].iloc[0]
+        ontology_builder.add_term(
+            term_id=hpo_id,
+            name=hpo_name,
+            definition=None,
+            primary_source=False
+        )
+
+        by_omim = by_hpo_data.groupby(["disease_id"])
+        for omim_id, by_omim_data in by_omim:
+            # link HPO -> OMIM
+            ontology_builder.add_ontology_relation(
+                source_term_id=hpo_id,
+                dest_term_id=omim_id,
+                relation=OntologyRelation.DISEASE_ASSOCIATION
+            )
+
+    by_gene = df.groupby(["gene_symbol"])
+    for gene_symbol, gene_data in by_gene:
+        # HGNC ID
+        try:
+            hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
+
+            by_omim = gene_data.groupby(["disease_id"])
+            for omim_id, by_omim_data in by_omim:
+                ontology_builder.add_ontology_relation(
+                    source_term_id=omim_id,
+                    dest_term_id=hgnc_term.id,
+                    relation=OntologyRelation.ALL_FREQUENCY
+                )
+        except ValueError:
+            print(f"Could not resolve gene symbol {gene_symbol} to HGNC ID")
+
+    # ontology_builder.complete()
+    ontology_builder.report()
 
 
 class Command(BaseCommand):
@@ -389,7 +399,7 @@ class Command(BaseCommand):
         parser.add_argument('--force', action="store_true")
         parser.add_argument('--mondo_json', required=False)
         parser.add_argument('--hpo_owl', required=False)
-        # parser.add_argument('--hpo_to_omim', required=False)
+        parser.add_argument('--omim_frequencies', required=False)
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -404,8 +414,8 @@ class Command(BaseCommand):
                 load_hpo(filename, force)
             except OntologyBuilderDataUpToDateException:
                 print("HPO File hash is the same as last import")
-        # if filename := options.get("hpo_to_omim"):
-        #    try:
-        #        load_hpo_disease(filename, force)
-        #    except OntologyBuilderDataUpToDateException:
-        #        print("HPO Disease hash is the same as last import")
+        if filename := options.get("omim_frequencies"):
+            try:
+                load_hpo_disease(filename, force)
+            except OntologyBuilderDataUpToDateException:
+                print("HPO Disease hash is the same as last import")

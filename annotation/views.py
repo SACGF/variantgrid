@@ -149,7 +149,6 @@ def _get_build_annotation_details(build_contigs, genome_build):
 def annotation(request):
     # Set Variables to None for uninstalled components, the template will show installation instructions
     ensembl_biomart_transcript_genes = None
-    hpa_counts_annotation = None
     mim_import = None
     human_phenotype_ontology_import = None
     mondo_import = None
@@ -216,8 +215,6 @@ def annotation(request):
 
     hpa_version = HumanProteinAtlasAnnotationVersion.objects.order_by("-annotation_date").first()
     hpa_counts = HumanProteinAtlasAnnotation.objects.filter(version=hpa_version).count()
-    if hpa_counts:
-        hpa_counts_annotation = f"{hpa_counts} HPA entries"
 
     somalier = None
     if somalier_enabled := settings.SOMALIER.get("enabled"):
@@ -227,7 +224,7 @@ def annotation(request):
     annotations_ok = [all(builds_ok),
                       ontology_all_imported,
                       clinvar_citations,
-                      hpa_counts_annotation,
+                      hpa_counts > 0,
                       mim_import,
                       human_phenotype_ontology_import,
                       mondo_import,
@@ -252,7 +249,7 @@ def annotation(request):
                "gene_symbol_alias_counts": gene_symbol_alias_counts,
                "diagnostic_gene_list": diagnostic_gene_list,
                "clinvar_citations": clinvar_citations,
-               "hpa_counts_annotation": hpa_counts_annotation,
+               "hpa_counts": hpa_counts,
                "num_annotation_columns": VariantGridColumn.objects.count(),
                "cached_web_resources": cached_web_resources,
                "python_command": settings.PYTHON_COMMAND,
