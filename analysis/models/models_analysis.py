@@ -78,6 +78,12 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def lock_history(self):
         return self.analysislock_set.order_by("pk")
 
+    def get_permission_object(self):
+        """ Snapshots use template analysis for permission """
+        if self.template_type == AnalysisTemplateType.SNAPSHOT:
+            return self.analysistemplateversion.template.analysis
+        return self
+
     def can_write(self, user):
         """ Disable modification when locked """
         if super().can_write(user):
