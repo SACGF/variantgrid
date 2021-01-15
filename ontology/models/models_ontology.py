@@ -56,9 +56,13 @@ class OntologyRelation:
     """
     IS_A = "is_a"
     EXACT = "exact"
+    RELATED = "related" # related synonym
     CLOSE = "close"
     BROAD = "broad"
     NARROW = "narrow"
+    ALTERNATIVE = "alternative"  # HPO has alternative ID in mondo file
+    XREF = "xref" # listed in MONDO xrefs, probably is the same term
+    REPLACED = "replaced"
 
     FREQUENCY = "frequency"
     PANEL_APP_AU = "panelappau"
@@ -178,9 +182,10 @@ class OntologyTermRelation(TimeStampedModel):
     relation = models.TextField()
     extra = models.JSONField(null=True, blank=True)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
-    deleted_date = models.DateTimeField(null=True, blank=True)
 
-    # note source/dest/relation aren't unique together due to the deleted date
+    class Meta:
+        unique_together = ("source_term", "dest_term", "relation")
+
     # as in we can have multiple copies, up to code to try to not duplicate
 
     def __str__(self):
@@ -220,7 +225,7 @@ class OntologyTermRelation(TimeStampedModel):
 
     @staticmethod
     def relations_of(term: OntologyTerm) -> QuerySet:
-        return OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term), deleted_date__isnull=True)
+        return OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term))
 
 
 @dataclass
@@ -282,7 +287,9 @@ class OntologySnake:
 
             all_leafs = [snake.leaf_term for snake in snakes]
             all_relations = list(
-                OntologyTermRelation.objects.filter(Q(source_term__in=all_leafs) | Q(dest_term__in=all_leafs), deleted_date__isnull=True)\
+                OntologyTermRelation.objects.filter(
+                    (Q(source_term__in=all_leafs) & ~Q(dest_term__in=seen)) |\
+                    (Q(dest_term__in=all_leafs) & ~Q(source_term__in=seen)))\
                     .exclude(relation=OntologyRelation.IS_A)\
                     .select_related("source_term", "dest_term"))
 
@@ -290,14 +297,13 @@ class OntologySnake:
                 for relation in all_relations:
                     if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
                         other_term = relation.other_end(snake.leaf_term)
-                        if other_term not in seen:
-                            new_snake = snake.snake_step(relation)
-                            if other_term.ontology_service == to_ontology:
-                                valid_snakes.append(new_snake)
-                                continue
-                            elif len(new_snake.paths) <= max_depth:
-                                new_snakes.append(new_snake)
-                            seen.add(other_term)
+                        new_snake = snake.snake_step(relation)
+                        if other_term.ontology_service == to_ontology:
+                            valid_snakes.append(new_snake)
+                            continue
+                        elif len(new_snake.paths) <= max_depth:
+                            new_snakes.append(new_snake)
+                        seen.add(other_term)
         return valid_snakes
 
     @staticmethod
@@ -308,3 +314,13 @@ class OntologySnake:
         """
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology)
+
+    @staticmethod
+    def genes_for_term(term: Union[OntologyTerm, str]):
+        if isinstance(term, str):
+            term = OntologyTerm.get_or_stub(term)
+            if term.is_stub:
+                return GeneSymbol.objects.none()
+        gene_symbol_snakes = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
+        gene_symbol_names = [snake.leaf_term.name for snake in gene_symbol_snakes]
+        return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)

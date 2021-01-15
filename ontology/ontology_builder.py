@@ -101,8 +101,8 @@ class OntologyBuilder:
                     print(f"This appears stale or might have just been stub with no extra information: {old}")
 
                 self.counters[model].deletes += olds.count()
-                if model == OntologyTermRelation:  # there are the only things that should actually get marked as deleted
-                    olds.update(deleted_date=now, modified=now)
+                if model == OntologyTermRelation:  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
+                    olds.delete()
 
         self._ontology_import.completed = True
         self._ontology_import.save()

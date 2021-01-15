@@ -21,7 +21,7 @@ ID_EXTRACT_P = re.compile(r"^.*\/([A-Z]+)_([0-9]+)$")
 HGNC_EXTRACT_P = re.compile(r"http://identifiers.org/hgnc/([0-9]+)")
 OMIM_URL_P = re.compile(r"http://identifiers.org/omim/([0-9]+)")
 GENE_SYMBOL_SEARCH = re.compile(r"([A-Z][A-Z,0-9]{2,})")
-OMIM_P = re.compile("OMIM:[0-9]+")
+ALT_ONTOLOGY_P = re.compile("(HP|OMIM):[0-9]+")
 
 GENE_RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004025": "disease causes dysfunction of",
@@ -34,7 +34,9 @@ MATCH_TYPES = {
     "http://www.w3.org/2004/02/skos/core#exactMatch": OntologyRelation.EXACT,
     "http://www.w3.org/2004/02/skos/core#closeMatch": OntologyRelation.CLOSE,
     "http://www.w3.org/2004/02/skos/core#broadMatch": OntologyRelation.BROAD,
-    "http://www.w3.org/2004/02/skos/core#narrowMatch": OntologyRelation.NARROW
+    "http://www.w3.org/2004/02/skos/core#narrowMatch": OntologyRelation.NARROW,
+    "http://www.geneontology.org/formats/oboInOwl#hasAlternativeId": OntologyRelation.ALTERNATIVE,
+    "http://purl.obolibrary.org/obo/IAO_0100001": OntologyRelation.REPLACED
 }
 
 """
@@ -55,7 +57,8 @@ def load_mondo(filename: str, force: bool):
         filename=filename,
         context="mondo_file",
         ontology_service=OntologyService.MONDO,
-        force_update=force)
+        force_update=force,
+        processor_version=2)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -100,13 +103,14 @@ def load_mondo(filename: str, force: bool):
                                 primary_source=True
                             )
 
+                            synonym_set = set()
                             if synonyms := meta.get("synonyms"):
                                 for synonym in synonyms:
                                     pred = synonym.get("pred")
                                     if pred == "hasExactSynonym":
                                         # val = synonym.get("val")
                                         for xref in synonym.get("xrefs", []):
-                                            if OMIM_P.match(xref):
+                                            if ALT_ONTOLOGY_P.match(xref):
                                                 ontology_builder.add_term(
                                                     term_id=xref,
                                                     name=label,
@@ -116,8 +120,44 @@ def load_mondo(filename: str, force: bool):
                                                 ontology_builder.add_ontology_relation(
                                                     source_term_id=full_id,
                                                     dest_term_id=xref,
-                                                    relation=OntologyRelation.EXACT,
+                                                    relation=OntologyRelation.EXACT
                                                 )
+                                                synonym_set.add(xref)
+
+                                for synonym in synonyms:
+                                    pred = synonym.get("pred")
+                                    if pred == "hasRelatedSynonym":
+                                        # val = synonym.get("val")
+                                        for xref in synonym.get("xrefs", []):
+                                            if ALT_ONTOLOGY_P.match(xref) and not xref in synonym_set:
+                                                ontology_builder.add_term(
+                                                    term_id=xref,
+                                                    name="Related to " + label,
+                                                    definition=f"Name copied from related synonym {full_id}",
+                                                    primary_source=False
+                                                )
+                                                ontology_builder.add_ontology_relation(
+                                                    source_term_id=full_id,
+                                                    dest_term_id=xref,
+                                                    relation=OntologyRelation.RELATED
+                                                )
+                                                synonym_set.add(xref)
+
+                            if xrefs := meta.get("xrefs"):
+                                for xref in xrefs:
+                                    val = xref.get("val")
+                                    if ALT_ONTOLOGY_P.match(val) and val not in synonym_set:
+                                        ontology_builder.add_term(
+                                            term_id=val,
+                                            name=label,
+                                            definition=f"Name copied from synonym {full_id}",
+                                            primary_source=False
+                                        )
+                                        ontology_builder.add_ontology_relation(
+                                            source_term_id=full_id,
+                                            dest_term_id=val,
+                                            relation=OntologyRelation.XREF
+                                        )
 
                             # for synonym in meta.get("synonyms", []):
                             #    synonym_value = synonym.get("val")
