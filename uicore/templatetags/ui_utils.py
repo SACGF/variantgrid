@@ -1,4 +1,5 @@
 import json
+import uuid
 from typing import Optional, Any
 
 from django import template
@@ -58,6 +59,50 @@ def parse_tag(token, parser):
             args.append(FilterExpression(bit, parser))
 
     return (tag_name, args, kwargs)
+
+
+@register.tag(name='install-instructions')
+def render_install_instructions(parser, token):
+    tag_name, args, kwargs = parse_tag(token, parser)
+    nodelist = parser.parse(('endinstall-instructions',))
+    parser.delete_first_token()
+    label = label=kwargs.get('label')
+    if not label:
+        if len(args) > 0:
+            label = args[0]
+        else:
+            raise ValueError("install-instructions required requires 'label' argument")
+
+    return InstallInstructionsTag(nodelist, label=label)
+
+
+class InstallInstructionsTag(template.Node):
+
+    def __init__(self, nodelist, label: FilterExpression = None):
+        self.nodelist = nodelist
+        self.label = label
+
+    def render(self, context):
+        if not context.request.user.is_superuser:
+            return ""
+
+        label_str = TagUtils.value_str(context, self.label)
+        id_safe = None
+        if not label_str:
+            label_str = ""
+            id_safe = str(uuid.uuid4()).replace("-", "_") + "_instructions"
+        else:
+            id_safe = re.sub("\W", "_", label_str).lower()
+        return f"""
+        <div>
+        <a class='hover-link install-instructions-toggle' data-toggle='collapse' href='#{id_safe}'><i class="fas fa-question-circle"></i> {label_str} Install/Update Instructions</a>
+        <div class='collapse install-instructions' id='{id_safe}'>
+        {self.nodelist.render(context)}
+        </div>
+        </div>
+        """
+
+
 
 @register.tag(name='labelled')
 def render_labelled(parser, token):
