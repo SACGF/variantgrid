@@ -127,25 +127,38 @@ class OntologyTerm(TimeStampedModel):
             gene_symbol = gene_symbol.symbol
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, name=gene_symbol).first():
             return gene_ontology
+        if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, extra__aliases__contains=gene_symbol).first():
+            return gene_ontology
         if hgnc := HGNCGeneNames.objects.filter(approved_symbol=gene_symbol).first():
-            # every term needs an import
-            o_import = OntologyImport.objects.create(
-                ontology_service=OntologyService.HGNC,
-                filename="HGNC Aliases",
-                context="adhoc_hgnc",
-                hash="N/A",
-                processor_version=1,
-                processed_date=now,
-                completed=True)
+            if hgnc_term := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, index=hgnc.id).first():
+                extra = hgnc_term.extra or dict()
+                hgnc_names = set(extra.get("aliases", []))
+                hgnc_names.append(gene_symbol).append(hgnc_term.name)
+                extra["aliases"] = list(hgnc_names)
+                hgnc_term.extra = extra
+                hgnc_term.save()
+                return hgnc_term
+            else:
+                # every term needs an import
+                o_import = OntologyImport.objects.create(
+                    ontology_service=OntologyService.HGNC,
+                    filename="HGNC Aliases",
+                    context="adhoc_hgnc",
+                    hash="N/A",
+                    processor_version=1,
+                    processed_date=now,
+                    completed=True)
 
-            term = OntologyTerm.objects.create(
-                id=f"HGNC:{hgnc.id}",
-                ontology_service=OntologyService.HGNC,
-                index=hgnc.id,
-                name=hgnc.approved_symbol,
-                from_import=o_import
-            )
-            return term
+                term = OntologyTerm.objects.create(
+                    id=f"HGNC:{hgnc.id}",
+                    ontology_service=OntologyService.HGNC,
+                    index=hgnc.id,
+                    name=hgnc.approved_symbol,
+                    definition=hgnc.approved_name,
+                    from_import=o_import
+                )
+                return term
+
         raise ValueError(f"Cannot find HGNC for {gene_symbol}")
 
     @staticmethod
