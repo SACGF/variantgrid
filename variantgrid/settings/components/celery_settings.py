@@ -116,6 +116,7 @@ CELERY_IMPORTS = (
     'seqauto.tasks.gold_summary_tasks',
     'seqauto.tasks.scan_run_jobs',
     'snpdb.models',
+    'snpdb.tasks.clingen_tasks',
     'snpdb.tasks.cohort_genotype_tasks',
     'snpdb.tasks.graph_generation_task',
     'snpdb.tasks.soft_delete_tasks',

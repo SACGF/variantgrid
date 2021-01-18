@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.db import connection, models
 from django.db.models import Value, IntegerField
 from django.db.models.aggregates import Count
-from django.db.models.deletion import CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.dispatch import receiver
 from django.utils import timezone
@@ -28,8 +28,9 @@ from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_coun
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
+from library.log_utils import report_event
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, ProcessingStatus, \
-    GenomeBuild
+    GenomeBuild, AlleleSource, Allele
 from snpdb.variant_collection import write_sql_to_variant_collection
 from classification.models import Classification, post_delete
 from variantgrid.celery import app
@@ -828,6 +829,29 @@ class NodeWiki(Wiki):
 
     def _get_restricted_object(self):
         return self.node.analysis
+
+
+class AnalysisNodeAlleleSource(AlleleSource):
+    """ Used to link a nodes variants to alleleles and liftover to other builds """
+    node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)
+
+    def get_genome_build(self):
+        if self.node:
+            genome_build = self.node.analysis.genome_build
+        else:
+            genome_build = None
+        return genome_build
+
+    def get_variant_qs(self):
+        if self.node:
+            qs = self.node.get_subclass().get_queryset()
+        else:
+            qs = Variant.objects.none()
+        return qs
+
+    def liftover_complete(self, genome_build: GenomeBuild):
+        report_event('Completed AnalysisNode liftover',
+                     extra_data={'node_id': self.node_id, 'allele_count': self.get_allele_qs().count()})
 
 
 class NodeVersion(models.Model):

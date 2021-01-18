@@ -8,7 +8,7 @@ import random
 
 from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, AnalysisTemplateVersion
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion, AnalysisNodeAlleleSource
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
@@ -20,7 +20,9 @@ from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes
 from analysis.views.node_json_view import NodeJSONPostView
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
+from library.django_utils import require_superuser
 from snpdb.models import Tag, BuiltInFilters
+from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
 
 
 @require_POST
@@ -298,6 +300,15 @@ def analysis_set_panel_size(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     analysis.analysis_panel_fraction = request.POST["analysis_panel_fraction"]
     analysis.save()
+    return JsonResponse({})
+
+
+@require_POST
+@require_superuser
+def node_populate_clingen_alleles(request, node_id):
+    node = get_node_subclass_or_404(request.user, node_id)
+    an_as, _ = AnalysisNodeAlleleSource.objects.get_or_create(node=node)
+    populate_clingen_alleles_from_allele_source.si(an_as.pk).apply_async()
     return JsonResponse({})
 
 

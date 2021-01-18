@@ -37,6 +37,7 @@ class VariantGrid(JqGridSQL):
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
         'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
         'clinvar__clinvar_variation_id': {'width': 60, 'formatter': 'clinvarLink'},
+        'variantallele__allele__clingen_allele': {'width': 90, 'formatter': 'formatClinGenAlleleId'},
         'variantannotation__cosmic_id': {'width': 90, 'formatter': 'cosmicLink'},
         'variantannotation__cosmic_legacy_id': {'width': 90, 'formatter': 'cosmicLink'},
         'variantannotation__transcript_version__gene_version__gene_symbol': {'formatter': 'geneSymbolLink'},

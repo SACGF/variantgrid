@@ -487,6 +487,19 @@ function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
 }
 
 
+function formatClinGenAlleleId(cellValue) {
+    // warning: doesn't use settings.CLINGEN_ALLELE_REGISTRY_DOMAIN as static JS
+    if (cellValue) {
+        let ca_id = "CA" + cellValue;
+        let url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${ca_id}`;
+        cellValue = `<a href="${url}" target="_blank">${ca_id}</a>`;
+    } else {
+        cellValue = "";
+    }
+    return cellValue;
+}
+
+
 jQuery.extend($.fn.fmatter , {
     'detailsLink' : detailsLink,
     'tagsFormatter' : tagsFormatter,
@@ -494,6 +507,7 @@ jQuery.extend($.fn.fmatter , {
     'clinvarLink' : clinvarLink,
     'cosmicLink' : cosmicLink,
     'omimLink' : omimLink,
+    'formatClinGenAlleleId': formatClinGenAlleleId,
     'geneSymbolLink' : geneSymbolLink,
     'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
     'gnomadFilteredFormatter' : gnomadFilteredFormatter,

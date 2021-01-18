@@ -507,8 +507,14 @@ class AlleleSource(models.Model):
     """ Provides a source of alleles for liftover pipelines. """
     objects = InheritanceManager()
 
+    def get_genome_build(self):
+        return None
+
+    def get_variants_qs(self):
+        return Variant.objects.none()
+
     def get_allele_qs(self):
-        return Allele.objects.none()
+        return Allele.objects.filter(variantallele__variant__in=self.get_variants_qs())
 
     def liftover_complete(self, genome_build: GenomeBuild):
         """ This is called at the end of a liftover pipeline (once per build) """

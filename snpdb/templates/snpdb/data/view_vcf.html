@@ -52,26 +52,24 @@ table#sample-formset input[type="text"] {
 }
 
 </style>
-{% endblock %}
+<script>
+function showBulkSet() {
+    $("#show-bulk-set-link").remove();
+    $("div#bulk-set-form-container").slideDown('slow');
+}
 
-{% block jshead %}
-    function showBulkSet() {
-        $("#show-bulk-set-link").remove();
-        $("div#bulk-set-form-container").slideDown('slow');
-    }
-    
-    function setBamPath() {
-        var bamPattern = $("input#bam_pattern").val();
-        $("tr.sample-row").each(function() {
-            var nameTD = $("td.sample-name", this);
-            var name = $("input", nameTD).val();
-            var data = {"name" : name};
-            var bfp = format(bamPattern, data);
-            var bamTD = $("td.bam_file_path", this);
-            $("input", bamTD).val(bfp);
-        });
+function setBamPath() {
+    var bamPattern = $("input#bam_pattern").val();
+    $("tr.sample-row").each(function() {
+        var nameTD = $("td.sample-name", this);
+        var name = $("input", nameTD).val();
+        var data = {"name" : name};
+        var bfp = format(bamPattern, data);
+        var bamTD = $("td.bam_file_path", this);
+        $("input", bamTD).val(bfp);
+    });
 
-    }
+}
 
 {% if vcf.import_status == 'S' and vcf.cohort %}
     function subCohortClick() {
@@ -94,141 +92,140 @@ table#sample-formset input[type="text"] {
     }
 {% endif %}
 
-    function initSubCohort() {
-        var subCohortButton = $("#sub-cohort-button");
-        subCohortButton.button({disabled: true});
-        {% if vcf.import_status == 'S' and vcf.cohort %}
-        subCohortButton.click(subCohortClick);
-        $(".sample-select").change(setupSubCohortButton);
-        setupSubCohortButton();
-        {% endif %}
-    }
+function initSubCohort() {
+    var subCohortButton = $("#sub-cohort-button");
+    subCohortButton.button({disabled: true});
+    {% if vcf.import_status == 'S' and vcf.cohort %}
+    subCohortButton.click(subCohortClick);
+    $(".sample-select").change(setupSubCohortButton);
+    setupSubCohortButton();
+    {% endif %}
+}
 
-    function setupSubCohortButton() {
-        var numSelectedSamples = $("input:checked", "#sample-formset").length;
-        var buttonEnabled = numSelectedSamples > 1;
-        $("#sub-cohort-button").button( "option", "disabled", !buttonEnabled );
-    }
+function setupSubCohortButton() {
+    var numSelectedSamples = $("input:checked", "#sample-formset").length;
+    var buttonEnabled = numSelectedSamples > 1;
+    $("#sub-cohort-button").button( "option", "disabled", !buttonEnabled );
+}
 
 
-    function addCreateProjectButtonAndForm() {
-        var createProjectButton = $("<div/>")
-            .addClass("click-to-add-button left")
-            .attr("title", "Create new project...");
+function addCreateProjectButtonAndForm() {
+    var createProjectButton = $("<div/>")
+        .addClass("click-to-add-button left")
+        .attr("title", "Create new project...");
 
-        var dialog, form;
-        var allFields = $("input", "#new-project-dialog");
+    var dialog, form;
+    var allFields = $("input", "#new-project-dialog");
 
-        function createNewProject() {
-            allFields.removeClass("ui-state-error");
-            var valid = true;
-            var name = $("#name", form);
-            var nameVal = name.val().trim(); 
-            if (!nameVal) {
-                name.addClass("ui-state-error");
-                valid = false;
-            }
-                
+    function createNewProject() {
+        allFields.removeClass("ui-state-error");
+        var valid = true;
+        var name = $("#name", form);
+        var nameVal = name.val().trim();
+        if (!nameVal) {
             name.addClass("ui-state-error");
-            
-            if (valid) {
-                var postData = {
-                    name: nameVal,
-                    description: $("#description", form).val().trim()
-                };
-            
-                $.ajax({
-                    type: "POST",
-                    url: "{% url 'api_project_create' %}",
-                    data: JSON.stringify(postData),
-                    headers: {
-                          'Accept': 'application/json',
-                          'Content-Type': 'application/json'
-                    },
-                    success: function(data) {
-                        var name = data.name;
-                        if (data.description) {
-                            name += " (" + data.description + ")";
-                        } 
-                        var option = $('<option>', {value: data.name, text: name, selected: 'selected'});
-                        $("select#id_project").append(option);   
-                        dialog.dialog("close");
-                    },
-                    error: function(data) {
-                        var errorMessage = data.responseJSON.name[0];
-                        $(".error-messages", dialog).html(errorMessage);
-                        console.log(data);
-                    }
-                });
-            }
-            return valid;
+            valid = false;
         }
 
-        dialog = $("#new-project-dialog").dialog({
-          autoOpen: false,
-          height: 400,
-          width: 350,
-          modal: true,
-          buttons: {
-            "Create new project": createNewProject,
-            Cancel: function() {
-              dialog.dialog("close");
-            }
-          },
-          close: function() {
-            form[0].reset();
-            allFields.removeClass( "ui-state-error" );
-            $(".error-messages", "#new-project-dialog").empty();
-          }
-        });
+        name.addClass("ui-state-error");
 
-        form = dialog.find( "form" ).on( "submit", function( event ) {
-          event.preventDefault();
-          console.log("dialog submit");
-          createNewProject();
-        });
-     
-        createProjectButton.click(function() {
-          dialog.dialog("open");
-        });
-        
-        $("select#id_project").addClass("left").after(createProjectButton);
+        if (valid) {
+            var postData = {
+                name: nameVal,
+                description: $("#description", form).val().trim()
+            };
+
+            $.ajax({
+                type: "POST",
+                url: "{% url 'api_project_create' %}",
+                data: JSON.stringify(postData),
+                headers: {
+                      'Accept': 'application/json',
+                      'Content-Type': 'application/json'
+                },
+                success: function(data) {
+                    var name = data.name;
+                    if (data.description) {
+                        name += " (" + data.description + ")";
+                    }
+                    var option = $('<option>', {value: data.name, text: name, selected: 'selected'});
+                    $("select#id_project").append(option);
+                    dialog.dialog("close");
+                },
+                error: function(data) {
+                    var errorMessage = data.responseJSON.name[0];
+                    $(".error-messages", dialog).html(errorMessage);
+                    console.log(data);
+                }
+            });
+        }
+        return valid;
     }
 
-    function showVCFHeader() {
-        $("#show-vcf-header").hide();
-        $("#vcf-header").show();
-    }
+    dialog = $("#new-project-dialog").dialog({
+      autoOpen: false,
+      height: 400,
+      width: 350,
+      modal: true,
+      buttons: {
+        "Create new project": createNewProject,
+        Cancel: function() {
+          dialog.dialog("close");
+        }
+      },
+      close: function() {
+        form[0].reset();
+        allFields.removeClass( "ui-state-error" );
+        $(".error-messages", "#new-project-dialog").empty();
+      }
+    });
 
-    function hideVCFHeader() {
-        $("#show-vcf-header").show();
-        $("#vcf-header").hide();
-    }
+    form = dialog.find( "form" ).on( "submit", function( event ) {
+      event.preventDefault();
+      console.log("dialog submit");
+      createNewProject();
+    });
 
-    function drawZygosityGraphs() {
-        const sample_zygosities = {{ sample_zygosities | jsonify }};
-        const sample_names = {{ sample_names | jsonify }};
-        showStackedBar('sample-zygosities-graph', 'Sample Zygosities', sample_zygosities, sample_names);
-    }
-{% endblock %}
+    createProjectButton.click(function() {
+      dialog.dialog("open");
+    });
 
-{% block jsdocumentready %}
+    $("select#id_project").addClass("left").after(createProjectButton);
+}
+
+function showVCFHeader() {
+    $("#show-vcf-header").hide();
+    $("#vcf-header").show();
+}
+
+function hideVCFHeader() {
+    $("#show-vcf-header").show();
+    $("#vcf-header").hide();
+}
+
+function drawZygosityGraphs() {
+    const sample_zygosities = {{ sample_zygosities | jsonify }};
+    const sample_names = {{ sample_names | jsonify }};
+    showStackedBar('sample-zygosities-graph', 'Sample Zygosities', sample_zygosities, sample_names);
+}
+
+$(document).ready(function() {
     $("div#bulk-set-form-container").hide();
 
     $("#set-bam-path-button").click(setBamPath);
 
-    $("button#vcf-submit-button").click(function() {
+    $("button#vcf-submit-button").click(function () {
         $("form#vcf-form").submit();
     });
 
     initSubCohort();
     $("#vcf-tabs").tabs({cache: true});  // need to avoid let/const redeclaration in Somalier html
-    
+
     addCreateProjectButtonAndForm();
 
     var dialog = setupCreatePatientDialog();
-    
-    $(".sample-patient > select", "form#vcf-form").each(function() {
+
+    $(".sample-patient > select", "form#vcf-form").each(function () {
         var parentRow = $(this).parents("tr");
         var sampleNameCell = $(".sample-name", parentRow);
         var sampleName = $("input", sampleNameCell).val();
@@ -237,6 +234,21 @@ table#sample-formset input[type="text"] {
 
     drawZygosityGraphs();
 
+
+    $("button#vcf-populate-clingen-alleles").click(function () {
+        let btn = $(this);
+        if (!btn.hasClass("disabled")) {
+            $.ajax({
+                type: "POST",
+                url: "{% url 'vcf_populate_clingen_alleles' vcf.pk %}",
+                success: function (data) {
+                    btn.addClass("disabled");
+                },
+            });
+        }
+    });
+});
+</script>
 {% endblock %}
 
 
@@ -366,10 +378,14 @@ table#sample-formset input[type="text"] {
 
         <p>
         {% if has_write_permission %}
-            <button id="vcf-submit-button" class="btn btn-primary">Update VCF</button></p>
+            <button id="vcf-submit-button" class="btn btn-primary">Update VCF</button>
+            {% if user.is_superuser %}
+                <button id="vcf-populate-clingen-alleles" class="btn btn-primary">Populate ClinGen Alleles</button>
+            {% endif %}
         {% else %}
             You can view but not modify this data.
         {% endif %}
+        </p>
 
         {% if vcf.import_status == 'S' and vcf.cohort %}
             <button id='sub-cohort-button' class="btn btn-outline-primary">

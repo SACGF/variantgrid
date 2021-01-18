@@ -1,7 +1,5 @@
 """
-At the moment, liftover is only via ClinGen Allele registry, but we have a model Allele
-which should work with everything (eventually) when we use other liftover tools
-
+Liftover via Clingen Allele Registry or NCBI remap
 """
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any

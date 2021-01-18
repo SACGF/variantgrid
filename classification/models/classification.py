@@ -100,6 +100,9 @@ class ClassificationImportAlleleSource(AlleleSource):
     """ A model to indicate that variants need to be linked to an allele and lifted over to other builds """
     classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
 
+    def get_genome_build(self):
+        return self.classification_import.genome_build
+
     def get_allele_qs(self):
         variants_qs = self.classification_import.get_variants_qs()
         return Allele.objects.filter(variantallele__variant__in=variants_qs)
@@ -119,14 +122,14 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     git_hash = models.TextField()
 
+    def get_genome_build(self):
+        return self.genome_build
+
     def get_variants_qs(self):
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, classification__isnull=False)
-
-    def get_allele_qs(self):
-        return Allele.objects.filter(variantallele__variant__in=self.get_variants_qs())
 
     def liftover_complete(self, genome_build: GenomeBuild):
         Classification.bulk_update_cached_c_hgvs()
