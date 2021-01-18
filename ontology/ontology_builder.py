@@ -106,9 +106,9 @@ class OntologyBuilder:
 
         self._ontology_import.completed = True
         self._ontology_import.save()
-        self.duration = datetime.now() - self.start
 
     def report(self):
+        self.duration = datetime.now() - self.start
         print(f"Time taken {self.duration}")
         for model, counter in self.counters.items():
             print(f"{model} - {counter}")

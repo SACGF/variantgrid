@@ -38,7 +38,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
-from ontology.models import OntologyTerm, OntologyService, OntologyImport
+from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyTermRelation
 from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF
 
 
@@ -188,16 +188,32 @@ def annotation(request):
     if mondo_count:
         mondo_import = f"Monarch Disease Ontology: {mondo_count} records."
 
-    # end deprecation
-
-    ontology_all_imported = True
-    ontology_stats = list()
+    all_ontologies_accounted_for = True
+    ontology_counts = list()
     for service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO]:
+        # don't report HGNC as it's just there as a stub for other items to relate to
         count = OntologyTerm.objects.filter(ontology_service=service).count()
-        if count == 0:
-            ontology_all_imported = False
-        last_import = OntologyImport.objects.filter(ontology_service=service).order_by('-created').first()
-        ontology_stats.append({"service": service, "count": count, "last_import": last_import})
+        ontology_counts.append({"service": service, "count": count})
+
+    ontology_services = [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]
+    ontology_relationship_counts = dict()
+    for first_index in range(len(ontology_services)):
+        first_service = ontology_services[first_index]
+        for second_index in range(first_index, len(ontology_services)):
+            second_service = ontology_services[second_index]
+            join_count = OntologyTermRelation.objects.filter(source_term__ontology_service=first_service, dest_term__ontology_service=second_service).count()
+            if first_service != second_service:
+                reverse_count = OntologyTermRelation.objects.filter(source_term__ontology_service=second_service, dest_term__ontology_service=first_service).count()
+                join_count += reverse_count
+            ontology_relationship_counts[f"{first_service}{second_service}"] = join_count
+            ontology_relationship_counts[f"{second_service}{first_service}"] = join_count
+
+    ontology_imports = list()
+    for context in ["mondo_file", "hpo_file", "hpo_disease"]:
+        last_import = OntologyImport.objects.filter(context=context).order_by('-created').first()
+        if not last_import:
+            all_ontologies_accounted_for = False
+        ontology_imports.append({"context": context, "last_import": last_import})
 
     hgnc_gene_names_count = HGNCGeneNames.objects.all().count()
     if hgnc_gene_names_count:
@@ -222,7 +238,7 @@ def annotation(request):
 
     # These are empty/None if not set.
     annotations_ok = [all(builds_ok),
-                      ontology_all_imported,
+                      all_ontologies_accounted_for,
                       clinvar_citations,
                       hpa_counts > 0,
                       mim_import,
@@ -244,7 +260,10 @@ def annotation(request):
                "mim_import": mim_import,
                "human_phenotype_ontology_import": human_phenotype_ontology_import,
                "mondo_import": mondo_import,
-               "ontology_stats": ontology_stats,
+               "ontology_services": ontology_services,
+               "ontology_counts": ontology_counts,
+               "ontology_relationship_counts": ontology_relationship_counts,
+               "ontology_imports": ontology_imports,
                "hgnc_gene_symbols_import": hgnc_gene_symbols_import,
                "gene_symbol_alias_counts": gene_symbol_alias_counts,
                "diagnostic_gene_list": diagnostic_gene_list,

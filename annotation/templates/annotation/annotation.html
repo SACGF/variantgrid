@@ -311,23 +311,84 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     {% endinstall-instructions %}
                 {% endlabelled %}
 
-                {% for ontology_stat in ontology_stats %}
-                    {% labelled label=ontology_stat.service %}
-                        <label>Records</label> {{ ontology_stat.count | intcomma }}<br/>
-                        <label>Last Imported</label> {% if ontology_stat.last_import %}"{{ ontology_stat.last_import.filename }}" {% timestamp ontology_stat.last_import.processed_date time_ago=True %}{% elif ontology_stat.count %}No direct import, records made from MONDO import{% else %}Never imported{% endif %}
+                {% labelled label="HGNC Gene Names" %}
+                    {% if hgnc_gene_symbols_import %}
+                        {{ hgnc_gene_symbols_import }}
+                    {% else %}
+                        <div>Not installed</div>
+                    {% endif %}
+                    {% install-instructions "HGNC Gene Names" %}
+                        Download default columns (as text) as "hgnc_gene_symbols.tsv" from <a href="https://www.genenames.org/cgi-bin/download">HGNC Gene Names Download</a>
+                        <code>{{ python_command }} manage.py hgnc_gene_symbols_import ${VARIANTGRID_SETUP_DATA}/hgnc_gene_symbols.tsv</code>
+                    {% endinstall-instructions %}
+                {% endlabelled %}
+                {% labelled label="Gene Symbol Aliases" %}
+                    {% if gene_symbol_alias_counts %}
+                        {% for source, count in gene_symbol_alias_counts.items %}
+                            <b>{{ source }}:</b> {{ count }}
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-value">Not installed</div>
+                    {% endif %}
+                    {% install-instructions "Gene Symbol Aliases" %}
+                        <code>
+wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
+{{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz
+                        </code>
+                     {% endinstall-instructions %}
+                {% endlabelled %}
+
+                {% for ontology_count in ontology_counts %}
+                    {% labelled label=ontology_count.service %}
+                        {{ ontology_count.count | intcomma }}
                     {% endlabelled %}
                 {% endfor %}
-                {% if user.is_superuser %}
-                    {% labelled label="Update Ontologies" %}
-                        <div class="install-instructions">
+                {% labelled label="Ontology Relationships" %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th></th>{% for service in ontology_services %}<th>{{ service }}</th>{% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ontology_row in ontology_services %}
+                                <tr>
+                                <th>{{ ontology_row }}</th>
+                                {% for ontology_col in ontology_services %}
+                                    {% with key=ontology_row|add:ontology_col %}
+                                    <td>{{ ontology_relationship_counts | get_item:key | intcomma}}</td>
+                                    {% endwith %}
+                                {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endlabelled %}
+                {% labelled label="Ontology Imports" %}
+                    {% for ontology_import in ontology_imports %}
+                        <div><b>{{ ontology_import.context }}</b> : {% timestamp ontology_import.last_import.processed_date time_ago=True %}</div>
+                    {% endfor %}
+                    {% install-instructions "Ontology Imports" %}
+                        <div>
                             <b>MONDO</b><br/>mondo.json can be downloaded from Download mondo.owl from <a href="http://www.obofoundry.org/ontology/mondo.html">Monarch Disease Ontology</a> on OBO foundry.<br/>
-                            <b>HPO</b><br/>hp.owl can be referenced from <code>git clone https://github.com/obophenotype/human-phenotype-ontology.git ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology</code><br/>
-                            <b>OMIM</b><br/>Direct OMIM import is not currently supported, but will be populated via MONDO file<br/>
-                            <br/>
                             <code>{{ python_command }} manage.py ontology_import --mondo_json (location of mondo.json) --hpo_owl (location of hp.owl) </code>
                         </div>
-                    {% endlabelled %}
-                {% endif %}
+                        <div class="mt-2">
+                            <b>HPO</b><br/>hp.owl can be referenced from
+                            <code>git clone https://github.com/obophenotype/human-phenotype-ontology.git ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology</code><br/>
+                            <code>{{ python_command }} manage.py ontology_import --hpo_owl (location of hp.owl) </code>
+                        </div>
+                        <div class="mt-2">
+                            <b>HPO Diseases</b><br/>
+                            Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a><br/>
+                            <code>{{ python_command }} manage.py ontology_import --omim_frequencies (location of OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes) </code>
+                        </div>
+                        <div class="mt-2">
+                            <b>OMIM</b><br/>Direct OMIM import is not currently supported, but will be populated via MONDO and HPO Diseases File<br/>
+                        </div>
+
+                    {% endinstall-instructions %}
+                {% endlabelled %}
 
                 {% labelled label="Deprecated Ontology Stats" %}<a class="hover-link" data-toggle="collapse" data-target="#deprecated-ontology">Toggle</a>{% endlabelled %}
                 <div id="deprecated-ontology" class="collapse">
@@ -381,33 +442,6 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     {% endlabelled %}
                     <hr/>
                 </div>
-
-                {% labelled label="HGNC Gene Names" %}
-                    {% if hgnc_gene_symbols_import %}
-                        {{ hgnc_gene_symbols_import }}
-                    {% else %}
-                        <div>Not installed</div>
-                    {% endif %}
-                    {% install-instructions "HGNC Gene Names" %}
-                        Download default columns (as text) as "hgnc_gene_symbols.tsv" from <a href="https://www.genenames.org/cgi-bin/download">HGNC Gene Names Download</a>
-                        <code>{{ python_command }} manage.py hgnc_gene_symbols_import ${VARIANTGRID_SETUP_DATA}/hgnc_gene_symbols.tsv</code>
-                    {% endinstall-instructions %}
-                {% endlabelled %}
-                {% labelled label="Gene Symbol Aliases" %}
-                    {% if gene_symbol_alias_counts %}
-                        {% for source, count in gene_symbol_alias_counts.items %}
-                            <b>{{ source }}:</b> {{ count }}
-                        {% endfor %}
-                    {% else %}
-                        <div class="no-value">Not installed</div>
-                    {% endif %}
-                    {% install-instructions "Gene Symbol Aliases" %}
-                        <code>
-wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-{{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz
-                        </code>
-                     {% endinstall-instructions %}
-                {% endlabelled %}
                 {% if somalier_enabled %}
                     {% labelled label="Somalier" %}
                         {% if somalier %}
@@ -450,6 +484,6 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
                         </div>
                     {% endlabelled %}
                 {% endfor %}
-            </div>
+            </>
         </div>
 {% endblock content %}
