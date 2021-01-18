@@ -92,7 +92,6 @@ class Test(URLTestCase):
         server = PanelAppServer.objects.order_by("pk").first()
         cls.panel_app_panel = PanelAppPanel.objects.get_or_create(server=server,
                                                                   panel_id=42,
-                                                                  cached_web_resource=cwr,
                                                                   disease_group='Tumour syndromes',
                                                                   disease_sub_group='Tumour syndromes',
                                                                   name='Blah blah blah',
