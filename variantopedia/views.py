@@ -27,7 +27,8 @@ from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele
+from snpdb.clingen_allele import link_allele_to_existing_variants
+from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, AlleleConversionTool
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings, UserPageAck
 from snpdb.serializers import VariantAlleleSerializer
@@ -324,6 +325,8 @@ def view_allele_from_variant(request, variant_id):
 
 def view_allele(request, pk):
     allele: Allele = get_object_or_404(Allele, pk=pk)
+    link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+
     latest_classifications = ClassificationModification.latest_for_user(
         user=request.user,
         allele=allele,
