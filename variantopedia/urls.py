@@ -17,6 +17,8 @@ urlpatterns = [
     perm_path('view_allele_from_variant/<int:variant_id>', views.view_allele_from_variant,
               name='view_allele_from_variant'),
     perm_path('view_allele/<int:pk>', views.view_allele, name='view_allele'),
+    perm_path('allele/<allele_id>/create_variant/<genome_build_name>',
+              views.create_variant_for_allele, name='create_variant_for_allele'),
     perm_path('view/<int:variant_id>', views.variant_details, name='variant_details'),
     perm_path('view/<int:variant_id>/<int:annotation_version_id>', views.variant_details_annotation_version,
               name='variant_details_annotation_version'),

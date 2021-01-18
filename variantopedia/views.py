@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
+from django.views.decorators.http import require_POST
 
 from analysis.models.nodes.analysis_node import Analysis
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
@@ -22,13 +23,16 @@ from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk
 from library.enums.log_level import LogLevel
 from library.git import Git
+from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, log_traceback
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from snpdb.clingen_allele import link_allele_to_existing_variants
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, AlleleConversionTool
+from snpdb.clingen_allele import link_allele_to_existing_variants, get_clingen_allele
+from snpdb.liftover import create_liftover_pipelines
+from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
+    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings, UserPageAck
 from snpdb.serializers import VariantAlleleSerializer
@@ -341,6 +345,18 @@ def view_allele(request, pk):
                "classifications": latest_classifications,
                "annotated_builds": GenomeBuild.builds_with_annotation()}
     return render(request, "variantopedia/view_allele.html", context)
+
+
+@require_POST
+def create_variant_for_allele(request, allele_id, genome_build_name):
+    """ Shortcut to create manual variant, but as a POST """
+    allele = get_object_or_404(Allele, pk=allele_id)
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
+    if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
+        allele_source = VariantAlleleSource.objects.create(variant_allele=variant_allele)
+        create_liftover_pipelines(admin_bot(), allele_source, ImportSource.WEB, variant_allele.genome_build, [genome_build])
+    return redirect(allele)
 
 
 def variant_details(request, variant_id, template='variant_details.html', extra_context: dict = None):

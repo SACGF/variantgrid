@@ -56,6 +56,23 @@
             {% endfor %}
         {% else %}
             {% labelled label='Warning' %}Not lifted over{% endlabelled %}
+
+            {%  if unfinished_liftover %}
+                <p>
+                    This variant is being lifted over to {{ unfinished_liftover.genome_build }} via {{ unfinished_liftover.get_conversion_tool_display }}
+                    (last updated {{ unfinished_liftover.modified|timesince }} ago)
+                </p>
+
+            {% else %}
+                {% if can_create_variant %}
+                    <form action="{% url 'create_variant_for_allele' allele.pk genome_build %}" method="POST">
+                        {% csrf_token %}
+                        <button class="btn btn-primary" type="submit">Create variant</button>
+                    </form>
+
+                {% endif %}
+            {% endif %}
+
         {% endif %}
         </div>
     </div>

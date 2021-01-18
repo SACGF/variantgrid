@@ -521,6 +521,22 @@ class AlleleSource(models.Model):
         pass
 
 
+class VariantAlleleSource(AlleleSource):
+    variant_allele = models.ForeignKey(VariantAllele, on_delete=CASCADE)
+
+    def get_genome_build(self):
+        return self.variant_allele.genome_build
+
+    def get_variants_qs(self):
+        return Variant.objects.filter(variantallele=self.variant_allele)
+
+    @staticmethod
+    def get_liftover_for_allele(allele, genome_build) -> Optional['Liftover']:
+        """ Only works if liftover was done via VariantAlleleSource """
+        allele_sources_qs = VariantAlleleSource.objects.filter(variant_allele__allele=allele)
+        return Liftover.objects.filter(allele_source__in=allele_sources_qs, genome_build=genome_build).first()
+
+
 class Liftover(TimeStampedModel):
     """ Liftover pipeline involves reading through a VCF where ID is set to Allele.pk and then creating
         VariantAllele entries for the variant/allele
