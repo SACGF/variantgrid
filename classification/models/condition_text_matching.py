@@ -200,7 +200,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         gene_str = cm.get(SpecialEKeys.GENE_SYMBOL)
         gene_symbol = GeneSymbol.objects.filter(symbol=gene_str).first()
 
-        existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification)
+        existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification).first()
 
         if not gene_symbol or classification.withdrawn:
             if existing:
