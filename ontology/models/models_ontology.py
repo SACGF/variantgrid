@@ -113,6 +113,12 @@ class OntologyTerm(TimeStampedModel):
         return self._state.adding
 
     @property
+    def is_obsolete(self) -> bool:
+        if self.name:
+            return "obsolete" in self.name.lower()
+        return False
+
+    @property
     def url_safe_id(self):
         return self.id.replace(":", "_")
 
@@ -131,9 +137,12 @@ class OntologyTerm(TimeStampedModel):
             return gene_ontology
         if hgnc := HGNCGeneNames.objects.filter(approved_symbol=gene_symbol).first():
             if hgnc_term := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, index=hgnc.id).first():
+                # we found an Ontology Term for HGNC, but the ID is already in use for another sybmol
+                # prioritise the name as defined by HGNCGeneNames but keep the other names in the aliases
+                hgnc_term.name = hgnc.approved_symbol
                 extra = hgnc_term.extra or dict()
-                hgnc_names = set(extra.get("aliases", []))
-                hgnc_names.append(gene_symbol).append(hgnc_term.name)
+                hgnc_names: Set[str] = set(extra.get("aliases", []))
+                hgnc_names.add(hgnc_term.name)
                 extra["aliases"] = list(hgnc_names)
                 hgnc_term.extra = extra
                 hgnc_term.save()
@@ -266,7 +275,7 @@ class OntologyTermRelation(TimeStampedModel):
                 return -1 if other1.ontology_service < other2.ontology_service else 1
             return -1 if other1.index < other2.index else 1
 
-        items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)).select_related("source_term", "dest_term"))
+        items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)).select_related("source_term", "dest_term", "from_import"))
         items.sort(key=functools.cmp_to_key(sort_relationships))
         return items
 

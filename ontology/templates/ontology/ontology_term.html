@@ -13,7 +13,7 @@
             <div class="card-body">
                 {% labelled label="Name" %}{{ term.name }}{% endlabelled %}
                 {% labelled label="Definition" value_css="white-space:pre-wrap" %}{{ term.definition }}{% endlabelled %}
-                {% labelled label="Extra" %}{% if term.extra %}<div class="pre-wrap">{{ term.extra | jsonify_pretty }}</div>{% endif %}{% endlabelled %}
+                {% labelled label="Extra" %}{% if term.extra %}<div style="white-space: pre-wrap; font-size: small" class="text-monospace">{{ term.extra | jsonify_pretty }}</div>{% endif %}{% endlabelled %}
                 {% labelled label="URL" %}
                     <a href="{{ term.url }}" class="external-link hover-link">{{ term.url }}</a>
                 {% endlabelled %}
