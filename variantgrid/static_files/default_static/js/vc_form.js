@@ -67,6 +67,20 @@ const VCForm = (function() {
         messages: [],
         delayedPatch: {},
 
+        isEditMode() {
+            return this.record.can_write && window.location.toString().indexOf("edit=true") !== -1;
+        },
+
+        editMode() {
+            let url;
+            if (document.location.toString().indexOf('?') !== -1) {
+                url = document.location.toString() + "&edit=true";
+            } else {
+                url = document.location.toString() + "?edit=true";
+            }
+            window.open(url, '_self');
+        },
+
         clear() {
             let res = confirm('Are you sure you wish to clear the form data?');
             if (res) {
@@ -127,7 +141,7 @@ const VCForm = (function() {
             this.updateCitations();
             this.updateTitle();
             
-            if (!this.record.can_write || this.alwaysAsterix) {
+            if (!this.isEditMode() || this.alwaysAsterix) {
                 this.searchAsterix();
             } else {
                 /*
@@ -399,7 +413,7 @@ const VCForm = (function() {
                 ).addClass('list-group-item').addClass('list-group-item-action').appendTo(publishUL);
             }
 
-            if (this.record.can_write) {
+            if (this.isEditMode()) {
                 jShareButtons.find('[title]').tooltip('hide').tooltip('dispose');
                 jShareButtons.empty();
                 
@@ -730,6 +744,10 @@ const VCForm = (function() {
             }
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Clin Sig');
+
+            if (this.record.can_write && !this.isEditMode()) {
+                $('<button>', {class:"mt-2 btn btn-primary w-100", html:`<i class=\"fas fa-unlock-alt\"></i> EDIT`, click:this.editMode}).appendTo(jSyncStatus);
+            }
         },
 
         alleleVariantData() {
@@ -781,7 +799,7 @@ const VCForm = (function() {
                 
                 let immutableDiv = visualElement.siblings('.immutable');
                 if (immutable) {
-                    if (!vcform.record.can_write) {
+                    if (!vcform.isEditMode()) {
                         visualElement.parent().addClass('entry-readonly');
                     }
                     visualElement.hide();
@@ -862,7 +880,7 @@ const VCForm = (function() {
         },
 
         immutable(key) {
-            if (!this.record.can_write || this.record.withdrawn) {
+            if (!this.isEditMode() || this.record.withdrawn) {
                 return true;
             }
             let blob = this.data[key] || {};
@@ -947,7 +965,7 @@ const VCForm = (function() {
                 noteDom.popover('dispose');
                 noteDom.removeClass('fas');
                 noteDom.addClass('far');
-                if (!this.record.can_write) {
+                if (!this.isEditMode()) {
                     noteDom.addClass('d-none');
                 }
             }
@@ -1310,7 +1328,7 @@ const VCForm = (function() {
         },
         
         promptNote: function(key) {
-            if (!this.record.can_write || this.record.withdrawn) {
+            if (!this.isEditMode() || this.record.withdrawn) {
                 return;
             }
         

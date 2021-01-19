@@ -70,6 +70,7 @@ class ExportFormatterReport(ExportFormatter):
         context['citations'] = [dict(citation._asdict()) for citation in get_citations(record.citations)]
         context['evidence_weights'] = Classification.summarize_evidence_weights(evidence)
         context['acmg_criteria'] = record.criteria_strength_summary(e_keys)
+        context['editable'] = record.classification.can_write(self.user)
         return context
 
     def content_type(self) -> str:

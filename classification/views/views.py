@@ -171,10 +171,10 @@ class AutopopulateView(APIView):
 
 @require_POST
 def create_classification(request):
-    return redirect(create_classification_object(request))
+    return redirect(create_classification_object(request).get_absolute_url() + "?edit=true")
 
 
-def create_classification_object(request):
+def create_classification_object(request) -> Classification:
     if not Classification.can_create_via_web_form(request.user):
         raise PermissionDenied('User cannot create classifications via web form')
 
