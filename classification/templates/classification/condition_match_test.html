@@ -53,7 +53,7 @@
                             {% for part in auto_match.scores %}
                                 <div class="row mb-1">
                                     <div class="col-1 text-right text-monospace">{{ part.score | floatformat:0 }}</div>
-                                    <div class="col-11">{{ part.description }}</div>
+                                    <div class="col-11">{{ part.name }} : <span class="text-secondary">{{ part.note }} - <span style="font-size:small">{{ part.percent | floatformat:0 }}% of {{ part.max | floatformat:0 }}</span></span></div>
                                 </div>
                             {% endfor %}
                         </td>

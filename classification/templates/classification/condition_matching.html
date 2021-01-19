@@ -15,6 +15,15 @@
         .condition-match-input::placeholder {
             color: #bbb;
         }
+        .toggle-cell {
+            width: 100px;
+        }
+        .term-cell {
+            width: 200px;
+        }
+        .relevance-cell {
+            width: 300px;
+        }
     </style>
     <script>
         const gene_symbol = "{{ clinvar_export.gene_symbol }}";
@@ -108,7 +117,7 @@
                 updateOntoRowSelections();
             });
 
-            $('<td>', {html:toggleButton}).appendTo(row);
+            $('<td>', {class: 'toggle-cell', html:toggleButton}).appendTo(row);
 
              $('<td>', {class: 'term-cell', html:[
                 $('<a>', {class: 'external-link', target:'blank', href:onto.url, text:onto.id}),
@@ -146,23 +155,19 @@
             let scoreDetail = $('<div>');
             for (let score_part of onto.scores) {
                 let score = score_part.score.toFixed(0);
-                if (score_part.score > 0) {
-                    score = "+" + score;
-                }
-                let paddingCount = 3 - score.length;
-                for (let i=0; i < paddingCount; i++) {
-                    score = '&nbsp;' + score;
-                }
 
                 $('<div>', {class:'mt-2',
                     html: [
-                        $('<span>', {class: 'text-monospace', html: score}),
-                        $('<span>', {text: " : " + score_part.description})
+                        $('<div>', {html:[
+                            $('<span>', {class: 'text-monospace', html: score}),
+                            $('<span>', {text: " : " + score_part.name + " out of " + score_part.max})
+                        ]}),
+                        $('<div>', {class:'text-muted', html:score_part.note})
                     ]
                 }).appendTo(scoreDetail);
             }
 
-            let scoreCell = $('<td>', {class:'text-monospace text-right', 'data-toggle': 'popover', 'title': 'score', 'data-content': scoreDetail.prop('outerHTML')}).appendTo(row);
+            let scoreCell = $('<td>', {class:'score-cell text-monospace text-right', 'data-toggle': 'popover', 'title': 'score', 'data-content': scoreDetail.prop('outerHTML')}).appendTo(row);
             $('<div>', {text: onto.score.toFixed(0)}).appendTo(scoreCell);
 
             return row;
@@ -281,10 +286,13 @@
                         " ",
                         $('<span>', {class: 'hover-detail text-muted', text: `${context.phenotype_row}`, title: evidence})
                 ]});
-            } else if (title == "parent_of_gene_relation") {
+            } else if (title == "Child") {
                 return $('<div>', {html: [
-                            $(`<i class="fas fa-circle text-success"></i>`),
-                            $('<span>', {text: `Child has established relation to gene symbol` })
+                            $(`<i class="far fa-circle text-dark"></i>`),
+                            " ",
+                            $('<span>', {text: "Indirect gene relation" }),
+                            " ",
+                            $('<span>', {class: 'text-muted', text: `parent of term with relation` })
                         ]});
             } else {
                 return $("<div>", {text: title});
@@ -359,14 +367,13 @@
                 } else {
                     $('#mp-gene-symbol').text(geneSymbol).removeClass('no-value');
                 }
-                let searchText = `{{ condition_text.normalized_text }} ${geneSymbol}`.trim();
                 let recordId = $(this).attr('data-id');
                 let selected = $(`#condition-match-${recordId}`).val();
                 let parsedMatch = parseTermText(selected);
                 $(`[name=mp-multimode][value=${parsedMatch.join}]`).trigger('click');
 
                 $('#mp-id').val(recordId);
-                $('#mp-search-text').val(`{{ condition_text.normalized_text }} ${geneSymbol}`.trim());
+                $('#mp-search-text').val(`{{ condition_text.normalized_text }}`.trim());
                 $('#mp-selection-title').text(label);
                 $('#mp-selected').val(parsedMatch.terms.join(", "));
                 if (inheritance == 'N/A') {
@@ -432,11 +439,11 @@
                     <table class="table" id="mp-results">
                         <thead>
                             <tr>
-                                <th>Toggle</th>
+                                <th class="toggle-cell">Toggle</th>
                                 <th class="term-cell">Term</th>
                                 <th class="relevance-cell">Relevance</th>
-                                <th>Description</th>
-                                <th>Score</th>
+                                <th class="description-cell">Description</th>
+                                <th class="score-cell">Score</th>
                             </tr>
                         </thead>
                         <tbody></tbody>

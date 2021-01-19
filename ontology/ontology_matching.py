@@ -7,6 +7,7 @@ from typing import Dict, Optional, List, Any, Set
 import requests
 from django.db.models import Q
 from django.db.models.functions import Length
+from django.urls import reverse
 
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation
 from ontology.panel_app_ontology import update_gene_relations
@@ -148,16 +149,48 @@ class OntologContextChildGeneRelationship(OntologyContext):
             "matching_children": self.children,
         }
 
+@dataclass
+class OntologyScoreWeighting:
+    name: str
+    weighting: float
+
+
+class OntologyMatchScoreWeightings:
+    DIRECT_REFERENCE = OntologyScoreWeighting("Term is directly referenced", 1000)
+    GENE = OntologyScoreWeighting("Gene matching", 20)
+    WORD_MATCHING = OntologyScoreWeighting("Word matching", 40)
+    WORD_SUPERFLUOUS = OntologyScoreWeighting("Limited extra words bonus", 40)
+
 
 @dataclass
 class OntologyMatchScorePart:
-    description: str
-    score: float
+    weighting: OntologyScoreWeighting
+    unit: float
+    note: str
+
+    @property
+    def score(self) -> float:
+        return self.weighting.weighting * self.unit
+
+    @property
+    def name(self) -> str:
+        return self.weighting.name
+
+    @property
+    def max(self) -> float:
+        return self.weighting.weighting
+
+    @property
+    def percent(self) -> float:
+        return self.unit * 100
 
     def as_json(self):
         return {
-            "description": self.description,
-            "score": self.score
+            "name": self.name,
+            "max": self.max,
+            "unit": self.unit,
+            "score": self.score,
+            "note": self.note
         }
 
 
@@ -180,6 +213,9 @@ class OntologyMeta:
             score += score_part.score
         return score
 
+    def __lt__(self, other):
+        return self.score < other.score
+
     def add_score(self, score: OntologyMatchScorePart):
         self.scores.append(score)
 
@@ -197,7 +233,7 @@ class OntologyMeta:
 
         data = {
             "id": self.term.id,
-            "url": self.term.url,
+            "url": reverse("ontology_term", kwargs={"term": self.term.url_safe_id}),
             "title": self.term.name,
             "definition": self.term.definition,
             "contexts": contexts,
@@ -266,9 +302,13 @@ class OntologyMatching:
             self.term_map[term_id] = mondo
 
             if self.gene_symbol:
-                mondo.add_score(OntologyMatchScorePart("Base score within gene context", 50.0))
+                pass
             else:
-                mondo.add_score(OntologyMatchScorePart("Base score outside of gene context", 100.0))
+                mondo.add_score(OntologyMatchScorePart(
+                    OntologyMatchScoreWeightings.GENE,
+                    unit=1,
+                    note="Not matching at gene level, gene association not required/relevant"
+                ))
 
         return mondo
 
@@ -280,36 +320,36 @@ class OntologyMatching:
         if search_terms := self.search_terms:
             if mondo.term.is_stub:
                 mondo.add_score(OntologyMatchScorePart(
-                    "No local copy of this term",
-                    -100
+                    OntologyScoreWeighting("No copy of this term in our database", -100),
+                    unit=-1
                 ))
             else:
                 match_terms = set(tokenize_condition_text(normalize_condition_text(mondo.term.name))) - SKIP_TERMS
                 superfluous_words = match_terms.difference(search_terms)
                 missing_words = search_terms.difference(match_terms)
 
-                missing_word_ratio = 0 if not match_terms else (float(len(missing_words)) / float(len(match_terms)))
-                superfluous_word_ratio =  0 if not match_terms else (float(len(superfluous_words)) / float(len(match_terms)))
+                missing_word_ratio = 0 if not match_terms else (float(len(missing_words)) / float(len(search_terms)))
+                superfluous_word_ratio = 0 if not match_terms else min(1, float(len(superfluous_words)) / float(len(match_terms)))
 
-                if missing_word_ratio:
-                    mondo.add_score(OntologyMatchScorePart(
-                        f"Missing words {pretty_set(missing_words)} @ ratio {missing_word_ratio:.2f} * 100",
-                        missing_word_ratio * -100.0
-                    ))
+                mondo.add_score(OntologyMatchScorePart(
+                    OntologyMatchScoreWeightings.WORD_MATCHING,
+                    unit=1 - missing_word_ratio,
+                    note=f"Missing words {pretty_set(missing_words)}" if missing_words else "No missing words"
+                ))
 
-                if superfluous_word_ratio:
-                    mondo.add_score(OntologyMatchScorePart(
-                        f"Superfluous words {pretty_set(superfluous_words)} @ ratio {superfluous_word_ratio:.2f} * 50",
-                        superfluous_word_ratio * -50.0
-                    ))
+                mondo.add_score(OntologyMatchScorePart(
+                    OntologyMatchScoreWeightings.WORD_SUPERFLUOUS,
+                    unit=1 - superfluous_word_ratio,
+                    note=f"Superfluous words {pretty_set(superfluous_words)}" if superfluous_words else "No superfluous words",
+                ))
 
-                if superfluous_words and not self.gene_symbol:
-                    for word in superfluous_words:
-                        if SUB_TYPE.match(word):
-                            mondo.add_score(OntologyMatchScorePart(
-                                "Superfluous words includes subtype \"{word}\"",
-                                20.0
-                            ))
+                # if superfluous_words and not self.gene_symbol:
+                #     for word in superfluous_words:
+                #         if SUB_TYPE.match(word):
+                #             mondo.add_score(OntologyMatchScorePart(
+                #                 "Superfluous words includes subtype \"{word}\"",
+                #                 20.0
+                #             ))
 
     def populate_relationships(self):
         scores: Dict[str, OntologyMeta] = dict()
@@ -339,9 +379,11 @@ class OntologyMatching:
                 for parent_term in OntologyTermRelation.parents_of(mondo_term):
                     parent_meta = self.find_or_create(parent_term.id)
                     scores[parent_term.id] = parent_meta
-                    parent_meta.add_context(OntologContextChildGeneRelationship(
-                        child_term_id=mondo_term.id
-                    ))
+                    if not MetaKeys.MONDO_GENE_LINK in parent_meta.contexts and \
+                        not MetaKeys.PANELAPP_GENE_LINK in parent_meta.contexts:
+                        parent_meta.add_context(OntologContextChildGeneRelationship(
+                            child_term_id=mondo_term.id
+                        ))
 
         for meta in scores.values():
             gene_relationships_via = set()
@@ -352,11 +394,22 @@ class OntologyMatching:
             if gene_relationships_via:
                 gene_relationships_via_str = ", ".join(gene_relationships_via)
                 meta.add_score(OntologyMatchScorePart(
-                    f"Established gene relationship (through {gene_relationships_via_str})", 50.0
+                    OntologyMatchScoreWeightings.GENE,
+                    unit=1,
+                    note=f"Established gene relationship (through {gene_relationships_via_str})"
                 ))
             elif MetaKeys.CHILD_GENE_LINK in meta.contexts:
+                # TODO should this be removed now that we establish parent MONDO relationships
                 meta.add_score(OntologyMatchScorePart(
-                    "Parent of term with established gene relationship", 25.0
+                    OntologyMatchScoreWeightings.GENE,
+                    unit=0.5,
+                    note=f"Parent of term that has gene relationship"
+                ))
+            else:
+                meta.add_score(OntologyMatchScorePart(
+                    OntologyMatchScoreWeightings.GENE,
+                    unit=0,
+                    note=f"No relationship to gene symbol in database"
                 ))
 
     def select_term(self, term: str):
@@ -365,22 +418,23 @@ class OntologyMatching:
     def reference_term(self, term: str):
         onto_meta = self.find_or_create(term)
         onto_meta.add_score(OntologyMatchScorePart(
-            "Directly referenced", 1000.0
+            OntologyMatchScoreWeightings.DIRECT_REFERENCE,
+            unit=1
         ))
         self.find_or_create(term).add_context(OntologyContextDirectReference())
 
     def searched_term(self, term: str):
         self.find_or_create(term).add_context(OntologyContextSearched())
 
-    def as_json(self) -> Any:
-        return [value.as_json() for value in self.term_map.values()]
-
     def __iter__(self):
-        # TODO probably should sort as well
-        return iter(self.term_map.values())
+        values = sorted(list(self.term_map.values()), reverse=True)
+        return iter(values)
+
+    def as_json(self) -> Any:
+        return [value.as_json() for value in self]
 
     @staticmethod
-    def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None, server_search: bool = True):
+    def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None, server_search: bool = True) -> 'OntologyMatching':
         ontology_matches = OntologyMatching(search_term=search_text, gene_symbol=gene_symbol)
         ontology_matches.populate_relationships()
 
@@ -405,8 +459,11 @@ class OntologyMatching:
 
             # ALSO, do client side search
             if server_search:
+                server_search_text = search_text
+                if gene_symbol:
+                    server_search_text = server_search_text + " " + gene_symbol
                 try:
-                    results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{search_text}', {
+                    results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{server_search_text}', {
                         "prefix": "MONDO",
                         "rows": 6,
                         "minimal_tokenizer": "false",

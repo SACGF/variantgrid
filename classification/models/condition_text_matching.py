@@ -3,19 +3,16 @@ import re
 
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import CASCADE, QuerySet, SET_NULL, Q
-from django.db.models.functions import Length
+from django.db.models import CASCADE, QuerySet, SET_NULL
 from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 from django.db import models
-
-from annotation.models import MonarchDiseaseOntology
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
     flag_types
-from classification.regexes import db_ref_regexes, DbRefRegex, DbRegexes
+from classification.regexes import db_ref_regexes, DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
