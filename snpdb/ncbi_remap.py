@@ -15,8 +15,8 @@ def ncbi_remap(source_vcf: str, source_genome_build: GenomeBuild, out_vcf: str, 
     # Using patch versions, I got 3% of GRCh38 -> GRCh37 liftover going to patches on first pass.
     # Using primary assembly we avoid the patches/alt loci etc.
     ASSEMBLIES = {
-        "GRCh37": "GCF_000001405.13",
-        "GRCh38": "GCF_000001405.26",
+        "GRCh37": "GCF_000001305.13",  # GRCh37.p13 :: Primary Assembly
+        "GRCh38": "GCF_000001305.14",  # GRCh38.p11 :: Primary Assembly
     }
     source_accession = ASSEMBLIES.get(source_genome_build.name, source_genome_build.accession)
     dest_accession = ASSEMBLIES.get(out_genome_build.name, out_genome_build.accession)
