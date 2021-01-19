@@ -198,12 +198,7 @@ class OntologyMeta:
 
     def __init__(self, term_id: str):
         self.term = OntologyTerm.get_or_stub(term_id)
-        self.parent: Optional[OntologyTerm] = None
         self.scores: List[OntologyMatchScorePart] = list()
-
-        if not self.term.is_stub:
-            # FIXME multiple parents are valid
-            self.parent = OntologyTermRelation.parents_of(self.term).first()
         self.contexts: Dict[str, OntologyContext] = dict()
 
     @property
@@ -241,16 +236,6 @@ class OntologyMeta:
             "score": self.score
         }
 
-        if self.parent:
-            data["parent_id"] = self.parent.id
-            data["parent_title"] = self.parent.name
-            """
-            sibling_count = MonarchDiseaseOntologyRelationship.objects.filter(object=self.parent, relationship="is_a").count() - 1
-            child_count = MonarchDiseaseOntologyRelationship.objects.filter(object=self.object, relationship="is_a").count()
-
-            data["sibling_count"] = sibling_count
-            data["children_count"] = child_count
-            """
         return data
 
 
@@ -442,9 +427,8 @@ class OntologyMatching:
             for select in selected:
                 ontology_matches.select_term(select)
 
-        # TODO change to any pattern, not just MONDO
-        MONDO_PATTERN = re.compile("MONDO:[0-9]+")
-        if MONDO_PATTERN.match(search_text):
+        ONTOLOGY_PATTERN = re.compile("(MONDO|OMIM|HP):[0-9]+")
+        if ONTOLOGY_PATTERN.match(search_text):
             ontology_matches.find_or_create(search_text)
 
         else:
@@ -454,6 +438,7 @@ class OntologyMatching:
             qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
             qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
             qs = qs.order_by(Length('name')).values_list("id", flat=True)
+            result: OntologyTerm
             for result in qs[0:20]:
                 ontology_matches.searched_term(result)
 
