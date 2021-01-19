@@ -11,6 +11,7 @@ from manual.operations.manual_operations import ManualOperation
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('manual', '0002_deployment'),
         ('snpdb', '0009_remove_settingsoverride_variant_tag_group_by_variant'),
     ]
 

@@ -2,13 +2,13 @@
 
 from django.db import migrations
 
-from manual.models import ManualMigrationTask
 from manual.operations.manual_operations import ManualOperation
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('manual', '0002_deployment'),
         ('ontology', '0001_initial'),
     ]
 
