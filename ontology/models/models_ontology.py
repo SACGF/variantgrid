@@ -53,22 +53,40 @@ class OntologyService(models.TextChoices):
 
 class OntologyRelation:
     """
-    Common relationships, relationship is free text
+    Common relationships, relationship is free text.
+    Note it's best to look at the import source for these.
     """
     IS_A = "is_a"
-    EXACT = "exact"
-    RELATED = "related" # related synonym
-    CLOSE = "close"
-    BROAD = "broad"
-    NARROW = "narrow"
+    EXACT = "exact"  # defined by HPO and MONDO
+    RELATED = "related"  # defined by HPO and MONDO (also use relatedSynonymn from mondo to populate this)
+    CLOSE = "close"  # defined by HPO and MONDO
+    BROAD = "broad"  # defined by HPO and MONDO
+    NARROW = "narrow"  # defined by HPO and MONDO
     ALTERNATIVE = "alternative"  # HPO has alternative ID in mondo file
-    XREF = "xref" # listed in MONDO xrefs, probably is the same term
+    XREF = "xref"  # listed in MONDO xrefs, probably is the same term
     REPLACED = "replaced"
 
     FREQUENCY = "frequency"
     PANEL_APP_AU = "panelappau"
-    DISEASE_ASSOCIATION = "disease association" # used by OMIM_ALL_FREQUENCIES
-    ALL_FREQUENCY = "frequency" # used by OMIM_ALL_FREQUENCIES
+    ALL_FREQUENCY = "frequency"  # used by OMIM_ALL_FREQUENCIES
+    ENTREZ_ASSOCIATION = "associated condition"
+
+    DISPLAY_NAMES = {
+        IS_A: "is a",
+        ALL_FREQUENCY: "frequently occurs with",
+        ENTREZ_ASSOCIATION: "has an associated gene of"
+    }
+
+    """
+    # MONDO associations
+    "http://purl.obolibrary.org/obo/RO_0004025": "disease causes dysfunction of",
+    "http://purl.obolibrary.org/obo/RO_0004001": "has material basis in gain of function germline mutation in",
+    "http://purl.obolibrary.org/obo/RO_0004021": "disease has basis in disruption of",
+    "http://purl.obolibrary.org/obo/RO_0004020": "disease has basis in dysfunction of",
+    "http://purl.obolibrary.org/obo/RO_0004026": "disease has location",
+    "http://purl.obolibrary.org/obo/RO_0004027": "disease has inflammation site",
+    "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure"
+    """
 
 
 class OntologyImport(TimeStampedModel):
@@ -240,7 +258,7 @@ class OntologyTermRelation(TimeStampedModel):
 
     @property
     def relation_display(self):
-        return self.relation.replace("_", " ")
+        return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
 
     @staticmethod
     def parents_of(source_term: OntologyTerm) -> QuerySet:

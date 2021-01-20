@@ -345,7 +345,7 @@ def load_hpo_disease(filename: str, force: bool):
         filename=filename,
         context="hpo_disease",
         ontology_service=OntologyService.HPO,
-        processor_version=2,
+        processor_version=4,
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
@@ -370,12 +370,12 @@ def load_hpo_disease(filename: str, force: bool):
             ontology_builder.add_ontology_relation(
                 source_term_id=hpo_id,
                 dest_term_id=omim_id,
-                relation=OntologyRelation.DISEASE_ASSOCIATION
+                relation=OntologyRelation.ALL_FREQUENCY
             )
 
     by_gene = df.groupby(["gene_symbol"])
     for gene_symbol, gene_data in by_gene:
-        # HGNC ID
+        # IMPORTANT, the gene_id is the entrez gene_id, not the HGNC gene id
         try:
             hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
 
@@ -384,12 +384,12 @@ def load_hpo_disease(filename: str, force: bool):
                 ontology_builder.add_ontology_relation(
                     source_term_id=omim_id,
                     dest_term_id=hgnc_term.id,
-                    relation=OntologyRelation.ALL_FREQUENCY
+                    relation=OntologyRelation.ENTREZ_ASSOCIATION
                 )
         except ValueError:
             print(f"Could not resolve gene symbol {gene_symbol} to HGNC ID")
 
-    # ontology_builder.complete()
+    ontology_builder.complete()
     ontology_builder.report()
 
 

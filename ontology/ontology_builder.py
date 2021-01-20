@@ -98,10 +98,13 @@ class OntologyBuilder:
             for model in [OntologyTermRelation, OntologyTerm]:
                 olds = model.objects.filter(from_import__context=self.context, from_import__ontology_service=self.ontology_service).exclude(from_import=self._ontology_import)
                 for old in olds[0:3]:
-                    print(f"This appears stale or might have just been stub with no extra information: {old}")
+                    print(f"This appears stale: {old}")
 
-                self.counters[model].deletes += olds.count()
+                count = olds.count()
+                self.counters[model].deletes += count
                 if model == OntologyTermRelation:  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
+                    if count:
+                        print("Deleting {count} stale relationships")
                     olds.delete()
 
         self._ontology_import.completed = True
