@@ -541,8 +541,9 @@ function createRowColumns(tr, headerRow) {
     // You can use "extraClasses" to ensure a column has a (non-unique) class 
 
     let geneType = tr.attr("type");
-    if (!geneType || geneType === 'gene') {
-        columns = columns.concat(getGeneRowColumns(geneSymbol, headerRow));
+    if (!geneType || geneType === 'gene' || geneType === 'unmatched') {
+        let canAddGene = geneType != 'unmatched';
+        columns = columns.concat(getGeneRowColumns(geneSymbol, headerRow, canAddGene));
     } else {
         let colspan = getNumberOfColumns(headerRow);
         let initFunc;
@@ -554,10 +555,6 @@ function createRowColumns(tr, headerRow) {
                 let aliasLink = $("<a />").attr("href", "#gene-row-" + matchedGene).text(matchedGene);
                 let aliasMessage = $("<span />").append("Matched ").append(aliasLink).append(": " + matchInfo);
                 cell.append(aliasMessage);
-            };
-        } else if (geneType === 'unmatched') {
-            initFunc = function(cell, geneSymbol) {
-                cell.text('Could not match gene symbol');
             };
         }
         let singleMessageColumn = { "txType": "td",
@@ -571,7 +568,7 @@ function createRowColumns(tr, headerRow) {
 }
 
 
-function getGeneRowColumns(geneSymbol, headerRow) {
+function getGeneRowColumns(geneSymbol, headerRow, canAddGene) {
     let columns = [];
     for (let i=0 ; i<evidenceColumns.length ; ++i) {
         let evidenceType = evidenceColumns[i];
@@ -691,7 +688,7 @@ function getGeneRowColumns(geneSymbol, headerRow) {
                 "txType": 'td',
                 "class": className,
             };
-            if (canWriteGeneList(geneListId)) {
+            if (canAddGene && canWriteGeneList(geneListId)) {
                 columnData["hoverHandler"] = function(container) {
                     emptyGeneHoverHandler(container, pathologyTestVersionId, className, geneSymbol, addGeneToPathologyTest);
                 };
@@ -714,7 +711,7 @@ function getGeneRowColumns(geneSymbol, headerRow) {
                 "txType": 'td',
                 "class": geneListClass,
             };
-            if (canWriteGeneList(geneListId)) {
+            if (canAddGene && canWriteGeneList(geneListId)) {
                 columnData["hoverHandler"] = function(container) {
                     emptyGeneHoverHandler(container, geneListId, geneListClass, geneSymbol, addGeneToGeneList);
                 };
@@ -1071,7 +1068,7 @@ function addGeneDataRows(tbody, geneListId, geneListClass, geneDataList, geneCli
         let gene = geneData['gene'];
         let rowType = geneData['type'];
 
-        let addCellClickHandler = geneListId && rowType === "gene";
+        let addCellClickHandler = geneListId;
 
         while ( rowIndex<existingRows.length ) {
             tr = $(existingRows[rowIndex]);
@@ -1100,12 +1097,15 @@ function addGeneDataRows(tbody, geneListId, geneListClass, geneDataList, geneCli
         geneIconsDiv.addClass("gene-icons-container").addClass("left");
         geneLabel.append(geneIconsDiv);
 
-        if (rowType === 'gene') {
-            getGeneInfo(geneIconsDiv, gene);
-            const URL = Urls.view_gene_symbol(gene);
-            let geneLink = $("<a />").text(gene).attr({"class": 'hover-link', "href": URL, "target": "_blank"});
-            geneLabelDiv.append(geneLink);
-    
+        if (rowType === 'gene' || rowType === 'unmatched') {
+            if (rowType === 'gene') {
+                getGeneInfo(geneIconsDiv, gene);
+                const URL = Urls.view_gene_symbol(gene);
+                let geneLink = $("<a />").text(gene).attr({"class": 'hover-link', "href": URL, "target": "_blank"});
+                geneLabelDiv.append(geneLink);
+            } else {
+                geneLabelDiv.append($("<span/>").text(gene).attr("title", "Could not match gene symbol"));
+            }
             if (addCellClickHandler) {
                 setCellGene(tr, geneListId, geneListClass, gene, geneClickHandler);
             }
