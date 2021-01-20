@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from django.contrib.auth.models import User
 import unittest
@@ -94,7 +95,7 @@ class Test(URLTestCase):
                                                                   panel_id=42,
                                                                   disease_group='Tumour syndromes',
                                                                   disease_sub_group='Tumour syndromes',
-                                                                  name='Blah blah blah',
+                                                                  name=uuid.uuid4(),
                                                                   current_version='1.20')[0]
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
