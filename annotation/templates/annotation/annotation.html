@@ -391,7 +391,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                         <div class="mt-4">
                             <b>Bulk</b><br/>
 If all the files are in place, the uploads can be triggered by a single command rather than waiting for each step to finish, e.g.
-<code>{{ python_command }} manage.py ontology_import --mondo_json (location of mondo.json) -omim_frequencies (location of OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes) --omim_frequencies (location of OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes)</code>
+<code>{{ python_command }} manage.py ontology_import --mondo_json (location of mondo.json) --hpo_owl (location of hp.owl) --omim_frequencies (location of OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes)</code>
                         </div>
 
                     {% endinstall-instructions %}
