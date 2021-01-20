@@ -6,7 +6,7 @@ from typing import List, Iterable
 
 from django.conf import settings
 from django.db import models
-from django.db.models import CASCADE
+from django.db.models import CASCADE, Q
 from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
@@ -198,6 +198,10 @@ class SomalierRelatePairs(models.Model):
 
     class Meta:
         unique_together = ('sample_a', 'sample_b')
+
+    @staticmethod
+    def get_for_sample(sample: Sample):
+        return SomalierRelatePairs.objects.filter(Q(sample_a=sample) | Q(sample_b=sample))
 
 
 class SomalierConfig:
