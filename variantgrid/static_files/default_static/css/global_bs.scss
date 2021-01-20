@@ -307,6 +307,19 @@ a {
     opacity: 0.6;
     margin-left: 4px;
 }
+.toggle-link:before {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'FontAwesome';
+    content: "\f105";
+    opacity: 0.6;
+    margin-right: 4px;
+}
+.toggle-link[aria-expanded=true]:before {
+   content: "\f107";
+}
 
 .modal-header nav .breadcrumb {
     background-color: transparent;
@@ -488,6 +501,9 @@ div.background-image {
 // still used by wiki (not yet compatible with bootstrap's d-none
 .hidden { display: none }
 
+.toggle-link {
+  color: #88B;
+}
 .hover-detail {
     color: #446;
     text-decoration: none;

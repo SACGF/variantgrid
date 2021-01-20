@@ -252,6 +252,21 @@ a {
   margin-left: 4px;
 }
 
+.toggle-link:before {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  font-family: "FontAwesome";
+  content: "";
+  opacity: 0.6;
+  margin-right: 4px;
+}
+
+.toggle-link[aria-expanded=true]:before {
+  content: "";
+}
+
 .modal-header nav .breadcrumb {
   background-color: transparent;
   margin: 0;
@@ -416,6 +431,10 @@ div.background-image {
 
 .hidden {
   display: none;
+}
+
+.toggle-link {
+  color: #88B;
 }
 
 .hover-detail {
