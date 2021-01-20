@@ -13,7 +13,12 @@
             <div class="card-body">
                 {% labelled label="Name" %}{{ term.name }}{% endlabelled %}
                 {% labelled label="Definition" value_css="white-space:pre-wrap" %}{{ term.definition }}{% endlabelled %}
-                {% labelled label="Extra" %}{% if term.extra %}<div style="white-space: pre-wrap; font-size: small" class="text-monospace">{{ term.extra | jsonify_pretty }}</div>{% endif %}{% endlabelled %}
+                {% labelled label="Extra" %}
+                    {% if term.extra %}
+                    <a href="#ontology-extra" data-toggle="collapse" class="toggle-link">Toggle raw extra data (technical)</a>
+                    <div id="ontology-extra" class="text-monospace collapse" style="white-space: pre-wrap; font-size: small">{{ term.extra | jsonify_pretty }}</div>
+                    {% else %}<div class="no-value">-</div>{% endif %}
+                {% endlabelled %}
                 {% labelled label="URL" %}
                     <a href="{{ term.url }}" class="external-link hover-link">{{ term.url }}</a>
                 {% endlabelled %}
@@ -28,7 +33,7 @@
                         {% if not gene_relationships %}-{% endif %}
                         {% for snake in gene_relationships %}
                             <div>
-                            <span class="text-muted">THIS</span>
+                            <span class="text-muted text-monospace">{{ term.id }}</span>
                             {% for step in snake.show_steps %}
                                 <div class="text-center d-inline-block mx-2">{{ step.relation.relation_display }}</div>
                                 {% ontology_term step.dest_term %} &nbsp;
@@ -42,9 +47,9 @@
                     {% if not relationships %}-{% endif %}
                     {% for relationship in relationships %}
                         <div>
-                        {% if relationship.source_term == term %}<span class="text-muted">THIS</span>{% else %}{% ontology_term relationship.source_term %}{% endif %}
+                        {% if relationship.source_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.source_term %}{% endif %}
                         <div class="text-center d-inline-block mx-2">{{ relationship.relation_display }}</div>
-                        {% if relationship.dest_term == term %}<span class="text-muted">THIS</span>{% else %}{% ontology_term relationship.dest_term %}{% endif %}
+                        {% if relationship.dest_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.dest_term %}{% endif %}
                         <span class="text-muted d-inline-block hover-detail" title="Import {{ relationship.from_import.id }}" data-content="Last imported: {{ relationship.from_import.processed_date }}<br/>From: {{ relationship.from_import.filename }}">&nbsp;from import {{ relationship.from_import.id }}</span>
                         </div>
                     {% endfor %}
