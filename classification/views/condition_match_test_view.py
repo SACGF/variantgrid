@@ -9,7 +9,6 @@ from ontology.ontology_matching import OntologyMatching
 def condition_match_test_view(request):
     condition_text = request.GET.get("condition_text")
     gene_symbol_str = request.GET.get("gene_symbol")
-    gene_symbol: Optional[GeneSymbol] = None
     auto_matches = list()
     attempted = False
 
@@ -21,7 +20,7 @@ def condition_match_test_view(request):
                 messages.add_message(request, messages.WARNING, f"Could not find Gene Symbol '{gene_symbol_str}'")
                 valid = False
         if valid:
-            auto_matches = OntologyMatching.from_search(condition_text, gene_symbol)
+            auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
             attempted = True
 
     context = {
