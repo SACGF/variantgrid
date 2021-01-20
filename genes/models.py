@@ -66,16 +66,17 @@ class BadTranscript(ValueError):
 class HGNCGeneNames(models.Model):
     # pk = HGNC id with HGNC: stripped out
     hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
-    approved_symbol = models.TextField()
+    # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
+    gene_symbol = models.ForeignKey('GeneSymbol', on_delete=CASCADE)
     approved_name = models.TextField()
     status = models.CharField(max_length=1, choices=HGNCStatus.choices)
     previous_symbols = models.TextField()
-    synonyms = models.TextField()
+    alias_symbols = models.TextField()
     refseq_ids = models.TextField()
 
     def __str__(self):
-        return f"HGNC:{self.pk} approved symbol: {self.approved_symbol}, " \
-               f"previous symbols: {self.previous_symbols}, synonyms: {self.synonyms}"
+        return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \
+               f"previous symbols: {self.previous_symbols}, alias_symbols: {self.alias_symbols}"
 
 
 gene_symbol_withdrawn_str = '~withdrawn'

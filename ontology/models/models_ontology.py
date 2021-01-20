@@ -153,11 +153,11 @@ class OntologyTerm(TimeStampedModel):
             return gene_ontology
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, extra__aliases__contains=gene_symbol).first():
             return gene_ontology
-        if hgnc := HGNCGeneNames.objects.filter(approved_symbol=gene_symbol).first():
+        if hgnc := HGNCGeneNames.objects.filter(gene_symbol_id=gene_symbol).first():
             if hgnc_term := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, index=hgnc.id).first():
                 # we found an Ontology Term for HGNC, but the ID is already in use for another sybmol
                 # prioritise the name as defined by HGNCGeneNames but keep the other names in the aliases
-                hgnc_term.name = hgnc.approved_symbol
+                hgnc_term.name = hgnc.gene_symbol_id
                 extra = hgnc_term.extra or dict()
                 hgnc_names: Set[str] = set(extra.get("aliases", []))
                 hgnc_names.add(hgnc_term.name)
@@ -180,7 +180,7 @@ class OntologyTerm(TimeStampedModel):
                     id=f"HGNC:{hgnc.id}",
                     ontology_service=OntologyService.HGNC,
                     index=hgnc.id,
-                    name=hgnc.approved_symbol,
+                    name=hgnc.gene_symbol_id,
                     definition=hgnc.approved_name,
                     from_import=o_import
                 )
