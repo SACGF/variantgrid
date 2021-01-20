@@ -279,7 +279,7 @@ def view_sample(request, sample_id):
     patient_form = PatientForm(user=request.user)  # blank
     related_samples = None
     if settings.SOMALIER.get("enabled"):
-        related_samples = SomalierRelatePairs.objects.filter(Q(sample_a=sample) | Q(sample_b=sample))
+        related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
     context = {'sample': sample,
                'samples': [sample],

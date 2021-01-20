@@ -720,9 +720,9 @@ class GeneAnnotationRelease(models.Model):
         """ """
         gene_annotation_releases = []
         for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
-            vav = genome_build.latest_variant_annotation_version
-            if vav.gene_annotation_release:
-                gene_annotation_releases.append(vav.gene_annotation_release)
+            if vav := genome_build.latest_variant_annotation_version:
+                if vav.gene_annotation_release:
+                    gene_annotation_releases.append(vav.gene_annotation_release)
         return gene_annotation_releases
 
     def __str__(self):
@@ -977,7 +977,9 @@ class GeneList(models.Model):
             if created:
                 num_added += 1
 
-        qs = self.genelistgenesymbol_set.filter(gene_symbol__in=gene_symbol_deletions)
+        # Match original name and symbol so we can delete non-matched
+        name_or_symbol_match = Q(original_name__in=gene_symbol_deletions) | Q(gene_symbol__in=gene_symbol_deletions)
+        qs = self.genelistgenesymbol_set.filter(name_or_symbol_match)
         num_deleted = qs.delete()
         return num_added, num_deleted
 

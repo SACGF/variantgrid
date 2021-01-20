@@ -98,7 +98,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
     stats_per_sample, stats_passing_filters_per_sample = _create_stats_per_sample(vcf, annotation_version)
     vep_skipped_count = 0
 
-    for vals in values_queryset:
+    for vals in values_queryset.iterator():
         chrom = vals["locus__contig__name"]
         ref_len = vals["locus__ref__length"]
         alt_len = vals["alt__length"]

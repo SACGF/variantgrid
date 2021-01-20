@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from classification.enums import SubmissionSource, CriteriaEvaluation, ValidationCode, SpecialEKeys
-from classification.models import VCDataDict
+from classification.models import VCDataDict, EvidenceKeyMap
 from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.models.classification import Classification
 from classification.views.classification_view import ClassificationView
@@ -29,7 +29,8 @@ class ClassificationTestQuirks(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False
         )
-        data = VCDataDict(vc.evidence)
+        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        data = VCDataDict(vc.evidence, evidence_keys)
         self.assertEqual(data['bp1'].value, CriteriaEvaluation.BENIGN_SUPPORTING)
         self.assertEqual(data['bp2'].value, CriteriaEvaluation.NOT_MET)
 
@@ -52,7 +53,8 @@ class ClassificationTestQuirks(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False
         )
-        data = VCDataDict(vc.evidence)
+        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        data = VCDataDict(vc.evidence, evidence_keys)
         self.assertTrue(data['affected_status'].has_validiation_code(ValidationCode.INVALID_VALUE))
         self.assertEqual(data['ancestry'].value, ['ASJ', 'CA'])
         self.assertTrue(data['contribution'].has_validiation_code(ValidationCode.TOO_MANY_VALUES))
@@ -91,7 +93,8 @@ class ClassificationTestQuirks(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=True
         )
-        data = VCDataDict(vc.evidence)
+        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        data = VCDataDict(vc.evidence, evidence_keys)
         self.assertTrue(data['genome_build'].has_validiation_code(ValidationCode.MANDATORY))  # didn't provide genome build, should be created with man error
         self.assertIsNone(data['gene_symbol'].immutability)  # immutable but not in original submission
         self.assertEqual(data[SpecialEKeys.C_HGVS].immutability, SubmissionSource.VARIANT_GRID)  # immutable key set despite no value
@@ -108,7 +111,8 @@ class ClassificationTestQuirks(TestCase):
                 SpecialEKeys.CONDITION: 'yaps'
             }
         )
-        data = VCDataDict(vc.evidence)
+        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        data = VCDataDict(vc.evidence, evidence_keys)
         self.assertEqual(data[SpecialEKeys.C_HGVS].value, 'old_c')  # immutability stopped the update of this value
         self.assertEqual(data[SpecialEKeys.G_HGVS].value, 'gg')
         self.assertEqual(data[SpecialEKeys.G_HGVS].immutability, SubmissionSource.VARIANT_GRID)  # provided immutable value later
@@ -125,6 +129,6 @@ class ClassificationTestQuirks(TestCase):
             }
         )
         # trying to patch API immutable fields as FORM should have no effect
-        data = VCDataDict(vc.evidence)
+        data = VCDataDict(vc.evidence, evidence_keys)
         self.assertEqual(data[SpecialEKeys.CONDITION].value, 'yaps')
         self.assertFalse('immutable' in data[SpecialEKeys.PATIENT_ID].raw)

@@ -298,9 +298,9 @@ def html_link(url: str, title: str) -> SafeString:
     return mark_safe(f"<a href='{url}'>{html.escape(title)}</a>")
 
 
-def batch_iterator(iteratable, batch_size: int = 10):
+def batch_iterator(iterable, batch_size: int = 10):
     batch = []
-    for record in iteratable:
+    for record in iterable:
         batch.append(record)
         if len(batch) >= batch_size:
             yield batch

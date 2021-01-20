@@ -12,3 +12,4 @@ wget https://zenodo.org/record/3479773/files/1kg.somalier.tar.gz?download=1 --ou
 
 chmod a+x somalier
 tar xfz 1kg.somalier.tar.gz
+chmod -R a+r 1kg-somalier

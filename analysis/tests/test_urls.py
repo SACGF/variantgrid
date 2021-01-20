@@ -49,6 +49,14 @@ class Test(URLTestCase):
                                                 cohort_genotype_packed_field_index=1, sort_order=2)
         father_cs = CohortSample.objects.create(cohort=cls.cohort, sample=father_sample,
                                                 cohort_genotype_packed_field_index=2, sort_order=3)
+
+        assign_permission_to_user_and_groups(cls.user_owner, cls.cohort)
+
+        # Cohort version has been bumped every time a cohort sample has been added
+        collection = CohortGenotypeCollection.objects.create(cohort=cls.cohort,
+                                                             cohort_version=cls.cohort.version,
+                                                             num_samples=cls.cohort.cohortsample_set.count())
+
         cls.trio = Trio.objects.create(name="test_urls_trio",
                                        cohort=cls.cohort,
                                        mother=mother_cs,
@@ -56,12 +64,6 @@ class Test(URLTestCase):
                                        father=father_cs,
                                        father_affected=False,
                                        proband=proband_cs)
-        assign_permission_to_user_and_groups(cls.user_owner, cls.cohort)
-
-        # Cohort version has been bumped every time a cohort sample has been added
-        collection = CohortGenotypeCollection.objects.create(cohort=cls.cohort,
-                                                             cohort_version=cls.cohort.version,
-                                                             num_samples=cls.cohort.cohortsample_set.count())
         vcf_filename = os.path.join(settings.BASE_DIR, "annotation/tests/test_data/test_grch37.vep_annotated.vcf")
         slowly_create_loci_and_variants_for_vcf(grch37, vcf_filename, get_variant_id_from_info=True)
         variant = Variant.objects.filter(Variant.get_no_reference_q()).first()

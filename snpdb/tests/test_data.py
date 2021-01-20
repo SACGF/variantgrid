@@ -24,6 +24,14 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
                                             cohort_genotype_packed_field_index=2, sort_order=2)
     father_cs = CohortSample.objects.create(cohort=cohort, sample=father_sample,
                                             cohort_genotype_packed_field_index=3, sort_order=3)
+
+    assign_permission_to_user_and_groups(user, cohort)
+
+    # Cohort version has been bumped every time a cohort sample has been added
+    CohortGenotypeCollection.objects.create(cohort=cohort,
+                                            cohort_version=cohort.version,
+                                            num_samples=cohort.cohortsample_set.count())
+
     trio = Trio.objects.create(name="test_urls_trio",
                                cohort=cohort,
                                mother=mother_cs,
@@ -31,11 +39,5 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
                                father=father_cs,
                                father_affected=False,
                                proband=proband_cs)
-    assign_permission_to_user_and_groups(user, cohort)
-
-    # Cohort version has been bumped every time a cohort sample has been added
-    CohortGenotypeCollection.objects.create(cohort=cohort,
-                                            cohort_version=cohort.version,
-                                            num_samples=cohort.cohortsample_set.count())
 
     return trio

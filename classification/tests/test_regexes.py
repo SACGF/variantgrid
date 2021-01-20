@@ -27,8 +27,8 @@ class RegexTests(TestCase):
         results = db_ref_regexes.search(text, default_regex=DbRegexes.SNP)
         self.assertEqual(len(results), 3)
         self.assertEqual(str(results[0]), 'ClinGen:123')
-        self.assertEqual(str(results[1]), 'OMIM:444')
-        self.assertEqual(str(results[2]), 'OMIM:555')
+        self.assertEqual(str(results[1]), 'OMIM:000444')
+        self.assertEqual(str(results[2]), 'OMIM:000555')
 
     def test_clingen(self):
         text = 'Without the word cl-in-gen lets see if CA123456 is caught'
@@ -67,8 +67,8 @@ class RegexTests(TestCase):
         text = 'OMIM# 12345 PMID#23456 HPO:123456'
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 3)
-        self.assertEqual(str(results[0]), 'HP:123456')
-        self.assertEqual(str(results[1]), 'OMIM:12345')
+        self.assertEqual(str(results[0]), 'HP:0123456')
+        self.assertEqual(str(results[1]), 'OMIM:012345')
         self.assertEqual(str(results[2]), 'PubMed:23456')
 
     def test_urls(self):
