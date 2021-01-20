@@ -1,13 +1,13 @@
 from django.template import Library
 
 from ontology.models import OntologyTerm
-from ontology.ontology_matching import OntologyMeta
+from ontology.ontology_matching import OntologyMatch
 
 register = Library()
 
 
-@register.inclusion_tag("ontology/tags/ontology_meta.html")
-def ontology_meta(data: OntologyMeta):
+@register.inclusion_tag("ontology/tags/ontology_match.html")
+def ontology_meta(data: OntologyMatch):
     return {"ontology": data}
 
 

@@ -336,6 +336,10 @@ class OntologySnake:
             steps.append(OntologySnakeStep(relation=path, dest_term=node))
         return steps
 
+    @property
+    def leaf_relationship(self) -> OntologyTermRelation:
+        return self.paths[-1]
+
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
     def snake_from(term: OntologyTerm, to_ontology: OntologyService, max_depth: int = 1) -> List['OntologySnake']:

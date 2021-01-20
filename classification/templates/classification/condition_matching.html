@@ -126,12 +126,8 @@
             ]}).appendTo(row);
 
             let contexts = $('<td>', {class: 'relevance-cell'});
-            for (let [title, context] of Object.entries(onto.contexts)) {
-                let contextBox = renderContext(title, context);
-                if (contextBox) {
-                    contextBox.appendTo(contexts);
-                }
-            }
+            contexts.append(renderContext(onto));
+
             contexts.appendTo(row);
             let description = $('<td>', {class:'description-cell text-muted' }).appendTo(row);
             description.append(highlightDescription(onto.definition))
@@ -172,21 +168,9 @@
 
         function renderOntologies(ontos) {
             ontos.sort((a, b) => {
-                let scoreOnto = (onto) => {
-                    let score = onto.score;
-                    // put the selected terms at the top regardless of score
-                    if (onto.contexts["selected"]) {
-                        score += 1000;
-                    }
-                    return score;
-                }
-                let score1 = scoreOnto(a);
-                let score2 = scoreOnto(b);
-                if (score1 == score2) {
-                    return (a.name || '').localeCompare((b.name || ''));
-                } else {
-                    return score2 - score1;
-                }
+                let score1 = a.score + (a.selected ? 10000 : 0);
+                let score2 = b.score + (b.selected ? 10000 : 0);
+                return score2 - score1;
             });
 
             let tbody = $('#mp-results tbody');
@@ -235,56 +219,50 @@
             });
         }
 
-        function renderContext(title, context) {
-            if (title == "selected") {
-                return null; // redundant to checkbox, so no need to show it here
-            }
-            if (title == "searched") {
+        function renderContext(onto) {
+            if (onto.text_search) {
                 return $('<div>', {html: [
                         $(`<i class="fas fa-circle text-secondary"></i>`),
                         $('<span>', {text: "Text search" })
                 ]});
             }
-            if (title == "referenced") {
+            if (onto.direct_reference) {
                 return $('<div>', {html: [
                         $(`<i class="fas fa-circle text-dark"></i>`),
                         $('<span>', {text: "Referenced in Condition Text" })
                 ]});
             }
-            if (title == "similar_match") {
-                return $('<div>', {html: [
-                    $(`<i class="fas fa-circle text-primary"></i>`),
-                    $('<span>', {text: `Selected by another record for same text${context.matches_gene ? ' and gene symbol' : ''}` }),
-                    " ",
-                    // FIXME use URLS
-                    $('<a>', {href:`/classification/clinvar_export/${context.vce_id}`, target:"_blank", text:"View other export"})
-                ]});
-            }
-            if (title == "Monarch") {
-                return $('<div>', {html: [
+            if (onto.gene_relationships && onto.gene_relationships.length) {
+                html = [
                         $(`<i class="fas fa-circle text-success"></i>`),
-                        $('<span>', {text: title }),
-                        " ",
-                        $('<span>', {class: 'text-muted', text: `${context.relation} ${context.gene_symbol}`})
-                ]});
-            } else if (title == "PanelApp AU") {
-                let evidence = context.evidence.join(", ");
-                return $('<div>', {html: [
-                        $(`<i class="fas fa-circle text-success"></i>`),
-                        $('<span>', {text: title }),
-                        " ",
-                        $('<span>', {class: 'hover-detail text-muted', text: `${context.phenotype_row}`, title: evidence})
-                ]});
-            } else if (title == "Child") {
-                return $('<div>', {html: [
-                            $(`<i class="far fa-circle text-dark"></i>`),
-                            " ",
-                            $('<span>', {text: "Indirect gene relation" }),
-                            " ",
-                            $('<span>', {class: 'text-muted', text: `parent of term with relation` })
-                        ]});
-            } else {
-                return $("<div>", {text: title});
+                        $('<span>', {text: "Established gene relationship"}),
+                        " "
+                    ];
+                let first = true;
+                for (let relationship of onto.gene_relationships) {
+                    if (!first) {
+                        html.push(", ");
+                    } else {
+                        first = false;
+                    }
+                    if (relationship.relation === "panelappau") {
+                        let extra = relationship.extra || {};
+                        let tooltip = `Phenotype: ${extra.phenotype_row}<br/>Evidence: ${extra.evidence ? extra.evidence.join(',') : ''}<br/>Via related term: ${relationship.via}`;
+                        html.push( $('<span>', {class: 'text-muted', text: 'PanelApp AU', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
+                    } else if (relationship.source === "hpo_disease") {
+                        let tooltip = `Via related term: ${relationship.via}`;
+                        html.push( $('<span>', {class: 'text-muted', text: 'Entrez', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
+                    } else if (relationship.source === "mondo_file") {
+                        let tooltip = `Relationship: ${relationship.relation}`;
+                        html.push( $('<span>', {class: 'text-muted', text: "MONDO", 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
+                    } else {
+                        let tooltip = `Relationship: ${relationship.relation}`;
+                        html.push( $('<span>', {class: 'text-muted', text: relationship.source, 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
+                    }
+                }
+                return $('<div>', {
+                    html: html
+                });
             }
         }
 
