@@ -398,7 +398,7 @@ class OntologySnake:
                         if other_term.ontology_service == to_ontology:
                             valid_snakes.append(new_snake)
                             continue
-                        elif len(new_snake.paths) < max_depth:
+                        elif len(new_snake.paths) <= max_depth:
                             new_snakes.append(new_snake)
                         seen.add(other_term)
         return OntologySnakes(valid_snakes)
