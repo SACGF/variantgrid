@@ -2,16 +2,16 @@ from django.conf import settings
 from django.db.models.query_utils import Q
 from django.template import Library
 
-from annotation.forms import HPOSynonymForm, MIMAliasForm
 from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, GeneSymbolForm, \
     GeneAnnotationReleaseForm, panel_app_server_autocomplete_form_factory
 from genes.models import GeneInfo, GeneListCategory, PanelAppServer, GeneAnnotationRelease
+from ontology.forms import HPOForm, OMIMForm
 from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
 from pathtests.models import PathologyTest
 from seqauto.forms import EnrichmentKitForm
 from seqauto.models import EnrichmentKit
 from snpdb.forms import LabSelectForm
-from snpdb.models import Company, UserSettings
+from snpdb.models import Company
 
 register = Library()
 
@@ -103,16 +103,14 @@ def gene_grid(context, columns_from_url=None,
                          "form": LabSelectForm()}
     categories.append(hpo_category_data)
 
-    # HPO
     hpo_category_data = {"icon_css_class": "hpo-icon",
                          "description": "Human Phenotype Ontology",
-                         "form": HPOSynonymForm(),
+                         "form": HPOForm(),
                          "form_css_class": "hpo-gene-list-form"}
     categories.append(hpo_category_data)
-    # OMIM
     omim_category_data = {"icon_css_class": "omim-icon",
                           "description": "OMIM",
-                          "form": MIMAliasForm(),
+                          "form": OMIMForm(),
                           "form_css_class": "omim-gene-list-form"}
     categories.append(omim_category_data)
 

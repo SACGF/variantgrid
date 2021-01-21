@@ -1,28 +1,7 @@
-import urllib
-
 from django.contrib import messages
 from django.views.generic import TemplateView
-from rest_framework.response import Response
-from rest_framework.status import HTTP_200_OK
-from rest_framework.views import APIView
 
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake
-from ontology.ontology_matching import OntologyMatching
-
-
-class SearchMondoText(APIView):
-
-    def get(self, request, **kwargs) -> Response:
-
-        search_term = request.GET.get('search_term') or ''
-        gene_symbol = request.GET.get('gene_symbol')
-
-        urllib.parse.quote(search_term).replace('/', '%252F')  # a regular escape / gets confused for a URL divider
-        selected = [term.strip() for term in (request.GET.get('selected') or '').split(",") if term.strip()]
-
-        ontology_matches = OntologyMatching.from_search(search_text=search_term, gene_symbol=gene_symbol, selected=selected, server_search=True)
-
-        return Response(status=HTTP_200_OK, data=ontology_matches.as_json())
 
 
 class OntologyTermView(TemplateView):

@@ -36,7 +36,7 @@ def _get_panel_app_panel_url_and_json(panel_app_panel):
     return url, json_data
 
 
-def get_panel_app_panel_as_gene_list_json(gene_list_id, panel_app_panel_id):
+def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
     panel_app_panel = PanelAppPanel.objects.get(pk=panel_app_panel_id)
     url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
 
@@ -64,7 +64,7 @@ def get_panel_app_panel_as_gene_list_json(gene_list_id, panel_app_panel_id):
             gene_evidence[glgs.gene_symbol_id] = evidence
             # TODO: Handle unmatched symbols??
 
-    data = {"pk": gene_list_id,
+    data = {"pk": f"{PANEL_APP_PREFIX}-{panel_app_panel_id}",
             "category": {"name": "PanelApp", "icon_css_class": panel_app_panel.server.icon_css_class},
             "name": name,
             "import_status": "S",

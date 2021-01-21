@@ -12,12 +12,10 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 import json
 
-from annotation.models.models_mim_hpo import HPOSynonym, MIMMorbidAlias, \
-    HumanPhenotypeOntology, MIMMorbid
 from genes.gene_matching import GeneSymbolMatcher, GeneMatcher
-from genes.models import GeneInfo, GeneList, FakeGeneList, GeneListGeneSymbol, GeneSymbol, GeneAnnotationRelease, \
+from genes.models import GeneInfo, GeneList, FakeGeneList, GeneAnnotationRelease, \
     ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList
-from genes.panel_app import PANEL_APP_PREFIX, get_panel_app_panel_as_gene_list_json
+from genes.panel_app import get_panel_app_panel_as_gene_list_json
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json
 from genes.serializers import GeneInfoSerializer, GeneListGeneSymbolSerializer, GeneListSerializer, \
     GeneAnnotationReleaseSerializer, SampleGeneListSerializer
@@ -44,83 +42,22 @@ def is_owner_or_has_permission_factory(django_permission):
 WriteGeneListPermission = is_owner_or_has_permission_factory(DjangoPermission.WRITE)
 
 
-def get_fake_gene_list_json(gene_list_id, name, genes, category_name, icon_css_class):
-    gene_list = FakeGeneList(name=name, user=None)
-    gene_list_genes = []
+class PanelAppGeneListView(APIView):
+    """ Tunnels through to panel app (can't make cross site requests) """
 
-    # TODO: Better way to convert to symbols??
-    for gene_symbol in GeneSymbol.objects.filter(geneversion__gene__in=genes).distinct():
-        gene_list_genes.append(GeneListGeneSymbol(gene_list=gene_list, original_name=gene_symbol, gene_symbol=gene_symbol))
-    genelistgenesymbol_set = GeneListGeneSymbolSerializer(gene_list_genes, many=True).data
-
-    data = {"pk": gene_list_id,
-            "category": {"name": category_name, "icon_css_class": icon_css_class},
-            "name": name,
-            "import_status": "S",
-            "genelistgenesymbol_set": genelistgenesymbol_set,
-            "can_write": False}
-    return data
-
-
-def get_hpo_as_gene_list_json(gene_list_id, hpo_id):
-    hpo = get_object_or_404(HumanPhenotypeOntology, pk=hpo_id)
-    name = str(hpo)
-    genes = hpo.get_genes()
-    return get_fake_gene_list_json(gene_list_id, name, genes, "HPO", "hpo-icon")
-
-
-def get_hpo_synonym_as_gene_list_json(gene_list_id, hpo_synonym_id):
-    hpo_synonym = get_object_or_404(HPOSynonym, pk=hpo_synonym_id)
-    name = str(hpo_synonym)
-    genes = hpo_synonym.hpo.get_genes()
-    return get_fake_gene_list_json(gene_list_id, name, genes, "HPO", "hpo-icon")
-
-
-def get_mim_as_gene_list_json(gene_list_id, mim_id):
-    mim_morbid = get_object_or_404(MIMMorbid, pk=mim_id)
-    name = str(mim_morbid)
-    genes = mim_morbid.get_genes()
-    return get_fake_gene_list_json(gene_list_id, name, genes, "OMIM", "omim-icon")
-
-
-def get_mim_alias_as_gene_list_json(gene_list_id, mim_alias_id):
-    mim_alias = get_object_or_404(MIMMorbidAlias, pk=mim_alias_id)
-    name = str(mim_alias)
-    genes = mim_alias.mim_morbid.get_genes()
-    return get_fake_gene_list_json(gene_list_id, name, genes, "OMIM", "omim-icon")
+    def get(self, request, *args, **kwargs):
+        panel_app_id = self.kwargs['pk']
+        data = get_panel_app_panel_as_gene_list_json(panel_app_id)
+        return Response(data)
 
 
 class GeneListView(APIView):
-    """ Pass pk "panel-app-XX" and we'll tunnel through a panel app
-        (can't make cross site requests)
-        Also pk "hpo-synonym-XXX prefix for HPO
-    """
 
     def get(self, request, *args, **kwargs):
-        SPECIAL_PREFIXES = {
-            PANEL_APP_PREFIX: get_panel_app_panel_as_gene_list_json,
-            "hpo-": get_hpo_as_gene_list_json,
-            "hpo-synonym-": get_hpo_synonym_as_gene_list_json,
-            "mim-": get_mim_as_gene_list_json,
-            "mim-alias-": get_mim_alias_as_gene_list_json,
-        }
-        # Need to go longest to shortest so that we don't match hpo before hpo-synonym
-        special_prefixes_longest_to_shortest = reversed(sorted(SPECIAL_PREFIXES.items(), key=len))
-
         gene_list_id = self.kwargs['pk']
-        special_id = None
-        special_case_func = None
-        for prefix, func in special_prefixes_longest_to_shortest:
-            if gene_list_id.startswith(prefix):
-                special_id = gene_list_id.replace(prefix, "")
-                special_case_func = func
-                break
-        if special_case_func:
-            data = special_case_func(gene_list_id, special_id)
-        else:
-            gl = GeneList.get_for_user(request.user, gene_list_id)
-            serializer = GeneListSerializer(gl, context={"request": request})
-            data = serializer.data
+        gl = GeneList.get_for_user(request.user, gene_list_id)
+        serializer = GeneListSerializer(gl, context={"request": request})
+        data = serializer.data
 
         return Response(data)
 

@@ -76,6 +76,7 @@ rest_urlpatterns = [
     perm_path('api/gene_list/modify/<int:pk>', views_rest.ModifyGeneListView.as_view(), name='api_modify_gene_list'),
     perm_path('api/gene_list/create', views_rest.CreateGeneListView.as_view(), name='api_create_gene_list'),
     perm_path('api/gene_list/<pk>', views_rest.GeneListView.as_view(), name='api_view_gene_list'),
+    perm_path('api/panel_app/<pk>/gene_list', views_rest.PanelAppGeneListView.as_view(), name='api_view_panel_app_gene_list'),
     perm_path('api/named_gene_list/<category__name>/<name>', views_rest.NamedGeneListView.as_view(), name='api_named_gene_list'),
     perm_path('api/panel_app/gene_evidence/<int:server_id>/<gene_symbol>', views_rest.PanelAppGeneEvidenceView.as_view(), name='api_panel_app_gene_evidence'),
     perm_path('api/gene/batch_info', views_rest.BatchGeneInfoView.as_view(), name='api_batch_gene_info'),

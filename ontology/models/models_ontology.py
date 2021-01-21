@@ -127,7 +127,7 @@ class OntologyTerm(TimeStampedModel):
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     def __str__(self):
-        return self.id
+        return f"{self.id}: {self.name}"
 
     class Meta:
         unique_together = ("ontology_service", "index")
@@ -153,6 +153,11 @@ class OntologyTerm(TimeStampedModel):
     @property
     def url_safe_id(self):
         return self.id.replace(":", "_")
+
+    @staticmethod
+    def get_from_slug(slug_pk):
+        pk = slug_pk.replace("_", ":")
+        return OntologyTerm.objects.get(pk=pk)
 
     @staticmethod
     def get_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> 'OntologyTerm':
