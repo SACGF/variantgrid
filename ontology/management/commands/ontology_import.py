@@ -77,7 +77,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=2)
+        processor_version=3)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -154,7 +154,7 @@ def load_mondo(filename: str, force: bool):
                                         if xref_term.type in {"HP", "OMIM"} and not xref_term.id in synonym_set:
                                             ontology_builder.add_term(
                                                 term_id=xref_term.id,
-                                                name="Related to " + label,
+                                                name=label,
                                                 definition=f"Name copied from related synonym {full_id}",
                                                 primary_source=False
                                             )
