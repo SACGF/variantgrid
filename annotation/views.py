@@ -23,12 +23,10 @@ from annotation.annotation_versions import get_variant_annotation_version
 from annotation.citations import get_citations, CitationDetails
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    EnsemblGeneAnnotationVersion, EnsemblGeneAnnotationVersionDiff, VariantAnnotationVersionDiff, MIMGene
+    EnsemblGeneAnnotationVersion, EnsemblGeneAnnotationVersionDiff, VariantAnnotationVersionDiff
 from annotation.models.models import ClinVarCitation, CachedCitation, \
     CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation
 from annotation.models.models_enums import AnnotationStatus, CitationSource
-from annotation.models.models_mim_hpo import MIMMorbid, MIMMorbidAlias, \
-    HumanPhenotypeOntology, PhenotypeMIM, HPOSynonym
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
