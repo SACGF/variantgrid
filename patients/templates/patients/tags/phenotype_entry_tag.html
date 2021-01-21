@@ -222,12 +222,12 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         var phenotypeInput = getPhenotypeInput();
         phenotypeInput.keyup(startDescriptionUpdateTimer);
     
-        $('#id_hpo_synonym', phenotypeEditorTag).change(function() {
-            var regex = "HP:\\d{7}: ([^\\(]*)";
+        $('#id_hpo', phenotypeEditorTag).change(function() {
+            var regex = "HP:\\d{7} ([^\\(]*)";
             searchForText('hpo', regex, this);
         });
-        $('#id_mim_morbid_alias', phenotypeEditorTag).change(function() {
-            var regex = "MIM: \\d+ ([^\\(]*)";
+        $('#id_omim', phenotypeEditorTag).change(function() {
+            var regex = "OMIM:\\d+ ([^\\(]*)";
             searchForText('omim', regex, this);
         });
         $('#id_gene', phenotypeEditorTag).change(function() {
@@ -255,8 +255,8 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             {% if gene_form %}<td style="width:30%"><div class='ontology-label gene'>Genes</div></td>{% endif %}
         </tr>
         <tr>
-            {% if hpo_form %}<td style="width:30%"><div class="hpo">{{ hpo_form.hpo_synonym }} {{ hpo_form.media }}</div></td>{% endif %}
-            {% if omim_form %}<td style="width:30%"><div class='omim'>{{ omim_form.mim_morbid_alias }}</div></td>{% endif %}
+            {% if hpo_form %}<td style="width:30%"><div class="hpo">{{ hpo_form.hpo }} {{ hpo_form.media }}</div></td>{% endif %}
+            {% if omim_form %}<td style="width:30%"><div class='omim'>{{ omim_form.omim }}</div></td>{% endif %}
             {% if gene_form %}<td style="width:30%"><div class='gene'>{{ gene_form.gene }}</div></td>{% endif %}
         </tr>
     </table>

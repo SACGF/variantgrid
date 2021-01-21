@@ -266,12 +266,12 @@
 			}
     	}
 
-        $('#id_hpo_synonym').change(function() {
-	        var regex = "HP:\\d{7}: ([^\\(]*)";
+        $('#id_hpo').change(function() {
+	        var regex = "HP:\\d{7} ([^\\(]*)";
         	searchForText('hpo', regex, this);
         });
-        $('#id_mim_morbid_alias').change(function() {
-	        var regex = "MIM: \\d+ ([^\\(]*)";
+        $('#id_omim').change(function() {
+	        var regex = "OMIM:\\d+ ([^\\(]*)";
         	searchForText('omim', regex, this);
         });
         $('#id_gene').change(function() {
@@ -388,9 +388,9 @@
     	        Click the graphs to filter patients, or enter terms:
                 <table class="pheno-drop-downs">
                     <tr><td><div class='ontology-label hpo w-100'>Human Phenotype Ontology</div>
-                    <tr><td class='hpo'> {{ hpo_form.hpo_synonym }} 
+                    <tr><td class='hpo'> {{ hpo_form.hpo }}
                     <tr><td><div class='ontology-label omim w-100'>OMIM</div>
-                    <tr><td class='omim'> {{ omim_form.mim_morbid_alias }} 
+                    <tr><td class='omim'> {{ omim_form.omim }}
                     <tr><td><div class='ontology-label gene w-100'>Genes</div>
                     <tr><td class='gene'> {{ gene_form.gene }}
                     <!-- Only need 1 media for entire page -->

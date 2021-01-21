@@ -127,7 +127,7 @@ class OntologyTerm(TimeStampedModel):
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     def __str__(self):
-        return f"{self.id}: {self.name}"
+        return f"{self.id} {self.name}"
 
     class Meta:
         unique_together = ("ontology_service", "index")

@@ -1,5 +1,6 @@
 import abc
 
+from django.db.models.functions import Length
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -14,6 +15,9 @@ class AbstractOntologyTermAutocompleteView(abc.ABC, AutocompleteView):
     @abc.abstractmethod
     def _get_ontology_service(self):
         pass
+
+    def sort_queryset(self, qs):
+        return qs.order_by(Length("name").asc(), 'name')
 
     def get_user_queryset(self, user):
         qs = OntologyTerm.objects.all()

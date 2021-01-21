@@ -5,7 +5,6 @@ from django.views.decorators.http import require_POST
 from jfu.http import upload_receive, UploadResponse, JFUResponse
 import mimetypes
 
-from annotation.forms import HPOSynonymForm, MIMAliasForm
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from annotation.phenotype_matching import create_phenotype_description
 from genes.forms import GeneForm
@@ -14,6 +13,7 @@ from library.file_utils import rm_if_exists
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.log_utils import log_traceback
 from library.utils import invert_dict
+from ontology.forms import OMIMForm, HPOForm
 from patients import forms
 from patients.forms import PatientSearchForm, PatientContactForm
 from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
@@ -266,8 +266,8 @@ def patients(request):
     phenotype_match_graphs = TextPhenotypeMatch.objects.exists()
     context = {"phenotype_match_graphs": phenotype_match_graphs,
                "patient_search_form": PatientSearchForm(),
-               'omim_form': MIMAliasForm(),
-               'hpo_form': HPOSynonymForm(),
+               'omim_form': OMIMForm(),
+               'hpo_form': HPOForm(),
                'gene_form': GeneForm(),
                "initially_hide_create_patient_form": initially_hide_create_patient_form,
                "form": form}

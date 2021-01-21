@@ -1,6 +1,6 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from annotation import views, views_rest, views_autocomplete
+from annotation import views, views_rest
 from annotation.grids import HPOGeneGrid, MIMGeneGrid, TissueGeneGrid, \
     VariantAnnotationVersionGrid, AnnotationRunGrid
 from library.django_utils.jqgrid_view import JQGridView
@@ -31,9 +31,6 @@ urlpatterns = [
     perm_path('tissue_gene/grid/<int:human_protein_atlas_version_id>/<int:tissue_sample_id>/<min_abundance>/<slug:op>/', JQGridView.as_view(grid=TissueGeneGrid, csv_download=True), name='tissue_gene_grid'),
     perm_path('hpo_gene/grid/<int:hpo_id>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=HPOGeneGrid, csv_download=True), name='hpo_genes_grid'),
     perm_path('mim_gene/grid/<int:mim_morbid_id>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=MIMGeneGrid, csv_download=True), name='mim_genes_grid'),
-
-    perm_path('autocomplete/MIMMorbidAlias/', views_autocomplete.MIMMorbidAliasAutocompleteView.as_view(), name='mim_morbid_alias_autocomplete'),
-    perm_path('autocomplete/HPOSynonym/', views_autocomplete.HPOSynonymAutocompleteView.as_view(), name='hpo_synonym_autocomplete'),
 ]
 
 rest_urlpatterns = [

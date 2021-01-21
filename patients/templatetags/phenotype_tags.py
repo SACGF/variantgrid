@@ -1,8 +1,8 @@
 from django.template import Library
 import uuid
 
-from annotation.forms import MIMAliasForm, HPOSynonymForm
 from genes.forms import GeneForm
+from ontology.forms import HPOForm, OMIMForm
 
 register = Library()
 
@@ -28,9 +28,9 @@ def phenotype_entry(context, form_entry_field, phenotype_description,
     omim_form = None
     gene_form = None
     if show_hpo:
-        hpo_form = HPOSynonymForm()
+        hpo_form = HPOForm()
     if show_omim:
-        omim_form = MIMAliasForm()
+        omim_form = OMIMForm()
     if show_genes:
         gene_form = GeneForm()
 
