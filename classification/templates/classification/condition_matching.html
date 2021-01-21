@@ -270,6 +270,9 @@
             let searchText = $('#mp-search-text').val();
             let geneSymbol = $('#mp-gene-symbol').text();
             let selected = $('#mp-selected').val();
+            if (geneSymbol === "-") {
+                geneSymbol = "";
+            }
 
             searchMondo({
                 searchText,
