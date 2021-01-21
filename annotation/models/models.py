@@ -26,7 +26,6 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
     VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
-from annotation.models.models_mim_hpo import MIMMorbid
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -36,17 +35,6 @@ from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
-
-
-class MIMGene(models.Model):
-    mim_morbid = models.ForeignKey(MIMMorbid, on_delete=CASCADE)
-    gene = models.ForeignKey(Gene, on_delete=CASCADE)
-
-    class Meta:
-        unique_together = ("mim_morbid", "gene")
-
-    def __str__(self):
-        return f"{self.mim_morbid}: {self.gene}"
 
 
 class SubVersionPartition(RelatedModelsPartitionModel):

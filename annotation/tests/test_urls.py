@@ -3,10 +3,9 @@ import unittest
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_gene_annotation, create_fake_variant_annotation
-from annotation.models import HPOSynonym, MIMMorbidAlias, HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
+from annotation.models import HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
     ClinVar, Citation, CitationSource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from annotation.tests.test_data_mim_hpo import create_mim_hpo_test_data
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -23,12 +22,8 @@ class Test(URLTestCase):
 
         cls.annotation_version_grch37 = get_fake_annotation_version(cls.grch37)
         cls.annotation_version_grch38 = get_fake_annotation_version(cls.grch38)
-        create_mim_hpo_test_data()
 
         cls.human_protein_atlas_tissue_sample = HumanProteinAtlasTissueSample.objects.get_or_create(name="foo")[0]
-
-        cls.mm_alias = MIMMorbidAlias.objects.last()
-        cls.hpo_synonym = HPOSynonym.objects.last()
 
         create_fake_clinvar_data(cls.annotation_version_grch37.clinvar_version)
         clinvar = ClinVar.objects.filter(version=cls.annotation_version_grch37.clinvar_version).first()
@@ -82,16 +77,10 @@ class Test(URLTestCase):
                          "tissue_sample_id": self.human_protein_atlas_tissue_sample.pk,
                          "min_abundance": HumanProteinAtlasAbundance.MEDIUM,
                          "op": "config"}
-        hpo_kwargs = {"hpo_id": self.hpo_synonym.hpo_id}
-        hpo_kwargs.update(build_kwargs)
-        mim_kwargs = {"mim_morbid_id": self.mm_alias.mim_morbid_id}
-        mim_kwargs.update(build_kwargs)
         GRID_LIST_URLS = [
             ("variant_annotation_version_grid", build_kwargs, 200),
             ("annotation_run_grid", build_kwargs, 200),
             ("tissue_gene_grid", tissue_kwargs, 200),
-            ("hpo_genes_grid", hpo_kwargs, 200),
-            ("mim_genes_grid", mim_kwargs, 200),
         ]
         self._test_urls(GRID_LIST_URLS, self.user)
 

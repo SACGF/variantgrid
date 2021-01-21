@@ -8,7 +8,6 @@ from django.db.models import PROTECT, CASCADE, QuerySet, Q
 from django.urls import reverse
 from model_utils.models import TimeStampedModel, now
 
-from genes.gene_matching import HGNCMatcher
 from genes.models import GeneSymbol
 from library.utils import Constant
 
@@ -166,6 +165,8 @@ class OntologyTerm(TimeStampedModel):
         This should be used as little as possible and only to bridge between GeneSymbols and OntologyTerms
         aka if you're talking about GeneSymbols, pass around the GeneSymbol object, not the OntologyTerm
         """
+        from genes.gene_matching import HGNCMatcher
+
         if isinstance(gene_symbol, GeneSymbol):
             gene_symbol = gene_symbol.symbol
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, name=gene_symbol).first():

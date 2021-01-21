@@ -65,8 +65,6 @@ class Test(URLTestCase):
         patient_build_kwargs = {"patient_id": cls.patient.pk, "genome_build_name": cls.grch37.name}
         cls.PRIVATE_GRID_LIST_URLS = [
             ("patient_grid", {}, cls.patient),
-            #("patient_hpo_genes_grid", patient_build_kwargs, ("name", hpo_gene_symbol)),
-            #("patient_mim_genes_grid", patient_build_kwargs, ("name", mim_gene_symbol)),
             ("patient_records_grid", {}, patient_records),
             ("patient_record_grid", {"patient_records_id": patient_records.pk}, patient_record),
         ]

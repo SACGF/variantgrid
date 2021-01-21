@@ -7,7 +7,7 @@ from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeFor
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
     PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
     VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm
-from analysis.models import TagNode
+from analysis.models import TagNode, OntologyTerm
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -28,10 +28,10 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
-from annotation.models import MIMMorbidAlias, HPOSynonym
 from classification.views.classification_datatables import ClassificationDatatableConfig
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
+from ontology.models import OntologyService
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import Sample
 from classification.models.classification import Classification
@@ -195,10 +195,9 @@ class PhenotypeNodeView(NodeView):
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
-        mim_morbid_alias_ids = self.object.phenotypenodeomim_set.all().values_list("mim_morbid_alias", flat=True)
-        hpo_synonym_ids = self.object.phenotypenodehpo_set.all().values_list("hpo_synonym", flat=True)
-        form_initial["mim_morbid_alias"] = MIMMorbidAlias.objects.filter(pk__in=mim_morbid_alias_ids)
-        form_initial["hpo_synonym"] = HPOSynonym.objects.filter(pk__in=hpo_synonym_ids)
+        ontology_terms = self.object.phenotypenodeontology_set.all().values_list("ontology_term", flat=True)
+        form_initial["omim"] = OntologyTerm.objects.filter(pk__in=ontology_terms, ontology_service=OntologyService.OMIM)
+        form_initial["hpo"] = OntologyTerm.objects.filter(pk__in=ontology_terms, ontology_service=OntologyService.HPO)
         return form_initial
 
     def get_context_data(self, **kwargs):

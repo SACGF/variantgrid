@@ -11,12 +11,12 @@ import re
 import time
 
 
-from annotation.models.models_mim_hpo import HumanPhenotypeOntology, MIMMorbidAlias, HPOSynonym
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes, \
     TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, TextPhenotypeSentence
 from genes.models import GeneSymbol, Gene
 from library.log_utils import log_traceback
 from library.utils import get_and_log_time_since, invert_dict_of_lists, all_equal
+from ontology.models import OntologyTerm
 from patients.models import Patient
 
 HPO_PATTERN = re.compile(r"HP:(\d{7})$")
@@ -29,7 +29,7 @@ MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
 
 CodePK = Any
 Lookups = Dict[CodePK, str]
-OntologyObj = Union[HumanPhenotypeOntology, MIMMorbidAlias, Gene]
+OntologyObj = Union[OntologyTerm, Gene]
 OntologyDict = Dict[str, OntologyObj]
 OntologyResults = Tuple[str, List[Union[CodePK, OntologyObj]]]
 

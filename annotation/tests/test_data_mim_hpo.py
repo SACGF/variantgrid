@@ -1,4 +1,3 @@
-from annotation.models.models_mim_hpo import HumanPhenotypeOntology, HPOSynonym, MIMMorbid, MIMMorbidAlias
 
 
 def create_mim_hpo_test_data():

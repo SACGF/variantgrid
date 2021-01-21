@@ -514,19 +514,15 @@ class PhenotypeNodeForm(BaseNodeForm):
         node = super().save(commit=False)
 
         # TODO: I'm sure there's a way to get Django to handle this via save_m2m()
-        hpo_set = self.instance.phenotypenodehpo_set
-        omim_set = self.instance.phenotypenodeomim_set
+        ontology_term_set = self.instance.phenotypenodeontologyterm_set
 
-        hpo_set.all().delete()
-        omim_set.all().delete()
-
-        for ontology_term in self.cleaned_data["hpo"]:
-            pass
-            #hpo_set.create(hpo_synonym=hpo_synonym)
+        ontology_term_set.all().delete()
 
         for ontology_term in self.cleaned_data["omim"]:
-            pass
-            # omim_set.create(mim_morbid_alias=mim_morbid_alias)
+            ontology_term_set.create(ontology_term=ontology_term)
+
+        for ontology_term in self.cleaned_data["hpo"]:
+            ontology_term_set.create(ontology_term=ontology_term)
 
         if commit:
             node.save()

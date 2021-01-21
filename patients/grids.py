@@ -3,15 +3,11 @@ from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404
 
-from annotation.models.models_mim_hpo import MIMMorbid, HumanPhenotypeOntology
-from annotation.models.models_phenotype_match import PATIENT_OMIM_PATH, \
-    PATIENT_HPO_PATH, PATIENT_GENE_SYMBOL_PATH
-from genes.models import GeneVersion
+from annotation.models.models_phenotype_match import PATIENT_GENE_SYMBOL_PATH, PATIENT_ONTOLOGY_TERM_PATH
 from library.django_utils import get_model_fields
-from library.jqgrid_abstract_genes_grid import AbstractGenesGrid
 from library.jqgrid_user_row_config import JqGridUserRowConfig
+from ontology.models import OntologyTerm
 from patients.models import PatientRecords, Patient, PatientRecord
-from snpdb.models import GenomeBuild
 
 
 class PatientListGrid(JqGridUserRowConfig):
@@ -31,12 +27,9 @@ class PatientListGrid(JqGridUserRowConfig):
 
             # We need to filter to a sub patients list NOT just to certain terms, so that StringAgg will
             # return all the terms for that person
-            if term_type == 'omim':
-                omim = MIMMorbid.objects.get(description=value)
-                patient_id_q = Q(**{PATIENT_OMIM_PATH: omim})
-            elif term_type == 'hpo':
-                hpo = HumanPhenotypeOntology.objects.get(name=value)  # @UndefinedVariable
-                patient_id_q = Q(**{PATIENT_HPO_PATH: hpo})
+            if term_type == 'ontology_term':
+                ontology_term = OntologyTerm.get_from_slug(value)
+                patient_id_q = Q(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term})
             elif term_type == 'gene':
                 # Match to gene_symbol as there may be multiple with that symbol
                 patient_id_q = Q(**{PATIENT_GENE_SYMBOL_PATH: value})
@@ -49,8 +42,7 @@ class PatientListGrid(JqGridUserRowConfig):
 
         # Add sample_count to queryset
         annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',', distinct=True),
-                             "phenotype_matches": StringAgg(PATIENT_HPO_PATH + "__name", '|', distinct=True),
-                             "omim": StringAgg(PATIENT_OMIM_PATH + "__description", '|', distinct=True),
+                             "ontology_terms": StringAgg(PATIENT_ONTOLOGY_TERM_PATH + "__name", '|', distinct=True),
                              "genes": StringAgg(PATIENT_GENE_SYMBOL_PATH, '|', distinct=True),
                              "sample_count": Count("sample", distinct=True),
                              "samples": StringAgg("sample__name", ", ", distinct=True)}
@@ -65,8 +57,7 @@ class PatientListGrid(JqGridUserRowConfig):
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         EXTRA_COLUMNS = [
             {'index': 'reference_id', 'name': 'reference_id', 'label': 'Specimen ReferenceIDs'},
-            {'index': 'phenotype_matches', 'name': 'phenotype_matches', 'label': 'Phenotype Matches', 'classes': 'no-word-wrap', 'formatter': 'phenotypeFormatter'},
-            {'index': 'omim', 'name': 'omim', 'label': 'OMIM', 'classes': 'no-word-wrap', 'formatter': 'omimFormatter'},
+            {'index': 'ontology_terms', 'name': 'ontology_terms', 'label': 'Ontology Terms', 'classes': 'no-word-wrap'},
             {'index': 'genes', 'name': 'genes', 'label': 'Genes', 'classes': 'no-word-wrap', 'formatter': 'geneFormatter'},
             {'index': 'sample_count', 'name': 'sample_count', 'label': '# samples', 'sorttype': 'int', 'width': '30px'},
             {'index': 'samples', 'name': 'samples', 'label': 'Samples'},
@@ -108,88 +99,3 @@ class PatientRecordGrid(JqGridUserRowConfig):
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
-
-
-class PatientHPOGenesGrid(AbstractGenesGrid):
-    model = GeneVersion
-    caption = "Patient HPO genes"
-
-    def __init__(self, user, patient_id, genome_build_name):
-        super().__init__(user)
-
-        self.patient = Patient.get_for_user(user, patient_id)
-        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.extra_config.update({'sortname': 'name',
-                                  'sortorder': 'asc'})
-
-    def get_caption(self):
-        return f"{self.caption} ({self.genome_build})"
-
-    def get_column_names(self):
-        return ["phenotypes"]
-
-    def get_sql_params_and_columns(self, request):
-        sql = """   SELECT DISTINCT genes_geneversion.gene_symbol_id as name,
-                    string_agg(DISTINCT annotation_humanphenotypeontology.name, ', ') as phenotypes
-                    from annotation_mimgene
-                    join genes_gene on (genes_gene.identifier=gene_id)
-                    join genes_geneversion on (genes_geneversion.gene_id = genes_gene.identifier)
-                    join annotation_phenotypemim on (annotation_phenotypemim.mim_morbid_id=annotation_mimgene.mim_morbid_id)
-                    join annotation_humanphenotypeontology on (annotation_humanphenotypeontology.id=annotation_phenotypemim.hpo_id)
-                    where annotation_phenotypemim.hpo_id in %s
-                    AND genes_geneversion.genome_build_id = %s
-                    group by genes_geneversion.gene_symbol_id
-        """
-
-        patient_hpo = self.patient.get_hpo_qs()
-        if patient_hpo:
-            hpo_list = [str(hpo.pk) for hpo in patient_hpo]
-        else:
-            hpo_list = [-1]  # Invalid
-        params = [tuple(hpo_list), self.genome_build.pk]
-        return sql, params, None, False
-
-    def get_labels(self):
-        return ['Gene ID', "HPOs"]
-
-
-class PatientMIMGenesGrid(AbstractGenesGrid):
-    model = GeneVersion
-    caption = "Patient MIM genes"
-
-    def __init__(self, user, patient_id, genome_build_name):
-        super().__init__(user)
-
-        self.patient = Patient.get_for_user(user, patient_id)
-        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.extra_config.update({'sortname': 'name',
-                                  'sortorder': 'asc'})
-
-    def get_caption(self):
-        return f"{self.caption} ({self.genome_build})"
-
-    def get_column_names(self):
-        return ["mims"]
-
-    def get_sql_params_and_columns(self, request):
-        sql = """   SELECT DISTINCT genes_geneversion.gene_symbol_id as name,
-                    string_agg(DISTINCT annotation_mimmorbid.description, ', ') as mims
-                    from annotation_mimgene
-                    join genes_gene on (genes_gene.identifier=gene_id)
-                    join genes_geneversion on (genes_geneversion.gene_id = genes_gene.identifier)
-                    join annotation_mimmorbid on (annotation_mimmorbid.accession=annotation_mimgene.mim_morbid_id)
-                    where annotation_mimmorbid.accession in %s
-                    AND genes_geneversion.genome_build_id = %s
-                    group by genes_geneversion.gene_symbol_id
-        """
-
-        patient_mim = self.patient.get_mim_qs()
-        if patient_mim:
-            mim_list = [str(mim.pk) for mim in patient_mim]
-        else:
-            mim_list = [-1]  # Invalid
-        params = [tuple(mim_list), self.genome_build.pk]
-        return sql, params, None, False
-
-    def get_labels(self):
-        return ['Gene ID', "OMIM"]

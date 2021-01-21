@@ -1,8 +1,7 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from annotation import views, views_rest
-from annotation.grids import HPOGeneGrid, MIMGeneGrid, TissueGeneGrid, \
-    VariantAnnotationVersionGrid, AnnotationRunGrid
+from annotation.grids import TissueGeneGrid, VariantAnnotationVersionGrid, AnnotationRunGrid
 from library.django_utils.jqgrid_view import JQGridView
 from variantgrid.perm_path import perm_path
 
@@ -29,8 +28,6 @@ urlpatterns = [
     perm_path('annotation_run/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AnnotationRunGrid), name='annotation_run_grid'),
 
     perm_path('tissue_gene/grid/<int:human_protein_atlas_version_id>/<int:tissue_sample_id>/<min_abundance>/<slug:op>/', JQGridView.as_view(grid=TissueGeneGrid, csv_download=True), name='tissue_gene_grid'),
-    perm_path('hpo_gene/grid/<int:hpo_id>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=HPOGeneGrid, csv_download=True), name='hpo_genes_grid'),
-    perm_path('mim_gene/grid/<int:mim_morbid_id>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=MIMGeneGrid, csv_download=True), name='mim_genes_grid'),
 ]
 
 rest_urlpatterns = [

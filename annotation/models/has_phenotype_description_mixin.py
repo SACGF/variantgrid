@@ -1,6 +1,3 @@
-from annotation.models.models_mim_hpo import MIMMorbid, HumanPhenotypeOntology
-
-
 class HasPhenotypeDescriptionMixin:
 
     def _get_phenotype_input_text_field(self):
@@ -36,26 +33,12 @@ class HasPhenotypeDescriptionMixin:
             _phenotype_description = None
         return _phenotype_description
 
-    def get_hpo_qs(self):
+    def get_ontology_terms(self):
         if self.phenotype_description:
-            hpos = self.phenotype_description.get_hpo_qs()
+            terms = self.phenotype_description.get_ontology_terms()
         else:
-            hpos = HumanPhenotypeOntology.objects.none()  # @UndefinedVariable
-        return hpos
-
-    def get_mim_qs(self):
-        if self.phenotype_description:
-            mims = self.phenotype_description.get_mim_qs()
-        else:
-            mims = MIMMorbid.objects.none()
-        return mims
-
-    def get_mim_and_pheno_mim_qs(self):
-        if self.phenotype_description:
-            mims = self.phenotype_description.get_mim_and_pheno_mim_qs()
-        else:
-            mims = MIMMorbid.objects.none()
-        return mims
+            terms = []
+        return terms
 
     def get_gene_qs(self):
         from genes.models import Gene

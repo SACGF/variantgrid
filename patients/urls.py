@@ -1,7 +1,6 @@
 from library.django_utils.jqgrid_view import JQGridView
 from patients import views, views_autocomplete
-from patients.grids import PatientListGrid, PatientHPOGenesGrid, PatientMIMGenesGrid, \
-    PatientRecordsGrid, PatientRecordGrid
+from patients.grids import PatientListGrid, PatientRecordsGrid, PatientRecordGrid
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -17,7 +16,6 @@ urlpatterns = [
     perm_path('view_patient/<int:patient_id>', views.view_patient, name='view_patient'),
     perm_path('view_patient/contact/<int:patient_id>', views.view_patient_contact_tab, name='view_patient_contact_tab'),
     perm_path('view_patient/patient_specimens/<int:patient_id>', views.view_patient_specimens, name='view_patient_specimens'),
-    perm_path('view_patient/genes/<int:patient_id>', views.view_patient_genes, name='view_patient_genes'),
     perm_path('view_patient/modifications/<int:patient_id>', views.view_patient_modifications, name='view_patient_modifications'),
 
     # Attachments
@@ -36,8 +34,6 @@ urlpatterns = [
 
     # Grids
     perm_path('patient/grid/<slug:op>/', JQGridView.as_view(grid=PatientListGrid, delete_row=True), name='patient_grid'),
-    perm_path('patient_hpo/grid/<int:patient_id>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=PatientHPOGenesGrid, csv_download=True), name='patient_hpo_genes_grid'),
-    perm_path('patient_mim/grid/<int:patient_id>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=PatientMIMGenesGrid, csv_download=True), name='patient_mim_genes_grid'),
     perm_path('patient_records/grid/<slug:op>/', JQGridView.as_view(grid=PatientRecordsGrid), name='patient_records_grid'),
     perm_path('patient_record/grid/<int:patient_records_id>/<slug:op>/', JQGridView.as_view(grid=PatientRecordGrid), name='patient_record_grid'),
 

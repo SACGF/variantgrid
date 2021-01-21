@@ -9,7 +9,6 @@ from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, Phenot
     PhenotypeNodeOntologyTerm
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
     NodeWiki
-from annotation.serializers import HPOSynonymSerializer, MIMMorbidAliasSerializer
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
@@ -92,6 +91,7 @@ class AnalysisNodeSerializer(DynamicFieldsModelSerializer):
             model_name = serializer_subclass.Meta.model._meta.label
             node_serializers[model_name] = serializer_subclass
         return node_serializers
+
 
 class AlleleFrequencyNodeSerializer(AnalysisNodeSerializer):
     class Meta(AnalysisNodeSerializer.Meta):

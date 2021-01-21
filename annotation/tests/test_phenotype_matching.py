@@ -1,7 +1,6 @@
 from django.test import TestCase
 
 
-from annotation.models.models_phenotype_match import PhenotypeMatchTypes
 from annotation.phenotype_matching import default_lookup_factory, \
     cached_lookup_factory
 from annotation.tests.test_data_mim_hpo import create_mim_hpo_test_data

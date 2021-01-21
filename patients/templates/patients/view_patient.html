@@ -102,7 +102,6 @@
         {% end_ui_register_tab_embedded %}
         {% ui_register_tab label="Contact" url="view_patient_contact_tab" param=patient.pk url_check=True tab_set="patients" %}
         {% ui_register_tab label="Specimens" url="view_patient_specimens" param=patient.pk url_check=True tab_set="patients"%}
-        {% ui_register_tab label="Genes" url="view_patient_genes" param=patient.pk url_check=True tab_set="patients" %}
         {% if has_write_permission %}
             {% ui_register_tab_embedded label="Sharing / Permissions" tab_set="patients" %}{% url "group_permissions" 'patients.models.Patient' patient.pk %}{% end_ui_register_tab_embedded %}
             <!-- Patient modification could show private info - only show to those with write access -->

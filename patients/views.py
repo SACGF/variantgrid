@@ -85,14 +85,6 @@ def view_patient_specimens(request, patient_id):
     return render(request, 'patients/view_patient_specimens.html', context)
 
 
-def view_patient_genes(request, patient_id):
-    patient = Patient.get_for_user(request.user, patient_id)
-    genome_build = UserSettings.get_for_user(request.user).default_genome_build
-    context = {"patient": patient,
-               "genome_build": genome_build}
-    return render(request, 'patients/view_patient_genes.html', context)
-
-
 def view_patient_modifications(request, patient_id):
     patient = Patient.get_for_user(request.user, patient_id)
     patient_modifications = patient.patientmodification_set.all().order_by("-date")
