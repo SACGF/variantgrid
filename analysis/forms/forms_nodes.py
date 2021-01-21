@@ -28,13 +28,13 @@ from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygo
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
-from annotation.models.models_mim_hpo import MIMMorbidAlias, HPOSynonym
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from genes.panel_app import get_local_cache_gene_list
 from library.forms import NumberInput
 from library.utils import md5sum_str
+from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import GenomicInterval, Company, ImportStatus, Sample, VCFFilter
@@ -489,14 +489,14 @@ class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
 
 
 class PhenotypeNodeForm(BaseNodeForm):
-    mim_morbid_alias = forms.ModelMultipleChoiceField(required=False,
-                                                      queryset=MIMMorbidAlias.objects.all(),
-                                                      widget=ModelSelect2Multiple(url='mim_morbid_alias_autocomplete',
-                                                                                  attrs={'data-placeholder': 'OMIM term...'}))
-    hpo_synonym = forms.ModelMultipleChoiceField(required=False,
-                                                 queryset=HPOSynonym.objects.all(),
-                                                 widget=ModelSelect2Multiple(url='hpo_synonym_autocomplete',
-                                                                             attrs={'data-placeholder': 'Phenotype...'}))
+    omim = forms.ModelMultipleChoiceField(required=False,
+                                          queryset=OntologyTerm.objects.all(),
+                                          widget=ModelSelect2Multiple(url='omim_autocomplete',
+                                                                      attrs={'data-placeholder': 'OMIM...'}))
+    hpo = forms.ModelMultipleChoiceField(required=False,
+                                         queryset=OntologyTerm.objects.all(),
+                                         widget=ModelSelect2Multiple(url='hpo_autocomplete',
+                                                                     attrs={'data-placeholder': 'HPO...'}))
 
     class Meta:
         model = PhenotypeNode
@@ -520,11 +520,13 @@ class PhenotypeNodeForm(BaseNodeForm):
         hpo_set.all().delete()
         omim_set.all().delete()
 
-        for hpo_synonym in self.cleaned_data["hpo_synonym"]:
-            hpo_set.create(hpo_synonym=hpo_synonym)
+        for ontology_term in self.cleaned_data["hpo"]:
+            pass
+            #hpo_set.create(hpo_synonym=hpo_synonym)
 
-        for mim_morbid_alias in self.cleaned_data["mim_morbid_alias"]:
-            omim_set.create(mim_morbid_alias=mim_morbid_alias)
+        for ontology_term in self.cleaned_data["omim"]:
+            pass
+            # omim_set.create(mim_morbid_alias=mim_morbid_alias)
 
         if commit:
             node.save()
