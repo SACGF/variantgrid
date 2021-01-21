@@ -26,8 +26,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
     VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
-from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
-from annotation.ontology import OntologyMixin
+from annotation.models.models_mim_hpo import MIMMorbid
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
