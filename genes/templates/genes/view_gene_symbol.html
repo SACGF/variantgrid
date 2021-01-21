@@ -275,21 +275,21 @@
                 {% panel_app_gene_evidence server gene_symbol %}
             {% endfor %}
 
-            {% if mim_and_hpo_for_gene %}
+            {% if omim_and_hpo_for_gene %}
                 <h4>OMIM and Human Phenotype Ontology</h4>
 
                 <table class="table">
                     <thead>
-                    <tr><th>MIM Morbid</th><th>Description</th><th>HPOs</th>
+                    <tr><th>OMIM</th><th>Name</th><th>HPOs</th>
                     </thead>
                     <tbody>
-                    {% for mim, hpo_list in mim_and_hpo_for_gene %}
-                        <tr><td><a class="hover-link" href="https://www.omim.org/entry/{{ mim.accession }}">{{ mim.accession }}</a>
-                            <td>{{ mim.description }}
+                    {% for omim, hpo_list in omim_and_hpo_for_gene %}
+                        <tr><td><a class="hover-link" href="{{ omim.url }}">{{ omim.id }}</a>
+                            <td>{{ omim.name }}
                             <td>
                             {% if hpo_list %}
                                 {% for hpo in hpo_list %}
-                                    <a class="hover-link" href="http://compbio.charite.de/hpoweb/showterm?id={{ hpo.hpo_id }}">{{ hpo }}</a>&#160;
+                                    <a class="hover-link" href="{{ hpo.url }}">{{ hpo.id }} {{ hpo.name }}</a>&#160;
                                 {% endfor %}
                             {% endif %}
                     {% endfor %}

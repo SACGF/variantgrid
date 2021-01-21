@@ -22,7 +22,7 @@ from lazy import lazy
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.forms import EnsemblGeneAnnotationVersionForm
-from annotation.models.models import AnnotationVersion, EnsemblGeneAnnotation, Citation, VariantAnnotation, MIMGene
+from annotation.models.models import AnnotationVersion, EnsemblGeneAnnotation, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGeneListForm, CustomGeneListForm, \
@@ -35,6 +35,7 @@ from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
+from ontology.models import OntologySnake, OntologyService
 from seqauto.models import EnrichmentKit
 from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
 from snpdb.models.models_genome import GenomeBuild
@@ -111,15 +112,16 @@ def view_gene(request, gene_id):
     return render(request, "genes/view_gene.html", context)
 
 
-def _get_mim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
-    genes = gene_symbol.genes
-    mim_set = set((mim_gene.mim_morbid for mim_gene in MIMGene.objects.filter(gene__in=genes)))
-    mim_and_hpo_for_gene = []
-    for mim in sorted(mim_set, key=lambda m: m.accession):
-        hpo_set = set((pm.hpo for pm in mim.phenotypemim_set.order_by("pk")))
-        hpo_list = sorted(hpo_set, key=lambda h: h.pk)
-        mim_and_hpo_for_gene.append((mim, hpo_list))
-    return mim_and_hpo_for_gene
+def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
+    omim_and_hpo_for_gene = []
+    seen_omim = set()
+    for snake in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM):
+        omim = snake.leaf_term
+        if omim not in seen_omim:
+            seen_omim.add(omim)
+            hpo_list = [hpo_snake.leaf_term for hpo_snake in OntologySnake.snake_from(omim, OntologyService.HPO)]
+            omim_and_hpo_for_gene.append((omim, hpo_list))
+    return omim_and_hpo_for_gene
 
 
 def view_gene_symbol(request, gene_symbol, genome_build_name=None):
@@ -178,7 +180,7 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         gene_level_columns = None
         num_gene_annotation_versions = 0
 
-    mim_and_hpo_for_gene = _get_mim_and_hpo_for_gene_symbol(gene_symbol)
+    omim_and_hpo_for_gene = _get_omim_and_hpo_for_gene_symbol(gene_symbol)
     gene_lists_qs = GeneList.filter_for_user(request.user)
     gene_in_gene_lists = GeneList.visible_gene_lists_containing_gene_symbol(gene_lists_qs, gene_symbol).exists()
 
@@ -203,7 +205,7 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
         "has_tagged_variants": has_tagged_variants,
         "has_variants": has_variants,
-        "mim_and_hpo_for_gene": mim_and_hpo_for_gene,
+        "omim_and_hpo_for_gene": omim_and_hpo_for_gene,
         "num_gene_annotation_versions": num_gene_annotation_versions,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
