@@ -166,11 +166,6 @@ class OntologyMatching:
                 missing_word_ratio = 0 if not match_terms else (float(len(missing_words)) / float(len(search_terms)))
                 superfluous_word_ratio = 0 if not match_terms else min(1, float(len(superfluous_words)) / float(len(match_terms)))
 
-                # DIRECT_REFERENCE = OntologyScoreWeighting("Term is directly referenced", 1000)
-                # GENE = OntologyScoreWeighting("Gene matching", 20)
-                # WORD_MATCHING = OntologyScoreWeighting("Word matching", 40)
-                # WORD_SUPERFLUOUS = OntologyScoreWeighting("Limited extra words bonus", 40)
-
                 scores.append(OntologyMatch.Score(
                     name="Word Matching", max=40, unit=1 - missing_word_ratio,
                     note=f"Missing words {pretty_set(missing_words)}" if missing_words else "No missing words"
@@ -194,7 +189,7 @@ class OntologyMatching:
                 if OntologyImportSource.MONDO in source_codes:
                     sources.append("MONDO")
                 if OntologyImportSource.HPO in source_codes:
-                    sources.append("Entrez")
+                    sources.append("NCBI")
 
                 scores.append(OntologyMatch.Score(
                     name="Gene relationship", max=20, unit=1 if sources else 0,
