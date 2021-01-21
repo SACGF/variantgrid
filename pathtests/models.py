@@ -4,9 +4,9 @@ from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
-from annotation.models.models_mim_hpo import HPOSynonym, MIMMorbidAlias
-from genes.models import GeneList, Gene
+from genes.models import GeneList, Gene, GeneSymbol
 from library.enums import ModificationOperation
+from ontology.models import OntologyTerm
 from pathtests.models_enums import PathologyTestGeneModificationOutcome, \
     CaseState, InvestigationType, CaseWorkflowStatus
 from patients.models import Patient, Clinician, ExternallyManagedModel, \
@@ -147,13 +147,13 @@ class PathologyTestGeneModificationRequest(TimeStampedModel):
     pathology_test_version = models.ForeignKey(PathologyTestVersion, on_delete=CASCADE)
     outcome = models.CharField(max_length=1, choices=PathologyTestGeneModificationOutcome.choices, default=PathologyTestGeneModificationOutcome.PENDING)
     operation = models.CharField(max_length=1, choices=ModificationOperation.CHOICES)
-    gene = models.ForeignKey(Gene, on_delete=CASCADE)
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=CASCADE)
     comments = models.TextField(blank=True)
 
     def __str__(self):
         operation = self.get_operation_display()
-        name = " ".join((self.pathology_test_version, operation, self.gene.gene_symbol))
+        name = " ".join((self.pathology_test_version, operation, self.gene_symbol))
         outcome = self.get_outcome_display()
         return f"{name}: {outcome}"
 
@@ -254,16 +254,6 @@ class PathologyTestOrderSample(models.Model):
 class PathologyTestOrderPopulation(models.Model):
     pathology_test_order = models.ForeignKey(PathologyTestOrder, on_delete=CASCADE)
     population = models.CharField(max_length=3, choices=PopulationGroup.choices)
-
-
-class PathologyTestOrderHPO(models.Model):
-    pathology_test_order = models.ForeignKey(PathologyTestOrder, on_delete=CASCADE)
-    hpo_synonym = models.ForeignKey(HPOSynonym, on_delete=CASCADE)
-
-
-class PathologyTestOrderOMIM(models.Model):
-    pathology_test_order = models.ForeignKey(PathologyTestOrder, on_delete=CASCADE)
-    mim_morbid_alias = models.ForeignKey(MIMMorbidAlias, on_delete=CASCADE)
 
 
 def get_external_order_system_last_checked():

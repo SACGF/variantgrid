@@ -330,6 +330,7 @@ function removeColumn(className) {
 
 function getGeneListColumn(geneListId, selectElement, addEmptyGeneLists) {
     addEmptyGeneLists = getValue(addEmptyGeneLists, true);
+    geneListId = String(geneListId);
     const className = 'gene-list-' + geneListId;
     removeColumn(className); // Remove any existing if this is a reload
 
