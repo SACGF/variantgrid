@@ -182,17 +182,18 @@ class OntologyMatching:
 
             if gene_symbol := self.gene_symbol:
                 # TODO work out if we want to apply different scores to different matches
-                sources = set()
+                source_codes = set()
                 for snake in match.gene_relationships:
                     relationship_source = snake.show_steps()[0].relation.from_import.import_source  # remember these steps are from gene to term, so the first step describes the relationship to the gene
-                    sources.add(relationship_source)
+                    source_codes.add(relationship_source)
 
                 sources = list()
-                if OntologyImportSource.PANEL_APP_AU in sources:
+                # these are the only sources we care about?
+                if OntologyImportSource.PANEL_APP_AU in source_codes:
                     sources.append("PanelAPP AU")
-                if OntologyImportSource.MONDO in sources:
+                if OntologyImportSource.MONDO in source_codes:
                     sources.append("MONDO")
-                if OntologyImportSource.HPO in sources:
+                if OntologyImportSource.HPO in source_codes:
                     sources.append("Entrez")
 
                 scores.append(OntologyMatch.Score(
@@ -214,15 +215,12 @@ class OntologyMatching:
         if gene_symbol := self.gene_symbol:
             update_gene_relations(gene_symbol)  # make sure panel app AU is up to date
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
-            seen_gene_relationships: Set[OntologyService] = set()  # if MONDO:123456 relates to OMIM:64454 via two different ways, we don't care
-            # only care about the relationship to the gene
+                        # only care about the relationship to the gene
             for snake in snakes:
                 gene_relation = snake.show_steps()[0].relation
-                if gene_relation not in seen_gene_relationships:
-                    seen_gene_relationships.add(gene_relation)
-                    mondo_term = snake.leaf_term
-                    mondo_meta = self.find_or_create(mondo_term.id)
-                    mondo_meta.gene_relationships.append(snake)
+                mondo_term = snake.leaf_term
+                mondo_meta = self.find_or_create(mondo_term.id)
+                mondo_meta.gene_relationships.append(snake)
 
     def select_term(self, term: str):
         self.find_or_create(term).selected = True

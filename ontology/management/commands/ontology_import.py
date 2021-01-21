@@ -92,12 +92,12 @@ def load_mondo(filename: str, force: bool):
 
         print("** Reviewing Nodes")
         for node in graph.get("nodes", []):
-            #if node.get("type") == "CLASS":
 
             if node_id_full := node.get("id"):
                 term = TermId(node_id_full)
                 if term.type == "MONDO":
                     full_id = term.id
+                    node_to_mondo[node_id_full] = full_id
 
                     if meta := node.get("meta"):
                         label = node.get("lbl")
@@ -124,14 +124,17 @@ def load_mondo(filename: str, force: bool):
 
                         synonym_set = set()
                         if synonyms := meta.get("synonyms"):
-                            # TODO fix copy and paste code below
+
+                            # only allow 1 relationship between any 2 terms (though DB does allow more)
+                            # storing all of them would be more "accurate" but gets in the way of our usage
+                            # prioritise relationships as EXACT, RELATED, related terms, XREF
                             for synonym in synonyms:
                                 pred = synonym.get("pred")
                                 if pred == "hasExactSynonym":
                                     # val = synonym.get("val")
                                     for xref in synonym.get("xrefs", []):
                                         xref_term = TermId(xref)
-                                        if xref_term.type in {"HP", "OMIM"} and not xref_term.id:
+                                        if xref_term.type in {"HP", "OMIM"}:
                                             ontology_builder.add_term(
                                                 term_id=xref,
                                                 name=label,
@@ -145,6 +148,7 @@ def load_mondo(filename: str, force: bool):
                                             )
                                             synonym_set.add(xref)
 
+                            # look at related synonyms second, if we have RELATED, don't bother with any other relationships
                             for synonym in synonyms:
                                 pred = synonym.get("pred")
                                 if pred == "hasRelatedSynonym":
@@ -164,24 +168,18 @@ def load_mondo(filename: str, force: bool):
                                                 relation=OntologyRelation.RELATED
                                             )
                                             synonym_set.add(xref_term.id)
-
-                        # for synonym in meta.get("synonyms", []):
-                        #    synonym_value = synonym.get("val")
-                        # if synonym_value:
-                        #    synonyms.append(synonym_value)
-                        #    genes_mentioned = genes_mentioned.union(set(GENE_SYMBOL_SEARCH.findall(synonym_value)))
-                        node_to_mondo[node_id_full] = full_id
+                        #end synonymns
 
                         for bp in meta.get("basicPropertyValues", []):
                             val = TermId(bp.get("val"))
-                            if val.type in {"HP", "OMIM"}:
+                            if val.type in {"HP", "OMIM"} and not val.id in synonym_set:
                                 pred = bp.get("pred")
                                 pred = MATCH_TYPES.get(pred, pred)
 
                                 ontology_builder.add_term(
                                     term_id=val.id,
                                     name=label,
-                                    definition=f"Name copied from synonym {full_id}",
+                                    definition=f"Name copied from {pred} synonym {full_id}",
                                     primary_source=False
                                 )
                                 ontology_builder.add_ontology_relation(
@@ -189,6 +187,7 @@ def load_mondo(filename: str, force: bool):
                                     dest_term_id=val.id,
                                     relation=pred
                                 )
+                            synonym_set.add(val.id)
 
                         if xrefs := meta.get("xrefs"):
                             for xref in xrefs:
@@ -197,7 +196,7 @@ def load_mondo(filename: str, force: bool):
                                     ontology_builder.add_term(
                                         term_id=val.id,
                                         name=label,
-                                        definition=f"Name copied from synonym {full_id}",
+                                        definition=f"Name copied from xref synonym {full_id}",
                                         primary_source=False
                                     )
                                     ontology_builder.add_ontology_relation(
@@ -216,7 +215,6 @@ def load_mondo(filename: str, force: bool):
                         primary_source=False
                     )
                     node_to_hgnc_id[node_id_full] = term.id
-
 
         print("** Reviewing axioms")
         if axioms := graph.get("logicalDefinitionAxioms"):
