@@ -3,6 +3,7 @@
 from django.db import migrations, models
 import django.db.models.deletion
 
+
 def _gene_to_gene_symbol(apps, schema_editor):
     PathologyTestGeneModificationRequest = apps.get_model("pathtests", "PathologyTestGeneModificationRequest")
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")

@@ -2,17 +2,18 @@ from typing import Dict
 
 from rest_framework import serializers
 
-from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, PhenotypeNode, PhenotypeNodeOMIM, \
-    PhenotypeNodeHPO, BuiltInFilterNode, ClassificationsNode, DamageNode, ExpressionNode, VennNode, ZygosityNode, \
+from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, PhenotypeNode, BuiltInFilterNode, \
+    ClassificationsNode, DamageNode, ExpressionNode, VennNode, ZygosityNode, TrioNode, CohortNode, PedigreeNode, \
     TissueNode, SelectedInParentNode, SampleNode, PopulationNode, PopulationNodeGnomADPopulation, GeneListNode, \
     IntersectionNode, GeneListNodeGeneList, Analysis, AlleleFrequencyNode, AllVariantsNode, TagNode, MergeNode, \
-    TrioNode, CohortNode, PedigreeNode
+    PhenotypeNodeOntologyTerm
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
     NodeWiki
 from annotation.serializers import HPOSynonymSerializer, MIMMorbidAliasSerializer
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
+from ontology.serializers import OntologyTermSerializer
 
 
 class NodeAlleleFrequencyRangeSerializer(serializers.ModelSerializer):
@@ -199,43 +200,30 @@ class PedigreeNodeSerializer(AnalysisNodeSerializer):
         fields = _analysis_node_fields(model)
 
 
-class PhenotypeNodeHPOSerializer(serializers.ModelSerializer):
-    hpo_synonym = HPOSynonymSerializer()
+class PhenotypeNodeOntologyTermSerializer(serializers.ModelSerializer):
+    ontology_term = OntologyTermSerializer()
 
     class Meta:
-        model = PhenotypeNodeHPO
-        fields = "__all__"
-
-
-class PhenotypeNodeOMIMSerializer(serializers.ModelSerializer):
-    mim_morbid_alias = MIMMorbidAliasSerializer()
-
-    class Meta:
-        model = PhenotypeNodeOMIM
+        model = PhenotypeNodeOntologyTerm
         fields = "__all__"
 
 
 class PhenotypeNodeSerializer(AnalysisNodeSerializer):
-    phenotypenodehpo_set = PhenotypeNodeHPOSerializer(many=True)
-    phenotypenodeomim_set = PhenotypeNodeOMIMSerializer(many=True)
+    phenotypenodeontology_set = PhenotypeNodeOntologyTermSerializer(many=True)
 
     class Meta(AnalysisNodeSerializer.Meta):
         model = PhenotypeNode
         fields = _analysis_node_fields(model) + ["phenotypenodehpo_set", "phenotypenodeomim_set"]
 
     def create(self, validated_data):
-        phenotypenodehpo_set = validated_data.pop('phenotypenodehpo_set')
-        phenotypenodeomim_set = validated_data.pop('phenotypenodeomim_set')
+        phenotypenodeontology_set = validated_data.pop('phenotypenodeontology_set')
 
         node = super().create(validated_data)
 
-        for hpo_data in phenotypenodehpo_set:
-            print(f"hpo_data: {hpo_data}")
-            # PhenotypeNodeHPO.objects.create(phenotype_node=node, **hpo_data)
+        for ontology_data in phenotypenodeontology_set:
+            print(f"ontology_data: {ontology_data}")
+            PhenotypeNodeOntologyTerm.objects.create(phenotype_node=node, **ontology_data)
 
-        for omim_data in phenotypenodeomim_set:
-            print(f"omim_data: {omim_data}")
-            #PhenotypeNodeOMIM.objects.create(phenotype_node=node, **omim_data)
         return node
 
 

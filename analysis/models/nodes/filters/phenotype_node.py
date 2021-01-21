@@ -8,9 +8,7 @@ import logging
 import operator
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.models import VariantTranscriptAnnotation
-from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, \
-    MIMMorbidAlias
+from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import Gene, GeneSymbol
 from patients.models import Patient
 
@@ -68,29 +66,13 @@ class PhenotypeNode(AnalysisNode):
     def modifies_parents(self):
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
             return self.patient.get_gene_qs().exists()
-        return self.text_phenotype or self.phenotypenodehpo_set.exists() or self.phenotypenodeomim_set.exists()
-
-    def get_mim_qs(self):
-        mim_ids = set()
-
-        def add_mims(p_set, rel_path):
-            """ Adds to set but also filters for None """
-            values_qs = p_set.filter(**{rel_path + "__isnull": False}).values_list(rel_path, flat=True)
-            mim_ids.update(values_qs)
-
-        add_mims(self.phenotypenodehpo_set, "hpo_synonym__hpo__phenotypemim__mim_morbid")
-        add_mims(self.phenotypenodeomim_set, "mim_morbid_alias__mim_morbid")
-
-        if mim_ids:
-            return MIMMorbid.objects.filter(pk__in=mim_ids)
-        return MIMMorbid.objects.none()
+        return self.text_phenotype or self.phenotypenodeontologyterm_set.exists()
 
     def get_gene_qs(self):
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
             return self.patient.get_gene_qs()
-        mim_morbid_qs = self.get_mim_qs()
-        if mim_morbid_qs:
-            return Gene.objects.filter(mimgene__mim_morbid__in=mim_morbid_qs)
+
+        # TODO: Implement this
 
         return Gene.objects.none()
 
@@ -177,15 +159,11 @@ class PhenotypeNode(AnalysisNode):
         return name
 
     def save_clone(self):
-        phenotype_hpo_terms = list(self.phenotypenodehpo_set.all())
-        phenotype_omim_terms = list(self.phenotypenodeomim_set.all())
+        phenotype_ontology_terms = list(self.phenotypenodeontologyterm_set.all())
 
         copy = super().save_clone()
-        for phenotype_hpo in phenotype_hpo_terms:
-            copy.phenotypenodehpo_set.create(hpo_synonym=phenotype_hpo.hpo_synonym)
-
-        for phenotype_omim in phenotype_omim_terms:
-            copy.phenotypenodeomim_set.create(mim_morbid_alias=phenotype_omim.mim_morbid_alias)
+        for phenotype_ot in phenotype_ontology_terms:
+            copy.phenotypenodeontologyterm_set.create(ontology_term=phenotype_ot.ontology_term)
         return copy
 
     @staticmethod
@@ -193,11 +171,9 @@ class PhenotypeNode(AnalysisNode):
         return "Phenotype"
 
 
-class PhenotypeNodeHPO(models.Model):
+class PhenotypeNodeOntologyTerm(models.Model):
     phenotype_node = models.ForeignKey(PhenotypeNode, on_delete=CASCADE)
-    hpo_synonym = models.ForeignKey(HPOSynonym, on_delete=CASCADE)
+    ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
 
-
-class PhenotypeNodeOMIM(models.Model):
-    phenotype_node = models.ForeignKey(PhenotypeNode, on_delete=CASCADE)
-    mim_morbid_alias = models.ForeignKey(MIMMorbidAlias, on_delete=CASCADE)
+    class Meta:
+        unique_together = ("phenotype_node", "ontology_term")
