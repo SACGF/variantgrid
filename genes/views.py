@@ -1,6 +1,6 @@
 import uuid
 from collections import defaultdict
-from typing import Tuple
+from typing import Tuple, List
 
 from django.conf import settings
 from django.contrib import messages
@@ -35,7 +35,7 @@ from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict
-from ontology.models import OntologySnake, OntologyService
+from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
 from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
 from snpdb.models.models_genome import GenomeBuild
@@ -112,15 +112,11 @@ def view_gene(request, gene_id):
     return render(request, "genes/view_gene.html", context)
 
 
-def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
+def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
     omim_and_hpo_for_gene = []
-    seen_omim = set()
-    for snake in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM):
-        omim = snake.leaf_term
-        if omim not in seen_omim:
-            seen_omim.add(omim)
-            hpo_list = [hpo_snake.leaf_term for hpo_snake in OntologySnake.snake_from(omim, OntologyService.HPO)]
-            omim_and_hpo_for_gene.append((omim, hpo_list))
+    for omim in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=0).leafs(): # direct links only
+        hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
+        omim_and_hpo_for_gene.append((omim, hpo_list))
     return omim_and_hpo_for_gene
 
 

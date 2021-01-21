@@ -132,6 +132,11 @@ class OntologyTerm(TimeStampedModel):
     class Meta:
         unique_together = ("ontology_service", "index")
 
+    def __lt__(self, other):
+        if self.ontology_service != other.ontology_service:
+            return self.ontology_service < other.ontology_service
+        return self.index < other.index
+
     def get_absolute_url(self):
         return reverse('ontology_term', kwargs={"term": self.url_safe_id})
 
@@ -360,13 +365,13 @@ class OntologySnake:
 
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
-    def snake_from(term: OntologyTerm, to_ontology: OntologyService, max_depth: int = 1) -> List['OntologySnake']:
+    def snake_from(term: OntologyTerm, to_ontology: OntologyService, max_depth: int = 1) -> 'OntologySnakes':
         """
         Returns the smallest snake/paths from source term to the desired OntologyService
         Ignores IS_A paths
         """
         if term.ontology_service == to_ontology:
-            return [OntologySnake(source_term=term)]
+            return OntologySnakes([OntologySnake(source_term=term)])
 
         seen: Set[OntologyTerm] = set()
         seen.add(term)
@@ -393,19 +398,19 @@ class OntologySnake:
                         if other_term.ontology_service == to_ontology:
                             valid_snakes.append(new_snake)
                             continue
-                        elif len(new_snake.paths) <= max_depth:
+                        elif len(new_snake.paths) < max_depth:
                             new_snakes.append(new_snake)
                         seen.add(other_term)
-        return valid_snakes
+        return OntologySnakes(valid_snakes)
 
     @staticmethod
-    def terms_for_gene_symbol(gene_symbol: GeneSymbol, desired_ontology: OntologyService) -> List['OntologySnake']:
+    def terms_for_gene_symbol(gene_symbol: GeneSymbol, desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
         """
         Important, this will NOT trigger PanelApp, to do that first call
         panel_app_ontology.update_gene_relations
         """
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
-        return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology)
+        return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology, max_depth=max_depth)
 
     @staticmethod
     def gene_symbols_for_term(term: Union[OntologyTerm, str]) -> QuerySet:
@@ -416,3 +421,20 @@ class OntologySnake:
         gene_symbol_snakes = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
         gene_symbol_names = [snake.leaf_term.name for snake in gene_symbol_snakes]
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
+
+
+class OntologySnakes:
+
+    def __init__(self, snakes: List[OntologySnake]):
+        self.snakes = snakes
+
+    def __iter__(self):
+        return self.snakes.__iter__()
+
+    def __len__(self):
+        return len(self.snakes)
+
+    def leafs(self) -> Set[OntologyTerm]:
+        items = list(set([snake.leaf_term for snake in self]))
+        items.sort()
+        return items
