@@ -5,7 +5,7 @@ import django.db.models.deletion
 
 
 def _one_off_delete_clingen_disease_validity(apps, schema_editor):
-    # Delete this, will be re-loaded when visiting annotation page
+    # Will cascade delete diseasevalidity - will be re-loaded when visiting annotation page
     CachedWebResource = apps.get_model("annotation", "CachedWebResource")
     CachedWebResource.objects.filter(name="ClinGenDiseaseValidity").delete()
 
@@ -18,6 +18,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(_one_off_delete_clingen_disease_validity),
         migrations.AlterUniqueTogether(
             name='monarchdiseaseontologygenerelationship',
             unique_together=None,
@@ -64,5 +65,4 @@ class Migration(migrations.Migration):
         migrations.DeleteModel(
             name='MonarchDiseaseOntologyMIMMorbid',
         ),
-        migrations.RunPython(_one_off_delete_clingen_disease_validity)
     ]
