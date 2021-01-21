@@ -10,7 +10,7 @@ from django.db import transaction
 
 from annotation.models import HPOSynonymScope
 from library.file_utils import file_md5sum
-from ontology.models import OntologyService, OntologyRelation, OntologyTerm
+from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 
@@ -75,7 +75,7 @@ def load_mondo(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="mondo_file",
-        ontology_service=OntologyService.MONDO,
+        import_source=OntologyService.MONDO,
         force_update=force,
         processor_version=2)
 
@@ -288,7 +288,7 @@ def load_hpo(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="hpo_file",
-        ontology_service=OntologyService.HPO,
+        import_source=OntologyImportSource.HPO,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -344,7 +344,7 @@ def load_hpo_disease(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="hpo_disease",
-        ontology_service=OntologyService.HPO,
+        import_source=OntologyImportSource.HPO,
         processor_version=4,
         force_update=force)
     file_hash = file_md5sum(filename)

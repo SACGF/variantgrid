@@ -6,7 +6,7 @@ from typing import Union
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
 from library.utils import md5sum_str
-from ontology.models import OntologyService, OntologyTerm, OntologyRelation
+from ontology.models import OntologyService, OntologyTerm, OntologyRelation, OntologyImportSource
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 
@@ -20,7 +20,7 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
     filename = panel_app.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
     hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
 
-    ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol), ontology_service=OntologyService.PANEL_APP_AU)
+    ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol), import_source=OntologyImportSource.PANEL_APP_AU)
     try:
         ontology_builder.ensure_old(max_age=timedelta(days=settings.PANEL_APP_CACHE_DAYS))
 

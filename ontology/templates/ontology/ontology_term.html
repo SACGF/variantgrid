@@ -32,7 +32,7 @@
                         here yet.</p>
                         {% if not gene_relationships %}-{% endif %}
                         {% for snake in gene_relationships %}
-                            <div>
+                            <div class="mt-2">
                             <span class="text-muted text-monospace">{{ term.id }}</span>
                             {% for step in snake.show_steps %}
                                 <div class="text-center d-inline-block mx-2">{{ step.relation.relation_display }}</div>
@@ -46,11 +46,11 @@
                 {% labelled label="Direct Relationships" %}
                     {% if not relationships %}-{% endif %}
                     {% for relationship in relationships %}
-                        <div>
+                        <div class="mt-2">
                         {% if relationship.source_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.source_term %}{% endif %}
                         <div class="text-center d-inline-block mx-2">{{ relationship.relation_display }}</div>
                         {% if relationship.dest_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.dest_term %}{% endif %}
-                        <span class="text-muted d-inline-block hover-detail" title="Import {{ relationship.from_import.id }}" data-content="Last imported: {{ relationship.from_import.processed_date }}<br/>From: {{ relationship.from_import.filename }}">&nbsp;from import {{ relationship.from_import.id }}</span>
+                            <span class="text-muted d-inline-block hover-detail" title="Import {{ relationship.from_import.id }}" data-content="Last imported: {{ relationship.from_import.processed_date }}<br/>From: {{ relationship.from_import.filename }}">&nbsp;from <span style="word-break: break-all">{{ relationship.from_import.filename }}</span></span>
                         </div>
                     {% endfor %}
                 {% endlabelled %}

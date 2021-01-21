@@ -10,7 +10,7 @@ from django.db.models.functions import Length
 from django.urls import reverse
 from lazy import lazy
 
-from ontology.models import OntologyTerm, OntologyService, OntologySnake
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
 from ontology.panel_app_ontology import update_gene_relations
 
 
@@ -182,20 +182,17 @@ class OntologyMatching:
 
             if gene_symbol := self.gene_symbol:
                 # TODO work out if we want to apply different scores to different matches
-                contexts = set()
-                services = set()
+                sources = set()
                 for snake in match.gene_relationships:
-                    relationship_source = snake.show_steps()[0].relation.from_import  # remember these steps are from gene to term, so the first step describes the relationship to the gene
-                    contexts.add(relationship_source.context)
-                    services.add(relationship_source.ontology_service)
+                    relationship_source = snake.show_steps()[0].relation.from_import.import_source  # remember these steps are from gene to term, so the first step describes the relationship to the gene
+                    sources.add(relationship_source)
 
                 sources = list()
-                # TODO fix up this data in the from_import table so we don't have to check sources and contexts
-                if OntologyService.PANEL_APP_AU in services:
+                if OntologyImportSource.PANEL_APP_AU in sources:
                     sources.append("PanelAPP AU")
-                if "mondo_file" in contexts:
+                if OntologyImportSource.MONDO in sources:
                     sources.append("MONDO")
-                if "hpo_disease" in contexts:
+                if OntologyImportSource.HPO in sources:
                     sources.append("Entrez")
 
                 scores.append(OntologyMatch.Score(

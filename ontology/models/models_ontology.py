@@ -1,7 +1,7 @@
 import functools
 import re
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Set, Union, Tuple
+from typing import Optional, List, Dict, Set, Union
 
 from django.db import models
 from django.db.models import PROTECT, CASCADE, QuerySet, Q
@@ -15,13 +15,19 @@ from library.utils import Constant
 A series of models that currently stores the combination of MONDO, OMIM, HPO & HGNC.
 (Note that HGNC is included just to model relationships, please use GeneSymbol for all your GeneSymbol needs).
 """
+class OntologyImportSource:
+    PANEL_APP_AU = "PAAU"
+    MONDO = "MONDO"
+    OMIM = "OMIM"
+    HPO = "HP"
+    HGNC = "HGNC"
+
 
 class OntologyService(models.TextChoices):
     MONDO = "MONDO", "MONDO"
     OMIM = "OMIM", "OMIM"
     HPO = "HP", "HP"
     HGNC = "HGNC", "HGNC"
-    PANEL_APP_AU = "PAAU", "PanelApp AU"  # Not used as an ontology, but just as a source of imports
 
     EXPECTED_LENGTHS: Dict[str, int] = Constant({
         MONDO[0]: 7,
@@ -74,7 +80,8 @@ class OntologyRelation:
     DISPLAY_NAMES = {
         IS_A: "is a",
         ALL_FREQUENCY: "frequently occurs with",
-        ENTREZ_ASSOCIATION: "has an associated gene of"
+        ENTREZ_ASSOCIATION: "has an associated gene of",
+        PANEL_APP_AU: "PanelApp AU association"
     }
 
     """
@@ -94,7 +101,7 @@ class OntologyImport(TimeStampedModel):
     Keeps track of when data was imported, typically used to see how old the data is and if it needs
     to be imported again
     """
-    ontology_service = models.CharField(max_length=5, choices=OntologyService.choices)
+    import_source = models.TextField()
     filename = models.TextField()
     context = models.TextField()
     hash = models.TextField()
@@ -199,19 +206,26 @@ class OntologyTerm(TimeStampedModel):
         if len(parts) != 2:
             raise ValueError(f"Can not convert {id_str} to a proper id")
 
-        prefix = OntologyService(parts[0])
-        num_part = int(parts[1])
-        clean_id = OntologyService.index_to_id(prefix, num_part)
+        prefix = OntologyService(parts[0].strip())
+        postfix = parts[1].strip()
+        try:
+            num_part = int(postfix)
+            clean_id = OntologyService.index_to_id(prefix, num_part)
 
-        if existing := OntologyTerm.objects.filter(id=clean_id).first():
-            return existing
+            if existing := OntologyTerm.objects.filter(id=clean_id).first():
+                return existing
 
-        return OntologyTerm(
-            id=clean_id,
-            ontology_service=prefix,
-            index=num_part,
-            name="Not stored locally"
-        )
+            return OntologyTerm(
+                id=clean_id,
+                ontology_service=prefix,
+                index=num_part,
+                name="Not stored locally"
+            )
+        except ValueError:
+            if existing := OntologyTerm.objects.filter(ontology_service=prefix, name=postfix).first():
+                return existing
+            else:
+                raise ValueError(f"Can not convert {id_str} to a proper id")
 
     @property
     def padded_index(self) -> str:
@@ -348,7 +362,7 @@ class OntologySnake:
         Ignores IS_A paths
         """
         if term.ontology_service == to_ontology:
-            return OntologySnake(source_term=term)
+            return [OntologySnake(source_term=term)]
 
         seen: Set[OntologyTerm] = set()
         seen.add(term)

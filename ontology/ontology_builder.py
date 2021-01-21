@@ -46,7 +46,7 @@ class OntologyBuilder:
         STUB = 1
         DETAILED = 2
 
-    def __init__(self, filename: str, context: str, ontology_service: OntologyService, processor_version: int = 1, force_update: bool = False):
+    def __init__(self, filename: str, context: str, import_source: str, processor_version: int = 1, force_update: bool = False):
         """
         :filename: Name of the resource used, only used for logging purposes
         :context: In what context are we inserting records (e.g. full file context, or partial panel app)
@@ -55,14 +55,14 @@ class OntologyBuilder:
         """
         self.start = datetime.now()
         self.duration = None
-        self.filename = filename.split("/")[-1]
-        self.ontology_service = ontology_service
+        self.filename = filename if ':' in filename else filename.split("/")[-1]
+        self.import_source = import_source
         self.context = context
         self.processor_version = processor_version
         self.data_hash = None
         self.force_update = force_update
 
-        self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(ontology_service=ontology_service, context=context, completed=True).order_by('-modified').first()
+        self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(import_source=import_source, context=context, completed=True).order_by('-modified').first()
         if self.previous_import and self.previous_import.processor_version != self.processor_version:
             self.previous_import = None  # if previous import was done with an older version of the import code, don't count it
 
@@ -96,7 +96,7 @@ class OntologyBuilder:
         """
         if purge_old:
             for model in [OntologyTermRelation, OntologyTerm]:
-                olds = model.objects.filter(from_import__context=self.context, from_import__ontology_service=self.ontology_service).exclude(from_import=self._ontology_import)
+                olds = model.objects.filter(from_import__context=self.context, from_import__import_source=self.import_source).exclude(from_import=self._ontology_import)
                 for old in olds[0:3]:
                     print(f"This appears stale: {old}")
 
@@ -119,7 +119,7 @@ class OntologyBuilder:
     @lazy
     def _ontology_import(self) -> OntologyImport:
         return OntologyImport.objects.create(
-            ontology_service=self.ontology_service,
+            import_source=self.import_source,
             context=self.context,
             filename=self.filename,
             processed_date=now,
@@ -162,7 +162,7 @@ class OntologyBuilder:
         if not primary_source:
             if existing := OntologyTerm.objects.filter(id=term_id).first():
                 existing_import = existing.from_import
-                if existing_import.context != self.context or existing_import.ontology_service != self.ontology_service:
+                if existing_import.context != self.context or existing_import.import_source != self.import_source:
                     # record was imported by a different process, so leave it alone
                     # e.g. it was imported via an OMIM import but we're just referencing a stub value
                     # now from a MONDO import.

@@ -38,7 +38,7 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
 HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":(c|g|p)\..*\d+")
-ONTOLOGY_PATTERN = re.compile(r"\w+:[0-9]+")
+ONTOLOGY_PATTERN = re.compile(r"\w+:.*")
 
 class AbstractMetaVariant:
 
