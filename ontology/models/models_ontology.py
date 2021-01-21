@@ -8,7 +8,8 @@ from django.db.models import PROTECT, CASCADE, QuerySet, Q
 from django.urls import reverse
 from model_utils.models import TimeStampedModel, now
 
-from genes.models import GeneSymbol, HGNCGeneNames
+from genes.gene_matching import HGNCMatcher
+from genes.models import GeneSymbol
 from library.utils import Constant
 
 """
@@ -21,6 +22,7 @@ class OntologyImportSource:
     OMIM = "OMIM"
     HPO = "HP"
     HGNC = "HGNC"
+
 
 
 class OntologyService(models.TextChoices):
@@ -160,7 +162,9 @@ class OntologyTerm(TimeStampedModel):
             return gene_ontology
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, extra__aliases__contains=gene_symbol).first():
             return gene_ontology
-        if hgnc := HGNCGeneNames.objects.filter(gene_symbol_id=gene_symbol).first():
+
+        hgnc_matcher = HGNCMatcher.instance()
+        if hgnc := hgnc_matcher.match_hgnc(gene_symbol):
             if hgnc_term := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, index=hgnc.id).first():
                 # we found an Ontology Term for HGNC, but the ID is already in use for another sybmol
                 # prioritise the name as defined by HGNCGeneNames but keep the other names in the aliases

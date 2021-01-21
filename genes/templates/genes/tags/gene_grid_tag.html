@@ -1573,9 +1573,9 @@ function clinGenCellInit(cell, gene_symbol) {
                     let classification = diseaseValidity["classification"];
                     let date = diseaseValidity["date"];
                     let gene_validity_summary_url = diseaseValidity["gene_validity_summary_url"];
-                    let mondo = diseaseValidity["mondo"];
-                    let diseaseName = mondo["name"];
-                    let diseaseDescription = mondo["description"];
+                    let ontologyTerm = diseaseValidity["ontology_term"];
+                    let diseaseName = ontologyTerm["name"];
+                    let diseaseDescription = ontologyTerm["definition"];
                     let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ":");
                     diseaseSpan.attr("title", diseaseDescription);
                     let dvSpan = $("<span />").addClass("disease-validity");

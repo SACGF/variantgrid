@@ -3,19 +3,22 @@ from io import StringIO
 import logging
 import requests
 
-from annotation.models import MonarchDiseaseOntology, DiseaseValidity
+from annotation.models import DiseaseValidity
 from annotation.models.models import GeneDiseaseValidity, GeneDiseaseCurator
 from annotation.models.models_enums import ClinGenClassification
 from library.utils import invert_dict
 import pandas as pd
+
+from ontology.models import OntologyTerm, OntologyService
 
 
 def store_clingen_gene_validity_curations_from_web(cached_web_resource):
     """ Gets latest copy, maps MONDO -> HPO / OMIM terms """
     CLINGEN_DISEASE_HOST_NAME = "https://search.clinicalgenome.org"
     CLINGEN_DISEASE_CSV_URL = f"{CLINGEN_DISEASE_HOST_NAME}/kb/gene-validity.csv"
-    if not MonarchDiseaseOntology.objects.exists():
-        msg = "No MonarchDiseaseOntology records, you need to import them - see the annotation page."
+
+    if not OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO).exists():
+        msg = "No MONDO OntologyTerm records, you need to import them - see the annotation page."
         raise ValueError(msg)
 
     # clingen (grch38) to hg19 genes
@@ -34,12 +37,12 @@ def store_clingen_gene_validity_curations_from_web(cached_web_resource):
         genes_set.add(gene_symbol)
         classification = row['CLASSIFICATION']
         classification = clingen_disease_validity_lookup[classification]
-        mondo_id = row['DISEASE ID (MONDO)'].replace("MONDO_", "")
+        mondo_id = row['DISEASE ID (MONDO)'].replace("MONDO_", "MONDO:")
         try:
-            mondo = MonarchDiseaseOntology.objects.get(pk=mondo_id)
-        except MonarchDiseaseOntology.DoesNotExist:
-            mondo = None
-            logging.error("Could not load mondo_id '%s' - perhaps update your Monarch Disease Ontology annotations?", mondo_id)
+            ontology_term = OntologyTerm.objects.get(pk=mondo_id)
+        except OntologyTerm.DoesNotExist:
+            ontology_term = None
+            logging.error("Could not load '%s' - perhaps update your Monarch Disease Ontology annotations?", mondo_id)
 
         # Some entries in "CLASSIFICATION DATE" are "false" (WTF?)
         # handle them, but also handle any other non-date that may turn up in the future
@@ -52,7 +55,7 @@ def store_clingen_gene_validity_curations_from_web(cached_web_resource):
                 logging.warning("Couldn't parse classification date '%s': %s", classification_date_str, e)
         disease_validity = DiseaseValidity.objects.create(gene_disease_curator=clingen_curator,
                                                           sop=row['SOP'],
-                                                          mondo=mondo,
+                                                          ontology_term=ontology_term,
                                                           classification=classification,
                                                           date=classification_date,
                                                           validity_summary_url=row['ONLINE REPORT'])

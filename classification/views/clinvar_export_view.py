@@ -1,21 +1,12 @@
-from collections import defaultdict
-from typing import Set, Dict, Any, Union, List
+from typing import Dict, Any
 
-from django.contrib import messages
-from django.db.models import QuerySet
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render
 from guardian.shortcuts import get_objects_for_user
 from gunicorn.config import User
 
-from annotation.models import MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology
-from classification.enums import SpecialEKeys
-from classification.models import ClinVarExport, EvidenceKeyMap, MultiCondition, ConditionTextMatch
-from classification.regexes import db_ref_regexes
-from library.log_utils import report_exc_info
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, BaseDatatableView
+from classification.models import ClinVarExport, EvidenceKeyMap, ConditionTextMatch
+from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
-
-Ontology = Union[MonarchDiseaseOntology, MIMMorbid, HumanPhenotypeOntology]
 
 class ClinVarExportColumns(DatatableConfig):
 
@@ -85,7 +76,6 @@ class ClinVarExportColumns(DatatableConfig):
     def __init__(self, request):
         super().__init__(request)
 
-        self.ontology_dict: Dict[str, Ontology] = dict()
         evidence_keys = EvidenceKeyMap.cached()
 
         self.rich_columns = [

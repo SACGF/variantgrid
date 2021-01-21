@@ -2,10 +2,11 @@ from rest_framework import serializers
 
 from annotation.models.models import EnsemblGeneAnnotationVersion, \
     EnsemblGeneAnnotation, VariantAnnotationVersion, VariantAnnotation, \
-    DiseaseValidity, MonarchDiseaseOntology
+    DiseaseValidity
 from annotation.models.models_mim_hpo import HumanPhenotypeOntology, HPOSynonym, \
     MIMMorbid, MIMMorbidAlias
 from genes.serializers import GeneSerializer
+from ontology.serializers import OntologyTermSerializer
 from snpdb.serializers import VariantSerializer
 
 
@@ -22,13 +23,6 @@ class EnsemblGeneAnnotationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EnsemblGeneAnnotation
-        fields = '__all__'
-
-
-class MonarchDiseaseOntologySerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = MonarchDiseaseOntology
         fields = '__all__'
 
 
@@ -63,11 +57,9 @@ class MIMMorbidAliasSerializer(serializers.ModelSerializer):
 
 
 class DiseaseValiditySerializer(serializers.ModelSerializer):
-    mondo = MonarchDiseaseOntologySerializer()
+    ontology_term = OntologyTermSerializer()
     classification = serializers.SerializerMethodField()
     gene_disease_curator = serializers.StringRelatedField()
-    hpo_synonym = HPOSynonymSerializer()
-    mim_morbid_alias = MIMMorbidAliasSerializer()
 
     class Meta:
         model = DiseaseValidity

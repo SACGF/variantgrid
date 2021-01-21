@@ -1,18 +1,5 @@
 {% if gene_symbol.genediseasevalidity_set.exists %}
 {% load static %}
-<style>
-.column-icon {
-    width: 40px;
-    height: 40px;
-    background-size: 40px 40px;
-    margin: auto;
-    float: left;
-}
-
-.clingen-icon {
-    margin-right: 20px;
-}
-</style>
 <div class='gene-disease card'>
     <div class="card-header">
         Gene / Disease associations
@@ -22,7 +9,7 @@
             <ul class='list-group'>
                 {% for dvg in gene_symbol.genediseasevalidity_set.all %}
                     <a href='{{ dvg.disease_validity.validity_summary_url }}' class="list-group-item list-group-action">
-                        <b>{{ dvg.disease_validity.mondo.name }}</b> {% if dvg.disease_validity.mondo.description %}({{ dvg.disease_validity.mondo.description }}){% endif %} - {{ dvg.disease_validity.get_classification_display }}. ({{ dvg.disease_validity.sop }}, {{ dvg.disease_validity.date }})
+                        <b>{{ dvg.disease_validity.ontology_term.name }}</b> {% if dvg.disease_validity.ontology_term.definition %}({{ dvg.disease_validity.ontology_term.definition }}){% endif %} - {{ dvg.disease_validity.get_classification_display }}. ({{ dvg.disease_validity.sop }}, {{ dvg.disease_validity.date }})
                     </a>
                 {% endfor %}
             </ul>

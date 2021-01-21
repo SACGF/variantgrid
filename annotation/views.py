@@ -24,7 +24,7 @@ from annotation.citations import get_citations, CitationDetails
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     EnsemblGeneAnnotationVersion, EnsemblGeneAnnotationVersionDiff, VariantAnnotationVersionDiff, MIMGene
-from annotation.models.models import ClinVarCitation, CachedCitation, MonarchDiseaseOntology, \
+from annotation.models.models import ClinVarCitation, CachedCitation, \
     CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation
 from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_mim_hpo import MIMMorbid, MIMMorbidAlias, \
@@ -149,9 +149,6 @@ def _get_build_annotation_details(build_contigs, genome_build):
 def annotation(request):
     # Set Variables to None for uninstalled components, the template will show installation instructions
     ensembl_biomart_transcript_genes = None
-    mim_import = None
-    human_phenotype_ontology_import = None
-    mondo_import = None
     hgnc_gene_symbols_import = None
     diagnostic_gene_list = None
 
@@ -168,25 +165,6 @@ def annotation(request):
     gene_symbol_alias_counts = get_field_counts(GeneSymbolAlias.objects.all(), "source")
     if gene_symbol_alias_counts:
         gene_symbol_alias_counts = {GeneSymbolAliasSource(k).label: v for k, v in gene_symbol_alias_counts.items()}
-
-    # These are deprecated, but still report them until all code has moved on
-
-    mim_counts = MIMMorbid.objects.all().count()
-    mim_alias_counts = MIMMorbidAlias.objects.all().count()
-    mim_gene_counts = MIMGene.objects.count()
-
-    if all([mim_counts, mim_alias_counts, mim_gene_counts]):
-        mim_import = f"MIM records: {mim_counts}, Aliases: {mim_alias_counts}, Genes: {mim_gene_counts}"
-
-    hpo_count = HumanPhenotypeOntology.objects.count()  # @UndefinedVariable
-    hpo_synonym_count = HPOSynonym.objects.count()
-    hpo_phenotype_count = PhenotypeMIM.objects.count()
-    if hpo_count and hpo_synonym_count and hpo_phenotype_count:
-        human_phenotype_ontology_import = f"{hpo_count} HPO terms ({hpo_synonym_count} synonyms)"
-
-    mondo_count = MonarchDiseaseOntology.objects.all().count()
-    if mondo_count:
-        mondo_import = f"Monarch Disease Ontology: {mondo_count} records."
 
     all_ontologies_accounted_for = True
     ontology_counts = list()
@@ -241,9 +219,6 @@ def annotation(request):
                       all_ontologies_accounted_for,
                       clinvar_citations,
                       hpa_counts > 0,
-                      mim_import,
-                      human_phenotype_ontology_import,
-                      mondo_import,
                       hgnc_gene_symbols_import]
     if somalier_enabled:
         annotations_ok.append(somalier)
@@ -257,9 +232,6 @@ def annotation(request):
     context = {"annotations_all_imported": annotations_all_imported,
                "genome_build_annotations": genome_build_annotations,
                "ensembl_biomart_transcript_genes": ensembl_biomart_transcript_genes,
-               "mim_import": mim_import,
-               "human_phenotype_ontology_import": human_phenotype_ontology_import,
-               "mondo_import": mondo_import,
                "ontology_services": ontology_services,
                "ontology_counts": ontology_counts,
                "ontology_relationship_counts": ontology_relationship_counts,

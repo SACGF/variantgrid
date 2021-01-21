@@ -33,6 +33,7 @@ from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
+from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
@@ -984,40 +985,6 @@ class AnnotationVersion(models.Model):
         return f"{self.pk} ({self.annotation_date.date()})"
 
 
-class MonarchDiseaseOntology(models.Model, OntologyMixin):
-    # PK = Mondo ID
-    PREFIX = "MONDO:"
-    name = models.TextField()
-    definition = models.TextField(null=True)
-
-    @classmethod
-    def expected_length(cls) -> int:
-        return 7
-
-    @property
-    def url(self) -> str:
-        # FIXME redundant to dbregex but don't want to reference that from this file
-        return f"https://vm-monitor.monarchinitiative.org/disease/MONDO:{self.padded_id}"
-
-
-class MonarchDiseaseOntologyGeneRelationship(models.Model):
-    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
-    relationship = models.TextField()
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-
-    class Meta:
-        unique_together = ('mondo', 'relationship', 'gene_symbol')
-
-
-class MonarchDiseaseOntologyMIMMorbid(models.Model):
-    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
-    relationship = models.TextField()
-    omim_id = models.IntegerField()  # could also link this to MIMMorbid records, but that gets out of date
-
-    class Meta:
-        unique_together = ('mondo', 'relationship', 'omim_id')
-
-
 class CachedWebResource(TimeStampedModel):
     """ These are annotations that can populate themselves via the web
 
@@ -1047,14 +1014,15 @@ class GeneDiseaseCurator(models.Model):
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     cached_web_resource = models.ForeignKey(CachedWebResource, null=True, on_delete=CASCADE)  # If from web
 
+    def __str__(self):
+        return self.name
+
 
 class DiseaseValidity(models.Model):
     gene_disease_curator = models.ForeignKey(GeneDiseaseCurator, on_delete=CASCADE)
     text_phenotype = models.TextField(blank=True)
     sop = models.TextField(blank=True)  # ClinGen Gene Clinical Validity SOP
-    mondo = models.ForeignKey(MonarchDiseaseOntology, null=True, on_delete=SET_NULL)
-    hpo_synonym = models.ForeignKey(HPOSynonym, null=True, on_delete=SET_NULL)
-    mim_morbid_alias = models.ForeignKey(MIMMorbidAlias, null=True, on_delete=SET_NULL)
+    ontology_term = models.ForeignKey(OntologyTerm, null=True, on_delete=SET_NULL)
     classification = models.CharField(max_length=1, choices=ClinGenClassification.choices)
     date = models.DateField(null=True)
     validity_summary_url = models.TextField()

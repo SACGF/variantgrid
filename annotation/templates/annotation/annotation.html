@@ -396,57 +396,6 @@ If all the files are in place, the uploads can be triggered by a single command 
 
                     {% endinstall-instructions %}
                 {% endlabelled %}
-
-                {% labelled label="Deprecated Ontology Stats" %}<a class="hover-link" data-toggle="collapse" data-target="#deprecated-ontology">Toggle</a>{% endlabelled %}
-                <div id="deprecated-ontology" class="collapse">
-                    <div class="install-instructions">
-                        The below is data stored in the old ontology tables. Most code should now reference the new ontology tables.
-                    </div>
-                    <hr/>
-                    {% labelled label="(DEPRECATED) OMIM" %}
-                        {% if mim_import %}
-                            {{ mim_import }}
-                        {% else %}
-                            <div class="no-value">Not installed</div>
-                        {% endif %}
-                        {% install-instructions label="(DEPRECATED) OMIM" %}
-                            <ul>
-                                <li>Export: "Gene stable ID", "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="http://www.ensembl.org/biomart/martview/">Ensembl Biomart</a>
-                                    Use (GRC38 version or later as it has aliases) and make sure you tick "unique"
-                                </li>
-                                <li>Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a>.</li>
-                            </ul>
-                            <code>{{ python_command }} manage.py mim_import --biomart ${VARIANTGRID_SETUP_DATA}/mim_biomart.tsv --disease_gene_txt ${VARIANTGRID_SETUP_DATA}/OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt</code>
-                        {% endinstall-instructions %}
-                    {% endlabelled %}
-                    {% labelled label="(DEPRECATED) Human Phenotype Ontology" %}
-                        {% if human_phenotype_ontology_import %}
-                            {{ human_phenotype_ontology_import }}
-                        {% else %}<div class="no-value">Not installed</div>{% endif %}
-                        {% install-instructions label="(DEPRECATED) Human Phenotype Ontology" %}
-                            <ul>
-                            <li>(you may already have this from OMIM above) Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a>.</li>
-                            <li>Get latest Git repo via:
-                                <code>git clone https://github.com/obophenotype/human-phenotype-ontology.git ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology</code>
-                            </ul>
-                            <code>{{ python_command }} manage.py human_phenotype_ontology_import --disease_gene_txt ${VARIANTGRID_SETUP_DATA}/OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt --owl ${VARIANTGRID_SETUP_DATA}/human-phenotype-ontology/hp.owl</code>
-                        {% endinstall-instructions %}
-                    {% endlabelled %}
-                    {% labelled label="(DEPRECATED) Monarch Disease Ontology" %}
-                        {% if mondo_import %}
-                            {{ mondo_import }}
-                        {% else %}
-                            <div class="no-value">Not installed</div>
-                        {% endif %}
-                        {% install-instructions "(DEPRECATED) Monarch Disease Ontology" %}
-                            <ul>
-                            <li>Download mondo.owl from <a href="http://www.obofoundry.org/ontology/mondo.html">Monarch Disease Ontology</a> on OBO foundry.
-                            </ul>
-                            <p>
-                            <code>{{ python_command }} manage.py mondo_import --owl ${VARIANTGRID_SETUP_DATA}/mondo.owl</code>
-                            </p>
-                        {% endinstall-instructions %}
-                    {% endlabelled %}
                     <hr/>
                 </div>
                 {% if somalier_enabled %}
