@@ -1,0 +1,4 @@
+#Format: diseaseId<tab>gene-symbol<tab>gene-id(entrez)<tab>HPO-ID<tab>HPO-term-name
+OMIM:192500	KCNQ1	3784	HP:0001657	Prolonged QT interval
+OMIM:613688	ALG10B	144245	HP:0001657	Prolonged QT interval
+OMIM:613688	KCNH2	3757	HP:0001657	Prolonged QT interval
