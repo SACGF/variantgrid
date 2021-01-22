@@ -1102,7 +1102,7 @@ const VCForm = (function() {
                 let scrollMe = $('.main-content');
                 let scroll = scrollMe.scrollTop();
                 scrollMe.scrollTop(scroll - event.originalEvent.wheelDeltaY);
-                return true;
+                return false;
             });
         },
 
