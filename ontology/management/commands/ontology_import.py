@@ -8,7 +8,7 @@ import pronto
 from django.core.management import BaseCommand
 from django.db import transaction
 
-from annotation.models import HPOSynonymScope
+from annotation.models.models_enums import HPOSynonymScope
 from library.file_utils import file_md5sum
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
