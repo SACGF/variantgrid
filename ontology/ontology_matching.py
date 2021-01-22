@@ -143,19 +143,25 @@ class OntologyMatching:
     def apply_score(self, match: OntologyMatch):
         scores: List[OntologyMatch.Score] = list()
         regular_match = True
+        if match.direct_reference:
+            regular_match = False
+            scores.append(OntologyMatch.Score(
+                name="Directly referenced",
+                unit=1, max=1000, note=""
+            ))
         if match.term.is_stub:
             # Should this be prioritised over direct reference?
             regular_match = False
             scores.append(OntologyMatch.Score(
                 name="No copy of this term in our database",
                 unit=1, max=-100, note=""
-        ))
-        if match.direct_reference:
+            ))
+        if match.term.is_obsolete:
             regular_match = False
             scores.append(OntologyMatch.Score(
-                name="Directly referenced",
-                unit=1, max=1000, note=""
-        ))
+                name="This term is marked as obsolete",
+                unit=1, max=-100, note=""
+            ))
         if regular_match:
             if search_terms := self.search_terms:
                 match_terms = set(tokenize_condition_text(normalize_condition_text(match.term.name))) - SKIP_TERMS
