@@ -84,13 +84,6 @@ class Test(URLTestCase):
         ]
         self._test_urls(GRID_LIST_URLS, self.user)
 
-    def testAutocompleteUrls(self):
-        AUTOCOMPLETE_URLS = [
-            ('mim_morbid_alias_autocomplete', self.mm_alias, {"q": self.mm_alias.name}),
-            ('hpo_synonym_autocomplete', self.hpo_synonym, {"q": self.hpo_synonym.name}),
-        ]
-        self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user, True)
-
 
 if __name__ == "__main__":
     unittest.main()
