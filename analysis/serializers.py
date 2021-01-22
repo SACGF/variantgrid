@@ -209,18 +209,18 @@ class PhenotypeNodeOntologyTermSerializer(serializers.ModelSerializer):
 
 
 class PhenotypeNodeSerializer(AnalysisNodeSerializer):
-    phenotypenodeontology_set = PhenotypeNodeOntologyTermSerializer(many=True)
+    phenotypenodeontologyterm_set = PhenotypeNodeOntologyTermSerializer(many=True)
 
     class Meta(AnalysisNodeSerializer.Meta):
         model = PhenotypeNode
-        fields = _analysis_node_fields(model) + ["phenotypenodehpo_set", "phenotypenodeomim_set"]
+        fields = _analysis_node_fields(model) + ["phenotypenodeontologyterm_set"]
 
     def create(self, validated_data):
-        phenotypenodeontology_set = validated_data.pop('phenotypenodeontology_set')
+        phenotypenodeontologyterm_set = validated_data.pop('phenotypenodeontologyterm_set')
 
         node = super().create(validated_data)
 
-        for ontology_data in phenotypenodeontology_set:
+        for ontology_data in phenotypenodeontologyterm_set:
             print(f"ontology_data: {ontology_data}")
             PhenotypeNodeOntologyTerm.objects.create(phenotype_node=node, **ontology_data)
 

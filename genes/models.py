@@ -726,6 +726,12 @@ class GeneAnnotationRelease(models.Model):
                     gene_annotation_releases.append(vav.gene_annotation_release)
         return gene_annotation_releases
 
+    def genes_for_symbols(self, gene_symbols_qs) -> QuerySet:
+        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=self,
+                                                       release_gene_symbol__gene_symbol__in=gene_symbols_qs)
+        return Gene.objects.filter(pk__in=rgsg_qs.values_list("gene_id", flat=True))
+
+
     def __str__(self):
         return f"{self.genome_build.name}/{self.get_annotation_consortium_display()} - v{self.version}"
 

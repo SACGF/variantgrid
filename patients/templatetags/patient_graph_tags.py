@@ -48,8 +48,8 @@ def patient_phenotypes_graph(graph_width=512, graph_height=384, max_records=20, 
 
 @register.inclusion_tag(MATCHES_GRAPH_TEMPLATE)
 def patient_omim_graph(graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
-    qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HPO)
-    return match_graph("OMIM", qs, "mim_morbid__description", OMIM_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
+    qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
+    return match_graph("OMIM", qs, "name", OMIM_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
 
 
 @register.inclusion_tag(MATCHES_GRAPH_TEMPLATE)

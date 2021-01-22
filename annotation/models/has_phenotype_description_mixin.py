@@ -1,3 +1,8 @@
+from typing import List
+
+from django.db.models import QuerySet
+
+
 class HasPhenotypeDescriptionMixin:
 
     def _get_phenotype_input_text_field(self):
@@ -33,18 +38,18 @@ class HasPhenotypeDescriptionMixin:
             _phenotype_description = None
         return _phenotype_description
 
-    def get_ontology_terms(self):
+    def get_ontology_term_ids(self) -> List[str]:
         if self.phenotype_description:
-            terms = self.phenotype_description.get_ontology_terms()
+            terms = self.phenotype_description.get_ontology_term_ids()
         else:
             terms = []
         return terms
 
-    def get_gene_qs(self):
+    def get_gene_symbols(self) -> QuerySet:
         from genes.models import Gene
 
         if self.phenotype_description:
-            gene_qs = self.phenotype_description.get_gene_qs()
+            gene_qs = self.phenotype_description.get_gene_symbols()
         else:
             gene_qs = Gene.objects.none()
         return gene_qs

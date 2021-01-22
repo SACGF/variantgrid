@@ -9,7 +9,8 @@ import operator
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
-from genes.models import Gene, GeneSymbol
+from genes.models import Gene, GeneSymbol, ReleaseGeneSymbolGene
+from ontology.models import OntologySnake
 from patients.models import Patient
 
 
@@ -64,17 +65,19 @@ class PhenotypeNode(AnalysisNode):
             self.appearance_dirty = True
 
     def modifies_parents(self):
+        return self.text_phenotype or self.get_gene_symbols_qs().exists()
+
+    def get_gene_symbols_qs(self):
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
-            return self.patient.get_gene_qs().exists()
-        return self.text_phenotype or self.phenotypenodeontologyterm_set.exists()
+            gene_symbols_qs = self.patient.get_gene_symbols()
+        else:
+            ontology_term_ids = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
+            gene_symbols_qs = OntologySnake.special_case_gene_symbols_for_terms(ontology_term_ids)
+        return gene_symbols_qs
 
     def get_gene_qs(self):
-        if self.accordion_panel == self.PANEL_PATIENT and self.patient:
-            return self.patient.get_gene_qs()
-
-        # TODO: Implement this
-
-        return Gene.objects.none()
+        gene_symbols_qs = self.get_gene_symbols_qs()
+        return self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
 
     def _get_node_q(self) -> Optional[Q]:
         qs_filters = []
@@ -126,17 +129,20 @@ class PhenotypeNode(AnalysisNode):
                 long_descriptions = []
                 short_descriptions = []
 
+                ontology_terms = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
+                hpo_list, omim_list = OntologyTerm.split_hpo_and_omim(ontology_terms)
+
                 phenotypes = []
-                for phpo in self.phenotypenodehpo_set.all():
-                    phenotypes.append(str(phpo.hpo_synonym))
+                for hpo in hpo_list:
+                    phenotypes.append(str(hpo))
 
                 if phenotypes:
                     long_descriptions.append("Phenotype: %s" % ', '.join(phenotypes))
                     short_descriptions.append(f"{len(phenotypes)} HPO")
 
                 omims = []
-                for pm in self.phenotypenodeomim_set.all():
-                    omims.append(str(pm.mim_morbid_alias))
+                for omim in omim_list:
+                    omims.append(str(omim))
 
                 if omims:
                     long_descriptions.append("OMIM %s" % ', '.join(omims))

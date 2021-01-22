@@ -556,13 +556,13 @@ table.as_table {
 }
 
 // term matches
-.hpo, .omim, .gene {
+.hp, .hpo, .omim, .gene {
   border: 3px solid white;
   margin: 0 4px 0 4px;
   border-radius: 3px;
   padding: 0 4px 0 4px;
 }
-.hpo {
+.hp, .hpo {
   background-color: #FF8C00;
   border-color: #FF8C00;
 }

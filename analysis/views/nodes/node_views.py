@@ -1,4 +1,7 @@
+from typing import Tuple
+
 from django.conf import settings
+from django.db.models import QuerySet
 from django.http.response import HttpResponse
 import json
 
@@ -195,29 +198,30 @@ class PhenotypeNodeView(NodeView):
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
-        ontology_terms = self.object.phenotypenodeontology_set.all().values_list("ontology_term", flat=True)
-        form_initial["omim"] = OntologyTerm.objects.filter(pk__in=ontology_terms, ontology_service=OntologyService.OMIM)
-        form_initial["hpo"] = OntologyTerm.objects.filter(pk__in=ontology_terms, ontology_service=OntologyService.HPO)
+        ontology_terms = self.object.phenotypenodeontologyterm_set.all().values_list("ontology_term", flat=True)
+        hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_terms)
+        form_initial["hpo"] = hpo
+        form_initial["omim"] = omim
         return form_initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
         node = self.object
-        patient_phenotypes = []
-        patient_mim = []
+        patient_hpo = []
+        patient_omim = []
         patient = node.patient
         if patient:
-            patient_phenotypes = patient.get_hpo_qs()
-            patient_mim = patient.get_mim_qs()
+            ontology_term_ids = patient.get_ontology_term_ids()
+            patient_hpo, patient_omim = OntologyTerm.split_hpo_and_omim(ontology_term_ids)
 
         patient_queryset = node.get_patients_qs()
         has_patients = patient_queryset.exists()
 
         context.update({
             'has_patients': has_patients,
-            "patient_phenotypes": patient_phenotypes,
-            "patient_mim": patient_mim
+            "patient_hpo": patient_hpo,
+            "patient_omim": patient_omim
         })
         return context
 

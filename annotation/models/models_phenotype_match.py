@@ -2,10 +2,11 @@ from typing import List
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL
 
 from genes.models import GeneSymbol, Gene
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologySnake
 from patients.models import Patient
 
 
@@ -42,15 +43,13 @@ class PhenotypeDescription(models.Model):
             results.extend(sentence.get_results())
         return results
 
-    def get_ontology_terms(self) -> List[OntologyTerm]:
-        #self.textphenotypesentence_set
-        raise NotImplementedError()
+    def get_ontology_term_ids(self) -> List[OntologyTerm]:
+        ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
+        return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
 
-
-    def get_gene_symbols(self) -> List[GeneSymbol]:
-        raise NotImplementedError()
-        #mimmorbid_qs = self.get_mim_and_pheno_mim_qs()
-        return Gene.objects.filter(mimgene__mim_morbid__in=mimmorbid_qs)
+    def get_gene_symbols(self) -> QuerySet:
+        ontology_term_ids = self.get_ontology_term_ids()
+        return OntologySnake.special_case_gene_symbols_for_terms(ontology_term_ids)
 
     def __str__(self):
         text = self.original_text[:50]

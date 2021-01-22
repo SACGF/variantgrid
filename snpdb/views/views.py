@@ -41,6 +41,8 @@ from library.guardian_utils import assign_permission_to_user_and_groups, DjangoP
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
 import pandas as pd
+
+from ontology.models import OntologyTerm
 from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
@@ -996,7 +998,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
     if len(empty_gene_value) == 1:
         default_color = empty_gene_value[0].rgb
 
-    phenotypes = ["Age", "HPO", "MIM"]
+    phenotypes = ["Age", "HPO", "OMIM"]
     highlight_gene_labels = []
     other_gene_labels = []
 
@@ -1064,7 +1066,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
             color_df[sample_name] = default_color
             color_df.loc["Age", sample_name] = '#FFFFFF'
             color_df.loc["HPO", sample_name] = '#FFFFFF'
-            color_df.loc["MIM", sample_name] = '#FFFFFF'
+            color_df.loc["OMIM", sample_name] = '#FFFFFF'
 
             text_df[sample_name] = default_text
 
@@ -1079,8 +1081,9 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     def format_min(mim):
                         return f"<div title='{mim}'>{mim.description}</div>"
 
-                    hpo_text = " ".join(map(format_hpo, patient.get_hpo_qs()))
-                    mim_text = " ".join(map(format_min, patient.get_mim_qs()))
+                    hpo, omim = OntologyTerm.split_hpo_and_omim(patient.get_ontology_term_ids())
+                    hpo_text = " ".join(map(format_hpo, hpo))
+                    omim_text = " ".join(map(format_min, omim))
 
                     try:
                         age = sample.specimen.age_at_collection_date
@@ -1089,7 +1092,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
                     text_df.loc["Age", sample_name] = age or ''
                     text_df.loc["HPO", sample_name] = hpo_text
-                    text_df.loc["MIM", sample_name] = mim_text
+                    text_df.loc["OMIM", sample_name] = omim_text
                 except PermissionDenied:
                     pass
                 except Patient.DoesNotExist:

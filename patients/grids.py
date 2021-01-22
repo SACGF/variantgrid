@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from annotation.models.models_phenotype_match import PATIENT_GENE_SYMBOL_PATH, PATIENT_ONTOLOGY_TERM_PATH
 from library.django_utils import get_model_fields
 from library.jqgrid_user_row_config import JqGridUserRowConfig
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologyService
 from patients.models import PatientRecords, Patient, PatientRecord
 
 
@@ -27,8 +27,9 @@ class PatientListGrid(JqGridUserRowConfig):
 
             # We need to filter to a sub patients list NOT just to certain terms, so that StringAgg will
             # return all the terms for that person
-            if term_type == 'ontology_term':
-                ontology_term = OntologyTerm.get_from_slug(value)
+            if term_type in ('HP', 'OMIM'):
+                ontology_service = OntologyService(term_type)
+                ontology_term = OntologyTerm.objects.get(name=value, ontology_service=ontology_service)
                 patient_id_q = Q(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term})
             elif term_type == 'gene':
                 # Match to gene_symbol as there may be multiple with that symbol

@@ -1,10 +1,11 @@
 import functools
+import operator
 import re
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Set, Union
+from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
 from django.db import models
-from django.db.models import PROTECT, CASCADE, QuerySet, Q
+from django.db.models import PROTECT, CASCADE, QuerySet, Q, F
 from django.urls import reverse
 from model_utils.models import TimeStampedModel, now
 
@@ -251,6 +252,12 @@ class OntologyTerm(TimeStampedModel):
     def url(self):
         return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
 
+    @staticmethod
+    def split_hpo_and_omim(ontology_term_ids: Iterable[str]) -> Tuple[QuerySet, QuerySet]:
+        hpo = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.HPO)
+        omim = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.OMIM)
+        return hpo, omim
+
 
 class OntologyTermRelation(TimeStampedModel):
     """
@@ -335,6 +342,8 @@ class OntologySnakeStep:
     relation: OntologyTermRelation
     dest_term: OntologyTerm
 
+
+OntologyList = Optional[Union[QuerySet, List[OntologyTerm]]]
 
 class OntologySnake:
     """
@@ -427,6 +436,43 @@ class OntologySnake:
         gene_symbol_snakes = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
         gene_symbol_names = [snake.leaf_term.name for snake in gene_symbol_snakes]
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
+
+    @staticmethod
+    def special_case_gene_symbols_for_terms(ontology_term_ids: Iterable[str]) -> QuerySet:
+        """ Fast path for looking up gene symbols - doesn't work w/everything, use gene_symbols_for_term """
+        hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_term_ids)
+        return OntologySnake.special_case_gene_symbols_for_hpo_and_omim(hpo_terms=hpo, omim_terms=omim)
+
+    @staticmethod
+    def special_case_gene_symbols_for_hpo_and_omim(*, hpo_terms: OntologyList = None, omim_terms: OntologyList = None) -> QuerySet:
+        """ Fast path for looking up gene symbols - doesn't work w/everything, use gene_symbols_for_term """
+        if hpo_terms is None:
+            hpo_terms = []
+        if omim_terms is None:
+            omim_terms = []
+        if not (hpo_terms or omim_terms):
+            return GeneSymbol.objects.none()
+
+        all_hpo_term_list = set()
+        for hpo_term in hpo_terms:
+            assert hpo_term.ontology_service == OntologyService.HPO, "'hpo_terms' must only contain HPO terms"
+            all_hpo_term_list.add(hpo_term.pk)
+            all_hpo_term_list.update(hpo_term.ontologytermrelation_set.filter(relation='is_a').values_list("source_term_id", flat=True))
+
+        for omim_term in omim_terms:
+            assert omim_term.ontology_service == OntologyService.OMIM, "'omim_terms' must only contain OMIM terms"
+
+        qs = OntologyTermRelation.objects.annotate(st=F("source_term_id"), dt=F("dest_term_id"))
+        omim_q_list = []
+        if hpo_terms:
+            omim = OntologyTermRelation.objects.filter(source_term__in=all_hpo_term_list, relation='frequency').values_list("dest_term_id", flat=True)
+            omim_q_list.append(Q(source_term__in=omim))
+        if omim_terms:
+            omim_q_list.append(Q(source_term__in=omim_terms))
+        q_omim = functools.reduce(operator.or_, omim_q_list)
+        genes_qs = qs.filter(q_omim, dt__startswith="HGNC").values_list("dest_term__name", flat=True)
+        gene_symbols = GeneSymbol.objects.filter(pk__in=genes_qs)
+        return gene_symbols
 
 
 class OntologySnakes:

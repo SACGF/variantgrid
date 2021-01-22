@@ -79,166 +79,162 @@
     {% endif %}
 </style>
 <script>
-    ignoreAutcompleteChangeEvent = false;
-    gridExtraFilters = {};
+ignoreAutcompleteChangeEvent = false;
+gridExtraFilters = {};
+filterFields = {};
+
+function changeFilter(field, op, data) {
+    let grid = $("#patient-grid");
+    if (field) {
+        filterFields[field] = {field : field, op: op, data: data};
+    }
+
+    let rules = []
+    for (let r in filterFields) {
+        let rule = filterFields[r];
+        let data = rule['data'];
+        if (data) {
+            rules.push(rule);
+        }
+    }
+    if (rules.length) {
+        let f = {groupOp:"AND", rules: rules};
+        $.extend(grid[0].p.postData,{filters:JSON.stringify(f)});
+        grid[0].p.search = true;
+    } else {
+        let f = {};
+        grid[0].p.search = false;
+    }
+    grid.trigger("reloadGrid",[{page:1,current:true}]);
+}
+
+
+function showCreatePatientForm() {
+    $("#new-patient-link").hide();
+    $("#new-patient-form-container").slideDown();
+}
+
+function resetGrid() {
+    $("#grid-filter-message").hide();
+    clearAutoCompletes();
     filterFields = {};
+    changeFilter();
+    filterGrid();
+}
 
-    function changeFilter(field, op, data) {
-        var grid = $("#patient-grid");
+function getExtraFilters() {
+    let extraFilters = '';
+    if (gridExtraFilters) {
+        extraFilters = JSON.stringify(gridExtraFilters);
+    }
+    return extraFilters;
+}
 
-        if (field) {
-            filterFields[field] = {field : field, op: op, data: data};
+function filterGrid(extra_filters) {
+    gridExtraFilters = extra_filters;
+    $("#patient-grid").trigger("reloadGrid");
+}
+
+function clearAutoCompletes(leave_autcomplete_term_type) {
+    // Clear the autcompletes (temp disabling change handlers)
+    const AUTOCOMPLETE_IDS = {
+        'HP': 'id_hpo_synonym',
+        'OMIM': 'id_mim_morbid_alias',
+        'gene': 'id_gene',
+    };
+
+    ignoreAutcompleteChangeEvent = true;
+    for (let t in AUTOCOMPLETE_IDS) {
+        if (t === leave_autcomplete_term_type) {
+            continue; // leave this one
         }
+        let autocomplete_id = AUTOCOMPLETE_IDS[t];
+        clearAutocompleteChoice("#" + autocomplete_id);
+    }
+    ignoreAutcompleteChangeEvent = false;
+}
 
-        rules = []
-        for (r in filterFields) {
-            rule = filterFields[r];
-            var data = rule['data'];
-            if (data) {
-                rules.push(rule);
+function filterPatientGrid(term_type, value, leave_autcomplete_term_type) {
+    let msgBox = $("#grid-filter-message");
+    msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'>" + value + "</span>... <a href='javascript:resetGrid()'>show all</a>");
+    msgBox.show();
+
+    filterGrid({'term_type' : term_type, 'value' : value });
+    clearAutoCompletes(leave_autcomplete_term_type);
+}
+
+function filterPatientGridFromBarClick(term_type, data) {
+    let barClicked = data.points[0];
+    let value = barClicked.y;
+    filterPatientGrid(term_type, value);
+}
+
+function plotlyHPOClickHandler(data) {
+    filterPatientGridFromBarClick('HP', data);
+}
+
+function plotlyOMIMClickHandler(data) {
+    filterPatientGridFromBarClick('OMIM', data);
+}
+
+function getTermLinks(term_type, term_list) {
+    let links = '';
+    if (term_list) {
+        let terms = term_list.split('|');
+        for (let i=0 ; i<terms.length ; ++i) {
+            let term = terms[i];
+            links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'>" + term + "</span>";
+        }
+    }
+    return links;
+}
+
+function patients_grid_complete() {
+    let grid = $("#patient-grid");
+    grid[0].p.postData["extra_filters"] = getExtraFilters;
+
+    $(".grid-term-link").each(function() {
+        $(this).click(function() {
+            let term_type = $(this).attr("term_type");
+            let value = $(this).attr("term");
+            filterPatientGrid(term_type, value)
+        });
+    });
+}
+
+$(document).ready(function() {
+    jQuery.extend($.fn.fmatter, {
+        viewPatientLink: function (patientId) {
+            const VIEW_PATIENT_URL = Urls.view_patient(patientId);
+            return "<a class='grid-link' href='" + VIEW_PATIENT_URL + "'><div class='grid-link-icon view-details-link'></div></a>";
+        },
+        showDescriptionSymbol: function (description, options, rowObject) {
+            let descriptionSymbol = '';
+            if (typeof description !== 'undefined' && description && description.length > 0) {
+                const VIEW_PATIENT_URL = Urls.view_patient(rowObject.id);
+                descriptionSymbol = "<a class='grid-link' href='" + VIEW_PATIENT_URL + "'><div title='' class='grid-link-icon patient-description'></div></a>";
             }
-        }
-        if (rules.length) {
-            var f = {groupOp:"AND", rules: rules};
-            $.extend(grid[0].p.postData,{filters:JSON.stringify(f)});
-            grid[0].p.search = true;
-        } else {
-            var f = {};
-            grid[0].p.search = false;
-        }
-        grid.trigger("reloadGrid",[{page:1,current:true}]);
+            return descriptionSymbol;
+        },
+        phenotypeFormatter: function (phenotype_terms) {
+            return getTermLinks('HPO', phenotype_terms);
+        },
+        omimFormatter: function (omim_terms) {
+            return getTermLinks('OMIM', omim_terms);
+        },
+        geneFormatter: function (genes) {
+            return getTermLinks('gene', genes);
+        },
+    });
+
+    function resetForm() {
+        $("form#patient-form").each(function () {
+            this.reset()
+        });
     }
-
-
-    function showCreatePatientForm() {
-        $("#new-patient-link").hide();
-        $("#new-patient-form-container").slideDown();
-    }
-
-    function resetGrid() {
-        $("#grid-filter-message").hide();
-        clearAutoCompletes();
-        filterFields = {};
-        changeFilter();
-        filterGrid();
-    }
-
-    function getExtraFilters() {
-        var extraFilters = '';
-        if (gridExtraFilters) {
-            extraFilters = JSON.stringify(gridExtraFilters);
-        }
-        return extraFilters;
-    }
-
-    function filterGrid(extra_filters) {
-        gridExtraFilters = extra_filters;
-        $("#patient-grid").trigger("reloadGrid");
-    }
-
-    function clearAutoCompletes(leave_autcomplete_term_type) {
-        // Clear the autcompletes (temp disabling change handlers)
-        var AUTOCOMPLETE_IDS = {
-            'hpo' : 'id_hpo_synonym',
-            'omim' : 'id_mim_morbid_alias',
-            'gene' : 'id_gene',
-        };
-
-        ignoreAutcompleteChangeEvent = true;
-        for (var t in AUTOCOMPLETE_IDS) {
-            if (t == leave_autcomplete_term_type) {
-                continue; // leave this one
-            }
-            var autocomplete_id = AUTOCOMPLETE_IDS[t];
-            clearAutocompleteChoice("#" + autocomplete_id);
-        }
-        ignoreAutcompleteChangeEvent = false;
-    }
-
-    function filterPatientGrid(term_type, value, leave_autcomplete_term_type) {
-        var msgBox = $("#grid-filter-message");
-        msgBox.html("Filtering grid to <span class='" + term_type + "'>" + value + "</span>... <a href='javascript:resetGrid()'>show all</a>");
-        msgBox.show();
-
-        filterGrid({'term_type' : term_type, 'value' : value });
-
-        clearAutoCompletes(leave_autcomplete_term_type);
-    }
-
-	function filterPatientGridFromBarClick(term_type, data) {
-        var barClicked = data.points[0];
-        var value = barClicked.y;
-        filterPatientGrid(term_type, value);
-	}
-
-    function plotlyHPOClickHandler(data) {
-        filterPatientGridFromBarClick('hpo', data);
-    }
-
-    function plotlyOMIMClickHandler(data) {
-        filterPatientGridFromBarClick('omim', data);
-    }
-
-	function getTermLinks(term_type, term_list) {
-		var links = '';
-		if (term_list) {
-    		var terms = term_list.split('|');
-    		for (var i=0 ; i<terms.length ; ++i) {
-    			var term = terms[i];
-    			links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'>" + term + "</span>";
-    		}
-    	}
-		return links;
-	}
-
-    function patients_grid_complete() {
-        var grid = $("#patient-grid");
-        grid[0].p.postData["extra_filters"] = getExtraFilters;
-
-		$(".grid-term-link").each(function() {
-			$(this).click(function() {
-				var term_type = $(this).attr("term_type");
-				var value = $(this).attr("term");
-		        filterPatientGrid(term_type, value)
-			});
-		});
-    }
-</script>
-{% endblock head %}
-
-{% block jsdocumentready %}
-	jQuery.extend($.fn.fmatter , {
-   		viewPatientLink : function(patientId) {
-			const VIEW_PATIENT_URL = Urls.view_patient(patientId);
-	    	return "<a class='grid-link' href='" + VIEW_PATIENT_URL + "'><div class='grid-link-icon view-details-link'></div></a>";
-		},
-   		showDescriptionSymbol : function(description, options, rowObject) {
-   			var descriptionSymbol = '';
-			if (typeof description !== 'undefined' && description && description.length > 0) {
-    			const VIEW_PATIENT_URL = Urls.view_patient(rowObject.id);
-				descriptionSymbol = "<a class='grid-link' href='" + VIEW_PATIENT_URL + "'><div title='' class='grid-link-icon patient-description'></div></a>";
-			}
-	    	return descriptionSymbol;
-		},
-		phenotypeFormatter : function(phenotype_terms) {
-			return getTermLinks('hpo', phenotype_terms);
-		},
-		omimFormatter : function(omim_terms) {
-			return getTermLinks('omim', omim_terms);
-		},
-		geneFormatter : function(genes) {
-			return getTermLinks('gene', genes);
-		},
-	});
-
-	function resetForm() {
-		$("form#patient-form").each(function() { this.reset() });
-	}
-
 
     function loadPatientOnSearchSelect() {
-
-        $('#id_patient').change(function() {
+        $('#id_patient').change(function () {
             let patientId = $(this).val();
             if (patientId) {
                 window.location = Urls.view_patient(patientId);
@@ -247,88 +243,92 @@
     }
 
     function filterGridOnTermSearchSelect() {
-    	function searchForText(term_type, regex, selector) {
-    	    if (ignoreAutcompleteChangeEvent) {
-    	        return;
-    	    }
+        function searchForText(term_type, regex, selector) {
+            if (ignoreAutcompleteChangeEvent) {
+                return;
+            }
 
-			if (!$(selector).val()) { // empty - show all on grid
-				resetGrid();
-				return;
-			}
+            if (!$(selector).val()) { // empty - show all on grid
+                resetGrid();
+                return;
+            }
 
-            var raw_text = $("option:selected", selector).text();
-			var match = new RegExp(regex).exec(raw_text);
-			if (match) {
-				var value = match[1].trim();
-				// pass in 3rd param to tell it we're from autocomplete box (and leave it)
-				filterPatientGrid(term_type, value, term_type);
-			}
-    	}
+            const raw_text = $("option:selected", selector).text();
+            const match = new RegExp(regex).exec(raw_text);
+            if (match) {
+                const value = match[1].trim();
+                // pass in 3rd param to tell it we're from autocomplete box (and leave it)
+                filterPatientGrid(term_type, value, term_type);
+            }
+        }
 
-        $('#id_hpo').change(function() {
-	        var regex = "HP:\\d{7} ([^\\(]*)";
-        	searchForText('hpo', regex, this);
+        $('#id_hpo').change(function () {
+            const regex = "HP:\\d{7} ([^\\(]*)";
+            searchForText('HP', regex, this);
         });
-        $('#id_omim').change(function() {
-	        var regex = "OMIM:\\d+ ([^\\(]*)";
-        	searchForText('omim', regex, this);
+        $('#id_omim').change(function () {
+            const regex = "OMIM:\\d+ ([^\\(]*)";
+            searchForText('OMIM', regex, this);
         });
-        $('#id_gene').change(function() {
-	        var regex = "([^\\s\\(]*)\\s+\\(";
-        	searchForText('gene', regex, this);
+        $('#id_gene').change(function () {
+            const regex = "([^\\s\\(]*)\\s+\\(";
+            searchForText('gene', regex, this);
         });
     }
 
-	var form = $("form#patient-form");
-    $("#id_first_name", form).change(function() { changeFilter('first_name', 'cn', $(this).val()); });
-    $("#id_last_name", form).change(function() { changeFilter('last_name', 'cn', $(this).val()); });
+    const form = $("form#patient-form");
+    $("#id_first_name", form).change(function () {
+        changeFilter('first_name', 'cn', $(this).val());
+    });
+    $("#id_last_name", form).change(function () {
+        changeFilter('last_name', 'cn', $(this).val());
+    });
 
-	var sexChangeOperation = function() {
-		var data = $(this).val();
-		if (data == 'U') {
-			data = null; // Use blank to not search when unknown
-		}
-		changeFilter('sex', 'eq', data);
-	}
-	$("#id_sex", form).change(sexChangeOperation);
-	$("button#reset-form").click(function() {
-		$("#patient-success").remove();
-		filterFields = {};
-		changeFilter();
-	});
+    const sexChangeOperation = function () {
+        let data = $(this).val();
+        if (data == 'U') {
+            data = null; // Use blank to not search when unknown
+        }
+        changeFilter('sex', 'eq', data);
+    };
+    $("#id_sex", form).change(sexChangeOperation);
+    $("button#reset-form").click(function () {
+        $("#patient-success").remove();
+        filterFields = {};
+        changeFilter();
+    });
 
-	var tabs = $("#grid-tabs");
-	tabs.tabs();
-	tabs.bind('tabsselect', function(event, ui) {
-   		$(".ui-tabs-panel", this).empty();
-	});
-	$('form#create-patient-form').ajaxForm({});
-	setupPatientSamplenode({name: ''});
+    const tabs = $("#grid-tabs");
+    tabs.tabs();
+    tabs.bind('tabsselect', function (event, ui) {
+        $(".ui-tabs-panel", this).empty();
+    });
+    $('form#create-patient-form').ajaxForm({});
+    setupPatientSamplenode({name: ''});
     loadPatientOnSearchSelect();
-	filterGridOnTermSearchSelect();
+    filterGridOnTermSearchSelect();
 
 
     patientSearchForm = $('#patient-search-form');
-    $("#patient-grid-filter", patientSearchForm).click(function() {
-        var familyCode = $("#id_family_code", patientSearchForm).val();
-        var patientPhenotype = $("#id_phenotype", patientSearchForm).val();
-        var filterMessages = [];
+    $("#patient-grid-filter", patientSearchForm).click(function () {
+        const familyCode = $("#id_family_code", patientSearchForm).val();
+        const patientPhenotype = $("#id_phenotype", patientSearchForm).val();
+        const filterMessages = [];
         if (familyCode) {
             filterMessages.push("FamilyCode: '" + familyCode + "'");
-            filterFields["family_code"] = {field : "family_code", op: 'ic', data: familyCode};
+            filterFields["family_code"] = {field: "family_code", op: 'ic', data: familyCode};
         } else {
             delete filterFields["family_code"];
         }
         if (patientPhenotype) {
             filterMessages.push("Phenotype/Description contains: '" + patientPhenotype + "'");
-            filterFields["phenotype"] = {field : "phenotype", op: 'ic', data: patientPhenotype};
+            filterFields["phenotype"] = {field: "phenotype", op: 'ic', data: patientPhenotype};
         } else {
             delete filterFields["phenotype"];
         }
 
-        var filterMessage = filterMessages.join(", ");
-        var msgBox = $("#grid-filter-message");
+        const filterMessage = filterMessages.join(", ");
+        const msgBox = $("#grid-filter-message");
         msgBox.html("Filtering grid to " + filterMessage + " ... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
 
@@ -336,8 +336,9 @@
     });
 
     $("button#create-new-patient").click(showCreatePatientForm);
-
-{% endblock jsdocumentready %}
+});
+</script>
+{% endblock head %}
 {% block submenu_page_content %}
 	<div>
         <h3>Patients</h3>

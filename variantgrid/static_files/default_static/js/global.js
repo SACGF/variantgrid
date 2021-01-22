@@ -722,6 +722,7 @@ jQuery.fn.extend({multitooltip: function(mode, params) {
 function showReloadPageErrorDialog(selector, message, allowClose) {
     let buttons = [
         {   text: "Reload Page",
+            class: "btn",
             click: function() {
                 $(this).dialog("close");
                 location.reload();
@@ -731,6 +732,7 @@ function showReloadPageErrorDialog(selector, message, allowClose) {
     if (allowClose) {
         let closeButton = {
             text: "Close and continue (not recommended)",
+            class: "btn btn-outline-danger",
             click: function () {
                 $(this).dialog("close");
             },
