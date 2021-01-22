@@ -1229,6 +1229,7 @@ const VCForm = (function() {
             let explain = this.explain(key);
             let refs = this.refs(key);
             let eKey = eKeys.key(key);
+            let immutable = this.immutable(key);
 
             jHelp.closest('.card').find('.card-title').text(eKey.label);
             jHelp.empty();
@@ -1278,7 +1279,7 @@ const VCForm = (function() {
                     $('<div>', {class: "my-1"}).append($('<label>', {text: 'Version: '}), $('<span>').html(eKey.version))
                 );
             }
-            if (eKey.examples) {
+            if (eKey.examples && !immutable) {
                 eKey.examples.forEach(example => {
                     content.append(
                         $('<div>', {class: "my-1"}).append($('<label>', {class:'mr-2', text: 'Example: '}), $('<span>').html(example))
