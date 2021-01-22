@@ -148,13 +148,13 @@ class OntologyMatching:
             regular_match = False
             scores.append(OntologyMatch.Score(
                 name="No copy of this term in our database",
-                unit=1, max=-100
+                unit=1, max=-100, note=""
         ))
         if match.direct_reference:
             regular_match = False
             scores.append(OntologyMatch.Score(
                 name="Directly referenced",
-                unit=1, max=1000
+                unit=1, max=1000, note=""
         ))
         if regular_match:
             if search_terms := self.search_terms:
@@ -243,8 +243,8 @@ class OntologyMatching:
                 ontology_matches.select_term(select)
 
         ONTOLOGY_PATTERN = re.compile("(MONDO|OMIM|HP):[0-9]+")
-        if ONTOLOGY_PATTERN.match(search_text):
-            ontology_matches.find_or_create(search_text).direct_reference = True
+        for match in ONTOLOGY_PATTERN.finditer(search_text):
+            ontology_matches.find_or_create(match.group(0)).direct_reference = True
 
         else:
             # Client search

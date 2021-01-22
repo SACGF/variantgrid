@@ -220,17 +220,18 @@
         }
 
         function renderContext(onto) {
-            if (onto.text_search) {
-                return $('<div>', {html: [
-                        $(`<i class="fas fa-circle text-secondary"></i>`),
-                        $('<span>', {text: "Text search" })
-                ]});
-            }
+            let allContexts = $('<div>');
             if (onto.direct_reference) {
-                return $('<div>', {html: [
+                $('<div>', {html: [
                         $(`<i class="fas fa-circle text-dark"></i>`),
                         $('<span>', {text: "Referenced in Condition Text" })
-                ]});
+                ]}).appendTo(allContexts);
+            }
+            if (onto.text_search) {
+                 $('<div>', {html: [
+                        $(`<i class="fas fa-circle text-secondary"></i>`),
+                        $('<span>', {text: "Text search" })
+                ]}).appendTo(allContexts);
             }
             if (onto.gene_relationships && onto.gene_relationships.length) {
                 html = [
@@ -260,10 +261,11 @@
                         html.push( $('<span>', {class: 'text-muted', text: relationship.source, 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
                     }
                 }
-                return $('<div>', {
+                $('<div>', {
                     html: html
-                });
+                }).appendTo(allContexts);
             }
+            return allContexts;
         }
 
         function triggerSearchMondo() {
