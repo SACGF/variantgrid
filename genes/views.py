@@ -34,6 +34,7 @@ from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCatego
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
+from library.log_utils import report_exc_info
 from library.utils import defaultdict_to_dict
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
@@ -114,9 +115,13 @@ def view_gene(request, gene_id):
 
 def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
     omim_and_hpo_for_gene = []
-    for omim in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=0).leafs(): # direct links only
-        hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
-        omim_and_hpo_for_gene.append((omim, hpo_list))
+    try:
+        for omim in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=0).leafs(): # direct links only
+            hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
+            omim_and_hpo_for_gene.append((omim, hpo_list))
+    except ValueError:  # in case we don't have this gene symbol available
+        report_exc_info()
+
     return omim_and_hpo_for_gene
 
 
