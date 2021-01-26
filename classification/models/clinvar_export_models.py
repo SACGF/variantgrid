@@ -256,6 +256,6 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
         cl: Classification
         if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
             cve: ClinVarExport
-            if cve := ClinVarExport.objects.filter(classification_based_on__classification=cl):
+            if cve := ClinVarExport.objects.filter(classification_based_on__classification=cl).first():
                 cve.withdrawn = flag_comment.resolution.status == FlagStatus.OPEN
                 cve.save()
