@@ -8,15 +8,6 @@
 {% block title %}Annotation Info{% endblock title %}
 {% block head %}
 <script>
-
-    function showMoreGeneTranscriptInfo(build) {
-        var bContainer = "#build-" + build + "-details";
-        $(".show-more-gene-transcript-info-link", bContainer).hide();
-        var instructions = $(".gene-transcript-instructions", bContainer);
-        // instructions.removeClass("install-instructions");
-        instructions.show();
-    }
-
     $(document).ready(() => {
         fixLinks();
         $(".load-cached-web-resource").click(function() {
@@ -135,8 +126,9 @@
                                 <b>Annotation:</b> {{ details.annotation_consortium }}
                                 <b>Genes:</b> {{ details.genes_and_transcripts.genes }}
                                 <b>Transcripts:</b> {{ details.genes_and_transcripts.transcripts }}
+                                <a href="#{{ build_name }}-import-sources" data-toggle="collapse" class="toggle-link">Toggle import sources</a>
                             </div>
-                            <div class='hidden gene-transcript-instructions'>
+                            <div id="{{ build_name }}-import-sources" class='gene-transcript-instructions collapse'>
                                 <b>Import Sources</b>
                                 {% for file_name, import_stats in details.genes_and_transcripts.import_sources.items %}
                                     <div>
@@ -151,8 +143,9 @@
                                 <b>Annotation:</b> {{ cons_name }}
                                 <b>Genes:</b> {{ other_consortia_data.genes }}
                                 <b>Transcripts:</b> {{ other_consortia_data.transcripts }}
+                                <a href="#{{ build_name }}-other-import-sources" data-toggle="collapse" class="toggle-link">Toggle import sources</a>
                             </div>
-                            <div class='hidden gene-transcript-instructions'>
+                            <div id="{{ build_name }}-other-import-sources" class='gene-transcript-instructions collapse'>
                                 <b>Import Sources</b>
                                 {% for file_name, import_stats in other_consortia_data.import_sources.items %}
                                     <div>
