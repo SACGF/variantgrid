@@ -1,8 +1,7 @@
 from collections import defaultdict
 from typing import List, Optional, Dict, Union, Tuple, Iterable, Any
 
-from django.db.models import Count, QuerySet
-from django.db.models.expressions import F
+from django.db.models import Count
 from django.db.models.functions import Lower
 import Levenshtein
 import logging
@@ -15,7 +14,7 @@ from annotation.models.models_phenotype_match import PhenotypeMatchTypes, \
     TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, TextPhenotypeSentence
 from genes.models import GeneSymbol, Gene
 from library.log_utils import log_traceback
-from library.utils import get_and_log_time_since, invert_dict_of_lists, all_equal
+from library.utils import get_and_log_time_since, invert_dict_of_lists
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import Patient
 
@@ -97,28 +96,6 @@ def get_single_word_omim_fuzzy(omim_single_words_by_length: Dict[int, Lookups], 
     return get_id_from_single_word_fuzzy_match(omim_single_words_by_length, text, distance)
 
 
-def get_field_by_field_dict(qs: QuerySet, key_field: str, value_field: str) -> Lookups:
-    """ calls lower() before storing """
-    d: Lookups = dict()
-    for k, v in qs.annotate().values_list(key_field, value_field):
-        # Remove commas, as phenotype to match will have that done also
-        k = k.lower().replace(",", "")
-        d[k] = v
-    return d
-
-
-def get_records_by_field(qs: QuerySet, field: str) -> Dict[str, OntologyObj]:
-    """ calls lower() before storing """
-    records_by_field = {}
-
-    for o in qs:
-        f = getattr(o, field).lower()
-        # Remove commas, as phenotype to match will have that done also
-        f = f.replace(",", "")
-        records_by_field[f] = o
-    return records_by_field
-
-
 def create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
     word_lookup = defaultdict(dict)
 
@@ -129,16 +106,13 @@ def create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
     return word_lookup
 
 
-def get_special_case_match(text, hpo_records: OntologyDict, omim_alias_records: OntologyDict, gene_records: OntologyDict) -> Tuple[List[OntologyObj], List[OntologyObj], List[OntologyObj]]:
-    # For each MIM there is an alias (plus possibly others) - this gets the original one
-    mim_aliases_to_original_mim_qs = MIMMorbidAlias.objects.filter(mim_morbid__description=F("description")).order_by("mim_morbid")
-
+def get_special_case_match(text, hpo_records: OntologyDict, omim_records: OntologyDict, gene_records: OntologyDict) -> Tuple[List[OntologyObj], List[OntologyObj], List[OntologyObj]]:
     def load_omim_alias_by_id(accession) -> OntologyResults:
-        omim_alias = mim_aliases_to_original_mim_qs.get(mim_morbid__accession=accession)
-        return PhenotypeMatchTypes.OMIM, [omim_alias.pk]
+        pk = OntologyService.index_to_id(OntologyService.HPO, accession)
+        return PhenotypeMatchTypes.OMIM, [pk]
 
     def load_omim_by_name(description: str) -> OntologyResults:
-        omim_alias = omim_alias_records[description.lower()]
+        omim_alias = omim_records[description.lower()]
         return PhenotypeMatchTypes.OMIM, [omim_alias]
 
     def load_hpo_by_id(hpo_id) -> OntologyResults:
@@ -169,11 +143,13 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_alias_records: 
 
         return PhenotypeMatchTypes.GENE, genes_list
 
-    def load_original_mim_aliases_with_description(description: str) -> OntologyResults:
-        return PhenotypeMatchTypes.OMIM, mim_aliases_to_original_mim_qs.filter(description__icontains=description)
+    omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
 
-    def load_mim_aliases_with_description(description) -> OntologyResults:
-        return PhenotypeMatchTypes.OMIM, MIMMorbidAlias.objects.filter(description__icontains=description)
+    def load_omim_pks_containing_name(name: str) -> OntologyResults:
+        return PhenotypeMatchTypes.OMIM, omim_qs.filter(name__icontains=name).values_list("pk", flat=True)
+
+    def load_omim_pks_containing_alias_name(name) -> OntologyResults:
+        return PhenotypeMatchTypes.OMIM, omim_qs.objects.filter(aliases__icontains=name).values_list("pk", flat=True)
 
     ABSENT_FOREARM = (load_hpo_by_name, 'absent forearm')
     ABNORMAL_BRAIN = (load_hpo_by_name, "Abnormality of brain morphology")
@@ -195,7 +171,7 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_alias_records: 
     AFEBRILE = (load_hpo_by_name, "Focal seizures, afebril")
     GEFS = (load_hpo_by_name, "Febrile seizures")  # GEFS+ is a multi-type OMIM disease, this links to all those though
     PIG_GENES = (load_genes_by_name, ['PIG' + i for i in 'ABCFGHKLMNOPQSTUVWXYZ'])
-    GLYCOGEN_STORAGE_DISEASE = (load_original_mim_aliases_with_description, "glycogen storage disease")
+    GLYCOGEN_STORAGE_DISEASE = (load_omim_pks_containing_name, "glycogen storage disease")
     HIGH_TSH = (load_hpo_by_name, 'Thyroid-stimulating hormone excess')
     PARKINSONISM = (load_hpo_by_name, 'Parkinsonism')
     DIBETES_TYPE_1 = (load_hpo_by_name, 'Type I diabetes mellitus')
@@ -378,30 +354,30 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_alias_records: 
                                 "uncoordinated": (load_hpo_by_id, 2406),
                                 "urea cycle": (load_genes_by_name, ["ARG1", "ASL", "ASS1", "CPS1", "NAGS", "OTC"]),
                                 "urogenital sinus": (load_hpo_by_name, 'Urogenital anomalies'),
-                                "waardenburg type ii": (load_original_mim_aliases_with_description, "waardenburg syndrome, type 2"),
+                                "waardenburg type ii": (load_omim_pks_containing_name, "waardenburg syndrome, type 2"),
                                 "widespread eyes": (load_hpo_by_name, "Widely spaced eyes")}
 
     # People put down eg Waardenburg but there are many different OMIM diseases - we'll put ALL of them
     # Switching to MONDO will help disease families, as it's hierarchial (unlike OMIM)
-    ALPORT_SYNDROME = (load_original_mim_aliases_with_description, "Alport Syndrome")
-    CILIARY_DYSKINESIA = (load_original_mim_aliases_with_description, "Ciliary dyskinesia")
-    BARTTER_SYNDROME = (load_original_mim_aliases_with_description, "Bartter Syndrome")
-    BRUGADA_SYNDROME = (load_original_mim_aliases_with_description, "Brugada Syndrome")
-    CHARCOT_MARIE_TOOTH = (load_original_mim_aliases_with_description, "Charcot-marie-tooth")
-    CHONDRODYSPLASIA_PUNCTATA = (load_original_mim_aliases_with_description, "CHONDRODYSPLASIA PUNCTATA")
-    EHLER_DANOS = (load_original_mim_aliases_with_description, "EHLERS-DANLOS SYNDROME")
-    HLH = (load_original_mim_aliases_with_description, "HEMOPHAGOCYTIC LYMPHOHISTIOCYTOSIS")
-    LEBER_AMAUROSIS = (load_original_mim_aliases_with_description, "leber congenital amaurosis")
-    ROBINOW = (load_original_mim_aliases_with_description, "Robinow Syndrome")
-    SANFILIPPO = (load_mim_aliases_with_description, "Sanfilippo Syndrome")
-    STICKLER = (load_original_mim_aliases_with_description, "Stickler Syndrome")
-    TUBEROUS_SCLEROSIS = (load_original_mim_aliases_with_description, "tuberous sclerosis")
+    ALPORT_SYNDROME = (load_omim_pks_containing_name, "Alport Syndrome")
+    CILIARY_DYSKINESIA = (load_omim_pks_containing_name, "Ciliary dyskinesia")
+    BARTTER_SYNDROME = (load_omim_pks_containing_name, "Bartter Syndrome")
+    BRUGADA_SYNDROME = (load_omim_pks_containing_name, "Brugada Syndrome")
+    CHARCOT_MARIE_TOOTH = (load_omim_pks_containing_name, "Charcot-marie-tooth")
+    CHONDRODYSPLASIA_PUNCTATA = (load_omim_pks_containing_name, "CHONDRODYSPLASIA PUNCTATA")
+    EHLER_DANOS = (load_omim_pks_containing_name, "EHLERS-DANLOS SYNDROME")
+    HLH = (load_omim_pks_containing_name, "HEMOPHAGOCYTIC LYMPHOHISTIOCYTOSIS")
+    LEBER_AMAUROSIS = (load_omim_pks_containing_name, "leber congenital amaurosis")
+    ROBINOW = (load_omim_pks_containing_name, "Robinow Syndrome")
+    SANFILIPPO = (load_omim_pks_containing_alias_name, "Sanfilippo Syndrome")
+    STICKLER = (load_omim_pks_containing_name, "Stickler Syndrome")
+    TUBEROUS_SCLEROSIS = (load_omim_pks_containing_name, "tuberous sclerosis")
 
     DISEASE_FAMILIES = {
-        "aicardi goutires syndrome": (load_original_mim_aliases_with_description, "AICARDI-GOUTIERES"),
+        "aicardi goutires syndrome": (load_omim_pks_containing_name, "AICARDI-GOUTIERES"),
         "alport syndrome": ALPORT_SYNDROME,
         "alport": ALPORT_SYNDROME,
-        "autoinflammatory syndrome": (load_original_mim_aliases_with_description, "autoinflammatory syndrome"),
+        "autoinflammatory syndrome": (load_omim_pks_containing_name, "autoinflammatory syndrome"),
         "bartter syndrome": BARTTER_SYNDROME,
         "bartter": BARTTER_SYNDROME,
         "brugada": BRUGADA_SYNDROME,
@@ -415,24 +391,24 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_alias_records: 
         "ehrlers danlos": EHLER_DANOS,
         "ehlers-danos": EHLER_DANOS,
         "ehler danlos": EHLER_DANOS,
-        "gaucher disease":  (load_original_mim_aliases_with_description, "GAUCHER DISEASE"),
+        "gaucher disease":  (load_omim_pks_containing_name, "GAUCHER DISEASE"),
         "glycogen storage disease": GLYCOGEN_STORAGE_DISEASE,
-        "glut1 deficiency": (load_original_mim_aliases_with_description, "GLUT1 DEFICIENCY SYNDROME"),
+        "glut1 deficiency": (load_omim_pks_containing_name, "GLUT1 DEFICIENCY SYNDROME"),
         "hemophagocytic lymphohistiocytosis": HLH,
         "hlh": HLH,
-        "hht": (load_original_mim_aliases_with_description, "Hereditary hemorrhagic telangiectasia"),
+        "hht": (load_omim_pks_containing_name, "Hereditary hemorrhagic telangiectasia"),
         "leber amaurosis": LEBER_AMAUROSIS,
         "lebers amaurosis": LEBER_AMAUROSIS,
         "leber's amaurosis": LEBER_AMAUROSIS,  # TODO: This doesn't match as seems ' ' inserted??
-        "osteogenesis imperfecta": (load_original_mim_aliases_with_description, "osteogenesis imperfecta"),
+        "osteogenesis imperfecta": (load_omim_pks_containing_name, "osteogenesis imperfecta"),
         "robinow syndrome": ROBINOW,
         "robinow": ROBINOW,
         "sanfilippo": SANFILIPPO,
         "stickler syndrome": STICKLER,
         "stickler": STICKLER,
         "tuberous sclerosis": TUBEROUS_SCLEROSIS,
-        "usher syndrome": (load_original_mim_aliases_with_description, "usher syndrome"),
-        "waardenburg": (load_original_mim_aliases_with_description, "waardenburg"),
+        "usher syndrome": (load_omim_pks_containing_name, "usher syndrome"),
+        "waardenburg": (load_omim_pks_containing_name, "waardenburg"),
     }
 
     hpo_list = []
@@ -553,7 +529,7 @@ def get_terms_from_words(
         hpo_records,
         hpo_word_lookup,
         hpo_single_words_by_length,
-        omim_alias_records,
+        omim_records,
         omim_word_lookup,
         omim_single_words_by_length,
         gene_records):
@@ -562,11 +538,11 @@ def get_terms_from_words(
     lower_text = text.lower()
 
     hpo_list = []
-    omim_alias_list = []
+    omim_list = []
     gene_symbols = []
-    special_case_match = get_special_case_match(text, hpo_records, omim_alias_records, gene_records)
+    special_case_match = get_special_case_match(text, hpo_records, omim_records, gene_records)
     if any(special_case_match):
-        hpo_list, omim_alias_list, gene_symbols = special_case_match
+        hpo_list, omim_list, gene_symbols = special_case_match
     else:
         if len(lower_text) < MIN_MATCH_LENGTH:
             return []
@@ -575,18 +551,18 @@ def get_terms_from_words(
             return []
 
         hpo = hpo_records.get(lower_text)
-        omim_alias = omim_alias_records.get(lower_text)
-        if not any([hpo, omim_alias]):
+        omim = omim_records.get(lower_text)
+        if not any([hpo, omim]):
             if len(words) == 1:
                 w = words[0]
                 if len(w) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
                     hpo = get_single_word_hpo_fuzzy(hpo_single_words_by_length, lower_text)
-                    omim_alias = get_single_word_omim_fuzzy(omim_single_words_by_length, lower_text)
+                    omim = get_single_word_omim_fuzzy(omim_single_words_by_length, lower_text)
             else:
                 lower_words = [w.lower() for w in words]
                 distance = calculate_match_distance(lower_words)
                 hpo = get_multi_word_hpo_fuzzy(hpo_word_lookup, lower_words, lower_text, distance=distance)
-                omim_alias = get_multi_word_omim_fuzzy(omim_word_lookup, lower_words, lower_text, distance=distance)
+                omim = get_multi_word_omim_fuzzy(omim_word_lookup, lower_words, lower_text, distance=distance)
 
         if len(words) == 1:
             # Don't do fuzzy for genes as likely to get false positives
@@ -597,25 +573,25 @@ def get_terms_from_words(
         if hpo:
             hpo_list.append(hpo)
 
-        if omim_alias:
-            omim_alias_list.append(omim_alias)
+        if omim:
+            omim_list.append(omim)
 
     results = []
     offset_start = words_and_spans_subset[0][1][0]
     offset_end = words_and_spans_subset[-1][1][1]
 
-    for hpo_id in hpo_list:
+    for ontology_term_id in hpo_list:
         tpm = TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype,
                                                 match_type=PhenotypeMatchTypes.HPO,
-                                                hpo_id=hpo_id,
+                                                ontology_term_id=ontology_term_id,
                                                 offset_start=offset_start,
                                                 offset_end=offset_end)
         results.append(tpm)
 
-    for omim_alias_id in omim_alias_list:
+    for ontology_term_id in omim_list:
         tpm = TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype,
                                                 match_type=PhenotypeMatchTypes.OMIM,
-                                                omim_alias_id=omim_alias_id,
+                                                ontology_term_id=ontology_term_id,
                                                 offset_start=offset_start,
                                                 offset_end=offset_end)
         results.append(tpm)
@@ -878,53 +854,29 @@ def get_omim_pks_by_term():
     """ Create entries for UNIQUE ';' separated terms
         ie "BECKWITH-WIEDEMANN SYNDROME; BWS" => "BECKWITH-WIEDEMANN" and "BECKWITH-WIEDEMANN SYNDROME" and "BWS" """
 
-    omim_records = get_records_by_field(MIMMorbidAlias.objects.select_related("mim_morbid"), 'description')
-    terms = defaultdict(list)
+    omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
+    omim_pks_by_term = {}
 
-    def break_up_dashes(omim_description, omim_alias):
+    def break_up_dashes(omim_description, pk):
         if '-' in omim_description:
             cleaned_omim_description = omim_description.replace('-', ' ')
-            terms[cleaned_omim_description].append(omim_alias)
+            omim_pks_by_term[cleaned_omim_description] = pk
 
     def break_up_syndromes_and_disease(omim_description, omim_alias):
         words = omim_description.split()
         if len(words) >= 2 and words[-1] in ['syndrome', 'disease']:
             term_before_syndrome = ' '.join(words[:-1])
-            terms[term_before_syndrome].append(omim_alias)
+            omim_pks_by_term[term_before_syndrome] = pk
             break_up_dashes(term_before_syndrome, omim_alias)
 
-    omim_pks_by_term = {}
-    for omim_description, omim_alias in omim_records.items():
-        omim_pks_by_term[omim_description] = omim_alias.pk
-        split_terms = omim_description.split(";")
-        if len(split_terms) > 1:
-            for term in split_terms:
-                term = term.strip()
-                terms[term].append(omim_alias)
-                break_up_syndromes_and_disease(term, omim_alias)
-                break_up_dashes(term, omim_alias)
-        else:
-            break_up_syndromes_and_disease(omim_description, omim_alias)
-            break_up_dashes(omim_description, omim_alias)
-
-    for term, omim_aliases in terms.items():
-        if term not in omim_records:
-            if len(omim_aliases) == 1:
-                omim_pks_by_term[term] = omim_aliases[0].pk
-            else:
-                mims = [mim_alias.mim_morbid.pk for mim_alias in omim_aliases]
-                if all_equal(mims):
-                    # Find the one that's the alias to main mim entry
-                    representative_mim = None
-                    for mim_alias in omim_aliases:
-                        if mim_alias.mim_morbid.description == mim_alias.description:
-                            representative_mim = mim_alias
-                            break
-
-                    if not representative_mim:  # Any one will have to do...
-                        representative_mim = omim_aliases[0]
-
-                    omim_pks_by_term[term] = representative_mim.pk
+    for pk, name, aliases in omim_qs.values_list("pk", "name", "aliases"):
+        for term in [name] + aliases:
+            term = term.strip().lower()
+            omim_pks_by_term[term] = pk
+            for split_term in term.split(";"):
+                omim_pks_by_term[split_term] = pk
+                break_up_syndromes_and_disease(split_term, pk)
+                break_up_dashes(split_term, pk)
     return omim_pks_by_term
 
 
@@ -941,8 +893,13 @@ def get_single_words_by_length(records, min_length):
 
 def default_lookup_factory():
     # Start with synonyms so they're overwritten by HPO
-    hpo_pks = get_field_by_field_dict(HPOSynonym.objects.all(), 'name', "hpo_id")
-    hpo_pks.update(get_field_by_field_dict(OntologyTerm.objects.filter(ontology_service=OntologyService.HPO), 'name', "pk"))
+    hpo_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HPO)
+    hpo_pks = {}
+    for pk, name, aliases in hpo_qs.values_list('pk', 'name', "aliases"):
+        for alias in [name] + aliases:
+            k = alias.lower().replace(",", "")
+            hpo_pks[k] = pk
+
     break_up_hpo_terms(hpo_pks)
     hpo_word_lookup = create_word_lookups(hpo_pks)
 

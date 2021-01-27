@@ -86,11 +86,6 @@ class GeneSymbol(models.Model):
     symbol = models.TextField(primary_key=True)
 
     @property
-    def accession(self):
-        """ For use by TextPhenotypeMatch """
-        return self.symbol
-
-    @property
     def name(self):
         """ For use by TextPhenotypeMatch """
         return self.symbol

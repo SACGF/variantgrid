@@ -36,6 +36,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["somalier_existing_vcfs"]), test=_test_no_ontology),
+        ManualOperation(task_id=ManualOperation.task_id_manage(["match_patient_phenotypes", "--clear"]), test=_test_no_ontology),
         migrations.RunPython(_one_off_move_ontology)
     ]

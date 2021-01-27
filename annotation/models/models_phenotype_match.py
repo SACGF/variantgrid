@@ -111,12 +111,17 @@ class TextPhenotypeMatch(models.Model):
 
     def to_dict(self):
         """ This is what's sent as JSON back to client for highlighting and grids """
-        gene_symbols_qs = GeneSymbol.objects.filter(geneversion__gene__in=self.record.get_genes()).order_by("pk")
-        gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
+        if self.match_type == PhenotypeMatchTypes.GENE:
+            gene_symbols = [self.gene_symbol_id]
+        else:
+            gene_symbols_qs = OntologySnake.special_case_gene_symbols_for_terms([self.ontology_term_id])
+            gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
 
-        return {"accession": self.record.accession,
+        string = str(self.record)
+
+        return {"accession": string,
                 "gene_symbols": gene_symbols,
-                "match": str(self.record),
+                "match": string,
                 "match_type": self.match_type,
                 "name": self.record.name,
                 "offset_start": self.offset_start,
