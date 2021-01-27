@@ -13,7 +13,7 @@ class FileUploadView(View):
 
     def get(self, request, **kwargs):
         user: User = request.user
-        labs = Lab.valid_labs_qs(user=user, admin_check=True).filter(upload_location__isnull=False)
+        labs = Lab.valid_labs_qs(user=user, admin_check=True).filter(upload_location__isnull=False).exclude(upload_location__iexact='')
         context = {"labs": labs}
         return render(request, 'classification/import_upload.html', context)
 
