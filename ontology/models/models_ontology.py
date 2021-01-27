@@ -191,7 +191,7 @@ class OntologyTerm(TimeStampedModel):
             else:
                 # every term needs an import
                 o_import = OntologyImport.objects.create(
-                    ontology_service=OntologyService.HGNC,
+                    import_source=OntologyService.HGNC,
                     filename="HGNC Aliases",
                     context="adhoc_hgnc",
                     hash="N/A",

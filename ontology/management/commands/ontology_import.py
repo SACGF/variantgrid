@@ -2,6 +2,7 @@ import itertools
 import json
 import re
 from dataclasses import dataclass
+from typing import List
 
 import pandas as pd
 import pronto
@@ -9,10 +10,11 @@ from django.core.management import BaseCommand
 from django.db import transaction
 
 from annotation.models.models_enums import HPOSynonymScope
+from genes.models import HGNCGeneNames
 from library.file_utils import file_md5sum
-from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource
+from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
-
+from model_utils.models import now
 
 """
 MONDO import file can be found http://www.obofoundry.org/ontology/mondo.html
@@ -49,6 +51,7 @@ ID_OBO = re.compile("^http://purl[.]obolibrary[.]org/obo/([A-Z]+)_([0-9]+)$")
 ID_IDENTIFIERS = re.compile("http://identifiers[.]org/([A-Za-z]+)/([0-9]+)$")
 ID_STRAIGHT = re.compile("^([A-Z]+):([0-9]+)$")
 
+
 @dataclass
 class TermId:
     type: str = None
@@ -66,7 +69,6 @@ class TermId:
         return f"{self.type}:{self.index}"
 
 
-@transaction.atomic
 def load_mondo(filename: str, force: bool):
     data_file = None
 
@@ -281,7 +283,6 @@ def load_mondo(filename: str, force: bool):
     print("Committing...")
 
 
-@transaction.atomic
 def load_hpo(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
@@ -337,7 +338,6 @@ def load_hpo(filename: str, force: bool):
     print("Committing...")
 
 
-@transaction.atomic
 def load_hpo_disease(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
@@ -391,6 +391,35 @@ def load_hpo_disease(filename: str, force: bool):
     ontology_builder.report()
 
 
+def sync_hgnc():
+    uploads: List[OntologyTerm] = list()
+
+    o_import = OntologyImport.objects.create(
+        import_source="HGNC Sync",
+        filename="HGNC Aliases",
+        context="hgnc_sync",
+        hash="N/A",
+        processor_version=1,
+        processed_date=now,
+        completed=True)
+
+    for hgnc in HGNCGeneNames.objects.all():
+        uploads.append(OntologyTerm(
+            id=f"HGNC:{hgnc.id}",
+            ontology_service=OntologyService.HGNC,
+            name=hgnc.gene_symbol_id,
+            index=hgnc.id,
+            definition=hgnc.approved_name,
+            from_import=o_import
+        ))
+
+    old_count = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC).count()
+    OntologyTerm.objects.bulk_create(uploads, ignore_conflicts=True)
+    updated_count = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC).count()
+    delta = updated_count - old_count
+    print(f"Inserted {delta} records from HGNCGeneNames into OntologyTerm")
+
+
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
@@ -398,10 +427,15 @@ class Command(BaseCommand):
         parser.add_argument('--mondo_json', required=False)
         parser.add_argument('--hpo_owl', required=False)
         parser.add_argument('--omim_frequencies', required=False)
+        parser.add_argument('--hgnc_sync', action="store_true", required=False)
 
     @transaction.atomic
     def handle(self, *args, **options):
         force = options.get("force")
+        if options.get("hgnc_sync"):
+            print("Syncing HGNC")
+            sync_hgnc()
+
         if filename := options.get("mondo_json"):
             try:
                 load_mondo(filename, force)
