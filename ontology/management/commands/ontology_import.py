@@ -7,8 +7,6 @@ from typing import List
 import pandas as pd
 import pronto
 from django.core.management import BaseCommand
-from django.db import transaction
-from docutils.nodes import version
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNCGeneNames
@@ -399,7 +397,6 @@ def load_hpo_disease(filename: str, force: bool):
 def load_biomart(filename: str, force: bool):
     MIM_DESCRIPTION = "MIM morbid description"
     MIM_ACCESSION = "MIM morbid accession"
-    ENSEMBL_GENE_ID = "Gene stable ID"
 
     ontology_builder = OntologyBuilder(
         filename=filename,
@@ -412,7 +409,7 @@ def load_biomart(filename: str, force: bool):
 
     # Create MIMMorbid from BioMart file
     mim_biomart_df = pd.read_csv(filename, sep='\t').dropna().astype({"MIM morbid accession": int})
-    for expected_col in [MIM_DESCRIPTION, MIM_ACCESSION, ENSEMBL_GENE_ID]:
+    for expected_col in [MIM_DESCRIPTION, MIM_ACCESSION]:
         if expected_col not in mim_biomart_df.columns:
             msg = f"file {filename} missing column: '{expected_col}': columns: '{mim_biomart_df.columns}'"
             raise ValueError(msg)
@@ -428,7 +425,7 @@ def load_biomart(filename: str, force: bool):
 
         ontology_builder.add_term(
             term_id=f"OMIM:{mim_accession_id}",
-            name=description,
+            name=name,
             definition=None,
             primary_source=True,
             aliases=aliases

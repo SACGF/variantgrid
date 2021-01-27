@@ -383,7 +383,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                         </div>
                         <div class="mt-4">
                             <b>OMIM</b><br/>Direct OMIM import is not currently supported, but will be populated via MONDO, HPO Diseases File and biomart<br/>
-                            Export: "Gene stable ID", "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="http://www.ensembl.org/biomart/martview/">Ensembl Biomart</a><br/>
+                            Export: "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="http://www.ensembl.org/biomart/martview/">Ensembl Biomart</a><br/> as a TSV.
                             Use (GRC38 version or later as it has aliases) and make sure you tick "unique"
  <code>{{ python_command }} manage.py ontology_import --biomart (location of mart_export)</code>
                         </div>
