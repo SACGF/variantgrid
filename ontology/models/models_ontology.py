@@ -24,7 +24,6 @@ class OntologyImportSource:
     HGNC = "HGNC"
 
 
-
 class OntologyService(models.TextChoices):
     MONDO = "MONDO", "MONDO"
     OMIM = "OMIM", "OMIM"

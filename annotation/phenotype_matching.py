@@ -16,7 +16,7 @@ from annotation.models.models_phenotype_match import PhenotypeMatchTypes, \
 from genes.models import GeneSymbol, Gene
 from library.log_utils import log_traceback
 from library.utils import get_and_log_time_since, invert_dict_of_lists, all_equal
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologyService
 from patients.models import Patient
 
 HPO_PATTERN = re.compile(r"HP:(\d{7})$")
@@ -142,7 +142,8 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_alias_records: 
         return PhenotypeMatchTypes.OMIM, [omim_alias]
 
     def load_hpo_by_id(hpo_id) -> OntologyResults:
-        hpo = HumanPhenotypeOntology.objects.get(pk=hpo_id)  # @UndefinedVariable
+        pk = OntologyService.index_to_id(OntologyService.HPO, hpo_id)
+        hpo = OntologyTerm.objects.get(pk=pk)
         return PhenotypeMatchTypes.HPO, [hpo.pk]
 
     def load_hpo_by_name(hpo_name) -> OntologyResults:
@@ -941,7 +942,7 @@ def get_single_words_by_length(records, min_length):
 def default_lookup_factory():
     # Start with synonyms so they're overwritten by HPO
     hpo_pks = get_field_by_field_dict(HPOSynonym.objects.all(), 'name', "hpo_id")
-    hpo_pks.update(get_field_by_field_dict(HumanPhenotypeOntology.objects.all(), 'name', "pk"))
+    hpo_pks.update(get_field_by_field_dict(OntologyTerm.objects.filter(ontology_service=OntologyService.HPO), 'name', "pk"))
     break_up_hpo_terms(hpo_pks)
     hpo_word_lookup = create_word_lookups(hpo_pks)
 
