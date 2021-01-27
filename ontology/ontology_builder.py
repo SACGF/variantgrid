@@ -196,6 +196,8 @@ class OntologyBuilder:
             defaults["definition"] = definition
         if extra is not None:
             defaults["extra"] = extra
+        if aliases is not None:
+            defaults["aliases"] = aliases
 
         term, created = OntologyTerm.objects.update_or_create(
             id=term_id,

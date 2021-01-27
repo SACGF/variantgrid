@@ -185,7 +185,7 @@ def annotation(request):
             ontology_relationship_counts[f"{second_service}{first_service}"] = join_count
 
     ontology_imports = list()
-    for context in ["mondo_file", "hpo_file", "hpo_disease"]:
+    for context in ["mondo_file", "hpo_file", "hpo_disease", "biomart_omim_aliases"]:
         last_import = OntologyImport.objects.filter(context=context).order_by('-created').first()
         if not last_import:
             all_ontologies_accounted_for = False

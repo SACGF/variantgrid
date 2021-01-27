@@ -289,7 +289,7 @@ def load_hpo(filename: str, force: bool):
         filename=filename,
         context="hpo_file",
         import_source=OntologyImportSource.HPO,
-        version=2,
+        processor_version=2,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -407,6 +407,8 @@ def load_biomart(filename: str, force: bool):
         import_source="biomart",
         processor_version=1,
         force_update=force)
+    file_hash = file_md5sum(filename)
+    ontology_builder.ensure_hash_changed(data_hash=file_hash)
 
     # Create MIMMorbid from BioMart file
     mim_biomart_df = pd.read_csv(filename, sep='\t').dropna().astype({"MIM morbid accession": int})
@@ -420,14 +422,14 @@ def load_biomart(filename: str, force: bool):
 
     for mim_accession_id, description in description_series.items():
         descriptions_list = [x.strip() for x in str(description).split(";;")]
+        name = descriptions_list[0]
 
-        aliases = list()
-        for alias_description in descriptions_list[1:]:
-            aliases.append(alias_description)
+        aliases = descriptions_list[1:]
 
         ontology_builder.add_term(
             term_id=f"OMIM:{mim_accession_id}",
             name=description,
+            definition=None,
             primary_source=True,
             aliases=aliases
         )
