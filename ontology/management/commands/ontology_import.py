@@ -8,6 +8,7 @@ import pandas as pd
 import pronto
 from django.core.management import BaseCommand
 from django.db import transaction
+from docutils.nodes import version
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNCGeneNames
@@ -288,6 +289,7 @@ def load_hpo(filename: str, force: bool):
         filename=filename,
         context="hpo_file",
         import_source=OntologyImportSource.HPO,
+        version=2,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -301,15 +303,17 @@ def load_hpo(filename: str, force: bool):
         term_id = str(term.id)
 
         extra = None
-        synonyms = []
+        detailed_aliases = []
+        aliases = set()
         for synonym in term.synonyms:
+            aliases.add(synonym.description)
             scope = scope_lookup[synonym.scope]
-            synonyms.append({
+            detailed_aliases.append({
                 "name": synonym.description,
                 "scope": scope
             })
-        if synonyms:
-            extra = {"synonyms": synonyms}
+        if detailed_aliases:
+            extra = {"synonyms": detailed_aliases}
 
         if not term_id.startswith(OntologyService.HPO):
             continue
@@ -319,7 +323,8 @@ def load_hpo(filename: str, force: bool):
             name=term.name,
             extra=extra,
             definition=term.definition,
-            primary_source=True
+            primary_source=True,
+            aliases=list(aliases)
         )
 
         children = itertools.islice(term.subclasses(), 1, None)
@@ -343,7 +348,7 @@ def load_hpo_disease(filename: str, force: bool):
         filename=filename,
         context="hpo_disease",
         import_source=OntologyImportSource.HPO,
-        processor_version=4,
+        processor_version=5,
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
@@ -391,6 +396,46 @@ def load_hpo_disease(filename: str, force: bool):
     ontology_builder.report()
 
 
+def load_biomart(filename: str, force: bool):
+    MIM_DESCRIPTION = "MIM morbid description"
+    MIM_ACCESSION = "MIM morbid accession"
+    ENSEMBL_GENE_ID = "Gene stable ID"
+
+    ontology_builder = OntologyBuilder(
+        filename=filename,
+        context="biomart_omim_aliases",
+        import_source="biomart",
+        processor_version=1,
+        force_update=force)
+
+    # Create MIMMorbid from BioMart file
+    mim_biomart_df = pd.read_csv(filename, sep='\t').dropna().astype({"MIM morbid accession": int})
+    for expected_col in [MIM_DESCRIPTION, MIM_ACCESSION, ENSEMBL_GENE_ID]:
+        if expected_col not in mim_biomart_df.columns:
+            msg = f"file {filename} missing column: '{expected_col}': columns: '{mim_biomart_df.columns}'"
+            raise ValueError(msg)
+
+    mim_biomart_df = mim_biomart_df.set_index(MIM_ACCESSION)
+    description_series = mim_biomart_df[MIM_DESCRIPTION]
+
+    for mim_accession_id, description in description_series.items():
+        descriptions_list = [x.strip() for x in str(description).split(";;")]
+
+        aliases = list()
+        for alias_description in descriptions_list[1:]:
+            aliases.append(alias_description)
+
+        ontology_builder.add_term(
+            term_id=f"OMIM:{mim_accession_id}",
+            name=description,
+            primary_source=True,
+            aliases=aliases
+        )
+
+    ontology_builder.complete()
+    ontology_builder.report()
+
+
 def sync_hgnc():
     uploads: List[OntologyTerm] = list()
 
@@ -428,24 +473,33 @@ class Command(BaseCommand):
         parser.add_argument('--hpo_owl', required=False)
         parser.add_argument('--omim_frequencies', required=False)
         parser.add_argument('--hgnc_sync', action="store_true", required=False)
+        parser.add_argument('--biomart', required=False)
 
-    @transaction.atomic
     def handle(self, *args, **options):
         force = options.get("force")
+
         if options.get("hgnc_sync"):
             print("Syncing HGNC")
             sync_hgnc()
+
+        if filename := options.get("biomart"):
+            try:
+                load_biomart(filename, force=force)
+            except OntologyBuilderDataUpToDateException:
+                print("MONDO File hash is the same as last import")
 
         if filename := options.get("mondo_json"):
             try:
                 load_mondo(filename, force)
             except OntologyBuilderDataUpToDateException:
                 print("MONDO File hash is the same as last import")
+
         if filename := options.get("hpo_owl"):
             try:
                 load_hpo(filename, force)
             except OntologyBuilderDataUpToDateException:
                 print("HPO File hash is the same as last import")
+
         if filename := options.get("omim_frequencies"):
             try:
                 load_hpo_disease(filename, force)

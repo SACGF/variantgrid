@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import PROTECT, CASCADE, QuerySet, Q, F
 from django.urls import reverse
@@ -123,6 +124,7 @@ class OntologyTerm(TimeStampedModel):
     name = models.TextField(null=True, blank=True)  # should only be null if we're using it as a placeholder reference
     definition = models.TextField(null=True, blank=True)
     extra = models.JSONField(null=True, blank=True)
+    aliases = ArrayField(models.TextField(blank=False), null=False, blank=True, default=list)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     def __str__(self):
@@ -171,7 +173,7 @@ class OntologyTerm(TimeStampedModel):
             gene_symbol = gene_symbol.symbol
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, name=gene_symbol).first():
             return gene_ontology
-        if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, extra__aliases__contains=gene_symbol).first():
+        if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, aliases__contains=gene_symbol).first():
             return gene_ontology
 
         hgnc_matcher = HGNCMatcher.instance()
@@ -179,12 +181,9 @@ class OntologyTerm(TimeStampedModel):
             if hgnc_term := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, index=hgnc.id).first():
                 # we found an Ontology Term for HGNC, but the ID is already in use for another sybmol
                 # prioritise the name as defined by HGNCGeneNames but keep the other names in the aliases
-                hgnc_term.name = hgnc.gene_symbol_id
-                extra = hgnc_term.extra or dict()
-                hgnc_names: Set[str] = set(extra.get("aliases", []))
-                hgnc_names.add(hgnc_term.name)
-                extra["aliases"] = list(hgnc_names)
-                hgnc_term.extra = extra
+                # Also only lazily load aliases, we shouldn't have too many sources of data that request based on
+                # deprecated gene names
+                hgnc_term.aliases.append(gene_symbol)
                 hgnc_term.save()
                 return hgnc_term
             else:

@@ -2,7 +2,7 @@ import enum
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta, datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from django.utils import timezone
 from lazy import lazy
@@ -95,8 +95,12 @@ class OntologyBuilder:
         Will also complain about other records not included in this import but wont delete them
         """
         if purge_old:
+            old_imports = set(OntologyImport.objects.filter(context=self.context, import_source=self.import_source).values_list("pk", flat=True))
+            old_imports.remove(self._ontology_import.pk)
+
             for model in [OntologyTermRelation, OntologyTerm]:
-                olds = model.objects.filter(from_import__context=self.context, from_import__import_source=self.import_source).exclude(from_import=self._ontology_import)
+
+                olds = model.objects.filter(from_import__in=old_imports)
                 for old in olds[0:3]:
                     print(f"This appears stale: {old}")
 
@@ -104,8 +108,8 @@ class OntologyBuilder:
                 self.counters[model].deletes += count
                 if model == OntologyTermRelation:  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
                     if count:
-                        print("Deleting {count} stale relationships")
-                    olds.delete()
+                        print(f"Deleting {count} stale relationships")
+                        olds.delete()
 
         self._ontology_import.completed = True
         self._ontology_import.save()
@@ -151,7 +155,13 @@ class OntologyBuilder:
         self.created_cache[term_id] = OntologyBuilder.CreatedState.STUB
         return term_id
 
-    def add_term(self, term_id: str, name: str, definition: Optional[str], extra: Dict = None, primary_source: bool = True):
+    def add_term(self,
+                 term_id: str,
+                 name: str,
+                 definition: Optional[str],
+                 extra: Optional[Dict] = None,
+                 aliases: Optional[List[str]] = None,
+                 primary_source: bool = True):
         """
         Returns the term_id
         """
