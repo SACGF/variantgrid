@@ -312,7 +312,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
 
                 {% labelled label="HGNC Gene Names" %}
                     {% if hgnc_gene_symbols_import %}
-                        {{ hgnc_gene_symbols_import }}
+                        {{ hgnc_gene_symbols_import | intcomma }} HGNC Gene Names
                     {% else %}
                         <div>Not installed</div>
                     {% endif %}
@@ -324,7 +324,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                 {% labelled label="Gene Symbol Aliases" %}
                     {% if gene_symbol_alias_counts %}
                         {% for source, count in gene_symbol_alias_counts.items %}
-                            <b>{{ source }}:</b> {{ count }}
+                            <b>{{ source }}:</b> {{ count | intcomma }}
                         {% endfor %}
                     {% else %}
                         <div class="no-value">Not installed</div>

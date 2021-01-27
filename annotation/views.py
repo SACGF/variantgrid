@@ -166,7 +166,7 @@ def annotation(request):
 
     all_ontologies_accounted_for = True
     ontology_counts = list()
-    for service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO]:
+    for service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]:
         # don't report HGNC as it's just there as a stub for other items to relate to
         count = OntologyTerm.objects.filter(ontology_service=service).count()
         ontology_counts.append({"service": service, "count": count})
@@ -193,7 +193,7 @@ def annotation(request):
 
     hgnc_gene_names_count = HGNCGeneNames.objects.all().count()
     if hgnc_gene_names_count:
-        hgnc_gene_symbols_import = f"{hgnc_gene_names_count} HGNC Gene Names"
+        hgnc_gene_symbols_import = hgnc_gene_names_count
 
     diagnostic = GeneListCategory.objects.get(name='Diagnostic')
     diagnostic_gene_list_count = diagnostic.genelist_set.all().count()
