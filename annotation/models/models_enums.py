@@ -82,7 +82,7 @@ class ClinGenClassification(models.TextChoices):
     STRONG = 'S', 'Strong'
     MODERATE = 'M', 'Moderate'
     LIMITED = 'L', 'Limited'
-    NO_REPORTED_EVIDENCE = 'N', 'No Reported Evidence'
+    NO_KNOWN_DISEASE_RELATIONSHIP = 'N', 'No Known Disease Relationship'
     REFUTED = 'R', 'Refuted'
     DISPUTED = 'P', 'Disputed'
 

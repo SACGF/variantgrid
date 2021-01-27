@@ -15,7 +15,7 @@ from ontology.models import OntologyTerm, OntologyService
 def store_clingen_gene_validity_curations_from_web(cached_web_resource):
     """ Gets latest copy, maps MONDO -> HPO / OMIM terms """
     CLINGEN_DISEASE_HOST_NAME = "https://search.clinicalgenome.org"
-    CLINGEN_DISEASE_CSV_URL = f"{CLINGEN_DISEASE_HOST_NAME}/kb/gene-validity.csv"
+    CLINGEN_DISEASE_CSV_URL = f"{CLINGEN_DISEASE_HOST_NAME}/kb/gene-validity/download"
 
     if not OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO).exists():
         msg = "No MONDO OntologyTerm records, you need to import them - see the annotation page."
@@ -84,7 +84,7 @@ def read_clingen_csv(clingen_csv_text):
 
     csv_lines = []
     for line in clingen_csv_text.split("\n"):
-        if line.startswith(HEADER_SEPARATOR):
+        if HEADER_SEPARATOR in line:
             header_separators_found += 1
             continue
         if header_separators_found:
