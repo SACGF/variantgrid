@@ -194,7 +194,10 @@
     {% endlabelled %}
     {% labelled label="Since" %}
         <input class="form-control" type="text" name="since" placeholder="YYYY-MM-DD or <number of days>" />
-        <div class="text-muted">Optional - Filter out classifications that haven't changed since this date e.g. 2020-01-06</div>
+        <div class="text-muted">Optional - Filter out classifications that haven't changed since this date e.g. 2020-01-06<br/>
+        WARNING: Applying incremental changes with "since" can result in withdrawn classifications remaining in your system.<br/>
+        Recommended for users of Alissa 5.2
+        </div>
     {% endlabelled %}
     {% labelled label="Organistion exclusion" %}
         {% for org in orgs %}
