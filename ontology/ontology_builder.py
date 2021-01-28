@@ -188,16 +188,16 @@ class OntologyBuilder:
             "index": ontology_index,
             "from_import": self._ontology_import
         }
-        # if there is an existing record, and it has values for name, definition or extra and we don't
-        # don't want to overwrite them
-        if name:
+        # if primary source of data, overwrite existing record
+        # otherwise, only fill in provided data
+        if name or primary_source:
             defaults["name"] = name
-        if definition:
+        if definition or primary_source:
             defaults["definition"] = definition
-        if extra is not None:
+        if extra is not None or primary_source:
             defaults["extra"] = extra
-        if aliases is not None:
-            defaults["aliases"] = aliases
+        if aliases is not None or primary_source:
+            defaults["aliases"] = aliases or list()
 
         term, created = OntologyTerm.objects.update_or_create(
             id=term_id,
