@@ -221,7 +221,7 @@ class OntologyTerm(TimeStampedModel):
         if len(parts) != 2:
             raise ValueError(f"Can not convert {id_str} to a proper id")
 
-        prefix = OntologyService(parts[0].strip())
+        prefix = OntologyService(parts[0].strip()).upper()
         postfix = parts[1].strip()
         try:
             num_part = int(postfix)
