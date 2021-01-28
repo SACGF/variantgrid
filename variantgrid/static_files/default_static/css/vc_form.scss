@@ -178,6 +178,10 @@ table.diff {
     }
 }
 
+.immutable-textarea span {
+    white-space: pre-wrap;
+}
+
 .submission-source {
     display: inline-block;
     width: 18px !important;
