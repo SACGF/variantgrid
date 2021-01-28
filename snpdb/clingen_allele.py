@@ -357,7 +357,7 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
                             "conversion_tool": conversion_tool}
                 va, _ = VariantAllele.objects.get_or_create(variant=variant,
                                                             defaults=defaults)
-            variant_allele_by_build[genome_build] = va
+                variant_allele_by_build[genome_build] = va
         except Variant.DoesNotExist:
             pass  # Variant may not be created for build
         except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError, ClinGenAllele.ClinGenBuildNotInResponseError) as e:
