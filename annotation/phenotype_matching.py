@@ -51,7 +51,7 @@ def get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length
     return reversed(sorted(word_combos_and_spans, key=lambda item: sum([len(i[0]) for i in item])))
 
 
-def get_id_from_multi_word_fuzzy_match(lookup: Lookups, words: List[str], text: str, distance: int) -> Optional[CodePK]:
+def get_id_from_multi_word_fuzzy_match(lookup: Lookups, words: List[str], text: str, distance: int = 1) -> Optional[CodePK]:
     potentials: Lookups = dict()
     for w in words:
         potentials.update(lookup[w])
@@ -61,7 +61,7 @@ def get_id_from_multi_word_fuzzy_match(lookup: Lookups, words: List[str], text: 
     return get_id_from_fuzzy_match(potentials, text, distance)
 
 
-def get_id_from_single_word_fuzzy_match(single_words_by_length: Dict[int, Lookups], text: str, distance: int) -> Optional[CodePK]:
+def get_id_from_single_word_fuzzy_match(single_words_by_length: Dict[int, Lookups], text: str, distance: int = 1) -> Optional[CodePK]:
     text_length = len(text)
     potentials: Lookups = dict()
     for l in [text_length - distance, text_length, text_length + distance]:
@@ -80,22 +80,6 @@ def get_id_from_fuzzy_match(lookup: Lookups, text: str, max_distance: int) -> Op
     return None
 
 
-def get_multi_word_hpo_fuzzy(hpo_word_lookup, words, text: str, distance: int = 1) -> Optional[CodePK]:
-    return get_id_from_multi_word_fuzzy_match(hpo_word_lookup, words, text, distance)
-
-
-def get_multi_word_omim_fuzzy(omim_word_lookup, words, text: str, distance=1) -> Optional[CodePK]:
-    return get_id_from_multi_word_fuzzy_match(omim_word_lookup, words, text, distance)
-
-
-def get_single_word_hpo_fuzzy(hpo_single_words_by_length: Dict[int, Lookups], text: str, distance=1) -> Optional[CodePK]:
-    return get_id_from_single_word_fuzzy_match(hpo_single_words_by_length, text, distance)
-
-
-def get_single_word_omim_fuzzy(omim_single_words_by_length: Dict[int, Lookups], text: str, distance=1) -> Optional[CodePK]:
-    return get_id_from_single_word_fuzzy_match(omim_single_words_by_length, text, distance)
-
-
 def create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
     word_lookup = defaultdict(dict)
 
@@ -106,22 +90,24 @@ def create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
     return word_lookup
 
 
-def get_special_case_match(text, hpo_records: OntologyDict, omim_records: OntologyDict, gene_records: OntologyDict) -> Tuple[List[OntologyObj], List[OntologyObj], List[OntologyObj]]:
-    def load_omim_alias_by_id(accession) -> OntologyResults:
-        pk = OntologyService.index_to_id(OntologyService.OMIM, accession)
-        return PhenotypeMatchTypes.OMIM, [pk]
+def load_omim_by_id(accession) -> OntologyResults:
+    pk = OntologyService.index_to_id(OntologyService.OMIM, accession)
+    return PhenotypeMatchTypes.OMIM, [pk]
 
+
+def load_hpo_by_id(hpo_id) -> OntologyResults:
+    pk = OntologyService.index_to_id(OntologyService.HPO, hpo_id)
+    hpo = OntologyTerm.objects.get(pk=pk)
+    return PhenotypeMatchTypes.HPO, [hpo.pk]
+
+
+def get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> Tuple[Dict, Dict, Dict]:
     def load_omim_by_name(description: str) -> OntologyResults:
-        omim_alias = omim_records[description.lower()]
+        omim_alias = omim_pks[description.lower()]
         return PhenotypeMatchTypes.OMIM, [omim_alias]
 
-    def load_hpo_by_id(hpo_id) -> OntologyResults:
-        pk = OntologyService.index_to_id(OntologyService.HPO, hpo_id)
-        hpo = OntologyTerm.objects.get(pk=pk)
-        return PhenotypeMatchTypes.HPO, [hpo.pk]
-
     def load_hpo_by_name(hpo_name) -> OntologyResults:
-        hpo = hpo_records[hpo_name.lower()]
+        hpo = hpo_pks[hpo_name.lower()]
         return PhenotypeMatchTypes.HPO, [hpo]
 
     def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
@@ -132,7 +118,7 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
         return PhenotypeMatchTypes.HPO, hpo_list
 
     def load_gene_by_name(gene_symbol: str) -> OntologyResults:
-        gene = gene_records[gene_symbol.lower()]
+        gene = gene_symbol_records[gene_symbol.lower()]
         return PhenotypeMatchTypes.GENE, [gene]
 
     def load_genes_by_name(gene_symbols_list: List[str]) -> OntologyResults:
@@ -187,7 +173,7 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
                          "ADPCKD": (load_omim_by_name, "POLYCYSTIC KIDNEY DISEASE 1"),
                          "AVSD": (load_hpo_by_name, "Atrioventricular septal defect"),
                          "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
-                         "BrCa": (load_omim_alias_by_id, 114480),  # BREAST CANCER
+                         "BrCa": (load_omim_by_id, 114480),  # BREAST CANCER
                          "CHD": (load_hpo_by_name, "Abnormal heart morphology"),
                          "CMS": CMS,
                          "DD":  DEVELOPMENTAL_DELAY,
@@ -202,14 +188,14 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
                          "HCM": (load_hpo_by_name, "Concentric hypertrophic cardiomyopathy"),
                          "HL": (load_hpo_by_name, "Hodgkin lymphoma"),
                          'HUS': HUS,
-                         "IBD": (load_omim_alias_by_id, 266600),  # IBD1
+                         "IBD": (load_omim_by_id, 266600),  # IBD1
                          "ID": (load_hpo_by_name, 'intellectual disability'),
                          "LGA": (load_hpo_by_name, "Large for gestational age"),
                          "LQTS": (load_hpo_by_name, "Long QT syndrome"),
                          "MM": (load_hpo_by_name, 'Multiple myeloma'),
                          "NCS": (load_hpo_by_name, "Neurocardiogenic syncope"),
                          "PCKD": (load_hpo_by_name, "Polycystic kidney dysplasia"),
-                         "PV": (load_omim_alias_by_id, 263300),  # POLYCYTHEMIA VERA; PV
+                         "PV": (load_omim_by_id, 263300),  # POLYCYTHEMIA VERA; PV
                          "SCID": (load_hpo_by_name, "Severe combined immunodeficiency"),
                          'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
                          "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
@@ -220,7 +206,7 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
                                 "abdo pain": (load_hpo_by_name, "Abdominal pain"),
                                 "abnormal mri brain": ABNORMAL_BRAIN,
                                 "aching limbs": (load_hpo_by_name, "Limb pain"),
-                                "adenosine phosphoribosyl transferase deficiencies": (load_omim_alias_by_id, 614723),
+                                "adenosine phosphoribosyl transferase deficiencies": (load_omim_by_id, 614723),
                                 "agenesis cc": (load_hpo_by_name, "Agenesis of corpus callosum"),
                                 "afebrile seizures": AFEBRILE,
                                 "afebrile": AFEBRILE,
@@ -228,14 +214,14 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
                                 "autistic": AUTISTIC,
                                 "behaviour problems": (load_hpo_by_name, "Behavioral abnormality"),
                                 "bladder ca": (load_hpo_by_name, "Bladder neoplasm"),
-                                "bowel cancer": (load_omim_alias_by_id, 114500),
+                                "bowel cancer": (load_omim_by_id, 114500),
                                 "bowel polyps": (load_hpo_by_name, "Colorectal polyps"),
                                 "brain abnormalities": ABNORMAL_BRAIN,
                                 "brain abnormality": ABNORMAL_BRAIN,
                                 "brain malformation": ABNORMAL_BRAIN,
                                 "bulls ' eye maculopathy": BULLS_EYE_MACULOPATHY,  # TODO: Hacked due to us joining ' badly
                                 "caf au lait": (load_hpo_by_name, "Cafe-au-lait spot"),
-                                "carnitine transporter deficiency": (load_omim_alias_by_id, 212140),
+                                "carnitine transporter deficiency": (load_omim_by_id, 212140),
                                 "callosal dysgenesis": (load_hpo_by_name, 'Callosal agenesis'),
                                 "coagulation disorder": (load_hpo_by_name, "Abnormality of coagulation"),
                                 "congenital heart disease": (load_hpo_by_id, 1627),
@@ -254,8 +240,8 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
                                 "dysmorphic feature": DYSMORPHIC_FACE,
                                 "dysmorphic features": DYSMORPHIC_FACE,
                                 "easily bruised skin": (load_hpo_by_name, "Bruise easily"),
-                                "ehler danlos syndrome (type iii)": (load_omim_alias_by_id, 130020),
-                                "ehlers-danos syndrome classic type": (load_omim_alias_by_id, 130000),
+                                "ehler danlos syndrome (type iii)": (load_omim_by_id, 130020),
+                                "ehlers-danos syndrome classic type": (load_omim_by_id, 130000),
                                 "elevated ammonia": (load_hpo_by_name, "Hyperammonemia"),
                                 "elevated ck": ELEVATED_CK,
                                 "elevated ketones": KETOSIS,
@@ -304,8 +290,8 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
                                 "low carnitine": (load_hpo_by_name, "Decreased plasma carnitine"),
                                 "lymphopaena": (load_hpo_by_name, "Lymphopenia"),
                                 "migranes": (load_hpo_by_name, "migraine"),
-                                "men type 1": (load_omim_alias_by_id, 131100),
-                                "methylenetetrahyrofolate deficiency": (load_omim_alias_by_id, 236250),  # HOMOCYSTINURIA DUE TO DEFICIENCY OF N(5,10)-METHYLENETETRAHYDROFOLATE REDUCTASE ACTIVITY
+                                "men type 1": (load_omim_by_id, 131100),
+                                "methylenetetrahyrofolate deficiency": (load_omim_by_id, 236250),  # HOMOCYSTINURIA DUE TO DEFICIENCY OF N(5,10)-METHYLENETETRAHYDROFOLATE REDUCTASE ACTIVITY
                                 "missing forearm": ABSENT_FOREARM,
                                 "missing forearms": ABSENT_FOREARM,
                                 "mitochondrial resp. chain disorder": MITO_DEFICIENCY,
@@ -410,19 +396,22 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
         "usher syndrome": (load_omim_pks_containing_name, "usher syndrome"),
         "waardenburg": (load_omim_pks_containing_name, "waardenburg"),
     }
+    return HARDCODED_LOOKUPS, CASE_INSENSITIVE_LOOKUPS, DISEASE_FAMILIES
 
+
+def get_special_case_match(text, phenotype_matcher) -> Tuple[List[OntologyObj], List[OntologyObj], List[OntologyObj]]:
     hpo_list = []
     omim_alias_list = []
     genes = []
 
-    hl = HARDCODED_LOOKUPS.get(text)
+    hl = phenotype_matcher.hardcoded_lookups.get(text)
     if not hl:
         # Lookup accessions in form of: HP:0000362, OMIM:607196
 
         PATTERNS = [
             (HPO_PATTERN, load_hpo_by_id),
             (HPO_TYPO_PATTERN, load_hpo_by_id),
-            (OMIM_PATTERN, load_omim_alias_by_id),
+            (OMIM_PATTERN, load_omim_by_id),
         ]
 
         for pattern, load_func in PATTERNS:
@@ -434,12 +423,12 @@ def get_special_case_match(text, hpo_records: OntologyDict, omim_records: Ontolo
     if not hl:  # Try lowercase lookups
         lowercase_text = text.lower()
 
-        hl = CASE_INSENSITIVE_LOOKUPS.get(lowercase_text)
+        hl = phenotype_matcher.case_insensitive_lookups.get(lowercase_text)
         if not hl:
-            hl = DISEASE_FAMILIES.get(lowercase_text)
+            hl = phenotype_matcher.disease_families.get(lowercase_text)
 
     if hl:
-        (func, arg) = hl
+        func, arg = hl
         try:
             match_type, records = func(arg)
             if match_type == PhenotypeMatchTypes.HPO:
@@ -476,7 +465,8 @@ def words_together(text, first_words, second_words):
 
 
 def skip_word(lower_text):
-    """ Return true to skip a word, throws SkipAllPhenotypeMatchException to skip all. Only need to skip >MIN_LENGTH words as will do that later (after exact) """
+    """ Return true to skip a word, throws SkipAllPhenotypeMatchException to skip all.
+        Only need to skip >MIN_LENGTH words as will do that later (after exact) """
 
     # For multi-words where you want to skip components
     SKIP_ALL = {"library prep", "to cgf", "set up", "ad pattern", "recurrent eps", "rest of"}
@@ -523,16 +513,7 @@ def calculate_match_distance(words: List[str]) -> int:
     return distance
 
 
-def get_terms_from_words(
-        text_phenotype,
-        words_and_spans_subset,
-        hpo_records,
-        hpo_word_lookup,
-        hpo_single_words_by_length,
-        omim_records,
-        omim_word_lookup,
-        omim_single_words_by_length,
-        gene_records):
+def get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher: 'PhenotypeMatcher'):
     words = [ws[0] for ws in words_and_spans_subset]
     text = ' '.join(words)
     lower_text = text.lower()
@@ -540,7 +521,7 @@ def get_terms_from_words(
     hpo_list = []
     omim_list = []
     gene_symbols = []
-    special_case_match = get_special_case_match(text, hpo_records, omim_records, gene_records)
+    special_case_match = get_special_case_match(text, phenotype_matcher)
     if any(special_case_match):
         hpo_list, omim_list, gene_symbols = special_case_match
     else:
@@ -550,24 +531,23 @@ def get_terms_from_words(
         if skip_word(lower_text):
             return []
 
-        hpo = hpo_records.get(lower_text)
-        omim = omim_records.get(lower_text)
+        hpo = phenotype_matcher.hpo_pks.get(lower_text)
+        omim = phenotype_matcher.omim_pks.get(lower_text)
         if not any([hpo, omim]):
             if len(words) == 1:
                 w = words[0]
                 if len(w) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
-                    hpo = get_single_word_hpo_fuzzy(hpo_single_words_by_length, lower_text)
-                    omim = get_single_word_omim_fuzzy(omim_single_words_by_length, lower_text)
+                    hpo = get_id_from_single_word_fuzzy_match(phenotype_matcher.hpo_single_words_by_length, lower_text)
+                    omim = get_id_from_single_word_fuzzy_match(phenotype_matcher.omim_single_words_by_length, lower_text)
             else:
                 lower_words = [w.lower() for w in words]
                 distance = calculate_match_distance(lower_words)
-                hpo = get_multi_word_hpo_fuzzy(hpo_word_lookup, lower_words, lower_text, distance=distance)
-                omim = get_multi_word_omim_fuzzy(omim_word_lookup, lower_words, lower_text, distance=distance)
+                hpo = get_id_from_multi_word_fuzzy_match(phenotype_matcher.hpo_word_lookup, lower_words, lower_text, distance=distance)
+                omim = get_id_from_multi_word_fuzzy_match(phenotype_matcher.omim_word_lookup, lower_words, lower_text, distance=distance)
 
         if len(words) == 1:
             # Don't do fuzzy for genes as likely to get false positives
-            gene_symbol = gene_records.get(lower_text)
-            if gene_symbol:
+            if gene_symbol := phenotype_matcher.gene_symbol_records.get(lower_text):
                 gene_symbols.append(gene_symbol)
 
         if hpo:
@@ -614,20 +594,12 @@ def sub_array_index(array, sub_array):
     return None
 
 
-def parse_words(text_phenotype,
-                input_words_and_spans,
-                hpo_records,
-                hpo_word_lookup,
-                hpo_single_words_by_length,
-                omim_records,
-                omim_word_lookup,
-                omim_single_words_by_length,
-                gene_records) -> List:
+def parse_words(text_phenotype, input_words_and_spans, phenotype_matcher) -> List:
     results = []
 
     word_combos_and_spans = get_word_combos_and_spans_sorted_by_length(input_words_and_spans, max_combo_length=MAX_COMBO_LENGTH)
     for words_and_spans_subset in word_combos_and_spans:
-        words_results = get_terms_from_words(text_phenotype, words_and_spans_subset, hpo_records, hpo_word_lookup, hpo_single_words_by_length, omim_records, omim_word_lookup, omim_single_words_by_length, gene_records)
+        words_results = get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher)
         if words_results:
             results.extend(words_results)
             if words_and_spans_subset != input_words_and_spans:  # More to match
@@ -636,11 +608,11 @@ def parse_words(text_phenotype,
                 after_words = input_words_and_spans[i + len(words_and_spans_subset):]
 
                 if before_words:
-                    before_results = parse_words(text_phenotype, before_words, hpo_records, hpo_word_lookup, hpo_single_words_by_length, omim_records, omim_word_lookup, omim_single_words_by_length, gene_records)
+                    before_results = parse_words(text_phenotype, before_words, phenotype_matcher)
                     results.extend(before_results)
 
                 if after_words:
-                    after_results = parse_words(text_phenotype, after_words, hpo_records, hpo_word_lookup, hpo_single_words_by_length, omim_records, omim_word_lookup, omim_single_words_by_length, gene_records)
+                    after_results = parse_words(text_phenotype, after_words, phenotype_matcher)
                     results.extend(after_results)
 
             break
@@ -779,7 +751,7 @@ def sentences_and_offsets(txt):
     return split_sentences_and_offsets
 
 
-def process_text_phenotype(text_phenotype, hpo_records, hpo_word_lookup, hpo_single_words_by_length, omim_records, omim_word_lookup, omim_single_words_by_length, gene_records):
+def process_text_phenotype(text_phenotype, phenotype_matcher):
     tokenized_text_and_spans = word_tokenise_and_spans(text_phenotype.text)
 
     tokenized_text = []
@@ -809,7 +781,7 @@ def process_text_phenotype(text_phenotype, hpo_records, hpo_word_lookup, hpo_sin
     words_and_spans = transform_words(words, tags, spans)
 
     try:
-        parse_words(text_phenotype, words_and_spans, hpo_records, hpo_word_lookup, hpo_single_words_by_length, omim_records, omim_word_lookup, omim_single_words_by_length, gene_records)
+        parse_words(text_phenotype, words_and_spans, phenotype_matcher)
     except SkipAllPhenotypeMatchException:
         logging.info("Completely skipping: %s", text_phenotype.text)
 
@@ -898,37 +870,27 @@ def get_single_words_by_length(records, min_length):
     return words_by_length
 
 
-def default_lookup_factory():
-    # Start with synonyms so they're overwritten by HPO
-    hpo_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HPO)
-    hpo_pks = {}
-    for pk, name, aliases in hpo_qs.values_list('pk', 'name', "aliases"):
-        for alias in [name] + aliases:
-            k = alias.lower().replace(",", "")
-            hpo_pks[k] = pk
+class PhenotypeMatcher:
+    def __init__(self):
+        # Start with synonyms so they're overwritten by HPO
+        hpo_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HPO)
+        self.hpo_pks = {}
+        for pk, name, aliases in hpo_qs.values_list('pk', 'name', "aliases"):
+            for alias in [name] + aliases:
+                k = alias.lower().replace(",", "")
+                self.hpo_pks[k] = pk
 
-    break_up_hpo_terms(hpo_pks)
-    hpo_word_lookup = create_word_lookups(hpo_pks)
+        break_up_hpo_terms(self.hpo_pks)
+        self.hpo_word_lookup = create_word_lookups(self.hpo_pks)
 
-    omim_pks = get_omim_pks_by_term()
-    omim_word_lookup = create_word_lookups(omim_pks)
+        self.omim_pks = get_omim_pks_by_term()
+        self.omim_word_lookup = create_word_lookups(self.omim_pks)
 
-    gene_symbol_records = dict(GeneSymbol.objects.annotate(lower=Lower("pk")).values_list("lower", "pk"))
-    hpo_single_words_by_length = get_single_words_by_length(hpo_pks, 5)
-    omim_single_words_by_length = get_single_words_by_length(omim_pks, 5)
-    return hpo_pks, hpo_word_lookup, hpo_single_words_by_length, omim_pks, omim_word_lookup, omim_single_words_by_length, gene_symbol_records
-
-
-def cached_lookup_factory(*args):
-    """ Use like so:
-            lookups = default_lookup_factory() # Keep in scope
-            lookup_factory = cached_lookup_factory(*lookups)
-    """
-
-    def lookup_factory():
-        return args
-
-    return lookup_factory
+        self.gene_symbol_records = dict(GeneSymbol.objects.annotate(lower=Lower("pk")).values_list("lower", "pk"))
+        self.hpo_single_words_by_length = get_single_words_by_length(self.hpo_pks, 5)
+        self.omim_single_words_by_length = get_single_words_by_length(self.omim_pks, 5)
+        special_case_lookups = get_special_case_lookups(self.hpo_pks, self.omim_pks, self.gene_symbol_records)
+        self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
 
 
 def replace_comments_with_spaces(text):
@@ -954,7 +916,10 @@ def replace_comments_with_spaces(text):
     return ''.join(cleaned_chars)
 
 
-def create_phenotype_description(text, lookup_factory=default_lookup_factory):
+def create_phenotype_description(text, phenotype_matcher=None):
+    if phenotype_matcher is None:
+        phenotype_matcher = PhenotypeMatcher()
+
     phenotype_description = PhenotypeDescription.objects.create(original_text=text)
     known_sentences = []
     unknown_sentences = []
@@ -980,9 +945,8 @@ def create_phenotype_description(text, lookup_factory=default_lookup_factory):
             known_sentences.append(tps)
 
     if unknown_sentences:
-        args = lookup_factory()
         for sentence in unknown_sentences:
-            process_text_phenotype(sentence.text_phenotype, *args)
+            process_text_phenotype(sentence.text_phenotype, phenotype_matcher)
             known_sentences.append(sentence)
 
     return phenotype_description
@@ -993,10 +957,8 @@ def bulk_patient_phenotype_matching(patients=None):
         patients = Patient.objects.filter(phenotype__isnull=False)
 
     start = time.time()
-    lookups = default_lookup_factory()
+    phenotype_matcher = PhenotypeMatcher()
     get_and_log_time_since(start, "load references")
-
-    lookup_factory = cached_lookup_factory(*lookups)
 
     start = time.time()
     patients = list(patients)
@@ -1005,7 +967,7 @@ def bulk_patient_phenotype_matching(patients=None):
     if num_patients:
         for i, p in enumerate(patients):
 
-            parsed_phenotypes = p.process_phenotype_if_changed(lookup_factory=lookup_factory)
+            parsed_phenotypes = p.process_phenotype_if_changed(phenotype_matcher=phenotype_matcher)
             num_parsed_phenotypes += parsed_phenotypes
             if not i % 50:
                 perc_complete = 100.0 * i / num_patients

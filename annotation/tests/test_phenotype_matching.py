@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes
-from annotation.phenotype_matching import default_lookup_factory, cached_lookup_factory
+from annotation.phenotype_matching import PhenotypeMatcher
 from ontology.tests.test_data_ontology import create_ontology_test_data
 from patients.models import Patient
 
@@ -12,12 +12,11 @@ class TestPhenotypeMatching(TestCase):
     def setUpTestData(cls):
         create_ontology_test_data()
 
-        lookups = default_lookup_factory()
-        cls.lookup_factory = cached_lookup_factory(*lookups)
+        cls.phenotype_matcher = PhenotypeMatcher()
 
     def create_patient_match_phenotypes(self, phenotype):
         patient = Patient.objects.create(phenotype=phenotype)
-        patient.process_phenotype_if_changed(lookup_factory=self.lookup_factory)
+        patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
 
         return patient.patient_text_phenotype.phenotype_description.get_results()
 

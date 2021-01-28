@@ -54,16 +54,15 @@ class HasPhenotypeDescriptionMixin:
             gene_qs = Gene.objects.none()
         return gene_qs
 
-    def process_phenotype_if_changed(self, lookup_factory=None, phenotype_approval_user=None):
-        """ pass in lookup_factory to be able to cache it.
+    def process_phenotype_if_changed(self, phenotype_matcher=None, phenotype_approval_user=None):
+        """ pass in phenotype_matcher to save re-loading
             if you don't pass in phenotype_approval_user assumed it is done automatically and thus needs user approval
             returns whether phenotype changed """
 
         # Stop circular import
-        from annotation.phenotype_matching import default_lookup_factory, \
-            create_phenotype_description
-        if lookup_factory is None:
-            lookup_factory = default_lookup_factory
+        from annotation.phenotype_matching import PhenotypeMatcher, create_phenotype_description
+        if phenotype_matcher is None:
+            phenotype_matcher = PhenotypeMatcher()
 
         phenotype_input_text = self.phenotype_input_text
         phenotype_description_relation = self.phenotype_description_relation
@@ -85,7 +84,7 @@ class HasPhenotypeDescriptionMixin:
                 pass
             else:
                 # TODO: Do as async job??
-                phenotype_description_relation.phenotype_description = create_phenotype_description(phenotype_input_text, lookup_factory)
+                phenotype_description_relation.phenotype_description = create_phenotype_description(phenotype_input_text, phenotype_matcher)
                 phenotype_description_relation.approved_by = phenotype_approval_user
                 phenotype_description_relation.save()
 
