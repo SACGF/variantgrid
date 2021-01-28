@@ -80,16 +80,6 @@ def get_id_from_fuzzy_match(lookup: Lookups, text: str, max_distance: int) -> Op
     return None
 
 
-def create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
-    word_lookup = defaultdict(dict)
-
-    for text, obj in records.items():
-        for word in text.split():
-            word_lookup[word][text] = obj
-
-    return word_lookup
-
-
 def load_omim_by_id(accession) -> OntologyResults:
     pk = OntologyService.index_to_id(OntologyService.OMIM, accession)
     return PhenotypeMatchTypes.OMIM, [pk]
@@ -99,304 +89,6 @@ def load_hpo_by_id(hpo_id) -> OntologyResults:
     pk = OntologyService.index_to_id(OntologyService.HPO, hpo_id)
     hpo = OntologyTerm.objects.get(pk=pk)
     return PhenotypeMatchTypes.HPO, [hpo.pk]
-
-
-def get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> Tuple[Dict, Dict, Dict]:
-    def load_omim_by_name(description: str) -> OntologyResults:
-        omim_alias = omim_pks[description.lower()]
-        return PhenotypeMatchTypes.OMIM, [omim_alias]
-
-    def load_hpo_by_name(hpo_name) -> OntologyResults:
-        hpo = hpo_pks[hpo_name.lower()]
-        return PhenotypeMatchTypes.HPO, [hpo]
-
-    def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
-        hpo_list: List[OntologyObj] = list()
-        for hpo_name in hpo_name_list:
-            _, hpo = load_hpo_by_name(hpo_name)
-            hpo_list.extend(hpo)
-        return PhenotypeMatchTypes.HPO, hpo_list
-
-    def load_gene_by_name(gene_symbol: str) -> OntologyResults:
-        gene = gene_symbol_records[gene_symbol.lower()]
-        return PhenotypeMatchTypes.GENE, [gene]
-
-    def load_genes_by_name(gene_symbols_list: List[str]) -> OntologyResults:
-        genes_list = []
-        for gene_symbol in gene_symbols_list:
-            _, genes = load_gene_by_name(gene_symbol)
-            genes_list.extend(genes)
-
-        return PhenotypeMatchTypes.GENE, genes_list
-
-    omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
-
-    def load_omim_pks_containing_name(name: str) -> OntologyResults:
-        return PhenotypeMatchTypes.OMIM, omim_qs.filter(name__icontains=name).values_list("pk", flat=True)
-
-    def load_omim_pks_containing_alias_name(name) -> OntologyResults:
-        return PhenotypeMatchTypes.OMIM, omim_qs.objects.filter(aliases__icontains=name).values_list("pk", flat=True)
-
-    ABSENT_FOREARM = (load_hpo_by_name, 'absent forearm')
-    ABNORMAL_BRAIN = (load_hpo_by_name, "Abnormality of brain morphology")
-    ABNORMALITY_OF_LIMBS = (load_hpo_by_name, 'Abnormality of limbs')
-    ARYLSULFATASE_A_DEFICIENCY = (load_omim_by_name, "ARYLSULFATASE A DEFICIENCY")
-    AUTISTIC = (load_hpo_by_id, 729)
-    BULLS_EYE_MACULOPATHY = (load_hpo_by_name, "bull's eye maculopathy")
-    FATTY_ACID_DISORDER = (load_hpo_by_name, "Abnormality of fatty-acid metabolism")
-    HUS = (load_hpo_by_name, "Hemolytic-uremic syndrome")
-    MITO_DEFICIENCY = (load_omim_by_name, "MITOCHONDRIAL COMPLEX I DEFICIENCY")
-    DEVELOPMENTAL_DELAY = (load_hpo_by_name, "Developmental delay")
-    GLOBAL_DEVELOPMENTAL_DELAY = (load_hpo_by_name, "Global developmental delay")
-    ELEVATED_CK = (load_hpo_by_name, "Elevated creatine kinase")
-    KETOSIS = (load_hpo_by_name, "Ketosis")
-    PIERRE_ROBIN = (load_hpo_by_name, "Pierre-Robin sequence")
-    PAVM = (load_hpo_by_name, "Pulmonary arteriovenous malformation")
-    CMS = (load_hpo_by_name, "Fatigable weakness")
-    HYDROPS_FETALIS = (load_hpo_by_name, "Nonimmune hydrops fetalis")
-    AFEBRILE = (load_hpo_by_name, "Focal seizures, afebril")
-    GEFS = (load_hpo_by_name, "Febrile seizures")  # GEFS+ is a multi-type OMIM disease, this links to all those though
-    PIG_GENES = (load_genes_by_name, ['PIG' + i for i in 'ABCFGHKLMNOPQSTUVWXYZ'])
-    GLYCOGEN_STORAGE_DISEASE = (load_omim_pks_containing_name, "glycogen storage disease")
-    HIGH_TSH = (load_hpo_by_name, 'Thyroid-stimulating hormone excess')
-    PARKINSONISM = (load_hpo_by_name, 'Parkinsonism')
-    DIBETES_TYPE_1 = (load_hpo_by_name, 'Type I diabetes mellitus')
-    DYSMORPHIC_FACE = (load_hpo_by_name, "Abnormal facial shape")
-    COGNITIVE_IMPAIRMENT = (load_hpo_by_name, "Cognitive impairment")  # There is also 'Specific learning disability' but this is different I think
-    FACIAL_DYSMORPHISM = (load_hpo_by_id, 1999)
-    HEARING_IMPAIRMENT = (load_hpo_by_name, "Hearing impairment")
-
-    HARDCODED_LOOKUPS = {'aHUS': HUS,
-                         "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
-                         # AML fix until we get new HPO data - see https://github.com/obophenotype/human-phenotype-ontology/issues/4236
-                         "AML": (load_hpo_by_name, "Acute myeloid leukemia"),
-                         "ADPCKD": (load_omim_by_name, "POLYCYSTIC KIDNEY DISEASE 1"),
-                         "AVSD": (load_hpo_by_name, "Atrioventricular septal defect"),
-                         "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
-                         "BrCa": (load_omim_by_id, 114480),  # BREAST CANCER
-                         "CHD": (load_hpo_by_name, "Abnormal heart morphology"),
-                         "CMS": CMS,
-                         "DD":  DEVELOPMENTAL_DELAY,
-                         "FAOD": (load_hpo_by_name, "Abnormality of fatty-acid metabolism"),
-                         "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
-                         "FTT": (load_hpo_by_name, "Failure to thrive"),
-                         "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
-                         "GEFS": GEFS,
-                         "GEFS+": GEFS,
-                         "GSD": GLYCOGEN_STORAGE_DISEASE,
-                         "GTOP": (load_hpo_by_name, "Spontaneous abortion"),  # Genetic Termination of Pregnancy
-                         "HCM": (load_hpo_by_name, "Concentric hypertrophic cardiomyopathy"),
-                         "HL": (load_hpo_by_name, "Hodgkin lymphoma"),
-                         'HUS': HUS,
-                         "IBD": (load_omim_by_id, 266600),  # IBD1
-                         "ID": (load_hpo_by_name, 'intellectual disability'),
-                         "LGA": (load_hpo_by_name, "Large for gestational age"),
-                         "LQTS": (load_hpo_by_name, "Long QT syndrome"),
-                         "MM": (load_hpo_by_name, 'Multiple myeloma'),
-                         "NCS": (load_hpo_by_name, "Neurocardiogenic syncope"),
-                         "PCKD": (load_hpo_by_name, "Polycystic kidney dysplasia"),
-                         "PV": (load_omim_by_id, 263300),  # POLYCYTHEMIA VERA; PV
-                         "SCID": (load_hpo_by_name, "Severe combined immunodeficiency"),
-                         'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
-                         "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
-                         "SUDEP": (load_hpo_by_name, ["Sudden death", "Epilepsy"]),
-                         "VSD": (load_hpo_by_name, "Ventricular septal defect")}
-
-    CASE_INSENSITIVE_LOOKUPS = {"aarskog": (load_omim_by_name, "AARSKOG-SCOTT SYNDROME"),
-                                "abdo pain": (load_hpo_by_name, "Abdominal pain"),
-                                "abnormal mri brain": ABNORMAL_BRAIN,
-                                "aching limbs": (load_hpo_by_name, "Limb pain"),
-                                "adenosine phosphoribosyl transferase deficiencies": (load_omim_by_id, 614723),
-                                "agenesis cc": (load_hpo_by_name, "Agenesis of corpus callosum"),
-                                "afebrile seizures": AFEBRILE,
-                                "afebrile": AFEBRILE,
-                                "autistic features": AUTISTIC,
-                                "autistic": AUTISTIC,
-                                "behaviour problems": (load_hpo_by_name, "Behavioral abnormality"),
-                                "bladder ca": (load_hpo_by_name, "Bladder neoplasm"),
-                                "bowel cancer": (load_omim_by_id, 114500),
-                                "bowel polyps": (load_hpo_by_name, "Colorectal polyps"),
-                                "brain abnormalities": ABNORMAL_BRAIN,
-                                "brain abnormality": ABNORMAL_BRAIN,
-                                "brain malformation": ABNORMAL_BRAIN,
-                                "bulls ' eye maculopathy": BULLS_EYE_MACULOPATHY,  # TODO: Hacked due to us joining ' badly
-                                "caf au lait": (load_hpo_by_name, "Cafe-au-lait spot"),
-                                "carnitine transporter deficiency": (load_omim_by_id, 212140),
-                                "callosal dysgenesis": (load_hpo_by_name, 'Callosal agenesis'),
-                                "coagulation disorder": (load_hpo_by_name, "Abnormality of coagulation"),
-                                "congenital heart disease": (load_hpo_by_id, 1627),
-                                "congenital myasthenic": CMS,
-                                "congenital myasthenic syndrome": CMS,
-                                "congenital myaesthenic": CMS,
-                                "congenital myaesthenic syndrome": CMS,
-                                "cortical vision impairment": (load_hpo_by_name, "Cortical visual impairment"),
-                                "craniofacial dysmorphism": FACIAL_DYSMORPHISM,
-                                "crowded dentition": (load_hpo_by_id, 678),
-                                "development delay": DEVELOPMENTAL_DELAY,
-                                "dev issues": DEVELOPMENTAL_DELAY,
-                                "distal hypermobility": (load_hpo_by_name, "Limitation of joint mobility"),
-                                "duane syndrome": (load_hpo_by_id, 9921),
-                                "dystrophin": (load_gene_by_name, 'DMD'),
-                                "dysmorphic feature": DYSMORPHIC_FACE,
-                                "dysmorphic features": DYSMORPHIC_FACE,
-                                "easily bruised skin": (load_hpo_by_name, "Bruise easily"),
-                                "ehler danlos syndrome (type iii)": (load_omim_by_id, 130020),
-                                "ehlers-danos syndrome classic type": (load_omim_by_id, 130000),
-                                "elevated ammonia": (load_hpo_by_name, "Hyperammonemia"),
-                                "elevated ck": ELEVATED_CK,
-                                "elevated ketones": KETOSIS,
-                                "elevated lactate": (load_hpo_by_name, "Increased blood lactate"),
-                                "elevated pth": (load_hpo_by_name, "Elevated circulating parathyroid hormone (PTH) level"),
-                                "epileptic": (load_hpo_by_name, "epilepsy"),
-                                "facial dysmorphology": FACIAL_DYSMORPHISM,
-                                "fatty acid oxidation defect": FATTY_ACID_DISORDER,
-                                "fatty acid oxidation disorder": FATTY_ACID_DISORDER,
-                                "fetal hydrops": HYDROPS_FETALIS,
-                                "global dd": GLOBAL_DEVELOPMENTAL_DELAY,
-                                "global delay": GLOBAL_DEVELOPMENTAL_DELAY,
-                                "global dev delay": GLOBAL_DEVELOPMENTAL_DELAY,
-                                #"hailey-hailey syndrome" : (load_omim_by_name, "HAILEY-HAILEY DISEASE"),
-                                "hand flapping": (load_hpo_by_name, "Recurrent hand flapping"),
-                                "hearing aids": HEARING_IMPAIRMENT,
-                                "hearing impaired": HEARING_IMPAIRMENT,
-                                "hereditary neuralgic amyotrophy": (load_omim_by_name, "AMYOTROPHY, HEREDITARY NEURALGIC"),
-                                "high ketones": KETOSIS,
-                                "high acth": (load_hpo_by_name, "Increased circulating ACTH level"),
-                                "hot flushes": (load_hpo_by_name, "Episodic fever"),  # Not the same but best I can match
-                                "hyperinsulinism": (load_hpo_by_name, "Elevated insulin level"),
-                                "hypoca": (load_hpo_by_name, "Hypocalcemia"),
-                                "hypoferritinaemia": (load_hpo_by_name, "Decreased serum ferritin"),  # hyper is there, hypo is not...
-                                "hypok": (load_hpo_by_name, "Hypokalemia"),
-                                "hypomg": (load_hpo_by_name, "Hypomagnesemia"),
-                                "hypop": (load_hpo_by_name, "Hypophosphatemia"),
-                                # I considered making a general conversion of "hypoplastic X" -> "Hypoplasia of X" but there are lots
-                                # of aliases that already do that, and a few entries for hypoplastic X but NOT hypoplasia of X so do case by case
-                                "hypoplastic right ventricle": (load_hpo_by_name, "Hypoplasia of right ventricle"),
-                                "inattention": (load_hpo_by_name, "Short attention span"),
-                                "increased renin": (load_hpo_by_name, "Increased serum renin"),
-                                "intellectual delay": (load_hpo_by_name, "Delayed intellectual development"),
-                                "impaired consciousness": (load_hpo_by_name, "Reduced consciousness/confusion"),
-                                "iron deficiency": (load_hpo_by_name, "Abnormal serum iron"),
-                                "kneist dysplasia": (load_omim_by_name, "KNIEST DYSPLASIA"),
-                                "learning difficulties": COGNITIVE_IMPAIRMENT,
-                                "learning disability": COGNITIVE_IMPAIRMENT,
-                                "legius": (load_omim_by_name, "Legius Syndrome"),
-                                "leg pains": (load_hpo_by_name, "Limb pain"),
-                                "limb abnormalities": ABNORMALITY_OF_LIMBS,
-                                "low arylsulphatase": ARYLSULFATASE_A_DEFICIENCY,
-                                "low arylsulphatase A": ARYLSULFATASE_A_DEFICIENCY,
-                                "low bgl": (load_hpo_by_name, "Hypoglycemia"),
-                                "low bp": (load_hpo_by_name, "Low blood pressure"),
-                                "low carnitine": (load_hpo_by_name, "Decreased plasma carnitine"),
-                                "lymphopaena": (load_hpo_by_name, "Lymphopenia"),
-                                "migranes": (load_hpo_by_name, "migraine"),
-                                "men type 1": (load_omim_by_id, 131100),
-                                "methylenetetrahyrofolate deficiency": (load_omim_by_id, 236250),  # HOMOCYSTINURIA DUE TO DEFICIENCY OF N(5,10)-METHYLENETETRAHYDROFOLATE REDUCTASE ACTIVITY
-                                "missing forearm": ABSENT_FOREARM,
-                                "missing forearms": ABSENT_FOREARM,
-                                "mitochondrial resp. chain disorder": MITO_DEFICIENCY,
-                                "mitochondrial respiratory chain disorder": MITO_DEFICIENCY,
-                                "moya moya": (load_hpo_by_id, 11834),
-                                "musculoskeletal abnormalities": (load_hpo_list_by_names, ["Muscular abnormality", "Skeletal abnormalities"]),
-                                "na craving": (load_hpo_by_name, "Salt craving"),
-                                "neuroregression": (load_hpo_by_name, "Neurodevelopmental regression"),
-                                "noggin": (load_gene_by_name, 'NOG'),
-                                "no speech": (load_hpo_by_id, 1344),
-                                "ohtahara syndrome": (load_omim_by_name, "OHTAHARA SYNDROME, X-LINKED"),
-                                "opisthoclonus": (load_hpo_by_name, "opisthotonus"),
-                                "opitz gbbb": (load_omim_by_name, "OPITZ GBBB SYNDROME, X-LINKED"),
-                                "parkinson's disease": PARKINSONISM,
-                                "parkinsons": PARKINSONISM,
-                                "parkinson's": PARKINSONISM,
-                                "parkinson": PARKINSONISM,
-                                "pierre robin": PIERRE_ROBIN,
-                                "pierre-robin": PIERRE_ROBIN,
-                                'pig genes': PIG_GENES,
-                                "periodic fever": (load_omim_by_name, "PERIODIC FEVER, FAMILIAL, AUTOSOMAL DOMINANT"),
-                                "polysyndactyly": (load_hpo_by_name, "Polysyndactyly of big toe"),
-                                "poor sleep": (load_hpo_by_id, 2360),
-                                "prolonged qt": (load_hpo_by_name, "Prolonged QT interval"),
-                                "prostate ca": (load_hpo_by_name, "Prostate cancer"),
-                                "pulmonary avms": PAVM,
-                                "pul avms": PAVM,
-                                "raised ck": ELEVATED_CK,
-                                "raised liver enzymes": (load_hpo_by_name, "Elevated liver enzymes"),
-                                "raised ketones": KETOSIS,
-                                "raised methionine": (load_hpo_by_name, "Hypermethioninemia"),
-                                "raised urinary orotate": (load_hpo_by_name, "High urine orotic acid levels"),
-                                "raised tyrosine": (load_hpo_by_name, "Hypertyrosinemia"),
-                                "raised tsh": HIGH_TSH,
-                                "increased tsh": HIGH_TSH,
-                                "increased sweat": (load_hpo_by_name, "Hyperhidrosis"),
-                                "recurrent urtis": (load_hpo_by_name, "Recurrent upper respiratory tract infections"),
-                                "rem sleep": (load_hpo_by_name, "Abnormal REM sleep"),
-                                "renal ca": (load_hpo_by_name, "Renal cell carcinoma"),
-                                "severe fetal hydrops": (load_hpo_by_name, "Severe hydrops fetalis"),
-                                "spastic cp": (load_hpo_by_name, "Cerebral palsy"),
-                                "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
-                                "type 1 diabetes": DIBETES_TYPE_1,
-                                "t1 diabetes": DIBETES_TYPE_1,
-                                "two hair whorls": (load_hpo_by_id, 10813),
-                                "uncoordinated": (load_hpo_by_id, 2406),
-                                "urea cycle": (load_genes_by_name, ["ARG1", "ASL", "ASS1", "CPS1", "NAGS", "OTC"]),
-                                "urogenital sinus": (load_hpo_by_name, 'Urogenital anomalies'),
-                                "waardenburg type ii": (load_omim_pks_containing_name, "waardenburg syndrome, type 2"),
-                                "widespread eyes": (load_hpo_by_name, "Widely spaced eyes")}
-
-    # People put down eg Waardenburg but there are many different OMIM diseases - we'll put ALL of them
-    # Switching to MONDO will help disease families, as it's hierarchial (unlike OMIM)
-    ALPORT_SYNDROME = (load_omim_pks_containing_name, "Alport Syndrome")
-    CILIARY_DYSKINESIA = (load_omim_pks_containing_name, "Ciliary dyskinesia")
-    BARTTER_SYNDROME = (load_omim_pks_containing_name, "Bartter Syndrome")
-    BRUGADA_SYNDROME = (load_omim_pks_containing_name, "Brugada Syndrome")
-    CHARCOT_MARIE_TOOTH = (load_omim_pks_containing_name, "Charcot-marie-tooth")
-    CHONDRODYSPLASIA_PUNCTATA = (load_omim_pks_containing_name, "CHONDRODYSPLASIA PUNCTATA")
-    EHLER_DANOS = (load_omim_pks_containing_name, "EHLERS-DANLOS SYNDROME")
-    HLH = (load_omim_pks_containing_name, "HEMOPHAGOCYTIC LYMPHOHISTIOCYTOSIS")
-    LEBER_AMAUROSIS = (load_omim_pks_containing_name, "leber congenital amaurosis")
-    ROBINOW = (load_omim_pks_containing_name, "Robinow Syndrome")
-    SANFILIPPO = (load_omim_pks_containing_alias_name, "Sanfilippo Syndrome")
-    STICKLER = (load_omim_pks_containing_name, "Stickler Syndrome")
-    TUBEROUS_SCLEROSIS = (load_omim_pks_containing_name, "tuberous sclerosis")
-
-    DISEASE_FAMILIES = {
-        "aicardi goutires syndrome": (load_omim_pks_containing_name, "AICARDI-GOUTIERES"),
-        "alport syndrome": ALPORT_SYNDROME,
-        "alport": ALPORT_SYNDROME,
-        "autoinflammatory syndrome": (load_omim_pks_containing_name, "autoinflammatory syndrome"),
-        "bartter syndrome": BARTTER_SYNDROME,
-        "bartter": BARTTER_SYNDROME,
-        "brugada": BRUGADA_SYNDROME,
-        "brugada syndrome": BRUGADA_SYNDROME,
-        "charcot-marie-tooth": CHARCOT_MARIE_TOOTH,
-        "charcot marie tooth": CHARCOT_MARIE_TOOTH,
-        "chondrodysplasia": CHONDRODYSPLASIA_PUNCTATA,
-        "chondroplasia punctata": CHONDRODYSPLASIA_PUNCTATA,  # Typo
-        "cilial dyskinesis": CILIARY_DYSKINESIA,
-        "cilial dyskinesia": CILIARY_DYSKINESIA,
-        "ehrlers danlos": EHLER_DANOS,
-        "ehlers-danos": EHLER_DANOS,
-        "ehler danlos": EHLER_DANOS,
-        "gaucher disease":  (load_omim_pks_containing_name, "GAUCHER DISEASE"),
-        "glycogen storage disease": GLYCOGEN_STORAGE_DISEASE,
-        "glut1 deficiency": (load_omim_pks_containing_name, "GLUT1 DEFICIENCY SYNDROME"),
-        "hemophagocytic lymphohistiocytosis": HLH,
-        "hlh": HLH,
-        "hht": (load_omim_pks_containing_name, "Hereditary hemorrhagic telangiectasia"),
-        "leber amaurosis": LEBER_AMAUROSIS,
-        "lebers amaurosis": LEBER_AMAUROSIS,
-        "leber's amaurosis": LEBER_AMAUROSIS,  # TODO: This doesn't match as seems ' ' inserted??
-        "osteogenesis imperfecta": (load_omim_pks_containing_name, "osteogenesis imperfecta"),
-        "robinow syndrome": ROBINOW,
-        "robinow": ROBINOW,
-        "sanfilippo": SANFILIPPO,
-        "stickler syndrome": STICKLER,
-        "stickler": STICKLER,
-        "tuberous sclerosis": TUBEROUS_SCLEROSIS,
-        "usher syndrome": (load_omim_pks_containing_name, "usher syndrome"),
-        "waardenburg": (load_omim_pks_containing_name, "waardenburg"),
-    }
-    return HARDCODED_LOOKUPS, CASE_INSENSITIVE_LOOKUPS, DISEASE_FAMILIES
 
 
 def get_special_case_match(text, phenotype_matcher) -> Tuple[List[OntologyObj], List[OntologyObj], List[OntologyObj]]:
@@ -789,87 +481,6 @@ def process_text_phenotype(text_phenotype, phenotype_matcher):
     text_phenotype.save()
 
 
-def break_up_hpo_terms(hpo_pks):
-    """ or could be alias """
-
-    new_entries = {}
-    for name, hpo in hpo_pks.items():
-        words = name.split()
-        # Make dysplasia/disease synonyms
-        if len(words) >= 2:
-            if words[-1] == 'dysplasia':
-                words[-1] = 'disease'
-                text = ' '.join(words)
-                if text not in hpo_pks:
-                    new_entries[text] = hpo
-
-            if words[-1] in ['dysplasia', "disease", "syndrome"]:
-                before_disease_text = ' '.join(words[:-1])
-                if before_disease_text not in hpo_pks:
-                    new_entries[before_disease_text] = hpo
-
-            # Vitamin B12 deficiency => B12 deficiency, B-12 deficiency
-            if len(words) == 3 and words[0] == 'vitamin' and words[2] == 'deficiency':
-                if words[1].startswith('b'):  # Only B12 etc not "C" or "D" (need vitamin for those)
-                    no_vitamin = words[1:]
-                    no_vitamin_text = ' '.join(no_vitamin)
-                    new_entries[no_vitamin_text] = hpo
-
-                    b_vitamin = words[1]
-                    dash_text = 'b-%s deficiency' % b_vitamin[1:]
-                    new_entries[dash_text] = hpo
-
-    hpo_pks.update(new_entries)
-
-
-def get_omim_pks_by_term():
-    """ Create entries for UNIQUE ';' separated terms
-        ie "BECKWITH-WIEDEMANN SYNDROME; BWS" => "BECKWITH-WIEDEMANN" and "BECKWITH-WIEDEMANN SYNDROME" and "BWS" """
-
-    omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
-    omim_pks_by_term = {}
-
-    def break_up_dashes(omim_description, pk):
-        if '-' in omim_description:
-            cleaned_omim_description = omim_description.replace('-', ' ')
-            omim_pks_by_term[cleaned_omim_description] = pk
-
-    def break_up_syndromes_and_disease(omim_description, omim_alias):
-        words = omim_description.split()
-        if len(words) >= 2:
-            for t in ['syndrome', 'disease']:
-                try:
-                    i = words.index(t)
-                    if i >= 2:
-                        term_before_syndrome = ' '.join(words[:i])
-                        omim_pks_by_term[term_before_syndrome] = pk
-                        break_up_dashes(term_before_syndrome, omim_alias)
-                except ValueError:
-                    pass
-
-    for pk, name, aliases in omim_qs.values_list("pk", "name", "aliases"):
-        for term in [name] + aliases:
-            # Remove commas, as phenotype to match will have that done also
-            term = term.strip().lower().replace(",", "")
-            omim_pks_by_term[term] = pk
-            for split_term in term.split(";"):
-                omim_pks_by_term[split_term] = pk
-                break_up_syndromes_and_disease(split_term, pk)
-                break_up_dashes(split_term, pk)
-    return omim_pks_by_term
-
-
-def get_single_words_by_length(records, min_length):
-    """ if key is pure alpha (ie FOO not FOO,BAR or FOO1 or FOO BAR) put lookup into dict by lengths """
-    words_by_length = defaultdict(dict)
-    for k, v in records.items():
-        if k.isalpha():
-            length = len(k)
-            if length >= min_length:
-                words_by_length[length][k] = v
-    return words_by_length
-
-
 class PhenotypeMatcher:
     def __init__(self):
         # Start with synonyms so they're overwritten by HPO
@@ -880,17 +491,407 @@ class PhenotypeMatcher:
                 k = alias.lower().replace(",", "")
                 self.hpo_pks[k] = pk
 
-        break_up_hpo_terms(self.hpo_pks)
-        self.hpo_word_lookup = create_word_lookups(self.hpo_pks)
+        self._break_up_hpo_terms(self.hpo_pks)
+        self.hpo_word_lookup = self._create_word_lookups(self.hpo_pks)
 
-        self.omim_pks = get_omim_pks_by_term()
-        self.omim_word_lookup = create_word_lookups(self.omim_pks)
+        self.omim_pks = self._get_omim_pks_by_term()
+        self.omim_word_lookup = self._create_word_lookups(self.omim_pks)
 
         self.gene_symbol_records = dict(GeneSymbol.objects.annotate(lower=Lower("pk")).values_list("lower", "pk"))
-        self.hpo_single_words_by_length = get_single_words_by_length(self.hpo_pks, 5)
-        self.omim_single_words_by_length = get_single_words_by_length(self.omim_pks, 5)
-        special_case_lookups = get_special_case_lookups(self.hpo_pks, self.omim_pks, self.gene_symbol_records)
+        self.hpo_single_words_by_length = self._get_single_words_by_length(self.hpo_pks, 5)
+        self.omim_single_words_by_length = self._get_single_words_by_length(self.omim_pks, 5)
+        special_case_lookups = self._get_special_case_lookups(self.hpo_pks, self.omim_pks, self.gene_symbol_records)
         self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
+
+    @staticmethod
+    def _create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
+        word_lookup = defaultdict(dict)
+
+        for text, obj in records.items():
+            for word in text.split():
+                word_lookup[word][text] = obj
+
+        return word_lookup
+
+    @staticmethod
+    def _get_single_words_by_length(records, min_length):
+        """ if key is pure alpha (ie FOO not FOO,BAR or FOO1 or FOO BAR) put lookup into dict by lengths """
+        words_by_length = defaultdict(dict)
+        for k, v in records.items():
+            if k.isalpha():
+                length = len(k)
+                if length >= min_length:
+                    words_by_length[length][k] = v
+        return words_by_length
+
+    @staticmethod
+    def _break_up_hpo_terms(hpo_pks):
+        """ or could be alias """
+
+        new_entries = {}
+        for name, hpo in hpo_pks.items():
+            words = name.split()
+            # Make dysplasia/disease synonyms
+            if len(words) >= 2:
+                if words[-1] == 'dysplasia':
+                    words[-1] = 'disease'
+                    text = ' '.join(words)
+                    if text not in hpo_pks:
+                        new_entries[text] = hpo
+
+                if words[-1] in ['dysplasia', "disease", "syndrome"]:
+                    before_disease_text = ' '.join(words[:-1])
+                    if before_disease_text not in hpo_pks:
+                        new_entries[before_disease_text] = hpo
+
+                # Vitamin B12 deficiency => B12 deficiency, B-12 deficiency
+                if len(words) == 3 and words[0] == 'vitamin' and words[2] == 'deficiency':
+                    if words[1].startswith('b'):  # Only B12 etc not "C" or "D" (need vitamin for those)
+                        no_vitamin = words[1:]
+                        no_vitamin_text = ' '.join(no_vitamin)
+                        new_entries[no_vitamin_text] = hpo
+
+                        b_vitamin = words[1]
+                        dash_text = 'b-%s deficiency' % b_vitamin[1:]
+                        new_entries[dash_text] = hpo
+
+        hpo_pks.update(new_entries)
+
+    @staticmethod
+    def _get_omim_pks_by_term():
+        """ Create entries for UNIQUE ';' separated terms
+            ie "BECKWITH-WIEDEMANN SYNDROME; BWS" => "BECKWITH-WIEDEMANN" and "BECKWITH-WIEDEMANN SYNDROME" and "BWS" """
+
+        omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
+        omim_pks_by_term = {}
+
+        def break_up_dashes(omim_description, pk):
+            if '-' in omim_description:
+                cleaned_omim_description = omim_description.replace('-', ' ')
+                omim_pks_by_term[cleaned_omim_description] = pk
+
+        def break_up_syndromes_and_disease(omim_description, omim_alias):
+            words = omim_description.split()
+            if len(words) >= 2:
+                for t in ['syndrome', 'disease']:
+                    try:
+                        i = words.index(t)
+                        if i >= 2:
+                            term_before_syndrome = ' '.join(words[:i])
+                            omim_pks_by_term[term_before_syndrome] = pk
+                            break_up_dashes(term_before_syndrome, omim_alias)
+                    except ValueError:
+                        pass
+
+        for pk, name, aliases in omim_qs.values_list("pk", "name", "aliases"):
+            for term in [name] + aliases:
+                # Remove commas, as phenotype to match will have that done also
+                term = term.strip().lower().replace(",", "")
+                omim_pks_by_term[term] = pk
+                for split_term in term.split(";"):
+                    omim_pks_by_term[split_term] = pk
+                    break_up_syndromes_and_disease(split_term, pk)
+                    break_up_dashes(split_term, pk)
+        return omim_pks_by_term
+
+    @staticmethod
+    def _get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> Tuple[Dict, Dict, Dict]:
+        def load_omim_by_name(description: str) -> OntologyResults:
+            omim_alias = omim_pks[description.lower()]
+            return PhenotypeMatchTypes.OMIM, [omim_alias]
+
+        def load_hpo_by_name(hpo_name) -> OntologyResults:
+            hpo = hpo_pks[hpo_name.lower()]
+            return PhenotypeMatchTypes.HPO, [hpo]
+
+        def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
+            hpo_list: List[OntologyObj] = list()
+            for hpo_name in hpo_name_list:
+                _, hpo = load_hpo_by_name(hpo_name)
+                hpo_list.extend(hpo)
+            return PhenotypeMatchTypes.HPO, hpo_list
+
+        def load_gene_by_name(gene_symbol: str) -> OntologyResults:
+            gene = gene_symbol_records[gene_symbol.lower()]
+            return PhenotypeMatchTypes.GENE, [gene]
+
+        def load_genes_by_name(gene_symbols_list: List[str]) -> OntologyResults:
+            genes_list = []
+            for gene_symbol in gene_symbols_list:
+                _, genes = load_gene_by_name(gene_symbol)
+                genes_list.extend(genes)
+
+            return PhenotypeMatchTypes.GENE, genes_list
+
+        omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
+
+        def load_omim_pks_containing_name(name: str) -> OntologyResults:
+            return PhenotypeMatchTypes.OMIM, omim_qs.filter(name__icontains=name).values_list("pk", flat=True)
+
+        def load_omim_pks_containing_alias_name(name) -> OntologyResults:
+            return PhenotypeMatchTypes.OMIM, omim_qs.objects.filter(aliases__icontains=name).values_list("pk", flat=True)
+
+        ABSENT_FOREARM = (load_hpo_by_name, 'absent forearm')
+        ABNORMAL_BRAIN = (load_hpo_by_name, "Abnormality of brain morphology")
+        ABNORMALITY_OF_LIMBS = (load_hpo_by_name, 'Abnormality of limbs')
+        ARYLSULFATASE_A_DEFICIENCY = (load_omim_by_name, "ARYLSULFATASE A DEFICIENCY")
+        AUTISTIC = (load_hpo_by_id, 729)
+        BULLS_EYE_MACULOPATHY = (load_hpo_by_name, "bull's eye maculopathy")
+        FATTY_ACID_DISORDER = (load_hpo_by_name, "Abnormality of fatty-acid metabolism")
+        HUS = (load_hpo_by_name, "Hemolytic-uremic syndrome")
+        MITO_DEFICIENCY = (load_omim_by_name, "MITOCHONDRIAL COMPLEX I DEFICIENCY")
+        DEVELOPMENTAL_DELAY = (load_hpo_by_name, "Developmental delay")
+        GLOBAL_DEVELOPMENTAL_DELAY = (load_hpo_by_name, "Global developmental delay")
+        ELEVATED_CK = (load_hpo_by_name, "Elevated creatine kinase")
+        KETOSIS = (load_hpo_by_name, "Ketosis")
+        PIERRE_ROBIN = (load_hpo_by_name, "Pierre-Robin sequence")
+        PAVM = (load_hpo_by_name, "Pulmonary arteriovenous malformation")
+        CMS = (load_hpo_by_name, "Fatigable weakness")
+        HYDROPS_FETALIS = (load_hpo_by_name, "Nonimmune hydrops fetalis")
+        AFEBRILE = (load_hpo_by_name, "Focal seizures, afebril")
+        GEFS = (load_hpo_by_name, "Febrile seizures")  # GEFS+ is a multi-type OMIM disease, this links to all those though
+        PIG_GENES = (load_genes_by_name, ['PIG' + i for i in 'ABCFGHKLMNOPQSTUVWXYZ'])
+        GLYCOGEN_STORAGE_DISEASE = (load_omim_pks_containing_name, "glycogen storage disease")
+        HIGH_TSH = (load_hpo_by_name, 'Thyroid-stimulating hormone excess')
+        PARKINSONISM = (load_hpo_by_name, 'Parkinsonism')
+        DIBETES_TYPE_1 = (load_hpo_by_name, 'Type I diabetes mellitus')
+        DYSMORPHIC_FACE = (load_hpo_by_name, "Abnormal facial shape")
+        COGNITIVE_IMPAIRMENT = (load_hpo_by_name, "Cognitive impairment")  # There is also 'Specific learning disability' but this is different I think
+        FACIAL_DYSMORPHISM = (load_hpo_by_id, 1999)
+        HEARING_IMPAIRMENT = (load_hpo_by_name, "Hearing impairment")
+
+        HARDCODED_LOOKUPS = {'aHUS': HUS,
+                             "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
+                             # AML fix until we get new HPO data - see https://github.com/obophenotype/human-phenotype-ontology/issues/4236
+                             "AML": (load_hpo_by_name, "Acute myeloid leukemia"),
+                             "ADPCKD": (load_omim_by_name, "POLYCYSTIC KIDNEY DISEASE 1"),
+                             "AVSD": (load_hpo_by_name, "Atrioventricular septal defect"),
+                             "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
+                             "BrCa": (load_omim_by_id, 114480),  # BREAST CANCER
+                             "CHD": (load_hpo_by_name, "Abnormal heart morphology"),
+                             "CMS": CMS,
+                             "DD":  DEVELOPMENTAL_DELAY,
+                             "FAOD": (load_hpo_by_name, "Abnormality of fatty-acid metabolism"),
+                             "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
+                             "FTT": (load_hpo_by_name, "Failure to thrive"),
+                             "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
+                             "GEFS": GEFS,
+                             "GEFS+": GEFS,
+                             "GSD": GLYCOGEN_STORAGE_DISEASE,
+                             "GTOP": (load_hpo_by_name, "Spontaneous abortion"),  # Genetic Termination of Pregnancy
+                             "HCM": (load_hpo_by_name, "Concentric hypertrophic cardiomyopathy"),
+                             "HL": (load_hpo_by_name, "Hodgkin lymphoma"),
+                             'HUS': HUS,
+                             "IBD": (load_omim_by_id, 266600),  # IBD1
+                             "ID": (load_hpo_by_name, 'intellectual disability'),
+                             "LGA": (load_hpo_by_name, "Large for gestational age"),
+                             "LQTS": (load_hpo_by_name, "Long QT syndrome"),
+                             "MM": (load_hpo_by_name, 'Multiple myeloma'),
+                             "NCS": (load_hpo_by_name, "Neurocardiogenic syncope"),
+                             "PCKD": (load_hpo_by_name, "Polycystic kidney dysplasia"),
+                             "PV": (load_omim_by_id, 263300),  # POLYCYTHEMIA VERA; PV
+                             "SCID": (load_hpo_by_name, "Severe combined immunodeficiency"),
+                             'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
+                             "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
+                             "SUDEP": (load_hpo_by_name, ["Sudden death", "Epilepsy"]),
+                             "VSD": (load_hpo_by_name, "Ventricular septal defect")}
+
+        CASE_INSENSITIVE_LOOKUPS = {"aarskog": (load_omim_by_name, "AARSKOG-SCOTT SYNDROME"),
+                                    "abdo pain": (load_hpo_by_name, "Abdominal pain"),
+                                    "abnormal mri brain": ABNORMAL_BRAIN,
+                                    "aching limbs": (load_hpo_by_name, "Limb pain"),
+                                    "adenosine phosphoribosyl transferase deficiencies": (load_omim_by_id, 614723),
+                                    "agenesis cc": (load_hpo_by_name, "Agenesis of corpus callosum"),
+                                    "afebrile seizures": AFEBRILE,
+                                    "afebrile": AFEBRILE,
+                                    "autistic features": AUTISTIC,
+                                    "autistic": AUTISTIC,
+                                    "behaviour problems": (load_hpo_by_name, "Behavioral abnormality"),
+                                    "bladder ca": (load_hpo_by_name, "Bladder neoplasm"),
+                                    "bowel cancer": (load_omim_by_id, 114500),
+                                    "bowel polyps": (load_hpo_by_name, "Colorectal polyps"),
+                                    "brain abnormalities": ABNORMAL_BRAIN,
+                                    "brain abnormality": ABNORMAL_BRAIN,
+                                    "brain malformation": ABNORMAL_BRAIN,
+                                    "bulls ' eye maculopathy": BULLS_EYE_MACULOPATHY,  # TODO: Hacked due to us joining ' badly
+                                    "caf au lait": (load_hpo_by_name, "Cafe-au-lait spot"),
+                                    "carnitine transporter deficiency": (load_omim_by_id, 212140),
+                                    "callosal dysgenesis": (load_hpo_by_name, 'Callosal agenesis'),
+                                    "coagulation disorder": (load_hpo_by_name, "Abnormality of coagulation"),
+                                    "congenital heart disease": (load_hpo_by_id, 1627),
+                                    "congenital myasthenic": CMS,
+                                    "congenital myasthenic syndrome": CMS,
+                                    "congenital myaesthenic": CMS,
+                                    "congenital myaesthenic syndrome": CMS,
+                                    "cortical vision impairment": (load_hpo_by_name, "Cortical visual impairment"),
+                                    "craniofacial dysmorphism": FACIAL_DYSMORPHISM,
+                                    "crowded dentition": (load_hpo_by_id, 678),
+                                    "development delay": DEVELOPMENTAL_DELAY,
+                                    "dev issues": DEVELOPMENTAL_DELAY,
+                                    "distal hypermobility": (load_hpo_by_name, "Limitation of joint mobility"),
+                                    "duane syndrome": (load_hpo_by_id, 9921),
+                                    "dystrophin": (load_gene_by_name, 'DMD'),
+                                    "dysmorphic feature": DYSMORPHIC_FACE,
+                                    "dysmorphic features": DYSMORPHIC_FACE,
+                                    "easily bruised skin": (load_hpo_by_name, "Bruise easily"),
+                                    "ehler danlos syndrome (type iii)": (load_omim_by_id, 130020),
+                                    "ehlers-danos syndrome classic type": (load_omim_by_id, 130000),
+                                    "elevated ammonia": (load_hpo_by_name, "Hyperammonemia"),
+                                    "elevated ck": ELEVATED_CK,
+                                    "elevated ketones": KETOSIS,
+                                    "elevated lactate": (load_hpo_by_name, "Increased blood lactate"),
+                                    "elevated pth": (load_hpo_by_name, "Elevated circulating parathyroid hormone (PTH) level"),
+                                    "epileptic": (load_hpo_by_name, "epilepsy"),
+                                    "facial dysmorphology": FACIAL_DYSMORPHISM,
+                                    "fatty acid oxidation defect": FATTY_ACID_DISORDER,
+                                    "fatty acid oxidation disorder": FATTY_ACID_DISORDER,
+                                    "fetal hydrops": HYDROPS_FETALIS,
+                                    "global dd": GLOBAL_DEVELOPMENTAL_DELAY,
+                                    "global delay": GLOBAL_DEVELOPMENTAL_DELAY,
+                                    "global dev delay": GLOBAL_DEVELOPMENTAL_DELAY,
+                                    #"hailey-hailey syndrome" : (load_omim_by_name, "HAILEY-HAILEY DISEASE"),
+                                    "hand flapping": (load_hpo_by_name, "Recurrent hand flapping"),
+                                    "hearing aids": HEARING_IMPAIRMENT,
+                                    "hearing impaired": HEARING_IMPAIRMENT,
+                                    "hereditary neuralgic amyotrophy": (load_omim_by_name, "AMYOTROPHY, HEREDITARY NEURALGIC"),
+                                    "high ketones": KETOSIS,
+                                    "high acth": (load_hpo_by_name, "Increased circulating ACTH level"),
+                                    "hot flushes": (load_hpo_by_name, "Episodic fever"),  # Not the same but best I can match
+                                    "hyperinsulinism": (load_hpo_by_name, "Elevated insulin level"),
+                                    "hypoca": (load_hpo_by_name, "Hypocalcemia"),
+                                    "hypoferritinaemia": (load_hpo_by_name, "Decreased serum ferritin"),  # hyper is there, hypo is not...
+                                    "hypok": (load_hpo_by_name, "Hypokalemia"),
+                                    "hypomg": (load_hpo_by_name, "Hypomagnesemia"),
+                                    "hypop": (load_hpo_by_name, "Hypophosphatemia"),
+                                    # I considered making a general conversion of "hypoplastic X" -> "Hypoplasia of X" but there are lots
+                                    # of aliases that already do that, and a few entries for hypoplastic X but NOT hypoplasia of X so do case by case
+                                    "hypoplastic right ventricle": (load_hpo_by_name, "Hypoplasia of right ventricle"),
+                                    "inattention": (load_hpo_by_name, "Short attention span"),
+                                    "increased renin": (load_hpo_by_name, "Increased serum renin"),
+                                    "intellectual delay": (load_hpo_by_name, "Delayed intellectual development"),
+                                    "impaired consciousness": (load_hpo_by_name, "Reduced consciousness/confusion"),
+                                    "iron deficiency": (load_hpo_by_name, "Abnormal serum iron"),
+                                    "kneist dysplasia": (load_omim_by_name, "KNIEST DYSPLASIA"),
+                                    "learning difficulties": COGNITIVE_IMPAIRMENT,
+                                    "learning disability": COGNITIVE_IMPAIRMENT,
+                                    "legius": (load_omim_by_name, "Legius Syndrome"),
+                                    "leg pains": (load_hpo_by_name, "Limb pain"),
+                                    "limb abnormalities": ABNORMALITY_OF_LIMBS,
+                                    "low arylsulphatase": ARYLSULFATASE_A_DEFICIENCY,
+                                    "low arylsulphatase A": ARYLSULFATASE_A_DEFICIENCY,
+                                    "low bgl": (load_hpo_by_name, "Hypoglycemia"),
+                                    "low bp": (load_hpo_by_name, "Low blood pressure"),
+                                    "low carnitine": (load_hpo_by_name, "Decreased plasma carnitine"),
+                                    "lymphopaena": (load_hpo_by_name, "Lymphopenia"),
+                                    "migranes": (load_hpo_by_name, "migraine"),
+                                    "men type 1": (load_omim_by_id, 131100),
+                                    "methylenetetrahyrofolate deficiency": (load_omim_by_id, 236250),  # HOMOCYSTINURIA DUE TO DEFICIENCY OF N(5,10)-METHYLENETETRAHYDROFOLATE REDUCTASE ACTIVITY
+                                    "missing forearm": ABSENT_FOREARM,
+                                    "missing forearms": ABSENT_FOREARM,
+                                    "mitochondrial resp. chain disorder": MITO_DEFICIENCY,
+                                    "mitochondrial respiratory chain disorder": MITO_DEFICIENCY,
+                                    "moya moya": (load_hpo_by_id, 11834),
+                                    "musculoskeletal abnormalities": (load_hpo_list_by_names, ["Muscular abnormality", "Skeletal abnormalities"]),
+                                    "na craving": (load_hpo_by_name, "Salt craving"),
+                                    "neuroregression": (load_hpo_by_name, "Neurodevelopmental regression"),
+                                    "noggin": (load_gene_by_name, 'NOG'),
+                                    "no speech": (load_hpo_by_id, 1344),
+                                    "ohtahara syndrome": (load_omim_by_name, "OHTAHARA SYNDROME, X-LINKED"),
+                                    "opisthoclonus": (load_hpo_by_name, "opisthotonus"),
+                                    "opitz gbbb": (load_omim_by_name, "OPITZ GBBB SYNDROME, X-LINKED"),
+                                    "parkinson's disease": PARKINSONISM,
+                                    "parkinsons": PARKINSONISM,
+                                    "parkinson's": PARKINSONISM,
+                                    "parkinson": PARKINSONISM,
+                                    "pierre robin": PIERRE_ROBIN,
+                                    "pierre-robin": PIERRE_ROBIN,
+                                    'pig genes': PIG_GENES,
+                                    "periodic fever": (load_omim_by_name, "PERIODIC FEVER, FAMILIAL, AUTOSOMAL DOMINANT"),
+                                    "polysyndactyly": (load_hpo_by_name, "Polysyndactyly of big toe"),
+                                    "poor sleep": (load_hpo_by_id, 2360),
+                                    "prolonged qt": (load_hpo_by_name, "Prolonged QT interval"),
+                                    "prostate ca": (load_hpo_by_name, "Prostate cancer"),
+                                    "pulmonary avms": PAVM,
+                                    "pul avms": PAVM,
+                                    "raised ck": ELEVATED_CK,
+                                    "raised liver enzymes": (load_hpo_by_name, "Elevated liver enzymes"),
+                                    "raised ketones": KETOSIS,
+                                    "raised methionine": (load_hpo_by_name, "Hypermethioninemia"),
+                                    "raised urinary orotate": (load_hpo_by_name, "High urine orotic acid levels"),
+                                    "raised tyrosine": (load_hpo_by_name, "Hypertyrosinemia"),
+                                    "raised tsh": HIGH_TSH,
+                                    "increased tsh": HIGH_TSH,
+                                    "increased sweat": (load_hpo_by_name, "Hyperhidrosis"),
+                                    "recurrent urtis": (load_hpo_by_name, "Recurrent upper respiratory tract infections"),
+                                    "rem sleep": (load_hpo_by_name, "Abnormal REM sleep"),
+                                    "renal ca": (load_hpo_by_name, "Renal cell carcinoma"),
+                                    "severe fetal hydrops": (load_hpo_by_name, "Severe hydrops fetalis"),
+                                    "spastic cp": (load_hpo_by_name, "Cerebral palsy"),
+                                    "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
+                                    "type 1 diabetes": DIBETES_TYPE_1,
+                                    "t1 diabetes": DIBETES_TYPE_1,
+                                    "two hair whorls": (load_hpo_by_id, 10813),
+                                    "uncoordinated": (load_hpo_by_id, 2406),
+                                    "urea cycle": (load_genes_by_name, ["ARG1", "ASL", "ASS1", "CPS1", "NAGS", "OTC"]),
+                                    "urogenital sinus": (load_hpo_by_name, 'Urogenital anomalies'),
+                                    "waardenburg type ii": (load_omim_pks_containing_name, "waardenburg syndrome, type 2"),
+                                    "widespread eyes": (load_hpo_by_name, "Widely spaced eyes")}
+
+        # People put down eg Waardenburg but there are many different OMIM diseases - we'll put ALL of them
+        # Switching to MONDO will help disease families, as it's hierarchial (unlike OMIM)
+        ALPORT_SYNDROME = (load_omim_pks_containing_name, "Alport Syndrome")
+        CILIARY_DYSKINESIA = (load_omim_pks_containing_name, "Ciliary dyskinesia")
+        BARTTER_SYNDROME = (load_omim_pks_containing_name, "Bartter Syndrome")
+        BRUGADA_SYNDROME = (load_omim_pks_containing_name, "Brugada Syndrome")
+        CHARCOT_MARIE_TOOTH = (load_omim_pks_containing_name, "Charcot-marie-tooth")
+        CHONDRODYSPLASIA_PUNCTATA = (load_omim_pks_containing_name, "CHONDRODYSPLASIA PUNCTATA")
+        EHLER_DANOS = (load_omim_pks_containing_name, "EHLERS-DANLOS SYNDROME")
+        HLH = (load_omim_pks_containing_name, "HEMOPHAGOCYTIC LYMPHOHISTIOCYTOSIS")
+        LEBER_AMAUROSIS = (load_omim_pks_containing_name, "leber congenital amaurosis")
+        ROBINOW = (load_omim_pks_containing_name, "Robinow Syndrome")
+        SANFILIPPO = (load_omim_pks_containing_alias_name, "Sanfilippo Syndrome")
+        STICKLER = (load_omim_pks_containing_name, "Stickler Syndrome")
+        TUBEROUS_SCLEROSIS = (load_omim_pks_containing_name, "tuberous sclerosis")
+
+        DISEASE_FAMILIES = {
+            "aicardi goutires syndrome": (load_omim_pks_containing_name, "AICARDI-GOUTIERES"),
+            "alport syndrome": ALPORT_SYNDROME,
+            "alport": ALPORT_SYNDROME,
+            "autoinflammatory syndrome": (load_omim_pks_containing_name, "autoinflammatory syndrome"),
+            "bartter syndrome": BARTTER_SYNDROME,
+            "bartter": BARTTER_SYNDROME,
+            "brugada": BRUGADA_SYNDROME,
+            "brugada syndrome": BRUGADA_SYNDROME,
+            "charcot-marie-tooth": CHARCOT_MARIE_TOOTH,
+            "charcot marie tooth": CHARCOT_MARIE_TOOTH,
+            "chondrodysplasia": CHONDRODYSPLASIA_PUNCTATA,
+            "chondroplasia punctata": CHONDRODYSPLASIA_PUNCTATA,  # Typo
+            "cilial dyskinesis": CILIARY_DYSKINESIA,
+            "cilial dyskinesia": CILIARY_DYSKINESIA,
+            "ehrlers danlos": EHLER_DANOS,
+            "ehlers-danos": EHLER_DANOS,
+            "ehler danlos": EHLER_DANOS,
+            "gaucher disease":  (load_omim_pks_containing_name, "GAUCHER DISEASE"),
+            "glycogen storage disease": GLYCOGEN_STORAGE_DISEASE,
+            "glut1 deficiency": (load_omim_pks_containing_name, "GLUT1 DEFICIENCY SYNDROME"),
+            "hemophagocytic lymphohistiocytosis": HLH,
+            "hlh": HLH,
+            "hht": (load_omim_pks_containing_name, "Hereditary hemorrhagic telangiectasia"),
+            "leber amaurosis": LEBER_AMAUROSIS,
+            "lebers amaurosis": LEBER_AMAUROSIS,
+            "leber's amaurosis": LEBER_AMAUROSIS,  # TODO: This doesn't match as seems ' ' inserted??
+            "osteogenesis imperfecta": (load_omim_pks_containing_name, "osteogenesis imperfecta"),
+            "robinow syndrome": ROBINOW,
+            "robinow": ROBINOW,
+            "sanfilippo": SANFILIPPO,
+            "stickler syndrome": STICKLER,
+            "stickler": STICKLER,
+            "tuberous sclerosis": TUBEROUS_SCLEROSIS,
+            "usher syndrome": (load_omim_pks_containing_name, "usher syndrome"),
+            "waardenburg": (load_omim_pks_containing_name, "waardenburg"),
+        }
+        return HARDCODED_LOOKUPS, CASE_INSENSITIVE_LOOKUPS, DISEASE_FAMILIES
+
 
 
 def replace_comments_with_spaces(text):
