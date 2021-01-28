@@ -22,6 +22,7 @@ OMIM_PATTERN = re.compile(r"OMIM:(\d+)$")
 MIN_MATCH_LENGTH = 3
 MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
 
+
 def load_omim_by_id(accession) -> OntologyResults:
     pk = OntologyService.index_to_id(OntologyService.OMIM, accession)
     return PhenotypeMatchTypes.OMIM, [pk]
@@ -90,14 +91,14 @@ class PhenotypeMatcher:
         hpo_list = []
         omim_list = []
         gene_symbols = []
-        special_case_match = self.get_special_case_match(text)
+        special_case_match = self._get_special_case_match(text)
         if any(special_case_match):
             hpo_list, omim_list, gene_symbols = special_case_match
         else:
             if len(lower_text) < MIN_MATCH_LENGTH:
                 return [], [], []
 
-            if self.skip_word(lower_text):
+            if self._skip_word(lower_text):
                 return [], [], []
 
             hpo = self.hpo_pks.get(lower_text)
@@ -129,7 +130,7 @@ class PhenotypeMatcher:
 
         return hpo_list, omim_list, gene_symbols
 
-    def get_special_case_match(self, text) -> Tuple[List[CodePK], List[CodePK], List[CodePK]]:
+    def _get_special_case_match(self, text) -> Tuple[List[CodePK], List[CodePK], List[CodePK]]:
         hpo_list = []
         omim_alias_list = []
         gene_symbols = []
@@ -178,7 +179,7 @@ class PhenotypeMatcher:
         return hpo_list, omim_alias_list, gene_symbols
 
     @classmethod
-    def skip_word(cls, lower_text):
+    def _skip_word(cls, lower_text):
         """ Return true to skip a word, throws SkipAllPhenotypeMatchException to skip all.
             Only need to skip >MIN_LENGTH words as will do that later (after exact) """
 
@@ -205,12 +206,14 @@ class PhenotypeMatcher:
         return distance
 
     @staticmethod
-    def get_id_from_multi_word_fuzzy_match(lookup: CodePKLookups, words: List[str], text: str, distance: int = 1) -> \
-    Optional[CodePK]:
+    def get_id_from_multi_word_fuzzy_match(lookup: CodePKLookups, words: List[str], text: str, distance: int = 1) -> Optional[CodePK]:
         potentials: CodePKLookups = dict()
+        min_length = len(text) - distance
+        max_length = len(text) + distance
         for w in words:
-            potentials.update(lookup[w])
-
+            for term, pk in lookup[w].items():
+                if min_length <= len(term) <= max_length:
+                    potentials[term] = pk
         if not potentials:
             return None
         return PhenotypeMatcher.get_id_from_fuzzy_match(potentials, text, distance)
@@ -220,9 +223,9 @@ class PhenotypeMatcher:
                                             distance: int = 1) -> Optional[CodePK]:
         text_length = len(text)
         potentials: CodePKLookups = dict()
-        for l in [text_length - distance, text_length, text_length + distance]:
-            words = single_words_by_length.get(l)
-            if words:
+        # Can quickly exclude words that are greater than +/- distance away
+        for l in range(text_length - distance, text_length + distance + 1):
+            if words := single_words_by_length.get(l):
                 potentials.update(words)
         return PhenotypeMatcher.get_id_from_fuzzy_match(potentials, text, distance)
 

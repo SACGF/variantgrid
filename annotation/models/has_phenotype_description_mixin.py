@@ -95,24 +95,21 @@ class HasPhenotypeDescriptionMixin:
 
     @staticmethod
     def pop_kwargs(kwargs_dict):
-        """ remove kwargs (so save for other model does't fail """
-        check_patient_text_phenotype = kwargs_dict.pop("check_patient_text_phenotype", True)
-        phenotype_approval_user = kwargs_dict.pop("phenotype_approval_user", None)
-        return {"check_patient_text_phenotype": check_patient_text_phenotype,
-                "phenotype_approval_user": phenotype_approval_user}
+        """ remove kwargs (so save for other model doesn't fail """
+        defaults = {"check_patient_text_phenotype": True,
+                    "phenotype_approval_user": None,
+                    "phenotype_matcher": None}
+        return {k: kwargs_dict.pop(k, v) for k, v in defaults.items()}
 
     def save_phenotype(self, kwargs_dict):
         """ Pass kwargs_dict as dict - will pop fields it uses:
             "check_patient_text_phenotype" and "phenotype_approval_user" """
-
-        kwargs = HasPhenotypeDescriptionMixin.pop_kwargs(kwargs_dict)
-        check_patient_text_phenotype = kwargs["check_patient_text_phenotype"]
-        phenotype_approval_user = kwargs["phenotype_approval_user"]
 
         # Some browsers send Text inputs with \r\n - while AJAX sends it as \n
         # strip \r to keep it consistent so that highlighting offsets line up
         if self.phenotype_input_text:
             self.phenotype_input_text = self.phenotype_input_text.replace('\r', '')
 
-        if check_patient_text_phenotype:
-            self.process_phenotype_if_changed(phenotype_approval_user=phenotype_approval_user)
+        kwargs = HasPhenotypeDescriptionMixin.pop_kwargs(kwargs_dict)
+        if kwargs.pop("check_patient_text_phenotype", False):
+            self.process_phenotype_if_changed(**kwargs)

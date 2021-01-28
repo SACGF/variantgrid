@@ -11,13 +11,13 @@ class TestPhenotypeMatching(TestCase):
     @classmethod
     def setUpTestData(cls):
         create_ontology_test_data()
-
         cls.phenotype_matcher = PhenotypeMatcher()
 
     def create_patient_match_phenotypes(self, phenotype):
-        patient = Patient.objects.create(phenotype=phenotype)
-        patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
+        patient = Patient(phenotype=phenotype)
+        patient.save(phenotype_matcher=self.phenotype_matcher)
 
+        patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
         return patient.patient_text_phenotype.phenotype_description.get_results()
 
     def check_expected_results_for_description(self, expected_results_by_description):
