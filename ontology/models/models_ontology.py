@@ -171,9 +171,10 @@ class OntologyTerm(TimeStampedModel):
 
         if isinstance(gene_symbol, GeneSymbol):
             gene_symbol = gene_symbol.symbol
+
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, name=gene_symbol).first():
             return gene_ontology
-        if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, aliases__contains=gene_symbol).first():
+        if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, aliases__contains=[gene_symbol]).first():
             return gene_ontology
 
         hgnc_matcher = HGNCMatcher.instance()
