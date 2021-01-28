@@ -402,7 +402,7 @@ def load_biomart(filename: str, force: bool):
         filename=filename,
         context="biomart_omim_aliases",
         import_source="biomart",
-        processor_version=1,
+        processor_version=2,
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)
@@ -485,7 +485,7 @@ class Command(BaseCommand):
             try:
                 load_biomart(filename, force=force)
             except OntologyBuilderDataUpToDateException:
-                print("MONDO File hash is the same as last import")
+                print("BioMart File hash is the same as last import")
 
         if filename := options.get("mondo_json"):
             try:
