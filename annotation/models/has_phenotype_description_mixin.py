@@ -2,7 +2,6 @@ from typing import List
 
 from django.db.models import QuerySet
 
-
 class HasPhenotypeDescriptionMixin:
 
     def _get_phenotype_input_text_field(self):
@@ -60,7 +59,9 @@ class HasPhenotypeDescriptionMixin:
             returns whether phenotype changed """
 
         # Stop circular import
-        from annotation.phenotype_matching import PhenotypeMatcher, create_phenotype_description
+        from annotation.phenotype_matcher import PhenotypeMatcher
+        from annotation.phenotype_matching import create_phenotype_description
+
         if phenotype_matcher is None:
             phenotype_matcher = PhenotypeMatcher()
 

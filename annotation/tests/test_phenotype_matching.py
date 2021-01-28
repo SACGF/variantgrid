@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes
-from annotation.phenotype_matching import PhenotypeMatcher
+from annotation.phenotype_matcher import PhenotypeMatcher
 from ontology.tests.test_data_ontology import create_ontology_test_data
 from patients.models import Patient
 
