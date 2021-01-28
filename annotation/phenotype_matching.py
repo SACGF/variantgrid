@@ -108,7 +108,7 @@ def create_word_lookups(records: Lookups) -> Dict[str, OntologyDict]:
 
 def get_special_case_match(text, hpo_records: OntologyDict, omim_records: OntologyDict, gene_records: OntologyDict) -> Tuple[List[OntologyObj], List[OntologyObj], List[OntologyObj]]:
     def load_omim_alias_by_id(accession) -> OntologyResults:
-        pk = OntologyService.index_to_id(OntologyService.HPO, accession)
+        pk = OntologyService.index_to_id(OntologyService.OMIM, accession)
         return PhenotypeMatchTypes.OMIM, [pk]
 
     def load_omim_by_name(description: str) -> OntologyResults:
@@ -490,12 +490,12 @@ def skip_word(lower_text):
         raise SkipAllPhenotypeMatchException()
 
     # Words which have no use matching on their own
-    COMMON_WORDS = {'acute', 'adult', 'all', 'and',
+    COMMON_WORDS = {'acute', 'adult', 'all', 'and', 'associated',
                     'bad', 'bilateral', 'birth', 'blood', 'borderline',
                     'can', 'carries', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma', 'commas', 'coned', 'cord', 'cousin', 'cousins',
-                    'diffused', 'deficiency', 'distal',
+                    'diffused', 'deficiency', 'disorder', 'distal',
                     'exclude',
-                    'face', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from',
+                    'face', 'familial', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from',
                     'generalized', "generalised",
                     'hard', 'hearing',
                     'image', 'inheritance', 'insulin',
@@ -507,9 +507,9 @@ def skip_word(lower_text):
                     'onset',
                     'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged', 'proximal', 'progressive',
                     'range', 'raise', 'recurrent', 'right',
-                    'severe', 'she', 'short', 'skeletal', 'sleep',
+                    'severe', 'she', 'short', 'skeletal', 'sleep', 'syndrome',
                     'the', 'transient',
-                    'wants', 'was'}
+                    'wants', 'was', 'with'}
 
     return lower_text in COMMON_WORDS
 
@@ -864,14 +864,21 @@ def get_omim_pks_by_term():
 
     def break_up_syndromes_and_disease(omim_description, omim_alias):
         words = omim_description.split()
-        if len(words) >= 2 and words[-1] in ['syndrome', 'disease']:
-            term_before_syndrome = ' '.join(words[:-1])
-            omim_pks_by_term[term_before_syndrome] = pk
-            break_up_dashes(term_before_syndrome, omim_alias)
+        if len(words) >= 2:
+            for t in ['syndrome', 'disease']:
+                try:
+                    i = words.index(t)
+                    if i >= 2:
+                        term_before_syndrome = ' '.join(words[:i])
+                        omim_pks_by_term[term_before_syndrome] = pk
+                        break_up_dashes(term_before_syndrome, omim_alias)
+                except ValueError:
+                    pass
 
     for pk, name, aliases in omim_qs.values_list("pk", "name", "aliases"):
         for term in [name] + aliases:
-            term = term.strip().lower()
+            # Remove commas, as phenotype to match will have that done also
+            term = term.strip().lower().replace(",", "")
             omim_pks_by_term[term] = pk
             for split_term in term.split(";"):
                 omim_pks_by_term[split_term] = pk
