@@ -1,6 +1,7 @@
 import logging
 import os
 import uuid
+from abc import ABC
 from subprocess import CalledProcessError
 from typing import List, Iterable
 

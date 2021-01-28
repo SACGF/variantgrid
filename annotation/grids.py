@@ -99,5 +99,3 @@ class TissueGeneGrid(AbstractGenesGrid):
     @property
     def csv_name(self):
         return f"{self.tissue_sample.name}_{self.min_abundance}_tissue_genes"
-
-

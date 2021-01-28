@@ -129,6 +129,7 @@ disable=print-statement,
         too-few-public-methods, # Enums get caught...
 	line-too-long, # too many at the moment
 	wrong-import-order,
+	invalid-str-returned, # False positives Django __str__
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

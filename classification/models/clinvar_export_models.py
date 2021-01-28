@@ -14,7 +14,7 @@ from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap, classification_post_publish_signal, \
     Classification, flag_types
 from classification.models.evidence_mixin import VCDbRefDict
-from classification.regexes import db_ref_regexes, DbRegexes
+from classification.regexes import DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution, FlagStatus
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
@@ -84,10 +84,10 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
         # TODO - do we reduce this to just records shared globally??!
         # or do we accept both, and treat the share level as a to be confirmed globally
         for cm in ClassificationModification.objects.filter(
-            classification__withdrawn=False,
-            classification__variant__variantallele__allele=allele,
-            is_last_published=True,
-            share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).select_related('classification'):
+                classification__withdrawn=False,
+                classification__variant__variantallele__allele=allele,
+                is_last_published=True,
+                share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).select_related('classification'):
 
             classification = cm.classification
             # decision, grabbing the 38 representation

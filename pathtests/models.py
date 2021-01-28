@@ -4,13 +4,11 @@ from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
-from genes.models import GeneList, Gene, GeneSymbol
+from genes.models import GeneList, GeneSymbol
 from library.enums import ModificationOperation
-from ontology.models import OntologyTerm
 from pathtests.models_enums import PathologyTestGeneModificationOutcome, \
     CaseState, InvestigationType, CaseWorkflowStatus
-from patients.models import Patient, Clinician, ExternallyManagedModel, \
-    TEST_PATIENT_KWARGS
+from patients.models import Patient, Clinician, ExternallyManagedModel, TEST_PATIENT_KWARGS
 from patients.models_enums import PopulationGroup
 from seqauto.models import Experiment, SequencingRun, EnrichmentKit
 from snpdb.models import Wiki, Sample

@@ -121,8 +121,7 @@ class AlleleOverlap:
         lab_ids = set(lab.id for lab in labs)
 
         # find the variant for ALL variant classifications, and keep a dict of variant id to classification id
-        classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id',
-                                                                                                          'variant')
+        classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id', 'variant')
         variant_to_vcids: Dict[int, List[int]] = defaultdict(list)
         for classification_id, variant_id in classification_variant_ids_qs:
             variant_to_vcids[variant_id].append(classification_id)

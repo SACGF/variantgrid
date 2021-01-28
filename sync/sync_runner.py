@@ -35,17 +35,11 @@ def run_sync(sync_destination: SyncDestination, full_sync: bool = False) -> Sync
 
     config = sync_destination.config
     sync_type = config.get('type')
-    if sync_type == 'shariant' or sync_type == 'variantgrid':
+    if sync_type in ('shariant', 'variantgrid'):
         direction = config.get('direction')
         if direction == 'upload':
-
             return sync_shariant_upload(sync_destination=sync_destination, full_sync=full_sync)
-
-        elif direction == 'download':
-
+        if direction == 'download':
             return sync_shariant_download(sync_destination=sync_destination, full_sync=full_sync)
-
-        else:
-            raise ValueError('config.direction must be upload or download')
-    else:
-        raise ValueError(f'unknown sync_type: {sync_type}')
+        raise ValueError('config.direction must be upload or download')
+    raise ValueError(f'unknown sync_type: {sync_type}')

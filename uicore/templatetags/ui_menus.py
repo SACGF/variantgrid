@@ -1,4 +1,4 @@
-from typing import List, Any, Optional
+from typing import Any, Optional
 
 from django.template.library import Library
 from django.urls import reverse
@@ -9,11 +9,12 @@ from variantgrid.perm_path import get_visible_url_names
 register = Library()
 UNSET = '!@#$%^&*()'
 
+
 @register.inclusion_tag("uicore/tags/menu_item.html", takes_context=True)
 def menu_top(context,
-               url_name: str,
-               app_name: str,
-               title: str = None):
+             url_name: str,
+             app_name: str,
+             title: str = None):
     url = None
     for url_name_part in url_name.split('|'):
         if get_visible_url_names().get(url_name_part):
@@ -42,10 +43,11 @@ def menu_top(context,
         'id': f'menu-top-{app_names[0]}'
     }
 
+
 @register.inclusion_tag("uicore/tags/menu_item.html", takes_context=True)
 def menu_item(
         context,
-        url_name:str,
+        url_name: str,
         css_class: str = '',
         arg1: Any = UNSET,
         arg2: Any = UNSET,

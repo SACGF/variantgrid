@@ -20,7 +20,7 @@ def update_django_messages(context):
         for message in messages:
             tags = message.tags
             text = str(message)
-            message_json.append({"tags": tags, "text": text});
+            message_json.append({"tags": tags, "text": text})
     message_json_string = json.dumps(message_json)
     return SafeString(f"update_django_messages({message_json_string});")
 
@@ -173,17 +173,17 @@ class LabelledValueTag(template.Node):
         row_css = "form-group row mb-4 mb-md-3"
 
         if hint == "tiny":
-            label_css = f"col-12 col-md-6 text-md-right"
-            value_css = f"col-12 col-md-6 text-left align-self-center text-break"
+            label_css = "col-12 col-md-6 text-md-right"
+            value_css = "col-12 col-md-6 text-left align-self-center text-break"
         elif hint == "chunky":
-            label_css = f"col-12"
-            value_css = f"col-12 text-break"
+            label_css = "col-12"
+            value_css = "col-12 text-break"
         elif hint == "inline":
             label_css = "m-2 align-self-center"
             value_css = "m-2"
         else:
-            label_css = f"col-12 col-md-3 text-md-right align-self-center"
-            value_css = f"col-12 col-md-9 text-left text-break"
+            label_css = "col-12 col-md-3 text-md-right align-self-center"
+            value_css = "col-12 col-md-9 text-left text-break"
 
         label_css_extra = TagUtils.value_str(context, self.label_css, '')
         label_css = f"{label_css} {label_css_extra}".strip()
@@ -207,7 +207,7 @@ class LabelledValueTag(template.Node):
             div_id = f"id=\"{complete_id}\""
             for_id = f"for=\"{complete_id}\""
 
-        if output == "" or output == "None":
+        if output in ("", "None"):
             output = "<span class=\"no-value\">-</span>"
         elif LabelledValueTag.big_zero.match(output):
             output = f"<span class=\"zero-value\">{output}</span>"
@@ -221,8 +221,7 @@ class LabelledValueTag(template.Node):
 
         if hint == "inline":
             return content
-        else:
-            return f'<div class="{row_css}">{content}</div>'
+        return f'<div class="{row_css}">{content}</div>'
 
 
 @register.filter()
@@ -232,22 +231,21 @@ def severity_icon(severity: str) -> str:
     severity = severity.upper()
     if severity.startswith('C'):  # critical
         return SafeString('<i class="fas fa-bomb text-danger"></i>')
-    elif severity.startswith('E'):  # error
+    if severity.startswith('E'):  # error
         return SafeString('<i class="fas fa-exclamation-circle text-danger"></i>')
-    elif severity.startswith('W'):  # warning
+    if severity.startswith('W'):  # warning
         return SafeString('<i class="fas fa-exclamation-triangle text-warning"></i>')
-    elif severity.startswith('I'):  # info
+    if severity.startswith('I'):  # info
         return SafeString('<i class="fas fa-info-circle text-info"></i>')
-    else:  # debug
-        return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
+    # debug
+    return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
 
 
 @register.filter()
 def checked(test: bool) -> str:
     if test:
         return SafeString('checked="checked"')
-    else:
-        return ''
+    return ''
 
 class TagUtils:
 

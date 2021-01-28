@@ -25,7 +25,6 @@ def _one_off_move_ontology(apps, schema_editor):
         PhenotypeNodeOntologyTerm.objects.create(phenotype_node=pn_omim.phenotype_node, ontology_term=ontology_term)
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

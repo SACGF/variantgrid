@@ -20,6 +20,5 @@ class OntologyTermView(TemplateView):
                 "gene_relationships": gene_relationships,
                 "relationships": OntologyTermRelation.relations_of(term)
             }
-        else:
-            messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")
-            return {"term": term}
+        messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")
+        return {"term": term}

@@ -17,12 +17,10 @@ from library.django_utils import add_save_message
 from pathtests.forms import SelectPathologyTestForm, SelectPathologyTestVersionForm, \
     PathologyTestOrderForm, CaseForm, CreatePathologyTestForm, PathologyTestVersionForm
 from pathtests.models import PathologyTest, PathologyTestVersion, \
-    PathologyTestGeneModificationRequest, PathologyTestGeneModificationOutcome, \
-    get_cases_qs, PathologyTestOrder, Case, \
-    get_external_order_system_last_checked, ActivePathologyTestVersion
+    PathologyTestGeneModificationRequest, PathologyTestGeneModificationOutcome, get_cases_qs, PathologyTestOrder, \
+    Case, get_external_order_system_last_checked, ActivePathologyTestVersion
 from patients.forms import external_pk_autocomplete_form_factory
-from patients.models import Clinician, get_lead_scientist_users_for_user, \
-    FollowLeadScientist
+from patients.models import Clinician, get_lead_scientist_users_for_user, FollowLeadScientist
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -233,14 +231,13 @@ def handle_modification_requests(post_dict, pathology_test_version, op_key, modi
 
             request_info = []
             for gmr in gene_modification_requests:
-                req_info = f"{gmr.user} on {gmr.modified}"
+                req_info = f"{gmr.user} {gmr.get_operation_display()} on {gmr.modified}"
                 if gmr.comments:
                     req_info += ": " + gmr.comments
                 request_info.append(req_info)
             request_info_str = ", ".join(request_info)
             curator = pathology_test_version.pathology_test.curator
-            operation = gmr.get_operation_display()
-            modification_info = f"{operation} request: {request_info_str}, accepted by {curator} on {current_time}"
+            modification_info = f"request: {request_info_str}, accepted by {curator} on {current_time}"
             gene_modification_info[gene_symbol] = modification_info
 
         for gmr in gene_modification_requests:

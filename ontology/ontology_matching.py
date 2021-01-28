@@ -8,7 +8,6 @@ import requests
 from django.db.models import Q
 from django.db.models.functions import Length
 from django.urls import reverse
-from lazy import lazy
 
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
 from ontology.panel_app_ontology import update_gene_relations

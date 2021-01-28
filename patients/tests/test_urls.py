@@ -56,11 +56,6 @@ class Test(URLTestCase):
             ('specimen_autocomplete', cls.specimen, {"q": cls.specimen.reference_id}),
         ]
 
-        # TODO: do HPO etc and make sure they are not visible by
-        # create_mim_hpo_test_data
-        mim_gene_symbol = "RUNX1"
-        hpo_gene_symbol = "GATA2"
-
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
         patient_build_kwargs = {"patient_id": cls.patient.pk, "genome_build_name": cls.grch37.name}
         cls.PRIVATE_GRID_LIST_URLS = [

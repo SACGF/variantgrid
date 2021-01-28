@@ -65,9 +65,7 @@ def page_help_embedded(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_page_help_embedded',))
     parser.delete_first_token()
-    return PageHelpContent(nodelist,
-                            title=kwargs.get('title')
-    )
+    return PageHelpContent(nodelist, title=kwargs.get('title'))
 
 
 class PageHelpContent(template.Node):

@@ -6,11 +6,9 @@ from rest_framework.views import APIView
 from typing import Iterable, Dict, Any, Union, List, Optional
 import datetime
 
-from flags.models import Flag, \
-    FlagComment, FlagType, FlagCollection, FlagPermissionLevel, FlagWatch
+from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagWatch
 from flags.models.enums import FlagStatus
-from flags.models.models import FlagResolution, FlagTypeResolution, \
-    fetch_flag_infos
+from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none
 from snpdb.models import Lab
@@ -24,7 +22,7 @@ class CommentDetails:
         self.helper = helper
         self.detailed = False
 
-    def to_json(self) -> Dict[str,Any]:
+    def to_json(self) -> Dict[str, Any]:
         status = None
         resolution = self.comment.resolution
         if resolution:
@@ -52,7 +50,7 @@ class CommentDetails:
 
 class FlagHelper:
 
-    def __init__(self, flag_collections: Union[FlagCollection,Iterable[FlagCollection]], user: User):
+    def __init__(self, flag_collections: Union[FlagCollection, Iterable[FlagCollection]], user: User):
 
         if flag_collections is None:
             flag_collections = []
@@ -392,7 +390,7 @@ class FlagView(APIView):
     def post(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_id')
         f = Flag.objects.get(pk=pk)  # type: Flag
-        data = request.data;
+        data = request.data
         resolution = data.get('resolution', None)
         if resolution:
             resolution = FlagResolution.objects.get(pk=resolution)

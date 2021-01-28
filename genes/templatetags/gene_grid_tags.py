@@ -114,7 +114,7 @@ def gene_grid(context, columns_from_url=None,
                          "description": "Human Phenotype Ontology",
                          "form": HPOForm(),
                          "form_css_class": "hpo-gene-list-form"}
-    categories.append(hpo_category_data) #
+    categories.append(hpo_category_data)
     omim_category_data = {"name": "OMIM",
                           "icon_css_class": "omim-icon",
                           "description": "OMIM",

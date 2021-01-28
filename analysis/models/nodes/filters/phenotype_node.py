@@ -9,7 +9,7 @@ import operator
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
-from genes.models import Gene, GeneSymbol, ReleaseGeneSymbolGene
+from genes.models import GeneSymbol
 from ontology.models import OntologySnake
 from patients.models import Patient
 

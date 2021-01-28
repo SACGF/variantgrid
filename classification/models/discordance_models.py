@@ -13,13 +13,11 @@ from typing import Set, Optional, List
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from classification.enums import ClinicalSignificanceComparison
-from classification.enums.discordance_enums import DiscordanceReportResolution, \
-    ContinuedDiscordanceReason
+from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.enums.classification_enums import SpecialEKeys
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationModification, \
-    Classification
+from classification.models.classification import ClassificationModification, Classification
 
 
 class DiscordanceReport(TimeStampedModel):
@@ -357,7 +355,6 @@ class DiscordanceReportClassification(TimeStampedModel):
 
         has_reclass_reason = False
         internal_reviewed = False
-        sig_change_date = None
 
         processed_flag = set()
         for flag_comment in relevant_comments_qs:  # : :type flag_comment: FlagComment

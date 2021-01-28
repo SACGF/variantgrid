@@ -317,7 +317,7 @@ class PhenotypeMatcher:
                 cleaned_omim_description = omim_description.replace('-', ' ')
                 omim_pks_by_term[cleaned_omim_description] = pk
 
-        def break_up_syndromes_and_disease(omim_description, omim_alias):
+        def break_up_syndromes_and_disease(omim_description, pk):
             words = omim_description.split()
             if len(words) >= 2:
                 for t in ['syndrome', 'disease']:
@@ -326,7 +326,7 @@ class PhenotypeMatcher:
                         if i >= 2:
                             term_before_syndrome = ' '.join(words[:i])
                             omim_pks_by_term[term_before_syndrome] = pk
-                            break_up_dashes(term_before_syndrome, omim_alias)
+                            break_up_dashes(term_before_syndrome, pk)
                     except ValueError:
                         pass
 

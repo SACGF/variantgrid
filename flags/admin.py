@@ -1,7 +1,8 @@
 from django.contrib import admin
 from flags import models
-from flags.models import FlagTypeResolution, FlagStatus
+from flags.models import FlagStatus
 from flags.models.models import FlagType
+
 
 class FlagTypeFilter(admin.SimpleListFilter):
     list_per_page = 200

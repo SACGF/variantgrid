@@ -3,15 +3,13 @@ from django.contrib.auth.models import User
 from django_admin_json_editor.admin import JSONEditorWidget
 import json
 from django.conf import settings
-from django_extensions.management.commands.admin_generator import AdminModel
 
 from annotation.models.models import AnnotationVersion
 from library.guardian_utils import admin_bot
 from snpdb.admin import ModelAdminBasics
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
-from classification.enums.classification_enums import EvidenceCategory, \
-    SpecialEKeys, SubmissionSource, ShareLevel
+from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification
 from classification.models.classification import Classification, ClassificationImport
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
@@ -257,12 +255,11 @@ class ClassificationAdmin(admin.ModelAdmin):
         imports_by_genome = {}
 
         for vc in qs:
-            genome_build = None
             try:
                 genome_build = vc.get_genome_build()
                 if not genome_build.pk in imports_by_genome:
                     imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=request.user,
-                                                                                                    genome_build=genome_build)
+                                                                                             genome_build=genome_build)
                 vc_import = imports_by_genome[genome_build.pk]
                 vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
                 vc.classification_import = vc_import

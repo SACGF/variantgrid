@@ -29,7 +29,7 @@ from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from snpdb.clingen_allele import link_allele_to_existing_variants, get_clingen_allele
+from snpdb.clingen_allele import link_allele_to_existing_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
     AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource

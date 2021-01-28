@@ -1,11 +1,6 @@
-from typing import List, Any, Optional
-
 from django.conf import settings
 from django.template.library import Library
-from django.urls import reverse
-from library.django_utils import get_url_from_view_path
 from classification.models.classification_utils import UserClassificationStats
-from variantgrid.perm_path import get_visible_url_names
 
 register = Library()
 

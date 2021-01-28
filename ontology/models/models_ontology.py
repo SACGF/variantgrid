@@ -187,26 +187,25 @@ class OntologyTerm(TimeStampedModel):
                 hgnc_term.aliases.append(gene_symbol)
                 hgnc_term.save()
                 return hgnc_term
-            else:
-                # every term needs an import
-                o_import = OntologyImport.objects.create(
-                    import_source=OntologyService.HGNC,
-                    filename="HGNC Aliases",
-                    context="adhoc_hgnc",
-                    hash="N/A",
-                    processor_version=1,
-                    processed_date=now,
-                    completed=True)
+            # every term needs an import
+            o_import = OntologyImport.objects.create(
+                import_source=OntologyService.HGNC,
+                filename="HGNC Aliases",
+                context="adhoc_hgnc",
+                hash="N/A",
+                processor_version=1,
+                processed_date=now,
+                completed=True)
 
-                term = OntologyTerm.objects.create(
-                    id=f"HGNC:{hgnc.id}",
-                    ontology_service=OntologyService.HGNC,
-                    index=hgnc.id,
-                    name=hgnc.gene_symbol_id,
-                    definition=hgnc.approved_name,
-                    from_import=o_import
-                )
-                return term
+            term = OntologyTerm.objects.create(
+                id=f"HGNC:{hgnc.id}",
+                ontology_service=OntologyService.HGNC,
+                index=hgnc.id,
+                name=hgnc.gene_symbol_id,
+                definition=hgnc.approved_name,
+                from_import=o_import
+            )
+            return term
 
         raise ValueError(f"Cannot find HGNC for {gene_symbol}")
 
@@ -239,8 +238,7 @@ class OntologyTerm(TimeStampedModel):
         except ValueError:
             if existing := OntologyTerm.objects.filter(ontology_service=prefix, name=postfix).first():
                 return existing
-            else:
-                raise ValueError(f"Can not convert {id_str} to a proper id")
+            raise ValueError(f"Can not convert {id_str} to a proper id")
 
     @property
     def padded_index(self) -> str:
@@ -287,7 +285,7 @@ class OntologyTermRelation(TimeStampedModel):
         """
         if term == self.source_term:
             return self.dest_term
-        elif term == self.dest_term:
+        if term == self.dest_term:
             return self.source_term
         raise ValueError("Term was neither a source or dest term, can't find the other end")
 
@@ -320,8 +318,7 @@ class OntologyTermRelation(TimeStampedModel):
             if rel1source != rel2source:
                 if rel1source:
                     return -1
-                else:
-                    return 1
+                return 1
             other1 = rel1.other_end(term)
             other2 = rel2.other_end(term)
             if other1.ontology_service != other2.ontology_service:
@@ -412,7 +409,7 @@ class OntologySnake:
                         if other_term.ontology_service == to_ontology:
                             valid_snakes.append(new_snake)
                             continue
-                        elif len(new_snake.paths) <= max_depth:
+                        if len(new_snake.paths) <= max_depth:
                             new_snakes.append(new_snake)
                         seen.add(other_term)
         return OntologySnakes(valid_snakes)
@@ -485,7 +482,5 @@ class OntologySnakes:
     def __len__(self):
         return len(self.snakes)
 
-    def leafs(self) -> Set[OntologyTerm]:
-        items = list(set([snake.leaf_term for snake in self]))
-        items.sort()
-        return items
+    def leafs(self) -> List[OntologyTerm]:
+        return list(sorted({snake.leaf_term for snake in self}))

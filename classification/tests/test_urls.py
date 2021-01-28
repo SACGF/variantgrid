@@ -39,11 +39,10 @@ class Test(URLTestCase):
         sample = None
         # ensembl_transcript_accession = "ENST00000376887.4:c.1498G>A"
         classification = create_classification_for_sample_and_variant_objects(cls.user_owner,
-                                                                                              sample,
-                                                                                              variant,
-                                                                                              grch37,
-                                                                                              # ensembl_transcript_accession=ensembl_transcript_accession,
-                                                                                              annotation_version=annotation_version)
+                                                                              sample,
+                                                                              variant,
+                                                                              grch37,
+                                                                              annotation_version=annotation_version)
         # Need a modification to be able to export
         classification.patch_value({"clinical_significance": "VUS"}, user=cls.user_owner, save=True)
         classification.publish_latest(cls.user_owner)

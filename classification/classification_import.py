@@ -100,7 +100,7 @@ def _classification_upload_pipeline(
                                                 visible=False)
 
     UploadedClassificationImport.objects.create(uploaded_file=uploaded_file,
-                                                       classification_import=classification_import)
+                                                classification_import=classification_import)
     upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
     _add_post_data_insertion_upload_steps(upload_pipeline)
     process_upload_pipeline(upload_pipeline)

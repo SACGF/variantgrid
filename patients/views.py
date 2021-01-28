@@ -18,7 +18,7 @@ from patients import forms
 from patients.forms import PatientSearchForm, PatientContactForm
 from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
     PatientAttachment
-from snpdb.models import Sample, UserSettings
+from snpdb.models import Sample
 import pandas as pd
 
 

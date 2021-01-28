@@ -1,5 +1,4 @@
-from typing import List, Optional, Dict, Any, Tuple, Set
-import re
+from typing import List, Optional, Dict, Any
 
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField

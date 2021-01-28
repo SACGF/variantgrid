@@ -2,7 +2,7 @@ import json
 from django.core.management import CommandParser
 from django.core.management.base import BaseCommand
 
-from manual.models import ManualMigrationTask, ManualMigrationRequired, ManualMigrationOutstanding
+from manual.models import ManualMigrationOutstanding
 
 
 class Command(BaseCommand):

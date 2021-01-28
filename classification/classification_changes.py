@@ -1,16 +1,15 @@
 import operator
 from datetime import datetime
 from functools import total_ordering
-from typing import Any, Iterator, List, Optional, Iterable, Union
+from typing import Any, List, Optional, Union
 
-from django.db.models import QuerySet, Q
+from django.db.models import Q
 from django.contrib.auth.models import User
 from flags.models import FlagComment, Flag, FlagResolution
 from library.utils import IterableTransformer, IteratableStitcher
 from snpdb.models import Allele
 from classification.enums import SubmissionSource
-from classification.models import ClassificationModification, Classification, \
-    classification_flag_types
+from classification.models import ClassificationModification, Classification, classification_flag_types
 from django.utils.timezone import now
 
 

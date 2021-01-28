@@ -65,8 +65,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     def get_from_fuzzy_string(genome_build_str: str):
         if "h37" in genome_build_str:
             return GenomeBuild.grch37()
-        else:
-            return GenomeBuild.grch38()
+        return GenomeBuild.grch38()
 
     @staticmethod
     @timed_cache(ttl=60)

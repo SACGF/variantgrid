@@ -17,8 +17,7 @@ class ManualMigrationTask(models.Model):
         remainder = parts[1]
         if category == "manage":
             return f"python3.8 manage.py {remainder}"
-        else:
-            return f"{category} {remainder}"
+        return f"{category} {remainder}"
 
 
 class ManualMigrationRequired(TimeStampedModel):

@@ -29,8 +29,8 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event
-from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, ProcessingStatus, \
-    GenomeBuild, AlleleSource, Allele
+from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
+    ProcessingStatus, GenomeBuild, AlleleSource
 from snpdb.variant_collection import write_sql_to_variant_collection
 from classification.models import Classification, post_delete
 from variantgrid.celery import app

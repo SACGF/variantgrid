@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL
 
-from genes.models import GeneSymbol, Gene
+from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologySnake
 from patients.models import Patient
 

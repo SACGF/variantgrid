@@ -9,7 +9,7 @@ from lazy import lazy
 from model_utils.models import now
 
 from genes.models import GeneSymbol
-from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport, OntologyService
+from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -26,9 +26,8 @@ class OperationCounter:
         if created:
             self.inserts += 1
             return self.inserts
-        else:
-            self.updates += 1
-            return self.updates
+        self.updates += 1
+        return self.updates
 
     def __str__(self) -> str:
         return f"Inserts {self.inserts}, Updates {self.updates}, Stale {self.deletes}"
@@ -131,7 +130,7 @@ class OntologyBuilder:
             hash=self.data_hash)
 
     def _count(self, model, created: bool):
-        value = self.counters[model].count_op(created)
+        self.counters[model].count_op(created)
         self.total_count += 1
         if self.total_count % 1000 == 0:
             print(f"Handled {self.total_count} records")

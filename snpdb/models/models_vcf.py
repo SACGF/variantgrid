@@ -26,7 +26,7 @@ from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
-from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource, Allele
+from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
 from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
 
 
