@@ -65,14 +65,14 @@ class BadTranscript(ValueError):
 
 class HGNC(models.Model):
     # pk = HGNC id with HGNC: stripped out
-    hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
+    alias_symbols = models.TextField()
+    approved_name = models.TextField()
     # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
     gene_symbol = models.ForeignKey('GeneSymbol', on_delete=CASCADE)
-    approved_name = models.TextField()
-    status = models.CharField(max_length=1, choices=HGNCStatus.choices)
+    hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
     previous_symbols = models.TextField()
-    alias_symbols = models.TextField()
     refseq_ids = models.TextField()
+    status = models.CharField(max_length=1, choices=HGNCStatus.choices)
 
     def __str__(self):
         return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \
