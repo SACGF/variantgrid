@@ -63,7 +63,7 @@ class BadTranscript(ValueError):
     pass
 
 
-class HGNCGeneNames(models.Model):
+class HGNC(models.Model):
     # pk = HGNC id with HGNC: stripped out
     hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
     # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
@@ -338,7 +338,7 @@ class GeneVersion(models.Model):
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     version = models.IntegerField()  # RefSeq GeneIDs are always 1 (not versioned)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    hgnc = models.ForeignKey(HGNCGeneNames, null=True, on_delete=CASCADE)
+    hgnc = models.ForeignKey(HGNC, null=True, on_delete=CASCADE)
     description = models.TextField(null=True)
     biotype = models.TextField(null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)

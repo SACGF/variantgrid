@@ -7,7 +7,7 @@ from lazy import lazy
 import re
 
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAnnotationRelease, GeneVersion, \
-    ReleaseGeneSymbol, ReleaseGeneSymbolGene, HGNCGeneNames
+    ReleaseGeneSymbol, ReleaseGeneSymbolGene, HGNC
 from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
 from library.cache import timed_cache
 
@@ -77,7 +77,7 @@ class HGNCMatcher:
 
     @lazy
     def _hgnc_by_uc_gene_symbol(self) -> Dict:
-        hgnc_qs = HGNCGeneNames.objects.filter(status=HGNCStatus.APPROVED)
+        hgnc_qs = HGNC.objects.filter(status=HGNCStatus.APPROVED)
         return {str(hgnc.gene_symbol_id).upper(): hgnc for hgnc in hgnc_qs}
 
     def match_hgnc(self, gene_symbol: str):

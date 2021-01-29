@@ -12,7 +12,7 @@ import os
 import re
 
 from genes.gene_matching import GeneMatcher
-from genes.models import GeneAnnotationImport, HGNCGeneNames, \
+from genes.models import GeneAnnotationImport, HGNC, \
     GeneSymbol, Gene, GeneVersion, Transcript, TranscriptVersion, GeneAnnotationRelease, ReleaseGeneVersion, \
     ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -31,7 +31,7 @@ class Command(BaseCommand):
         self.annotation_consortium = None
         self.genome_build = None
         self.contig_id_to_fasta = None
-        self.hgnc_ids = set(HGNCGeneNames.objects.values_list("pk", flat=True))
+        self.hgnc_ids = set(HGNC.objects.values_list("pk", flat=True))
         # Known objects containers are updated with new inserts
         self.known_gene_symbols = set(GeneSymbol.objects.all().values_list("pk", flat=True))
         self.known_gene_versions_by_gene_id = defaultdict(dict)

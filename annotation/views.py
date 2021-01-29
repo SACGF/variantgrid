@@ -30,7 +30,7 @@ from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
-from genes.models import GeneListCategory, HGNCGeneNames, GeneAnnotationImport, \
+from genes.models import GeneListCategory, HGNC, GeneAnnotationImport, \
     GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
@@ -189,7 +189,7 @@ def annotation(request):
             all_ontologies_accounted_for = False
         ontology_imports.append({"context": context, "last_import": last_import})
 
-    hgnc_gene_names_count = HGNCGeneNames.objects.all().count()
+    hgnc_gene_names_count = HGNC.objects.all().count()
     if hgnc_gene_names_count:
         hgnc_gene_symbols_import = hgnc_gene_names_count
 

@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 import logging
 
 from genes.gene_matching import GeneMatcher
-from genes.models import HGNCStatus, HGNCGeneNamesImport, HGNCGeneNames, GeneSymbolAlias, GeneSymbol, \
+from genes.models import HGNCStatus, HGNCGeneNamesImport, HGNC, GeneSymbolAlias, GeneSymbol, \
     GeneAnnotationRelease
 from genes.models_enums import GeneSymbolAliasSource
 from library.django_utils import get_model_fields
@@ -36,14 +36,14 @@ def insert_hgnc_data(hgnc_import, existing_hgnc_ids: set, df):
         gene_symbols.append(GeneSymbol(symbol=gene_symbol_id))
 
         status = hgnc_status_lookup[row[STATUS]]
-        hgnc = HGNCGeneNames(pk=hgnc_id,
-                             hgnc_import=hgnc_import,
-                             gene_symbol_id=gene_symbol_id,
-                             approved_name=row[APPROVED_NAME],
-                             status=status,
-                             previous_symbols=row[PREVIOUS_SYMBOLS],
-                             alias_symbols=row[ALIAS_SYMBOLS],
-                             refseq_ids=row[REFSEQ_IDS])
+        hgnc = HGNC(pk=hgnc_id,
+                    hgnc_import=hgnc_import,
+                    gene_symbol_id=gene_symbol_id,
+                    approved_name=row[APPROVED_NAME],
+                    status=status,
+                    previous_symbols=row[PREVIOUS_SYMBOLS],
+                    alias_symbols=row[ALIAS_SYMBOLS],
+                    refseq_ids=row[REFSEQ_IDS])
         if hgnc_id in existing_hgnc_ids:
             hgnc_gene_names_update.append(hgnc)
         else:
@@ -67,12 +67,12 @@ def insert_hgnc_data(hgnc_import, existing_hgnc_ids: set, df):
 
     if hgnc_gene_names_new:
         logging.info("Creating %d new hgnc_gene_names", len(hgnc_gene_names_new))
-        HGNCGeneNames.objects.bulk_create(hgnc_gene_names_new)
+        HGNC.objects.bulk_create(hgnc_gene_names_new)
 
     if hgnc_gene_names_update:
         logging.info("Updating %d hgnc_gene_names", len(hgnc_gene_names_update))
-        fields = get_model_fields(HGNCGeneNames, ignore_fields=["id"])
-        HGNCGeneNames.objects.bulk_update(hgnc_gene_names_update, fields, batch_size=2000)
+        fields = get_model_fields(HGNC, ignore_fields=["id"])
+        HGNC.objects.bulk_update(hgnc_gene_names_update, fields, batch_size=2000)
 
 
 class Command(BaseCommand):
@@ -94,7 +94,7 @@ class Command(BaseCommand):
                 msg = f"TSV ({df.columns}) is missing required column '{c}', is it downloaded from '{url}'?"
                 raise ValueError(msg)
 
-        existing_hgnc_ids = set(HGNCGeneNames.objects.all().values_list("pk", flat=True))
+        existing_hgnc_ids = set(HGNC.objects.all().values_list("pk", flat=True))
         insert_hgnc_data(hgnc_import, existing_hgnc_ids, df)
 
         # Make sure gene symbols are matched to genes in each release

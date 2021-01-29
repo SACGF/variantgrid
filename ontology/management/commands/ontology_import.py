@@ -9,7 +9,7 @@ import pronto
 from django.core.management import BaseCommand
 
 from annotation.models.models_enums import HPOSynonymScope
-from genes.models import HGNCGeneNames
+from genes.models import HGNC
 from library.file_utils import file_md5sum
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
@@ -447,7 +447,7 @@ def sync_hgnc():
         processed_date=now,
         completed=True)
 
-    for hgnc in HGNCGeneNames.objects.all():
+    for hgnc in HGNC.objects.all():
         uploads.append(OntologyTerm(
             id=f"HGNC:{hgnc.id}",
             ontology_service=OntologyService.HGNC,
