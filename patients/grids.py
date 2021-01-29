@@ -41,9 +41,13 @@ class PatientListGrid(JqGridUserRowConfig):
             patient_id_qs = Patient.objects.filter(patient_id_q).values_list("pk", flat=True)
             queryset = queryset.filter(pk__in=patient_id_qs)
 
+        ontology_path = f"{PATIENT_ONTOLOGY_TERM_PATH}__name"
+        q_hpo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
+        q_omim = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
         # Add sample_count to queryset
         annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',', distinct=True),
-                             "ontology_terms": StringAgg(PATIENT_ONTOLOGY_TERM_PATH + "__name", '|', distinct=True),
+                             "hpo": StringAgg(ontology_path, '|', filter=q_hpo, distinct=True),
+                             "omim": StringAgg(ontology_path, '|', filter=q_omim, distinct=True),
                              "genes": StringAgg(PATIENT_GENE_SYMBOL_PATH, '|', distinct=True),
                              "sample_count": Count("sample", distinct=True),
                              "samples": StringAgg("sample__name", ", ", distinct=True)}
@@ -58,7 +62,8 @@ class PatientListGrid(JqGridUserRowConfig):
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         EXTRA_COLUMNS = [
             {'index': 'reference_id', 'name': 'reference_id', 'label': 'Specimen ReferenceIDs'},
-            {'index': 'ontology_terms', 'name': 'ontology_terms', 'label': 'Ontology Terms', 'classes': 'no-word-wrap'},
+            {'index': 'hpo', 'name': 'hpo', 'label': 'HPO', 'classes': 'no-word-wrap', 'formatter': 'hpoFormatter'},
+            {'index': 'omim', 'name': 'omim', 'label': 'OMIM', 'classes': 'no-word-wrap', 'formatter': 'omimFormatter'},
             {'index': 'genes', 'name': 'genes', 'label': 'Genes', 'classes': 'no-word-wrap', 'formatter': 'geneFormatter'},
             {'index': 'sample_count', 'name': 'sample_count', 'label': '# samples', 'sorttype': 'int', 'width': '30px'},
             {'index': 'samples', 'name': 'samples', 'label': 'Samples'},

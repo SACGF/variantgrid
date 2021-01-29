@@ -171,7 +171,7 @@
                 viewZygosity : function(zygosity, options, rowObject) {
                     return ZYGOSITY_DICT[zygosity] || zygosity;
                 },
-                phenotypeFormatter : function(phenotype_terms) {
+                hpoFormatter : function(phenotype_terms) {
                     return getTermLinks('hpo', phenotype_terms);
                 },
                 omimFormatter : function(omim_terms) {
@@ -187,7 +187,7 @@
                           {name:'sample__name', index:'sample__name', label: 'Sample Name', formatter: 'viewSampleLink'},
                           {name:'zygosity',index:'zygosity', label: 'Zygosity', formatter: 'viewZygosity'},
                           {name:'sample__samplefromsequencingsample__sequencing_sample__enrichment_kit',index:'sample__samplefromsequencingsample__sequencing_sample__enrichment_kit', label: 'EnrichmentKit'},
-                          {name:'patient_phenotype',index:'patient_phenotype', label: 'Patient Phenotype', classes: 'no-word-wrap', formatter: 'phenotypeFormatter'},
+                          {name:'patient_hpo',index:'patient_hpo', label: 'Patient HPO', classes: 'no-word-wrap', formatter: 'hpoFormatter'},
                           {name:'patient_omim',index:'patient_omim', label: 'Patient OMIM', classes: 'no-word-wrap', formatter: 'omimFormatter'},
                           {name:'sample__vcf__name',index:'sample__vcf__name', label: 'VCF'},
                           {name:'allele_frequency',index:'allele_frequency', label: 'Allele Frequency', sorttype: 'float', formatter: 'sampleFormatFieldFormatter'},

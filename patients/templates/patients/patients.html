@@ -118,8 +118,8 @@ function resetGrid() {
     $("#grid-filter-message").hide();
     clearAutoCompletes();
     filterFields = {};
+    gridExtraFilters = {};
     changeFilter();
-    filterGrid();
 }
 
 function getExtraFilters() {
@@ -216,8 +216,8 @@ $(document).ready(function() {
             }
             return descriptionSymbol;
         },
-        phenotypeFormatter: function (phenotype_terms) {
-            return getTermLinks('HPO', phenotype_terms);
+        hpoFormatter: function (phenotype_terms) {
+            return getTermLinks('HP', phenotype_terms);
         },
         omimFormatter: function (omim_terms) {
             return getTermLinks('OMIM', omim_terms);
