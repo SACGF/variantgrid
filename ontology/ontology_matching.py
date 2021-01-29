@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.db.models.functions import Length
 from django.urls import reverse
 
+from classification.regexes import db_ref_regexes
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
 from ontology.panel_app_ontology import update_gene_relations
 
@@ -86,8 +87,8 @@ class OntologyMatch:
         return data
 
 
-SKIP_TERMS = {"", "disease", "disorder", "the", "a", "an", "and", "or", "for", "the", "type"}
-SUB_TYPE = re.compile("[0-9]+[a-z]?")
+SKIP_TERMS = {"", "the", "a", "an", "and", "or", "for", "the", "type"}
+SUB_TYPE = re.compile("([0-9]+[A-Z]?|i|ii|iii|iv|v|vi|vii)", re.IGNORECASE)
 
 
 def tokenize_condition_text(text: str) -> Set[str]:
@@ -162,10 +163,28 @@ class OntologyMatching:
                 unit=1, max=-100, note=""
             ))
         if regular_match:
+            search_subtype = None
+            subtype = None
+
             if search_terms := self.search_terms:
+
+                for word in search_terms:
+                    if SUB_TYPE.match(word):
+                        search_subtype = word
+                        break
+
                 match_terms = set(tokenize_condition_text(normalize_condition_text(match.term.name))) - SKIP_TERMS
-                # TODO maybe check description for match terms?
                 superfluous_words = match_terms.difference(search_terms)
+
+                # if we're doing a search on a gene symbol
+                if not search_subtype and self.gene_symbol:
+                    for word in superfluous_words:
+                        if SUB_TYPE.match(word):
+                            subtype = word
+                            break
+                    if subtype:
+                        superfluous_words.remove(subtype)
+
                 missing_words = search_terms.difference(match_terms)
 
                 missing_word_ratio = 0 if not match_terms else (float(len(missing_words)) / float(len(search_terms)))
@@ -196,10 +215,23 @@ class OntologyMatching:
                 if OntologyImportSource.HPO in source_codes:
                     sources.append("NCBI")
 
-                scores.append(OntologyMatch.Score(
-                    name="Gene relationship", max=20, unit=1 if sources else 0,
-                    note=f"Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
-                ))
+                penalty_for_missing_subtype = not search_subtype and not subtype
+
+                if not sources:
+                    scores.append(OntologyMatch.Score(
+                        name="Gene relationship", max=20, unit=0,
+                        note="No relationship between this term and gene in our database"
+                    ))
+                elif not search_subtype and not subtype:
+                    scores.append(OntologyMatch.Score(
+                        name="Gene relationship", max=20, unit=0.95,
+                        note="No specific sub-type. Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
+                    ))
+                else:
+                    scores.append(OntologyMatch.Score(
+                        name="Gene relationship", max=20, unit=1 if sources else 0,
+                        note=f"Has specific sub-type ({subtype or search_subtype}). Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
+                    ))
             else:
                 scores.append(OntologyMatch.Score(
                     name="Gene relationship", max=20, unit=1,
@@ -247,11 +279,14 @@ class OntologyMatching:
             for select in selected:
                 ontology_matches.select_term(select)
 
-        ONTOLOGY_PATTERN = re.compile("(MONDO|OMIM|HP):[0-9]+")
-        for match in ONTOLOGY_PATTERN.finditer(search_text):
-            ontology_matches.find_or_create(match.group(0)).direct_reference = True
+        has_match = False
+        matches = db_ref_regexes.search(search_text)
+        for match in matches:
+            if match.db in ("MONDO", "OMIM", "HP"):  # don't want to much PubMed etc
+                has_match = True
+                ontology_matches.find_or_create(match.id_fixed).direct_reference = True
 
-        else:
+        if not has_match:
             # Client search
             # this currently requires all words to be present
             search_terms = set(tokenize_condition_text(search_text))
