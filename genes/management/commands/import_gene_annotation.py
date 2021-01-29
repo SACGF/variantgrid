@@ -506,6 +506,7 @@ class RefSeqParser(GFFParser):
         hgnc = dbxref.get("HGNC")
         if hgnc:
             hgnc = hgnc.replace("HGNC:", "")
+            hgnc = int(hgnc)
             if hgnc in self.hgnc_ids:
                 hgnc_id = hgnc
 
@@ -577,6 +578,7 @@ class EnsemblParser(GFFParser):
         if description:
             if m := self.hgnc_pattern.match(description):
                 description, potential_hgnc_id = m.groups()
+                potential_hgnc_id = int(potential_hgnc_id)
                 if potential_hgnc_id in self.hgnc_ids:
                     hgnc_id = potential_hgnc_id
 
