@@ -339,7 +339,7 @@ class Command(BaseCommand):
 
             print("Matching existing gene list symbols to this release...")
             gm = GeneMatcher(release)
-            gm.match_unmatched_in_gene_lists()
+            gm.match_unmatched_in_hgnc_and_gene_lists()
 
     @staticmethod
     def set_transcript_data(existing_transcript_version, data):

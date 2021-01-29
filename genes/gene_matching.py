@@ -27,7 +27,7 @@ class GeneSymbolMatcher:
 
     def _match_symbols_to_genes_in_releases(self):
         for gm in self._release_gene_matchers:
-            gm.match_unmatched_in_gene_lists()
+            gm.match_unmatched_in_hgnc_and_gene_lists()
 
     def get_gene_symbol_id_and_alias_id(self, original_gene_symbol: str):
         uc_original_gene_symbol = original_gene_symbol.upper()
@@ -156,9 +156,11 @@ class GeneMatcher:
         gene_symbol_qs = GeneSymbol.objects.filter(pk__in=gene_symbol_list)
         return self._match_unmatched_gene_symbol_qs(gene_symbol_qs)
 
-    def match_unmatched_in_gene_lists(self):
-        """ Match any matched symbols without matched genes """
-        gene_symbol_qs = GeneSymbol.objects.filter(genelistgenesymbol__isnull=False)
+    def match_unmatched_in_hgnc_and_gene_lists(self):
+        """ Make sure symbols have matched genes for each release so they can be used in analyses """
+        q_gene_list = Q(genelistgenesymbol__isnull=False)
+        q_hgnc = Q(hgncgenenames__isnull=False)
+        gene_symbol_qs = GeneSymbol.objects.filter(q_gene_list | q_hgnc)
         return self._match_unmatched_gene_symbol_qs(gene_symbol_qs)
 
 

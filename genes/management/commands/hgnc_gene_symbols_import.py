@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 
-"""
-HGNC Gene Symbols
-"""
-
 from django.core.management.base import BaseCommand
 import logging
 
-from genes.models import HGNCStatus, HGNCGeneNamesImport, HGNCGeneNames, GeneSymbolAlias, GeneSymbol
+from genes.gene_matching import GeneMatcher
+from genes.models import HGNCStatus, HGNCGeneNamesImport, HGNCGeneNames, GeneSymbolAlias, GeneSymbol, \
+    GeneAnnotationRelease
 from genes.models_enums import GeneSymbolAliasSource
 from library.django_utils import get_model_fields
 from library.pandas_utils import df_replace_nan
@@ -90,8 +88,7 @@ class Command(BaseCommand):
         df = pd.read_csv(hgnc_gene_symbols_tsv, sep='\t', index_col=False)
         df = df_replace_nan(df)
 
-        REQUIRED_COLUMNS = [HGNC_ID, APPROVED_SYMBOL, APPROVED_NAME, STATUS, PREVIOUS_SYMBOLS, ALIAS_SYMBOLS, REFSEQ_IDS]
-        for c in REQUIRED_COLUMNS:
+        for c in [HGNC_ID, APPROVED_SYMBOL, APPROVED_NAME, STATUS, PREVIOUS_SYMBOLS, ALIAS_SYMBOLS, REFSEQ_IDS]:
             if c not in df.columns:
                 url = "https://www.genenames.org/cgi-bin/download"
                 msg = f"TSV ({df.columns}) is missing required column '{c}', is it downloaded from '{url}'?"
@@ -99,3 +96,9 @@ class Command(BaseCommand):
 
         existing_hgnc_ids = set(HGNCGeneNames.objects.all().values_list("pk", flat=True))
         insert_hgnc_data(hgnc_import, existing_hgnc_ids, df)
+
+        # Make sure gene symbols are matched to genes in each release
+        for release in GeneAnnotationRelease.objects.all():
+            gm = GeneMatcher(release)
+            gm.match_unmatched_in_hgnc_and_gene_lists()
+
