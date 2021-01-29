@@ -18,8 +18,10 @@ class VariantSampleInformation:
         values_qs = self._cohort_genotype_to_sample_genotypes(values_qs)
 
         self.variant = variant
-        self.num_samples = Sample.objects.count()
-        self.user_sample_ids = set(Sample.filter_for_user(user).values_list("pk", flat=True))
+        self.genome_build = variant.genome_build
+        self.num_samples = Sample.objects.filter(vcf__genome_build=self.genome_build).count()
+        visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build=self.genome_build)
+        self.user_sample_ids = set(visible_samples_qs.values_list("pk", flat=True))
         self.num_user_samples = len(self.user_sample_ids)
 
         locus_counter = defaultdict(Counter)

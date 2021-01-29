@@ -47,9 +47,9 @@
     <h3>Samples</h3>
 
     {% if vsi.has_hidden_samples %}
-        <p>Searching {{ vsi.num_samples }} samples (you can see {{ vsi.num_user_samples }}).
+        <p>Searching {{ vsi.num_samples }} samples for this build (you can see {{ vsi.num_user_samples }}).
     {% else %}
-        <p>Searching {{ vsi.num_samples }} samples.
+        <p>Searching {{ vsi.num_samples }} samples for this build.
     {% endif %}
 
 	{% if vsi.hidden_samples_details.num_invisible_observations %}
@@ -247,9 +247,9 @@
 	No results found
 	
     {% if vsi.has_hidden_samples %}
-        (searched {{ vsi.num_samples }} samples, of which you can see {{ vsi.num_user_samples }}).
+        (searched {{ vsi.num_samples }} samples for this build, of which you can see {{ vsi.num_user_samples }}).
     {% else %}
-        (searched {{ vsi.num_samples }} samples).
+        (searched {{ vsi.num_samples }} samples for this build).
     {% endif %}
 	</p>
 {% endif %}
