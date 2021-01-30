@@ -42,7 +42,7 @@ from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 
 
-class HGNCGeneNamesImport(TimeStampedModel):
+class HGNCImport(TimeStampedModel):
     pass
 
 
@@ -67,19 +67,42 @@ class HGNC(models.Model):
     # pk = HGNC id with HGNC: stripped out
     alias_symbols = models.TextField()
     approved_name = models.TextField()
+    ccds_ids = models.TextField(null=True)
+    ensembl_gene_id = models.TextField(null=True)
+    gene_group_ids = models.TextField(null=True)
+    gene_groups = models.TextField(null=True)
     # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
     gene_symbol = models.ForeignKey('GeneSymbol', on_delete=CASCADE)
-    hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
-    previous_symbols = models.TextField()
-    refseq_ids = models.TextField()
+    hgnc_import = models.ForeignKey(HGNCImport, on_delete=CASCADE)
+    location = models.TextField(null=True)
+    mgd_ids = models.TextField(null=True)
+    previous_symbols = models.TextField(null=True)
+    refseq_ids = models.TextField(null=True)
+    rgd_ids = models.TextField(null=True)
     status = models.CharField(max_length=1, choices=HGNCStatus.choices)
+    ucsc_ids = models.TextField(null=True)
 
     def __str__(self):
         return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \
                f"previous symbols: {self.previous_symbols}, alias_symbols: {self.alias_symbols}"
 
 
+# TODO: I think this is obsolete, HGNC don't do this anymore
 gene_symbol_withdrawn_str = '~withdrawn'
+
+
+class UniProt(models.Model):
+    # accession = Primary (citable) accession number (1st element in SwissProt record)
+    accession = models.TextField(primary_key=True)
+    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    function = models.TextField(null=True)
+    pathway = models.TextField(null=True)
+    pathway_interaction_db = models.TextField(null=True)
+    reactome = models.TextField(null=True)
+    tissue_specificity = models.TextField(null=True)
+
+    def __str__(self):
+        return self.accession
 
 
 class GeneSymbol(models.Model):
@@ -269,11 +292,12 @@ class Gene(models.Model):
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
+    summary = models.TextField(null=True)  # Only used by RefSeq
 
     @property
     def is_legacy(self):
         """ Required internally, but probably shouldn't be shown to the user """
-        return self.identifier.startswith('unknown_')
+        return self.identifier.startswith(Gene.FAKE_GENE_ID_PREFIX)
 
     def get_external_url(self):
         if self.annotation_consortium == AnnotationConsortium.REFSEQ:

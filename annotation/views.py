@@ -147,7 +147,6 @@ def _get_build_annotation_details(build_contigs, genome_build):
 def annotation(request):
     # Set Variables to None for uninstalled components, the template will show installation instructions
     ensembl_biomart_transcript_genes = None
-    hgnc_gene_symbols_import = None
     diagnostic_gene_list = None
 
     build_contigs = get_build_contigs()
@@ -189,10 +188,6 @@ def annotation(request):
             all_ontologies_accounted_for = False
         ontology_imports.append({"context": context, "last_import": last_import})
 
-    hgnc_gene_names_count = HGNC.objects.all().count()
-    if hgnc_gene_names_count:
-        hgnc_gene_symbols_import = hgnc_gene_names_count
-
     diagnostic = GeneListCategory.objects.get(name='Diagnostic')
     diagnostic_gene_list_count = diagnostic.genelist_set.all().count()
     if diagnostic_gene_list_count:
@@ -214,8 +209,7 @@ def annotation(request):
     annotations_ok = [all(builds_ok),
                       all_ontologies_accounted_for,
                       clinvar_citations,
-                      hpa_counts > 0,
-                      hgnc_gene_symbols_import]
+                      hpa_counts > 0]
     if somalier_enabled:
         annotations_ok.append(somalier)
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header
@@ -232,7 +226,6 @@ def annotation(request):
                "ontology_counts": ontology_counts,
                "ontology_relationship_counts": ontology_relationship_counts,
                "ontology_imports": ontology_imports,
-               "hgnc_gene_symbols_import": hgnc_gene_symbols_import,
                "gene_symbol_alias_counts": gene_symbol_alias_counts,
                "diagnostic_gene_list": diagnostic_gene_list,
                "clinvar_citations": clinvar_citations,

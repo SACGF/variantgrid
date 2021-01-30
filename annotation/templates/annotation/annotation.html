@@ -303,17 +303,6 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     {% endinstall-instructions %}
                 {% endlabelled %}
 
-                {% labelled label="HGNC Gene Names" %}
-                    {% if hgnc_gene_symbols_import %}
-                        {{ hgnc_gene_symbols_import | intcomma }} HGNC Gene Names
-                    {% else %}
-                        <div>Not installed</div>
-                    {% endif %}
-                    {% install-instructions "HGNC Gene Names" %}
-                        Download default columns (as text) as "hgnc_gene_symbols.tsv" from <a href="https://www.genenames.org/cgi-bin/download">HGNC Gene Names Download</a>
-                        <code>{{ python_command }} manage.py hgnc_gene_symbols_import ${VARIANTGRID_SETUP_DATA}/hgnc_gene_symbols.tsv</code>
-                    {% endinstall-instructions %}
-                {% endlabelled %}
                 {% labelled label="Gene Symbol Aliases" %}
                     {% if gene_symbol_alias_counts %}
                         {% for source, count in gene_symbol_alias_counts.items %}

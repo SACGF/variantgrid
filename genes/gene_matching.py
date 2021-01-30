@@ -159,7 +159,7 @@ class GeneMatcher:
     def match_unmatched_in_hgnc_and_gene_lists(self):
         """ Make sure symbols have matched genes for each release so they can be used in analyses """
         q_gene_list = Q(genelistgenesymbol__isnull=False)
-        q_hgnc = Q(hgncgenenames__isnull=False)
+        q_hgnc = Q(hgnc__isnull=False)
         gene_symbol_qs = GeneSymbol.objects.filter(q_gene_list | q_hgnc)
         return self._match_unmatched_gene_symbol_qs(gene_symbol_qs)
 
