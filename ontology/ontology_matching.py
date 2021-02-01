@@ -94,15 +94,15 @@ PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a",})  # only exclude "A" from pre
 
 SUB_TYPE = re.compile("^(.*?)(?: )((?:group|type)?(?: )?(?:[A-Z]|[0-9]+|[0-9]+[A-Z]|i|ii|iii|iv|v|vi|vii|viii|ix))$", re.IGNORECASE)
 ROMAN = {
-    "i": 1,
-    "ii": 2,
-    "iii": 3,
-    "iv": 4,
-    "v": 5,
-    "vi": 6,
-    "vii": 7,
-    "viii": 8,
-    "ix": 9
+    "i": '1',
+    "ii": '2',
+    "iii": '3',
+    "iv": '4',
+    "v": '5',
+    "vi": '6',
+    "vii": '7',
+    "viii": '8',
+    "ix": '9'
 }
 
 class SearchText:
