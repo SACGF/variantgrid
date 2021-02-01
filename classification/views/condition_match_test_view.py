@@ -23,7 +23,7 @@ def condition_match_test_download_view(request):
         try:
             row_count = 0
             yield delimited_row([
-                "id", "classification_count", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches (max 5)", "score"
+                "id", "classification_count", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches (max 5)", "score", "status"
             ])
 
             ct: ConditionText
@@ -40,16 +40,27 @@ def condition_match_test_download_view(request):
                         gene_symbol=ctm.gene_symbol,
                         classification__isnull=False
                     ).count()
-                    if len(top) > 0:
+
+                    best_matches_count = len(top)
+                    if best_matches_count > 0:
+                        status = "manual"
+                        top_score = int(top[0].score)
+                        if best_matches_count == 1:
+                            if top_score >= 100:
+                                status = "auto"
+                            elif top_score >= 98:
+                                status = "review"
+
                         yield delimited_row([
                             ct.id,
                             classification_count,
                             ct.lab.name,
                             ct.normalized_text,
                             ctm.gene_symbol.name,
-                            len(top),
+                            best_matches_count,
                             '\n'.join([match.term.id + " " + match.term.name for match in top[0:5]]),
-                            int(top[0].score)
+                            top_score,
+                            status
                         ])
                         row_count += 1
 
