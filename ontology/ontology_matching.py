@@ -155,7 +155,7 @@ class SearchText:
         return self.prefix_terms.union(self.suffix_terms)
 
 
-def pretty_set(s: Set[str]) -> str:
+def pretty_set(s: Iterable[str]) -> str:
     tokens = list(s)
     tokens = sorted(tokens)
     tokens = [f'"{tok}"' for tok in tokens]
@@ -276,18 +276,20 @@ class OntologyMatching:
                     ))
                 else:
                     scores.append(OntologyMatch.Score(
-                        name="Gene relationship", max=18, unit=1,
-                        note="No relationship between this term and gene in our database"
+                        name="Gene relationship", max=20, unit=1,
+                        note=f"Has relationships via {pretty_set(sources)}"
                     ))
                     injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
-                    scores.append(OntologyMatch.Score(
-                        name="Gene relationship - No extra suffix", max=1, unit=0 if injected_suffix else 1,
-                        note=f"Has extra suffix of '{match_text.suffix}'"
-                    ))
-                    scores.append(OntologyMatch.Score(
-                        name="Gene relationship - Is leaf term", max=1, unit=1 if match.is_leaf else 0,
-                        note="Term has children" if not match.is_leaf else "Term has no children"
-                    ))
+                    if injected_suffix:
+                        scores.append(OntologyMatch.Score(
+                            name="Gene relationship - Extra suffix", max=-1, unit=1,
+                            note=f"Has extra suffix of '{match_text.suffix}'"
+                        ))
+                    if not match.is_leaf:
+                        scores.append(OntologyMatch.Score(
+                            name="Gene relationship - not leaf leaf term", max=-2, unit=1,
+                            note="Term has children, could be more specific"
+                        ))
             else:
                 scores.append(OntologyMatch.Score(
                     name="Gene relationship", max=20, unit=1,
