@@ -12,7 +12,7 @@ from lazy import lazy
 
 from classification.regexes import db_ref_regexes
 from library.utils import empty_to_none
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource, OntologyTermRelation
 from ontology.panel_app_ontology import update_gene_relations
 
 
@@ -23,7 +23,7 @@ class OntologyMatch:
         name: str
         unit: float
         max: float
-        note: str
+        note: Optional[str] = ""
 
         @property
         def score(self) -> float:
@@ -48,9 +48,14 @@ class OntologyMatch:
         self.selected: bool = False  # has the user selected this term for whatever context this is
         self.direct_reference: bool = False  # was this term referenced by ID directly, e.g. text is "patient has MONDO:123456" and this is "MONDO:123456"
         self.gene_relationships: List[OntologySnake] = list()  # in what ways is this related to the gene in question (assuming there is a gene in question)
-
         self.scores: List[OntologyMatch.Score] = list()
         self.score = 0
+
+    @lazy
+    def is_leaf(self) -> Optional[bool]:
+        if not self.term.is_stub and self.term.ontology_service == OntologyService.MONDO:
+            return not OntologyTermRelation.children_of(self.term).exists()  # no children exist
+        return None
 
     def __lt__(self, other):
         return self.score < other.score
@@ -234,7 +239,7 @@ class OntologyMatching:
                     match_text_terms = match_text.prefix_terms
 
                 missing_words = search_text_terms.difference(match_text_terms)
-                missing_word_ratio = float(len(superfluous_words)) / float(len(search_text_terms))
+                missing_word_ratio = float(len(missing_words)) / float(len(search_text_terms))
 
                 superfluous_words = match_text_terms.difference(search_text_terms)
                 superfluous_word_ratio = float(len(superfluous_words)) / float(len(match_text_terms))
@@ -269,20 +274,19 @@ class OntologyMatching:
                         name="Gene relationship", max=20, unit=0,
                         note="No relationship between this term and gene in our database"
                     ))
-                elif self.search_text and self.search_text.suffix_terms:
-                    scores.append(OntologyMatch.Score(
-                        name="Gene relationship", max=20, unit=1,
-                        note=f"Search term already had sub-type '{self.search_text.suffix}'. Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
-                    ))
-                elif not match_text.suffix_terms:
-                    scores.append(OntologyMatch.Score(
-                        name="Gene relationship", max=20, unit=0.95,
-                        note="No specific sub-type. Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
-                    ))
                 else:
                     scores.append(OntologyMatch.Score(
-                        name="Gene relationship", max=20, unit=1 if sources else 0,
-                        note=f"Has specific sub-type '({match_text.suffix})'. Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
+                        name="Gene relationship", max=18, unit=1,
+                        note="No relationship between this term and gene in our database"
+                    ))
+                    injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
+                    scores.append(OntologyMatch.Score(
+                        name="Gene relationship - No extra suffix", max=1, unit=0 if injected_suffix else 1,
+                        note=f"Has extra suffix of '{match_text.suffix}'"
+                    ))
+                    scores.append(OntologyMatch.Score(
+                        name="Gene relationship - Is leaf term", max=1, unit=1 if match.is_leaf else 0,
+                        note="Term has children" if not match.is_leaf else "Term has no children"
                     ))
             else:
                 scores.append(OntologyMatch.Score(

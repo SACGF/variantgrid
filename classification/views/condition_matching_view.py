@@ -1,8 +1,11 @@
+from typing import Dict, Any
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
-from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts
+from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, \
+    ConditionTextStatus
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import re
 
@@ -17,12 +20,10 @@ class ConditionTextColumns(DatatableConfig):
             RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"]),
             RichColumn(key="classifications_count", label="Classifications Affected", orderable=True),
             RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, default_sort=SortOrder.DESC)
-
-            # TODO count matches?
         ]
 
     def get_initial_queryset(self):
-        return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
+        return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True).exclude(status=ConditionTextStatus.TERMS_PROVIDED)
 
 
 def condition_matchings_view(request):

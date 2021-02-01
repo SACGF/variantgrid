@@ -22,6 +22,7 @@ from snpdb.models import Lab
 
 class ConditionTextStatus(models.TextChoices):
     TERMS_PROVIDED = 'T', 'Terms Provided'
+    TERMS_PROVIDED_MULTI = 'M', 'Multiple Terms Provided'
     AUTO_MATCHED = 'A', 'Auto-Matched'
     NO_MATCHING = 'N', 'Not Auto-Matched'
     USER_REVIEWED = 'U', 'User Reviewed'
@@ -211,8 +212,12 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
 
         for ct in ConditionText.objects.all():
+            ConditionTextMatch.attempt_automatch(ct)
             update_condition_text_match_counts(ct)
-            ct.save()
+            if ct.classifications_count == 0:
+                ct.delete()
+            else:
+                ct.save()
 
     @staticmethod
     def attempt_automatch(condition_text: ConditionText, force: bool = False):
@@ -225,14 +230,19 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         matches = db_ref_regexes.search(text=text)
         if matches:
             root: ConditionTextMatch
-            if root := condition_text.root():
+            if root := condition_text.root:
                 root.condition_xrefs = [match.id_fixed for match in matches]
                 root.save()
                 if len(matches) == 1:
-                    condition_text.basic_match = True
+                    condition_text.status = ConditionTextStatus.TERMS_PROVIDED
+                else:
+                    condition_text.status = ConditionTextStatus.TERMS_PROVIDED_MULTI
                 condition_text.save()
                 return True
-        # TODO try more auto-matching here
+        else:
+            condition_text.status = ConditionTextStatus.NO_MATCHING
+            return False
+        # TODO try more auto-matching here, will be nice and slow
         pass
 
 

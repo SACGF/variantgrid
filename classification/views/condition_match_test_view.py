@@ -23,7 +23,7 @@ def condition_match_test_download_view(request):
         try:
             row_count = 0
             yield delimited_row([
-                "id", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches (max 5)", "score"
+                "id", "classification_count", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches (max 5)", "score"
             ])
 
             ct: ConditionText
@@ -35,15 +35,21 @@ def condition_match_test_download_view(request):
                 for ctm in ct.gene_levels:
                     from_search = OntologyMatching.from_search(search_text=ct.normalized_text, gene_symbol=ctm.gene_symbol.symbol)
                     top = from_search.top_terms()
+                    classification_count = ConditionTextMatch.objects.filter(
+                        condition_text=ctm.condition_text,
+                        gene_symbol=ctm.gene_symbol,
+                        classification__isnull=False
+                    ).count()
                     if len(top) > 0:
                         yield delimited_row([
                             ct.id,
+                            classification_count,
                             ct.lab.name,
                             ct.normalized_text,
                             ctm.gene_symbol.name,
                             len(top),
                             '\n'.join([match.term.id + " " + match.term.name for match in top[0:5]]),
-                            top[0].score
+                            int(top[0].score)
                         ])
                         row_count += 1
 
