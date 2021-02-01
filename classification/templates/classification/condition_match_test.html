@@ -44,7 +44,14 @@
             <button class="btn btn-primary">Search</button>
         </form>
 
-        <div class="text-muted">Note the following words will be ignored: "a", "an", "and", "for", "or", "the", "type"</div>
+        {% if search_text %}
+            <div class="text-muted">
+                {% labelled label="Prefix" %}{{ search_text.prefix }}{% endlabelled %}
+                {% labelled label="Prefix Terms" %}{{ search_text.prefix_terms_display }}{% endlabelled %}
+                {% labelled label="Suffix" %}{{ search_text.suffix }}{% endlabelled %}
+                {% labelled label="Suffix Terms" %}{{ search_text.suffix_terms_display }}{% endlabelled %}
+            </div>
+        {% endif %}
 
         {% if attempted %}
             {% if auto_matches %}

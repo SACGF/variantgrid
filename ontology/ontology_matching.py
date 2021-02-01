@@ -92,7 +92,7 @@ class OntologyMatch:
 SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "or", "for", "the", "type", "group"}
 PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a",})  # only exclude "A" from prefix, in case it says "type" A
 
-SUB_TYPE = re.compile("^(.*?)(group|type)?( )?([A-Z]|[0-9]+|[0-9]+[A-Z]|i|ii|iii|iv|v|vi|vii|viii|ix)$", re.IGNORECASE)
+SUB_TYPE = re.compile("^(.*?)(?: )((?:group|type)?(?: )?(?:[A-Z]|[0-9]+|[0-9]+[A-Z]|i|ii|iii|iv|v|vi|vii|viii|ix))$", re.IGNORECASE)
 ROMAN = {
     "i": 1,
     "ii": 2,
@@ -128,17 +128,26 @@ class SearchText:
 
         normal_text = normalize_condition_text(text)
         if sub_type_match := SUB_TYPE.match(normal_text):
-            self.prefix = sub_type_match.group(1)
-            self.suffix = sub_type_match.group(2)
+            self.prefix = sub_type_match.group(1).strip()
+            self.suffix = sub_type_match.group(2).strip()
 
             self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
             self.suffix_terms = set(SearchText.roman_to_arabic(term) for term in SearchText.tokenize_condition_text(self.suffix)) - SUFFIX_SKIP_TERMS
         else:
             self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
 
-    @lazy
+    @property
+    def prefix_terms_display(self) -> str:
+        return ", ".join(sorted(list(self.prefix_terms)))
+
+    @property
+    def suffix_terms_display(self):
+        # TODO make these django filters
+        return ", ".join(sorted(list(self.suffix_terms)))
+
+    @property
     def all_terms(self) -> Set[str]:
-        return self.prefix_terms + self.suffix_terms
+        return self.prefix_terms.union(self.suffix_terms)
 
 
 def pretty_set(s: Set[str]) -> str:
@@ -203,8 +212,8 @@ class OntologyMatching:
                 name="This term is marked as obsolete",
                 unit=1, max=-100, note=""
             ))
-        if regular_match:
 
+        if regular_match:
             match_text = SearchText(match.term.name)
             if search_text := self.search_text and self.search_text.raw:
 
@@ -262,7 +271,7 @@ class OntologyMatching:
                     ))
                 elif self.search_text and self.search_text.suffix_terms:
                     scores.append(OntologyMatch.Score(
-                        name="Gene relationship", max=20, unit=0.95,
+                        name="Gene relationship", max=20, unit=1,
                         note=f"Search term already had sub-type '{self.search_text.suffix}'. Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
                     ))
                 elif not match_text.suffix_terms:
@@ -333,40 +342,43 @@ class OntologyMatching:
             for select in selected:
                 ontology_matches.select_term(select)
 
-        matches = db_ref_regexes.search(search_text)
-        has_match = not not matches
-        for match in matches:
-            ontology_matches.find_or_create(match.id_fixed).direct_reference = True
+        if search_text:
+            matches = db_ref_regexes.search(search_text)
+            has_match = not not matches
+            for match in matches:
+                ontology_matches.find_or_create(match.id_fixed).direct_reference = True
 
-        if not has_match and search_text:
-            # Client search this currently requires all words to be present
-            search_terms = set(SearchText.tokenize_condition_text(search_text))
-            qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
-            qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
-            qs = qs.order_by(Length('name')).values_list("id", flat=True)
-            result: OntologyTerm
-            for result in qs[0:20]:
-                ontology_matches.searched_term(result)
+            if not has_match:
+                # only search if we didn't find an OMIM/MONDO term linked directly
 
-            if server_search:
-                server_search_text = search_text
-                if gene_symbol:
-                    server_search_text = server_search_text + " " + gene_symbol
-                try:
-                    results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{server_search_text}', {
-                        "prefix": "MONDO",
-                        "rows": 6,
-                        "minimal_tokenizer": "false",
-                        "category": "disease"
-                    }).json().get("docs")
+                # Client search this currently requires all words to be present
+                search_terms = set(SearchText.tokenize_condition_text(search_text))
+                qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
+                qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
+                qs = qs.order_by(Length('name')).values_list("id", flat=True)
+                result: OntologyTerm
+                for result in qs[0:20]:
+                    ontology_matches.searched_term(result)
 
-                    for result in results:
-                        o_id = result.get('id')
-                        # result.get('label') gives the labe as it's known by the search server
-                        ontology_matches.searched_term(o_id)
-                except:
-                    pass
-                    # TODO communicate to the user couldn't search mondo text search
+                if server_search:
+                    server_search_text = search_text
+                    if gene_symbol:
+                        server_search_text = server_search_text + " " + gene_symbol
+                    try:
+                        results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{server_search_text}', {
+                            "prefix": "MONDO",
+                            "rows": 6,
+                            "minimal_tokenizer": "false",
+                            "category": "disease"
+                        }).json().get("docs")
+
+                        for result in results:
+                            o_id = result.get('id')
+                            # result.get('label') gives the labe as it's known by the search server
+                            ontology_matches.searched_term(o_id)
+                    except:
+                        pass
+                        # TODO communicate to the user couldn't search mondo text search
 
         ontology_matches.apply_scores()
         return ontology_matches

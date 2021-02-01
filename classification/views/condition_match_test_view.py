@@ -7,7 +7,7 @@ from classification.models import ConditionTextMatch, ConditionText, ConditionTe
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
-from ontology.ontology_matching import OntologyMatching
+from ontology.ontology_matching import OntologyMatching, SearchText
 
 
 def condition_match_test_download_view(request):
@@ -59,19 +59,20 @@ def condition_match_test_view(request):
     auto_matches = list()
     attempted = False
 
+    valid = True
     if condition_text:
-        valid = True
         if gene_symbol_str:
             gene_symbol = GeneSymbol.objects.filter(symbol=gene_symbol_str).first()
             if not gene_symbol:
                 messages.add_message(request, messages.WARNING, f"Could not find Gene Symbol '{gene_symbol_str}'")
                 valid = False
-        if valid:
-            auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
-            attempted = True
+    if valid:
+        auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
+        attempted = True
 
     context = {
         "condition_text": condition_text,
+        "search_text": SearchText(condition_text),
         "gene_symbol": gene_symbol_str,
         "auto_matches": auto_matches,
         "attempted": attempted
