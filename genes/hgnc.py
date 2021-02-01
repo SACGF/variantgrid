@@ -77,6 +77,7 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
                     hgnc_import=hgnc_import,
                     location=record.get("location"),
                     mgd_ids=_get_list('mgd_id'),
+                    omim_ids=_get_list('omim_id'),
                     previous_symbols=_join_list(previous_symbols),
                     refseq_ids=_get_list('refseq_accession'),
                     rgd_ids=_get_list('rg_id'),

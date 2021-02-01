@@ -76,6 +76,7 @@ class HGNC(models.Model):
     hgnc_import = models.ForeignKey(HGNCImport, on_delete=CASCADE)
     location = models.TextField(null=True)
     mgd_ids = models.TextField(null=True)
+    omim_ids = models.TextField(null=True)
     previous_symbols = models.TextField(null=True)
     refseq_ids = models.TextField(null=True)
     rgd_ids = models.TextField(null=True)
@@ -1416,6 +1417,17 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}
         return GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).filter(**kwargs)
+
+
+class RVIS(models.Model):
+    """ Residual Variation Intolerance Score
+        @see https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1003709 """
+    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
+    oe_ratio_percentile = models.FloatField()
+
+    def __str__(self):
+        return f"{self.gene_symbol_id}: {self.oe_ratio_percentile}"
 
 
 class GnomADGeneConstraint(models.Model):
