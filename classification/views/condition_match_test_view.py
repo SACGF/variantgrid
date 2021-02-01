@@ -1,5 +1,6 @@
 from datetime import datetime
 from django.contrib import messages
+from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
 
@@ -11,36 +12,44 @@ from ontology.ontology_matching import OntologyMatching, SearchText
 
 
 def condition_match_test_download_view(request):
-    row_count = 10
+    max_count = 10
     try:
         if row_count_str := request.POST.get("row_count"):
-            row_count = int(row_count_str)
+            max_count = int(row_count_str)
     except ValueError:
         pass
 
     def result_iterator():
         try:
+            row_count = 0
             yield delimited_row([
                 "id", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches (max 5)", "score"
             ])
+
             ct: ConditionText
-            for ct in ConditionText.objects.exclude(status=ConditionTextStatus.TERMS_PROVIDED)\
-                              .exclude(normalized_text__iexact='')\
+            for ct in ConditionText.objects.annotate(text_len=Length('normalized_text'))\
+                              .filter(text_len__gte=3)\
                               .select_related('lab')\
-                              .order_by('-classifications_count')[0:row_count]:
+                              .order_by('-classifications_count')[0:max_count]:
                 ctm: ConditionTextMatch
                 for ctm in ct.gene_levels:
                     from_search = OntologyMatching.from_search(search_text=ct.normalized_text, gene_symbol=ctm.gene_symbol.symbol)
                     top = from_search.top_terms()
-                    yield delimited_row([
-                        ct.id,
-                        ct.lab.name,
-                        ct.normalized_text,
-                        ctm.gene_symbol.name,
-                        len(top),
-                        '\n'.join([match.term.id + " " + match.term.name for match in top[0:5]]),
-                        top[0].score
-                    ])
+                    if len(top) > 0:
+                        yield delimited_row([
+                            ct.id,
+                            ct.lab.name,
+                            ct.normalized_text,
+                            ctm.gene_symbol.name,
+                            len(top),
+                            '\n'.join([match.term.id + " " + match.term.name for match in top[0:5]]),
+                            top[0].score
+                        ])
+                        row_count += 1
+
+                if row_count >= max_count:
+                    return
+
         except GeneratorExit:
             pass
         except Exception:
