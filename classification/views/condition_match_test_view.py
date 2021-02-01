@@ -25,6 +25,7 @@ def condition_match_test_download_view(request):
             ])
             ct: ConditionText
             for ct in ConditionText.objects.exclude(status=ConditionTextStatus.TERMS_PROVIDED)\
+                              .exclude(normalized_text__iexact='')\
                               .select_related('lab')\
                               .order_by('-classifications_count')[0:row_count]:
                 ctm: ConditionTextMatch
