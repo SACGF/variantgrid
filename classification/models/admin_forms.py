@@ -470,8 +470,34 @@ class ClassificationReportTemplateAdmin(admin.ModelAdmin):
         }, **kwargs)
 
 
+class ConditionTextStatusFilter(admin.SimpleListFilter):
+    title = 'Status Filter'
+    parameter_name = 'status_filter'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [("outstanding", "Only with outstanding classifications")]
+
+    def queryset(self, request, queryset):
+        if value := self.value():
+            if value == "outstanding":
+                queryset = queryset.exclude(classifications_count_outstanding=0)
+        return queryset
+
+
 class ConditionTextAdmin(ModelAdminBasics):
-    list_display = ["pk", "lab", "normalized_text"]
+    search_fields = ('id', 'normalized_text')
+    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding"]
+    list_filter = [ConditionTextStatusFilter, ClassificationLabFilter]
+
+
+class ConditionTextMatchAdmin(ModelAdminBasics):
+    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "created"]
+
+
+class ClinVarExportAdmin(ModelAdminBasics):
+    list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
+
 
 
 class ConditionTextMatchAdmin(ModelAdminBasics):
