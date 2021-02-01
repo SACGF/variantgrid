@@ -5,6 +5,7 @@ from django.shortcuts import render
 
 from classification.models import ConditionTextMatch, ConditionText, ConditionTextStatus
 from genes.models import GeneSymbol
+from library.log_utils import report_exc_info
 from library.utils import delimited_row
 from ontology.ontology_matching import OntologyMatching
 
@@ -41,6 +42,8 @@ def condition_match_test_download_view(request):
                     ])
         except GeneratorExit:
             pass
+        except Exception:
+            report_exc_info()
 
     response = StreamingHttpResponse(result_iterator(), content_type='text/csv')
     modified_str = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
