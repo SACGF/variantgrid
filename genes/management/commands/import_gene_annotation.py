@@ -16,6 +16,7 @@ from genes.models import GeneAnnotationImport, HGNC, \
     GeneSymbol, Gene, GeneVersion, Transcript, TranscriptVersion, GeneAnnotationRelease, ReleaseGeneVersion, \
     ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
+from genes.refseq import retrieve_refseq_gene_summaries
 from library.django_utils import highest_pk
 from library.file_utils import open_handle_gzip
 from library.utils import invert_dict
@@ -341,6 +342,10 @@ class Command(BaseCommand):
             gm = GeneMatcher(release)
             gm.match_unmatched_in_hgnc_and_gene_lists()
 
+            if unknown_gene_ids and self.annotation_consortium == AnnotationConsortium.REFSEQ:
+                print("Created new RefSeq genes - retrieving gene summaries via API")
+                retrieve_refseq_gene_summaries()
+
     @staticmethod
     def set_transcript_data(existing_transcript_version, data):
         data["id"] = existing_transcript_version.accession  # Ensembl genePred data does not contain versions
@@ -558,7 +563,7 @@ class EnsemblParser(GFFParser):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.hgnc_pattern = re.compile(r"(.*) \[Source:HGNC.*Acc:HGNC:(\d+)\]")
+        self.hgnc_pattern = re.compile(r"(.*) \[Source:HGNC.*Acc:HGNC:(\d+)]")
 
     def is_gene(self, feature_type, attributes):
         return 'gene_id' in attributes
