@@ -72,7 +72,7 @@ def condition_match_test_view(request):
 
     context = {
         "condition_text": condition_text,
-        "search_text": SearchText(condition_text),
+        "search_text": SearchText(condition_text) if condition_text else None,
         "gene_symbol": gene_symbol_str,
         "auto_matches": auto_matches,
         "attempted": attempted
