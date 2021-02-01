@@ -21,7 +21,7 @@ def condition_match_test_download_view(request):
     def result_iterator():
         try:
             yield delimited_row([
-                "id", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches", "score"
+                "id", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches (max 5)", "score"
             ])
             ct: ConditionText
             for ct in ConditionText.objects.exclude(status=ConditionTextStatus.TERMS_PROVIDED)\
@@ -37,7 +37,7 @@ def condition_match_test_download_view(request):
                         ct.normalized_text,
                         ctm.gene_symbol.name,
                         len(top),
-                        '\n'.join([match.term.id + " " + match.term.name for match in top]),
+                        '\n'.join([match.term.id + " " + match.term.name for match in top[0:5]]),
                         top[0].score
                     ])
         except GeneratorExit:

@@ -11,6 +11,7 @@ from django.urls import reverse
 from lazy import lazy
 
 from classification.regexes import db_ref_regexes
+from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
 from ontology.panel_app_ontology import update_gene_relations
 
@@ -205,7 +206,7 @@ class OntologyMatching:
         if regular_match:
 
             match_text = SearchText(match.term.name)
-            if search_text := self.search_text:
+            if search_text := self.search_text and self.search_text.raw:
 
                 superfluous_words = set()
                 missing_words = set()
@@ -324,6 +325,7 @@ class OntologyMatching:
 
     @staticmethod
     def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None, server_search: bool = True) -> 'OntologyMatching':
+        search_text = empty_to_none(search_text)
         ontology_matches = OntologyMatching(search_term=search_text, gene_symbol=gene_symbol)
         ontology_matches.populate_relationships()  # find all terms linked to the gene_symbol (if there is one)
 
@@ -336,7 +338,7 @@ class OntologyMatching:
         for match in matches:
             ontology_matches.find_or_create(match.id_fixed).direct_reference = True
 
-        if not has_match:
+        if not has_match and search_text:
             # Client search this currently requires all words to be present
             search_terms = set(SearchText.tokenize_condition_text(search_text))
             qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
