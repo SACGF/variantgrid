@@ -204,8 +204,8 @@ class OntologyMatching:
             ))
         if regular_match:
 
+            match_text = SearchText(match.term.name)
             if search_text := self.search_text:
-                match_text = SearchText(match.term.name)
 
                 superfluous_words = set()
                 missing_words = set()
@@ -272,7 +272,7 @@ class OntologyMatching:
                 else:
                     scores.append(OntologyMatch.Score(
                         name="Gene relationship", max=20, unit=1 if sources else 0,
-                        note=f"Has specific sub-type '({search_text.suffix})'. Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
+                        note=f"Has specific sub-type '({match_text.suffix})'. Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
                     ))
             else:
                 scores.append(OntologyMatch.Score(
