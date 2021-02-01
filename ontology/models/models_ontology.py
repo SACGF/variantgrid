@@ -341,6 +341,7 @@ class OntologySnakeStep:
 
 OntologyList = Optional[Union[QuerySet, List[OntologyTerm]]]
 
+
 class OntologySnake:
     """
     Use to "Snake" through Ontology nodes, typically to resolve to/from gene symbols.
