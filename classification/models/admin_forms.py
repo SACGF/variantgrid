@@ -10,7 +10,8 @@ from snpdb.admin import ModelAdminBasics
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification
+from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionText, \
+    ConditionTextMatch
 from classification.models.classification import Classification, ClassificationImport
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.classification_import import process_classification_import
@@ -487,8 +488,18 @@ class ConditionTextStatusFilter(admin.SimpleListFilter):
 
 class ConditionTextAdmin(ModelAdminBasics):
     search_fields = ('id', 'normalized_text')
-    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding", "status"]
+    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding", "min_auto_match_score"]
     list_filter = [ConditionTextStatusFilter, ClassificationLabFilter]
+
+    def auto_match(self, request, queryset):
+        condition_text: ConditionText
+        for condition_text in queryset:
+            ConditionTextMatch.attempt_automatch(condition_text=condition_text, force=True, server_search=True)
+            self.message_user(request, message=f"Automatching of {condition_text.normalized_text} resulted in min score of {condition_text.min_auto_match_score} matching {condition_text.classification_match_count}",
+                              level=messages.INFO)
+
+    auto_match.short_description = "Automatch (overwrite existing data)"
+    actions = [auto_match]
 
 
 class ConditionTextMatchAdmin(ModelAdminBasics):

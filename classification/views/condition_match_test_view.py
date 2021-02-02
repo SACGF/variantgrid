@@ -4,7 +4,7 @@ from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
 
-from classification.models import ConditionTextMatch, ConditionText, ConditionTextStatus
+from classification.models import ConditionTextMatch, ConditionText
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row

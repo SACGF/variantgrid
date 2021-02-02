@@ -20,21 +20,13 @@ from ontology.ontology_matching import OntologyMatching, normalize_condition_tex
 from snpdb.models import Lab
 
 
-class ConditionTextStatus(models.TextChoices):
-    TERMS_PROVIDED = 'T', 'Terms Provided'
-    TERMS_PROVIDED_MULTI = 'M', 'Multiple Terms Provided'
-    AUTO_MATCHED = 'A', 'Auto-Matched'
-    NO_MATCHING = 'N', 'Not Auto-Matched'
-    USER_REVIEWED = 'U', 'User Reviewed'
-
-
 class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     normalized_text = models.TextField()
     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
 
     # set to true if root condition text was set by auto-matching
     last_edited_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True)
-    status = models.CharField(max_length=1, choices=ConditionTextStatus.choices, default=ConditionTextStatus.NO_MATCHING)
+    min_auto_match_score = models.IntegerField(default=0)
 
     classifications_count = models.IntegerField(default=0)
     classifications_count_outstanding = models.IntegerField(default=0)
@@ -58,12 +50,15 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     @transaction.atomic
     def clear(self):
-        self.conditiontextmatch_set.update(condition_xrefs=list())
-        self.basic_match = False
-        self.requires_approval = False
+        self.conditiontextmatch_set.update(condition_xrefs=list(), condition_multi_operation=MultiCondition.NOT_DECIDED)
         self.last_edited_by = None
+        self.min_auto_match_score = 0
         self.classifications_count_outstanding = self.classifications_count
         self.save()
+
+    @property
+    def classification_match_count(self) -> int:
+        return self.classifications_count - self.classifications_count_outstanding
 
     @property
     def user_edited(self) -> bool:
@@ -205,46 +200,56 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return self.conditiontextmatch_set.all()
 
     @staticmethod
-    def sync_all():
+    def sync_all(force=False):
         cms = ClassificationModification.objects.filter(is_last_published=True, classification__withdrawn=False).select_related("classification", "classification__lab")
         cm: ClassificationModification
         for cm in cms:
             ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
 
         for ct in ConditionText.objects.all():
-            ConditionTextMatch.attempt_automatch(ct)
-            update_condition_text_match_counts(ct)
+            ConditionTextMatch.attempt_automatch(condition_text=ct, force=force, server_search = False)
             if ct.classifications_count == 0:
                 ct.delete()
             else:
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText, force: bool = False):
+    def attempt_automatch(condition_text: ConditionText, force: bool = False, server_search = False):
         text = condition_text.normalized_text
         if force or not condition_text.user_edited:
             condition_text.clear()
         else:
             return False  # couldn't overwrite what we already had
 
-        matches = OntologyMatching.from_search(search_text=text, gene_symbol=None, server_search=False)
-        if top_values := matches.top_terms():
-            root: ConditionTextMatch
-            if root := condition_text.root:
-                if top_values[0].score > 100:
-                    root.condition_xrefs = [match.term.id for match in top_values]
-                    root.save()
-                    if len(top_values) == 1:
-                        condition_text.status = ConditionTextStatus.TERMS_PROVIDED
-                    else:
-                        condition_text.status = ConditionTextStatus.TERMS_PROVIDED_MULTI
-                    condition_text.save()
-                    return True
-        else:
-            condition_text.status = ConditionTextStatus.NO_MATCHING
-            return False
-        # TODO try more auto-matching here, will be nice and slow
-        pass
+        try:
+            # don't do server side search for top level, only care about matching terms on IDs directly
+            top_level_matches = OntologyMatching.from_search(search_text=text, gene_symbol=None, server_search=False)
+            if top_values := top_level_matches.top_terms():
+                root: ConditionTextMatch
+                if root := condition_text.root:
+                    if top_values[0].score > 100:
+                        root.condition_xrefs = [match.term.id for match in top_values]
+                        root.save()
+                        condition_text.min_auto_match_score = int(top_values[0].score)
+                        condition_text.save()
+            else:
+                min_score = float('inf')
+                for gene_level in condition_text.gene_levels:
+                    gene_matches = OntologyMatching.from_search(search_text=text, gene_symbol=gene_level.gene_symbol.symbol, server_search=server_search)
+                    if top_value := gene_matches.only_top_term():
+                        if top_value.score >= 98:
+                            gene_level.condition_xrefs = [top_value.term.id]
+                            gene_level.save()
+                        min_score = min(min_score, top_value.score)
+                    elif top_values := gene_matches.top_terms():
+                        # but we had a duplicate, so as great as the score is, it doesn't count
+                        min_score = min(min_score, top_values[0].score)
+
+                condition_text.min_auto_match_score = int(min_score)
+                condition_text.save()
+        finally:
+            update_condition_text_match_counts(condition_text)
+            condition_text.save()
 
 
 
@@ -348,7 +353,7 @@ def update_condition_text_match_counts(ct: ConditionText):
     # selecting parents from the DB
     by_id: Dict[int, ConditionTextMatch] = dict()
     classification_related: List[ConditionTextMatch] = list()
-    for ctm in ConditionTextMatch.objects.filter(condition_text=ct):
+    for ctm in ct.conditiontextmatch_set.all():
         by_id[ctm.id] = ctm
         if ctm.classification:
             classification_related.append(ctm)

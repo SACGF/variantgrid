@@ -4,8 +4,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
-from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, \
-    ConditionTextStatus
+from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import re
 
@@ -23,7 +22,8 @@ class ConditionTextColumns(DatatableConfig):
         ]
 
     def get_initial_queryset(self):
-        return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True).exclude(status=ConditionTextStatus.TERMS_PROVIDED)
+        # exclude where we've auto matched and have 0 outstanding left
+        return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True).exclude(min_auto_match_score__gt=100, classifications_count_outstanding=0)
 
 
 def condition_matchings_view(request):

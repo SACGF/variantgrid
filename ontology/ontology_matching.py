@@ -330,6 +330,13 @@ class OntologyMatching:
     def searched_term(self, term: str):
         self.find_or_create(term).text_search = True
 
+    def only_top_term(self) -> Optional[OntologyMatch]:
+        tops = self.top_terms()
+        if len(tops) == 1:
+            return tops[0]
+        else:
+            return None
+
     def top_terms(self) -> List[OntologyMatch]:
         top_values: List[OntologyMatch] = list()
         for match in self:
@@ -360,6 +367,8 @@ class OntologyMatching:
 
         if search_text:
             matches = db_ref_regexes.search(search_text, default_regex=DbRegexes.OMIM)
+            matches = [match for match in matches if match.db in ["OMIM", "HP", "MONDO"]]
+
             has_match = not not matches
             if has_match:
                 for match in matches:
