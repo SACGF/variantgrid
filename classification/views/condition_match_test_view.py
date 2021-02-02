@@ -9,6 +9,7 @@ from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
 from ontology.ontology_matching import OntologyMatching, SearchText
+from snpdb.models import Lab
 
 
 def condition_match_test_download_view(request):
@@ -29,6 +30,7 @@ def condition_match_test_download_view(request):
             ct: ConditionText
             for ct in ConditionText.objects.annotate(text_len=Length('normalized_text'))\
                               .filter(text_len__gte=3)\
+                              .exclude(lab__group_name='ch_westmead/lab_1')\
                               .select_related('lab')\
                               .order_by('-classifications_count')[0:max_count]:
                 ctm: ConditionTextMatch

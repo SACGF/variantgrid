@@ -10,7 +10,7 @@ from django.db.models.functions import Length
 from django.urls import reverse
 from lazy import lazy
 
-from classification.regexes import db_ref_regexes
+from classification.regexes import db_ref_regexes, DbRegexes
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource, OntologyTermRelation
 from ontology.panel_app_ontology import update_gene_relations
@@ -126,7 +126,7 @@ class SearchText:
 
     def __init__(self, text: str):
         self.raw = text
-        self.prefix = text
+        self.prefix = None
         self.prefix_terms: Set[str] = set()
         self.suffix = None
         self.suffix_terms: Set[str] = set()
@@ -139,6 +139,7 @@ class SearchText:
             self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
             self.suffix_terms = set(SearchText.roman_to_arabic(term) for term in SearchText.tokenize_condition_text(self.suffix)) - SUFFIX_SKIP_TERMS
         else:
+            self.prefix = normal_text
             self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
 
     @property
@@ -279,12 +280,6 @@ class OntologyMatching:
                         name="Gene relationship", max=20, unit=1,
                         note=f"Has relationships via {pretty_set(sources)}"
                     ))
-                    injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
-                    if injected_suffix:
-                        scores.append(OntologyMatch.Score(
-                            name="Gene relationship - Extra suffix", max=-1, unit=1,
-                            note=f"Has extra suffix of '{match_text.suffix}'"
-                        ))
                     if not match.is_leaf:
                         scores.append(OntologyMatch.Score(
                             name="Gene relationship - not leaf leaf term", max=-2, unit=1,
@@ -295,6 +290,14 @@ class OntologyMatching:
                     name="Gene relationship", max=20, unit=1,
                     note=f"Matching on gene not required at this level"
                 ))
+
+            injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
+            if injected_suffix:
+                scores.append(OntologyMatch.Score(
+                    name="Gene relationship - Extra suffix", max=-1, unit=1,
+                    note=f"Has extra suffix of '{match_text.suffix}'"
+                ))
+
         match.scores = scores
         total = 0
         for score in scores:
@@ -349,7 +352,7 @@ class OntologyMatching:
                 ontology_matches.select_term(select)
 
         if search_text:
-            matches = db_ref_regexes.search(search_text)
+            matches = db_ref_regexes.search(search_text, default_regex=DbRegexes.OMIM)
             has_match = not not matches
             for match in matches:
                 ontology_matches.find_or_create(match.id_fixed).direct_reference = True
