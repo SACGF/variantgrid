@@ -11,6 +11,7 @@ from django.urls import reverse
 from lazy import lazy
 
 from classification.regexes import db_ref_regexes, DbRegexes
+from library.log_utils import report_message
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource, OntologyTermRelation
 from ontology.panel_app_ontology import update_gene_relations
@@ -305,6 +306,12 @@ class OntologyMatching:
 
     def populate_relationships(self, server_search=True):
         if gene_symbol := self.gene_symbol:
+            try:
+                hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
+            except ValueError:
+                report_message(message=f"Could not resolve {gene_symbol} to HGNC OntologyTerm - can't do gene specific resolutions", level='warning')
+                return
+
             if server_search:
                 update_gene_relations(gene_symbol)  # make sure panel app AU is up to date
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now

@@ -19,13 +19,7 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
 
     # note that we only check PanelApp here, as other imports are done by file
 
-    hgnc_term: OntologyTerm
-    try:
-        hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
-    except ValueError:
-        report_message(message=f"Could not resolve {gene_symbol} to HGNC OntologyTerm", level='warning')
-        return
-
+    hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
     panel_app = PanelAppServer.australia_instance()
     filename = panel_app.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
     ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol), import_source=OntologyImportSource.PANEL_APP_AU)

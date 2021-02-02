@@ -16,10 +16,10 @@ class ConditionTextColumns(DatatableConfig):
         super().__init__(request)
 
         self.rich_columns = [
-            RichColumn(key="lab__name", label='Lab', orderable=True),
-            RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"]),
-            RichColumn(key="classifications_count", label="Classifications Affected", orderable=True),
-            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, default_sort=SortOrder.DESC)
+            RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text']),
+            RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"], sort_keys=['normalized_text', 'lab__name']),
+            RichColumn(key="classifications_count", label="Classifications Affected", orderable=True, sort_keys=['classifications_count', 'normalized_text']),
+            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, sort_keys=['classifications_count_outstanding', 'normalized_text'])
         ]
 
     def get_initial_queryset(self):
