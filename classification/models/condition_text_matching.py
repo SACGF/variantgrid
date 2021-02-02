@@ -245,6 +245,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                         # but we had a duplicate, so as great as the score is, it doesn't count
                         min_score = min(min_score, top_values[0].score)
 
+                if min_score == float('inf'):
+                    min_score = 0
+
                 condition_text.min_auto_match_score = int(min_score)
                 condition_text.save()
         finally:
