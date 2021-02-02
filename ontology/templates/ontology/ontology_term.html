@@ -19,6 +19,9 @@
                     <div id="ontology-extra" class="text-monospace collapse" style="white-space: pre-wrap; font-size: small">{{ term.extra | jsonify_pretty }}</div>
                     {% else %}<div class="no-value">-</div>{% endif %}
                 {% endlabelled %}
+                {% if term.aliases %}
+                    {% labelled label="Aliases" %}{{ term.aliases | jsonify_pretty }}{% endlabelled %}
+                {% endif %}
                 {% labelled label="URL" %}
                     <a href="{{ term.url }}" class="external-link hover-link">{{ term.url }}</a>
                 {% endlabelled %}
