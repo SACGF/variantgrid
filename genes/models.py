@@ -1013,7 +1013,7 @@ class GeneList(models.Model):
     def get_for_user(user, gene_list_id, success_only=True):
         try:
             return GeneList.filter_for_user(user, success_only).get(pk=gene_list_id)
-        except:
+        except GeneList.DoesNotExist:
             # Need to distinguish between does not exist and no permission
             get_object_or_404(GeneList, pk=gene_list_id)  # potentially throws GeneList.DoesNotExist
             # If we're here, object exists but we have a permission error
