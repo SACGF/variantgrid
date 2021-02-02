@@ -487,7 +487,7 @@ class ConditionTextStatusFilter(admin.SimpleListFilter):
 
 class ConditionTextAdmin(ModelAdminBasics):
     search_fields = ('id', 'normalized_text')
-    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding"]
+    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding", "status"]
     list_filter = [ConditionTextStatusFilter, ClassificationLabFilter]
 
 

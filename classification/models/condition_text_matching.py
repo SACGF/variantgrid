@@ -227,18 +227,19 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         else:
             return False  # couldn't overwrite what we already had
 
-        matches = db_ref_regexes.search(text=text)
-        if matches:
+        matches = OntologyMatching.from_search(search_text=text, gene_symbol=None, server_search=False)
+        if top_values := matches.top_terms():
             root: ConditionTextMatch
             if root := condition_text.root:
-                root.condition_xrefs = [match.id_fixed for match in matches]
-                root.save()
-                if len(matches) == 1:
-                    condition_text.status = ConditionTextStatus.TERMS_PROVIDED
-                else:
-                    condition_text.status = ConditionTextStatus.TERMS_PROVIDED_MULTI
-                condition_text.save()
-                return True
+                if top_values[0].score > 100:
+                    root.condition_xrefs = [match.term.id for match in top_values]
+                    root.save()
+                    if len(top_values) == 1:
+                        condition_text.status = ConditionTextStatus.TERMS_PROVIDED
+                    else:
+                        condition_text.status = ConditionTextStatus.TERMS_PROVIDED_MULTI
+                    condition_text.save()
+                    return True
         else:
             condition_text.status = ConditionTextStatus.NO_MATCHING
             return False

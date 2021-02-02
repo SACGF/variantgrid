@@ -93,7 +93,7 @@ class OntologyMatch:
 
         return data
 
-
+OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6}")
 SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "or", "for", "the", "type", "group"}
 PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a",})  # only exclude "A" from prefix, in case it says "type" A
 
@@ -253,6 +253,12 @@ class OntologyMatching:
                     name="Limited extra words bonus", max=40, unit=1 - superfluous_word_ratio,
                     note=f"Superfluous words {pretty_set(superfluous_words)}" if superfluous_words else "No superfluous words"
                 ))
+                injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
+                if injected_suffix:
+                    scores.append(OntologyMatch.Score(
+                        name="Extra suffix", max=-1, unit=1,
+                        note=f"Has extra suffix of '{match_text.suffix}'"
+                    ))
 
             if gene_symbol := self.gene_symbol:
                 # TODO work out if we want to apply different scores to different matches
@@ -291,22 +297,16 @@ class OntologyMatching:
                     note=f"Matching on gene not required at this level"
                 ))
 
-            injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
-            if injected_suffix:
-                scores.append(OntologyMatch.Score(
-                    name="Gene relationship - Extra suffix", max=-1, unit=1,
-                    note=f"Has extra suffix of '{match_text.suffix}'"
-                ))
-
         match.scores = scores
         total = 0
         for score in scores:
             total += score.score
         match.score = total
 
-    def populate_relationships(self):
+    def populate_relationships(self, server_search=True):
         if gene_symbol := self.gene_symbol:
-            update_gene_relations(gene_symbol)  # make sure panel app AU is up to date
+            if server_search:
+                update_gene_relations(gene_symbol)  # make sure panel app AU is up to date
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
             for snake in snakes:
                 gene_relation = snake.show_steps()[0].relation
@@ -345,7 +345,7 @@ class OntologyMatching:
     def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None, server_search: bool = True) -> 'OntologyMatching':
         search_text = empty_to_none(search_text)
         ontology_matches = OntologyMatching(search_term=search_text, gene_symbol=gene_symbol)
-        ontology_matches.populate_relationships()  # find all terms linked to the gene_symbol (if there is one)
+        ontology_matches.populate_relationships(server_search=server_search)  # find all terms linked to the gene_symbol (if there is one)
 
         if selected:
             for select in selected:
@@ -354,22 +354,27 @@ class OntologyMatching:
         if search_text:
             matches = db_ref_regexes.search(search_text, default_regex=DbRegexes.OMIM)
             has_match = not not matches
-            for match in matches:
-                ontology_matches.find_or_create(match.id_fixed).direct_reference = True
+            if has_match:
+                for match in matches:
+                    ontology_matches.find_or_create(match.id_fixed).direct_reference = True
+            else:
+                if stray_omim_matches := OPRPHAN_OMIM_TERMS.findall(search_text):
+                    has_match = True
+                    for omim_index in stray_omim_matches:
+                        ontology_matches.find_or_create(f"OMIM:{omim_index}").direct_reference = True
 
             if not has_match:
-                # only search if we didn't find an OMIM/MONDO term linked directly
-
-                # Client search this currently requires all words to be present
-                search_terms = set(SearchText.tokenize_condition_text(search_text))
-                qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
-                qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
-                qs = qs.order_by(Length('name')).values_list("id", flat=True)
-                result: OntologyTerm
-                for result in qs[0:20]:
-                    ontology_matches.searched_term(result)
-
                 if server_search:
+                    # technically this bit isn't a server search, but need to make the boolean more flexible
+                    search_terms = set(SearchText.tokenize_condition_text(search_text))
+                    qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
+                    qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
+                    qs = qs.order_by(Length('name')).values_list("id", flat=True)
+                    result: OntologyTerm
+                    for result in qs[0:20]:
+                        ontology_matches.searched_term(result)
+
+                    # the actual server search
                     server_search_text = search_text
                     if gene_symbol:
                         server_search_text = server_search_text + " " + gene_symbol
