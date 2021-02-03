@@ -551,68 +551,6 @@ $(document).ready(function() {
                         </div>
                     </div>
                 </div>
-
-                <div class="col-12 mt-4 has-gene-info" id="gene-info">
-                    <div class="card">
-                        <div class="card-header">Gene</div>
-                        <div class="card-body">
-                            {% labelled id='hgnc_symbol' %}{% endlabelled %}
-                            {% labelled id='hgnc_name' %}{% endlabelled %}
-                            {% labelled id='gene_biotype' %}{% endlabelled %}
-                            {% labelled id='gene_family_tag' %}{% endlabelled %}
-                            {% labelled id='gene_family_description'%}{% endlabelled %}
-                            {% labelled id='refseq_gene_summary' %}{% endlabelled %}
-                            {% labelled id='function_from_uniprotkb' %}{% endlabelled %}
-                            {% labelled id='pathway_from_uniprotkb' %}{% endlabelled %}
-
-                            {% labelled id='tissue_specificity_from_uniprotkb' %}{% endlabelled %}
-                            {% labelled id='phenotypes_from_ensembl' %}{% endlabelled %}
-                            {% labelled id='omim_phenotypes' %}{% endlabelled %}
-                            {% labelled id='omim_id' %}{% endlabelled %}
-
-                            <div id="extra-gene-info" class="collapse">
-                                {% labelled id='hgnc_id' %}{% endlabelled %}
-                                {% labelled id='in_cancer_gene_census' %}{% endlabelled %}
-                                {% labelled id='entrez_gene_id' %}{% endlabelled %}
-                                {% labelled id='uniprot_id' %}{% endlabelled %}
-                                {% labelled id='ucsc_id' %}{% endlabelled %}
-                                {% labelled id='enzyme_ids' %}{% endlabelled %}
-                                {% labelled id='ccds_ids' %}{% endlabelled %}
-                                {% labelled id='rgd_id' %}{% endlabelled %}
-                                {% labelled id='mgi_id' %}{% endlabelled %}
-                                {% labelled id='rvis_percentile' %}{% endlabelled %}
-                                {% labelled id='status' %}{% endlabelled %}
-                                {% labelled id='band' %}{% endlabelled %}
-                                {% labelled id='strand' %}{% endlabelled %}
-                                {% labelled id='percentage_gc_content' %}{% endlabelled %}
-                                {% labelled id='transcript_count' %}{% endlabelled %}
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <a id='show-more-gene-info-link' data-toggle="collapse" class="hover-link has-gene-info" href='#extra-gene-info'>More...</a>
-                            <div class="hidden no-gene-info">
-                                No gene annotation available.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6 mt-4">
-                    {% load gene_disease_tags %}
-                    {% gene_disease variant_annotation.transcript_version.gene_version.gene_symbol %}
-                </div>
-                <div class="col-md-6 mt-4">
-                    <div class="card">
-                        <div class="card-header">gnomAD Gene Constraints</div>
-                        <div class="card-body">
-                            {% labelled label="LOF summary" id='gnomad_gene_constraint_oe_lof_summary' %}{% endlabelled %}
-                            <div class="hidden">
-                                {% labelled id='gnomad_gene_constraint_method' %}{% endlabelled %}
-                                {% labelled label="Url" id='gnomad_gene_constraint_url' %}{% endlabelled %}
-                            </div>
-                            {% labelled label="Retrieved Via" id='gnomad_gene_constraint_retrieval' %}{% endlabelled %}
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
