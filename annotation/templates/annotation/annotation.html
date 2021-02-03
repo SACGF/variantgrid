@@ -231,18 +231,14 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                             </ol>
                         {% endinstall-instructions %}
                     {% endlabelled %}
-                    {% labelled label="Ensembl Gene level Annotation" %}
+                    {% labelled label="Gene Annotation" %}
                        {% if details.gene_level_annotation %}
                             {{ details.gene_level_annotation }}
                        {% else %}
                             <div class="no-value">Not Installed</div>
                        {% endif %}
-                        {% install-instructions "Ensembl Gene Level Annotation" %}
-                            {% if build_name == 'GRCh37' %}
-                                <code>{{ python_command }} manage.py gene_level_annotation_import --genome-build {{ build_name }} --ensembl-version 75 ${ANNOTATION_BASEDIR}/reference/gene_annotation/current/ensembl_key.v75.full_annotation.tsv</code>
-                            {% elif build_name == 'GRCh38' %}
-                                <code>{{ python_command }} manage.py gene_level_annotation_import --genome-build {{ build_name }} --ensembl-version 98 ${ANNOTATION_BASEDIR}/reference/gene_annotation/current/ensembl_key.v98.full_annotation.tsv</code>
-                            {% endif %}
+                        {% install-instructions "Gene Annotation" %}
+                            <code>{{ python_command }} manage.py gene_annotation --gene-annotation-release=(Gene Annotation Release ID)</code>
                         {% endinstall-instructions %}
                     {% endlabelled %}
                     {% labelled label="ClinVar" %}

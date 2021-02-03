@@ -5,11 +5,10 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
-from annotation.models.models import EnsemblGeneAnnotation, AnnotationVersion, \
-    EnsemblGeneAnnotationVersion
+from annotation.models.models import AnnotationVersion
 from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
-    GeneListGeneSymbol, GeneAnnotationRelease
+    GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion
 from library.django_utils import get_model_fields
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -143,9 +142,9 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
 
 class GenesGrid(JqGridUserRowConfig):
-    model = EnsemblGeneAnnotation
+    model = ReleaseGeneVersion
     caption = "GeneAnnotations"
-    fields = get_model_fields(EnsemblGeneAnnotation)
+    fields = get_model_fields(ReleaseGeneVersion)
     colmodel_overrides = {'id': {'hidden': True}}
 
     # 'version' : {'hidden' : True}}
@@ -154,38 +153,29 @@ class GenesGrid(JqGridUserRowConfig):
         extra_filters = kwargs.pop("extra_filters", None)
         super().__init__(user)
         queryset = self.model.objects.all()
-
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+
+        # TODO: Put back all the other fields - joining to HGNC and to GeneAnnotation
+
         av = AnnotationVersion.latest(genome_build)
-        ensembl_gene_annotation_version = av.ensembl_gene_annotation_version
-        self.extra_filters_description_list = []
+        gene_annotation_version = av.gene_annotation_version
+        gene_annotation_release_id = av.gene_annotation_version.gene_annotation_release_id
         if extra_filters:
-
-            version = extra_filters["version"]
-            ensembl_gene_annotation_version = EnsemblGeneAnnotationVersion.objects.get(pk=version)
-
-            self.extra_filters_description_list.append(str(ensembl_gene_annotation_version))
+            gene_annotation_release_id = extra_filters["gene_annotation_release_id"]
             column = extra_filters.get("column")
             if column:
                 if column in GenesGrid.fields:
                     is_null = extra_filters.get("is_null", False)
                     kwargs = {f"{column}__isnull": is_null}
                     queryset = queryset.filter(**kwargs)
-
-                    if is_null:
-                        col_description = column + " is null."
-                    else:
-                        col_description = column + " is NOT null."
-                    self.extra_filters_description_list.append(col_description)
                 else:
                     raise PermissionDenied(f"Bad column '{column}'")
 
-        queryset = queryset.filter(version=ensembl_gene_annotation_version)
+        queryset = queryset.filter(release_id=gene_annotation_release_id)
         self.queryset = queryset.values(*self.get_field_names())
-        self.version = ensembl_gene_annotation_version
         grid_export_url = reverse("genes_grid", kwargs={"genome_build_name": genome_build_name,
                                                         "op": JQGridViewOp.DOWNLOAD})
-        self.extra_config.update({'sortname': 'hgnc_symbol',
+        self.extra_config.update({'sortname': 'gene_version__gene_symbol',
                                   'sortorder': 'asc',
                                   'shrinkToFit': False,
                                   'grid_export_url': grid_export_url})

@@ -82,6 +82,7 @@ class HGNC(models.Model):
     rgd_ids = models.TextField(null=True)
     status = models.CharField(max_length=1, choices=HGNCStatus.choices)
     ucsc_ids = models.TextField(null=True)
+    uniprot_ids = models.TextField(null=True)
 
     def __str__(self):
         return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \

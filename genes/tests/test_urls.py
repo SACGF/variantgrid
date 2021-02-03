@@ -4,7 +4,7 @@ import uuid
 from django.contrib.auth.models import User
 import unittest
 
-from annotation.fake_annotation import get_fake_annotation_version, create_fake_gene_annotation
+from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import CachedWebResource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, GeneCoverage, GeneList, PanelAppPanel, \
@@ -25,8 +25,7 @@ class Test(URLTestCase):
         cls.user_owner = User.objects.get_or_create(username='testuser')[0]
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        annotation_version = get_fake_annotation_version(cls.grch37)
-        create_fake_gene_annotation(annotation_version.ensembl_gene_annotation_version)
+        get_fake_annotation_version(cls.grch37)
 
         trio = create_fake_trio(cls.user_owner, cls.grch37)
         cls.cohort = trio.cohort

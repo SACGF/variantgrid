@@ -87,15 +87,15 @@ class PhenotypeNode(AnalysisNode):
         text_phenotypes = (self.text_phenotype or '').split()
         if text_phenotypes:
             sql_path = "variantannotation__gene__ensemblgeneannotation"
-            columns = ['refseq_gene_summary',
-                       'omim_phenotypes',
-                       'function_from_uniprotkb',
-                       'phenotypes_from_ensembl']
+            columns = ['variantannotation__gene__gene_summary',
+                       'variantannotation__gene__geneannotation__omim_terms',
+                       'variantannotation__uniprot__function',
+                       'variantannotation__gene__geneannotation__hpo_terms']
 
             text_filters = []
             for text_phenotype in text_phenotypes:
                 for c in columns:
-                    col_path = f"{sql_path}__{c}__icontains"
+                    col_path = f"{c}__icontains"
                     tp_q = Q(**{col_path: text_phenotype})
                     text_filters.append(tp_q)
 

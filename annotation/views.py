@@ -23,15 +23,14 @@ from annotation.annotation_versions import get_variant_annotation_version
 from annotation.citations import get_citations, CitationDetails
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    EnsemblGeneAnnotationVersion, EnsemblGeneAnnotationVersionDiff, VariantAnnotationVersionDiff
+    VariantAnnotationVersionDiff
 from annotation.models.models import ClinVarCitation, CachedCitation, \
     CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation
 from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
-from genes.models import GeneListCategory, HGNC, GeneAnnotationImport, \
-    GeneVersion, TranscriptVersion, GeneSymbolAlias
+from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
@@ -118,9 +117,8 @@ def _get_build_annotation_details(build_contigs, genome_build):
             if gene_annotation_release := av.variant_annotation_version.gene_annotation_release:
                 annotation_details["gene_annotation_release"] = str(gene_annotation_release)
 
-        ensembl_counts = av.get_ensembl_gene_annotation().count()
-        if ensembl_counts:
-            annotation_details["gene_level_annotation"] = f"{ensembl_counts} gene level annotations."
+        if gene_annotation_counts := av.get_gene_annotation().count():
+            annotation_details["gene_level_annotation"] = f"{gene_annotation_counts} gene annotations."
 
         clinvar_counts = av.get_clinvar().count()
         if clinvar_counts:
@@ -128,7 +126,7 @@ def _get_build_annotation_details(build_contigs, genome_build):
 
         clinvar_counts = av.get_clinvar().count()
         annotation_sub_components = [reference_ok, genes_and_transcripts, gene_annotation_release,
-                                     ensembl_counts, clinvar_counts]
+                                     gene_annotation_counts, clinvar_counts]
         if settings.SOMALIER.get("enabled"):
             somalier_cfg = SomalierConfig()
             try:
@@ -298,8 +296,7 @@ def version_diffs(request):
 
         return data
 
-    VERSION_LEVELS = [('Gene', EnsemblGeneAnnotationVersion, EnsemblGeneAnnotationVersionDiff),
-                      ('Variant', VariantAnnotationVersion, VariantAnnotationVersionDiff)]
+    VERSION_LEVELS = [('Variant', VariantAnnotationVersion, VariantAnnotationVersionDiff)]
 
     version_levels = []
     for name, version_klass, version_diff_klass in VERSION_LEVELS:

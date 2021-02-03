@@ -7,9 +7,9 @@ import logging
 import time
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import SampleVariantAnnotationStats, SampleEnsemblGeneAnnotationStats, \
+from annotation.models import SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
     SampleClinVarAnnotationStats, SampleVariantAnnotationStatsPassingFilter, \
-    SampleEnsemblGeneAnnotationStatsPassingFilter, SampleClinVarAnnotationStatsPassingFilter, \
+    SampleGeneAnnotationStatsPassingFilter, SampleClinVarAnnotationStatsPassingFilter, \
     AnnotationVersion
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import InvalidAnnotationVersionError, VCFAnnotationStats
@@ -22,7 +22,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 SAMPLE_STATS = "sample_stats"
 SAMPLE_ANNOTATION_STATS = "annotation_stats"
-SAMPLE_ENSEMBL_GENE_STATS = "ensembl_gene_stats"
+SAMPLE_GENE_STATS = "gene_stats"
 SAMPLE_CLINVAR_STATS = "clinvar_stats"
 
 
@@ -45,13 +45,13 @@ def calculate_vcf_stats(vcf_id, annotation_version_id):
 
 def _create_stats_per_sample(vcf: VCF, annotation_version) -> Tuple[Dict, Optional[Dict]]:
     vav_kwargs = {"variant_annotation_version": annotation_version.variant_annotation_version}
-    ega_kwargs = {"ensembl_gene_annotation_version": annotation_version.ensembl_gene_annotation_version}
+    ega_kwargs = {"gene_annotation_version": annotation_version.gene_annotation_version}
     cv_kwargs = {"clinvar_version": annotation_version.clinvar_version}
 
     STATS_CLASSES = {
         SAMPLE_STATS: (SampleStats, SampleStatsPassingFilter, {}),
         SAMPLE_ANNOTATION_STATS: (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter, vav_kwargs),
-        SAMPLE_ENSEMBL_GENE_STATS: (SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter, ega_kwargs),
+        SAMPLE_GENE_STATS: (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, ega_kwargs),
         SAMPLE_CLINVAR_STATS: (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, cv_kwargs),
     }
 
@@ -88,7 +88,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         "variantannotation__dbsnp_rs_id",
         "variantannotation__impact",
         "variantannotation__transcript_id",
-        "variantannotation__gene__ensemblgeneannotation__omim_phenotypes",
+        "variantannotation__gene__geneannotation__omim_terms",
         "variantannotation__vep_skipped_reason",
         "clinvar__highest_pathogenicity",
     ]
@@ -107,7 +107,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         dbsnp = vals["variantannotation__dbsnp_rs_id"]
         impact = vals["variantannotation__impact"]
         transcript = vals["variantannotation__transcript_id"]
-        omim = vals["variantannotation__gene__ensemblgeneannotation__omim_phenotypes"]
+        omim = vals["variantannotation__gene__geneannotation__omim_phenotypes"]
         vep_skipped = vals["variantannotation__vep_skipped_reason"]
         clinvar_highest_pathogenicity = vals["clinvar__highest_pathogenicity"]
 
@@ -172,7 +172,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
                         ast.ref_high_or_moderate_count += 1
 
             if transcript:
-                for gs in [sl[SAMPLE_ENSEMBL_GENE_STATS] for sl in sample_stats_list]:
+                for gs in [sl[SAMPLE_GENE_STATS] for sl in sample_stats_list]:
                     gs.gene_count += 1
 
                     if omim:
@@ -225,12 +225,12 @@ def calculate_needed_stats(run_async=False):
 
         needs_stats = Q(samplestats__isnull=True)
         needs_stats |= ~Q(samplevariantannotationstats__variant_annotation_version=annotation_version.variant_annotation_version)
-        needs_stats |= ~Q(sampleensemblgeneannotationstats__ensembl_gene_annotation_version=annotation_version.ensembl_gene_annotation_version)
+        needs_stats |= ~Q(samplegeneannotationstats__gene_annotation_version=annotation_version.gene_annotation_version)
         needs_stats |= ~Q(sampleclinvarannotationstats__clinvar_version=annotation_version.clinvar_version)
 
         needs_stats_passing_filters = Q(samplestatspassingfilter__isnull=True)
         needs_stats_passing_filters |= ~Q(samplevariantannotationstats__variant_annotation_version=annotation_version.variant_annotation_version)
-        needs_stats_passing_filters |= ~Q(sampleensemblgeneannotationstats__ensembl_gene_annotation_version=annotation_version.ensembl_gene_annotation_version)
+        needs_stats_passing_filters |= ~Q(samplegeneannotationstats__gene_annotation_version=annotation_version.gene_annotation_version)
         needs_stats_passing_filters |= ~Q(sampleclinvarannotationstats__clinvar_version=annotation_version.clinvar_version)
 
         qs_filter = needs_stats | (Q(vcf__vcffilter__isnull=False) & needs_stats_passing_filters)

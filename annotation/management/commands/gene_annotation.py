@@ -13,7 +13,8 @@ from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
 class Command(BaseCommand):
-    GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "hpo_terms", "omim_terms", "oe_ratio_percentile", "oe_lof"]
+    GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "hpo_terms", "omim_terms",
+                              "rvis_oe_ratio_percentile", "gnomad_oe_lof"]
     TERM_JOIN_STRING = " | "
 
     def add_arguments(self, parser):
@@ -60,9 +61,9 @@ class Command(BaseCommand):
         annotation_by_gene = defaultdict(dict)
         for hgnc_ot in OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC):
             omim_snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.OMIM)
-            omim_terms = self.TERM_JOIN_STRING.join((str(l) for l in omim_snake.leafs()))
+            omim_terms = self.TERM_JOIN_STRING.join((str(lt) for lt in omim_snake.leafs()))
             hpo_snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.HPO)
-            hpo_terms = self.TERM_JOIN_STRING.join((str(l) for l in hpo_snake.leafs()))
+            hpo_terms = self.TERM_JOIN_STRING.join((str(lt) for lt in hpo_snake.leafs()))
 
             uc_symbol = hgnc_ot.name.upper()
             genes_qs = gene_annotation_release.genes_for_symbol(uc_symbol)
@@ -78,7 +79,7 @@ class Command(BaseCommand):
             genes_qs = gene_annotation_release.genes_for_symbol(gene_symbol_id)
             if genes_qs.exists():
                 for gene in genes_qs:
-                    annotation_by_gene[gene]["oe_lof"] = oe_lof
+                    annotation_by_gene[gene]["gnomad_oe_lof"] = oe_lof
             else:
                 print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - GnomADGeneConstraint")
                 missing_genes["gnomad_gene_constraints"] += 1
@@ -87,7 +88,7 @@ class Command(BaseCommand):
             genes_qs = gene_annotation_release.genes_for_symbol(gene_symbol_id)
             if genes_qs.exists():
                 for gene in genes_qs:
-                    annotation_by_gene[gene]["oe_ratio_percentile"] = oe_ratio_percentile
+                    annotation_by_gene[gene]["rvis_oe_ratio_percentile"] = oe_ratio_percentile
             else:
                 print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - RVIS")
                 missing_genes["rvis"] += 1

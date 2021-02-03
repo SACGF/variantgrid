@@ -6,7 +6,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from django.forms.models import model_to_dict
 from django.http.response import JsonResponse, Http404
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
@@ -21,12 +20,11 @@ from global_login_required import login_not_required
 from lazy import lazy
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.forms import EnsemblGeneAnnotationVersionForm
-from annotation.models.models import AnnotationVersion, EnsemblGeneAnnotation, Citation, VariantAnnotation
+from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGeneListForm, CustomGeneListForm, \
-    GeneSymbolForm
+    GeneSymbolForm, GeneAnnotationReleaseForm
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
@@ -46,18 +44,18 @@ from snpdb.variant_queries import get_has_classifications_q, get_has_variant_tag
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification
 from classification.views.classification_datatables import ClassificationDatatableConfig
-from variantopedia.variant_column_utils import get_gene_annotation_column_data
 
 
 def genes(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     av = AnnotationVersion.latest(genome_build)
-    ensembl_gene_annotation_version = av.ensembl_gene_annotation_version
-    version_form = EnsemblGeneAnnotationVersionForm(initial={'version': ensembl_gene_annotation_version})
+    gene_annotation_release = av.gene_annotation_version.gene_annotation_release
+
+    gene_annotation_release_form = GeneAnnotationReleaseForm(initial={'release': gene_annotation_release})
 
     context = {"genome_build": genome_build,
                "gene_form": GeneForm(),
-               "version_form": version_form}
+               "gene_annotation_release_form": gene_annotation_release_form}
     return render(request, 'genes/genes.html', context)
 
 
@@ -172,15 +170,6 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
 
     has_variants = has_observed_variants or has_classified_variants or has_tagged_variants
 
-    gene_annotation = EnsemblGeneAnnotation.get_for_symbol(genome_build, gene_symbol)
-    if gene_annotation:
-        gene_level_columns = get_gene_annotation_column_data(gene_annotation)
-        ega_qs = gene_annotation.gene.ensemblgeneannotation_set.filter(version__genome_build=genome_build)
-        num_gene_annotation_versions = ega_qs.count()
-    else:
-        gene_level_columns = None
-        num_gene_annotation_versions = 0
-
     omim_and_hpo_for_gene = _get_omim_and_hpo_for_gene_symbol(gene_symbol)
     gene_lists_qs = GeneList.filter_for_user(request.user)
     gene_in_gene_lists = GeneList.visible_gene_lists_containing_gene_symbol(gene_lists_qs, gene_symbol).exists()
@@ -194,10 +183,8 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "consortium_genes_and_aliases": defaultdict_to_dict(consortium_genes_and_aliases),
         "citations": citations,
         "gene_symbol": gene_symbol,
-        "gene_annotation": gene_annotation,
         "gene_in_gene_lists": gene_in_gene_lists,
         "gene_infos": GeneInfo.get_for_gene_symbol(gene_symbol),
-        "gene_level_columns": gene_level_columns,
         "genome_build": genome_build,
         "has_classified_variants": has_classified_variants,
         "panel_app_servers": PanelAppServer.objects.order_by("pk"),
@@ -207,35 +194,11 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "has_tagged_variants": has_tagged_variants,
         "has_variants": has_variants,
         "omim_and_hpo_for_gene": omim_and_hpo_for_gene,
-        "num_gene_annotation_versions": num_gene_annotation_versions,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
         "datatable_config": ClassificationDatatableConfig(request)
     }
     return render(request, "genes/view_gene_symbol.html", context)
-
-
-def view_gene_annotation_history(request, genome_build_name, gene_symbol):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-
-    ega = EnsemblGeneAnnotation.get_for_symbol(genome_build, gene_symbol)
-    if ega is None:
-        raise Http404(f"No EnsemblGeneAnnotation for {genome_build}/{gene_symbol}")
-
-    gene_annotation_dicts_by_version = {}
-    versions = []
-    for ega in ega.gene.ensemblgeneannotation_set.filter(version__genome_build=genome_build):
-        ega_dict = model_to_dict(ega)
-        del ega_dict["id"]
-        del ega_dict["version"]
-        gene_annotation_dicts_by_version[ega.version.pk] = ega_dict
-        versions.append((ega.version.pk, str(ega.version)))
-
-    context = {"gene": ega.gene,
-               "gene_annotation_dicts_by_version": gene_annotation_dicts_by_version,
-               "versions": versions}
-    return render(request, "genes/view_gene_annotation_history.html", context)
 
 
 def view_transcript(request, transcript_id):

@@ -66,17 +66,6 @@ class CitationSource(models.TextChoices):
                       'PubMedCentral': PUBMED_CENTRAL[0]})
 
 
-class TranscriptStatus(models.TextChoices):
-    KNOWN = 'K', "KNOWN"
-    NOVEL = 'N', "NOVEL"
-    PUTATIVE = 'P', "PUTATIVE"
-
-
-class GenomicStrand(models.TextChoices):
-    SENSE = '+', '+'
-    ANTISENSE = '-', '-'
-
-
 class ClinGenClassification(models.TextChoices):
     DEFINITIVE = 'D', 'Definitive'
     STRONG = 'S', 'Strong'

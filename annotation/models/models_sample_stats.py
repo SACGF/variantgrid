@@ -10,8 +10,7 @@
 from django.db import models
 from django.db.models.deletion import CASCADE
 
-from annotation.models.models import VariantAnnotationVersion, \
-    EnsemblGeneAnnotationVersion, ClinVarVersion
+from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, GeneAnnotationVersion
 from snpdb.models import Sample
 from snpdb.models.models_enums import BuiltInFilters
 
@@ -56,8 +55,8 @@ class AbstractVariantAnnotationStats(models.Model):
         return count
 
 
-class AbstractEnsemblGeneAnnotationStats(models.Model):
-    ensembl_gene_annotation_version = models.ForeignKey(EnsemblGeneAnnotationVersion, on_delete=CASCADE)
+class AbstractGeneAnnotationStats(models.Model):
+    gene_annotation_version = models.ForeignKey(GeneAnnotationVersion, on_delete=CASCADE)
     gene_count = models.IntegerField(default=0)
 
     # Separated into zygosity as it's used by SampleNode counts
@@ -125,7 +124,7 @@ class AbstractSampleVariantAnnotationStats(AbstractVariantAnnotationStats):
         return cls.objects.get(sample=sample, variant_annotation_version=annotation_version.variant_annotation_version)
 
 
-class AbstractSampleEnsemblGeneAnnotationStats(AbstractEnsemblGeneAnnotationStats):
+class AbstractSampleGeneAnnotationStats(AbstractGeneAnnotationStats):
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
 
     class Meta:
@@ -133,7 +132,7 @@ class AbstractSampleEnsemblGeneAnnotationStats(AbstractEnsemblGeneAnnotationStat
 
     @classmethod
     def load_version(cls, sample, annotation_version):
-        return cls.objects.get(sample=sample, ensembl_gene_annotation_version=annotation_version.ensembl_gene_annotation_version)
+        return cls.objects.get(sample=sample, gene_annotation_version=annotation_version.gene_annotation_version)
 
 
 class AbstractSampleClinVarAnnotationStats(AbstractClinVarAnnotationStats):
@@ -155,11 +154,11 @@ class SampleVariantAnnotationStatsPassingFilter(AbstractSampleVariantAnnotationS
     pass
 
 
-class SampleEnsemblGeneAnnotationStats(AbstractSampleEnsemblGeneAnnotationStats):
+class SampleGeneAnnotationStats(AbstractSampleGeneAnnotationStats):
     pass
 
 
-class SampleEnsemblGeneAnnotationStatsPassingFilter(AbstractSampleEnsemblGeneAnnotationStats, AbstractPassingFilter):
+class SampleGeneAnnotationStatsPassingFilter(AbstractSampleGeneAnnotationStats, AbstractPassingFilter):
     pass
 
 

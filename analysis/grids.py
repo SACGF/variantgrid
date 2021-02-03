@@ -42,7 +42,7 @@ class VariantGrid(JqGridSQL):
         'variantannotation__cosmic_legacy_id': {'width': 90, 'formatter': 'cosmicLink'},
         'variantannotation__transcript_version__gene_version__gene_symbol': {'formatter': 'geneSymbolLink'},
         'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
-        'variantannotation__gene__ensemblgeneannotation__omim_id': {'width': 60, 'formatter': 'omimLink'},
+        'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60, 'formatter': 'omimLink'},
         'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
     }
 

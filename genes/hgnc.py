@@ -82,7 +82,8 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
                     refseq_ids=_get_list('refseq_accession'),
                     rgd_ids=_get_list('rgd_id'),
                     status=status,
-                    ucsc_ids=record.get('ucsc_id'))
+                    ucsc_ids=record.get('ucsc_id'),
+                    uniprot_ids=_get_list('uniprot_ids'))
 
         if hgnc_id in existing_hgnc_ids:
             hgnc_gene_names_update.append(hgnc)

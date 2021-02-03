@@ -222,50 +222,25 @@
         {% endif %}
 
         {% if show_annotation %}
-            <h4>Gene Annotations</h4>
-            {% if gene_annotation %}
-                <p>Gene Annotation Version: <a class="hover-link" href="{% url 'annotation_versions' %}">{{ gene_annotation.version }}</a>
-                {% if num_gene_annotation_versions > 1 %}
-                    - <a href="{% url 'view_gene_annotation_history' gene_symbol.pk %}">Compare {{ num_gene_annotation_versions }} historical versions</a>.
-                {% endif %}
+            {% if gene_summary %}
+                <p>{{ gene_summary }}</p>
             {% endif %}
 
-            <div id='gene-info' class="mt-2">
-                {% if gene_annotation %}
-                    <div class='short-summary'>
-                        <p>
-                            <b>{{ gene_annotation.hgnc_name }}:</b> {{ gene_annotation.refseq_gene_summary }}
-                        </p>
-                        <div id='summary-gene-icons-container'></div>
-                    </div>
+            {% if True %}
+                <h4>HGNC</h4>
 
-                    <div class="accordion indicator-plus-before round-indicator mb-4">
-                        <div class="card">
-                            <div class="card-header collapsed" data-toggle="collapse" data-target="#full-gene-info" >
-                                <a class="card-title">Full Annotation Summary</a>
-                            </div>
-                            <div id="full-gene-info" class="collapse" aria-labelledby="heading-{{ page_id }}">
-                                <div class="card-body">
-                                    {% for grid_column in gene_level_columns %}
-                                        {% labelled id=grid_column.id label=grid_column.description shorten_label=True %}{{ grid_column.value | safe}}{% endlabelled %}
-                                    {% endfor %}
-                                    {% if gene_infos.exists %}
-                                    <h5>Gene Info</h5>
-                                    <div class='gene-info-container'>
-                                        {% for gi in gene_infos %}
-                                            <div class='gene-icon {{ gi.icon_css_class }}' title='{{ gi.name }}'></div>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div id='hgnc-info' class="mt-2">
+                    TODO: HGNC
+                </div>
+            {% endif %}
 
-                {% else %}
-                    <!-- No annotation for this gene -->
-                {% endif %}
-            </div>
+            {% if True %}
+                <h4>UniProt</h4>
+
+                <div id='uniprot-info' class="mt-2">
+                    TODO: UniProt
+                </div>
+            {% endif %}
 
             {% gene_disease gene_symbol %}
 

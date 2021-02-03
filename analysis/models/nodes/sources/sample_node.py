@@ -10,7 +10,7 @@ import operator
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter
 from analysis.models.nodes.cohort_mixin import SampleMixin
 from annotation.models import SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, \
-    SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter, \
+    SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, \
     SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter
 from genes.models import SampleGeneList
 from patients.models_enums import Zygosity
@@ -159,7 +159,7 @@ class SampleNode(SampleMixin, AnalysisNode):
         CLASSES = {
             BuiltInFilters.TOTAL: (SampleStats, SampleStatsPassingFilter),
             BuiltInFilters.CLINVAR: (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter),
-            BuiltInFilters.OMIM: (SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter),
+            BuiltInFilters.OMIM: (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter),
             BuiltInFilters.IMPACT_HIGH_OR_MODERATE: (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter),
         }
         annotation_version = self.analysis.annotation_version

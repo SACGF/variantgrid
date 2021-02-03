@@ -300,15 +300,6 @@ function addGeneSymbol(geneSymbol) {
     addGeneRows(tbody, 0, '', [geneSymbol]);
 }
 
-function geneAnnotationCallBack(gene_id, callBackFunc) {
-    $.ajax({
-        type: "GET",
-        url: Urls.api_view_gene_id(gene_id),
-        success: callBackFunc
-    });
-}
-
-
 function addAndRetrieveGeneListColumnIfNotExists(geneListId, selectElement, addEmptyGeneLists) {
     if (geneLists.indexOf(geneListId) > -1) {
         return;

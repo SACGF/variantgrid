@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 import unittest
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
-    create_fake_gene_annotation, create_fake_variant_annotation
+    create_fake_variant_annotation
 from annotation.models import HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
     ClinVar, Citation, CitationSource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
@@ -40,9 +40,6 @@ class Test(URLTestCase):
         cls.citations_ids_list_pubmed = pubmed_citation
         transcript_version = create_fake_transcript_version(cls.grch37)
 
-        create_fake_gene_annotation(cls.annotation_version_grch37.ensembl_gene_annotation_version)
-        create_fake_gene_annotation(cls.annotation_version_grch38.ensembl_gene_annotation_version)
-
         cls.gene_id = transcript_version.gene_version.gene_id
         cls.gene_symbol = transcript_version.gene_version.gene_symbol
 
@@ -63,7 +60,6 @@ class Test(URLTestCase):
             ("citations_tab", {"citations_ids_list": self.citations_ids_list}, 200),
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
             # API
-            ("api_view_gene_id", {"gene_id": self.gene_id}, 200),
             ("api_view_gene_disease_validity", {"gene_symbol": self.gene_symbol}, 200),
             ("api_gene_annotation", {"gene_symbol": self.gene_symbol}, 200),
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),

@@ -24,7 +24,7 @@ from annotation.external_search_terms import get_variant_search_terms, get_varia
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
-    TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
+    ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
     VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease, UniProt
 from genes.models_enums import AnnotationConsortium
@@ -215,82 +215,6 @@ class CachedCitation(TimeStampedModel):
         return record
 
 
-class EnsemblGeneAnnotationVersion(SubVersionPartition):
-    RECORDS_BASE_TABLE_NAMES = ["annotation_ensemblgeneannotation"]
-    filename = models.TextField()
-    md5_hash = models.CharField(max_length=32)
-    ensembl_version = models.IntegerField()
-    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-
-
-@receiver(pre_delete, sender=EnsemblGeneAnnotationVersion)
-def ensembl_gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):
-    instance.delete_related_objects()
-
-
-class EnsemblGeneAnnotation(models.Model):
-    """ Populated from SACGF Gene Level Annotation (Frank Feng) """
-    version = models.ForeignKey(EnsemblGeneAnnotationVersion, on_delete=CASCADE)
-    gene = models.ForeignKey(Gene, on_delete=CASCADE)
-    hgnc_symbol = models.TextField(null=True)
-    external_gene_name = models.TextField(null=True)
-    hgnc_symbol_lower = models.TextField(null=True)
-    hgnc_name = models.TextField(null=True)
-    synonyms = models.TextField(null=True)
-    previous_symbols = models.TextField(null=True)
-    hgnc_chromosome = models.TextField(null=True)
-    gene_family_tag = models.TextField(null=True)
-    gene_family_description = models.TextField(null=True)
-    hgnc_id = models.TextField(null=True)
-    entrez_gene_id = models.IntegerField(null=True)
-    uniprot_id = models.TextField(null=True)
-    ucsc_id = models.TextField(null=True)
-    omim_id = models.TextField(null=True)  # Can have multiple (comma sep)
-    enzyme_ids = models.TextField(null=True)
-    ccds_ids = models.TextField(null=True)
-    rgd_id = models.TextField(null=True)
-    mgi_id = models.TextField(null=True)
-    rvis_percentile = models.TextField(null=True)
-    refseq_gene_summary = models.TextField(null=True)
-    function_from_uniprotkb = models.TextField(null=True)
-    pathway_from_uniprotkb = models.TextField(null=True)
-    tissue_specificity_from_uniprotkb = models.TextField(null=True)
-    phenotypes_from_ensembl = models.TextField(null=True)
-    omim_phenotypes = models.TextField(null=True)
-    gene_biotype = models.TextField(null=True)
-    status = models.CharField(max_length=1, choices=TranscriptStatus.choices, null=True)
-    chromosome_name = models.TextField(null=True)
-    start_position = models.IntegerField(null=True)
-    end_position = models.IntegerField(null=True)
-    band = models.TextField(null=True)
-    strand = models.CharField(max_length=1, choices=GenomicStrand.choices, null=True)
-    percentage_gc_content = models.FloatField(null=True)
-    transcript_count = models.IntegerField(null=True)
-    in_cancer_gene_census = models.BooleanField(null=True)
-
-    class Meta:
-        unique_together = ("version", "gene")
-
-    @staticmethod
-    def latest_qs():
-        latest_version = EnsemblGeneAnnotationVersion.objects.order_by("pk").last()
-        return EnsemblGeneAnnotation.objects.filter(version=latest_version)
-
-    @staticmethod
-    def get_for_symbol(genome_build: GenomeBuild, gene_symbol: GeneSymbol):
-        annotation_version = AnnotationVersion.latest(genome_build)
-        ega_qs = annotation_version.get_ensembl_gene_annotation()
-        ENSEMBL_ANNOTATION = [
-            Q(hgnc_symbol=gene_symbol),
-            Q(gene__in=gene_symbol.get_genes().filter(annotation_consortium=AnnotationConsortium.ENSEMBL)),
-        ]
-        gene_annotation = None
-        for q in ENSEMBL_ANNOTATION:
-            if gene_annotation := ega_qs.filter(q).first():
-                break
-        return gene_annotation
-
-
 class GeneAnnotationVersion(SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_geneannotation"]
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, on_delete=CASCADE)
@@ -315,11 +239,15 @@ class GeneAnnotation(models.Model):
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     hpo_terms = models.TextField(null=True)
     omim_terms = models.TextField(null=True)
-    oe_ratio_percentile = models.FloatField(null=True)  # Copied from genes.RVIS
-    oe_lof = models.FloatField(null=True)  # Copied from genes.GnomADGeneConstraint
+    rvis_oe_ratio_percentile = models.FloatField(null=True)  # Copied from genes.RVIS
+    gnomad_oe_lof = models.FloatField(null=True)  # Copied from genes.GnomADGeneConstraint
 
     class Meta:
         unique_together = ("version", "gene")
+
+    @staticmethod
+    def get_for_gene_version(gene_version):
+        pass
 
 
 class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
@@ -883,13 +811,11 @@ class InvalidAnnotationVersionError(Exception):
 # We re-use this, if nobody has referenced it - as you may eg update
 # variant/gene/clinvar annotations every 6 months etc and no point having so many sub-versions
 class AnnotationVersion(models.Model):
-    SUB_ANNOTATIONS = ['variant_annotation_version', 'ensembl_gene_annotation_version', 'gene_annotation_version',
-                       'clinvar_version', 'human_protein_atlas_version']
+    SUB_ANNOTATIONS = ['variant_annotation_version', 'gene_annotation_version', 'clinvar_version', 'human_protein_atlas_version']
 
     annotation_date = models.DateTimeField(auto_now=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, null=True, on_delete=PROTECT)
-    ensembl_gene_annotation_version = models.ForeignKey(EnsemblGeneAnnotationVersion, null=True, on_delete=PROTECT)
     gene_annotation_version = models.ForeignKey(GeneAnnotationVersion, null=True, on_delete=PROTECT)
     clinvar_version = models.ForeignKey(ClinVarVersion, null=True, on_delete=PROTECT)
     human_protein_atlas_version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, null=True, on_delete=PROTECT)
@@ -957,7 +883,6 @@ class AnnotationVersion(models.Model):
             kwargs = {
                 "genome_build": genome_build,
                 "variant_annotation_version": latest_for_build(VariantAnnotationVersion, genome_build),
-                "ensembl_gene_annotation_version": latest_for_build(EnsemblGeneAnnotationVersion, genome_build),
                 "gene_annotation_version": latest_for_build(GeneAnnotationVersion, genome_build, "gene_annotation_release__genome_build"),
                 "clinvar_version": latest_for_build(ClinVarVersion, genome_build),
                 "human_protein_atlas_version": latest(HumanProteinAtlasAnnotationVersion)
@@ -987,9 +912,6 @@ class AnnotationVersion(models.Model):
     def get_gene_annotation(self):
         return GeneAnnotation.objects.filter(version=self.gene_annotation_version)
 
-    def get_ensembl_gene_annotation(self):
-        return EnsemblGeneAnnotation.objects.filter(version=self.ensembl_gene_annotation_version)
-
     def get_clinvar(self):
         return ClinVar.objects.filter(version=self.clinvar_version)
 
@@ -999,7 +921,7 @@ class AnnotationVersion(models.Model):
     @property
     def long_description(self):
         sub_versions = [f"Variant: {self.variant_annotation_version}",
-                        f"Gene: {self.ensembl_gene_annotation_version}",
+                        f"Gene: {self.gene_annotation_version}",
                         f"ClinVar: {self.clinvar_version}",
                         f"HPA: {self.human_protein_atlas_version}"]
         sub_versions_str = ", ".join(sub_versions)

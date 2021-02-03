@@ -76,7 +76,7 @@ class Command(BaseCommand):
 
         separator = '\t'  # Was having trouble with quoting CSVs
         logging.info("Creating TSV to insert into database...")
-        csv_filename = get_import_processing_filename(version_id, "human_protein_annotation.csv", prefix='ensembl_gene_annotation')
+        csv_filename = get_import_processing_filename(version_id, "human_protein_annotation.csv", prefix='human_protein_atlas')
         if os.path.exists(csv_filename):
             os.remove(csv_filename)
         write_sql_copy_csv(records, csv_filename, separator=separator)

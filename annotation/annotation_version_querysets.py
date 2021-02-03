@@ -7,7 +7,7 @@ This is done by string replacement of table joins with explicit table parition n
 into SQL - @see library.django_utils.django_queryset_sql_transformer.get_queryset_with_transformer_hook
 
 Ideally, this could have been done via Django FilteredRelation - but that doesn't support nested relations
-(ie can't do 'variantannotation__gene__ensemblgeneannotation)
+(ie can't do 'variantannotation__gene__geneannotation)
 """
 
 from django.db.models.query_utils import Q

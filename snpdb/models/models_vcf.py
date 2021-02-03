@@ -259,8 +259,8 @@ class Sample(SortByPKMixin, models.Model):
         related_objects = [
             self.sampleclinvarannotationstats_set,
             self.sampleclinvarannotationstatspassingfilter_set,
-            self.sampleensemblgeneannotationstats_set,
-            self.sampleensemblgeneannotationstatspassingfilter_set,
+            self.samplegeneannotationstats_set,
+            self.samplegeneannotationstatspassingfilter_set,
             self.samplelocuscount_set,
             self.samplevariantannotationstats_set,
             self.samplevariantannotationstatspassingfilter_set,
