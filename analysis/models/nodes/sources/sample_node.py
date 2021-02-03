@@ -146,11 +146,9 @@ class SampleNode(SampleMixin, AnalysisNode):
         return "\n".join(name_parts)
 
     def _has_filters_that_affect_label_counts(self):
-        try:
-            if self.nodeallelefrequencyfilter:
-                return True
-        except NodeAlleleFrequencyFilter.DoesNotExist:
-            pass
+        # This returns None if no filters to apply
+        if NodeAlleleFrequencyFilter.get_sample_q(self, self.sample):
+            return True
 
         return any([getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET])
 

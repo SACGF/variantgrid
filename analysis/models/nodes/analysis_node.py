@@ -639,8 +639,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             if not self.modifies_parents():
                 return parent_node_count.count
-        except:
+        except NodeCount.DoesNotExist:
             pass
+        except Exception as e:
+            logging.warning(e)
 
         return None
 
