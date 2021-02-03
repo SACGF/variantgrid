@@ -105,7 +105,10 @@ class GeneAnnotationReleaseAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, _user):
         """ Doesn't actually use user for GeneAnnotationRelease """
-        return GeneAnnotationRelease.objects.all()
+        qs = GeneAnnotationRelease.objects.all()
+        if genome_build_id := self.forwarded.get('genome_build_id', None):
+            qs = qs.filter(genome_build_id=genome_build_id)
+        return qs
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')

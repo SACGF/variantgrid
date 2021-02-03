@@ -14,7 +14,7 @@ from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import UserSettings, Q
+from snpdb.models import UserSettings, Q, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
 
@@ -141,10 +141,24 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
                                   'shrinkToFit': False})
 
 
+def _get_gene_fields():
+    q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
+    columns_qs = VariantGridColumn.objects.filter(q_gene)
+    fields = []
+    for variant_column in columns_qs.values_list("variant_column", flat=True):
+        gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
+        if gene_column.startswith("gene__"):
+            gene_column = "gene_version__" + gene_column
+        fields.append(gene_column)
+
+    print(fields)
+    return fields
+
+
 class GenesGrid(JqGridUserRowConfig):
     model = ReleaseGeneVersion
     caption = "GeneAnnotations"
-    fields = get_model_fields(ReleaseGeneVersion)
+    fields = _get_gene_fields()
     colmodel_overrides = {'id': {'hidden': True}}
 
     # 'version' : {'hidden' : True}}
@@ -158,12 +172,10 @@ class GenesGrid(JqGridUserRowConfig):
         # TODO: Put back all the other fields - joining to HGNC and to GeneAnnotation
 
         av = AnnotationVersion.latest(genome_build)
-        gene_annotation_version = av.gene_annotation_version
         gene_annotation_release_id = av.gene_annotation_version.gene_annotation_release_id
         if extra_filters:
             gene_annotation_release_id = extra_filters["gene_annotation_release_id"]
-            column = extra_filters.get("column")
-            if column:
+            if column := extra_filters.get("column"):
                 if column in GenesGrid.fields:
                     is_null = extra_filters.get("is_null", False)
                     kwargs = {f"{column}__isnull": is_null}

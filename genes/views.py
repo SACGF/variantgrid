@@ -24,11 +24,11 @@ from annotation.models.models import AnnotationVersion, Citation, VariantAnnotat
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGeneListForm, CustomGeneListForm, \
-    GeneSymbolForm, GeneAnnotationReleaseForm
+    GeneSymbolForm, GeneAnnotationReleaseForm, GeneAnnotationReleaseGenomeBuildForm
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList
+    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList, GeneAnnotationRelease
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
@@ -51,7 +51,8 @@ def genes(request, genome_build_name=None):
     av = AnnotationVersion.latest(genome_build)
     gene_annotation_release = av.gene_annotation_version.gene_annotation_release
 
-    gene_annotation_release_form = GeneAnnotationReleaseForm(initial={'release': gene_annotation_release})
+    gene_annotation_release_form = GeneAnnotationReleaseGenomeBuildForm(genome_build=genome_build,
+                                                                        initial={'release': gene_annotation_release})
 
     context = {"genome_build": genome_build,
                "gene_form": GeneForm(),
