@@ -88,6 +88,37 @@ class HGNC(models.Model):
         return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \
                f"previous symbols: {self.previous_symbols}, alias_symbols: {self.alias_symbols}"
 
+    def url(self):
+        return f"https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:{self.pk}"
+
+    @lazy
+    def ccds_list(self):
+        return (self.ccds_ids or '').split(",")
+
+    @lazy
+    def gene_group_id_list(self):
+        return (self.gene_group_ids or '').split(",")
+
+    @lazy
+    def mgd_list(self):
+        return (self.mgd_ids or '').split(",")
+
+    @lazy
+    def rgd_list(self):
+        return (self.rgd_ids or '').split(",")
+
+    @lazy
+    def ucsc_list(self):
+        return (self.ucsc_ids or '').split(",")
+
+    @lazy
+    def uniprot_list(self) -> List['UniProt']:
+        ulist = []
+        if self.uniprot_ids:
+            uniprot_ids = self.uniprot_ids.split(",")
+            ulist = list(UniProt.objects.filter(pk__in=uniprot_ids))
+        return ulist
+
 
 # TODO: I think this is obsolete, HGNC don't do this anymore
 gene_symbol_withdrawn_str = '~withdrawn'

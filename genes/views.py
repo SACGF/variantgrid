@@ -141,6 +141,8 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     has_observed_variants = False
     has_tagged_variants = False
 
+    hgnc = None
+    gene_summary = None
     gene_versions = gene_symbol.geneversion_set.all()
     if gene_versions.exists():
         # This page is shown using the users default genome build
@@ -154,6 +156,8 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
             msg = f"This symbol is not associated with any genes in build {desired_genome_build}, viewing in build {genome_build}"
             messages.add_message(request, messages.WARNING, msg)
 
+        hgnc = gene_version.hgnc
+        gene_summary = gene_version.gene.summary
         gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build, traverse_aliases=True)
         gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
         has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
@@ -185,8 +189,10 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "gene_symbol": gene_symbol,
         "gene_in_gene_lists": gene_in_gene_lists,
         "gene_infos": GeneInfo.get_for_gene_symbol(gene_symbol),
+        "gene_summary": gene_summary,
         "genome_build": genome_build,
         "has_classified_variants": has_classified_variants,
+        "hgnc": hgnc,
         "panel_app_servers": PanelAppServer.objects.order_by("pk"),
         "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
         "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
