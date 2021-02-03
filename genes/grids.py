@@ -9,7 +9,6 @@ from annotation.models.models import AnnotationVersion
 from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
     GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion
-from library.django_utils import get_model_fields
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
@@ -143,7 +142,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
 def _get_gene_fields():
     q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
-    columns_qs = VariantGridColumn.objects.filter(q_gene)
+    columns_qs = VariantGridColumn.objects.filter(q_gene).order_by("pk")
     fields = []
     for variant_column in columns_qs.values_list("variant_column", flat=True):
         gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
@@ -151,7 +150,6 @@ def _get_gene_fields():
             gene_column = "gene_version__" + gene_column
         fields.append(gene_column)
 
-    print(fields)
     return fields
 
 
@@ -160,8 +158,6 @@ class GenesGrid(JqGridUserRowConfig):
     caption = "GeneAnnotations"
     fields = _get_gene_fields()
     colmodel_overrides = {'id': {'hidden': True}}
-
-    # 'version' : {'hidden' : True}}
 
     def __init__(self, user, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)
@@ -255,9 +251,11 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
         if gene_list_id_list:
             gene_list_ids = gene_list_id_list.split("/")
             if gene_list_ids:
+                vav = gene_coverage_collection.genome_build.latest_variant_annotation_version
+                release = vav.gene_annotation_release
                 for gene_list_id in gene_list_ids:
                     gene_list = get_object_or_404(GeneList, pk=gene_list_id)
-                    genes.update(gene_list.get_genes())
+                    genes.update(gene_list.get_genes(release))
 
         queryset = self.get_coverage_queryset(gene_coverage_collection, genes)
         self.queryset = queryset.values(*self.get_field_names())
