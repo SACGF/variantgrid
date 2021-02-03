@@ -5,7 +5,12 @@
 {% block css %}
 	.sort_placeholder {height: 15px; border: red 3px solid;}
 	.list_placeholder { font-weight: bolder; }
-	.columns-list { margin: 5px; float: left;}
+	.columns-list {
+		margin: 5px; float: left;
+		width: 40%;
+		height: 100%;
+		border: 1px solid black;
+	}
 	.columns-list ul {
 		height: 100%;
 		list-style: none;
@@ -13,11 +18,11 @@
 	
 	div#columns-widget {
 		padding-top: 10px;
+		height: 100%;
 	}
 
 	#columns-widget li
 	{
-		width: 300px;
 		margin: 0;
 		padding: 5px;
 		margin-right: 10px;
@@ -87,53 +92,55 @@
 		}).disableSelection();
 		
 		// Set the height of both columns-list to be that of largest
-		var tallest = Math.max($("#my_columns").height(), $("#available_columns").height());
+		var tallest = Math.max($("#my_columns")[0].scrollHeight, $("#available_columns")[0].scrollHeight);
 		$(".columns-list").height(tallest);
 	});	
 {% endblock jshead %}
 
 {% block submenu_page_content %}
 
+<h3>Customize Columns: {{ custom_columns.name }}</h3>
+
 <div>
-	<h3>Customize Columns: {{ custom_columns.name }}</h3>
+	<table id="color-legend">
+	<tr><td><div class="color-box sample-column">&nbsp;</div>
+		<td><b>Sample Level</b> VCF sample/genotype information
+	<tr><td><div class="color-box transcript-column">&nbsp;</div>
+		<td><b>Transcript Level</b> Annotated at the variant level via VCF annotation process (different values per transcript)
+	<tr><td><div class="color-box variant-column">&nbsp;</div>
+		<td><b>Variant Level</b> Annotated at the variant level via VCF annotation process
+	<tr><td><div class="color-box database-column">&nbsp;</div>
+		<td><b>Database Level</b> Internal Database stats
+	<tr><td><div class="color-box gene-column">&nbsp;</div>
+		<td><b>Gene Level</b> Per-gene information, matched via gene associated with variant's assigned ensembl_transcript_id
+	<tr><td><div class="color-box hgnc-column">&nbsp;</div>
+		<td><b>HGNC</b> linked via gene (RefSeq/Ensembl assigns HGNC to their genes)
+	<tr><td><div class="color-box clinvar-column">&nbsp;</div>
+		<td><b>ClinVar</b> Clinical Variants
+	<tr><td><div class="color-box uniprot-column">&nbsp;</div>
+		<td><b>UniProt</b> UniProt linked via VEP "swissprot" call.
+	</table>
+</div>
 
-	<div>
-		<table id="color-legend">
-        <tr><td><div class="color-box sample-column">&nbsp;</div>
-            <td><b>Sample Level</b> VCF sample/genotype information 
-        <tr><td><div class="color-box transcript-column">&nbsp;</div>
-            <td><b>Transcript Level</b> Annotated at the variant level via VCF annotation process (different values per transcript) 
-		<tr><td><div class="color-box variant-column">&nbsp;</div>
-			<td><b>Variant Level</b> Annotated at the variant level via VCF annotation process
-        <tr><td><div class="color-box database-column">&nbsp;</div>
-            <td><b>Database Level</b> Internal Database stats 
-		<tr><td><div class="color-box gene-column">&nbsp;</div>
-			<td><b>Gene Level</b> Per-gene information, matched via gene associated with variant's assigned ensembl_transcript_id
-		<tr><td><div class="color-box clinvar-column">&nbsp;</div>
-			<td><b>ClinVar</b> Clinical Variants 
-		</table>
+{% load ui_help %}
+{% page_help 'settings/view_custom_columns_help' 'Custom Columns' %}
+
+<div id="columns-widget">
+	<div id="my_columns" class="columns-list">
+		<ul id="my_columns_sortable">
+			<li id="active_placeholder" class="ui-state-disabled"><h2>My Columns</h2></li>
+			{% for column in my_columns_list %}
+				<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><div class="column-name">{{ column.pk }}</div><div class="column-description">{{ column.description | safe  }}</div></li>
+			{% endfor %}
+		</ul>
 	</div>
-
-    {% load ui_help %}
-    {% page_help 'settings/view_custom_columns_help' 'Custom Columns' %}
-
-	<div id="columns-widget">
-		<div id="my_columns" class="columns-list">
-			<ul id="my_columns_sortable">
-			    <li id="active_placeholder" class="ui-state-disabled"><h2>My Columns</h2></li>
-			    {% for column in my_columns_list %}
-				    <li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><span class="column-name">{{ column.pk }}</span><span class="column-description">{{ column.description | safe  }}</span></li>
-			    {% endfor %}
-			</ul>
-		</div>
-		<div id="available_columns" class="columns-list">
-			<ul id="available_columns_sortable">
-			    <li id="inactive_placeholder" class="ui-state-disabled"><h2>Available Columns</h2></li>
-			    {% for column in available_columns_list %}
-				    <li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><span class="column-name">{{ column.pk }}</span><span class="column-description">{{ column.description | safe }}</span></li>
-			    {% endfor %}
-			</ul>
-		</div>
+	<div id="available_columns" class="columns-list">
+		<ul id="available_columns_sortable">
+			<li id="inactive_placeholder" class="ui-state-disabled"><h2>Available Columns</h2></li>
+			{% for column in available_columns_list %}
+				<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><div class="column-name">{{ column.pk }}</div><div class="column-description">{{ column.description | safe }}</div></li>
+			{% endfor %}
+		</ul>
 	</div>
 </div>
 

@@ -15,6 +15,7 @@ TISSUE_SPEC_KEY = "TISSUE SPECIFICITY: "
 PATHWAY_KEY = "PATHWAY: "
 PID_KEY = "Pathway_Interaction_DB"
 REACTOME_KEY = "Reactome"
+JOIN_STRING = " | "  # What's used to merge multiple entries together
 
 
 def store_uniprot_from_web(cached_web_resource: CachedWebResource):
@@ -30,14 +31,17 @@ def store_uniprot_from_web(cached_web_resource: CachedWebResource):
         logging.info("Extracting data")
         uniprot_data = extract_uniprot_sprot(text_f)
 
-    logging.info("Creating DB records")
+    logging.info("Merging records")
     uniprot_records = []
     for accession, data in uniprot_data.items():
         if data:
-            uniprot_records.append(UniProt(accession=accession, cached_web_resource=cached_web_resource, **data))
+            # All values are sets
+            str_data = {k: JOIN_STRING.join(v) for k, v in data.items()}
+            uniprot_records.append(UniProt(accession=accession, cached_web_resource=cached_web_resource, **str_data))
         else:
             print(f"{accession} had no data we care about!")
 
+    logging.info("Creating DB records")
     UniProt.objects.bulk_create(uniprot_records, batch_size=2000)
 
     cached_web_resource.description = f"{len(uniprot_records)} UniProt records"

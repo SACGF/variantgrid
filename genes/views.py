@@ -284,7 +284,6 @@ def view_transcript_version(request, transcript_id, version):
                "version_count": version_count}
 
     if not tv:
-        # https://www.theonion.com/area-man-constantly-mentioning-he-doesnt-own-a-televisi-1819565469
         return render(request, "genes/view_transcript_version.html", context)
 
     accession = tv.accession

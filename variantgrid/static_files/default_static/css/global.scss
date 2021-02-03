@@ -1300,13 +1300,18 @@ span.cs- { background-color: #f0f0f0 }
     background-color: #97f988;
 }
 
+.hgnc-column {
+    background-color: #ffc21b;
+}
+
 .clinvar-column {
     background-color: #ff0000;
 }
 
-.cosmic-column {
-    background-color: #14559f;
+.uniprot-column {
+    background-color: #71b8d3;
 }
+
 
 #gene-grid-link {
     display: flex;

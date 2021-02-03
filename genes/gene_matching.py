@@ -88,6 +88,10 @@ class HGNCMatcher:
 
 
 class GeneMatcher:
+    """ Genes and symbols change over time. This creates DB records connecting them for a particular
+        GeneAnnotationRelease.
+
+        To actually retrieve matched genes for a release, use GeneAnnotationRelease.genes_for_symbol(s) """
     def __init__(self, release: GeneAnnotationRelease):
         self.release = release
 

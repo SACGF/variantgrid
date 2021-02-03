@@ -49,8 +49,10 @@ class ColumnAnnotationLevel(models.TextChoices):
     CLINVAR_LEVEL = 'C', 'ClinVar'
     DATABASE_LEVEL = 'D', 'Database'
     GENE_LEVEL = 'G', 'Gene'
+    HGNC_LEVEL = 'H', 'HGNC'
     SAMPLE_LEVEL = 'S', 'Sample'
     TRANSCRIPT_LEVEL = 'T', 'Transcript'
+    UNIPROT_LEVEL = 'U', 'UniProt'
     VARIANT_LEVEL = 'V', 'Variant'
 
 

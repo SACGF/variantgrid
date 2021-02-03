@@ -80,7 +80,7 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
                     omim_ids=_get_list('omim_id'),
                     previous_symbols=_join_list(previous_symbols),
                     refseq_ids=_get_list('refseq_accession'),
-                    rgd_ids=_get_list('rg_id'),
+                    rgd_ids=_get_list('rgd_id'),
                     status=status,
                     ucsc_ids=record.get('ucsc_id'))
 

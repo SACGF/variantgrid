@@ -26,12 +26,12 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
     VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
-from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
+from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease, UniProt
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologyImport
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
@@ -289,6 +289,37 @@ class EnsemblGeneAnnotation(models.Model):
             if gene_annotation := ega_qs.filter(q).first():
                 break
         return gene_annotation
+
+
+class GeneAnnotationVersion(SubVersionPartition):
+    RECORDS_BASE_TABLE_NAMES = ["annotation_geneannotation"]
+    gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, on_delete=CASCADE)
+    last_ontology_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
+    rvis_import_date = models.DateTimeField()
+    gnomad_import_date = models.DateTimeField()
+
+    @property
+    def genome_build(self):
+        return self.gene_annotation_release.genome_build
+
+
+@receiver(pre_delete, sender=GeneAnnotationVersion)
+def gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):
+    instance.delete_related_objects()
+
+
+class GeneAnnotation(models.Model):
+    """ This is generated against genes found via GeneAnnotationRelease
+        so that data matches up in analyses """
+    version = models.ForeignKey(GeneAnnotationVersion, on_delete=CASCADE)
+    gene = models.ForeignKey(Gene, on_delete=CASCADE)
+    hpo_terms = models.TextField(null=True)
+    omim_terms = models.TextField(null=True)
+    oe_ratio_percentile = models.FloatField(null=True)  # Copied from genes.RVIS
+    oe_lof = models.FloatField(null=True)  # Copied from genes.GnomADGeneConstraint
+
+    class Meta:
+        unique_together = ("version", "gene")
 
 
 class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
@@ -684,6 +715,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     overlapping_symbols = models.TextField(null=True, blank=True)
 
     somatic = models.BooleanField(null=True, blank=True)
+    uniprot = models.ForeignKey(UniProt, null=True, on_delete=CASCADE)  # linked via 1st element of swissprot
     variant_class = models.CharField(max_length=2, choices=VariantClass.choices, null=True, blank=True)
     vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.choices, null=True, blank=True)
 
@@ -826,7 +858,7 @@ class ManualVariantEntry(models.Model):
 
     @staticmethod
     def get_entry_type(line: str) -> ManualVariantEntryType:
-        HGVS_MINIMAL_PATTERN = re.compile(r"[^:].+:(c|g|p)\..*\d+.*")
+        HGVS_MINIMAL_PATTERN = re.compile(r"[^:].+:[cgp]\..*\d+.*")
         MATCHERS = {
             DBSNP_PATTERN: ManualVariantEntryType.DBSNP,
             HGVS_MINIMAL_PATTERN: ManualVariantEntryType.HGVS,
@@ -851,13 +883,14 @@ class InvalidAnnotationVersionError(Exception):
 # We re-use this, if nobody has referenced it - as you may eg update
 # variant/gene/clinvar annotations every 6 months etc and no point having so many sub-versions
 class AnnotationVersion(models.Model):
-    SUB_ANNOTATIONS = ['variant_annotation_version', 'ensembl_gene_annotation_version', 'clinvar_version',
-                       'human_protein_atlas_version']
+    SUB_ANNOTATIONS = ['variant_annotation_version', 'ensembl_gene_annotation_version', 'gene_annotation_version',
+                       'clinvar_version', 'human_protein_atlas_version']
 
     annotation_date = models.DateTimeField(auto_now=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, null=True, on_delete=PROTECT)
     ensembl_gene_annotation_version = models.ForeignKey(EnsemblGeneAnnotationVersion, null=True, on_delete=PROTECT)
+    gene_annotation_version = models.ForeignKey(GeneAnnotationVersion, null=True, on_delete=PROTECT)
     clinvar_version = models.ForeignKey(ClinVarVersion, null=True, on_delete=PROTECT)
     human_protein_atlas_version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, null=True, on_delete=PROTECT)
 
@@ -911,8 +944,8 @@ class AnnotationVersion(models.Model):
         def latest(klass):
             return klass.objects.order_by('annotation_date').last()
 
-        def latest_for_build(klass, genome_build):
-            qs = klass.objects.filter(genome_build=genome_build)
+        def latest_for_build(klass, genome_build: GenomeBuild, genome_build_path: str="genome_build"):
+            qs = klass.objects.filter(**{genome_build_path: genome_build})
             return qs.order_by('annotation_date').last()
 
         if sub_version_genome_build:
@@ -925,6 +958,7 @@ class AnnotationVersion(models.Model):
                 "genome_build": genome_build,
                 "variant_annotation_version": latest_for_build(VariantAnnotationVersion, genome_build),
                 "ensembl_gene_annotation_version": latest_for_build(EnsemblGeneAnnotationVersion, genome_build),
+                "gene_annotation_version": latest_for_build(GeneAnnotationVersion, genome_build, "gene_annotation_release__genome_build"),
                 "clinvar_version": latest_for_build(ClinVarVersion, genome_build),
                 "human_protein_atlas_version": latest(HumanProteinAtlasAnnotationVersion)
             }
@@ -949,6 +983,9 @@ class AnnotationVersion(models.Model):
 
     def get_variant_annotation(self):
         return VariantAnnotation.objects.filter(version=self.variant_annotation_version)
+
+    def get_gene_annotation(self):
+        return GeneAnnotation.objects.filter(version=self.gene_annotation_version)
 
     def get_ensembl_gene_annotation(self):
         return EnsemblGeneAnnotation.objects.filter(version=self.ensembl_gene_annotation_version)

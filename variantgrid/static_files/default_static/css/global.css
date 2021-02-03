@@ -8,7 +8,7 @@ html, body {
   height: 100%;
   margin: 0;
   font-size: 14px;
-  font-family: "Raleway", serif;
+  font-family: 'Raleway',serif;
 }
 
 #second-level-menu > .submenu {
@@ -251,14 +251,14 @@ h3 .hover-link {
     is the preferred method.
     It can handle either a <p><label>xxx</label><inline-value/></p> or
     <div><label>xxx</label><block value class="value" />
-
+    
     It tries to be compatible with Django form as_p
 */
 form label {
   font-weight: bold;
 }
 
-input[type=checkbox], input[type=radio] {
+input[type='checkbox'], input[type='radio'] {
   cursor: pointer;
 }
 
@@ -467,7 +467,7 @@ fieldset legend {
   color: #334466;
 }
 
-.horizontal-fields input[type=text], .horizontal-fields input[type=password], .horizontal-fields input[type=email], .horizontal-fields input[type=number], .horizontal-fields input:not([type]), .horizontal-fields textarea, fieldset.form-fields input[type=text], fieldset.form-fields input[type=password], fieldset.form-fields input[type=email], fieldset.form-fields input[type=number], fieldset.form-fields input:not([type]), fieldset.form-fields textarea {
+.horizontal-fields input[type='text'], .horizontal-fields input[type='password'], .horizontal-fields input[type='email'], .horizontal-fields input[type='number'], .horizontal-fields input:not([type]), .horizontal-fields textarea, fieldset.form-fields input[type='text'], fieldset.form-fields input[type='password'], fieldset.form-fields input[type='email'], fieldset.form-fields input[type='number'], fieldset.form-fields input:not([type]), fieldset.form-fields textarea {
   min-width: 300px;
   border-radius: 4px;
   border: 1px solid #dddddd;
@@ -619,7 +619,7 @@ li.error {
   border: 0px !important;
 }
 .grid-link .no-entry {
-  opacity: 0.1;
+  opacity: .1;
 }
 
 #node-data-container a.grid-link {
@@ -1153,7 +1153,7 @@ div#content {
 
 .gnomad-flag-label {
   display: inline;
-  padding: 0.2em 0.6em 0.3em;
+  padding: .2em .6em .3em;
   font-size: 75%;
   font-weight: bold;
   line-height: 1;
@@ -1161,7 +1161,7 @@ div#content {
   text-align: center;
   white-space: nowrap;
   vertical-align: baseline;
-  border-radius: 0.25em;
+  border-radius: .25em;
   background-color: #5cb85c;
 }
 
@@ -1285,12 +1285,16 @@ span.cs- {
   background-color: #97f988;
 }
 
+.hgnc-column {
+  background-color: #ffc21b;
+}
+
 .clinvar-column {
   background-color: #ff0000;
 }
 
-.cosmic-column {
-  background-color: #14559f;
+.uniprot-column {
+  background-color: #71b8d3;
 }
 
 #gene-grid-link {
@@ -1423,7 +1427,7 @@ span.cs- {
 }
 
 .sequencer-name-text {
-  font-size: 0.6em;
+  font-size: .6em;
 }
 
 .citations {
@@ -1457,7 +1461,7 @@ span.cs- {
   margin-bottom: 0;
 }
 .citation .loading {
-  opacity: 1;
+  opacity: 1.0;
 }
 .citation.failed {
   background-color: #ffcccc;

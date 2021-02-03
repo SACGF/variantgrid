@@ -18,6 +18,7 @@
                             <th>Version</th>
                             <th>Annotation Date</th>
                             <th>Variant</th>
+                            <th>Old Ensembl Gene</th>
                             <th>Gene</th>
                             <th>ClinVar</th>
                             <th>Human Protein Atlas</th>
@@ -30,6 +31,7 @@
                         <td>{% timestamp av.annotation_date %}</td>
                         <td>{{ av.variant_annotation_version|default_if_none:'' }}</td>
                         <td>{{ av.ensembl_gene_annotation_version|default_if_none:'' }}</td>
+                        <td>{{ av.gene_annotation_version|default_if_none:'' }}</td>
                         <td>{{ av.clinvar_version|default_if_none:'' }}</td>
                         <td>{{ av.human_protein_atlas_version|default_if_none:'' }}</td>
                         </tr>
