@@ -87,7 +87,7 @@ class PhenotypeNode(AnalysisNode):
         text_phenotypes = (self.text_phenotype or '').split()
         if text_phenotypes:
             sql_path = "variantannotation__gene__ensemblgeneannotation"
-            columns = ['variantannotation__gene__gene_summary',
+            columns = ['variantannotation__gene__summary',
                        'variantannotation__gene__geneannotation__omim_terms',
                        'variantannotation__uniprot__function',
                        'variantannotation__gene__geneannotation__hpo_terms']
