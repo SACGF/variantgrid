@@ -643,7 +643,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
     overlapping_symbols = models.TextField(null=True, blank=True)
 
     somatic = models.BooleanField(null=True, blank=True)
-    uniprot = models.ForeignKey(UniProt, null=True, on_delete=CASCADE)  # linked via 1st element of swissprot
+    # Out of 2M records on my machine, 0.12% had multiple records, but linking just 1 is much simpler as it allows us
+    # to link through to UniProt via gene annotation for the columns on the analysis variant grid
+    # Just need to be aware that there may be multiple, and only 1st in list of VEP SWISSPROT is linked
+    uniprot = models.ForeignKey(UniProt, null=True, on_delete=CASCADE)
     variant_class = models.CharField(max_length=2, choices=VariantClass.choices, null=True, blank=True)
     vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.choices, null=True, blank=True)
 
