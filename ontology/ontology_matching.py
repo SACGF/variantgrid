@@ -94,7 +94,7 @@ class OntologyMatch:
 
         return data
 
-OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6}")
+OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
 SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "or", "for", "the", "type", "group"}
 PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a",})  # only exclude "A" from prefix, in case it says "type" A
 
@@ -366,20 +366,25 @@ class OntologyMatching:
                 ontology_matches.select_term(select)
 
         if search_text:
-            matches = db_ref_regexes.search(search_text, default_regex=DbRegexes.OMIM)
+            matches = db_ref_regexes.search(search_text)
+            detected_any_ids = not not matches
+            detected_ontology_id = False
             matches = [match for match in matches if match.db in ["OMIM", "HP", "MONDO"]]
 
-            has_match = not not matches
-            if has_match:
-                for match in matches:
-                    ontology_matches.find_or_create(match.id_fixed).direct_reference = True
-            else:
-                if stray_omim_matches := OPRPHAN_OMIM_TERMS.findall(search_text):
-                    has_match = True
+            for match in matches:
+                detected_ontology_id = True
+                ontology_matches.find_or_create(match.id_fixed).direct_reference = True
+
+            # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
+            if not detected_any_ids:
+                stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(search_text)
+                stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
+                if stray_omim_matches:
+                    detected_ontology_id = True
                     for omim_index in stray_omim_matches:
                         ontology_matches.find_or_create(f"OMIM:{omim_index}").direct_reference = True
 
-            if not has_match:
+            if not detected_ontology_id:
                 if server_search:
                     # technically this bit isn't a server search, but need to make the boolean more flexible
                     search_terms = set(SearchText.tokenize_condition_text(search_text))

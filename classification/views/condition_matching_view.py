@@ -23,7 +23,7 @@ class ConditionTextColumns(DatatableConfig):
 
     def get_initial_queryset(self):
         # exclude where we've auto matched and have 0 outstanding left
-        return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True).exclude(min_auto_match_score__gt=100, classifications_count_outstanding=0)
+        return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True).exclude(classifications_count_outstanding=0)
 
 
 def condition_matchings_view(request):
