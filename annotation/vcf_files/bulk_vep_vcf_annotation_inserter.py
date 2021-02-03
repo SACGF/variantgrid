@@ -37,7 +37,6 @@ class VEPColumns:
     GENE = "Gene"
     FEATURE = "Feature"
     FEATURE_TYPE = "Feature_type"
-    UNIPROT = "SWISSPROT"
 
 
 class BulkVEPVCFAnnotationInserter:
@@ -333,9 +332,9 @@ class BulkVEPVCFAnnotationInserter:
 
         return transcript_version_id
 
-    def get_uniprot_id(self, vep_transcript_data):
+    def get_uniprot_id(self, data):
         """ Out of 2M records, only 0.12% contain multiple (ie P0CG04&B9A064) - just take 1st """
-        if uniprot_value := vep_transcript_data[VEPColumns.UNIPROT]:
+        if uniprot_value := data.get("swissprot"):
             for uv in uniprot_value.split("&"):
                 if uv in self.uniprot_identifiers:
                     return uv
