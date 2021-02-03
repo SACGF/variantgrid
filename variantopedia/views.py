@@ -436,7 +436,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                 pass
 
             if clinvar:
-                clinvar_citations = [{'idx':c.citation_id, 'db': c.get_citation_source_display()} for c in clinvar.get_citations()]
+                clinvar_citations = [{'idx': c.citation_id, 'db': c.get_citation_source_display()} for c in clinvar.get_citations()]
                 num_clinvar_citations = len(clinvar_citations)
         except:  # May not have been annotated?
             log_traceback()
