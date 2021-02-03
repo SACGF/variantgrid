@@ -7,10 +7,11 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
-from annotation.models import ClinVarReviewStatus, CitationSource
+from annotation.models import ClinVarReviewStatus, CitationSource, GeneAnnotationRelease
 from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
     HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, Citation, ClinVarCitation, \
     ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
+from genes.models import GeneAnnotationImport
 from genes.models_enums import AnnotationConsortium
 from ontology.models import OntologyImport
 from ontology.tests.test_data_ontology import create_ontology_test_data
@@ -40,7 +41,17 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
     create_ontology_test_data()
     last_ontology_import = OntologyImport.objects.last()
-    gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=variant_annotation_version.gene_annotation_release,
+
+    gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
+                                                                        annotation_consortium=AnnotationConsortium.ENSEMBL,
+                                                                        filename="fake")[0]
+    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version=42,
+                                                                          genome_build=genome_build,
+                                                                          annotation_consortium=AnnotationConsortium.ENSEMBL,
+                                                                          defaults={
+                                                                              "gene_annotation_import": gene_annotation_import,
+                                                                          })[0]
+    gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
                                                                           last_ontology_import=last_ontology_import,
                                                                           rvis_import_date=timezone.now(),
                                                                           gnomad_import_date=timezone.now())[0]

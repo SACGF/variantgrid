@@ -141,7 +141,6 @@ class Test(URLTestCase):
             ("genome_build_genes", {"genome_build_name": self.grch37.name}, 200),
             ("view_gene", {"gene_id": self.gene.pk}, 200),
             ("view_gene_symbol", gene_symbol_kwargs, 200),
-            ("view_gene_annotation_history", {"genome_build_name": self.grch37.name, "gene_symbol": self.gene_symbol}, 200),
             ("view_transcript", {"transcript_id": self.transcript.pk}, 200),
             ("view_transcript_version", {"transcript_id": self.transcript_version.transcript_id,
                                          "version": self.transcript_version.version}, 200),

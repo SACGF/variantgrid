@@ -61,7 +61,6 @@ class Test(URLTestCase):
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
             # API
             ("api_view_gene_disease_validity", {"gene_symbol": self.gene_symbol}, 200),
-            ("api_gene_annotation", {"gene_symbol": self.gene_symbol}, 200),
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
