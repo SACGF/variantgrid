@@ -107,7 +107,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         dbsnp = vals["variantannotation__dbsnp_rs_id"]
         impact = vals["variantannotation__impact"]
         transcript = vals["variantannotation__transcript_id"]
-        omim = vals["variantannotation__gene__geneannotation__omim_phenotypes"]
+        omim = vals["variantannotation__gene__geneannotation__omim_terms"]
         vep_skipped = vals["variantannotation__vep_skipped_reason"]
         clinvar_highest_pathogenicity = vals["clinvar__highest_pathogenicity"]
 
