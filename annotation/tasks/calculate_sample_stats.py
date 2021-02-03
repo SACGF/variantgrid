@@ -201,8 +201,13 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
                 s.save()
 
     if vep_skipped_count:
-        VCFAnnotationStats.objects.create(vcf=vcf, vep_skipped_count=vep_skipped_count,
-                                          variant_annotation_version=annotation_version.variant_annotation_version)
+        # We may be re-running a part of sample stats. Store the highest number skipped
+        stats, created = VCFAnnotationStats.objects.get_or_create(vcf=vcf, variant_annotation_version=annotation_version.variant_annotation_version,
+                                                                  defaults={"vep_skipped_count=vep_skipped_count": vep_skipped_count})
+        if not created:
+            if vep_skipped_count > stats.vep_skipped_count:
+                stats.vep_skipped_count = vep_skipped_count
+                stats.save()
 
     end = time.time()
     logging.info("SampleStats for %s took %.2f seconds", vcf, end - start)
