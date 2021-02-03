@@ -18,6 +18,7 @@
             </p>
         {% end_page_help_embedded %}
 
+        {% comment %}
         <h4>Download</h4>
         <form method="POST" action="{% url 'condition_match_test_download' %}">
             {% csrf_token %}
@@ -34,8 +35,9 @@
             </div>
         </form>
         <hr/>
-
         <h4>Test Single Term</h4>
+        {% endcomment %}
+
         <form method="GET">
             {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
             {% labelled label="Gene Symbol" %}<input class="form-control" style="max-width:300px" name="gene_symbol" value="{{ gene_symbol | default_if_none:'' }}" />
