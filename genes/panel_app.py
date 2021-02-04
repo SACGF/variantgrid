@@ -76,15 +76,15 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
 
 
 def _get_or_update_panel_app_panel(server, json_data):
-    pap, created = PanelAppPanel.objects.update_or_create(server=server,
-                                                          panel_id=json_data['id'],
-                                                          defaults={
-                                                              "disease_group": json_data['disease_group'],
-                                                              "disease_sub_group": json_data['disease_sub_group'],
-                                                              "name": json_data['name'],
-                                                              "status": json_data['status'],
-                                                              "current_version": json_data['version'],
-                                                          })
+    pap, _ = PanelAppPanel.objects.update_or_create(server=server,
+                                                    panel_id=json_data['id'],
+                                                    defaults={
+                                                        "disease_group": json_data['disease_group'],
+                                                        "disease_sub_group": json_data['disease_sub_group'],
+                                                        "name": json_data['name'],
+                                                        "status": json_data['status'],
+                                                        "current_version": json_data['version'],
+                                                    })
 
     relevant_disorders = json_data['relevant_disorders']
     pap.panelapppanelrelevantdisorders_set.exclude(name__in=relevant_disorders).delete()

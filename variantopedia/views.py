@@ -280,7 +280,7 @@ def search(request):
         classify = form.cleaned_data.get('classify')
         try:
             search_results = search_data(request.user, search_string, classify)
-            results, search_types, search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
+            results, _search_types, _search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
             details = f"'{search_string}' calculated {len(results)} results."
             create_event(request.user, 'search', details=details)
 
