@@ -252,7 +252,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         if not self._source_object:
             # appears to be an orphaned set
-            report_message(f'Could not find source object for FlagCollection', extra_data={'flag_collection_id': self.id})
+            report_message('Could not find source object for FlagCollection', extra_data={'flag_collection_id': self.id})
 
         return self._source_object
 
@@ -274,7 +274,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
     def is_owner_or_admin(self, user: User) -> bool:
         permission = self.permission_level(user)
-        return permission == FlagPermissionLevel.ADMIN or permission == FlagPermissionLevel.OWNER
+        return permission in (FlagPermissionLevel.ADMIN, FlagPermissionLevel.OWNER)
 
     def flags(self, user: User = None, only_open=False) -> QuerySet:
         if not user:

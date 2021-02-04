@@ -369,8 +369,8 @@ class Gene(models.Model):
         qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
         ret = qs.delete()
         if ret:
-             print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
-             print(ret)
+            print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
+            print(ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """

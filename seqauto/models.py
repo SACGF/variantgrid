@@ -1121,7 +1121,7 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
             self.save()
 
     def create_and_assign_sample_gene_list(self, sample: Sample):
-        logging.info(f"QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
+        logging.info("QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
         self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
                                                                      gene_list=self.custom_text_gene_list.gene_list)[0]
         self.save()
