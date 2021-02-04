@@ -35,8 +35,8 @@ def save_rvis_records(cached_web_resource: CachedWebResource, f):
         gene_symbol_id = known_gene_symbols.get(symbol.upper())
         if gene_symbol_id is None:
             # Will create new one
-            gene_symbols.append(GeneSymbol(symbol=gene_symbol_id))
             gene_symbol_id = symbol
+            gene_symbols.append(GeneSymbol(symbol=gene_symbol_id))
 
         rvis_records.append(RVIS(cached_web_resource=cached_web_resource, gene_symbol_id=gene_symbol_id,
                                  oe_ratio_percentile=oe_ratio_percentile))
