@@ -879,7 +879,7 @@ class AnnotationVersion(models.Model):
         def latest(klass):
             return klass.objects.order_by('annotation_date').last()
 
-        def latest_for_build(klass, genome_build: GenomeBuild, genome_build_path: str="genome_build"):
+        def latest_for_build(klass, genome_build: GenomeBuild, genome_build_path: str = "genome_build"):
             qs = klass.objects.filter(**{genome_build_path: genome_build})
             return qs.order_by('annotation_date').last()
 
