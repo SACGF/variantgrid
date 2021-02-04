@@ -1,3 +1,5 @@
+from typing import Dict, Any
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
@@ -13,15 +15,14 @@ class ConditionTextColumns(DatatableConfig):
         super().__init__(request)
 
         self.rich_columns = [
-            RichColumn(key="lab__name", label='Lab', orderable=True),
-            RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"]),
-            RichColumn(key="classifications_count", label="Classifications Affected", orderable=True),
-            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, default_sort=SortOrder.DESC)
-
-            # TODO count matches?
+            RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text']),
+            RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"], sort_keys=['normalized_text', 'lab__name']),
+            RichColumn(key="classifications_count", label="Classifications Affected", orderable=True, sort_keys=['classifications_count', 'normalized_text']),
+            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, sort_keys=['classifications_count_outstanding', 'normalized_text'])
         ]
 
     def get_initial_queryset(self):
+        # exclude where we've auto matched and have 0 outstanding left
         return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
 
 

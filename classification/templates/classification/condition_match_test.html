@@ -18,6 +18,26 @@
             </p>
         {% end_page_help_embedded %}
 
+        {% comment %}
+        <h4>Download</h4>
+        <form method="POST" action="{% url 'condition_match_test_download' %}">
+            {% csrf_token %}
+            Run and download auto matching attempts. (Note doesn't apply the results, just produces them for download).<br/>
+            This takes a while so it's recommended you limit your results.<br/>
+            <div class="form-group">
+                <label class="form-label">Condition Text Count</label>
+                <div class="input-group">
+                    <input type="number" name="row_count" value="10" />
+                    <span class="input-group-append">
+                        <input class="btn btn-primary" type="submit" value="Download" />
+                    </span>
+                </div>
+            </div>
+        </form>
+        <hr/>
+        <h4>Test Single Term</h4>
+        {% endcomment %}
+
         <form method="GET">
             {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
             {% labelled label="Gene Symbol" %}<input class="form-control" style="max-width:300px" name="gene_symbol" value="{{ gene_symbol | default_if_none:'' }}" />
@@ -26,7 +46,14 @@
             <button class="btn btn-primary">Search</button>
         </form>
 
-        <div class="text-muted">Note the following words will be ignored: "a", "an", "and", "disease", "disorder", "for", "or", "the", "the", "type"</div>
+        {% if search_text %}
+            <div class="text-muted">
+                {% labelled label="Prefix" %}{{ search_text.prefix }}{% endlabelled %}
+                {% labelled label="Prefix Terms" %}{{ search_text.prefix_terms_display }}{% endlabelled %}
+                {% labelled label="Suffix" %}{{ search_text.suffix }}{% endlabelled %}
+                {% labelled label="Suffix Terms" %}{{ search_text.suffix_terms_display }}{% endlabelled %}
+            </div>
+        {% endif %}
 
         {% if attempted %}
             {% if auto_matches %}

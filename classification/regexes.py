@@ -68,7 +68,8 @@ class DbRegexes:
     MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologyService.URLS[OntologyService.MONDO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.MONDO])
     NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
-    OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link=OntologyService.URLS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
+    # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
+    OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
     PMC = DbRefRegex(db="PMC", prefixes="PMCID", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}")
     PUBMED = DbRefRegex(db="PubMed", prefixes=["PubMed", "PMID", "PubMedCentral"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)

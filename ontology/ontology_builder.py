@@ -95,7 +95,8 @@ class OntologyBuilder:
         """
         if purge_old:
             old_imports = set(OntologyImport.objects.filter(context=self.context, import_source=self.import_source).values_list("pk", flat=True))
-            old_imports.remove(self._ontology_import.pk)
+            if self._ontology_import.pk in old_imports:
+                old_imports.remove(self._ontology_import.pk)
 
             for model in [OntologyTermRelation, OntologyTerm]:
 

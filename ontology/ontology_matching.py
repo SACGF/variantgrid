@@ -2,14 +2,18 @@ import operator
 import re
 from dataclasses import dataclass
 from functools import reduce
-from typing import Dict, Optional, List, Any, Set
+from typing import Dict, Optional, List, Any, Set, Iterable
 
 import requests
 from django.db.models import Q
 from django.db.models.functions import Length
 from django.urls import reverse
+from lazy import lazy
 
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
+from classification.regexes import db_ref_regexes, DbRegexes
+from library.log_utils import report_message
+from library.utils import empty_to_none
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource, OntologyTermRelation
 from ontology.panel_app_ontology import update_gene_relations
 
 
@@ -20,7 +24,7 @@ class OntologyMatch:
         name: str
         unit: float
         max: float
-        note: str
+        note: Optional[str] = ""
 
         @property
         def score(self) -> float:
@@ -45,9 +49,14 @@ class OntologyMatch:
         self.selected: bool = False  # has the user selected this term for whatever context this is
         self.direct_reference: bool = False  # was this term referenced by ID directly, e.g. text is "patient has MONDO:123456" and this is "MONDO:123456"
         self.gene_relationships: List[OntologySnake] = list()  # in what ways is this related to the gene in question (assuming there is a gene in question)
-
         self.scores: List[OntologyMatch.Score] = list()
         self.score = 0
+
+    @lazy
+    def is_leaf(self) -> Optional[bool]:
+        if not self.term.is_stub and self.term.ontology_service == OntologyService.MONDO:
+            return not OntologyTermRelation.children_of(self.term).exists()  # no children exist
+        return None
 
     def __lt__(self, other):
         return self.score < other.score
@@ -85,21 +94,70 @@ class OntologyMatch:
 
         return data
 
+OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
+SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "or", "for", "the", "type", "group"}
+PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a",})  # only exclude "A" from prefix, in case it says "type" A
 
-SKIP_TERMS = {"", "disease", "disorder", "the", "a", "an", "and", "or", "for", "the", "type"}
-SUB_TYPE = re.compile("[0-9]+[a-z]?")
+SUB_TYPE = re.compile("^(.*?)(?: )((?:group|type)?(?: )?(?:[A-Z]|[0-9]+|[0-9]+[A-Z]|i|ii|iii|iv|v|vi|vii|viii|ix))$", re.IGNORECASE)
+ROMAN = {
+    "i": '1',
+    "ii": '2',
+    "iii": '3',
+    "iv": '4',
+    "v": '5',
+    "vi": '6',
+    "vii": '7',
+    "viii": '8',
+    "ix": '9'
+}
+
+class SearchText:
+
+    @staticmethod
+    def roman_to_arabic(numeral: str):
+        return ROMAN.get(numeral, numeral)
+
+    @staticmethod
+    def tokenize_condition_text(text: str) -> Set[str]:
+        if text is None:
+            return set()
+        text = text.replace(";", " ").replace("-", " ").lower()
+        tokens = [token.strip() for token in text.split(" ")]
+        return tokens
+
+    def __init__(self, text: str):
+        self.raw = text
+        self.prefix = None
+        self.prefix_terms: Set[str] = set()
+        self.suffix = None
+        self.suffix_terms: Set[str] = set()
+
+        normal_text = normalize_condition_text(text)
+        if sub_type_match := SUB_TYPE.match(normal_text):
+            self.prefix = sub_type_match.group(1).strip()
+            self.suffix = sub_type_match.group(2).strip()
+
+            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
+            self.suffix_terms = set(SearchText.roman_to_arabic(term) for term in SearchText.tokenize_condition_text(self.suffix)) - SUFFIX_SKIP_TERMS
+        else:
+            self.prefix = normal_text
+            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
+
+    @property
+    def prefix_terms_display(self) -> str:
+        return ", ".join(sorted(list(self.prefix_terms)))
+
+    @property
+    def suffix_terms_display(self):
+        # TODO make these django filters
+        return ", ".join(sorted(list(self.suffix_terms)))
+
+    @property
+    def all_terms(self) -> Set[str]:
+        return self.prefix_terms.union(self.suffix_terms)
 
 
-def tokenize_condition_text(text: str) -> Set[str]:
-    if text is None:
-        return set()
-    text = text.replace(";", " ").replace("-", " ").lower()
-    tokens = [token.strip() for token in text.split(" ")]
-    tokens = [token for token in tokens if token not in SKIP_TERMS]
-    return tokens
-
-
-def pretty_set(s: Set[str]) -> str:
+def pretty_set(s: Iterable[str]) -> str:
     tokens = list(s)
     tokens = sorted(tokens)
     tokens = [f'"{tok}"' for tok in tokens]
@@ -113,6 +171,7 @@ def normalize_condition_text(text: str):
     text = text.lower()
     text = re.sub("[,;./]", " ", text)  # replace , ; . with spaces
     text = re.sub("[ ]{2,}", " ", text)  # replace multiple spaces with
+    text = text.strip()
     return text
 
 
@@ -120,11 +179,10 @@ class OntologyMatching:
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
         self.term_map: Dict[str, OntologyMatch] = dict()
-        self.search_term = search_term
-        self.search_terms = None
+        self.search_text: Optional[SearchText] = None
+        self.sub_type = None
         if search_term:
-            self.search_terms = set(tokenize_condition_text(normalize_condition_text(search_term))) - SKIP_TERMS
-
+            self.search_text = SearchText(search_term)
         self.gene_symbol = gene_symbol
 
     def find_or_create(self, term_id: str) -> OntologyMatch:
@@ -161,15 +219,32 @@ class OntologyMatching:
                 name="This term is marked as obsolete",
                 unit=1, max=-100, note=""
             ))
-        if regular_match:
-            if search_terms := self.search_terms:
-                match_terms = set(tokenize_condition_text(normalize_condition_text(match.term.name))) - SKIP_TERMS
-                # TODO maybe check description for match terms?
-                superfluous_words = match_terms.difference(search_terms)
-                missing_words = search_terms.difference(match_terms)
 
-                missing_word_ratio = 0 if not match_terms else (float(len(missing_words)) / float(len(search_terms)))
-                superfluous_word_ratio = 0 if not match_terms else min(1, float(len(superfluous_words)) / float(len(match_terms)))
+        if regular_match:
+            match_text = SearchText(match.term.name)
+            if search_text := self.search_text and self.search_text.raw:
+
+                superfluous_words = set()
+                missing_words = set()
+                missing_word_ratio = 0
+                superfluous_word_ratio = 0
+
+                search_text_terms: Set[str]
+                match_text_terms: Set[str]
+                if self.search_text.suffix_terms or not self.gene_symbol:
+                    search_text_terms = self.search_text.all_terms
+                    match_text_terms = match_text.all_terms
+                else:
+                    # match has a suffix and search term doesn't (but does have a gene symbol)
+                    # so don't penalise for the suffix
+                    search_text_terms = self.search_text.prefix_terms
+                    match_text_terms = match_text.prefix_terms
+
+                missing_words = search_text_terms.difference(match_text_terms)
+                missing_word_ratio = float(len(missing_words)) / float(len(search_text_terms))
+
+                superfluous_words = match_text_terms.difference(search_text_terms)
+                superfluous_word_ratio = float(len(superfluous_words)) / float(len(match_text_terms))
 
                 scores.append(OntologyMatch.Score(
                     name="Word Matching", max=40, unit=1 - missing_word_ratio,
@@ -179,6 +254,12 @@ class OntologyMatching:
                     name="Limited extra words bonus", max=40, unit=1 - superfluous_word_ratio,
                     note=f"Superfluous words {pretty_set(superfluous_words)}" if superfluous_words else "No superfluous words"
                 ))
+                injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
+                if injected_suffix:
+                    scores.append(OntologyMatch.Score(
+                        name="Extra suffix", max=-1, unit=1,
+                        note=f"Has extra suffix of '{match_text.suffix}'"
+                    ))
 
             if gene_symbol := self.gene_symbol:
                 # TODO work out if we want to apply different scores to different matches
@@ -196,26 +277,44 @@ class OntologyMatching:
                 if OntologyImportSource.HPO in source_codes:
                     sources.append("NCBI")
 
-                scores.append(OntologyMatch.Score(
-                    name="Gene relationship", max=20, unit=1 if sources else 0,
-                    note=f"Term relates to gene according to {sources}" if sources else "No relationship between this term and gene in our database"
-                ))
+                if not sources:
+                    scores.append(OntologyMatch.Score(
+                        name="Gene relationship", max=20, unit=0,
+                        note="No relationship between this term and gene in our database"
+                    ))
+                else:
+                    scores.append(OntologyMatch.Score(
+                        name="Gene relationship", max=20, unit=1,
+                        note=f"Has relationships via {pretty_set(sources)}"
+                    ))
+                    if not match.is_leaf:
+                        scores.append(OntologyMatch.Score(
+                            name="Gene relationship - not leaf leaf term", max=-2, unit=1,
+                            note="Term has children, could be more specific"
+                        ))
             else:
                 scores.append(OntologyMatch.Score(
                     name="Gene relationship", max=20, unit=1,
                     note=f"Matching on gene not required at this level"
                 ))
+
         match.scores = scores
         total = 0
         for score in scores:
             total += score.score
         match.score = total
 
-    def populate_relationships(self):
+    def populate_relationships(self, server_search=True):
         if gene_symbol := self.gene_symbol:
-            update_gene_relations(gene_symbol)  # make sure panel app AU is up to date
+            try:
+                hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
+            except ValueError:
+                report_message(message=f"Could not resolve {gene_symbol} to HGNC OntologyTerm - can't do gene specific resolutions", level='warning')
+                return
+
+            if server_search:
+                update_gene_relations(gene_symbol)  # make sure panel app AU is up to date
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
-                        # only care about the relationship to the gene
             for snake in snakes:
                 gene_relation = snake.show_steps()[0].relation
                 mondo_term = snake.leaf_term
@@ -231,6 +330,24 @@ class OntologyMatching:
     def searched_term(self, term: str):
         self.find_or_create(term).text_search = True
 
+    def only_top_term(self) -> Optional[OntologyMatch]:
+        tops = self.top_terms()
+        if len(tops) == 1:
+            return tops[0]
+        else:
+            return None
+
+    def top_terms(self) -> List[OntologyMatch]:
+        top_values: List[OntologyMatch] = list()
+        for match in self:
+            if len(top_values) == 0:
+                top_values.append(match)
+            elif top_values[0].score == match.score:
+                top_values.append(match)
+            else:
+                return top_values
+        return top_values
+
     def __iter__(self):
         values = sorted(list(self.term_map.values()), reverse=True)
         return iter(values)
@@ -240,48 +357,63 @@ class OntologyMatching:
 
     @staticmethod
     def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None, server_search: bool = True) -> 'OntologyMatching':
+        search_text = empty_to_none(search_text)
         ontology_matches = OntologyMatching(search_term=search_text, gene_symbol=gene_symbol)
-        ontology_matches.populate_relationships()  # find all terms linked to the gene_symbol (if there is one)
+        ontology_matches.populate_relationships(server_search=server_search)  # find all terms linked to the gene_symbol (if there is one)
 
         if selected:
             for select in selected:
                 ontology_matches.select_term(select)
 
-        ONTOLOGY_PATTERN = re.compile("(MONDO|OMIM|HP):[0-9]+")
-        for match in ONTOLOGY_PATTERN.finditer(search_text):
-            ontology_matches.find_or_create(match.group(0)).direct_reference = True
+        if search_text:
+            matches = db_ref_regexes.search(search_text)
+            detected_any_ids = not not matches
+            detected_ontology_id = False
+            matches = [match for match in matches if match.db in ["OMIM", "HP", "MONDO"]]
 
-        else:
-            # Client search
-            # this currently requires all words to be present
-            search_terms = set(tokenize_condition_text(search_text))
-            qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
-            qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
-            qs = qs.order_by(Length('name')).values_list("id", flat=True)
-            result: OntologyTerm
-            for result in qs[0:20]:
-                ontology_matches.searched_term(result)
+            for match in matches:
+                detected_ontology_id = True
+                ontology_matches.find_or_create(match.id_fixed).direct_reference = True
 
-            # ALSO, do client side search
-            if server_search:
-                server_search_text = search_text
-                if gene_symbol:
-                    server_search_text = server_search_text + " " + gene_symbol
-                try:
-                    results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{server_search_text}', {
-                        "prefix": "MONDO",
-                        "rows": 6,
-                        "minimal_tokenizer": "false",
-                        "category": "disease"
-                    }).json().get("docs")
+            # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
+            if not detected_any_ids:
+                stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(search_text)
+                stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
+                if stray_omim_matches:
+                    detected_ontology_id = True
+                    for omim_index in stray_omim_matches:
+                        ontology_matches.find_or_create(f"OMIM:{omim_index}").direct_reference = True
 
-                    for result in results:
-                        o_id = result.get('id')
-                        # result.get('label') gives the labe as it's known by the search server
-                        ontology_matches.searched_term(o_id)
-                except:
-                    pass
-                    # TODO communicate to the user couldn't search mondo text search
+            if not detected_ontology_id:
+                if server_search:
+                    # technically this bit isn't a server search, but need to make the boolean more flexible
+                    search_terms = set(SearchText.tokenize_condition_text(search_text))
+                    qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
+                    qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
+                    qs = qs.order_by(Length('name')).values_list("id", flat=True)
+                    result: OntologyTerm
+                    for result in qs[0:20]:
+                        ontology_matches.searched_term(result)
+
+                    # the actual server search
+                    server_search_text = search_text
+                    if gene_symbol:
+                        server_search_text = server_search_text + " " + gene_symbol
+                    try:
+                        results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{server_search_text}', {
+                            "prefix": "MONDO",
+                            "rows": 6,
+                            "minimal_tokenizer": "false",
+                            "category": "disease"
+                        }).json().get("docs")
+
+                        for result in results:
+                            o_id = result.get('id')
+                            # result.get('label') gives the labe as it's known by the search server
+                            ontology_matches.searched_term(o_id)
+                    except:
+                        pass
+                        # TODO communicate to the user couldn't search mondo text search
 
         ontology_matches.apply_scores()
         return ontology_matches

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Iterable
 
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
@@ -7,7 +7,7 @@ from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from lazy import lazy
 from model_utils.models import TimeStampedModel
-from django.db import models
+from django.db import models, transaction
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
     flag_types
@@ -15,6 +15,7 @@ from classification.regexes import db_ref_regexes, DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
+from library.guardian_utils import admin_bot
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text
 from snpdb.models import Lab
 
@@ -24,8 +25,8 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
 
     # set to true if root condition text was set by auto-matching
-    requires_approval = models.BooleanField(blank=True, default=False)
     last_edited_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True)
+    min_auto_match_score = models.IntegerField(default=0)
 
     classifications_count = models.IntegerField(default=0)
     classifications_count_outstanding = models.IntegerField(default=0)
@@ -46,6 +47,31 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
         super().save(**kwargs)
         assign_perm(self.get_read_perm(), self.lab.group, self)
         assign_perm(self.get_write_perm(), self.lab.group, self)
+
+    @transaction.atomic
+    def clear(self):
+        self.conditiontextmatch_set.update(condition_xrefs=list(), condition_multi_operation=MultiCondition.NOT_DECIDED)
+        self.last_edited_by = None
+        self.min_auto_match_score = 0
+        self.classifications_count_outstanding = self.classifications_count
+        self.save()
+
+    @property
+    def classification_match_count(self) -> int:
+        return self.classifications_count - self.classifications_count_outstanding
+
+    @property
+    def user_edited(self) -> bool:
+        #todo test exact=[]
+        return not (self.last_edited_by and self.last_edited_by != admin_bot() or self.conditiontextmatch_set.exclude(condition_xrefs__exact=list()).count() == 0)
+
+    @property
+    def root(self) -> 'ConditionTextMatch':
+        return self.conditiontextmatch_set.filter(gene_symbol__isnull=True, mode_of_inheritance__isnull=True, classification=None).first()
+
+    @property
+    def gene_levels(self) -> Iterable['ConditionTextMatch']:
+        return self.conditiontextmatch_set.filter(condition_text=self, gene_symbol__isnull=False, mode_of_inheritance__isnull=True, classification=None)
 
 
 class MultiCondition(models.TextChoices):
@@ -174,15 +200,61 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return self.conditiontextmatch_set.all()
 
     @staticmethod
-    def sync_all():
+    def sync_all(force=False):
         cms = ClassificationModification.objects.filter(is_last_published=True, classification__withdrawn=False).select_related("classification", "classification__lab")
         cm: ClassificationModification
         for cm in cms:
             ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
 
         for ct in ConditionText.objects.all():
-            update_condition_text_match_counts(ct)
-            ct.save()
+            ConditionTextMatch.attempt_automatch(condition_text=ct, force=force, server_search = False)
+            if ct.classifications_count == 0:
+                ct.delete()
+            else:
+                ct.save()
+
+    @staticmethod
+    def attempt_automatch(condition_text: ConditionText, force: bool = False, server_search = False):
+        text = condition_text.normalized_text
+        if force or not condition_text.user_edited:
+            condition_text.clear()
+        else:
+            return False  # couldn't overwrite what we already had
+
+        try:
+            # don't do server side search for top level, only care about matching terms on IDs directly
+            top_level_matches = OntologyMatching.from_search(search_text=text, gene_symbol=None, server_search=False)
+            if top_values := top_level_matches.top_terms():
+                root: ConditionTextMatch
+                if root := condition_text.root:
+                    if top_values[0].score > 100:
+                        root.condition_xrefs = [match.term.id for match in top_values]
+                        root.save()
+                        condition_text.min_auto_match_score = int(top_values[0].score)
+                        condition_text.save()
+            else:
+                min_score = float('inf')
+                for gene_level in condition_text.gene_levels:
+                    gene_matches = OntologyMatching.from_search(search_text=text, gene_symbol=gene_level.gene_symbol.symbol, server_search=server_search)
+                    if top_value := gene_matches.only_top_term():
+                        if top_value.score >= 98:
+                            gene_level.condition_xrefs = [top_value.term.id]
+                            gene_level.save()
+                        min_score = min(min_score, top_value.score)
+                    elif top_values := gene_matches.top_terms():
+                        # but we had a duplicate, so as great as the score is, it doesn't count
+                        min_score = min(min_score, top_values[0].score)
+
+                if min_score == float('inf'):
+                    min_score = 0
+
+                condition_text.min_auto_match_score = int(min_score)
+                condition_text.save()
+        finally:
+            update_condition_text_match_counts(condition_text)
+            condition_text.save()
+
+
 
     @staticmethod
     def sync_condition_text_classification(cm: ClassificationModification, update_counts=True):
@@ -218,13 +290,11 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             # if condition text has changed, remove the old entries
             ConditionTextMatch.objects.filter(classification=classification).exclude(condition_text=ct).delete()
 
-            matches = db_ref_regexes.search(text=normalized)
             root, _ = ConditionTextMatch.objects.get_or_create(
                 condition_text=ct,
                 gene_symbol=None,
                 mode_of_inheritance=None,
-                classification=None,
-                defaults={"condition_xrefs": [match.id_fixed for match in matches]}
+                classification=None
             )
 
             gene_level, _ = ConditionTextMatch.objects.get_or_create(
@@ -286,7 +356,7 @@ def update_condition_text_match_counts(ct: ConditionText):
     # selecting parents from the DB
     by_id: Dict[int, ConditionTextMatch] = dict()
     classification_related: List[ConditionTextMatch] = list()
-    for ctm in ConditionTextMatch.objects.filter(condition_text=ct):
+    for ctm in ct.conditiontextmatch_set.all():
         by_id[ctm.id] = ctm
         if ctm.classification:
             classification_related.append(ctm)
