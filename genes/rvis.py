@@ -41,5 +41,7 @@ def save_rvis_records(cached_web_resource: CachedWebResource, f):
         rvis_records.append(RVIS(cached_web_resource=cached_web_resource, gene_symbol_id=gene_symbol_id,
                                  oe_ratio_percentile=oe_ratio_percentile))
 
-    GeneSymbol.objects.bulk_create(gene_symbols)
+    if gene_symbols:
+        GeneSymbol.objects.bulk_create(gene_symbols)
+
     RVIS.objects.bulk_create(rvis_records)
