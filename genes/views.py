@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from django.http.response import JsonResponse, Http404
+from django.http.response import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
@@ -28,7 +28,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGen
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList
+    PfamSequenceIdentifier, PanelAppServer, SampleGeneList
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
@@ -125,10 +125,6 @@ def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[Ont
 
 
 def view_gene_symbol(request, gene_symbol, genome_build_name=None):
-    # determines if this gene symbol might ONLY be an alias
-    if gene_symbol.endswith(gene_symbol_withdrawn_str):
-        raise Http404('Withdrawn GeneSymbols not valid')
-
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
     for gene in gene_symbol.genes:

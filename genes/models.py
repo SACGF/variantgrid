@@ -120,10 +120,6 @@ class HGNC(models.Model):
         return ulist
 
 
-# TODO: I think this is obsolete, HGNC don't do this anymore
-gene_symbol_withdrawn_str = '~withdrawn'
-
-
 class UniProt(models.Model):
     # accession = Primary (citable) accession number (1st element in SwissProt record)
     accession = models.TextField(primary_key=True)

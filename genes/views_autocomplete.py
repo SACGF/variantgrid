@@ -5,8 +5,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
-from genes.models import PanelAppPanel, GeneList, GeneSymbol, Gene, Transcript, GeneAnnotationRelease, \
-    gene_symbol_withdrawn_str, PanelAppServer
+from genes.models import PanelAppPanel, GeneList, GeneSymbol, Gene, Transcript, GeneAnnotationRelease, PanelAppServer
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 
@@ -93,7 +92,7 @@ class GeneSymbolAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, _user):
         """ Doesn't actually use user for genes """
-        qs = GeneSymbol.objects.exclude(symbol__endswith=gene_symbol_withdrawn_str)
+        qs = GeneSymbol.objects.all()
         if self.q:
             qs = qs.filter(symbol__istartswith=self.q)
         return qs

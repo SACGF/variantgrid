@@ -92,6 +92,9 @@ class Command(BaseCommand):
             hpo_snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.HPO)
             hpo_terms = self.TERM_JOIN_STRING.join((str(lt) for lt in hpo_snake.leafs()))
 
+            if not (omim_terms or hpo_terms):
+                continue  # Skip who cares
+
             uc_symbol = hgnc_ot.name.upper()
             genes_qs = gene_annotation_release.genes_for_symbol(uc_symbol)
             if genes_qs.exists():
