@@ -22,7 +22,6 @@ def new_columns(apps, schema_editor):
         "hgnc_symbol": {"variant_column": "variantannotation__transcript_version__gene_version__hgnc__gene_symbol", "annotation_level": HGNC_LEVEL},
         "mgi_id": {"variant_column": "variantannotation__transcript_version__gene_version__hgnc__mgd_ids", "annotation_level": HGNC_LEVEL},
         "omim_id": {"variant_column": "variantannotation__transcript_version__gene_version__hgnc__omim_ids", "annotation_level": HGNC_LEVEL},
-        "omim_phenotypes": {"variant_column": "variantannotation__gene__geneannotation__omim_terms"},
         "pathway_from_uniprotkb": {"variant_column": "variantannotation__uniprot__pathway", "annotation_level": UNIPROT_LEVEL},
         "previous_symbols": {"variant_column": "variantannotation__transcript_version__gene_version__hgnc__previous_symbols", "annotation_level": HGNC_LEVEL},
         "refseq_gene_summary": {"variant_column": "variantannotation__gene__summary"},
