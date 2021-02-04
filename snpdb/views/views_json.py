@@ -75,5 +75,5 @@ def cohort_sample_count(request, cohort_id):
 def vcf_populate_clingen_alleles(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     vcf_as, _ = VCFAlleleSource.objects.get_or_create(vcf=vcf)
-    populate_clingen_alleles_from_allele_source.si(vcf_as.pk).apply_async()
+    populate_clingen_alleles_from_allele_source.si(vcf_as.pk, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
     return JsonResponse({})

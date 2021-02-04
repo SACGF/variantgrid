@@ -1,4 +1,5 @@
 {% load js_tags %}
+{% load settings_tags %}
 <style>
     code {
         white-space: pre-wrap;
@@ -76,7 +77,10 @@
     {%  endif %}
 
     {% if user.is_superuser %}
-        <button id="node-populate-clingen-alleles" class="btn btn-primary">Populate ClinGen Alleles</button>
+        <button id="node-populate-clingen-alleles" class="btn btn-primary"
+                title="Retrieves max {% settings_value 'CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS' %} ClinGen Alleles">
+            Populate ClinGen Alleles
+        </button>
     {% endif %}
 {% else %}
     The node has errors.
