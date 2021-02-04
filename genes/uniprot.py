@@ -86,11 +86,12 @@ def link_variant_annotation_to_uniprot():
         This is on_delete=SET_NONE so is cleared whenever UniProt is deleted in a reload so need to re-link """
 
     for vav in VariantAnnotationVersion.objects.all():
+        logging.info("Linking %s to UniProt records", vav)
         has_uniprot_qs = VariantAnnotation.objects.filter(version=vav, swissprot__isnull=False)
 
         # Can do these ones as a straight update
         updated = has_uniprot_qs.exclude(swissprot__icontains='&').update(uniprot_id=F("swissprot"))
-        logging.info("Linked %d variant annotation records to UniProt", updated)
+        logging.info("Directly linked %d variant annotation records to UniProt", updated)
 
         # Ones with "&" need special handling - only a small amount..
         uniprot_ids = set(UniProt.objects.all().values_list("pk", flat=True))
