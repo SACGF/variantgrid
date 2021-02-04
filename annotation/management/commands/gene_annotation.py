@@ -4,7 +4,8 @@ from collections import defaultdict, Counter
 from django.core.management import BaseCommand
 from django.utils import timezone
 
-from annotation.models import GeneAnnotationVersion, OntologyImport, OntologyTerm
+from annotation.models import GeneAnnotationVersion, OntologyImport, OntologyTerm, GenomeBuild, AnnotationVersion, \
+    InvalidAnnotationVersionError
 from genes.gene_matching import GeneMatcher
 from genes.models import GeneAnnotationRelease, RVIS, GnomADGeneConstraint
 from library.django_utils.django_file_utils import get_import_processing_filename
@@ -18,30 +19,59 @@ class Command(BaseCommand):
     TERM_JOIN_STRING = " | "
 
     def add_arguments(self, parser):
-        parser.add_argument('--gene-annotation-release', required=True, type=int)
         parser.add_argument('--force', action="store_true", help="Force create new GeneAnnotation for same release")
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument('--gene-annotation-release', type=int)
+        group.add_argument('--missing', action="store_true", help="Automatically create for latest AnnotationVersions for each build if missing")
 
     def handle(self, *args, **options):
         print(f"Started: {timezone.now()}")
 
-        gar_id = options["gene_annotation_release"]
         force = options["force"]
+        gar_id = options["gene_annotation_release"]
+        missing = options["missing"]
 
-        gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
-        if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
-            raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")
+        self._validate_has_required_data()
 
+        gnomad_gene_symbols = GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True)
+        rvis_gene_symbols = RVIS.objects.all().values_list("gene_symbol_id", flat=True)
+        gene_symbols = set(gnomad_gene_symbols) | set(rvis_gene_symbols)
+
+        if gar_id:
+            gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
+            if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
+                raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")
+        else:
+            for genome_build in GenomeBuild.builds_with_annotation():
+                av = AnnotationVersion.latest(genome_build, validate=False)
+                if av.gene_annotation_version:
+                    print(f"Skipping {av} - already has GeneAnnotation")
+                    continue
+
+                if not av.variant_annotation_version:
+                    raise InvalidAnnotationVersionError(f"AnnotationVersion {av} has no VariantAnnotationVersion set")
+
+                gar = av.variant_annotation_version.gene_annotation_release
+                if not gar:
+                    raise InvalidAnnotationVersionError(f"VariantAnnotationVersion {av.variant_annotation_version} needs to be assinged an GeneAnnotationRelease")
+
+                self._create_gene_annotation_version(gar, gene_symbols)
+
+    @staticmethod
+    def _validate_has_required_data():
         for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]:
             if not OntologyTerm.objects.filter(ontology_service=ontology_service).exists():
                 raise ValueError(f"No {ontology_service.label} records - please import first")
 
-        rvis = RVIS.objects.first()
-        if rvis is None:
+        if not RVIS.objects.exists():
             raise ValueError("You need to import RVIS (see annotation page)")
 
-        gnomad_gene_constraint = GnomADGeneConstraint.objects.first()
-        if gnomad_gene_constraint is None:
+        if not GnomADGeneConstraint.objects.exists():
             raise ValueError("You need to import gnomAD Gene Constraints (see annotation page)")
+
+    def _create_gene_annotation_version(self, gene_annotation_release, gene_symbols):
+        rvis = RVIS.objects.first()
+        gnomad_gene_constraint = GnomADGeneConstraint.objects.first()
 
         # Only 1 of each of RVIS/Gnomad (CachedWebResource - deleted upon reload)
         gav = GeneAnnotationVersion.objects.create(gene_annotation_release=gene_annotation_release,
@@ -51,9 +81,6 @@ class Command(BaseCommand):
 
         # 1st we need to make sure all symbols are matched in a GeneAnnotationRelease (HGNC already done)
         gene_matcher = GeneMatcher(gene_annotation_release)
-        gnomad_gene_symbols = GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True)
-        rvis_gene_symbols = RVIS.objects.all().values_list("gene_symbol_id", flat=True)
-        gene_symbols = set(gnomad_gene_symbols) | set(rvis_gene_symbols)
         gene_matcher.match_unmatched_symbols(gene_symbols)
 
         missing_genes = Counter()

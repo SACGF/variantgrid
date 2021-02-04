@@ -856,6 +856,12 @@ class AnnotationVersion(models.Model):
             missing = ", ".join([str(s) for s in missing_sub_annotations])
             raise InvalidAnnotationVersionError(f"AnnotationVersion: {self} missing sub annotations: {missing}")
 
+        if vav_gar := self.variant_annotation_version.gene_annotation_release:
+            gene_gar = self.gene_annotation_version.gene_annotation_release
+            if vav_gar != gene_gar:
+                different_msg = f"GeneAnnotationRelease is different fro Variant {vav_gar.pk} vs Gene: {gene_gar.pk}"
+                raise InvalidAnnotationVersionError(different_msg)
+
     @staticmethod
     def latest(genome_build: GenomeBuild, validate=True):
         av: AnnotationVersion = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date").last()
