@@ -1455,7 +1455,7 @@ class RVIS(models.Model):
         @see https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1003709 """
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
-    oe_ratio_percentile = models.FloatField()
+    oe_ratio_percentile = models.FloatField(null=True)
 
     def __str__(self):
         return f"{self.gene_symbol_id}: {self.oe_ratio_percentile}"
