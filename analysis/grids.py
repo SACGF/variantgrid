@@ -18,6 +18,7 @@ from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.utils import md5sum_str
+from ontology.grids import AbstractOntologyGenesGrid
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
@@ -563,3 +564,12 @@ class KaromappingAnalysesGrid(JqGridUserRowConfig):
             queryset = KaryomappingAnalysis.objects.filter(user=user)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'modified', 'sortorder': 'desc'})
+
+
+class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
+    def __init__(self, user, node_id, version):
+        self.node = get_node_subclass_or_404(user, node_id, version=version)
+        super().__init__()
+
+    def _get_ontology_terms_ids(self):
+        return self.node.get_ontology_term_ids()

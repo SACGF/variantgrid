@@ -35,6 +35,9 @@ import math
 
 
 # TODO: Merge code from jqGrid and this together?
+from library.pandas_utils import df_nan_to_none
+
+
 class DataFrameJqGrid:
     fields = []
     allow_empty = True
@@ -57,6 +60,7 @@ class DataFrameJqGrid:
 
     def get_items(self, request):
         df = self.get_dataframe()
+        df = df_nan_to_none(df)  # JSON can't handle NaN
         df = self.sort_dataframe(request, df)
         (df_slice, page_number, num_pages, num_records) = self.paginate_df(request, df)
         items = self.get_dataframe_rows(df_slice)

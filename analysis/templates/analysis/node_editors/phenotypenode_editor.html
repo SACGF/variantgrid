@@ -1,4 +1,4 @@
-{% extends "analysis/node_editors/grid_editor.html" %}
+{% extends "analysis/node_editors/grid_editor_gene_tab.html" %}
 {% load static %}
 {% load js_tags %}
 {% block style %}
@@ -43,6 +43,13 @@
         });
     }
 {% endblock inlinejs%}
+
+{% block gene_list_grid %}
+
+{% jqgrid 'node_ontology_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True node_id=node.pk version=node.version %}
+
+{% endblock gene_list_grid %}
+
 
 {% block content %}
 <style>
