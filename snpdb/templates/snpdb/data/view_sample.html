@@ -239,7 +239,6 @@ $(document).ready(function() {
                             <td>{{ slc.count }}
                     {% endfor %}
                 </table>
-                </p>
             {% endif %}
 
             {% if sex_guess %}
@@ -248,8 +247,6 @@ $(document).ready(function() {
             {% endif %}
         </div>
 	{% endif %}
-
-    </div> <!-- /sample-tabs -->
 
      {% if somalier_enabled %}
         {% with ancestry=sample.somaliersampleextract.somalierancestry %}
@@ -300,7 +297,7 @@ $(document).ready(function() {
             {% endif %}
         {% endwith %}
     {% endif %}
-
+    </div> <!-- /sample-tabs -->
 
     {% related_data_for_samples samples show_sample_info=False %}
     {% related_analyses_for_samples samples show_sample_info=False %}
@@ -353,9 +350,8 @@ $(document).ready(function() {
             {% endfor %}
         </table>
     {% endif %}
-    </div>
-<div id="error-dialog" class="no-close" title="Error">
 </div>
+<div id="error-dialog" class="no-close" title="Error">
 </div>
 
 {% include "snpdb/create_patient_dialog.html" %}
