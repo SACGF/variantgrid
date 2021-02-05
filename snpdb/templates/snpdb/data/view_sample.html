@@ -119,135 +119,138 @@ $(document).ready(function() {
     {% vcf_history_trail sample.vcf %}
 
     <div id="sample-tabs">
-    <ul>
-        <li><a href="#details">Details</a></li>
-        {% if sample.samplestats.import_status == 'S' %}
-        <li><a href="#sample-stats">Stats</a></li>
-        {% if somalier_enabled and sample.somaliersampleextract.somalierancestry %}
-            <li><a href="#sample-ancestry">Ancestry</a></li>
-        {% endif %}
-        <li><a href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
-        {% endif %}
-        {% if sample.import_status == 'S' or sample.import_status == 'A' %}
-        <li><a href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
-        {% endif %}
-        {% if url_name_visible.sample_gene_lists_tab %}
-        <li>
-            <a class="sample-gene-list-link" href="{% url 'sample_gene_lists_tab' sample.pk %}">
-                <div class="left">Genes of Interest</div>
-                {% if sample.activesamplegenelist %}
-                <div title="Active GeneList" class="left icon16 check-mark-green"></div>
+        <ul>
+            <li><a href="#details">Details</a></li>
+            {% if sample.samplestats.import_status == 'S' %}
+            <li><a href="#sample-stats">Stats</a></li>
+            {% if somalier_enabled and sample.somaliersampleextract.somalierancestry %}
+                <li><a href="#sample-ancestry">Ancestry</a></li>
+            {% endif %}
+            <li><a href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
+            {% endif %}
+            {% if sample.import_status == 'S' or sample.import_status == 'A' %}
+            <li><a href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
+            {% endif %}
+            {% if url_name_visible.sample_gene_lists_tab %}
+            <li>
+                <a class="sample-gene-list-link" href="{% url 'sample_gene_lists_tab' sample.pk %}">
+                    <div class="left">Genes of Interest</div>
+                    {% if sample.activesamplegenelist %}
+                    <div title="Active GeneList" class="left icon16 check-mark-green"></div>
+                    {% endif %}
+                    <div class="left">({{ sample.samplegenelist_set.count }})</div>
+                </a>
+            </li>
+            {% endif %}
+            {% if sample.sequencing_run and url_name_visible.view_sample_qc_tab %}
+            <li><a href="{% url 'view_sample_qc_tab' sample.pk %}">QC</a></li>
+            {% endif %}
+            {% if has_write_permission %}
+            <li><a href="{% url 'sample_permissions_tab' sample.pk %}">Sharing / Permissions</a></li>
+            {% endif %}
+        </ul>
+        <div id="details">
+            {% page_help user 'data/view_sample_help' 'Sample Help' %}
+
+            <form method="post" id='sample-form'>
+                {% csrf_token %}
+                <p>
+                    <label for="id_genome_build">Genome build:</label>
+                    <span id='id_genome_build'> {{ sample.vcf.genome_build }}</span>
+                </p>
+                {{ form.as_p }}
+                {% if has_write_permission %}
+                    <button id='save-sample' class="btn btn-primary">save</button>
+                {% else %}
+                    You can view but not modify this data.
                 {% endif %}
-                <div class="left">({{ sample.samplegenelist_set.count }})</div>
-            </a>
-        </li>
-        {% endif %}
-        {% if sample.sequencing_run and url_name_visible.view_sample_qc_tab %}
-        <li><a href="{% url 'view_sample_qc_tab' sample.pk %}">QC</a></li>
-        {% endif %}
-        {% if has_write_permission %}
-        <li><a href="{% url 'sample_permissions_tab' sample.pk %}">Sharing / Permissions</a></li>
-        {% endif %}
-    </ul>
-    <div id="details">
-	    {% page_help user 'data/view_sample_help' 'Sample Help' %}
+                {% include "messages/messages.html" %}
+                {% vcf_import_info sample.vcf 'Please click the VCF icon at the top of the page, then the "View upload processing" link.' %}
 
-    	<form method="post" id='sample-form'>
-    		{% csrf_token %}
-            <p>
-                <label for="id_genome_build">Genome build:</label>
-                <span id='id_genome_build'> {{ sample.vcf.genome_build }}</span>
-            </p>
-    		{{ form.as_p }}
-    		{% if has_write_permission %}
-    			<button id='save-sample' class="btn btn-primary">save</button>
-    		{% else %}
-    			You can view but not modify this data.
-    		{% endif %}
-    		{% include "messages/messages.html" %}
-            {% vcf_import_info sample.vcf 'Please click the VCF icon at the top of the page, then the "View upload processing" link.' %}
-
-            {{ form.media }}
-    	</form>
-    </div>
+                {{ form.media }}
+            </form>
+        </div>
     {% if sample.samplestats.import_status == 'S' %}
-    <div id="sample-stats">
-		<table>
-		<tr><th> <th> <th> Total %
-			{% if sample.samplestatspassingfilter %}
-			<th> (Pass Filters) </tr>
-			{% endif %}
-		<tr><th>Total
-			<td> {{ sample.samplestats.total_count }}
-			<td>100.0
-			{% if sample.samplestatspassingfilter %}
-			<td>({{ sample.samplestatspassingfilter.total_count }})
-			{% endif %}
-		<tr><td>&nbsp;</td>
-		<tr><th>SNPs		<td>{{ sample.samplestats.snp_count }}
-							<td>{{ sample.samplestats.snp_percent | floatformat }}
-							{% if sample.samplestatspassingfilter %}
-							<td>({{ sample.samplestatspassingfilter.snp_count }})
-							{% endif %}
-		<tr><th>Insertions	<td>{{ sample.samplestats.insertions_count }}
-							<td>{{ sample.samplestats.insertions_percent | floatformat }}
-							{% if sample.samplestatspassingfilter %}
-							<td>({{ sample.samplestatspassingfilter.insertions_count }})
-							{% endif %}
-		<tr><th>Deletions	<td>{{ sample.samplestats.deletions_count }}
-							<td>{{ sample.samplestats.deletions_percent | floatformat }}
-							{% if sample.samplestatspassingfilter %}
-							<td>({{ sample.samplestatspassingfilter.deletions_count }})
-							{% endif %}
-		</table>
-
-        <h3>Zygosity</h3>
-		<table>
-		<tr><td>      <th>Count
-                                {% if sample.samplestatspassingfilter %}
-                                <th> (Pass Filters) </tr>
-                                {% endif %}
-		<tr><th>Ref           <td>{{ sample.samplestats.ref_count }}
-                                {% if sample.samplestatspassingfilter %}
-                                <td>({{ sample.samplestatspassingfilter.ref_count }})
-                                {% endif %}
-		<tr><th>Het	          <td>{{ sample.samplestats.het_count }}
-                                {% if sample.samplestatspassingfilter %}
-                                <td>({{ sample.samplestatspassingfilter.het_count }})
-                                {% endif %}
-		<tr><th>Hom           <td>{{ sample.samplestats.hom_count }}
-                                {% if sample.samplestatspassingfilter %}
-                                <td>({{ sample.samplestatspassingfilter.hom_count }})
-                                {% endif %}
-        <tr><th>Unk           <td>{{ sample.samplestats.unk_count }}
-                                {% if sample.samplestatspassingfilter %}
-                                <td>({{ sample.samplestatspassingfilter.unk_count }})
-                                {% endif %}
-		</table>
-		
-		{% if sample_locus_count %}
-            <h3>Ploidy</h3>
+        <div id="sample-stats">
             <table>
-                <tr><th>Locus Count <th> Count
-                {% for slc in sample_locus_count %}
-                    <tr><td>{{ slc.locus_count }}
-                            {% if slc.locus_count == 1 %}
-                                (HOM)
-                            {% elif slc.locus_count == 2 %}
-                                (HET)
-                            {% endif %}
-                        <td>{{ slc.count }} 
-                {% endfor %}
+            <tr><th> <th> <th> Total %
+                {% if sample.samplestatspassingfilter %}
+                <th> (Pass Filters) </tr>
+                {% endif %}
+            <tr><th>Total
+                <td> {{ sample.samplestats.total_count }}
+                <td>100.0
+                {% if sample.samplestatspassingfilter %}
+                <td>({{ sample.samplestatspassingfilter.total_count }})
+                {% endif %}
+            <tr><td>&nbsp;</td>
+            <tr><th>SNPs		<td>{{ sample.samplestats.snp_count }}
+                                <td>{{ sample.samplestats.snp_percent | floatformat }}
+                                {% if sample.samplestatspassingfilter %}
+                                <td>({{ sample.samplestatspassingfilter.snp_count }})
+                                {% endif %}
+            <tr><th>Insertions	<td>{{ sample.samplestats.insertions_count }}
+                                <td>{{ sample.samplestats.insertions_percent | floatformat }}
+                                {% if sample.samplestatspassingfilter %}
+                                <td>({{ sample.samplestatspassingfilter.insertions_count }})
+                                {% endif %}
+            <tr><th>Deletions	<td>{{ sample.samplestats.deletions_count }}
+                                <td>{{ sample.samplestats.deletions_percent | floatformat }}
+                                {% if sample.samplestatspassingfilter %}
+                                <td>({{ sample.samplestatspassingfilter.deletions_count }})
+                                {% endif %}
             </table>
-            </p>
-		{% endif %}
-		
-		{% if sex_guess %}
-		<h3>Sex</h3>
-		{{ sample.samplestats.chrx_sex_guess }} (chrX Hom: {{ sample.samplestats.x_hom_count }}, Het: {{ sample.samplestats.x_het_count }})
-        {% endif %}
-    </div>
+
+            <h3>Zygosity</h3>
+            <table>
+            <tr><td>      <th>Count
+                                    {% if sample.samplestatspassingfilter %}
+                                    <th> (Pass Filters) </tr>
+                                    {% endif %}
+            <tr><th>Ref           <td>{{ sample.samplestats.ref_count }}
+                                    {% if sample.samplestatspassingfilter %}
+                                    <td>({{ sample.samplestatspassingfilter.ref_count }})
+                                    {% endif %}
+            <tr><th>Het	          <td>{{ sample.samplestats.het_count }}
+                                    {% if sample.samplestatspassingfilter %}
+                                    <td>({{ sample.samplestatspassingfilter.het_count }})
+                                    {% endif %}
+            <tr><th>Hom           <td>{{ sample.samplestats.hom_count }}
+                                    {% if sample.samplestatspassingfilter %}
+                                    <td>({{ sample.samplestatspassingfilter.hom_count }})
+                                    {% endif %}
+            <tr><th>Unk           <td>{{ sample.samplestats.unk_count }}
+                                    {% if sample.samplestatspassingfilter %}
+                                    <td>({{ sample.samplestatspassingfilter.unk_count }})
+                                    {% endif %}
+            </table>
+
+            {% if sample_locus_count %}
+                <h3>Ploidy</h3>
+                <table>
+                    <tr><th>Locus Count <th> Count
+                    {% for slc in sample_locus_count %}
+                        <tr><td>{{ slc.locus_count }}
+                                {% if slc.locus_count == 1 %}
+                                    (HOM)
+                                {% elif slc.locus_count == 2 %}
+                                    (HET)
+                                {% endif %}
+                            <td>{{ slc.count }}
+                    {% endfor %}
+                </table>
+                </p>
+            {% endif %}
+
+            {% if sex_guess %}
+            <h3>Sex</h3>
+            {{ sample.samplestats.chrx_sex_guess }} (chrX Hom: {{ sample.samplestats.x_hom_count }}, Het: {{ sample.samplestats.x_het_count }})
+            {% endif %}
+        </div>
 	{% endif %}
+
+    </div> <!-- /sample-tabs -->
+
      {% if somalier_enabled %}
         {% with ancestry=sample.somaliersampleextract.somalierancestry %}
             {% if ancestry %}
