@@ -404,6 +404,7 @@ class AnalysisTemplateRun(TimeStampedModel):
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
         analysis.genome_build = genome_build
+        analysis.annotation_version = AnnotationVersion.latest(genome_build, validate=True)
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments
