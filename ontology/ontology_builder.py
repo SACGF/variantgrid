@@ -87,13 +87,13 @@ class OntologyBuilder:
             self.previous_import.save()
             raise OntologyBuilderDataUpToDateException()
 
-    def complete(self, purge_old=True):
+    def complete(self, purge_old_relationships=True, purge_old_terms=False):
         """
         :purge_old If True will mark OntologyTermGeneRelations not included in this import (but included in a previous import
         with the same context and ontology service) as deleted
         Will also complain about other records not included in this import but wont delete them
         """
-        if purge_old:
+        if purge_old_relationships or purge_old_terms:
             old_imports = set(OntologyImport.objects.filter(context=self.context, import_source=self.import_source).values_list("pk", flat=True))
             if self._ontology_import.pk in old_imports:
                 old_imports.remove(self._ontology_import.pk)
@@ -106,9 +106,10 @@ class OntologyBuilder:
 
                 count = olds.count()
                 self.counters[model].deletes += count
-                if model == OntologyTermRelation:  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
+                if (model == OntologyTermRelation and purge_old_relationships) or \
+                        (model == OntologyTerm and purge_old_terms):  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
                     if count:
-                        print(f"Deleting {count} stale relationships")
+                        print(f"Deleting {count} stale {model}")
                         olds.delete()
 
         self._ontology_import.completed = True
