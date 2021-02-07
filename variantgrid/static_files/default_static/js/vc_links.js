@@ -107,7 +107,7 @@ let VCLinks = (function() {
             links.push(this.generateMonarchLink());
             links.push(this.makeLink('NCBI (Gene)', 'https://www.ncbi.nlm.nih.gov/gene/', '?term=@@', SpecialEKeys.GENE_SYMBOL));
             links.push(this.makeLink('OMIM (Gene)', 'https://www.omim.org', '/entry/@@', SpecialEKeys.GENE_OMIM_ID));
-            links.push(this.makeLink('PDB', 'https://www.rcsb.org/pdb', '/protein/@@', SpecialEKeys.UNIPROT_ID, 'Protein Data Bank'));
+            links.push(this.makeLink('PDB', 'https://www.rcsb.org', '/uniprot/@@', SpecialEKeys.UNIPROT_ID, 'Protein Data Bank'));
             links.push(this.generateUcsc());
             links.push(this.makeLink('Uniprot ID', 'https://www.uniprot.org/uniprot/', '@@', SpecialEKeys.UNIPROT_ID));
             links.push(this.generateVarsome());
