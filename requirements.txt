@@ -5,7 +5,7 @@ celery==4.4.7
 ConfigArgParse==1.2.3
 coreapi==2.3.3
 cyvcf2==0.20.1
-Django==3.1
+Django==3.1.6
 django_admin_json_editor==0.2.3
 django_autocomplete_light==3.5.1
 django-avatar==5.0.0
