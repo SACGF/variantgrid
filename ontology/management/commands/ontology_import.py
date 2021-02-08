@@ -421,8 +421,7 @@ def load_biomart(filename: str, force: bool):
     for mim_accession_id, description in description_series.items():
         descriptions_list = [x for x in str(description).split(";;")]
         name = descriptions_list[0]
-        aliases = [term for term in [term.strip() for term in str(description).split(";")] if term]
-
+        aliases = [name] + [term for term in [term.strip() for term in str(description).split(";")] if term]
         ontology_builder.add_term(
             term_id=f"OMIM:{mim_accession_id}",
             name=name,
@@ -483,7 +482,7 @@ def load_omim(filename: str, force: bool):
             if match := MOVED_TO.match(preferred_title):
                 # This will only happen if you uncomment Caret
                 moved_to = match.group(1)
-                preferred_title = "obsolete OMIM:{moved_to}"
+                preferred_title = f"obsolete, see OMIM:{moved_to}"
             else:
                 aliases.append(preferred_title)
                 aliases += [term for term in [term.strip() for term in (preferred_title + " " + alternative_terms).split(";")] if term]
