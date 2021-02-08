@@ -7,9 +7,10 @@ from django.urls.base import reverse
 from django.utils import timezone
 import unittest
 
-from analysis.models import Analysis, SampleNode, KaryomappingAnalysis
+from analysis.models import Analysis, SampleNode, KaryomappingAnalysis, GeneListNode, GeneListNodeGeneList
 from analysis.models.enums import SNPMatrix
 from annotation.fake_annotation import get_fake_annotation_version
+from genes.models import GeneList
 from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import Variant
@@ -91,6 +92,9 @@ class Test(URLTestCase):
         cls.node = SampleNode.objects.create(analysis=cls.analysis,
                                              sample=cls.sample,
                                              count=1)
+        gene_list = GeneList.objects.create(name="blah", user=cls.user_owner)
+        cls.gene_list_node = GeneListNode.objects.create(analysis=cls.analysis)
+        GeneListNodeGeneList.objects.create(gene_list_node=cls.gene_list_node, gene_list=gene_list)
 
         cls.karyomapping_analysis = KaryomappingAnalysis.objects.create(user=cls.user_owner,
                                                                         name="test karyomapping",
@@ -112,6 +116,10 @@ class Test(URLTestCase):
             # Node editor
             ('node_view', analysis_version_and_node_version_params, 200),
             ('node_debug', analysis_version_and_node_version_params, 200),
+
+            # Reproduce issue serializing GeneListNode
+            ('node_debug', {"node_id": cls.gene_list_node.pk, "node_version": cls.gene_list_node.version,
+                            "analysis_version": cls.analysis.version, "extra_filters": "default"}, 200),
 
             ('node_doc', {"node_id": cls.node.pk}, 200),
             ('node_load', {"node_id": cls.node.pk}, 302),
