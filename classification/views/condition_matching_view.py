@@ -1,10 +1,13 @@
 from typing import Dict, Any
 
+from django.db.models import QuerySet
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts
+from library.utils import empty_to_none
+from ontology.ontology_matching import normalize_condition_text
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import re
 
@@ -24,6 +27,14 @@ class ConditionTextColumns(DatatableConfig):
     def get_initial_queryset(self):
         # exclude where we've auto matched and have 0 outstanding left
         return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
+
+    def filter_queryset(self, qs: QuerySet) -> QuerySet:
+        if filter_text := empty_to_none(self.get_query_param("text_filter")):
+            normal_text = normalize_condition_text(filter_text)
+            words = [word.strip() for word in normal_text.split(" ")]
+            for word in words:
+                qs = qs.filter(normalized_text__icontains=word)
+        return qs
 
 
 def condition_matchings_view(request):

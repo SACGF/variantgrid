@@ -7,11 +7,6 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <script>
-        $(document).ready(() => {
-            EKeys.load().then(() => {
-                {% datatable_definition table_config=datatable_config table_id='condition-text-datatable' url='condition_text_datatable' responsive=True %}
-            });
-        });
         function idRenderer(data) {
             let text = data.normalized_text;
             let id = data.id;
@@ -27,6 +22,19 @@
 
             return aDom.prop('outerHTML');
         }
+        function datatableFilter(data) {
+            data.text_filter = $("#text-filter").val();
+        }
+
+        function applyFilters() {
+            $('#condition-text-datatable').DataTable().ajax.reload();
+        }
+
+        $(document).ready(() => {
+            EKeys.load().then(() => {
+                {% datatable_definition table_config=datatable_config data='datatableFilter' table_id='condition-text-datatable' url='condition_text_datatable' responsive=True %}
+            });
+        });
     </script>
 {% endblock head %}
 {% block content %}
@@ -37,6 +45,12 @@
             Help will go here for matching text to conditions
             </p>
         {% end_page_help_embedded %}
+        <div class="input-group">
+            <input class="form-control" id="text-filter" placeholder="">
+            <span class="input-group-append">
+                <button class="btn btn-primary" type="submit" onclick="applyFilters()">Filter</button>
+            </span>
+        </div>
         {% datatable datatable_config 'condition-text-datatable' class_name='condition-text-datatable responsive sticky-header' %}
     </div>
 {% endblock %}
