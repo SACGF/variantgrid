@@ -296,7 +296,8 @@ def get_clingen_allele(code: str) -> ClinGenAllele:
         api_response = clingen_allele_url_get(url)
         if "errorType" in api_response:
             raise ClinGenAlleleAPIException.from_api_response(api_response)
-        clingen_allele = ClinGenAllele.objects.create(pk=clingen_allele_id, api_response=api_response)
+        clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, pk=clingen_allele_id,
+                                                                      defaults={"api_response": api_response})
 
     allele, _ = Allele.objects.get_or_create(clingen_allele=clingen_allele)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
