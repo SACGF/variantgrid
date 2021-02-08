@@ -832,19 +832,24 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
     @lazy
     def variant_tag(self):
         variant_tag_id = self.kwargs["variant_tag_id"]
-        variant_tag = get_object_or_404(VariantTag, pk=variant_tag_id)
+        variant_tag = VariantTag.objects.get(pk=variant_tag_id)
         variant_tag.analysis.check_can_view(self.request.user)
         return variant_tag
 
     def get_context_data(self, *args, **kwargs):
-        context = super().get_context_data(*args, **kwargs)
-        context["variant_tag"] = self.variant_tag
+        try:
+            context = super().get_context_data(*args, **kwargs)
+            context["variant_tag"] = self.variant_tag
 
-        if not self.variant_tag.analysis.can_write(self.request.user):
-            read_only_message = "You have read-only access to this analysis. You can create a classification but it " \
-                                f"will not be linked to the analysis and the {settings.TAG_REQUIRES_CLASSIFICATION} " \
-                                f"tag will not be deleted."
-            messages.add_message(self.request, messages.WARNING, read_only_message)
+            if not self.variant_tag.analysis.can_write(self.request.user):
+                read_only_message = "You have read-only access to this analysis. You can create a classification but " \
+                                    "it will not be linked to the analysis and the " \
+                                    "{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
+                messages.add_message(self.request, messages.WARNING, read_only_message)
+        except VariantTag.DoesNotExist:
+            variant_tag_id = self.kwargs["variant_tag_id"]
+            msg = f"The VariantTag ({variant_tag_id}) does not exist. It may have been deleted or already classified."
+            context = {"error_message": msg}
         return context
 
 

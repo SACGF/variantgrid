@@ -180,6 +180,9 @@
 {% endblock %}
 {% block content %}
 <div class="chunk borderless">
+{% if error_message %}
+    {{ error_message }}
+{% else %}
     <h3>Create Classification for {{ variant }}</h3>
 
     <a class="hover-link my-2" href="{% url 'view_variant' variant.pk %}">Back to variant page for {{ variant }}.</a>
@@ -261,5 +264,6 @@
             <button class="btn btn-primary mt-2" id='create-variant-classification'>Create Classification</button>
         {% endif %}
     </form>
+{% endif %}
 </div>
 {% endblock %}
