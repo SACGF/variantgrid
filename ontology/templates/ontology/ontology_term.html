@@ -46,17 +46,38 @@
                     {% endlabelled %}
                 {% endif %}
                 <hr/>
-                {% labelled label="Direct Relationships" %}
-                    {% if not relationships %}-{% endif %}
-                    {% for relationship in relationships %}
+
+                {% labelled label="Parent Terms" %}
+                    {% if not parent_relationships %}-{% endif %}
+                    {% for relationship in parent_relationships %}
                         <div class="mt-2">
-                        {% if relationship.source_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.source_term %}{% endif %}
-                        <div class="text-center d-inline-block mx-2">{{ relationship.relation_display }}</div>
-                        {% if relationship.dest_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.dest_term %}{% endif %}
-                            <span class="text-muted d-inline-block hover-detail" title="Import {{ relationship.from_import.id }}" data-content="Last imported: {{ relationship.from_import.processed_date }}<br/>From: {{ relationship.from_import.filename }}">&nbsp;from <span style="word-break: break-all">{{ relationship.from_import.filename }}</span></span>
+                            {% ontology_relationship relationship term %}
                         </div>
                     {% endfor %}
                 {% endlabelled %}
+
+                <hr/>
+
+                {% labelled label="Direct Relationships" %}
+                    {% if not regular_relationships %}-{% endif %}
+                    {% for relationship in regular_relationships %}
+                        <div class="mt-2">
+                            {% ontology_relationship relationship term %}
+                        </div>
+                    {% endfor %}
+                {% endlabelled %}
+
+                <hr/>
+
+                {% labelled label="Child Terms" %}
+                    {% if not child_relationships %}-{% endif %}
+                    {% for relationship in child_relationships %}
+                        <div class="mt-2">
+                            {% ontology_relationship relationship term %}
+                        </div>
+                    {% endfor %}
+                {% endlabelled %}
+
             </div>
         </div>
     </div>
