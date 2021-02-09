@@ -23,9 +23,20 @@ def _one_off_move_ontology(apps, schema_editor):
         tpm.ontology_term = OntologyTerm.objects.get(pk=hpo_id)
         tpm.save()
 
+    MOVED_OMIM = {
+        614087: 227650,  # Fancomi anaemia
+    }
+
     for tpm in TextPhenotypeMatch.objects.filter(omim_alias__isnull=False):
-        omim_id = "OMIM:%d" % int(tpm.omim_alias.mim_morbid_id)
-        tpm.ontology_term = OntologyTerm.objects.get(pk=omim_id)
+        mim_id = int(tpm.omim_alias.mim_morbid_id)
+        mim_id = MOVED_OMIM.get(mim_id, mim_id)  # Some have been replaced
+        omim_id = "OMIM:%d" % mim_id
+        try:
+            tpm.ontology_term = OntologyTerm.objects.get(pk=omim_id)
+        except OntologyTerm.DoesNotExist:
+            print(f"Could not load: {omim_id}")
+            raise
+
         tpm.save()
 
 

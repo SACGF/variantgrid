@@ -27,7 +27,7 @@ def _one_off_move_ontology(apps, schema_editor):
     for pn_omim in PhenotypeNodeOMIM.objects.all():
         mim_id = pn_omim.mim_morbid_alias.mim_morbid_id
         mim_id = MOVED_OMIM.get(mim_id, mim_id)  # Some have been replaced
-        omim_id = "OMIM:%d" % int(mim_id)
+        omim_id = "OMIM:%d" % mim_id
         try:
             ontology_term = OntologyTerm.objects.get(pk=omim_id)
         except OntologyTerm.DoesNotExist:
