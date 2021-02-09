@@ -38,6 +38,13 @@ def _one_off_move_ontology(apps, schema_editor):
         try:
             tpm.ontology_term = OntologyTerm.objects.get(pk=omim_id)
         except OntologyTerm.DoesNotExist:
+            # If an OMIM term is gone but also matched to a gene, don't worry about it
+            if gene_tpm := TextPhenotypeMatch.objects.filter(text_phenotype=tpm.text_phenotype,
+                                                             offset_start=tpm.offset_start,
+                                                             offset_end=tpm.offset_end,
+                                                             match_type='G').first():
+                print(f"No OMIM term: {omim_id} but ok as matched to gene: {gene_tpm.gene_symbol}")
+                continue
             print(f"Could not load: {omim_id}")
             raise
 
