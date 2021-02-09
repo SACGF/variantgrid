@@ -22,7 +22,11 @@ def _one_off_move_ontology(apps, schema_editor):
 
     for pn_omim in PhenotypeNodeOMIM.objects.all():
         omim_id = "OMIM:%d" % int(pn_omim.mim_morbid_alias.mim_morbid_id)
-        ontology_term = OntologyTerm.objects.get(pk=omim_id)
+        try:
+            ontology_term = OntologyTerm.objects.get(pk=omim_id)
+        except OntologyTerm.DoesNotExist:
+            print(f"Could not load: {omim_id}")
+            raise
         # Original data may have had dupes
         PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node=pn_omim.phenotype_node, ontology_term=ontology_term)
 
