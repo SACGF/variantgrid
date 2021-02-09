@@ -17,12 +17,14 @@ def _one_off_move_ontology(apps, schema_editor):
     for pn_hpo in PhenotypeNodeHPO.objects.all():
         hpo_id = "HP:%07d" % int(pn_hpo.hpo_synonym.hpo_id)
         ontology_term = OntologyTerm.objects.get(pk=hpo_id)
-        PhenotypeNodeOntologyTerm.objects.create(phenotype_node=pn_hpo.phenotype_node, ontology_term=ontology_term)
+        # Original data may have had dupes
+        PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node=pn_hpo.phenotype_node, ontology_term=ontology_term)
 
     for pn_omim in PhenotypeNodeOMIM.objects.all():
         omim_id = "OMIM:%d" % int(pn_omim.mim_morbid_alias.mim_morbid_id)
         ontology_term = OntologyTerm.objects.get(pk=omim_id)
-        PhenotypeNodeOntologyTerm.objects.create(phenotype_node=pn_omim.phenotype_node, ontology_term=ontology_term)
+        # Original data may have had dupes
+        PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node=pn_omim.phenotype_node, ontology_term=ontology_term)
 
 
 class Migration(migrations.Migration):
