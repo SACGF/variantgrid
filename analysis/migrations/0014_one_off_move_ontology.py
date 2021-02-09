@@ -20,8 +20,14 @@ def _one_off_move_ontology(apps, schema_editor):
         # Original data may have had dupes
         PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node=pn_hpo.phenotype_node, ontology_term=ontology_term)
 
+    MOVED_OMIM = {
+        614087: 227650,  # Fancomi anaemia
+    }
+
     for pn_omim in PhenotypeNodeOMIM.objects.all():
-        omim_id = "OMIM:%d" % int(pn_omim.mim_morbid_alias.mim_morbid_id)
+        mim_id = pn_omim.mim_morbid_alias.mim_morbid_id
+        mim_id = MOVED_OMIM.get(mim_id, mim_id)  # Some have been replaced
+        omim_id = "OMIM:%d" % int(mim_id)
         try:
             ontology_term = OntologyTerm.objects.get(pk=omim_id)
         except OntologyTerm.DoesNotExist:
