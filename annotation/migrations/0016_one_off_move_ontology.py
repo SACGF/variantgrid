@@ -23,16 +23,12 @@ def _one_off_move_ontology(apps, schema_editor):
         tpm.ontology_term = OntologyTerm.objects.get(pk=hpo_id)
         tpm.save()
 
-    SKIP_OMIM = {601199}  # CALCIUM-SENSING RECEPTOR; CASR - matched from "CASR" - ok to just use gene match
     MOVED_OMIM = {
         614087: 227650,  # Fancomi anaemia
     }
 
     for tpm in TextPhenotypeMatch.objects.filter(omim_alias__isnull=False):
         mim_id = int(tpm.omim_alias.mim_morbid_id)
-        if mim_id in SKIP_OMIM:
-            continue
-
         mim_id = MOVED_OMIM.get(mim_id, mim_id)  # Some have been replaced
         omim_id = "OMIM:%d" % mim_id
         try:
