@@ -37,7 +37,7 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
         gm.match_unmatched_in_hgnc_and_gene_lists()
 
     status_counts = get_field_counts(HGNC.objects.all(), "status")
-    cached_web_resource.description = ", ".join([f"{hs.label}: {status_counts[hs]}" for hs in HGNCStatus])
+    cached_web_resource.description = ", ".join([f"{HGNCStatus(hs).label}: {c}" for hs, c in status_counts.items()])
     cached_web_resource.save()
 
 
