@@ -637,21 +637,22 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Override for optimisation """
 
         try:
-            parent_non_zero_label_counts = []
-            for parent in self.get_non_empty_parents():
-                if parent.count != 0:  # count=0 has 0 for all labels
-                    parent_node_count = NodeCount.load_for_node(parent, label)
-                    if parent_node_count.count != 0:
-                        parent_non_zero_label_counts.append(parent_node_count.count)
+            if self.has_input():
+                parent_non_zero_label_counts = []
+                for parent in self.get_non_empty_parents():
+                    if parent.count != 0:  # count=0 has 0 for all labels
+                        parent_node_count = NodeCount.load_for_node(parent, label)
+                        if parent_node_count.count != 0:
+                            parent_non_zero_label_counts.append(parent_node_count.count)
 
-            if not parent_non_zero_label_counts:
-                # logging.info("all parents had 0 %s counts", label)
-                return 0
+                if not parent_non_zero_label_counts:
+                    # logging.info("all parents had 0 %s counts", label)
+                    return 0
 
-            if not self.modifies_parents():
-                if len(parent_non_zero_label_counts) == 1:
-                    # logging.info("Single parent, no modification, using that")
-                    return parent_non_zero_label_counts[0]
+                if not self.modifies_parents():
+                    if len(parent_non_zero_label_counts) == 1:
+                        # logging.info("Single parent, no modification, using that")
+                        return parent_non_zero_label_counts[0]
         except NodeCount.DoesNotExist:
             pass
         except Exception as e:
