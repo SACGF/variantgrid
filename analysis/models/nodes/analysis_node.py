@@ -259,7 +259,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def get_single_parent_q(self):
         parent = self.get_single_parent()
-        return parent.get_q()
+        if parent.is_ready():
+            if parent.count == 0:
+                q = self.q_none()
+            else:
+                q = parent.get_q()
+        else:
+            # This should never happen...
+            raise ValueError("get_single_parent_q called when single parent not ready!!!")
+        return q
 
     def _get_annotation_kwargs_for_node(self) -> Dict:
         """ Override this method per-node.
