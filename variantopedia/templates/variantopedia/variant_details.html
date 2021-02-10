@@ -18,7 +18,7 @@
 <script type="text/javascript">
 
 function getBams() {
-    var bams = [];
+    const bams = [];
     {% if sample.bam_file_path %}
         bams.push("{{ sample.bam_file_path }}");
     {% endif %}
@@ -74,7 +74,7 @@ function transcriptFunc(transcriptId, data) {
 
 function geneFunc(geneId, geneSymbol, data) {
     if (geneSymbol) {
-        var currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
+        const currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
         console.log("currentCoverageGeneId:");
         console.log(currentCoverageGeneId);
         if (currentCoverageGeneId != geneSymbol) {
@@ -82,7 +82,7 @@ function geneFunc(geneId, geneSymbol, data) {
         }
     }
 
-    var gic = $("#gene-info-container");
+    const gic = $("#gene-info-container");
     if (data) {
         $(".no-gene-info", gic).hide();
         $(".has-gene-info", gic).show();
@@ -92,7 +92,7 @@ function geneFunc(geneId, geneSymbol, data) {
         return;
     }
 
-    var geneInfoTable = $('#gene-info');
+    const geneInfoTable = $('#gene-info');
     $.each(data, function(name, value) {
         if (value === null) {
             value = $('<span>', {class: 'no-value', text:'-'});
@@ -100,8 +100,8 @@ function geneFunc(geneId, geneSymbol, data) {
         $("#" + name, geneInfoTable).html(value);
     });
 
-    var gene_url = Urls.view_gene_symbol(geneSymbol);
-    var linkHtml = "<a id='gene-link' target='_blank' href='" + gene_url + "'>" + geneSymbol + "</a>";
+    const gene_url = Urls.view_gene_symbol(geneSymbol);
+    const linkHtml = "<a id='gene-link' target='_blank' href='" + gene_url + "'>" + geneSymbol + "</a>";
     $("#hgnc_symbol", geneInfoTable).html(linkHtml);
 }
 
@@ -140,7 +140,7 @@ function handlePubMedLinks(pubmed) {
 }
 
 function showVariantCoordinate() {
-    var variant_coordinate = $("#show-variant-coordinate-link").attr("variant_coordinate");
+    const variant_coordinate = $("#show-variant-coordinate-link").attr("variant_coordinate");
     $("#variant_coordinate").text(variant_coordinate);
 }
 
@@ -158,10 +158,10 @@ function populateVariantAllele(data) {
 
     $("#variant_coordinate").text(data.link_data.variant_string);
     if (data.link_data.variant_string !== data.link_data.variant_coordinate) {
-        var link = $("<a />").text("show all bases").attr({
-                id: "show-variant-coordinate-link",
-                variant_coordinate: data.link_data.variant_coordinate,
-                href: "javascript:showVariantCoordinate();",
+        const link = $("<a />").text("show all bases").attr({
+            id: "show-variant-coordinate-link",
+            variant_coordinate: data.link_data.variant_coordinate,
+            href: "javascript:showVariantCoordinate();",
         });
         $("#variant_coordinate").append(link);
     }

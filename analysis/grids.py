@@ -11,8 +11,7 @@ from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.views.analysis_permissions import get_node_subclass_or_404
-from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version, \
-    get_variant_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig
