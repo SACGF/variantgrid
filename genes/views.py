@@ -19,6 +19,7 @@ from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from lazy import lazy
 
+from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
@@ -163,11 +164,10 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
         has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
 
-        q = get_has_variant_tags()
-        has_tagged_variants = gene_variant_qs.filter(q).exists()
+        has_tagged_variants = VariantTag.get_for_build(genome_build, variant_qs=gene_variant_qs).exists()
 
-        # has classifications isn't 100% in sync with the classification table:
-        # this code looks at VariantAlleles wheras the classification table will filter on gene symbol and transcript evidence keys
+        # has classifications isn't 100% in sync with the classification table: this code looks at VariantAlleles
+        # wheras the classification table will filter on gene symbol and transcript evidence keys
         q = get_has_classifications_q(genome_build)
         has_classified_variants = gene_variant_qs.filter(q).exists()
     else:
@@ -198,7 +198,6 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
         "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
         "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
-        "has_tagged_variants": has_tagged_variants,
         "has_variants": has_variants,
         "omim_and_hpo_for_gene": omim_and_hpo_for_gene,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,

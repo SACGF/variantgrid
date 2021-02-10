@@ -120,8 +120,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
-        non_gene_fields = [f for f in fields if "__transcript_version__" not in f]
-        self.fields = non_gene_fields
+        self.fields = self._get_non_gene_fields(fields)
         self.update_overrides(override)
 
         gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
@@ -143,6 +142,23 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "asc",
                                   'shrinkToFit': False})
+
+    @staticmethod
+    def _get_non_gene_fields(fields):
+        """ Remove fields that'll all be the same """
+        non_gene_fields = []
+        for f in fields:
+            if f == "tags":
+                continue
+            keep = True
+            for gene_fields in ["__transcript_version__", "__gene__"]:
+                if gene_fields in f:
+                    keep = False
+                    break
+            if keep:
+                non_gene_fields.append(f)
+        return non_gene_fields
+
 
 
 def _get_gene_fields():

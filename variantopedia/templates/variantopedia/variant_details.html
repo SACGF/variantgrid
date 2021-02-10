@@ -273,14 +273,14 @@ $(document).ready(function() {
         </div>
     </div>
 
-    {% if variant.varianttag_set.exists %}
+    {% if variant_tags %}
         <div class="container mt-4">
             <h4>Tags</h4>
             <table id='tags-table' class="table">
                 <thead>
                     <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th>
                 </thead>
-                {% for vt in variant.varianttag_set.all %}
+                {% for vt in variant_tags %}
                     <tr>
                         <td><span class='grid-tag tagged-{{ vt.tag }}' title='Tagged as {{ vt.tag }}' tag_id='{{ vt.tag }}'><span class='user-tag-colored'>{{ vt.tag }}</span></span></td>
                         <td><a class='hover-link' href="{% url 'analysis' vt.analysis.pk %}">{{ vt.analysis }}</a></td>
