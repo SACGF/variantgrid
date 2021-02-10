@@ -1,0 +1,42 @@
+{% if tag_counts %}
+    <style>
+    #tag-top-bar .grid-tag {
+        cursor: pointer;
+    }
+
+    #tag-filter-description {
+        display: none;
+    }
+    </style>
+
+    <script>
+    function _tag_counts_filter_show_all() {
+        $("#tag-filter-description").hide();
+        {% if show_all_func %}
+            let showAllFunc = {{ show_all_func | safe }};
+            showAllFunc();
+        {% endif %}
+    }
+
+    $(document).ready(function() {
+        $(".grid-tag", "#tag-top-bar").click(function() {
+            const tagId = $(this).attr("tag_id");
+            const tagHtml = '<span class="tagged-' + tagId + '" title="Tagged as ' + tagId + '"><span class="user-tag-colored">' + tagId + '</span></span>';
+            $("#tag-filter-description-text").html("Filtering to " + tagHtml);
+            $("#tag-filter-description").show();
+            {% if click_func %}
+                let clickFunc = {{ click_func | safe }};
+                clickFunc(tagId);
+            {% endif %}
+        });
+    });
+    </script>
+    <div id='tag-top-bar'> Click to filter:
+    {% for tag, count in tag_counts %}
+        <span class="grid-tag tagged-{{tag}}" title="Tagged as {{tag}}" tag_id="{{tag}}">
+            <span class="user-tag-colored">{{ tag }}</span> : {{ count }}
+        </span>
+    {% endfor %}
+    <div id="tag-filter-description"><span id="tag-filter-description-text"></span> <a href="javascript:_tag_counts_filter_show_all();">Show All</a></div>
+    </div>
+{% endif %}

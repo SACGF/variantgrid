@@ -5,6 +5,7 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
+from analysis.models import VariantTag
 from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, InvalidAnnotationVersionError
 from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
@@ -13,7 +14,7 @@ from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import UserSettings, Q, VariantGridColumn
+from snpdb.models import UserSettings, Q, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
 
@@ -127,12 +128,16 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         genes_qs = get_variant_queryset_for_gene_symbol(gene_symbol, genome_build)
         queryset = variant_qs_filter_has_internal_data(genes_qs, genome_build)
-        if extra_filters:  # Hotspot filters
-            protein_position = extra_filters.get("protein_position")
-            if protein_position:
+        if extra_filters:
+            # Hotspot filters
+            if protein_position := extra_filters.get("protein_position"):
                 transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
                 queryset = queryset.filter(varianttranscriptannotation__transcript_version=transcript_version,
                                            varianttranscriptannotation__protein_position__icontains=protein_position)
+            if tag_id := extra_filters.get("tag"):
+                tag = get_object_or_404(Tag, pk=tag_id)
+                alleles_qs = VariantTag.objects.filter(tag=tag).values_list("variant__variantallele__allele")
+                queryset = queryset.filter(variantallele__allele__in=alleles_qs)
 
         self.queryset = queryset.distinct().values(*self.get_queryset_field_names())
         self.extra_config.update({'sortname': "locus__position",

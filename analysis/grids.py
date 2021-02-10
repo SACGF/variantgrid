@@ -376,13 +376,12 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        queryset = get_queryset_for_latest_annotation_version(VariantTag, genome_build)
+        queryset = VariantTag.get_for_build(genome_build)
         user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
             analyses_queryset = Analysis.filter_for_user(user)
         else:
             analyses_queryset = Analysis.objects.filter(user=user)
-        analyses_queryset = analyses_queryset.filter(genome_build=genome_build)
 
         if extra_filters:
             analysis_ids = extra_filters.get("analysis_ids")
@@ -440,8 +439,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
         else:
             analyses_queryset = Analysis.objects.filter(user=user)
 
-        analyses_queryset = analyses_queryset.filter(genome_build=genome_build)
-        tags_qs = VariantTag.objects.filter(analysis__in=analyses_queryset)
+        tags_qs = VariantTag.get_for_build(genome_build).filter(analysis__in=analyses_queryset)
         if extra_filters:
             tag_id = extra_filters.get("tag")
             if tag_id is not None:
@@ -449,7 +447,8 @@ class TaggedVariantGrid(AbstractVariantGrid):
                 tags_qs = tags_qs.filter(tag=tag)
 
         qs = get_variant_queryset_for_latest_annotation_version(genome_build)
-        qs = qs.filter(varianttag__in=tags_qs)
+        qs = qs.filter(variantallele__genome_build=genome_build,
+                       variantallele__allele__in=tags_qs.values_list("variant__variantallele__allele", flat=True))
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)

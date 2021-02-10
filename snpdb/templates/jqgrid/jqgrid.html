@@ -117,8 +117,8 @@ If we want to use jqgrid cdn, works for half
 				setRowChangeCallbacks{{ unique_code }}(grid, data["caption"])
 				
 			{% if init_func %}
-				var init_func = {{ init_func | safe }};
-                var init_kwargs = {{ init_kwargs | jsonify }};
+				let init_func = {{ init_func | safe }};
+                let init_kwargs = {{ init_kwargs | jsonify }};
 				init_func(grid, pagerId, init_kwargs);
 			{% endif %}
 

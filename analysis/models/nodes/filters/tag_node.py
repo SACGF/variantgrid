@@ -5,7 +5,7 @@ from django.db.models.query_utils import Q
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.nodes.analysis_node import Analysis, AnalysisNode
-from snpdb.models import Tag, Variant
+from snpdb.models import Tag, Variant, GenomeBuild, VariantAllele
 
 
 class TagNode(AnalysisNode):
@@ -81,3 +81,17 @@ class VariantTag(TimeStampedModel):
 
     def can_write(self, user):
         return self.analysis.can_write(user)
+
+    @staticmethod
+    def get_for_build(genome_build: GenomeBuild, variant_qs=None):
+        """ Returns tags visible within a build
+            variant_qs - set to filter - default (None) = all variants """
+        va_kwargs = {
+            "genome_build": genome_build,
+            "allele__in": VariantTag.objects.all().values_list("variant__variantallele__allele")
+        }
+        if variant_qs is not None:
+            va_kwargs["variant__in"] = variant_qs
+
+        va_qs = VariantAllele.objects.filter(**va_kwargs)
+        return VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True))
