@@ -5,7 +5,7 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, InvalidAnnotationVersionError
 from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
     GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion
@@ -143,21 +143,25 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 def _get_gene_fields():
     q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
     columns_qs = VariantGridColumn.objects.filter(q_gene).order_by("pk")
+    first_fields = ["gene_version__gene_symbol", "gene_version__gene", "gene_version__version"]
     fields = []
     for variant_column in columns_qs.values_list("variant_column", flat=True):
         gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
         if gene_column.startswith("gene__"):
             gene_column = "gene_version__" + gene_column
-        fields.append(gene_column)
+        if gene_column not in first_fields:
+            fields.append(gene_column)
 
-    return fields
+    return first_fields + fields
 
 
 class GenesGrid(JqGridUserRowConfig):
     model = ReleaseGeneVersion
-    caption = "GeneAnnotations"
+    caption = "Gene Release"
     fields = _get_gene_fields()
-    colmodel_overrides = {'id': {'hidden': True}}
+    colmodel_overrides = {
+        'gene_version__gene_symbol': {'formatter': 'geneSymbolLink'},
+    }
 
     def __init__(self, user, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)
@@ -179,7 +183,11 @@ class GenesGrid(JqGridUserRowConfig):
                 else:
                     raise PermissionDenied(f"Bad column '{column}'")
 
+        gene_annotation_version = GeneAnnotationVersion.objects.filter(gene_annotation_release_id=gene_annotation_release_id).order_by("annotation_date").last()
+        if gene_annotation_version is None:
+            raise InvalidAnnotationVersionError(f"No gene annotation version for gene_annotation_release: {gene_annotation_release_id}")
         queryset = queryset.filter(release_id=gene_annotation_release_id)
+        queryset = queryset.filter(gene_version__gene__geneannotation__version=gene_annotation_version)
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("genes_grid", kwargs={"genome_build_name": genome_build_name,
                                                         "op": JQGridViewOp.DOWNLOAD})

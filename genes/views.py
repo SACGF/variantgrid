@@ -36,7 +36,7 @@ from library.log_utils import report_exc_info
 from library.utils import defaultdict_to_dict
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
+from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample, AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
@@ -138,8 +138,14 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     has_observed_variants = False
     has_tagged_variants = False
 
-    hgnc = None
+    # There cn be multiple HGNCs per symbol (eg MMP21) - take Approved (A) over others
+    hgnc = gene_symbol.hgnc_set.order_by("status").first()
+    # Gene Summary only populated in RefSeq
     gene_summary = None
+    if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
+                                          geneversion__gene_symbol=gene_symbol).first():
+        gene_summary = refseq_gene.summary
+
     gene_versions = gene_symbol.geneversion_set.all()
     if gene_versions.exists():
         # This page is shown using the users default genome build
@@ -153,8 +159,6 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
             msg = f"This symbol is not associated with any genes in build {desired_genome_build}, viewing in build {genome_build}"
             messages.add_message(request, messages.WARNING, msg)
 
-        hgnc = gene_version.hgnc
-        gene_summary = gene_version.gene.summary
         gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build, traverse_aliases=True)
         gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
         has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
