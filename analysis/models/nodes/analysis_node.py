@@ -637,20 +637,25 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Override for optimisation """
 
         try:
-            parent = self.get_single_parent()
-            if parent.count == 0:
-                return 0  # True for all labels
+            parent_non_zero_label_counts = []
+            for parent in self.get_non_empty_parents():
+                if parent.count != 0:  # count=0 has 0 for all labels
+                    parent_node_count = NodeCount.load_for_node(parent, label)
+                    if parent_node_count.count != 0:
+                        parent_non_zero_label_counts.append(parent_node_count.count)
 
-            parent_node_count = NodeCount.load_for_node(parent, label)
-            if parent_node_count.count == 0:
+            if not parent_non_zero_label_counts:
+                # logging.info("all parents had 0 %s counts", label)
                 return 0
 
             if not self.modifies_parents():
-                return parent_node_count.count
+                if len(parent_non_zero_label_counts) == 1:
+                    # logging.info("Single parent, no modification, using that")
+                    return parent_non_zero_label_counts[0]
         except NodeCount.DoesNotExist:
             pass
         except Exception as e:
-            logging.warning(e)
+            logging.warning("Trouble getting cached %s count: %s", label, e)
 
         return None
 
@@ -685,10 +690,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         node_version = NodeVersion.get(self)
         for label, count in label_counts.items():
-            NodeCount.objects.create(node_version=node_version,
-                                     label=label,
-                                     count=count)
-            logging.debug("saved... %r, %r, %r %r", self.pk, self.version, label, count)
+            NodeCount.objects.create(node_version=node_version, label=label, count=count)
 
         return NodeStatus.READY, label_counts[BuiltInFilters.TOTAL]
 
