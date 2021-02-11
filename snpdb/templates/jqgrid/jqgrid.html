@@ -59,7 +59,8 @@ If we want to use jqgrid cdn, works for half
             url: origParams.url,
             colModel: origParams.colModel,
             colNames: origParams.colNames,
-            rowNum: -1, // all rows
+            rowNum: 0, // No paging - all rows. 0 = use maxRowNum
+            maxRowNum: Number.MAX_SAFE_INTEGER, // default=10k limit
             sortname: origParams.sortname,
             sortorder: origParams.sortorder,
         };
