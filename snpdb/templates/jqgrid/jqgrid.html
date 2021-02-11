@@ -31,9 +31,9 @@ If we want to use jqgrid cdn, works for half
 	// FIXME: Duplicated in grid.js
 	function setRowChangeCallbacks{{ unique_code }}(grid, gridName) {
 		$(".ui-pg-selbox").change(function() {
-			var gridRows = $(this).val();
-			var data = 'grid_name=' + gridName + '&grid_rows=' + gridRows;
-			$.ajax({
+            const gridRows = $(this).val();
+            const data = 'grid_name=' + gridName + '&grid_rows=' + gridRows;
+            $.ajax({
 			    type: "POST",
 			    data: data,
 			    url: '{% url 'set_user_row_config' %}',
@@ -44,10 +44,17 @@ If we want to use jqgrid cdn, works for half
 
     function downloadGridJSONAsCSV{{ unique_code }}(grid) {
         // Because the grid is paged, make a new copy of the grid to retrieve everything
-        var origParams = grid.jqGrid('getGridParam');
-        var name = origParams.caption;
-        var params = {
-            caption: "grid_data",
+        const origParams = grid.jqGrid('getGridParam');
+        let fileParts = [];
+        if (origParams.caption) {
+            let captionSlug = origParams.caption.replaceAll(" ", "_")
+            fileParts.push(captionSlug)
+        }
+        fileParts.push("grid_data")
+        let fileName = fileParts.join("_") + ".csv"
+
+        const params = {
+            caption: origParams.caption,
             datatype: "json",
             url: origParams.url,
             colModel: origParams.colModel,
@@ -57,15 +64,15 @@ If we want to use jqgrid cdn, works for half
             sortorder: origParams.sortorder,
         };
 
-        var fakeGrid = $("<table />");
+        const fakeGrid = $("<table />");
         params.gridComplete = function() {
-            var gridRowData = fakeGrid.getRowData();
-            var csv = JSON2CSV(gridRowData, true, true);
-            var downloadLink = document.createElement("a");
-            var blob = new Blob(["\ufeff", csv], {type : 'text/csv'});
-            var url = URL.createObjectURL(blob);
+            const gridRowData = fakeGrid.getRowData();
+            const csv = JSON2CSV(gridRowData, true, true);
+            const downloadLink = document.createElement("a");
+            const blob = new Blob(["\ufeff", csv], {type: 'text/csv'});
+            const url = URL.createObjectURL(blob);
             downloadLink.href = url;
-            downloadLink.download = params.caption + ".csv";
+            downloadLink.download = fileName;
             
             document.body.appendChild(downloadLink);
             downloadLink.click();
@@ -79,18 +86,18 @@ If we want to use jqgrid cdn, works for half
 	function setupJQGrid{{ unique_code }}() {
 		$(function () {
 	    	$.getJSON("{{ jqgrid_config_url }}", function(data) {
-			    var grid = $("#{{ grid_id }}");
-				var pagerId = '#{{ pager_id }}';
+			    const grid = $("#{{ grid_id }}");
+			    const pagerId = '#{{ pager_id }}';
 			    data["pager"] = pagerId;
 
 			{% if grid_complete %}
-				var grid_complete = {{ grid_complete | safe }};
+				let grid_complete = {{ grid_complete | safe }};
 				data["gridComplete"] = grid_complete;
 			{% endif %}
 
 			{% block set_grid_data %}
                 {% if jqgrid_config_get_parameters_func %}
-                    var jqgrid_config_get_parameters_func = {{ jqgrid_config_get_parameters_func | safe }};
+                    let jqgrid_config_get_parameters_func = {{ jqgrid_config_get_parameters_func | safe }};
                     data["url"] += "?" + jqgrid_config_get_parameters_func();
                 {% endif %}
 			{% endblock %}
@@ -124,14 +131,14 @@ If we want to use jqgrid cdn, works for half
 
 			{% if search %}
 		        // Make search always appear
-				var searchOptions = {multipleSearch:true,overlay:false,drag:false};
-		        grid.searchGrid(searchOptions);
+                const searchOptions = {multipleSearch: true, overlay: false, drag: false};
+                grid.searchGrid(searchOptions);
 				// find the div which contain the searching dialog
-				var searchDialog = $("#searchmodfbox_"+grid[0].id);    
-			    searchDialog.addClass("ui-jqgrid ui-widget ui-widget-content ui-corner-all");
-			    searchDialog.css({position:"relative", "z-index":"auto", "float":"left"})    
-			    var gbox = $("#{{ gbox_id }}");
-			    gbox.before(searchDialog);
+                const searchDialog = $("#searchmodfbox_" + grid[0].id);
+                searchDialog.addClass("ui-jqgrid ui-widget ui-widget-content ui-corner-all");
+			    searchDialog.css({position:"relative", "z-index":"auto", "float":"left"})
+                const gbox = $("#{{ gbox_id }}");
+                gbox.before(searchDialog);
 			    gbox.css({clear:"left"});
 				// Hide close button
 				searchDialog.find(".ui-jqdialog-titlebar-close").hide();
@@ -139,7 +146,7 @@ If we want to use jqgrid cdn, works for half
 			{% endif %}
 
             {% if download_grid_json_as_csv %}
-                var downloadGridJSONAsCSV = function() {
+                const downloadGridJSONAsCSV = function () {
                     downloadGridJSONAsCSV{{ unique_code }}(grid);
                 };
 
@@ -152,24 +159,26 @@ If we want to use jqgrid cdn, works for half
                             cursor : "pointer"
                 });
             {% else %}
-				var base_grid_export_url = data["grid_export_url"];
-				if (base_grid_export_url) {
-                    var exportGrid = function() {
+                const base_grid_export_url = data["grid_export_url"];
+                if (base_grid_export_url) {
+                    const exportGrid = function() {
                         grid_export_url = base_grid_export_url;
                         {% if modify_export_url %}
-                        var modify_export_url = {{ modify_export_url | safe }};
-                        grid_export_url = modify_export_url(grid_export_url); 
+                        let modify_export_url = {{ modify_export_url | safe }};
+                        grid_export_url = modify_export_url(grid_export_url);
                         {% endif %}
                         window.location = grid_export_url;
                     };
-				
-					var exportParams = {caption : "Download",
-				            			buttonicon : "ui-icon-arrowthickstop-1-s",
-				            			onClickButton : exportGrid,
-				            			position : "first",
-				            			title : "Export",
-				            			cursor : "pointer"}
-					grid.jqGrid('navButtonAdd', pagerId, exportParams);
+
+                    const exportParams = {
+                        caption: "Download",
+                        buttonicon: "ui-icon-arrowthickstop-1-s",
+                        onClickButton: exportGrid,
+                        position: "first",
+                        title: "Export",
+                        cursor: "pointer"
+                    };
+                    grid.jqGrid('navButtonAdd', pagerId, exportParams);
 				}
 			{% endif %}
 		    });
