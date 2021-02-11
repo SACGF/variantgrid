@@ -70,7 +70,6 @@ def main(args):
     # Write merge script
     merge_script_filename = f"gnomad_{genome_build}_merge.sh"
 
-
     vcf_header = write_vcf_header()
 
     with open(merge_script_filename, "w") as ms:

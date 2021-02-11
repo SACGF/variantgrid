@@ -27,4 +27,3 @@ class AbstractOntologyGenesGrid(DataFrameJqGrid, abc.ABC):
         gene_dict = {k: {t: ", ".join(sorted(term_set)) for t, term_set in v.items()} for k, v in gene_terms_set.items()}
         df = pd.DataFrame.from_dict(gene_dict, orient='index')
         return df.sort_index()
-
