@@ -160,7 +160,6 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         return non_gene_fields
 
 
-
 def _get_gene_fields():
     q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
     columns_qs = VariantGridColumn.objects.filter(q_gene).order_by("pk")
