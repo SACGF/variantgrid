@@ -11,6 +11,7 @@ from dateutil import parser
 from decimal import Decimal
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
+from django.db import models
 from enum import Enum
 from itertools import islice
 from json.encoder import JSONEncoder
@@ -538,3 +539,11 @@ class Constant:
         return self.value
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.value)
+
+
+class ArrayLength(models.Func):
+    """
+    Can annotate with array length now e.g.
+    MyModel.objects.all().annotate(field_len=ArrayLength('field')).order_by('field_len')
+    """
+    function = 'CARDINALITY'

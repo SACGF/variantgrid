@@ -406,6 +406,13 @@ class OntologySnake:
                 for relation in all_relations:
                     if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
                         other_term = relation.other_end(snake.leaf_term)
+                        # not going to find hgnc link via HPO
+                        # but would be better to exclude them all together, but really difficult with the
+                        # directional relationships
+                        if to_ontology == OntologyService.HGNC:
+                            if other_term.ontology_service == OntologyService.HPO:
+                                continue
+
                         new_snake = snake.snake_step(relation)
                         if other_term.ontology_service == to_ontology:
                             valid_snakes.append(new_snake)

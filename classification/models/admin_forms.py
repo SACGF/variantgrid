@@ -488,15 +488,13 @@ class ConditionTextStatusFilter(admin.SimpleListFilter):
 
 class ConditionTextAdmin(ModelAdminBasics):
     search_fields = ('id', 'normalized_text')
-    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding", "min_auto_match_score"]
+    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding"]
     list_filter = [ConditionTextStatusFilter, ClassificationLabFilter]
 
     def auto_match(self, request, queryset):
         condition_text: ConditionText
         for condition_text in queryset:
             ConditionTextMatch.attempt_automatch(condition_text=condition_text, force=True, server_search=True)
-            self.message_user(request, message=f"Automatching of {condition_text.normalized_text} resulted in min score of {condition_text.min_auto_match_score} matching {condition_text.classification_match_count}",
-                              level=messages.INFO)
 
     auto_match.short_description = "Automatch (overwrite existing data)"
     actions = [auto_match]

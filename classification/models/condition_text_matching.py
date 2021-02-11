@@ -10,12 +10,13 @@ from model_utils.models import TimeStampedModel
 from django.db import models, transaction
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
-    flag_types
+    flag_types, EvidenceKey, EvidenceKeyMap
 from classification.regexes import db_ref_regexes, DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
+from ontology.models import OntologyTerm
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text
 from snpdb.models import Lab
 
@@ -23,10 +24,6 @@ from snpdb.models import Lab
 class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     normalized_text = models.TextField()
     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
-
-    # set to true if root condition text was set by auto-matching
-    last_edited_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True)
-    min_auto_match_score = models.IntegerField(default=0)
 
     classifications_count = models.IntegerField(default=0)
     classifications_count_outstanding = models.IntegerField(default=0)
@@ -52,7 +49,6 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     def clear(self):
         self.conditiontextmatch_set.update(condition_xrefs=list(), condition_multi_operation=MultiCondition.NOT_DECIDED)
         self.last_edited_by = None
-        self.min_auto_match_score = 0
         self.classifications_count_outstanding = self.classifications_count
         self.save()
 
@@ -62,8 +58,8 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     @property
     def user_edited(self) -> bool:
-        #todo test exact=[]
-        return not (self.last_edited_by and self.last_edited_by != admin_bot() or self.conditiontextmatch_set.exclude(condition_xrefs__exact=list()).count() == 0)
+        # TODO annotate with array length rather than checking exist list
+        return self.conditiontextmatch_set.exclude(condition_xrefs__exact=list()).exclude(last_edited_by=admin_bot()).count() == 0
 
     @property
     def root(self) -> 'ConditionTextMatch':
@@ -82,18 +78,31 @@ class MultiCondition(models.TextChoices):
 
 class ResolvedCondition:
 
-    def __init__(self):
+    def __init__(self, search_term: Optional[str], gene_symbol: Optional[str]):
         self.condition_multi_operation = MultiCondition.NOT_DECIDED
-        self.condition_xrefs = OntologyMatching()
+        self.condition_xrefs = OntologyMatching(search_term=search_term, gene_symbol=gene_symbol)
 
 
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     condition_text = models.ForeignKey(ConditionText, on_delete=CASCADE)
+    last_edited_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True)
 
     parent = models.ForeignKey('ConditionTextMatch', on_delete=CASCADE, null=True, blank=True)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE, null=True, blank=True)
     mode_of_inheritance = ArrayField(models.TextField(blank=False), default=None, null=True, blank=True)
     classification = models.OneToOneField(Classification, on_delete=CASCADE, null=True, blank=True)
+
+    @property
+    def name(self):
+        if self.classification:
+            return self.classification.friendly_label
+        if self.mode_of_inheritance:
+            e_key = EvidenceKeyMap.cached_key(SpecialEKeys.MODE_OF_INHERITANCE)
+            return e_key.pretty_value(self.mode_of_inheritance)
+        if self.gene_symbol:
+            return self.gene_symbol.symbol
+        return "Default"
+
 
     @classmethod
     def get_permission_object(self):
@@ -115,13 +124,33 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return h_list
 
     @property
+    def is_root(self):
+        return not self.gene_symbol
+
+    @property
+    def is_gene_level(self):
+        # just used for templates
+        return not self.classification_id and self.mode_of_inheritance is None and self.gene_symbol_id is not None
+
+    @lazy
+    def classification_count(self):
+        if self.classification_id:
+            return 1
+        elif self.mode_of_inheritance:
+            return self.condition_text.conditiontextmatch_set.filter(parent=self).count()
+        elif self.gene_symbol_id:
+            return self.condition_text.conditiontextmatch_set.filter(classification_id__isnull=False, gene_symbol__pk=self.gene_symbol_id).count()
+        else:
+            return self.condition_text.conditiontextmatch_set.filter(classification_id__isnull=False).count()
+
+    @property
     def leaf(self) -> Optional[Any]:
         if self.classification:
             return self.classification
-        elif self.gene_symbol:
-            return self.gene_symbol
         elif self.mode_of_inheritance is not None:
             return self.mode_of_inheritance
+        elif self.gene_symbol:
+            return self.gene_symbol
         else:
             return None
 
@@ -131,6 +160,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @lazy
     def resolve_condition_xrefs(self) -> Optional[ResolvedCondition]:
+        """
+        Return the effective terms for this element
+        If no terms have been set for this match, check the parent match
+        """
         if not self.condition_xrefs:
             if not self.parent:
                 return None
@@ -145,6 +178,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @property
     def condition_matching_str(self) -> str:
+        """
+        Produce a single efficient line on what this condition text match is, e.g.
+        MONDO:00001233; MONDO:0553533; co-occurring
+        """
         result = ''
         if self.condition_xrefs:
             result = ", ".join(self.condition_xrefs)
@@ -158,6 +195,11 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return result
 
     def update_with_condition_matching_str(self, text: str):
+        """
+        Update teh condition text match with a single line of text e.g.
+        MONDO:00001233; MONDO:0553533; co-occurring
+        So the inverse of condition_matching_str
+        """
         terms = list()
         condition_multi_operation = MultiCondition.NOT_DECIDED
 
@@ -191,6 +233,16 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return len(self.condition_xrefs) == 1 or \
                (len(self.condition_xrefs) > 1 and self.condition_multi_operation != MultiCondition.NOT_DECIDED)
 
+    @lazy
+    def condition_xref_terms(self) -> List[OntologyTerm]:
+        terms = list()
+        for term_str in self.condition_xrefs:
+            try:
+                terms.append(OntologyTerm.get_or_stub(term_str))
+            except ValueError:
+                pass
+        return terms
+
     @property
     def is_blank(self):
         return len(self.condition_xrefs) == 0
@@ -201,6 +253,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @staticmethod
     def sync_all(force=False):
+        """
+        syncs ConditionTextMatch's to Classifications
+        """
         cms = ClassificationModification.objects.filter(is_last_published=True, classification__withdrawn=False).select_related("classification", "classification__lab")
         cm: ClassificationModification
         for cm in cms:
@@ -229,31 +284,24 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 if root := condition_text.root:
                     if top_values[0].score > 100:
                         root.condition_xrefs = [match.term.id for match in top_values]
+                        root.last_edited_by = admin_bot()
                         root.save()
-                        condition_text.min_auto_match_score = int(top_values[0].score)
                         condition_text.save()
             else:
-                min_score = float('inf')
                 for gene_level in condition_text.gene_levels:
                     gene_matches = OntologyMatching.from_search(search_text=text, gene_symbol=gene_level.gene_symbol.symbol, server_search=server_search)
                     if top_value := gene_matches.only_top_term():
                         if top_value.score >= 98:
                             gene_level.condition_xrefs = [top_value.term.id]
                             gene_level.save()
-                        min_score = min(min_score, top_value.score)
                     elif top_values := gene_matches.top_terms():
                         # but we had a duplicate, so as great as the score is, it doesn't count
-                        min_score = min(min_score, top_values[0].score)
+                        pass
 
-                if min_score == float('inf'):
-                    min_score = 0
-
-                condition_text.min_auto_match_score = int(min_score)
                 condition_text.save()
         finally:
             update_condition_text_match_counts(condition_text)
             condition_text.save()
-
 
 
     @staticmethod

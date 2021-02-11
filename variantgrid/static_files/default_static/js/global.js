@@ -746,3 +746,14 @@ function showReloadPageErrorDialog(selector, message, allowClose) {
         buttons: buttons,
     });
 }
+
+function severityIcon(severity) {
+    let first = severity.toUpperCase()[0];
+    switch (first) {
+        case 'C': return $('<i class="fas fa-bomb text-danger"></i>'); // critical
+        case 'E': return $('<i class="fas fa-exclamation-circle text-danger"></i>'); // error
+        case 'W': return $('<i class="fas fa-exclamation-triangle text-warning"></i>'); // warning
+        case 'I': return $('<i class="fas fa-info-circle text-info"></i>'); // info
+        default: return $(severity);
+    }
+}

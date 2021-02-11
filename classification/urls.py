@@ -5,7 +5,8 @@ from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, classification_import_upload_view, \
     classification_accumulation_graph
 from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
-from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, ConditionTextColumns
+from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
+    ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.clinvar_export_view import clinvar_exports_view, \
     clinvar_export_review_view, ClinVarExportColumns
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
@@ -113,6 +114,8 @@ rest_urlpatterns = [
 
     perm_path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
               name='lab_gene_classification_counts_api'),
+
+    perm_path('api/condition_text_matching/<int:pk>', ConditionTextMatchingAPI.as_view(), name='condition_text_matching_api')
 ]
 
 urlpatterns += format_suffix_patterns(rest_urlpatterns)
