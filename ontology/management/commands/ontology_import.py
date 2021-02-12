@@ -439,7 +439,7 @@ def load_omim(filename: str, force: bool):
         filename=filename,
         context="omim_file",
         import_source=OntologyImportSource.OMIM,
-        processor_version=2,
+        processor_version=3,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -485,7 +485,7 @@ def load_omim(filename: str, force: bool):
                 preferred_title = f"obsolete, see OMIM:{moved_to}"
             else:
                 aliases.append(preferred_title)
-                aliases += [term for term in [term.strip() for term in (preferred_title + " " + alternative_terms).split(";")] if term]
+                aliases += [term for term in [term.strip() for term in (preferred_title + ";" + alternative_terms).split(";")] if term]
 
             extras = {"type": omim_type}
             if included_titles:
