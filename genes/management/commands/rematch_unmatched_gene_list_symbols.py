@@ -13,7 +13,7 @@ class Command(BaseCommand):
             gene_symbol_id, alias_id = gsm.get_gene_symbol_id_and_alias_id(glgs.original_name)
             if gene_symbol_id:
                 glgs.gene_symbol_id = gene_symbol_id
-                glgs.gene_symbol_alias = alias_id
+                glgs.gene_symbol_alias_id = alias_id
                 modified_records.append(glgs)
             else:
                 num_unmatched += 1
