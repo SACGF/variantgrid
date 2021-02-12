@@ -492,10 +492,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_errors(self, include_parent_errors=True, flat=False):
         """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
         errors = []
-        try:
-            self.analysis.check_valid()
-        except ValueError as ve:
-            errors.append((NodeErrorSource.ANALYSIS, str(ve)))
+        for analysis_error in self.analysis.get_errors():
+            errors.append((NodeErrorSource.ANALYSIS, analysis_error))
+
         _, parent_errors = self.get_parents_and_errors()
         if include_parent_errors:
             errors.extend(parent_errors)

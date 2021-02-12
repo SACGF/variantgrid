@@ -72,9 +72,10 @@
     analysisNodeVariables = {}; // { node_id: fields: Set()}
 
 	function loadInitialGridEditor() {
+    {% if analysis.get_errors or analysis.get_warnings %}
 	    let loadFinishedFunc = analysisSettings;
-	{% if analysis.is_valid %}
-		loadFinishedFunc = function() {
+	{% else %}
+		let loadFinishedFunc = function() {
 			loadNodeData();
 			let activeNodeId = 0;
 		{% if active_node_id %}
@@ -198,7 +199,7 @@
                     <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"></a>
                     <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"></a>
                 {% endif %}
-                    <a id="settings-button" class="toolbar-button" href="javascript:analysisSettings()" title="Analysis Settings"></a>
+                    <a class="toolbar-button settings-icon" href="javascript:analysisSettings()" title="Analysis Settings"></a>
                     <a href="javascript:viewTags()" class='left no-link-style' title="Tags">
                         <span id="view-tags-button" class="toolbar-button"></span>
                         <span id="number-of-tags"></span>

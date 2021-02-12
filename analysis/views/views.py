@@ -43,7 +43,7 @@ from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
 from analysis.views.nodes.node_view import NodeView
-from annotation.models.models import MutationalSignatureInfo
+from annotation.models.models import MutationalSignatureInfo, InvalidAnnotationVersionError, AnnotationVersion
 from classification.views.views import create_classification_object, CreateClassificationForVariantView
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
@@ -122,7 +122,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
                "node_help": node_help_dict,
                "analysis_variables": analysis_variables,
                "has_write_permission": analysis.can_write(request.user),
-               "warnings": analysis.get_warnings(request.user),
+               "warnings": analysis.get_toolbar_warnings(request.user),
                "ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED": settings.ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED}
     return render(request, 'analysis/analysis.html', context)
 
@@ -642,9 +642,12 @@ def analysis_settings_details_tab(request, analysis_id):
                 analysis.save()
 
             add_save_message(request, valid, "Analysis Settings")
-    else:
-        if analysis.annotation_version is None:
-            messages.add_message(request, messages.ERROR, "Analysis setting 'annotation_version' is required.")
+
+    for error in analysis.get_errors():
+        messages.add_message(request, messages.ERROR, error)
+
+    for warning in analysis.get_warnings():
+        messages.add_message(request, messages.WARNING, warning)
 
     analysis_settings = get_analysis_settings(request.user, analysis)
     context = {"analysis": analysis,
