@@ -3,12 +3,13 @@ from django.contrib import messages
 from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
+from numpy.random.mtrand import normal
 
 from classification.models import ConditionTextMatch, ConditionText
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
-from ontology.ontology_matching import OntologyMatching, SearchText
+from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 from snpdb.models import Lab
 
 
@@ -87,16 +88,20 @@ def condition_match_test_view(request):
     gene_symbol_str = request.GET.get("gene_symbol")
     auto_matches = list()
     attempted = False
+    suggestion = None
 
-    valid = True
+    valid = False
     if condition_text:
+        valid = True
         if gene_symbol_str:
             gene_symbol = GeneSymbol.objects.filter(symbol=gene_symbol_str).first()
             if not gene_symbol:
                 messages.add_message(request, messages.WARNING, f"Could not find Gene Symbol '{gene_symbol_str}'")
                 valid = False
     if valid:
-        auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
+        #auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
+        auto_matches = None
+        suggestion = OntologyMatching.find_exact_match(normalize_condition_text(condition_text), fallback_to_online=True)
         attempted = True
 
     context = {
@@ -104,6 +109,7 @@ def condition_match_test_view(request):
         "search_text": SearchText(condition_text) if condition_text else None,
         "gene_symbol": gene_symbol_str,
         "auto_matches": auto_matches,
+        "suggestion": suggestion,
         "attempted": attempted
     }
 

@@ -118,11 +118,18 @@ class SearchText:
         return ROMAN.get(numeral, numeral)
 
     @staticmethod
-    def tokenize_condition_text(text: str) -> Set[str]:
+    def tokenize_condition_text(text: str, deplural=False) -> Set[str]:
         if text is None:
             return set()
         text = text.replace(";", " ").replace("-", " ").lower()
         tokens = [token.strip() for token in text.split(" ")]
+        if deplural:
+            new_tokens = list()
+            for token in tokens:
+                if len(token) >= 5 and token.endswith('s'):  #make sure 5 or more characters long so not acronymn
+                    token = token[0:-1]
+                new_tokens.append(token)
+            tokens = new_tokens
         return tokens
 
     def __init__(self, text: str):
@@ -137,11 +144,11 @@ class SearchText:
             self.prefix = sub_type_match.group(1).strip()
             self.suffix = sub_type_match.group(2).strip()
 
-            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
+            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deplural=True)) - PREFIX_SKIP_TERMS
             self.suffix_terms = set(SearchText.roman_to_arabic(term) for term in SearchText.tokenize_condition_text(self.suffix)) - SUFFIX_SKIP_TERMS
         else:
             self.prefix = normal_text
-            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix)) - PREFIX_SKIP_TERMS
+            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deplural=True)) - PREFIX_SKIP_TERMS
 
     @property
     def prefix_terms_display(self) -> str:
@@ -149,12 +156,25 @@ class SearchText:
 
     @property
     def suffix_terms_display(self):
-        # TODO make these django filters
         return ", ".join(sorted(list(self.suffix_terms)))
 
     @property
     def all_terms(self) -> Set[str]:
         return self.prefix_terms.union(self.suffix_terms)
+
+    def matches(self, term: OntologyTerm):
+        if name := term.name:
+            if SearchText(name).effective_equals(self):
+                return True
+        if aliases := term.aliases:
+            for alias in aliases:
+                if SearchText(alias).effective_equals(self):
+                    return True
+        return False
+
+    def effective_equals(self, other: 'SearchText') -> bool:
+        # TODO handle a little bit off by 1 letter matching
+        return self.prefix_terms == other.prefix_terms and self.suffix_terms == other.suffix_terms
 
 
 def pretty_set(s: Iterable[str]) -> str:
@@ -176,6 +196,49 @@ def normalize_condition_text(text: str):
 
 
 class OntologyMatching:
+
+    @staticmethod
+    def find_exact_match(text: str, fallback_to_online: bool = False):
+        match_text = SearchText(text)
+        q = list()
+        # TODO, can we leverage phenotype matching?
+        for term in match_text.prefix_terms:
+            if len(term) > 2:
+                # TODO evaluate if it was worth it comparing aliases
+                q.append(Q(name__icontains=term) | Q(aliases__icontains=term))
+        # don't bother with searching for suffix, just find them all and see how we go with the matching
+        if q:
+            checked = 0
+            for term in OntologyTerm.objects.filter(ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}).filter(reduce(operator.and_, q))[0:100]:
+                checked += 1
+                if match_text.matches(term):
+                    print(f"Checked {checked} matches, found a match")
+                    return term
+            print(f"Checked {checked} matches, found nothing")
+
+        if fallback_to_online:
+            try:
+                # TODO ensure "text" is safe, it should already be normalised
+                results = requests.get(
+                    f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
+                        "prefix": "MONDO",
+                        "rows": 10,
+                        "minimal_tokenizer": "false",
+                        "category": "disease"
+                    }).json().get("docs")
+
+                for result in results:
+                    o_id = result.get('id')
+                    # result.get('label') gives the label as it's known by the search server
+                    term = OntologyTerm.get_or_stub(o_id)
+                    if match_text.matches(term):
+                        print(f"Found exact match via server")
+                        return term
+            except:
+                print("Error searching server")
+        return None
+
+
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
         self.term_map: Dict[str, OntologyMatch] = dict()
