@@ -431,7 +431,7 @@ class OntologySnake:
         return OntologySnakes(valid_snakes)
 
     @staticmethod
-    def terms_for_gene_symbol(gene_symbol: GeneSymbol, desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
+    def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
         """
         Important, this will NOT trigger PanelApp, to do that first call
         panel_app_ontology.update_gene_relations

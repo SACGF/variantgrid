@@ -4,6 +4,7 @@
 {% load ui_menu_bars %}
 {% load ui_help %}
 {% load ui_utils %}
+{% load js_tags %}
 {% block title %}Condition Matching{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -61,6 +62,7 @@
                     {% labelled label="Can auto-assign (without confirmation)" %}{{ suggestion.is_auto_assignable }}{% endlabelled %}
                     {% if suggestion.terms %}
                         {% labelled label="Is leaf term" %}{{ suggestion.is_leaf }}{% endlabelled %}
+                        {% labelled label="Is obsolete" %}{{ suggestion.is_obsolete }}{% endlabelled %}
                     {% endif %}
                     {% if suggestion.alias_index %}
                         {% labelled label="OMIM index found in" %}{{ suggestion.alias_index }}{% endlabelled %}
@@ -82,23 +84,15 @@
                 </thead>
                 {% for auto_match in auto_matches %}
                     <tr>
-                        <td width="30%">{{ auto_match.term.id }}<br/>
+                        <td><a href="{{ term.url }}" target="_blank" class="hover-link">{{ auto_match.term.id }}</a><br/>
                             {{ auto_match.term.name }}
                             {% if auto_match.term.definition %}<br/><span class="text-muted wy-text-small">{{ auto_match.term.definition }}</span>{% endif %}
                         </td>
-                        <td>
-                            <div class="row mb-1">
-                                <div class="col-1 text-right text-monospace border-bottom" style="font-weight: bold">
-                                    {{ auto_match.score | floatformat:0 }}
-                                </div>
-                                <div class="col-11"></div>
-                            </div>
-                            {% for part in auto_match.scores %}
-                                <div class="row mb-1">
-                                    <div class="col-1 text-right text-monospace">{{ part.score | floatformat:0 }}</div>
-                                    <div class="col-11">{{ part.name }} : <span class="text-secondary">{{ part.note }} - <span style="font-size:small">{{ part.percent | floatformat:0 }}% of {{ part.max | floatformat:0 }}</span></span></div>
-                                </div>
-                            {% endfor %}
+                        <td width="200px">
+                            {% if auto_match.gene_relationships %}<div>Gene Matches</div>{% endif %}
+                            {% if auto_match.direct_reference %}<div>Embedded ID</div>{% endif %}
+                            {% if auto_match.text_search %}<div>Text Search</div>{% endif %}<br/>
+                            {% if auto_match.term.is_obsolete %}<div>Obsolete</div>{% endif %}<br/>
                         </td>
                     </tr>
                 {% endfor %}

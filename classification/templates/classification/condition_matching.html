@@ -12,17 +12,14 @@
         tr.selected {
             background-color: #ccffcc;
         }
-        .condition-match-input::placeholder {
-            color: #bbb;
-        }
         .toggle-cell {
             width: 100px;
         }
         .term-cell {
-            width: 200px;
+            width: 300px;
         }
         .relevance-cell {
-            width: 300px;
+            width: 250px;
         }
     </style>
     <script>
@@ -37,7 +34,7 @@
             let id = $('#mp-id').val();
 
             let selectedText = $('#mp-selected').val();
-            let {terms, _} = parseTermText(selectedText);
+            let {terms, __} = parseTermText(selectedText);
 
             let finalText = terms.join(", ");
             let mode = 'N';
@@ -58,7 +55,7 @@
             let join = 'N';
 
             let parts = text.split(";");
-            if (parts.length == 2) {
+            if (parts.length === 2) {
                 termText = parts[0].trim();
                 join = parts[1].trim().toLowerCase();
                 if (join.includes('/')) {
@@ -113,9 +110,10 @@
         function ontologyTr(onto) {
             let row = $('<tr>', {id: `result-${idSafe(onto.id)}`, class: 'onto-row'});
             let toggleButton = $('<button>', {class:'btn btn-outline-primary', text:'Toggle'}).click(() => {
-                let fullText = $('#mp-selected').val();
+                let mpSelected = $('#mp-selected');
+                let fullText = mpSelected.val();
                 let newText = toggleTerm(fullText, onto.id);
-                $('#mp-selected').val(newText);
+                mpSelected.val(newText);
                 updateOntoRowSelections();
             });
 
@@ -313,7 +311,7 @@
             }
             if (suggestion.messages && suggestion.messages.length) {
                 for (let message of suggestion.messages) {
-                    let messageDom = $('<div>', {html:[
+                    $('<div>', {html:[
                             severityIcon(message.severity),
                             ' ',
                             message.text
@@ -326,8 +324,8 @@
         function checkSuggestionCount() {
             let checkedCount = $('.suggestion-checkbox:checked').parents('.condition-match-placeholder').length;
             let button = $('#approve-suggestions');
-            button.text(`Approve ${checkedCount} suggestion${checkedCount == 1 ? '' : 's'}`);
-            if (checkedCount == 0) {
+            button.text(`Approve ${checkedCount} suggestion${checkedCount === 1 ? '' : 's'}`);
+            if (checkedCount === 0) {
                 button.hide();
             } else {
                 button.show();
@@ -441,14 +439,15 @@
                 let geneSymbol = mondoButton.attr('data-gene-symbol');
                 let label = mondoButton.attr('data-label');
                 let inheritance = mondoButton.attr('data-mode-of-inheritance');
-                if (geneSymbol == '') {
+                if (geneSymbol === '') {
                     $('#mp-gene-symbol').text('-').addClass('no-value');
                 } else {
                     $('#mp-gene-symbol').text(geneSymbol).removeClass('no-value');
                 }
                 let recordId = $(this).attr('data-id');
-                let selected = $(`#condition-match-${recordId}`).attr('data-terms');
-                let joiner = $(`#condition-match-${recordId}`).attr('data-join');
+                let conditionMatch = $(`#condition-match-${recordId}`);
+                let selected = conditionMatch.attr('data-terms');
+                let joiner = conditionMatch.attr('data-join');
                 // let parsedMatch = parseTermText(selected);
                 $(`[name=mp-multimode][value=${joiner}]`).trigger('click');
 
@@ -456,9 +455,9 @@
                 $('#mp-search-text').val(`{{ condition_text.normalized_text }}`.trim());
                 $('#mp-selection-title').text(label);
                 $('#mp-selected').val(selected);
-                if (inheritance == 'N/A') {
+                if (inheritance === 'N/A') {
                     $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'N/A'}));
-                } else if (inheritance == 'None') {
+                } else if (inheritance === 'None') {
                     $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'Not Specified'}));
                 } else {
                     $('#mp-mode-of-inheritance').text(inheritance);
@@ -492,7 +491,7 @@
                 <div class="modal-body">
                     <input id="mp-id" type="hidden" />
 
-                    {% labelled label="Terms" %}<input class="form-control" id="mp-selected" />{% endlabelled %}
+                    {% labelled label="Selected Terms" %}<input class="form-control" id="mp-selected" style="border-color:#444466"/>{% endlabelled %}
                     {% labelled label="Mutli-Mode" %}
                         <div id="mp-multimode" >
                             <div class="btn-group btn-group-toggle" data-toggle="buttons">
@@ -531,7 +530,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="submitUserChoices()">Save Changes</button>
+                    <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="submitUserChoices()">Save Selected Terms</button>
                 </div>
             </div>
         </div>
@@ -548,8 +547,10 @@
                     Help will go here for matching text to conditions
                 </p>
             {% end_page_help_embedded %}
+            {% comment %}
             {% labelled label="Lab" %}{{ condition_text.lab.name }}{% endlabelled %}
             {% labelled label="Text" %}{{ condition_text.normalized_text }}{% endlabelled %}
+            {% endcomment %}
             <ul id="condition-list" class="list-group mt-4">
                 {% condition_match condition_match %}
             </ul>

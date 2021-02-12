@@ -18,7 +18,7 @@
                     {% endif %}
                 </div>
             {% else %}
-                <span title="Default for condition text" data-toggle="tooltip" class="hover-detail"><label>Default</label></span>
+                <span title="Default for condition text" data-toggle="tooltip" class="hover-detail">{{ condition_match.condition_text.normalized_text }}</span>
             {% endif %}
         </div>
         <div class="col-6">
@@ -35,7 +35,7 @@
                 class="btn btn-outline-primary btn-rnd-rect mondo-picker"
                 data-mode-of-inheritance="{% if condition_match.mode_of_inheritance is not None %}{{ condition_match.mode_of_inheritance | ekey:"mode_of_inheritance" }}{% else %}N/A{% endif %}"
                 data-gene-symbol="{{ condition_match.gene_symbol | default_if_none:'' }}"
-                data-label="{{ condition_match.leaf }}"
+                data-label="{{ condition_match.leaf | default_if_none:'Default' }}"
                 data-id="{{ condition_match.id }}">
             <i class="fas fa-edit"></i></button></span>
         </div>
