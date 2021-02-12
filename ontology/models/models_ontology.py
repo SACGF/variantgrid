@@ -8,6 +8,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import PROTECT, CASCADE, QuerySet, Q, F
 from django.urls import reverse
+from lazy import lazy
 from model_utils.models import TimeStampedModel, now
 
 from genes.models import GeneSymbol
@@ -150,6 +151,13 @@ class OntologyTerm(TimeStampedModel):
         if self.name:
             return "obsolete" in self.name.lower()
         return False
+
+    @lazy
+    def is_leaf(self) -> bool:
+        # Warning, just meant to be called on MONDO terms
+        if not self.is_stub and self.ontology_service == OntologyService.MONDO:
+            return not OntologyTermRelation.children_of(self).exists()
+        return True
 
     @property
     def url_safe_id(self):

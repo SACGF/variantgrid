@@ -20,7 +20,7 @@
                     {% else %}<div class="no-value">-</div>{% endif %}
                 {% endlabelled %}
                 {% if term.aliases %}
-                    {% labelled label="Aliases" %}{{ term.aliases | jsonify_pretty }}{% endlabelled %}
+                    {% labelled label="Aliases" %}{% for alias in term.aliases %}{{ alias }}<br/>{% endfor %}{% endlabelled %}
                 {% endif %}
                 {% labelled label="URL" %}
                     <a href="{{ term.url }}" class="external-link hover-link">{{ term.url }}</a>

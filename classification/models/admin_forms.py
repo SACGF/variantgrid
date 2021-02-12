@@ -501,7 +501,7 @@ class ConditionTextAdmin(ModelAdminBasics):
 
 
 class ConditionTextMatchAdmin(ModelAdminBasics):
-    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "created"]
+    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "created", "last_edited_by"]
 
 
 class ClinVarExportAdmin(ModelAdminBasics):

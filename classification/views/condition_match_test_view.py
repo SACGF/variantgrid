@@ -3,72 +3,44 @@ from django.contrib import messages
 from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
-from numpy.random.mtrand import normal
-
-from classification.models import ConditionTextMatch, ConditionText
+from classification.models import ConditionText
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
-from snpdb.models import Lab
 
 
 def condition_match_test_download_view(request):
-    max_count = 10
-    try:
-        if row_count_str := request.POST.get("row_count"):
-            max_count = int(row_count_str)
-    except ValueError:
-        pass
+    check_sever = request.POST.get("external_search") == "True"
 
     def result_iterator():
         try:
             row_count = 0
             yield delimited_row([
-                "id", "classification_count", "lab", "text", "gene_symbol", "tied_top_matches", "top_matches (max 5)", "score", "status"
+                "id", "classification_count", "lab", "text", "suggestion", "auto-assignable", "found_externally"
             ])
 
             ct: ConditionText
             for ct in ConditionText.objects.annotate(text_len=Length('normalized_text'))\
                               .filter(text_len__gte=3)\
-                              .filter(lab__group_name='ch_westmead/lab_1')\
                               .select_related('lab')\
-                              .order_by('-classifications_count')[0:max_count]:
-                ctm: ConditionTextMatch
-                for ctm in ct.gene_levels:
-                    from_search = OntologyMatching.from_search(search_text=ct.normalized_text, gene_symbol=ctm.gene_symbol.symbol)
-                    top = from_search.top_terms()
-                    classification_count = ConditionTextMatch.objects.filter(
-                        condition_text=ctm.condition_text,
-                        gene_symbol=ctm.gene_symbol,
-                        classification__isnull=False
-                    ).count()
+                              .order_by('-classifications_count'):
 
-                    best_matches_count = len(top)
-                    if best_matches_count > 0:
-                        status = "manual"
-                        top_score = int(top[0].score)
-                        if best_matches_count == 1:
-                            if top_score >= 100:
-                                status = "auto"
-                            elif top_score >= 98:
-                                status = "review"
+                suggestion = OntologyMatching.top_level_suggestion(ct.normalized_text, fallback_to_online=check_sever)
+                term_text = ""
+                if terms := suggestion.terms:
+                    term_text = "\t".join([f"{term.id} : {term.name}" for term in terms])
 
-                        yield delimited_row([
-                            ct.id,
-                            classification_count,
-                            ct.lab.name,
-                            ct.normalized_text,
-                            ctm.gene_symbol.name,
-                            best_matches_count,
-                            '\n'.join([match.term.id + " " + match.term.name for match in top[0:5]]),
-                            top_score,
-                            status
-                        ])
-                        row_count += 1
-
-                if row_count >= max_count:
-                    return
+                yield delimited_row([
+                    ct.id,
+                    ct.classifications_count,
+                    ct.lab.name,
+                    ct.normalized_text,
+                    term_text,
+                    "TRUE" if suggestion.is_auto_assignable() else "FALSE",
+                    "TRUE" if suggestion.checked_server_terms > 0 and bool(suggestion.terms) else "FALSE"
+                ])
+                row_count += 1
 
         except GeneratorExit:
             pass
@@ -99,9 +71,8 @@ def condition_match_test_view(request):
                 messages.add_message(request, messages.WARNING, f"Could not find Gene Symbol '{gene_symbol_str}'")
                 valid = False
     if valid:
-        #auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
-        auto_matches = None
-        suggestion = OntologyMatching.find_exact_match(normalize_condition_text(condition_text), fallback_to_online=True)
+        auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
+        suggestion = OntologyMatching.top_level_suggestion(normalize_condition_text(condition_text), fallback_to_online=True)
         attempted = True
 
     context = {

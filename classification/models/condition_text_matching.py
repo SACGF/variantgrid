@@ -16,6 +16,8 @@ from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
+from library.log_utils import report_exc_info
+from library.utils import ArrayLength
 from ontology.models import OntologyTerm
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text
 from snpdb.models import Lab
@@ -47,8 +49,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     @transaction.atomic
     def clear(self):
-        self.conditiontextmatch_set.update(condition_xrefs=list(), condition_multi_operation=MultiCondition.NOT_DECIDED)
-        self.last_edited_by = None
+        self.conditiontextmatch_set.update(condition_xrefs=list(), condition_multi_operation=MultiCondition.NOT_DECIDED, last_edited_by=None)
         self.classifications_count_outstanding = self.classifications_count
         self.save()
 
@@ -58,8 +59,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     @property
     def user_edited(self) -> bool:
-        # TODO annotate with array length rather than checking exist list
-        return self.conditiontextmatch_set.exclude(condition_xrefs__exact=list()).exclude(last_edited_by=admin_bot()).count() == 0
+        return self.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(condition_xrefs_length__gt=0).exclude(last_edited_by=admin_bot()).exists()
 
     @property
     def root(self) -> 'ConditionTextMatch':
@@ -102,7 +102,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         if self.gene_symbol:
             return self.gene_symbol.symbol
         return "Default"
-
 
     @classmethod
     def get_permission_object(self):
@@ -262,14 +261,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
 
         for ct in ConditionText.objects.all():
-            ConditionTextMatch.attempt_automatch(condition_text=ct, force=force, server_search = False)
+            ConditionTextMatch.attempt_automatch(condition_text=ct, force=force, server_search=True)
+            update_condition_text_match_counts(ct)
             if ct.classifications_count == 0:
                 ct.delete()
             else:
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText, force: bool = False, server_search = False):
+    def attempt_automatch(condition_text: ConditionText, force: bool = False, server_search=False):
         text = condition_text.normalized_text
         if force or not condition_text.user_edited:
             condition_text.clear()
@@ -277,37 +277,18 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return False  # couldn't overwrite what we already had
 
         try:
-            # don't do server side search for top level, only care about matching terms on IDs directly
-            top_level_matches = OntologyMatching.from_search(search_text=text, gene_symbol=None, server_search=False)
-            if top_values := top_level_matches.top_terms():
-                root: ConditionTextMatch
-                if root := condition_text.root:
-                    if top_values[0].score > 100:
-                        root.condition_xrefs = [match.term.id for match in top_values]
+            if root := condition_text.root:
+                if match := OntologyMatching.top_level_suggestion(condition_text.normalized_text, fallback_to_online=server_search):
+                    if match.is_auto_assignable():
+                        root.condition_xrefs = match.terms
                         root.last_edited_by = admin_bot()
                         root.save()
-                        condition_text.save()
-            else:
-                for gene_level in condition_text.gene_levels:
-                    gene_matches = OntologyMatching.from_search(search_text=text, gene_symbol=gene_level.gene_symbol.symbol, server_search=server_search)
-                    if top_value := gene_matches.only_top_term():
-                        if top_value.score >= 98:
-                            gene_level.condition_xrefs = [top_value.term.id]
-                            gene_level.save()
-                    elif top_values := gene_matches.top_terms():
-                        # but we had a duplicate, so as great as the score is, it doesn't count
-                        pass
-
-                condition_text.save()
-        finally:
-            update_condition_text_match_counts(condition_text)
-            condition_text.save()
-
+        except Exception:
+            report_exc_info()
 
     @staticmethod
     def sync_condition_text_classification(cm: ClassificationModification, update_counts=True):
         classification = cm.classification
-
         if classification.withdrawn:
             ConditionTextMatch.objects.filter(classification=classification).delete()
             return
@@ -400,7 +381,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
 
 def update_condition_text_match_counts(ct: ConditionText):
-    # let's us count by doing one select out of the databse, rather than continually
+    # let's us count by doing one select all of the database, rather than continually
     # selecting parents from the DB
     by_id: Dict[int, ConditionTextMatch] = dict()
     classification_related: List[ConditionTextMatch] = list()

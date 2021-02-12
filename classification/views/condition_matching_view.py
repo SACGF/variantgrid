@@ -13,7 +13,7 @@ from classification.models import ConditionTextMatch, ConditionText, update_cond
 from classification.regexes import db_ref_regexes
 from library.utils import empty_to_none, ArrayLength
 from ontology.models import OntologyTerm, OntologySnake, OntologyService, OntologyTermRelation
-from ontology.ontology_matching import normalize_condition_text
+from ontology.ontology_matching import normalize_condition_text, OntologyMatching
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 import re
 
@@ -113,54 +113,22 @@ class ConditionMatchingSuggestion:
         self.messages.append(message)
 
     def as_json(self):
+        user_json = None
+        if self.terms: # only report on user who filled in values
+            if user := self.condition_text_match.last_edited_by:
+                user_json = {"username": user.username}
+
         return {
             "id": self.condition_text_match.id,
             "is_applied": self.is_applied,
             "terms": [{"id": term.id, "name": term.name, "definition": '???' if term.is_stub else term.definition} for term in self.terms],
             "joiner": self.condition_multi_operation,
-            "messages": [message.as_json() for message in self.messages]
+            "messages": [message.as_json() for message in self.messages],
+            "user": user_json
         }
 
     def __bool__(self):
         return not not self.terms or not not self.messages
-
-
-def embedded_term_check(root: ConditionTextMatch) -> Optional[ConditionMatchingSuggestion]:
-    OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
-
-    text = root.condition_text.normalized_text
-
-    db_matches = db_ref_regexes.search(text)
-    detected_any_ids = not not db_matches  # see if we found any prefix suffix, if we do,
-    detected_ontology_id = False
-    db_matches = [match for match in db_matches if match.db in ["OMIM", "HP", "MONDO"]]
-
-    found_terms = list()
-    for match in db_matches:
-        found_terms.append(OntologyTerm.get_or_stub(match.id_fixed))
-        detected_ontology_id = True
-
-    detected_ontology_id = not not found_terms
-    found_stray_omim = False
-
-    # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
-    if not detected_any_ids:
-        stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(text)
-        stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
-        if stray_omim_matches:
-            detected_ontology_id = True
-            for omim_index in stray_omim_matches:
-                omim = OntologyTerm.get_or_stub(f"OMIM:{omim_index}")
-                found_terms.append(omim)
-                found_stray_omim = True
-    if found_terms:
-        cms = ConditionMatchingSuggestion(condition_text_match=root)
-        for term in found_terms:
-            cms.add_term(term)
-        if found_stray_omim:
-            cms.add_message(ConditionMatchingMessage(severity="warning", text="Detected OMIM terms from raw numbers without prefix"))
-        return cms
-    return None
 
 
 def validate_suggestion(cms: ConditionMatchingSuggestion):
@@ -194,13 +162,8 @@ def validate_suggestion(cms: ConditionMatchingSuggestion):
                 cms.add_message(ConditionMatchingMessage(severity="error", text=f"{term.id} : is marked as obsolete"))
 
 
-def is_leaf(term: OntologyTerm):
-    if not term.is_stub and term.ontology_service == OntologyService.MONDO:
-        return not OntologyTermRelation.children_of(term).exists()
-    return True
-
-
 def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: Set[OntologyTerm], check_levels: int = 4):
+    # TODO move this to OntologyTerm class
     for term in terms:
         if term in ancestors:
             return True
@@ -226,13 +189,18 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
 
     root_level = ct.root
     root_cms: Optional[ConditionMatchingSuggestion]
-    if root_level.condition_xrefs:
-        root_cms = ConditionMatchingSuggestion(root_level)
-    else:
-        root_cms = embedded_term_check(root_level)
-        if not root_cms:
-            # FIXME make suggestions
-            root_cms = ConditionMatchingSuggestion(root_level)
+
+    root_cms = ConditionMatchingSuggestion(root_level)
+    if not root_cms.terms:
+        root_suggestion = OntologyMatching.top_level_suggestion(ct.normalized_text, fallback_to_online=True)
+        if terms := root_suggestion.terms:
+            for term in terms:
+                root_cms.add_term(term)
+            if root_suggestion.ids_in_text_warning:
+                root_cms.add_message(ConditionMatchingMessage(severity="warning", text=root_suggestion.ids_in_text_warning))
+            if root_suggestion.alias_index is not None and root_suggestion.alias_index > 1:
+                root_cms.add_message(ConditionMatchingMessage(severity="info", text="Found via OMIM alias"))
+
     validate_suggestion(root_cms)
     suggestions.append(root_cms)
 
@@ -261,7 +229,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                         if is_descendant({gene_level}, root_level_mondo, set()):
                             matches_gene_level.add(gene_level)
 
-                    leafs = [term for term in matches_gene_level if is_leaf(term)]
+                    leafs = [term for term in matches_gene_level if term.is_leaf]
                     root_level_str = ', '.join([term.id for term in root_level_mondo])
 
                     if not matches_gene_level:
@@ -269,7 +237,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                     elif len(matches_gene_level) == 1:
                         term = list(matches_gene_level)[0]
                         if term in root_level_terms:
-                            cms.add_message(ConditionMatchingMessage(severity="info",
+                            cms.add_message(ConditionMatchingMessage(severity="success",
                                                                      text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         else:
                             cms.add_term(list(matches_gene_level)[0])  # not guaranteed to be a leaf, but no associations on child terms
@@ -291,7 +259,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                     for term in parent_term_missing_gene:
                         cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{term.id} : no relationship on file to {gene_symbol.symbol}"))
                     for term in parent_term_has_gene:
-                        cms.add_message(ConditionMatchingMessage(severity="info",
+                        cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
 
     return suggestions
@@ -327,6 +295,7 @@ class ConditionTextMatchingAPI(APIView):
             ctm = ct.conditiontextmatch_set.get(pk=update.get('ctm_id'))
             ctm.condition_xrefs = terms
             ctm.condition_multi_operation = MultiCondition(update.get('joiner') or MultiCondition.NOT_DECIDED)
+            ctm.last_edited_by = request.user
             ctm.save()
         update_condition_text_match_counts(ct)
         ct.save()

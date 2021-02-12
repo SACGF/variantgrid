@@ -211,6 +211,22 @@ a.list-group-item-action {
   height: 32px;
 }
 
+.btn-rnd-rect {
+  width: 40px;
+  height: 40px;
+  padding: 7px 8px 7px 12px;
+  border-radius: 15px;
+  text-align: center;
+}
+
+.btn-circle {
+  width: 50px;
+  height: 50px;
+  padding: 7px 8px 7px 12px;
+  border-radius: 25px;
+  text-align: center;
+}
+
 .accordion > .card {
   overflow: inherit;
 }

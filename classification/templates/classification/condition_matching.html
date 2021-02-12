@@ -139,24 +139,6 @@
                 ]}).appendTo(description);
             }
 
-            let scoreDetail = $('<div>');
-            for (let score_part of onto.scores) {
-                let score = score_part.score.toFixed(0);
-
-                $('<div>', {class:'mt-2',
-                    html: [
-                        $('<div>', {html:[
-                            $('<span>', {class: 'text-monospace', html: score}),
-                            $('<span>', {text: " : " + score_part.name + " out of " + score_part.max})
-                        ]}),
-                        $('<div>', {class:'text-muted', html:score_part.note})
-                    ]
-                }).appendTo(scoreDetail);
-            }
-
-            let scoreCell = $('<td>', {class:'score-cell text-monospace text-right', 'data-toggle': 'popover', 'title': 'score', 'data-content': scoreDetail.prop('outerHTML')}).appendTo(row);
-            $('<div>', {text: onto.score.toFixed(0)}).appendTo(scoreCell);
-
             return row;
         }
 
@@ -169,12 +151,6 @@
         }
 
         function renderOntologies(ontos) {
-            ontos.sort((a, b) => {
-                let score1 = a.score + (a.selected ? 10000 : 0);
-                let score2 = b.score + (b.selected ? 10000 : 0);
-                return score2 - score1;
-            });
-
             let tbody = $('#mp-results tbody');
             tbody.empty();
             for (let onto of ontos) {
@@ -288,6 +264,9 @@
         function renderSuggestion(suggestion, id) {
             let dom = $('<div>');
             if (suggestion.terms && suggestion.terms.length) {
+                if (suggestion.user) {
+                    $('<div>', {text: `Set by ${suggestion.user.username}`, class:'text-secondary'}).appendTo(dom);
+                }
                 let termStyle = '';
                 if (!suggestion.is_applied) {
                     let wrapper = $(`#condition-match-${suggestion.id}`);
@@ -317,10 +296,10 @@
                 if (suggestion.terms.length > 1) {
                     let joiner_text = 'combination type undecided';
                     switch (suggestion.joiner) {
-                        case 'U': joiner_text = 'uncertain';
-                        case 'C': joiner_text = 'co-occurring';
+                        case 'U': joiner_text = 'Uncertain'; break;
+                        case 'C': joiner_text = 'Co-occurring'; break;
                     }
-                    $('<div>', {text: joiner_text, class:'text-muted'}).appendTo(dom);
+                    $('<div>', {text: joiner_text}).appendTo(dom);
                 }
             } else {
                 let wrapper = $(`#condition-match-${suggestion.id}`);
@@ -512,14 +491,8 @@
                 </div>
                 <div class="modal-body">
                     <input id="mp-id" type="hidden" />
-                    {% labelled label="Search Text" %}
-                        <div class="input-group">
-                            <input class="form-control" type="text" id="mp-search-text" />
-                            <span class="input-group-append"><button id="mp-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
-                        </div>
-                    {% endlabelled %}
-                    {% labelled label="Gene Symbol" %}<span id="mp-gene-symbol">None</span>{% endlabelled %}
-                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
+
+                    {% labelled label="Terms" %}<input class="form-control" id="mp-selected" />{% endlabelled %}
                     {% labelled label="Mutli-Mode" %}
                         <div id="mp-multimode" >
                             <div class="btn-group btn-group-toggle" data-toggle="buttons">
@@ -530,7 +503,18 @@
                         </div>
                         <div id="mp-singlemode" class="collapse no-value">N/A</div>
                     {% endlabelled %}
-                    {% labelled label="Terms" %}<input class="form-control" id="mp-selected" />{% endlabelled %}
+                    <hr/>
+
+                    {% labelled label="Gene Symbol" %}<span id="mp-gene-symbol">None</span>{% endlabelled %}
+                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
+
+                    {% labelled label="Search Text" %}
+                        <div class="input-group">
+                            <input class="form-control" type="text" id="mp-search-text" />
+                            <span class="input-group-append"><button id="mp-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
+                        </div>
+                    {% endlabelled %}
+
 
                     <label>Select Relevant Ontology Terms Below</label>
                     <table class="table" id="mp-results">
@@ -540,7 +524,6 @@
                                 <th class="term-cell">Term</th>
                                 <th class="relevance-cell">Relevance</th>
                                 <th class="description-cell">Description</th>
-                                <th class="score-cell">Score</th>
                             </tr>
                         </thead>
                         <tbody></tbody>

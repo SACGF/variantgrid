@@ -30,9 +30,9 @@
                 ...
             </div>
         </div>
-        <div class="col-1">
+        <div class="col-1 text-right">
             <button
-                class="btn btn-outline-primary mondo-picker"
+                class="btn btn-outline-primary btn-rnd-rect mondo-picker"
                 data-mode-of-inheritance="{% if condition_match.mode_of_inheritance is not None %}{{ condition_match.mode_of_inheritance | ekey:"mode_of_inheritance" }}{% else %}N/A{% endif %}"
                 data-gene-symbol="{{ condition_match.gene_symbol | default_if_none:'' }}"
                 data-label="{{ condition_match.leaf }}"

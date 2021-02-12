@@ -10,7 +10,7 @@ from django.db.models.functions import Length
 from django.urls import reverse
 from lazy import lazy
 
-from classification.regexes import db_ref_regexes, DbRegexes
+from classification.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource, OntologyTermRelation
@@ -111,6 +111,11 @@ ROMAN = {
     "ix": '9'
 }
 
+@dataclass
+class MatchInfo:
+    alias_index: Optional[int] = None
+
+
 class SearchText:
 
     @staticmethod
@@ -162,15 +167,15 @@ class SearchText:
     def all_terms(self) -> Set[str]:
         return self.prefix_terms.union(self.suffix_terms)
 
-    def matches(self, term: OntologyTerm):
+    def matches(self, term: OntologyTerm) -> Optional[MatchInfo]:
         if name := term.name:
             if SearchText(name).effective_equals(self):
-                return True
+                return MatchInfo(None)
         if aliases := term.aliases:
-            for alias in aliases:
+            for index, alias in enumerate(aliases):
                 if SearchText(alias).effective_equals(self):
-                    return True
-        return False
+                    return MatchInfo(index)
+        return None
 
     def effective_equals(self, other: 'SearchText') -> bool:
         # TODO handle a little bit off by 1 letter matching
@@ -195,10 +200,83 @@ def normalize_condition_text(text: str):
     return text
 
 
+@dataclass
+class TopLevelSuggestionDetails:
+    terms: Optional[List[OntologyTerm]]
+    ids_in_text: bool = False
+    ids_in_text_warning: str = None
+    checked_local_terms: int = 0
+    checked_server_terms: int = 0
+    alias_index: Optional[int] = None
+
+    def is_auto_assignable(self):
+        if terms := self.terms:
+            if len(terms) != 1:
+                return False
+            if self.ids_in_text_warning:
+                return False
+            if self.alias_index is not None and self.alias_index > 1:
+                return False
+            return True
+        return False
+
+    def __bool__(self):
+        return bool(self.terms)
+
+    def is_leaf(self):
+        if terms := self.terms:
+            for term in terms:
+                if not term.is_leaf:
+                    return False
+            return True
+        return None
+
+
 class OntologyMatching:
 
     @staticmethod
-    def find_exact_match(text: str, fallback_to_online: bool = False):
+    def top_level_suggestion(text: str, fallback_to_online: bool = True) -> TopLevelSuggestionDetails:
+        if suggestion := OntologyMatching.embedded_ids_check(text):
+            return suggestion
+        return OntologyMatching.search_suggestion(text, fallback_to_online=fallback_to_online)
+
+    @staticmethod
+    def embedded_ids_check(text: str) -> TopLevelSuggestionDetails:
+        OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
+
+        db_matches = db_ref_regexes.search(text)
+        detected_any_ids = bool(db_matches)  # see if we found any prefix suffix, if we do,
+        db_matches = [match for match in db_matches if match.db in ["OMIM", "HP", "MONDO"]]
+
+        found_terms = list()
+        for match in db_matches:
+            found_terms.append(OntologyTerm.get_or_stub(match.id_fixed))
+            detected_ontology_id = True
+
+        detected_ontology_id = bool(found_terms)
+        found_stray_omim = False
+
+        # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
+        if not detected_any_ids:
+            stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(text)
+            stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
+            if stray_omim_matches:
+                detected_ontology_id = True
+                for omim_index in stray_omim_matches:
+                    omim = OntologyTerm.get_or_stub(f"OMIM:{omim_index}")
+                    found_terms.append(omim)
+                    found_stray_omim = True
+        if found_terms:
+            warning = None
+            if found_stray_omim:
+                warning = "Detected OMIM terms from raw numbers without prefix"
+
+            return TopLevelSuggestionDetails(terms=found_terms, ids_in_text=True, ids_in_text_warning=warning)
+
+        return None
+
+    @staticmethod
+    def search_suggestion(text: str, fallback_to_online: bool = True) -> TopLevelSuggestionDetails:
         match_text = SearchText(text)
         q = list()
         # TODO, can we leverage phenotype matching?
@@ -207,15 +285,19 @@ class OntologyMatching:
                 # TODO evaluate if it was worth it comparing aliases
                 q.append(Q(name__icontains=term) | Q(aliases__icontains=term))
         # don't bother with searching for suffix, just find them all and see how we go with the matching
+        local_term_count = 0
         if q:
-            checked = 0
-            for term in OntologyTerm.objects.filter(ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}).filter(reduce(operator.and_, q))[0:100]:
-                checked += 1
-                if match_text.matches(term):
-                    print(f"Checked {checked} matches, found a match")
-                    return term
-            print(f"Checked {checked} matches, found nothing")
 
+            for term in OntologyTerm.objects.filter(ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}).filter(reduce(operator.and_, q)).order_by('ontology_service')[0:100]:
+                local_term_count += 1
+                if match_info := match_text.matches(term):
+                    return TopLevelSuggestionDetails(
+                        terms=[term],
+                        checked_local_terms=local_term_count,
+                        alias_index=match_info.alias_index
+                    )
+
+        server_term_count = 0
         if fallback_to_online:
             try:
                 # TODO ensure "text" is safe, it should already be normalised
@@ -228,16 +310,25 @@ class OntologyMatching:
                     }).json().get("docs")
 
                 for result in results:
+                    server_term_count += 1
                     o_id = result.get('id')
                     # result.get('label') gives the label as it's known by the search server
                     term = OntologyTerm.get_or_stub(o_id)
-                    if match_text.matches(term):
-                        print(f"Found exact match via server")
-                        return term
+                    if match_info := match_text.matches(term):
+                        return TopLevelSuggestionDetails(
+                            terms=[term],
+                            checked_local_terms=local_term_count,
+                            checked_server_terms=server_term_count,
+                            alias_index=match_info.alias_index
+                        )
             except:
                 print("Error searching server")
-        return None
 
+        return TopLevelSuggestionDetails(
+            terms=None,
+            checked_local_terms=local_term_count,
+            checked_server_terms=server_term_count,
+        )
 
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):

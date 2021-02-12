@@ -754,6 +754,7 @@ function severityIcon(severity) {
         case 'E': return $('<i class="fas fa-exclamation-circle text-danger"></i>'); // error
         case 'W': return $('<i class="fas fa-exclamation-triangle text-warning"></i>'); // warning
         case 'I': return $('<i class="fas fa-info-circle text-info"></i>'); // info
+        case 'S': return $('<i class="fas fa-check-circle text-success"></i>'); // success
         default: return $(severity);
     }
 }

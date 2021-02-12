@@ -18,25 +18,19 @@
             </p>
         {% end_page_help_embedded %}
 
-        {% comment %}
         <h4>Download</h4>
         <form method="POST" action="{% url 'condition_match_test_download' %}">
             {% csrf_token %}
             Run and download auto matching attempts. (Note doesn't apply the results, just produces them for download).<br/>
             This takes a while so it's recommended you limit your results.<br/>
             <div class="form-group">
-                <label class="form-label">Condition Text Count</label>
-                <div class="input-group">
-                    <input type="number" name="row_count" value="10" />
-                    <span class="input-group-append">
-                        <input class="btn btn-primary" type="submit" value="Download" />
-                    </span>
-                </div>
+                <input type="checkbox" name="external_search" id="external_search" value="True" checkled="True" />
+                <label class="form-label ml-1" for="external_search">Fallback to External Server Search</label>
             </div>
+            <input class="btn btn-primary" type="submit" value="Download" />
         </form>
         <hr/>
         <h4>Test Single Term</h4>
-        {% endcomment %}
 
         <form method="GET">
             {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
@@ -56,7 +50,27 @@
         {% endif %}
 
         {% if attempted %}
-            Suggestion = {% if suggestion %}{{ suggestion.id }} {{ suggestion.name }}{% endif %}
+            <div class="card">
+                <div class="card-header">Suggestion (applies at top level only)</div>
+                <div class="card-body">
+                    {% labelled label="Suggested Term" %}{% if suggestion.terms %}
+                        {% for term in suggestion.terms %}
+                            {{ term.id }} {{ term.name }}
+                        {% endfor %}
+                    {% endif %}{% endlabelled %}
+                    {% labelled label="Can auto-assign (without confirmation)" %}{{ suggestion.is_auto_assignable }}{% endlabelled %}
+                    {% if suggestion.terms %}
+                        {% labelled label="Is leaf term" %}{{ suggestion.is_leaf }}{% endlabelled %}
+                    {% endif %}
+                    {% if suggestion.alias_index %}
+                        {% labelled label="OMIM index found in" %}{{ suggestion.alias_index }}{% endlabelled %}
+                    {% endif %}
+                    {% labelled label="Found IDs in text" %}{{ suggestion.ids_in_text }}{% endlabelled %}
+                    {% labelled label="Found IDs in text warning" %}{{ suggestion.ids_in_text_warning }}{% endlabelled %}
+                    {% labelled label="Local database candidate terms inspected" %}{{ suggestion.checked_local_terms }}{% endlabelled %}
+                    {% labelled label="MONDO search server candidate terms inspected" %}{{ suggestion.checked_server_terms }}{% endlabelled %}
+                </div>
+            </div>
 
             {% if auto_matches %}
             <table class="table">
