@@ -251,7 +251,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return self.conditiontextmatch_set.all()
 
     @staticmethod
-    def sync_all(force=False):
+    def sync_all(force=False, offline=False):
         """
         syncs ConditionTextMatch's to Classifications
         """
@@ -261,7 +261,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
 
         for ct in ConditionText.objects.all():
-            ConditionTextMatch.attempt_automatch(condition_text=ct, force=force, server_search=True)
+            ConditionTextMatch.attempt_automatch(condition_text=ct, force=force, server_search=not offline)
             update_condition_text_match_counts(ct)
             if ct.classifications_count == 0:
                 ct.delete()

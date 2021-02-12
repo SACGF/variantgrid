@@ -219,7 +219,7 @@ class TopLevelSuggestionDetails:
     def is_obsolete(self):
         if terms := self.terms:
             for term in terms:
-                if not term.is_obsolete:
+                if term.is_obsolete:
                     return True
         return False
 
