@@ -411,10 +411,12 @@
                 $('.condition-match-placeholder').empty().removeAttr('data-terms').removeAttr('data-join', '');
             }
             for (let suggestion of suggestions) {
-                let wrapper = $(`#condition-match-${suggestion.id}`);
-                wrapper.html(renderSuggestion(suggestion));
-                wrapper.attr('data-terms', suggestion.terms.map(term => term.id).join(","));
-                wrapper.attr('data-join', suggestion.joiner);
+                if (!suggestion.hidden) {
+                    let wrapper = $(`#condition-match-${suggestion.id}`);
+                    wrapper.html(renderSuggestion(suggestion));
+                    wrapper.attr('data-terms', suggestion.terms.map(term => term.id).join(","));
+                    wrapper.attr('data-join', suggestion.joiner);
+                }
             }
             let inheritings = $('.condition-match-placeholder:not([data-terms])');
             for (let inheriting of inheritings) {
@@ -423,6 +425,8 @@
                 if (parentId) {
                     let parent = $(`#condition-match-${parentId}`).attr('data-name');
                     inheriting.html($('<span>', {class:'text-muted font-italic', text:`Inherits from ${parent}`}))
+                } else {
+                    inheriting.html($('<span>', {class:'text-muted font-italic', text:`No terms suggested`}));
                 }
             }
             checkSuggestionCount();

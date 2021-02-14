@@ -101,6 +101,7 @@ class ConditionMatchingSuggestion:
         self.condition_text_match = condition_text_match
         self.terms: List[OntologyTerm] = condition_text_match.condition_xref_terms
         self.is_applied = not not self.terms
+        self.hidden = False
         self.condition_multi_operation: MultiCondition = MultiCondition.NOT_DECIDED
         if self.is_applied:
             self.condition_multi_operation = condition_text_match.condition_multi_operation
@@ -121,6 +122,7 @@ class ConditionMatchingSuggestion:
         return {
             "id": self.condition_text_match.id,
             "is_applied": self.is_applied,
+            "hidden": self.hidden,
             "terms": [{"id": term.id, "name": term.name, "definition": '???' if term.is_stub else term.definition} for term in self.terms],
             "joiner": self.condition_multi_operation,
             "messages": [message.as_json() for message in self.messages],
@@ -200,6 +202,8 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                 root_cms.add_message(ConditionMatchingMessage(severity="warning", text=root_suggestion.ids_in_text_warning))
             if root_suggestion.alias_index is not None and root_suggestion.alias_index > 1:
                 root_cms.add_message(ConditionMatchingMessage(severity="info", text="Found via OMIM alias"))
+            if not root_suggestion.ids_in_text and not root_suggestion.is_leaf():
+                root_cms.hidden = True
 
     validate_suggestion(root_cms)
     suggestions.append(root_cms)

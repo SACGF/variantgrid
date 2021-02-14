@@ -131,6 +131,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         # just used for templates
         return not self.classification_id and self.mode_of_inheritance is None and self.gene_symbol_id is not None
 
+    @property
+    def is_classification_level(self):
+        return self.classification_id
+
     @lazy
     def classification_count(self):
         if self.classification_id:
@@ -248,7 +252,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @lazy
     def children(self) -> QuerySet:
-        return self.conditiontextmatch_set.all()
+        order_by = None
+        if self.is_root:
+            order_by = 'gene_symbol__symbol'
+        elif self.is_gene_level:
+            order_by = 'mode_of_inheritance'
+        else:
+            order_by = 'classification__id'
+
+        return self.conditiontextmatch_set.all().order_by(order_by)
 
     @staticmethod
     def sync_all(force=False, offline=False):
