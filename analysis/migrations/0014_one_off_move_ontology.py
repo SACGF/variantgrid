@@ -17,12 +17,24 @@ def _one_off_move_ontology(apps, schema_editor):
     for pn_hpo in PhenotypeNodeHPO.objects.all():
         hpo_id = "HP:%07d" % int(pn_hpo.hpo_synonym.hpo_id)
         ontology_term = OntologyTerm.objects.get(pk=hpo_id)
-        PhenotypeNodeOntologyTerm.objects.create(phenotype_node=pn_hpo.phenotype_node, ontology_term=ontology_term)
+        # Original data may have had dupes
+        PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node=pn_hpo.phenotype_node, ontology_term=ontology_term)
+
+    MOVED_OMIM = {
+        614087: 227650,  # Fancomi anaemia
+    }
 
     for pn_omim in PhenotypeNodeOMIM.objects.all():
-        omim_id = "OMIM:%d" % int(pn_omim.mim_morbid_alias.mim_morbid_id)
-        ontology_term = OntologyTerm.objects.get(pk=omim_id)
-        PhenotypeNodeOntologyTerm.objects.create(phenotype_node=pn_omim.phenotype_node, ontology_term=ontology_term)
+        mim_id = pn_omim.mim_morbid_alias.mim_morbid_id
+        mim_id = MOVED_OMIM.get(mim_id, mim_id)  # Some have been replaced
+        omim_id = "OMIM:%d" % mim_id
+        try:
+            ontology_term = OntologyTerm.objects.get(pk=omim_id)
+        except OntologyTerm.DoesNotExist:
+            print(f"Could not load: {omim_id}")
+            raise
+        # Original data may have had dupes
+        PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node=pn_omim.phenotype_node, ontology_term=ontology_term)
 
 
 class Migration(migrations.Migration):

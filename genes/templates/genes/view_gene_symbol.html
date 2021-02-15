@@ -375,28 +375,6 @@
             <a class='hover-link' href="javascript:clearGeneClassificationsGrid()">Show all...</a>
         </span>
         {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
-
-        {% if has_tagged_variants %}
-            <script>
-                function getGeneGridExtraFilters() {
-                    var gridParams = {
-                        gene_symbol : "{{ gene_symbol }}",
-                    };
-                    return JSON.stringify(gridParams);
-                }
-
-                function getGeneGridConfigUrl() {
-                    return "extra_filters=" + getGeneGridExtraFilters();
-                }
-
-                function geneGridInitFunc(grid, pagerId) {
-                    grid[0].p.postData["extra_filters"] = getGeneGridExtraFilters;
-                }
-            </script>
-            <h3>Tagged Variants</h3>
-            {% user_data_grid_filter 'gene_variant_tags' 'Analyses Variant Tags' %}
-            {% jqgrid 'analyses_variant_tags_grid' 'gene_variant_tags' genome_build_name=genome_build.name search=False jqgrid_config_get_parameters_func='getGeneGridConfigUrl' init_func='geneGridInitFunc' %}
-        {% endif %}
     </div>
     <div class="container">
         {% if show_annotation %}
@@ -434,7 +412,13 @@
                     function geneVariantsGridInitFunc(grid, pagerId) {
                         grid[0].p.postData["extra_filters"] = getGeneVariantsGridExtraFilters;
                     }
+
+                    function tagClick(tagId) {
+                        geneVariantsGridParams = {"tag" : tagId};
+                        $("#gene-variants-grid").trigger("reloadGrid");
+                    }
                 </script>
+                {% tag_counts_filter genome_build=genome_build gene_symbol=gene_symbol click_func='tagClick' show_all_func='clearGeneVariantsGrid' %}
                 {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False download_grid_json_as_csv=True gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='initialHideFilter' %}
             {% else %}
                 There are no variants for this gene.
@@ -446,8 +430,7 @@
             {% jqgrid 'gene_lists_for_gene_symbol_grid' category.name search=False delete=False gene_symbol=gene_symbol.pk %}
         {% endif %}
 
-        <div id='qc-gene-coverage-graph-container'>
-        </div>
+        <div id='qc-gene-coverage-graph-container'></div>
 	</div>
 
 {% endblock content %}

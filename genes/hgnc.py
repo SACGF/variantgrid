@@ -22,7 +22,8 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
 
     existing_hgnc_ids = set(HGNC.objects.all().values_list("pk", flat=True))
 
-    for hgnc_status in HGNCStatus:
+    # Symbol withdrawn doesn't return anything via REST
+    for hgnc_status in [HGNCStatus.APPROVED, HGNCStatus.ENTRY_WITHDRAWN]:
         url = HGNC_BASE_URL + hgnc_status.label
         logging.info("Fetching HGNC of status: %s", hgnc_status.label)
         r = requests.get(url, headers=headers)
@@ -36,7 +37,7 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
         gm.match_unmatched_in_hgnc_and_gene_lists()
 
     status_counts = get_field_counts(HGNC.objects.all(), "status")
-    cached_web_resource.description = ", ".join([f"{hs.label}: {status_counts[hs]}" for hs in HGNCStatus])
+    cached_web_resource.description = ", ".join([f"{HGNCStatus(hs).label}: {c}" for hs, c in status_counts.items()])
     cached_web_resource.save()
 
 

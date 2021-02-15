@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from django.http.response import JsonResponse, Http404
+from django.http.response import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
@@ -19,16 +19,17 @@ from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from lazy import lazy
 
+from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGeneListForm, CustomGeneListForm, \
-    GeneSymbolForm, GeneAnnotationReleaseForm, GeneAnnotationReleaseGenomeBuildForm
+    GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList, GeneAnnotationRelease
+    PfamSequenceIdentifier, PanelAppServer, SampleGeneList
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
@@ -36,7 +37,7 @@ from library.log_utils import report_exc_info
 from library.utils import defaultdict_to_dict
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
+from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample, AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
@@ -125,10 +126,6 @@ def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[Ont
 
 
 def view_gene_symbol(request, gene_symbol, genome_build_name=None):
-    # determines if this gene symbol might ONLY be an alias
-    if gene_symbol.endswith(gene_symbol_withdrawn_str):
-        raise Http404('Withdrawn GeneSymbols not valid')
-
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
     for gene in gene_symbol.genes:
@@ -142,8 +139,14 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     has_observed_variants = False
     has_tagged_variants = False
 
-    hgnc = None
+    # There cn be multiple HGNCs per symbol (eg MMP21) - take Approved (A) over others
+    hgnc = gene_symbol.hgnc_set.order_by("status").first()
+    # Gene Summary only populated in RefSeq
     gene_summary = None
+    if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
+                                          geneversion__gene_symbol=gene_symbol).first():
+        gene_summary = refseq_gene.summary
+
     gene_versions = gene_symbol.geneversion_set.all()
     if gene_versions.exists():
         # This page is shown using the users default genome build
@@ -157,17 +160,14 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
             msg = f"This symbol is not associated with any genes in build {desired_genome_build}, viewing in build {genome_build}"
             messages.add_message(request, messages.WARNING, msg)
 
-        hgnc = gene_version.hgnc
-        gene_summary = gene_version.gene.summary
         gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build, traverse_aliases=True)
         gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
         has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
 
-        q = get_has_variant_tags()
-        has_tagged_variants = gene_variant_qs.filter(q).exists()
+        has_tagged_variants = VariantTag.get_for_build(genome_build, variant_qs=gene_variant_qs).exists()
 
-        # has classifications isn't 100% in sync with the classification table:
-        # this code looks at VariantAlleles wheras the classification table will filter on gene symbol and transcript evidence keys
+        # has classifications isn't 100% in sync with the classification table: this code looks at VariantAlleles
+        # wheras the classification table will filter on gene symbol and transcript evidence keys
         q = get_has_classifications_q(genome_build)
         has_classified_variants = gene_variant_qs.filter(q).exists()
     else:
@@ -198,7 +198,6 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
         "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
         "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
-        "has_tagged_variants": has_tagged_variants,
         "has_variants": has_variants,
         "omim_and_hpo_for_gene": omim_and_hpo_for_gene,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,

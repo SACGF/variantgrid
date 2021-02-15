@@ -336,6 +336,9 @@ class GeneListNodeForm(BaseNodeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        samples_queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
+        self.fields['sample'].queryset = samples_queryset
+
         path_test_field = self.fields["pathology_test_gene_list"]
         company = Company.get_our_company()
         if company:

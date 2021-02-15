@@ -87,7 +87,7 @@ class Test(URLTestCase):
                                                                   user=cls.user_owner,
                                                                   import_status=ImportStatus.SUCCESS)[0]
 
-        cwr = CachedWebResource.objects.get_or_create(name="Fake PanelAppPanels", import_status=ImportStatus.SUCCESS)[0]
+        _ = CachedWebResource.objects.get_or_create(name="Fake PanelAppPanels", import_status=ImportStatus.SUCCESS)[0]
 
         server = PanelAppServer.objects.order_by("pk").first()
         cls.panel_app_panel = PanelAppPanel.objects.get_or_create(server=server,
@@ -107,10 +107,6 @@ class Test(URLTestCase):
             ('category_gene_list_autocomplete', cls.gene_list, {"q": cls.gene_list.name}),
             ('gene_list_autocomplete', cls.gene_list, {"q": cls.gene_list.name}),
         ]
-
-        gene_list_id_list = "/".join([str(cls.gene_list.pk)])
-        coverage_kwargs = {"gene_coverage_collection_id": cls.gene_coverage_collection.pk,
-                           "gene_list_id_list": gene_list_id_list}
 
         cls.PRIVATE_GRID_LIST_URLS = [
             ("gene_lists_grid", {"gene_list_category_id": cls.gene_list_category.pk}, cls.gene_list_w_category),

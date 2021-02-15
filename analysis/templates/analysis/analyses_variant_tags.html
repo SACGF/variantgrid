@@ -1,11 +1,14 @@
 {% extends menu_analysis_base %}
 {% load settings_tags %}
 {% load static %}
+{% load genome_build_tags %}
+{% load jqgrid_tags %}
+{% load user_tag_color_tags %}
+
 {% block title %}Analyses Variant Tags{% endblock title %}
 
 {% block head %}
 {{ block.super }}
-{% load user_tag_color_tags %}
 {% render_tag_styles_and_formatter %}
 <script>
     const REQUIRES_CLASSIFICATION = "{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}";
@@ -25,7 +28,6 @@
 
     function showAll() {
         gridParams = {};
-        $("#tag-filter-description").hide();
         reloadGrid();
     }
 
@@ -37,44 +39,36 @@
         grid2.trigger("reloadGrid");
     }
 
+    function classifyAndCloseButton(tagId) {
+        let classifyUrl = Urls.create_classification_for_variant_tag(tagId);
+        window.open(classifyUrl, "_blank");
+        $(`#tag-button-${tagId}`).remove();
+    }
+
     function formatVariantTagFirstColumn(variantString, options, rowObject) {
         const variantURL = Urls.view_variant(rowObject["variant__id"]);
         let cellValue = "<a href='" + variantURL + "' target='_blank'>" + variantString + "</a>";
         if (rowObject.tag__id == REQUIRES_CLASSIFICATION) {
-            let classifyUrl = Urls.create_classification_for_variant_tag(rowObject.id);
-            cellValue += `<a target="_blank" class="btn btn-primary new-classification-button" href="${classifyUrl}"><i class="fas fa-plus-circle"></i> New Classification</a>`;
+            let tagId = rowObject.id;
+            cellValue += `<a id="tag-button-${tagId}" class="btn btn-primary new-classification-button" href="javascript:classifyAndCloseButton(${tagId})"><i class="fas fa-plus-circle"></i> New Classification</a>`;
         }
         return cellValue;
+    }
+
+    function tagClick(tagId) {
+        gridParams = {"tag" : tagId};
+        reloadGrid();
     }
 
 $(document).ready(function() {
     jQuery.extend($.fn.fmatter , {
         formatVariantTagFirstColumn: formatVariantTagFirstColumn,
     });
-
-
-    $(".grid-tag", "#tag-top-bar").click(function() {
-        var tagId = $(this).attr("tag_id");
-        gridParams = {"tag" : tagId};
-        var tagHtml = '<span class="tagged-' + tagId + '" title="Tagged as ' + tagId + '"><span class="user-tag-colored">' + tagId + '</span></span>';
-        $("#tag-filter-description-text").html("Filtering to " + tagHtml);
-        $("#tag-filter-description").show()
-        reloadGrid();
-    });
 });
 </script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <style>
 {% render_node_count_colors_css %}
-
-#tag-top-bar .grid-tag {
-    cursor: pointer;
-}
-
-#tag-filter-description {
-    display: none;
-}
-
 .new-classification-button {
     margin: 4px;
 }
@@ -82,23 +76,11 @@ $(document).ready(function() {
 {% endblock head %}
 
 {% block submenu_page_content %}
-    {% load genome_build_tags %}
     {% genome_build_url_arg genome_build 'genome_build_analyses_variant_tags' %}
 
     <h3>Analyses Variant Tags</h3>
 
-    {% if tag_counts %}
-        <div id='tag-top-bar'> Click to filter:
-        {% for tag, count in tag_counts %}
-            <span class="grid-tag tagged-{{tag}}" title="Tagged as {{tag}}" tag_id="{{tag}}">
-                <span class="user-tag-colored">{{ tag }}</span> : {{ count }}
-            </span>
-        {% endfor %}
-        <div id="tag-filter-description"><span id="tag-filter-description-text"></span> <a href="javascript:showAll();">Show All</a></div>
-        </div>
-    {% endif %}
-
-    {% load jqgrid_tags %}
+    {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' %}
 
     <h3>Variants</h3>
 

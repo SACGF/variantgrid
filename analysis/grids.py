@@ -11,13 +11,13 @@ from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.views.analysis_permissions import get_node_subclass_or_404
-from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version, \
-    get_variant_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.utils import md5sum_str
+from ontology.grids import AbstractOntologyGenesGrid
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
@@ -375,13 +375,12 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        queryset = get_queryset_for_latest_annotation_version(VariantTag, genome_build)
+        queryset = VariantTag.get_for_build(genome_build)
         user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
             analyses_queryset = Analysis.filter_for_user(user)
         else:
             analyses_queryset = Analysis.objects.filter(user=user)
-        analyses_queryset = analyses_queryset.filter(genome_build=genome_build)
 
         if extra_filters:
             analysis_ids = extra_filters.get("analysis_ids")
@@ -439,8 +438,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
         else:
             analyses_queryset = Analysis.objects.filter(user=user)
 
-        analyses_queryset = analyses_queryset.filter(genome_build=genome_build)
-        tags_qs = VariantTag.objects.filter(analysis__in=analyses_queryset)
+        tags_qs = VariantTag.get_for_build(genome_build).filter(analysis__in=analyses_queryset)
         if extra_filters:
             tag_id = extra_filters.get("tag")
             if tag_id is not None:
@@ -448,7 +446,8 @@ class TaggedVariantGrid(AbstractVariantGrid):
                 tags_qs = tags_qs.filter(tag=tag)
 
         qs = get_variant_queryset_for_latest_annotation_version(genome_build)
-        qs = qs.filter(varianttag__in=tags_qs)
+        qs = qs.filter(variantallele__genome_build=genome_build,
+                       variantallele__allele__in=tags_qs.values_list("variant__variantallele__allele", flat=True))
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
@@ -563,3 +562,12 @@ class KaromappingAnalysesGrid(JqGridUserRowConfig):
             queryset = KaryomappingAnalysis.objects.filter(user=user)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'modified', 'sortorder': 'desc'})
+
+
+class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
+    def __init__(self, user, node_id, version):
+        self.node = get_node_subclass_or_404(user, node_id, version=version)
+        super().__init__()
+
+    def _get_ontology_terms_ids(self):
+        return self.node.get_ontology_term_ids()

@@ -76,7 +76,6 @@ def new_columns(apps, schema_editor):
          'queryset_field': True},
     ]
 
-
     NEW_COLUMN_VCF_INFO = [
         {'info_id': 'GENE_BIOTYPE', 'column_id': 'gene_biotype', 'number': None, 'type': 'S',
          'description': 'Gene Biotype'},

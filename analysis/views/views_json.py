@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import Max
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -308,7 +309,7 @@ def analysis_set_panel_size(request, analysis_id):
 def node_populate_clingen_alleles(request, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     an_as, _ = AnalysisNodeAlleleSource.objects.get_or_create(node=node)
-    populate_clingen_alleles_from_allele_source.si(an_as.pk).apply_async()
+    populate_clingen_alleles_from_allele_source.si(an_as.pk, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
     return JsonResponse({})
 
 

@@ -5,7 +5,8 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
-from annotation.models.models import AnnotationVersion
+from analysis.models import VariantTag
+from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, InvalidAnnotationVersionError
 from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
     GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion
@@ -13,7 +14,7 @@ from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import UserSettings, Q, VariantGridColumn
+from snpdb.models import UserSettings, Q, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
 
@@ -119,45 +120,68 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
-        non_gene_fields = [f for f in fields if "__transcript_version__" not in f]
-        self.fields = non_gene_fields
+        self.fields = self._get_non_gene_fields(fields)
         self.update_overrides(override)
 
         gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         genes_qs = get_variant_queryset_for_gene_symbol(gene_symbol, genome_build)
         queryset = variant_qs_filter_has_internal_data(genes_qs, genome_build)
-        if extra_filters:  # Hotspot filters
-            protein_position = extra_filters.get("protein_position")
-            if protein_position:
+        if extra_filters:
+            # Hotspot filters
+            if protein_position := extra_filters.get("protein_position"):
                 transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
                 queryset = queryset.filter(varianttranscriptannotation__transcript_version=transcript_version,
                                            varianttranscriptannotation__protein_position__icontains=protein_position)
+            if tag_id := extra_filters.get("tag"):
+                tag = get_object_or_404(Tag, pk=tag_id)
+                alleles_qs = VariantTag.objects.filter(tag=tag).values_list("variant__variantallele__allele")
+                queryset = queryset.filter(variantallele__allele__in=alleles_qs)
 
         self.queryset = queryset.distinct().values(*self.get_queryset_field_names())
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "asc",
                                   'shrinkToFit': False})
 
+    @staticmethod
+    def _get_non_gene_fields(fields):
+        """ Remove fields that'll all be the same """
+        non_gene_fields = []
+        for f in fields:
+            if f == "tags":
+                continue
+            keep = True
+            for gene_fields in ["__transcript_version__", "__gene__"]:
+                if gene_fields in f:
+                    keep = False
+                    break
+            if keep:
+                non_gene_fields.append(f)
+        return non_gene_fields
+
 
 def _get_gene_fields():
     q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
     columns_qs = VariantGridColumn.objects.filter(q_gene).order_by("pk")
+    first_fields = ["gene_version__gene_symbol", "gene_version__gene", "gene_version__version"]
     fields = []
     for variant_column in columns_qs.values_list("variant_column", flat=True):
         gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
         if gene_column.startswith("gene__"):
             gene_column = "gene_version__" + gene_column
-        fields.append(gene_column)
+        if gene_column not in first_fields:
+            fields.append(gene_column)
 
-    return fields
+    return first_fields + fields
 
 
 class GenesGrid(JqGridUserRowConfig):
     model = ReleaseGeneVersion
-    caption = "GeneAnnotations"
+    caption = "Gene Release"
     fields = _get_gene_fields()
-    colmodel_overrides = {'id': {'hidden': True}}
+    colmodel_overrides = {
+        'gene_version__gene_symbol': {'formatter': 'geneSymbolLink'},
+    }
 
     def __init__(self, user, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)
@@ -179,7 +203,11 @@ class GenesGrid(JqGridUserRowConfig):
                 else:
                     raise PermissionDenied(f"Bad column '{column}'")
 
+        gene_annotation_version = GeneAnnotationVersion.objects.filter(gene_annotation_release_id=gene_annotation_release_id).order_by("annotation_date").last()
+        if gene_annotation_version is None:
+            raise InvalidAnnotationVersionError(f"No gene annotation version for gene_annotation_release: {gene_annotation_release_id}")
         queryset = queryset.filter(release_id=gene_annotation_release_id)
+        queryset = queryset.filter(gene_version__gene__geneannotation__version=gene_annotation_version)
         self.queryset = queryset.values(*self.get_field_names())
         grid_export_url = reverse("genes_grid", kwargs={"genome_build_name": genome_build_name,
                                                         "op": JQGridViewOp.DOWNLOAD})

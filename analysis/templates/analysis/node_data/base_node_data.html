@@ -7,10 +7,14 @@
 <script type="text/javascript">
     function on_error_function(errors) {
         hideLoadingOverlay();
-        //console.log("on_error_function");
-        var html = "<div>Node errors:</div><ul class='messages'>";
-        for (i=0 ; i<errors.length ; ++i) {
-            html += "<li class='error'>" + errors[i] + "</li>";
+
+        let html = "<div>Node errors:</div><ul class='messages'>";
+        for (let i=0 ; i<errors.length ; ++i) {
+            let errorMessage = errors[i];
+            if (errorMessage.startsWith("Analysis:")) {
+                errorMessage += `<div><div style="margin-right: 2px" class="left">Fix this in </div> <a href="javascript:analysisSettings()"><div class="left icon16 settings-icon"></div><div class="left">Analysis settings</div></a><div class="clear"></div></div>`;
+            }
+            html += "<li class='error'>" + errorMessage + "</li>";
         }
         html += "</ul>"
         $("#node-data-container").empty();
@@ -26,7 +30,7 @@
             },
             error: function(xhr, error) {
                 console.log(error);
-                var message = "Error Loading Node Editor. Status: " + xhr.status + ". ";
+                let message = "Error Loading Node Editor. Status: " + xhr.status + ". ";
                 if (xhr.status >= 500) {
                     message += "Internal server error";
                 } else if (xhr.status >= 400) {

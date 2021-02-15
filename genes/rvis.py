@@ -5,6 +5,7 @@ import requests
 
 from annotation.models import CachedWebResource
 from genes.models import RVIS, GeneSymbol
+from library.pandas_utils import df_nan_to_none
 
 
 def store_rvis_from_web(cached_web_resource: CachedWebResource):
@@ -25,6 +26,8 @@ def save_rvis_records(cached_web_resource: CachedWebResource, f):
     known_gene_symbols = GeneSymbol.get_upper_case_lookup()
 
     df = pd.read_csv(f, sep='\t')
+    df = df_nan_to_none(df)
+
     gene_symbols = []
     rvis_records = []
     for _, row in df[[GENE_COLUMN, OE_RATIO_PERCENTILE]].iterrows():

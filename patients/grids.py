@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from annotation.models.models_phenotype_match import PATIENT_GENE_SYMBOL_PATH, PATIENT_ONTOLOGY_TERM_PATH
 from library.django_utils import get_model_fields
 from library.jqgrid_user_row_config import JqGridUserRowConfig
+from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import PatientRecords, Patient, PatientRecord
 
@@ -105,3 +106,12 @@ class PatientRecordGrid(JqGridUserRowConfig):
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
+
+
+class PatientOntologyGenesGrid(AbstractOntologyGenesGrid):
+    def __init__(self, user, patient_id):
+        self.patient = Patient.get_for_user(user, pk=patient_id)
+        super().__init__()
+
+    def _get_ontology_terms_ids(self):
+        return self.patient.get_ontology_term_ids()

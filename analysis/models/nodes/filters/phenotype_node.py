@@ -71,9 +71,12 @@ class PhenotypeNode(AnalysisNode):
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
             gene_symbols_qs = self.patient.get_gene_symbols()
         else:
-            ontology_term_ids = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
-            gene_symbols_qs = OntologySnake.special_case_gene_symbols_for_terms(ontology_term_ids)
+            gene_symbols_qs = OntologySnake.special_case_gene_symbols_for_terms(self.get_ontology_term_ids())
         return gene_symbols_qs
+
+    def get_ontology_term_ids(self):
+        """ For NodeOntologyGenesGrid """
+        return self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
 
     def get_gene_qs(self):
         gene_symbols_qs = self.get_gene_symbols_qs()
@@ -86,7 +89,6 @@ class PhenotypeNode(AnalysisNode):
 
         text_phenotypes = (self.text_phenotype or '').split()
         if text_phenotypes:
-            sql_path = "variantannotation__gene__ensemblgeneannotation"
             columns = ['variantannotation__gene__summary',
                        'variantannotation__gene__geneannotation__omim_terms',
                        'variantannotation__uniprot__function',

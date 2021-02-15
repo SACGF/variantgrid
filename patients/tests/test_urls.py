@@ -20,7 +20,7 @@ class Test(URLTestCase):
         cls.user_owner = User.objects.get_or_create(username='testuser')[0]
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        annotation_version_grch37 = get_fake_annotation_version(cls.grch37)
+        get_fake_annotation_version(cls.grch37)
 
         cls.patient = Patient.objects.get_or_create(first_name="Bob", last_name="Dobalina", sex=Sex.MALE)[0]
         assign_permission_to_user_and_groups(cls.user_owner, cls.patient)
@@ -57,7 +57,6 @@ class Test(URLTestCase):
         ]
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
-        patient_build_kwargs = {"patient_id": cls.patient.pk, "genome_build_name": cls.grch37.name}
         cls.PRIVATE_GRID_LIST_URLS = [
             ("patient_grid", {}, cls.patient),
             ("patient_records_grid", {}, patient_records),

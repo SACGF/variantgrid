@@ -6,9 +6,6 @@ from classification.models import classification_flag_types, Classification
 from flags.models import Flag, FlagComment
 import re
 
-from genes.hgvs import CHGVS
-from snpdb.models import GenomeBuild
-
 
 class Command(BaseCommand):
 

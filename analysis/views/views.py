@@ -43,7 +43,7 @@ from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
 from analysis.views.nodes.node_view import NodeView
-from annotation.models.models import MutationalSignatureInfo
+from annotation.models.models import MutationalSignatureInfo, InvalidAnnotationVersionError, AnnotationVersion
 from classification.views.views import create_classification_object, CreateClassificationForVariantView
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
@@ -122,7 +122,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
                "node_help": node_help_dict,
                "analysis_variables": analysis_variables,
                "has_write_permission": analysis.can_write(request.user),
-               "warnings": analysis.get_warnings(request.user),
+               "warnings": analysis.get_toolbar_warnings(request.user),
                "ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED": settings.ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED}
     return render(request, 'analysis/analysis.html', context)
 
@@ -283,10 +283,11 @@ def node_debug(request, analysis_version, node_id, node_version, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     model_name = node._meta.label
     node_serializers = AnalysisNodeSerializer.get_node_serializers()
-    serializer = node_serializers.get(model_name, AnalysisNodeSerializer)
+    serializer_klass = node_serializers.get(model_name, AnalysisNodeSerializer)
+    serializer = serializer_klass(node, context={"request": request})
 
     context = {"node": node,
-               "node_data": dict(sorted(serializer(node).data.items()))}
+               "node_data": dict(sorted(serializer.data.items()))}
     if node.valid:
         grid = VariantGrid(request.user, node, extra_filters)
         try:
@@ -641,9 +642,12 @@ def analysis_settings_details_tab(request, analysis_id):
                 analysis.save()
 
             add_save_message(request, valid, "Analysis Settings")
-    else:
-        if analysis.annotation_version is None:
-            messages.add_message(request, messages.ERROR, "Analysis setting 'annotation_version' is required.")
+
+    for error in analysis.get_errors():
+        messages.add_message(request, messages.ERROR, error)
+
+    for warning in analysis.get_warnings():
+        messages.add_message(request, messages.WARNING, warning)
 
     analysis_settings = get_analysis_settings(request.user, analysis)
     context = {"analysis": analysis,
@@ -831,19 +835,24 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
     @lazy
     def variant_tag(self):
         variant_tag_id = self.kwargs["variant_tag_id"]
-        variant_tag = get_object_or_404(VariantTag, pk=variant_tag_id)
+        variant_tag = VariantTag.objects.get(pk=variant_tag_id)
         variant_tag.analysis.check_can_view(self.request.user)
         return variant_tag
 
     def get_context_data(self, *args, **kwargs):
-        context = super().get_context_data(*args, **kwargs)
-        context["variant_tag"] = self.variant_tag
+        try:
+            context = super().get_context_data(*args, **kwargs)
+            context["variant_tag"] = self.variant_tag
 
-        if not self.variant_tag.analysis.can_write(self.request.user):
-            read_only_message = "You have read-only access to this analysis. You can create a classification but it " \
-                                f"will not be linked to the analysis and the {settings.TAG_REQUIRES_CLASSIFICATION} " \
-                                f"tag will not be deleted."
-            messages.add_message(self.request, messages.WARNING, read_only_message)
+            if not self.variant_tag.analysis.can_write(self.request.user):
+                read_only_message = "You have read-only access to this analysis. You can create a classification but " \
+                                    "it will not be linked to the analysis and the " \
+                                    "{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
+                messages.add_message(self.request, messages.WARNING, read_only_message)
+        except VariantTag.DoesNotExist:
+            variant_tag_id = self.kwargs["variant_tag_id"]
+            msg = f"The VariantTag ({variant_tag_id}) does not exist. It may have been deleted or already classified."
+            context = {"error_message": msg}
         return context
 
 

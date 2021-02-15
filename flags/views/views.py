@@ -249,7 +249,6 @@ class FlagHelper:
         json_data['collections'] = flag_collections_json
 
         for flag in self.flags.values():
-            created = flag.created
             flag_type = self.flag_types[flag.flag_type_id]
             if flag_type.only_one:
                 # find when flag was last opened

@@ -1,4 +1,5 @@
-from typing import List
+import logging
+from typing import List, Set
 
 from celery.canvas import chain, Signature
 from collections import defaultdict
@@ -92,7 +93,7 @@ def get_node_dependencies(nodes_by_id, parent_value_data):
     return node_dependencies
 
 
-def _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups):
+def _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups, existing_cache_jobs) -> Set:
     cache_jobs = set()
     after_jobs = []
     jobs = []
@@ -103,8 +104,9 @@ def _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups):
 
             # Cache jobs are separated, and put in a set to remove dupes such as when >=2 venn's have the same parents
             task_args_objs_set = node.get_cache_task_args_objs_set()
-            if task_args_objs_set:
-                cache_jobs.update(task_args_objs_set)
+            new_cache_jobs = task_args_objs_set - existing_cache_jobs
+            if new_cache_jobs:
+                cache_jobs.update(new_cache_jobs)
                 after_jobs.append(update_job)
             else:
                 jobs.append(update_job)
@@ -121,6 +123,7 @@ def _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups):
 
     add_jobs_to_groups(jobs, groups)
     add_jobs_to_groups(after_jobs, groups)
+    return cache_jobs
 
 
 def get_analysis_update_tasks(analysis_id) -> List:
@@ -161,8 +164,12 @@ def get_analysis_update_tasks(analysis_id) -> List:
             dependencies = get_node_dependencies(nodes_by_id, parent_value_data)
             topo_sorted = get_toposorted_nodes_from_parent_value_data(nodes_by_id, parent_value_data)
 
+            # Ensure cache loading tasks are only triggered once. Cache can come from different toposort level/groups
+            # eg MergeNode asks parent Venn to cache (which is was already doing)
+            all_cache_jobs = set()
             for grp in topo_sorted:
-                _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups)
+                group_cache_jobs = _add_jobs_for_group(analysis_update_uuid, dependencies, grp, groups, all_cache_jobs)
+                all_cache_jobs.update(group_cache_jobs)
 
             update_nodes_qs = analysis.analysisnode_set.filter(analysis_update_uuid=analysis_update_uuid)
             update_nodes_qs.update(analysis_update_uuid=None, status=NodeStatus.QUEUED)

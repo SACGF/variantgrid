@@ -88,8 +88,7 @@ def menu_item(
         title = url_name.replace('_', ' ')
         title_case = ''
         next_capital = True
-        for index in range(len(title)):
-            letter = title[index]
+        for letter in title:
             if next_capital:
                 letter = letter.upper()
                 next_capital = False

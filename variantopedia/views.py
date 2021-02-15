@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 
+from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import Analysis
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion
@@ -280,7 +281,7 @@ def search(request):
         classify = form.cleaned_data.get('classify')
         try:
             search_results = search_data(request.user, search_string, classify)
-            results, search_types, search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
+            results, _search_types, _search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
             details = f"'{search_string}' calculated {len(results)} results."
             create_event(request.user, 'search', details=details)
 
@@ -456,6 +457,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     except VariantAllele.DoesNotExist:
         variant_allele_data = None
 
+    variant_tags = VariantTag.get_for_build(variant.genome_build, variant_qs=variant.equivalent_variants)
+
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
         "annotation_version": annotation_version,
@@ -473,6 +476,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        "variant_tags": variant_tags,
         "vts": vts,
     }
     if extra_context:

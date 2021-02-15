@@ -259,7 +259,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def get_single_parent_q(self):
         parent = self.get_single_parent()
-        return parent.get_q()
+        if parent.is_ready():
+            if parent.count == 0:
+                q = self.q_none()
+            else:
+                q = parent.get_q()
+        else:
+            # This should never happen...
+            raise ValueError("get_single_parent_q called when single parent not ready!!!")
+        return q
 
     def _get_annotation_kwargs_for_node(self) -> Dict:
         """ Override this method per-node.
@@ -484,10 +492,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_errors(self, include_parent_errors=True, flat=False):
         """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
         errors = []
-        try:
-            self.analysis.check_valid()
-        except ValueError as ve:
-            errors.append((NodeErrorSource.ANALYSIS, str(ve)))
+        for analysis_error in self.analysis.get_errors():
+            errors.append((NodeErrorSource.ANALYSIS, analysis_error))
+
         _, parent_errors = self.get_parents_and_errors()
         if include_parent_errors:
             errors.extend(parent_errors)
@@ -629,20 +636,26 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Override for optimisation """
 
         try:
-            parent = self.get_single_parent()
-            if parent.count == 0:
-                return 0  # True for all labels
+            if self.has_input():
+                parent_non_zero_label_counts = []
+                for parent in self.get_non_empty_parents():
+                    if parent.count != 0:  # count=0 has 0 for all labels
+                        parent_node_count = NodeCount.load_for_node(parent, label)
+                        if parent_node_count.count != 0:
+                            parent_non_zero_label_counts.append(parent_node_count.count)
 
-            parent_node_count = NodeCount.load_for_node(parent, label)
-            if parent_node_count.count == 0:
-                return 0
+                if not parent_non_zero_label_counts:
+                    # logging.info("all parents had 0 %s counts", label)
+                    return 0
 
-            if not self.modifies_parents():
-                return parent_node_count.count
+                if not self.modifies_parents():
+                    if len(parent_non_zero_label_counts) == 1:
+                        # logging.info("Single parent, no modification, using that")
+                        return parent_non_zero_label_counts[0]
         except NodeCount.DoesNotExist:
             pass
         except Exception as e:
-            logging.warning(e)
+            logging.warning("Trouble getting cached %s count: %s", label, e)
 
         return None
 
@@ -677,10 +690,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         node_version = NodeVersion.get(self)
         for label, count in label_counts.items():
-            NodeCount.objects.create(node_version=node_version,
-                                     label=label,
-                                     count=count)
-            logging.debug("saved... %r, %r, %r %r", self.pk, self.version, label, count)
+            NodeCount.objects.create(node_version=node_version, label=label, count=count)
 
         return NodeStatus.READY, label_counts[BuiltInFilters.TOTAL]
 

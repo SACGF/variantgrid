@@ -120,10 +120,6 @@ class HGNC(models.Model):
         return ulist
 
 
-# TODO: I think this is obsolete, HGNC don't do this anymore
-gene_symbol_withdrawn_str = '~withdrawn'
-
-
 class UniProt(models.Model):
     # accession = Primary (citable) accession number (1st element in SwissProt record)
     accession = models.TextField(primary_key=True)
@@ -369,8 +365,8 @@ class Gene(models.Model):
         qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
         ret = qs.delete()
         if ret:
-             print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
-             print(ret)
+            print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
+            print(ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
@@ -1459,7 +1455,7 @@ class RVIS(models.Model):
         @see https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1003709 """
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
-    oe_ratio_percentile = models.FloatField()
+    oe_ratio_percentile = models.FloatField(null=True)
 
     def __str__(self):
         return f"{self.gene_symbol_id}: {self.oe_ratio_percentile}"

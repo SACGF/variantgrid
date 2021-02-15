@@ -1,5 +1,5 @@
 from analysis.grids import AnalysesGrid, AnalysesVariantTagsGrid, NodeColumnSummaryGrid, \
-    KaromappingAnalysesGrid, AnalysisTemplatesGrid, AnalysisNodeIssuesGrid, TaggedVariantGrid
+    KaromappingAnalysesGrid, AnalysisTemplatesGrid, AnalysisNodeIssuesGrid, TaggedVariantGrid, NodeOntologyGenesGrid
 from analysis.views import views, views_json, views_grid, \
     views_karyomapping, views_autocomplete
 from library.django_utils.jqgrid_view import JQGridView
@@ -94,6 +94,10 @@ urlpatterns = [
 
     perm_path('analysis_issues/grid/<slug:op>/',
               JQGridView.as_view(grid=AnalysisNodeIssuesGrid), name='analysis_node_issues_grid'),
+
+    perm_path('node/ontology/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
+              JQGridView.as_view(grid=NodeOntologyGenesGrid), name='node_ontology_genes_grid'),
+
     perm_path('analysis_issues', views.view_analysis_issues, name='analysis_issues'),
 
     # Mutational Signature

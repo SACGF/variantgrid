@@ -4,6 +4,7 @@
 {% load related_analyses_tags %}
 {% load vcf_import_info_tags %}
 {% load js_tags %}
+{% load settings_tags %}
 
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
@@ -380,7 +381,10 @@ $(document).ready(function() {
         {% if has_write_permission %}
             <button id="vcf-submit-button" class="btn btn-primary">Update VCF</button>
             {% if user.is_superuser %}
-                <button id="vcf-populate-clingen-alleles" class="btn btn-primary">Populate ClinGen Alleles</button>
+                <button id="vcf-populate-clingen-alleles" class="btn btn-primary"
+                        title="Retrieves max {% settings_value 'CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS' %} ClinGen Alleles">
+                    Populate ClinGen Alleles
+                </button>
             {% endif %}
         {% else %}
             You can view but not modify this data.

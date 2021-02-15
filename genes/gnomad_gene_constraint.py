@@ -17,6 +17,8 @@ from genes.models import GnomADGeneConstraint,\
 from genes.models_enums import AnnotationConsortium
 import pandas as pd
 
+from library.pandas_utils import df_nan_to_none
+
 
 def store_gnomad_gene_constraint_from_web(cached_web_resource):
     """ https://gnomad.broadinstitute.org/downloads#gene-constraint """
@@ -30,6 +32,8 @@ def store_gnomad_gene_constraint_from_web(cached_web_resource):
 
 
 def store_gnomad_gene_constraint_from_df(cached_web_resource, df):
+    df = df_nan_to_none(df)
+
     # gnomAD use Ensembl genes
     transcripts_qs = Transcript.objects.filter(annotation_consortium=AnnotationConsortium.ENSEMBL)
     ensembl_transcript_ids = set(transcripts_qs.values_list("pk", flat=True))

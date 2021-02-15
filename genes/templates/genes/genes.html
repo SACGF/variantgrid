@@ -55,6 +55,11 @@
         }
     }
 
+    function geneSymbolLink(v) {
+        let url = Urls.view_gene_symbol(v);
+        return `<a href='${url}'>${v}</a>`;
+    }
+
     $(document).ready(function() {
         $("#id_release").change(function() {
             filterGrid();
@@ -64,6 +69,12 @@
             let geneId = $("#id_gene").val();
             window.location = Urls.view_gene(geneId);
         });
+
+        jQuery.extend($.fn.fmatter , {
+            'geneSymbolLink' : geneSymbolLink,
+        });
+
+
     });
 </script>
 

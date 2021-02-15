@@ -1,0 +1,4 @@
+{% load jqgrid_tags %}
+
+{% jqgrid 'patient_ontology_genes_grid' 'patient-hpo-genes' search=False download_grid_json_as_csv=True patient_id=patient.pk %}
+
