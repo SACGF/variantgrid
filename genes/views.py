@@ -41,7 +41,7 @@ from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountC
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
-from snpdb.variant_queries import get_has_classifications_q, get_has_variant_tags, get_variant_queryset_for_gene_symbol
+from snpdb.variant_queries import get_has_classifications_q, get_variant_queryset_for_gene_symbol
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification
 from classification.views.classification_datatables import ClassificationDatatableConfig

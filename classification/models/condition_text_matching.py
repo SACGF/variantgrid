@@ -70,8 +70,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     classification = models.OneToOneField(Classification, on_delete=CASCADE, null=True, blank=True)
 
     @classmethod
-    def get_permission_object(self):
-        return self.condition_text
+    def get_permission_object(cls):
+        return cls.condition_text
 
     @classmethod
     def get_permission_class(cls):
