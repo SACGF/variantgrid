@@ -1,5 +1,7 @@
 {% extends menu_analysis_base %}
 {% load static %}
+{% load ui_help %}
+{% load jqgrid_tags %}
 {% block title %}Analysis templates{% endblock title %}
 
 {% block jsdocumentready %}
@@ -14,9 +16,6 @@
 {% endblock jsdocumentready %}
 
 {% block submenu_page_content %}
-    {% block page_menu_help %}
-    {% endblock page_menu_help %}
-
     <div id="analysis-template-form-container">
       <form id="analysis-template-form" method="post">
         {% csrf_token %}
@@ -33,7 +32,8 @@
       </form>
     </div>
 
-    {% load jqgrid_tags %}
+    {% page_help page_id='analysis/analysis_templates_help' title='Analyses Templates' %}
+
     {% user_data_grid_filter 'analysis_templates' 'Analysis Templates' %}
     {% jqgrid 'analysis_templates_grid' 'analysis_templates' search=False delete=True %}
 
