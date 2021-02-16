@@ -24,7 +24,7 @@ from library.log_utils import report_exc_info
 from library.utils import ArrayLength
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyRelation, OntologyTermRelation
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
-    OPRPHAN_OMIM_TERMS, SearchText, pretty_set
+    OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
 from snpdb.models import Lab
 
 
@@ -601,7 +601,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                     term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias), deplural=True, deroman=True))
             term_tokens.add(str(matched_term.id).lower())
             term_tokens.add(str(matched_term.id.split(":")[1]))
-            extra_words = text_tokens.difference(term_tokens)
+            extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS
             if len(extra_words) >= 3:
                 cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
 

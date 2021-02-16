@@ -409,6 +409,21 @@
             });
         }
 
+        function parentTerms(rowDom) {
+            let parentId = rowDom.attr('data-parent-id');
+            if (parentId) {
+                let parent = $(`#condition-match-${parentId}`);
+                if (parent.is("[data-applied]")) {
+                    let terms = parent.attr('data-terms').split(",");
+                    if (terms.length) {
+                        return terms.map(t => t.trim()).join(", ");
+                    }
+                }
+                return parentTerms(parent);
+            }
+            return null;
+        }
+
         function applySuggestionUpdates(results, complete) {
             let suggestions = results.suggestions;
             if (complete) {
@@ -427,7 +442,9 @@
                     wrapper.attr('data-join', suggestion.joiner);
                     if (suggestion.is_applied) {
                         valuesDom.html(renderSuggestion(suggestion));
-                        wrapper.attr('data-applied', 'true');
+                        if (suggestion.terms && suggestion.terms.length) {
+                            wrapper.attr('data-applied', 'true');
+                        }
                     } else {
                         suggestionDom.html(renderSuggestion(suggestion));
                     }
@@ -435,15 +452,21 @@
             }
 
             let inheritings = $('.condition-match-row:not([data-applied])');
+            $('.inherit').remove();
             for (let inheriting of inheritings) {
                 inheriting = $(inheriting);
+                let inheritedTerms = parentTerms(inheriting);
                 let valuesDom = inheriting.find('.condition-match-values');
                 let parentId = inheriting.attr('data-parent-id');
                 if (parentId) {
                     let parent = $(`#condition-match-${parentId}`).attr('data-label');
-                    valuesDom.html($('<span>', {class:'text-muted font-italic', text:`Inherits from ${parent}`}))
+                    if (inheritedTerms) {
+                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:inheritedTerms, title:`Inherits from ${parent}`}));
+                    } else {
+                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`Inherits from ${parent}`}));
+                    }
                 } else {
-                    valuesDom.html($('<span>', {class:'text-muted font-italic', text:`No terms set`}));
+                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`No terms set`}));
                 }
             }
 
@@ -582,8 +605,13 @@
                 {% condition_match condition_match %}
             </ul>
         </form>
-        <button id="approve-suggestions" class="btn btn-primary" onclick="approveSuggestions()">
-            Approve suggestions
-        </button>
+        <div class="row">
+            <div class="col-7"></div>
+            <div class="col-5">
+                <button id="approve-suggestions" class="btn btn-primary" onclick="approveSuggestions()">
+                    Approve suggestions
+                </button>
+            </div>
+        </div>
     </div>
 {% endblock %}

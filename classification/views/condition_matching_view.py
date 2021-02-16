@@ -154,9 +154,11 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                             cms.add_message(ConditionMatchingMessage(severity="success",
                                                                      text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         else:
-                            cms.add_term(list(matches_gene_level)[0])  # not guaranteed to be a leaf, but no associations on child terms
+                            if not root_cms.ids_found_in_text: # don't suggest children of embedded terms, if the parent level is
+                                cms.add_term(list(matches_gene_level)[0])  # not guaranteed to be a leaf, but no associations on child terms
                     elif len(leafs) == 1:
-                        cms.add_term(leafs[0])
+                        if not root_cms.ids_found_in_text:  # don't suggest children of embedded terms, if the parent level is
+                            cms.add_term(leafs[0])
                     else:
                         cms.add_message(ConditionMatchingMessage(severity="info", text=f"Multiple children of {root_level_str} are associated to {gene_symbol}"))
 
@@ -175,6 +177,10 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                     for term in parent_term_has_gene:
                         cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                if root_cms.is_applied and not cms.terms:
+                    # if parent was applied, and all we have are warnings
+                    # put them in the applied column not suggestion
+                    cms.is_applied = True
 
     return suggestions
 
