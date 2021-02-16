@@ -319,6 +319,17 @@ class OntologyTermRelation(TimeStampedModel):
         return OntologyTerm.objects.filter(id__in=children_ids).order_by("-id")
 
     @staticmethod
+    def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
+        if term.ontology_service == OntologyService.MONDO:
+            return term
+        if mondo_rel := OntologyTermRelation.objects.filter(
+            (Q(source_term=term) & Q(dest_term__ontology_service=OntologyService.MONDO)) |
+            (Q(dest_term=term) & Q(source_term__ontology_service=OntologyService.MONDO))
+        ).filter(relation=OntologyRelation.EXACT).first():
+            return mondo_rel.other_end(term)
+        return None
+
+    @staticmethod
     def relations_of(term: OntologyTerm) -> List['OntologyTermRelation']:
         def sort_relationships(rel1, rel2):
             rel1source = rel1.source_term_id == term.id

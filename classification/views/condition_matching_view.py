@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import List, Optional, Set
 
 from django.contrib.auth.models import User
@@ -9,11 +8,11 @@ from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition
-from classification.regexes import db_ref_regexes
+from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition, \
+    ConditionMatchingMessage, ConditionMatchingSuggestion, top_level_suggestion
 from library.utils import empty_to_none, ArrayLength
 from ontology.models import OntologyTerm, OntologySnake, OntologyService, OntologyTermRelation
-from ontology.ontology_matching import normalize_condition_text, OntologyMatching
+from ontology.ontology_matching import normalize_condition_text
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 import re
 
@@ -83,87 +82,6 @@ def condition_matching_view(request, pk: int):
     })
 
 
-@dataclass
-class ConditionMatchingMessage:
-    severity: str
-    text: str
-
-    def as_json(self):
-        return {
-            "severity": self.severity,
-            "text": self.text
-        }
-
-
-class ConditionMatchingSuggestion:
-
-    def __init__(self, condition_text_match: ConditionTextMatch):
-        self.condition_text_match = condition_text_match
-        self.terms: List[OntologyTerm] = condition_text_match.condition_xref_terms
-        self.is_applied = not not self.terms
-        self.hidden = False
-        self.condition_multi_operation: MultiCondition = MultiCondition.NOT_DECIDED
-        if self.is_applied:
-            self.condition_multi_operation = condition_text_match.condition_multi_operation
-        self.messages: List[ConditionMatchingMessage] = list()
-
-    def add_term(self, term: OntologyTerm):
-        self.terms.append(term)
-
-    def add_message(self, message: ConditionMatchingMessage):
-        self.messages.append(message)
-
-    def as_json(self):
-        user_json = None
-        if self.terms and self.is_applied: # only report on user who filled in values
-            if user := self.condition_text_match.last_edited_by:
-                user_json = {"username": user.username}
-
-        return {
-            "id": self.condition_text_match.id,
-            "is_applied": self.is_applied,
-            "hidden": self.hidden,
-            "terms": [{"id": term.id, "name": term.name, "definition": '???' if term.is_stub else term.definition} for term in self.terms],
-            "joiner": self.condition_multi_operation,
-            "messages": [message.as_json() for message in self.messages],
-            "user": user_json
-        }
-
-    def __bool__(self):
-        return not not self.terms or not not self.messages
-
-
-def validate_suggestion(cms: ConditionMatchingSuggestion):
-    if terms := cms.terms:
-        # validate if we have multiple terms without a valid joiner
-        if len(terms) > 1 and cms.condition_multi_operation not in {MultiCondition.UNCERTAIN, MultiCondition.CO_OCCURRING}:
-            cms.add_message(ConditionMatchingMessage(severity="error",
-                                                     text="Multiple terms provided, requires co-occurring/uncertain"))
-
-        if valid_terms := [term for term in terms if not term.is_stub]:
-            ontology_services: Set[str] = set()
-            for term in valid_terms:
-                ontology_services.add(term.ontology_service)
-            if len(ontology_services) > 1:
-                cms.add_message(ConditionMatchingMessage(severity="error", text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
-
-            # validate that the terms have a known gene association if we're at gene level
-            if cms.condition_text_match.is_gene_level:
-                gene_symbol = cms.condition_text_match.gene_symbol
-                # TODO ensure gene relationships are up to date
-                if not OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
-                    cms.add_message(ConditionMatchingMessage(severity="warning",
-                                                                 text=f"{term.id} : no direct relationship on file to {gene_symbol.symbol}"))
-
-        # validate that we have the terms being referenced (if we don't big chance that they're not valid)
-        for term in terms:
-            if term.is_stub:
-                cms.add_message(ConditionMatchingMessage(severity="warning",
-                                                         text=f"{term.id} : no copy of this term in our system"))
-            elif term.is_obsolete:
-                cms.add_message(ConditionMatchingMessage(severity="error", text=f"{term.id} : is marked as obsolete"))
-
-
 def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: Set[OntologyTerm], check_levels: int = 4):
     # TODO move this to OntologyTerm class
     for term in terms:
@@ -194,18 +112,10 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
 
     root_cms = ConditionMatchingSuggestion(root_level)
     if not root_cms.terms:
-        root_suggestion = OntologyMatching.top_level_suggestion(ct.normalized_text, fallback_to_online=True)
-        if terms := root_suggestion.terms:
-            for term in terms:
-                root_cms.add_term(term)
-            if root_suggestion.ids_in_text_warning:
-                root_cms.add_message(ConditionMatchingMessage(severity="warning", text=root_suggestion.ids_in_text_warning))
-            if root_suggestion.alias_index is not None and root_suggestion.alias_index > 1:
-                root_cms.add_message(ConditionMatchingMessage(severity="info", text="Found via OMIM alias"))
-            if not root_suggestion.ids_in_text and not root_suggestion.is_leaf():
-                root_cms.hidden = True
+        root_cms = top_level_suggestion(ct.normalized_text, fallback_to_online=True)
+        root_cms.condition_text_match = root_level
 
-    validate_suggestion(root_cms)
+    root_cms.validate()
     suggestions.append(root_cms)
 
     # filled in and gene level, exclude root as we take care of that before-hand
@@ -213,7 +123,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
     for ctm in filled_in:
         if ctm.condition_xref_terms:
             cms = ConditionMatchingSuggestion(ctm)
-            validate_suggestion(cms)
+            cms.validate()
             suggestions.append(cms)
 
         elif ctm.is_gene_level:  # should be the only other option
@@ -289,7 +199,7 @@ class ConditionTextMatchingAPI(APIView):
         ct.check_can_write(user)
 
         data = request.data.get("changes")
-        ctm: ConditionTextMatch
+        ctm: Optional[ConditionTextMatch] = None
         for update in data:
             terms = update.get('terms')
             if terms:
@@ -304,10 +214,10 @@ class ConditionTextMatchingAPI(APIView):
         update_condition_text_match_counts(ct)
         ct.save()
 
-        if len(data) == 1 and not ctm.is_root and not (ctm.is_gene_level and not ctm.condition_xrefs):
+        if len(data) == 1 and ctm and not ctm.is_root and not (ctm.is_gene_level and not ctm.condition_xrefs):
             # if we only have 1 suggestion, and it's not the root, and isn't a blanked out record with empty conditions
             cms = ConditionMatchingSuggestion(ctm)
-            validate_suggestion(cms)
+            cms.validate()
             return Response({
                 "suggestions": [cms.as_json()]
             })

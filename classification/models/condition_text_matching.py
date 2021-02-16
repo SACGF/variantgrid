@@ -1,8 +1,12 @@
-from typing import List, Optional, Dict, Any, Iterable
+import operator
+from dataclasses import dataclass
+from functools import reduce
+from typing import List, Optional, Dict, Any, Iterable, Set
 
+import requests
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import CASCADE, QuerySet, SET_NULL
+from django.db.models import CASCADE, QuerySet, SET_NULL, Q
 from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from lazy import lazy
@@ -10,7 +14,7 @@ from model_utils.models import TimeStampedModel
 from django.db import models, transaction
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
-    flag_types, EvidenceKey, EvidenceKeyMap
+    flag_types, EvidenceKeyMap
 from classification.regexes import db_ref_regexes, DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
@@ -18,8 +22,9 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from library.utils import ArrayLength
-from ontology.models import OntologyTerm
-from ontology.ontology_matching import OntologyMatching, normalize_condition_text
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyRelation, OntologyTermRelation
+from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
+    OPRPHAN_OMIM_TERMS, SearchText, pretty_set
 from snpdb.models import Lab
 
 
@@ -103,7 +108,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return self.gene_symbol.symbol
         return "Default"
 
-    @classmethod
     def get_permission_object(self):
         return self.condition_text
 
@@ -252,7 +256,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @lazy
     def children(self) -> QuerySet:
-        order_by = None
+        order_by: str
         if self.is_root:
             order_by = 'gene_symbol__symbol'
         elif self.is_gene_level:
@@ -290,7 +294,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         try:
             if root := condition_text.root:
-                if match := OntologyMatching.top_level_suggestion(condition_text.normalized_text, fallback_to_online=server_search):
+                if match := top_level_suggestion(condition_text.normalized_text, fallback_to_online=server_search):
                     if match.is_auto_assignable():
                         root.condition_xrefs = match.terms
                         root.last_edited_by = admin_bot()
@@ -421,6 +425,117 @@ def update_condition_text_match_counts(ct: ConditionText):
     ct.classifications_count_outstanding = invalid_count
 
 
+@dataclass
+class ConditionMatchingMessage:
+    severity: str
+    text: str
+
+    def as_json(self):
+        return {
+            "severity": self.severity,
+            "text": self.text
+        }
+
+
+class ConditionMatchingSuggestion:
+
+    def __init__(self, condition_text_match: Optional[ConditionTextMatch] = None):
+        self.condition_text_match = condition_text_match
+        self.terms: List[OntologyTerm] = condition_text_match.condition_xref_terms if condition_text_match else []
+        self.is_applied = bool(self.terms)
+        self.hidden = False
+        self.condition_multi_operation: MultiCondition = MultiCondition.NOT_DECIDED
+        if self.is_applied:
+            self.condition_multi_operation = condition_text_match.condition_multi_operation
+        self.messages: List[ConditionMatchingMessage] = list()
+        self.validated = False
+        self.ids_found_in_text: Optional[bool] = None
+
+    def add_term(self, term: OntologyTerm):
+        self.terms.append(term)
+
+    def add_message(self, message: ConditionMatchingMessage):
+        self.messages.append(message)
+
+    def as_json(self):
+        user_json = None
+        if self.terms and self.is_applied: # only report on user who filled in values
+            if condition_text_match := self.condition_text_match:
+                if user := self.condition_text_match.last_edited_by:
+                    user_json = {"username": user.username}
+
+        return {
+            "id": self.condition_text_match.id if self.condition_text_match else None,
+            "is_applied": self.is_applied,
+            "hidden": self.hidden,
+            "terms": [{"id": term.id, "name": term.name, "definition": '???' if term.is_stub else term.definition} for term in self.terms],
+            "joiner": self.condition_multi_operation,
+            "messages": [message.as_json() for message in self.messages],
+            "user": user_json
+        }
+
+    def is_auto_assignable(self):
+        # FIXME need to know if was assigned via embedded terms or not
+        if terms := self.terms:
+            if len(terms) != 1:
+                return False
+            if self.messages:
+                return False
+            if self.ids_found_in_text or self.is_all_leafs():
+                return True
+        return False
+
+    def validate(self):
+        if self.validated:
+            return
+        else:
+            self.validated = True
+        if terms := self.terms:
+            # validate if we have multiple terms without a valid joiner
+            if len(terms) > 1 and self.condition_multi_operation not in {MultiCondition.UNCERTAIN,
+                                                                        MultiCondition.CO_OCCURRING}:
+                self.add_message(ConditionMatchingMessage(severity="error",
+                                                         text="Multiple terms provided, requires co-occurring/uncertain"))
+
+            if valid_terms := [term for term in terms if not term.is_stub]:
+                ontology_services: Set[str] = set()
+                for term in valid_terms:
+                    ontology_services.add(term.ontology_service)
+                if len(ontology_services) > 1:
+                    self.add_message(ConditionMatchingMessage(severity="error",
+                                                             text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
+
+                # validate that the terms have a known gene association if we're at gene level
+                if ctm := self.condition_text_match:
+                    if ctm.is_gene_level:
+                        gene_symbol = self.condition_text_match.gene_symbol
+                        # TODO ensure gene relationships are up to date
+                        for term in valid_terms:
+                            if not OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
+                                self.add_message(ConditionMatchingMessage(severity="warning",
+                                                                         text=f"{term.id} : no direct relationship on file to {gene_symbol.symbol}"))
+
+            # validate that we have the terms being referenced (if we don't big chance that they're not valid)
+            for term in terms:
+                if term.is_stub:
+                    self.add_message(ConditionMatchingMessage(severity="warning",
+                                                             text=f"{term.id} : no copy of this term in our system"))
+                elif term.is_obsolete:
+                    self.add_message(
+                        ConditionMatchingMessage(severity="error", text=f"{term.id} : is marked as obsolete"))
+
+    def is_all_leafs(self):
+        if terms := self.terms:
+            for term in terms:
+                if not term.is_leaf:
+                    return False
+            return True
+        return None
+
+    def __bool__(self):
+        return not not self.terms or not not self.messages
+
+
 @receiver(classification_post_publish_signal, sender=Classification)
 def published(sender,
               classification: Classification,
@@ -445,3 +560,105 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
         cl: Classification
         if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version)
+
+
+def top_level_suggestion(text: str, fallback_to_online: bool = True) -> ConditionMatchingSuggestion:
+    if suggestion := embedded_ids_check(text):
+        return suggestion
+    return search_suggestion(text, fallback_to_online=fallback_to_online)
+
+
+def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
+    cms = ConditionMatchingSuggestion()
+
+    db_matches = db_ref_regexes.search(text)
+    detected_any_ids = bool(db_matches)  # see if we found any prefix suffix, if we do,
+    db_matches = [match for match in db_matches if match.db in ["OMIM", "HP", "MONDO"]]
+
+    for match in db_matches:
+        cms.add_term(OntologyTerm.get_or_stub(match.id_fixed))
+
+    found_stray_omim = False
+
+    # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
+    if not detected_any_ids:
+        stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(text)
+        stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
+        if stray_omim_matches:
+            for omim_index in stray_omim_matches:
+                omim = OntologyTerm.get_or_stub(f"OMIM:{omim_index}")
+                cms.add_term(omim)
+                cms.add_message(ConditionMatchingMessage(severity="warning", text=f"OMIM:{omim_index} was found without a prefix"))
+
+    if cms.terms:
+        cms.ids_found_in_text = True
+        if len(cms.terms) == 1:
+            matched_term = cms.terms[0]
+            text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text), deplural=True, deroman=True)
+            term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name), deplural=True, deroman=True)
+            if aliases := matched_term.aliases:
+                for alias in aliases:
+                    term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias), deplural=True, deroman=True))
+            term_tokens.add(str(matched_term.id).lower())
+            term_tokens.add(str(matched_term.id.split(":")[1]))
+            extra_words = text_tokens.difference(term_tokens)
+            if len(extra_words) >= 3:
+                cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
+
+    cms.validate()
+    return cms
+
+
+def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> ConditionMatchingSuggestion:
+    cms = ConditionMatchingSuggestion()
+    if match_info := search_text.matches(term):
+        if match_info.alias_index and match_info.alias_index >= 2:  # 0 alias is complete with acronymn, 1 alias without acronymn
+            cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Text matched on alias of {term.id}"))
+        if term.ontology_service == OntologyService.OMIM:
+            if mondo := OntologyTermRelation.as_mondo(term):
+                term = mondo
+
+        cms.add_term(term)
+        cms.validate()
+        return cms
+    return cms
+
+
+def search_suggestion(text: str, fallback_to_online: bool = True) -> ConditionMatchingSuggestion:
+    match_text = SearchText(text)
+    q = list()
+    # TODO, can we leverage phenotype matching?
+    for term in match_text.prefix_terms:
+        if len(term) > 2:
+            # TODO evaluate if it was worth it comparing aliases
+            q.append(Q(name__icontains=term) | Q(aliases__icontains=term))
+    # don't bother with searching for suffix, just find them all and see how we go with the matching
+    local_term_count = 0
+    if q:
+
+        for term in OntologyTerm.objects.filter(ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}).filter(reduce(
+                operator.and_, q)).order_by('ontology_service')[0:100]:
+            local_term_count += 1
+            if cms := search_text_to_suggestion(match_text, term):
+                return cms
+
+    if fallback_to_online:
+        try:
+            # TODO ensure "text" is safe, it should already be normalised
+            results = requests.get(
+                f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
+                    "prefix": "MONDO",
+                    "rows": 10,
+                    "minimal_tokenizer": "false",
+                    "category": "disease"
+                }).json().get("docs")
+
+            for result in results:
+                o_id = result.get('id')
+                # result.get('label') gives the label as it's known by the search server
+                term = OntologyTerm.get_or_stub(o_id)
+                if cms := search_text_to_suggestion(match_text, term):
+                    return cms
+        except:
+            print("Error searching server")
+    return ConditionMatchingSuggestion()

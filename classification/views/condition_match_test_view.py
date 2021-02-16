@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
-from classification.models import ConditionText
+from classification.models import ConditionText, top_level_suggestion
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
@@ -17,7 +17,7 @@ def condition_match_test_download_view(request):
         try:
             row_count = 0
             yield delimited_row([
-                "id", "classification_count", "lab", "text", "suggestion", "auto-assignable", "found_externally"
+                "id", "classification_count", "lab", "text", "suggestion", "auto-assignable"
             ])
 
             ct: ConditionText
@@ -26,7 +26,7 @@ def condition_match_test_download_view(request):
                               .select_related('lab')\
                               .order_by('-classifications_count'):
 
-                suggestion = OntologyMatching.top_level_suggestion(ct.normalized_text, fallback_to_online=check_sever)
+                suggestion = top_level_suggestion(ct.normalized_text, fallback_to_online=check_sever)
                 term_text = ""
                 if terms := suggestion.terms:
                     term_text = "\t".join([f"{term.id} : {term.name}" for term in terms])
@@ -37,8 +37,7 @@ def condition_match_test_download_view(request):
                     ct.lab.name,
                     ct.normalized_text,
                     term_text,
-                    "TRUE" if suggestion.is_auto_assignable() else "FALSE",
-                    "TRUE" if suggestion.checked_server_terms > 0 and bool(suggestion.terms) else "FALSE"
+                    "TRUE" if suggestion.is_auto_assignable() else "FALSE"
                 ])
                 row_count += 1
 
@@ -72,7 +71,7 @@ def condition_match_test_view(request):
                 valid = False
     if valid:
         auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
-        suggestion = OntologyMatching.top_level_suggestion(normalize_condition_text(condition_text), fallback_to_online=True)
+        suggestion = top_level_suggestion(normalize_condition_text(condition_text), fallback_to_online=True)
         attempted = True
 
     context = {

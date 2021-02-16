@@ -15,7 +15,37 @@
         <h3>Condition Match Testing</h3>
         {% page_help_embedded title='Condition Match Testing' %}
             <p>
-            Help will go here for matching text to conditions
+            This page lets admin users test text to see what terms will be auto applied or suggested.
+            </p>
+            <p>
+                Download: this shows you top level suggestions across all records, it will not show gene level suggestions.<br/>
+                Note that some top level suggestions will actually be hidden and automatically converted to gene level suggestions
+                on the relevant page.<br/>
+                Enabling "Fallback to External Server Search" will take a *lot* longer but give you more accurate results.
+            </p>
+            <p>
+                Condition text will be normalised, split into terms, de-pluralised and split into prefix and suffix parts.<br/>
+                To be a top auto-assignment the text must have no warnings and be:<br/>
+                A directly embedded ID e.g. MONDO:0000777 <br/>
+                or<br/>
+                Text that matches a MONDO name where that MONDO term is a leaf (if it's not a leaf it will be used as a basis for making gene level suggestions).<br/>
+                or<br/>
+                Text that matches an OMIM name (if it matches an OMIM alias then it will only be a suggestion). In either scenario the OMIM term should be converted
+                to the equivalent MONDO term.
+            </p>
+            <p>
+                The following validation warnings can only happen in suggestions:
+                <ul>
+                <li>The term was found by converting a stray number to an OMIM ID</li>
+                <li>A single embedded ID was found, but it also has more than 3 words that don't line up to the term's name or description</li>
+                </ul>
+                The following validation warnings can occur on suggestions or user selected values:
+                <ul>
+                <li>Multiple terms are embedded and co-occuring/uncertain hasn't been selected yet (can't provide that in text just yet)</li>
+                <li>Multiple kinds of terms are embedded, e.g. "MONDO:0000777, OMIM:102403"</li>
+                <li>A term has the word "obsolete" in its name e.g. MONDO:0200001</li>
+                <li>The term doesn't exist in our database</li>
+                </ul>
             </p>
         {% end_page_help_embedded %}
 
@@ -60,21 +90,22 @@
                         {% endfor %}
                     {% endif %}{% endlabelled %}
                     {% labelled label="Can auto-assign (without confirmation)" %}{{ suggestion.is_auto_assignable }}{% endlabelled %}
-                    {% if suggestion.terms %}
-                        {% labelled label="Is leaf term" %}{{ suggestion.is_leaf }}{% endlabelled %}
-                        {% labelled label="Is obsolete" %}{{ suggestion.is_obsolete }}{% endlabelled %}
+                    {% if suggestion.messages %}
+                        {% labelled label="Term warnings" %}
+                            <ul class="list-group">
+                                {% for message in suggestion.messages %}
+                                    <li class="list-group-item">{{ message.severity | severity_icon }} {{ message.text }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endlabelled %}
                     {% endif %}
-                    {% if suggestion.alias_index %}
-                        {% labelled label="OMIM index found in" %}{{ suggestion.alias_index }}{% endlabelled %}
-                    {% endif %}
-                    {% labelled label="Found IDs in text" %}{{ suggestion.ids_in_text }}{% endlabelled %}
-                    {% labelled label="Found IDs in text warning" %}{{ suggestion.ids_in_text_warning }}{% endlabelled %}
-                    {% labelled label="Local database candidate terms inspected" %}{{ suggestion.checked_local_terms }}{% endlabelled %}
-                    {% labelled label="MONDO search server candidate terms inspected" %}{{ suggestion.checked_server_terms }}{% endlabelled %}
+                    {% labelled label="Term IDs found in text" %}{{ suggestion.ids_found_in_text|default_if_none:'False' }}{% endlabelled %}
+                    {% labelled label="All terms are leafs" %}{{ suggestion.is_all_leafs }}{% endlabelled %}
                 </div>
             </div>
 
             {% if auto_matches %}
+            <h4 class="mt-4">User Picker Suggestions</h4>
             <table class="table">
                 <thead>
                     <tr>

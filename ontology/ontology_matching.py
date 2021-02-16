@@ -1,11 +1,8 @@
-import operator
 import re
 from dataclasses import dataclass
-from functools import reduce
 from typing import Dict, Optional, List, Any, Set, Iterable
 
 import requests
-from django.db.models import Q
 from django.urls import reverse
 from lazy import lazy
 
@@ -99,6 +96,7 @@ ROMAN = {
     "ix": '9'
 }
 
+
 @dataclass
 class MatchInfo:
     alias_index: Optional[int] = None
@@ -111,7 +109,7 @@ class SearchText:
         return ROMAN.get(numeral, numeral)
 
     @staticmethod
-    def tokenize_condition_text(text: str, deplural=False) -> Set[str]:
+    def tokenize_condition_text(text: str, deplural=False, deroman=False) -> Set[str]:
         if text is None:
             return set()
         text = text.replace(";", " ").replace("-", " ").lower()
@@ -123,6 +121,8 @@ class SearchText:
                     token = token[0:-1]
                 new_tokens.append(token)
             tokens = new_tokens
+        if deroman:
+            tokens = [SearchText.roman_to_arabic(token) for token in tokens]
         return set(tokens)
 
     def __init__(self, text: str):
@@ -138,7 +138,7 @@ class SearchText:
             self.suffix = sub_type_match.group(2).strip()
 
             self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deplural=True)) - PREFIX_SKIP_TERMS
-            self.suffix_terms = set(SearchText.roman_to_arabic(term) for term in SearchText.tokenize_condition_text(self.suffix)) - SUFFIX_SKIP_TERMS
+            self.suffix_terms = set(SearchText.tokenize_condition_text(self.suffix, deroman=True)) - SUFFIX_SKIP_TERMS
         else:
             self.prefix = normal_text
             self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deplural=True)) - PREFIX_SKIP_TERMS
@@ -188,143 +188,7 @@ def normalize_condition_text(text: str):
     return text
 
 
-@dataclass
-class TopLevelSuggestionDetails:
-    terms: Optional[List[OntologyTerm]]
-    ids_in_text: bool = False
-    ids_in_text_warning: str = None
-    checked_local_terms: int = 0
-    checked_server_terms: int = 0
-    alias_index: Optional[int] = None
-
-    def is_auto_assignable(self):
-        if terms := self.terms:
-            if len(terms) != 1:
-                return False
-            if self.ids_in_text_warning:
-                return False
-            if self.alias_index is not None and self.alias_index > 1:
-                return False
-            if not self.is_leaf:
-                return False
-            if self.is_obsolete:
-                return False
-            return True
-        return False
-
-    def __bool__(self):
-        return bool(self.terms)
-
-    @property
-    def is_obsolete(self):
-        if terms := self.terms:
-            for term in terms:
-                if term.is_obsolete:
-                    return True
-        return False
-
-    def is_leaf(self):
-        if terms := self.terms:
-            for term in terms:
-                if not term.is_leaf:
-                    return False
-            return True
-        return None
-
-
 class OntologyMatching:
-
-    @staticmethod
-    def top_level_suggestion(text: str, fallback_to_online: bool = True) -> TopLevelSuggestionDetails:
-        if suggestion := OntologyMatching.embedded_ids_check(text):
-            return suggestion
-        return OntologyMatching.search_suggestion(text, fallback_to_online=fallback_to_online)
-
-    @staticmethod
-    def embedded_ids_check(text: str) -> Optional[TopLevelSuggestionDetails]:
-
-        db_matches = db_ref_regexes.search(text)
-        detected_any_ids = bool(db_matches)  # see if we found any prefix suffix, if we do,
-        db_matches = [match for match in db_matches if match.db in ["OMIM", "HP", "MONDO"]]
-
-        found_terms = list()
-        for match in db_matches:
-            found_terms.append(OntologyTerm.get_or_stub(match.id_fixed))
-
-        found_stray_omim = False
-
-        # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
-        if not detected_any_ids:
-            stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(text)
-            stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
-            if stray_omim_matches:
-                for omim_index in stray_omim_matches:
-                    omim = OntologyTerm.get_or_stub(f"OMIM:{omim_index}")
-                    found_terms.append(omim)
-                    found_stray_omim = True
-        if found_terms:
-            warning = None
-            if found_stray_omim:
-                warning = "Detected OMIM terms from raw numbers without prefix"
-
-            return TopLevelSuggestionDetails(terms=found_terms, ids_in_text=True, ids_in_text_warning=warning)
-
-        return None
-
-    @staticmethod
-    def search_suggestion(text: str, fallback_to_online: bool = True) -> TopLevelSuggestionDetails:
-        match_text = SearchText(text)
-        q = list()
-        # TODO, can we leverage phenotype matching?
-        for term in match_text.prefix_terms:
-            if len(term) > 2:
-                # TODO evaluate if it was worth it comparing aliases
-                q.append(Q(name__icontains=term) | Q(aliases__icontains=term))
-        # don't bother with searching for suffix, just find them all and see how we go with the matching
-        local_term_count = 0
-        if q:
-
-            for term in OntologyTerm.objects.filter(ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}).filter(reduce(operator.and_, q)).order_by('ontology_service')[0:100]:
-                local_term_count += 1
-                if match_info := match_text.matches(term):
-                    return TopLevelSuggestionDetails(
-                        terms=[term],
-                        checked_local_terms=local_term_count,
-                        alias_index=match_info.alias_index
-                    )
-
-        server_term_count = 0
-        if fallback_to_online:
-            try:
-                # TODO ensure "text" is safe, it should already be normalised
-                results = requests.get(
-                    f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
-                        "prefix": "MONDO",
-                        "rows": 10,
-                        "minimal_tokenizer": "false",
-                        "category": "disease"
-                    }).json().get("docs")
-
-                for result in results:
-                    server_term_count += 1
-                    o_id = result.get('id')
-                    # result.get('label') gives the label as it's known by the search server
-                    term = OntologyTerm.get_or_stub(o_id)
-                    if match_info := match_text.matches(term):
-                        return TopLevelSuggestionDetails(
-                            terms=[term],
-                            checked_local_terms=local_term_count,
-                            checked_server_terms=server_term_count,
-                            alias_index=match_info.alias_index
-                        )
-            except:
-                print("Error searching server")
-
-        return TopLevelSuggestionDetails(
-            terms=None,
-            checked_local_terms=local_term_count,
-            checked_server_terms=server_term_count,
-        )
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
         self.term_map: Dict[str, OntologyMatch] = dict()
@@ -341,137 +205,6 @@ class OntologyMatching:
             self.term_map[term_id] = mondo
 
         return mondo
-
-    """
-    def apply_scores(self):
-        for match in self.term_map.values():
-            self.apply_score(match)
-
-    def apply_score(self, match: OntologyMatch):
-        scores: List[OntologyMatch.Score] = list()
-        regular_match = True
-        if match.direct_reference:
-            regular_match = False
-            scores.append(OntologyMatch.Score(
-                name="Directly referenced",
-                unit=1, max=1000, note=""
-            ))
-        if match.term.is_stub:
-            # Should this be prioritised over direct reference?
-            regular_match = False
-            scores.append(OntologyMatch.Score(
-                name="No copy of this term in our database",
-                unit=1, max=-100, note=""
-            ))
-        if match.term.is_obsolete:
-            regular_match = False
-            scores.append(OntologyMatch.Score(
-                name="This term is marked as obsolete",
-                unit=1, max=-100, note=""
-            ))
-
-        if regular_match:
-            match_text = SearchText(match.term.name)
-            if search_text := self.search_text and self.search_text.raw:
-
-                superfluous_words = set()
-                missing_words = set()
-                missing_word_ratio = 0
-                superfluous_word_ratio = 0
-
-                search_text_terms: Set[str]
-                match_text_terms: Set[str]
-                if self.search_text.suffix_terms or not self.gene_symbol:
-                    search_text_terms = self.search_text.all_terms
-                    match_text_terms = match_text.all_terms
-                else:
-                    # match has a suffix and search term doesn't (but does have a gene symbol)
-                    # so don't penalise for the suffix
-                    search_text_terms = self.search_text.prefix_terms
-                    match_text_terms = match_text.prefix_terms
-
-                missing_words = search_text_terms.difference(match_text_terms)
-                missing_word_ratio = float(len(missing_words)) / float(len(search_text_terms))
-
-                superfluous_words = match_text_terms.difference(search_text_terms)
-                superfluous_word_ratio = float(len(superfluous_words)) / float(len(match_text_terms))
-
-                scores.append(OntologyMatch.Score(
-                    name="Word Matching", max=40, unit=1 - missing_word_ratio,
-                    note=f"Missing words {pretty_set(missing_words)}" if missing_words else "No missing words"
-                ))
-                scores.append(OntologyMatch.Score(
-                    name="Limited extra words bonus", max=40, unit=1 - superfluous_word_ratio,
-                    note=f"Superfluous words {pretty_set(superfluous_words)}" if superfluous_words else "No superfluous words"
-                ))
-                injected_suffix = match_text.suffix_terms and not self.search_text.suffix_terms
-                if injected_suffix:
-                    scores.append(OntologyMatch.Score(
-                        name="Extra suffix", max=-1, unit=1,
-                        note=f"Has extra suffix of '{match_text.suffix}'"
-                    ))
-
-            if gene_symbol := self.gene_symbol:
-                # TODO work out if we want to apply different scores to different matches
-                source_codes = set()
-                for snake in match.gene_relationships:
-                    relationship_source = snake.show_steps()[0].relation.from_import.import_source  # remember these steps are from gene to term, so the first step describes the relationship to the gene
-                    source_codes.add(relationship_source)
-
-                sources = list()
-                # these are the only sources we care about?
-                if OntologyImportSource.PANEL_APP_AU in source_codes:
-                    sources.append("PanelAPP AU")
-                if OntologyImportSource.MONDO in source_codes:
-                    sources.append("MONDO")
-                if OntologyImportSource.HPO in source_codes:
-                    sources.append("NCBI")
-
-                if not sources:
-                    scores.append(OntologyMatch.Score(
-                        name="Gene relationship", max=20, unit=0,
-                        note="No relationship between this term and gene in our database"
-                    ))
-                else:
-                    scores.append(OntologyMatch.Score(
-                        name="Gene relationship", max=20, unit=1,
-                        note=f"Has relationships via {pretty_set(sources)}"
-                    ))
-                    if not match.is_leaf:
-                        scores.append(OntologyMatch.Score(
-                            name="Gene relationship - not leaf leaf term", max=-2, unit=1,
-                            note="Term has children, could be more specific"
-                        ))
-            else:
-                scores.append(OntologyMatch.Score(
-                    name="Gene relationship", max=20, unit=1,
-                    note=f"Matching on gene not required at this level"
-                ))
-
-        match.scores = scores
-        total = 0
-        for score in scores:
-            total += score.score
-        match.score = total
-        
-    def only_top_term(self) -> Optional[OntologyMatch]:
-        tops = self.top_terms()
-        if len(tops) == 1:
-            return tops[0]
-        else:
-            return None
-
-    def top_terms(self) -> List[OntologyMatch]:
-        top_values: List[OntologyMatch] = list()
-        for match in self:
-            if len(top_values) == 0:
-                top_values.append(match)
-            elif top_values[0].score == match.score:
-                top_values.append(match)
-            else:
-                return top_values
-        return top_values
-    """
 
     def populate_relationships(self, server_search=True):
         if gene_symbol := self.gene_symbol:
