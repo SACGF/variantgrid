@@ -46,7 +46,6 @@
                     default: finalText += "; uncertain/co-occurring"; break;
                 }
             }
-            console.log(finalText); // though we if change this to API no need to mangle them together
             applyChange(parseInt(id, 10), terms, mode);
         }
 
@@ -262,51 +261,55 @@
         function renderSuggestion(suggestion, id) {
             let dom = $('<div>');
             if (suggestion.terms && suggestion.terms.length) {
-                if (suggestion.user) {
-                    $('<div>', {text: `Set by ${suggestion.user.username}`, class:'text-secondary'}).appendTo(dom);
-                }
                 let termStyle = '';
                 if (!suggestion.is_applied) {
-                    let wrapper = $(`#condition-match-${suggestion.id}`);
-                    let parentId = wrapper.attr('data-parent-id');
-                    if (parentId) {
-                        let parent = $(`#condition-match-${parentId}`).attr('data-name');
-                        dom.append($('<div>', {class:'text-muted font-italic', text:`Inherits from ${parent}`}));
-                    } else {
-                        dom.append($('<div>', {class:'text-muted font-italic', text:`No terms provided`}));
-                    }
 
-                    $('<label>', {style: 'margin-left:1.25rem', html:[
-                        $('<input>', {type: 'checkbox', class:'form-check-input suggestion-checkbox', checked:'checked', click:() => {checkSuggestionCount()}}),
-                        'Suggestion',
-                    ]}).appendTo(dom);
+                    $('<label>', {
+                        style: 'margin-left:1.25rem', html: [
+                            $('<input>', {
+                                type: 'checkbox',
+                                class: 'form-check-input suggestion-checkbox',
+                                checked: 'checked',
+                                click: () => {
+                                    checkSuggestionCount()
+                                }
+                            }),
+                            'Selected',
+                        ]
+                    }).appendTo(dom);
                     termStyle = 'opacity:0.5';
                 }
                 for (let term of suggestion.terms) {
                     // TODO use generated URL
-                    let termDom = $('<div>', {style:termStyle, html:[
-                            $('<a>', {href:`/ontology/term/${term.id.replace(':','_')}`, text:term.id, target:'_blank', title:term.definition, 'data-toggle':'tooltip'}),
+                    let termDom = $('<div>', {
+                        style: termStyle, html: [
+                            $('<a>', {
+                                href: `/ontology/term/${term.id.replace(':', '_')}`,
+                                text: term.id,
+                                target: '_blank',
+                                title: term.definition,
+                                'data-toggle': 'tooltip'
+                            }),
                             ' ',
                             term.name
-                    ]});
+                        ]
+                    });
                     dom.append(termDom);
                 }
                 if (suggestion.terms.length > 1) {
                     let joiner_text = 'combination type undecided';
                     switch (suggestion.joiner) {
-                        case 'U': joiner_text = 'Uncertain'; break;
-                        case 'C': joiner_text = 'Co-occurring'; break;
+                        case 'U':
+                            joiner_text = 'Uncertain';
+                            break;
+                        case 'C':
+                            joiner_text = 'Co-occurring';
+                            break;
                     }
                     $('<div>', {text: joiner_text}).appendTo(dom);
                 }
-            } else {
-                let wrapper = $(`#condition-match-${suggestion.id}`);
-                let parentId = wrapper.attr('data-parent-id');
-                if (parentId) {
-                    let parent = $(`#condition-match-${parentId}`).attr('data-name');
-                    dom.append($('<span>', {class:'text-muted font-italic', text:`Inherits from ${parent}`}));
-                } else {
-                    dom.append($('<span>', {class:'text-muted font-italic', text:`No terms suggested`}));
+                if (suggestion.user) {
+                    $('<div>', {text: `Set by ${suggestion.user.username}`, class:'text-secondary'}).appendTo(dom);
                 }
             }
             if (suggestion.messages && suggestion.messages.length) {
@@ -322,9 +325,9 @@
         }
 
         function checkSuggestionCount() {
-            let checkedCount = $('.suggestion-checkbox:checked').parents('.condition-match-placeholder').length;
+            let checkedCount = $('.suggestion-checkbox:checked').length;
             let button = $('#approve-suggestions');
-            button.text(`Approve ${checkedCount} suggestion${checkedCount === 1 ? '' : 's'}`);
+            button.text(`Apply ${checkedCount} selected suggestion${checkedCount === 1 ? '' : 's'}`);
             if (checkedCount === 0) {
                 button.hide();
             } else {
@@ -333,7 +336,7 @@
         }
 
         function approveSuggestions() {
-            let checked = $('.suggestion-checkbox:checked').parents('.condition-match-placeholder');
+            let checked = $('.suggestion-checkbox:checked').parents('.condition-match-row');
             let changes = [];
             for (let placeholder of checked) {
                 placeholder = $(placeholder);
@@ -347,6 +350,7 @@
                 });
             }
             if (changes.length) {
+                console.log(changes);
                 applyChanges(changes);
             }
         }
@@ -408,27 +412,41 @@
         function applySuggestionUpdates(results, complete) {
             let suggestions = results.suggestions;
             if (complete) {
-                $('.condition-match-placeholder').empty().removeAttr('data-terms').removeAttr('data-join', '');
+                $('.condition-match-row').removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied');
             }
             for (let suggestion of suggestions) {
+                let wrapper = $(`#condition-match-${suggestion.id}`);
+                wrapper.removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied');
+
+                let valuesDom = wrapper.find('.condition-match-values').empty();
+                let suggestionDom = wrapper.find('.condition-match-suggestion').empty();
+
                 if (!suggestion.hidden) {
-                    let wrapper = $(`#condition-match-${suggestion.id}`);
-                    wrapper.html(renderSuggestion(suggestion));
                     wrapper.attr('data-terms', suggestion.terms.map(term => term.id).join(","));
+                    console.log(suggestion.joiner);
                     wrapper.attr('data-join', suggestion.joiner);
+                    if (suggestion.is_applied) {
+                        valuesDom.html(renderSuggestion(suggestion));
+                        wrapper.attr('data-applied', 'true');
+                    } else {
+                        suggestionDom.html(renderSuggestion(suggestion));
+                    }
                 }
             }
-            let inheritings = $('.condition-match-placeholder:not([data-terms])');
+
+            let inheritings = $('.condition-match-row:not([data-applied])');
             for (let inheriting of inheritings) {
                 inheriting = $(inheriting);
+                let valuesDom = inheriting.find('.condition-match-values');
                 let parentId = inheriting.attr('data-parent-id');
                 if (parentId) {
-                    let parent = $(`#condition-match-${parentId}`).attr('data-name');
-                    inheriting.html($('<span>', {class:'text-muted font-italic', text:`Inherits from ${parent}`}))
+                    let parent = $(`#condition-match-${parentId}`).attr('data-label');
+                    valuesDom.html($('<span>', {class:'text-muted font-italic', text:`Inherits from ${parent}`}))
                 } else {
-                    inheriting.html($('<span>', {class:'text-muted font-italic', text:`No terms suggested`}));
+                    valuesDom.html($('<span>', {class:'text-muted font-italic', text:`No terms set`}));
                 }
             }
+
             checkSuggestionCount();
         }
 
@@ -440,18 +458,18 @@
             // TODO : Make it so you can't click this button until the server
             $('.mondo-picker').click(function () {
                 let mondoButton = $(this);
-                let geneSymbol = mondoButton.attr('data-gene-symbol');
-                let label = mondoButton.attr('data-label');
-                let inheritance = mondoButton.attr('data-mode-of-inheritance');
+                let mondoRow = mondoButton.parents('.condition-match-row')
+                let geneSymbol = mondoRow.attr('data-gene-symbol');
+                let label = mondoRow.attr('data-label');
+                let inheritance = mondoRow.attr('data-mode-of-inheritance');
                 if (geneSymbol === '') {
                     $('#mp-gene-symbol').text('-').addClass('no-value');
                 } else {
                     $('#mp-gene-symbol').text(geneSymbol).removeClass('no-value');
                 }
-                let recordId = $(this).attr('data-id');
-                let conditionMatch = $(`#condition-match-${recordId}`);
-                let selected = conditionMatch.attr('data-terms');
-                let joiner = conditionMatch.attr('data-join');
+                let recordId = mondoRow.attr('data-id');
+                let selected = mondoRow.attr('data-terms');
+                let joiner = mondoRow.attr('data-join');
                 // let parsedMatch = parseTermText(selected);
                 $(`[name=mp-multimode][value=${joiner}]`).trigger('click');
 
@@ -501,7 +519,7 @@
                             <div class="btn-group btn-group-toggle" data-toggle="buttons">
                                 <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-n" value="N" checked="checked">?</label>
                                 <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-u" value="U">Uncertain</label>
-                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-c" value="C">Co-occuring</label>
+                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-c" value="C">Co-occurring</label>
                             </div>
                         </div>
                         <div id="mp-singlemode" class="collapse no-value">N/A</div>
@@ -551,11 +569,16 @@
                     Help will go here for matching text to conditions
                 </p>
             {% end_page_help_embedded %}
-            {% comment %}
-            {% labelled label="Lab" %}{{ condition_text.lab.name }}{% endlabelled %}
-            {% labelled label="Text" %}{{ condition_text.normalized_text }}{% endlabelled %}
-            {% endcomment %}
+
             <ul id="condition-list" class="list-group mt-4">
+                <li class="list-group-item">
+                    <div class="row">
+                        <div class="col-3"><b>Group</b></div>
+                        <div class="col-4"><b>Selected Terms</b></div>
+                        <div class="col-4"><b>Quick Suggestions</b></div>
+                        <div class="col-1"><b>Manual</b></div>
+                    </div>
+                </li>
                 {% condition_match condition_match %}
             </ul>
         </form>

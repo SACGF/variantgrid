@@ -2,8 +2,15 @@
 <div class="condition-match list-group-item"
     {% if condition_match.mode_of_inheritance is not None and not condition_match.mode_of_inheritance and not condition_match.classification %}style="display:none"{% endif %}
     >
-    <div class="row" style="align-items:center">
-        <div class="col-5">
+    <div class="row condition-match-row" style="align-items:center"
+        data-mode-of-inheritance="{% if condition_match.mode_of_inheritance is not None %}{{ condition_match.mode_of_inheritance | ekey:"mode_of_inheritance" }}{% else %}N/A{% endif %}"
+        data-gene-symbol="{{ condition_match.gene_symbol | default_if_none:'' }}"
+        data-label="{{ condition_match.name }}"
+        {% if condition_match.parent_id %}data-parent-id="{{ condition_match.parent_id }}"{% endif %}
+        id="condition-match-{{ condition_match.id }}"
+        data-id="{{ condition_match.id }}">
+
+        <div class="col-3">
             {% if condition_match.classification %}
                 <div style="margin-left:48px">
                     <div style="font-size: smaller">{% classification_quick condition_match.classification %}</div>
@@ -21,23 +28,18 @@
                 <span title="Default for condition text" data-toggle="tooltip" class="hover-detail">{{ condition_match.condition_text.normalized_text }}</span>
             {% endif %}
         </div>
-        <div class="col-6">
-            <div class="condition-match-placeholder"
-                 id="condition-match-{{ condition_match.id }}"
-                 data-id="{{ condition_match.id }}"
-                 {% if condition_match.parent_id %}data-parent-id="{{ condition_match.parent_id }}"{% endif %}
-                 data-name="{{ condition_match.name }}">
-                ...
+        <div class="col-4">
+            <div class="condition-match-values">
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="condition-match-suggestion">
             </div>
         </div>
         <div class="col-1 text-right">
-            <button
-                class="btn btn-outline-primary btn-rnd-rect mondo-picker"
-                data-mode-of-inheritance="{% if condition_match.mode_of_inheritance is not None %}{{ condition_match.mode_of_inheritance | ekey:"mode_of_inheritance" }}{% else %}N/A{% endif %}"
-                data-gene-symbol="{{ condition_match.gene_symbol | default_if_none:'' }}"
-                data-label="{{ condition_match.leaf | default_if_none:'Default' }}"
-                data-id="{{ condition_match.id }}">
-            <i class="fas fa-edit"></i></button></span>
+            <button class="btn btn-outline-primary btn-rnd-rect mondo-picker">
+            <i class="fas fa-edit"></i>
+            </button>
         </div>
     </div>
 </div>

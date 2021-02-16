@@ -76,7 +76,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
 
 class MultiCondition(models.TextChoices):
-    NOT_DECIDED = 'X', 'Not decided'
+    NOT_DECIDED = 'N', 'Not decided'
     UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
     CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
 
