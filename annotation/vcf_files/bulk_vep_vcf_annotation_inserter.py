@@ -18,6 +18,7 @@ from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
 from library.log_utils import log_traceback
 from library.utils import invert_dict
+from snpdb.models import GenomeBuild
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 VEP_SEPARATOR = '&'
@@ -165,12 +166,15 @@ class BulkVEPVCFAnnotationInserter:
             'somatic': format_vep_somatic,
             'topmed_af': format_pick_highest_float,
         }
+        if self.genome_build == GenomeBuild.grch38():
+            self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
+
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
         vc = VEPConfig(self.genome_build)
         # Sort to have consistent VCF headers
-        for cvf in ColumnVEPField.objects.all().order_by("source_field"):
+        for cvf in ColumnVEPField.filter_for_build(self.genome_build).order_by("source_field"):
             try:
                 if cvf.vep_custom:  # May not be configured
                     prefix = cvf.get_vep_custom_display()
@@ -180,9 +184,10 @@ class BulkVEPVCFAnnotationInserter:
                     if cvf.source_field_has_custom_prefix:
                         self.ignored_vep_fields.append(prefix)
 
-                self.source_field_to_columns[cvf.vep_info_field].add(cvf.column)
+                self.source_field_to_columns[cvf.vep_info_field].add(cvf.variant_grid_column_id)
+                # logging.info("Handling column %s => %s", cvf.vep_info_field, cvf.variant_grid_column_id)
             except:
-                logging.warning(f"Skipping custom {cvf.vep_info_field} due to missing settings")
+                logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
 
         self.prediction_pathogenic_values = {
             'sift': SIFTPrediction.get_damage_or_greater_levels(),
@@ -524,6 +529,11 @@ def empty_to_none(it):
 
 
 # Field formatters
+def gnomad_filtered_func(raw_value):
+    """ We use FILTER in Gnomad3 (GRCh38 only) - need to convert back to bool """
+    return raw_value not in (None, "PASS")
+
+
 def format_hgnc_id(raw_value):
     """ VEP GRCh37 returns 55 while GRCh38 returns "HGNC:55" """
     return int(raw_value.replace("HGNC:", ""))

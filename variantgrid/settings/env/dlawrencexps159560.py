@@ -30,10 +30,8 @@ ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
 # On laptop I get all kinds of errors using BigWig files, so just turn off
 ANNOTATION[BUILD_GRCH37]["vep_config"].update({
     'phastcons100way': None,
-    'phastcons30way': None,
     'phastcons46way': None,
     'phylop100way': None,
-    'phylop30way': None,
     'phylop46way': None,
     "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.head_100.hg19.vcf.gz",
     "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.head_100.hg19.vcf.gz",
@@ -41,10 +39,8 @@ ANNOTATION[BUILD_GRCH37]["vep_config"].update({
 ANNOTATION[BUILD_GRCH38]["vep_config"].update({
     'phastcons100way': None,
     'phastcons30way': None,
-    'phastcons46way': None,
     'phylop100way': None,
     'phylop30way': None,
-    'phylop46way': None,
     "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.head_100.hg38.vcf.gz",
     "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.head_100.hg38.vcf.gz",
 })

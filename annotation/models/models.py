@@ -279,7 +279,8 @@ class HumanProteinAtlasAnnotation(models.Model):
 class ColumnVEPField(models.Model):
     """ For VariantAnnotation/Transcript columns derived from VEP fields """
     column = models.TextField(unique=True)
-    variant_grid_column = models.OneToOneField(VariantGridColumn, null=True, on_delete=SET_NULL)
+    variant_grid_column = models.ForeignKey(VariantGridColumn, null=True, on_delete=SET_NULL)
+    genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
     category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
     source_field_processing_description = models.TextField(null=True)
@@ -300,8 +301,13 @@ class ColumnVEPField(models.Model):
         return vif
 
     @staticmethod
-    def get_source_fields(**columnvepfield_kwargs):
-        qs = ColumnVEPField.objects.filter(**columnvepfield_kwargs).distinct("source_field")
+    def filter_for_build(genome_build: GenomeBuild):
+        """ genome_build = NULL (no build) or matches provided build """
+        return ColumnVEPField.objects.filter(Q(genome_build=genome_build) | Q(genome_build__isnull=True))
+
+    @staticmethod
+    def get_source_fields(genome_build: GenomeBuild, **columnvepfield_kwargs):
+        qs = ColumnVEPField.filter_for_build(genome_build).filter(**columnvepfield_kwargs).distinct("source_field")
         return list(qs.values_list("source_field", flat=True).order_by("source_field"))
 
 
@@ -601,6 +607,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     af_1kg = models.FloatField(null=True, blank=True)
     af_uk10k = models.FloatField(null=True, blank=True)
     gnomad_af = models.FloatField(null=True, blank=True)
+    gnomad2_liftover_af = models.FloatField(null=True, blank=True)
+    gnomad_ac = models.IntegerField(null=True, blank=True)
+    gnomad_an = models.IntegerField(null=True, blank=True)
     gnomad_hom_alt = models.IntegerField(null=True, blank=True)
     gnomad_afr_af = models.FloatField(null=True, blank=True)
     gnomad_amr_af = models.FloatField(null=True, blank=True)
@@ -611,6 +620,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_oth_af = models.FloatField(null=True, blank=True)
     gnomad_sas_af = models.FloatField(null=True, blank=True)
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
+    gnomad_popmax_ac = models.IntegerField(null=True, blank=True)
+    gnomad_popmax_an = models.IntegerField(null=True, blank=True)
+    gnomad_popmax_hom_alt = models.IntegerField(null=True, blank=True)
     topmed_af = models.FloatField(null=True, blank=True)
     gnomad_filtered = models.BooleanField(null=True, blank=True)
     gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.choices, null=True, blank=True)
@@ -675,13 +687,23 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "DL": ("spliceai_pred_ds_dl", "spliceai_pred_dp_dl"),
     }
 
+    @lazy
+    def has_extended_gnomad_fields(self):
+        """ I grabbed a few new fields but haven't patched back to GRCh37 yet
+            TODO: remove this and if statements in variant_details.html once issue #231 is completed """
+        extended_fields = ["gnomad_ac", "gnomad_an", "gnomad_popmax_ac", "gnomad_popmax_an", "gnomad_popmax_hom_alt"]
+        return any(getattr(self, f) for f in extended_fields)
+
     @property
-    def gnomad_variant(self):
-        """ If you have gnomAD frequency - returns variant formatted as per 1-169519049-T-C """
+    def gnomad_url(self):
+        url = None
         if self.gnomad_af is not None:
             v = self.variant
-            return f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
-        return None
+            gnomad_variant = f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
+            url = f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}"
+            if self.version.genome_build == GenomeBuild.grch38():
+                url += "?dataset=gnomad_r3"
+        return url
 
     @property
     def mastermind_url(self):
