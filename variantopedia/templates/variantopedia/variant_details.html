@@ -234,8 +234,8 @@ $(document).ready(function() {
                     This is not the most recent version (which is {{ latest_annotation_version }}).
                 {% endif %}
 
-                {% if num_annotation_versions > 1 %}
-                    <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_annotation_versions }} historical versions</a>.
+                {% if num_variant_annotation_versions > 1 %}
+                    <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>.
                 {% endif %}
             {% endif %}
 

@@ -8,6 +8,7 @@ from celery.task.control import inspect  # @UnresolvedImport
 from django.conf import settings
 from django.contrib import messages
 from django.db.models import Q
+from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -43,7 +44,6 @@ from upload.upload_stats import get_vcf_variant_upload_stats
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs
 from variantopedia.search import search_data, SearchResults
-from variantopedia.variant_column_utils import get_columns_qs, get_variant_annotation_data
 
 
 def variants(request):
@@ -249,15 +249,11 @@ def view_variant_annotation_history(request, variant_id):
 
     annotation_versions = []
     variant_annotation_by_version = {}
-    av_qs = AnnotationVersion.objects.filter(variant_annotation_version__variantannotation__variant=variant)
-    for annotation_version in av_qs.order_by("pk"):
-        annotation_versions.append((annotation_version.pk, str(annotation_version)))
+    for va in variant.variantannotation_set.order_by("version"):
+        annotation_versions.append((va.version.pk, str(va.version)))
 
-        columns_qs = get_columns_qs()
-        variant_data = get_variant_annotation_data(variant, annotation_version, columns_qs)
-        variant_dict = {t[0]: t[2] for t in variant_data}
-        del variant_dict["variant"]
-        variant_annotation_by_version[annotation_version.pk] = variant_dict
+        va_dict = model_to_dict(va, exclude=["id", "variant_id"])
+        variant_annotation_by_version[va.version.pk] = va_dict
 
     context = {"variant": variant,
                "annotation_versions": annotation_versions,
@@ -398,7 +394,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     genes_canonical_transcripts = None
     num_clinvar_citations = 0
     clinvar_citations = None
-    num_annotation_versions = AnnotationVersion.objects.filter(variant_annotation_version__variantannotation__variant=variant).count()
+    num_variant_annotation_versions = variant.variantannotation_set.count()
 
     latest_classifications = ClassificationModification.latest_for_user(
         user=request.user,
@@ -468,7 +464,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
-        "num_annotation_versions": num_annotation_versions,
+        "num_variant_annotation_versions": num_variant_annotation_versions,
         "num_clinvar_citations": num_clinvar_citations,
         "clinvar_citations": clinvar_citations,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
