@@ -151,7 +151,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
 
 
                     if not matches_gene_level:
-                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Could not find relationship to {gene_symbol} via {root_level_str}"))
+                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Could not find relationship to {gene_symbol}"))
                     elif len(matches_gene_level) == 1:
                         term = list(matches_gene_level)[0]
                         if term in root_level_terms:
@@ -167,7 +167,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         cms.add_term(matches_gene_level_leafs[0])
                     else:
-                        cms.add_message(ConditionMatchingMessage(severity="info", text=f"Multiple children of {root_level_str} are associated to {gene_symbol}"))
+                        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{root_level_str} : Multiple children are associated to {gene_symbol}"))
 
                 else:
                     # if not MONDO term, see if this term has a known relationship directly

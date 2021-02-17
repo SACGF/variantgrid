@@ -25,6 +25,7 @@ from library.utils import ArrayLength
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyRelation, OntologyTermRelation
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
+from ontology.panel_app_ontology import update_gene_relations
 from snpdb.models import Lab
 
 
@@ -510,11 +511,14 @@ class ConditionMatchingSuggestion:
                 if ctm := self.condition_text_match:
                     if ctm.is_gene_level:
                         gene_symbol = self.condition_text_match.gene_symbol
-                        # TODO ensure gene relationships are up to date
+                        update_gene_relations(gene_symbol)
                         for term in valid_terms:
                             if not OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
                                 self.add_message(ConditionMatchingMessage(severity="warning",
                                                                          text=f"{term.id} : no direct relationship on file to {gene_symbol.symbol}"))
+                            else:
+                                self.add_message(ConditionMatchingMessage(severity="success",
+                                                                         text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
 
             # validate that we have the terms being referenced (if we don't big chance that they're not valid)
             for term in terms:
