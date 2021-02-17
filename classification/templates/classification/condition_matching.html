@@ -21,6 +21,12 @@
         .relevance-cell {
             width: 250px;
         }
+        .condition-match-suggestion .suggestion {
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #fbfffb;
+            border-radius: 5px;
+        }
     </style>
     <script>
         const gene_symbol = "{{ clinvar_export.gene_symbol }}";
@@ -258,12 +264,24 @@
             });
         }
 
+        function canSuggest(suggestion) {
+            if (suggestion.terms.length >= 1) {
+                for (let message of suggestion.messages) {
+                    if (message.severity.toLowerCase().startsWith("e")) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
+
         function renderSuggestion(suggestion, id) {
             let dom = $('<div>');
             if (suggestion.terms && suggestion.terms.length) {
+                dom.addClass('suggestion');
                 let termStyle = '';
-                if (!suggestion.is_applied) {
-
+                if (!suggestion.is_applied && canSuggest(suggestion)) {
                     $('<label>', {
                         style: 'margin-left:1.25rem', html: [
                             $('<input>', {
@@ -313,6 +331,7 @@
                 }
             }
             if (suggestion.messages && suggestion.messages.length) {
+                dom.addClass('suggestion');
                 for (let message of suggestion.messages) {
                     $('<div>', {html:[
                             severityIcon(message.severity),
@@ -463,10 +482,10 @@
                     if (inheritedTerms) {
                         valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:inheritedTerms, title:`Inherits from ${parent}`}));
                     } else {
-                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:'-', title:`Inherits from ${parent}`}));
+                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', html:'none', title:`Inherits from ${parent}`}));
                     }
                 } else {
-                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`-`, title:`No top level terms provided`}));
+                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`none`, title:`No top level terms provided`}));
                 }
             }
 
