@@ -1,4 +1,3 @@
-import logging
 from typing import List, Set
 
 from celery.canvas import chain, Signature

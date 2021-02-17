@@ -1,3 +1,21 @@
 <p>
-Analysis templates are pre-configured analyses that can be quickly generated (eg for a Sample or a Trio)
+Analysis templates are pre-configured analyses that can be configured then run on new data (eg a Sample or Trio)
+</p>
+
+<p>
+Templates are created like normal anaylses, then fields in the node editor are configured as "Analysis Variables" which means they will be set from new data when they are run.
+
+Currently, only Sample/Trio/Cohort works as Analysis Variables.
+</p>
+
+<p>
+When a template is run and samples are changed, some downstream nodes may also change (eg a GeneListNode configured to use a sample gene list, or PhenotypeNode using patient phenotypes)
+</p>
+
+<p>
+Note on <b>Genome Build</b> - An analysis templates is created for a particular genome build but can be run with data from any build.
+
+This will be fine if anything build specific was set as an Analysis Variable so is changed, but will fail if for example, a node was hardcoded to have build specific data (eg an IntersectionsNode with a hardcoded bed file)
+
+We run a check after running the template / populating data to make sure that all nodes use data from the same build.
 </p>

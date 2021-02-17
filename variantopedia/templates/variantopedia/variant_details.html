@@ -460,18 +460,30 @@ $(document).ready(function() {
                             {% labelled id='af_1kg' label='1000 genomes' hint="tiny" %}{{ variant_annotation.af_1kg|floatformat:6 }}{% endlabelled %}
                             {% labelled id='af_uk10k' label='UK10K' hint="tiny" %}{{ variant_annotation.af_uk10k|floatformat:6 }}{% endlabelled %}
                             {% labelled id='topmed_af' label='TopMed' hint="tiny"  %}{{ variant_annotation.topmed_af|floatformat:6 }}{% endlabelled %}
-                            {% if variant_annotation.gnomad_variant %}
+                            {% if variant_annotation.gnomad_url %}
                                 {% labelled label="View in gnomAD" hint="tiny" %}
-                                    <a target='_blank' class="hover-link" href='http://gnomad.broadinstitute.org/variant/{{ variant_annotation.gnomad_variant }}'>Click here</a>
+                                    <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
                                 {% endlabelled %}
                                 {% if variant_annotation.gnomad_flag %}
                                     {% labelled label="Is Flagged" label_css="gnomad-flagged-label gnomad-flagged" hint="tiny" %}{{ variant_annotation.gnomad_flag }}{% endlabelled %}
                                 {% else %}
                                     {% labelled label="Is Flagged" label_css="gnomad-flagged-label" hint="tiny" %}{% endlabelled %}
                                 {% endif %}
+                                {% labelled id='gnomad_af' label='Allele Frequency' hint="tiny" %}{{ variant_annotation.gnomad_af|floatformat:6 }}{% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' hint="tiny" %}{{ variant_annotation.gnomad2_liftover_af|floatformat:6 }}{% endlabelled %}
+                                {% endif %}
+
                                 {% labelled id='gnomad_total_homozygotes' label='Total Homozygotes' hint="tiny" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
-                                {% labelled id='gnomad_total' label='Total' hint="tiny" %}{{ variant_annotation.gnomad_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" %}{{ variant_annotation.gnomad_popmax_af|floatformat:6 }}{% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                    {% labelled id='gnomad_ac' label='Alt Allele Count' hint="tiny" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
+                                    {% labelled id='gnomad_an' label='Total number of alleles' hint="tiny" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
+                                {% endif %}
+                                {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" %}{{ variant_annotation.gnomad_popmax_af|floatformat:6 }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                    {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
+                                    {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
+                                {% endif %}
 
                                 {% labelled id='gnomad_afr_af' label='African' hint="tiny" %}{{ variant_annotation.gnomad_afr_af|floatformat:6 }}{% endlabelled %}
                                 {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" %}{{ variant_annotation.gnomad_asj_af|floatformat:6 }}{% endlabelled %}

@@ -313,7 +313,7 @@ class AnalysesGrid(JqGridUserRowConfig):
 class AnalysisTemplatesGrid(JqGridUserRowConfig):
     model = AnalysisTemplate
     caption = 'Analysis Templates'
-    fields = ["id", "name", "analysis", "user__username", "modified"]
+    fields = ["id", "name", "modified", "analysis", "analysis__genome_build", "analysis__description", "user__username"]
 
     colmodel_overrides = {
         "id": {"hidden": True},

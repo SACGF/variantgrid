@@ -140,7 +140,8 @@ class VEPPlugin(models.TextChoices):
 
 
 class VEPCustom(models.TextChoices):
-    GNOMAD = 'g', 'gnomAD'
+    GNOMAD_2 = 'g', 'gnomAD2'
+    GNOMAD_3 = 'n', 'gnomAD3'
     PHASTCONS_100_WAY = '1', 'phastCons100way'
     PHASTCONS_30_WAY = '2', 'phastCons30way'
     PHASTCONS_46_WAY = '3', 'phastCons46way'
