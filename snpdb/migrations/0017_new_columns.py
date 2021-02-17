@@ -71,7 +71,7 @@ def new_columns(apps, schema_editor):
          'annotation_level': 'U',
          'width': None,
          'label': 'UniProt reactome',
-         'description': '<a href="http://www.1000genomes.org/">The 1000 Genomes project.</a> ALT allele frequency. Ranges from 0 to 1, calculated from ~2500 (phase3_v5) global individuals.',
+         'description': "From <a target='_blank', href='http://www.uniprot.org/'>Universal Protein Knowledgebase</a>",
          'model_field': True,
          'queryset_field': True},
     ]
