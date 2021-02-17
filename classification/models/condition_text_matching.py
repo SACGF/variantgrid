@@ -22,7 +22,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from library.utils import ArrayLength
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyRelation, OntologyTermRelation
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
 from ontology.panel_app_ontology import update_gene_relations
@@ -178,7 +178,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             else:
                 return self.parent.resolve_condition_xrefs
 
-        rc = ResolvedCondition()
+        rc = ResolvedCondition(search_term=None, gene_symbol=None)
         rc.condition_multi_operation = self.condition_multi_operation
         for term in self.condition_xrefs:
             rc.condition_xrefs.select_term(term)
@@ -287,7 +287,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @staticmethod
     def attempt_automatch(condition_text: ConditionText, force: bool = False, server_search=False):
-        text = condition_text.normalized_text
         if force or not condition_text.user_edited:
             condition_text.clear()
         else:
@@ -298,14 +297,14 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 if match := top_level_suggestion(condition_text.normalized_text, fallback_to_online=server_search):
                     if match.is_auto_assignable():
                         print(f"{condition_text.root} : {match.terms}")
-                        root.condition_xrefs = match.terms
+                        root.condition_xrefs = match.term_str_array
                         root.last_edited_by = admin_bot()
                         root.save()
                     else:
                         for gene_symbol_level in condition_text.gene_levels:
                             if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol):
                                 print(f"{condition_text.root} {gene_symbol_level.gene_symbol} : {match.terms}")
-                                gene_symbol_level.condition_xrefs = match.terms
+                                gene_symbol_level.condition_xrefs = match.term_str_array
                                 gene_symbol_level.last_edited_by = admin_bot()
                                 gene_symbol_level.save()
         except Exception:
@@ -459,6 +458,10 @@ class ConditionMatchingSuggestion:
         self.messages: List[ConditionMatchingMessage] = list()
         self.validated = False
         self.ids_found_in_text: Optional[bool] = None
+
+    @property
+    def term_str_array(self) -> List[str]:
+        return [term.id for term in self.terms]
 
     def add_term(self, term: OntologyTerm):
         if term not in self.terms:
