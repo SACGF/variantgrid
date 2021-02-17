@@ -455,18 +455,15 @@
                 let valuesDom = wrapper.find('.condition-match-values').empty();
                 let suggestionDom = wrapper.find('.condition-match-suggestion').empty();
 
-                if (!suggestion.hidden) {
-                    wrapper.attr('data-terms', suggestion.terms.map(term => term.id).join(","));
-                    console.log(suggestion.joiner);
-                    wrapper.attr('data-join', suggestion.joiner);
-                    if (suggestion.is_applied) {
-                        valuesDom.html(renderSuggestion(suggestion));
-                        if (suggestion.terms && suggestion.terms.length) {
-                            wrapper.attr('data-applied', 'true');
-                        }
-                    } else {
-                        suggestionDom.html(renderSuggestion(suggestion));
+                wrapper.attr('data-terms', suggestion.terms.map(term => term.id).join(","));
+                wrapper.attr('data-join', suggestion.joiner);
+                if (suggestion.is_applied) {
+                    valuesDom.html(renderSuggestion(suggestion));
+                    if (suggestion.terms && suggestion.terms.length) {
+                        wrapper.attr('data-applied', 'true');
                     }
+                } else {
+                    suggestionDom.html(renderSuggestion(suggestion));
                 }
             }
 
@@ -485,8 +482,20 @@
                         valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', html:'none', title:`Inherits from ${parent}`}));
                     }
                 } else {
-                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`none`, title:`No top level terms provided`}));
+                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`-`, title:`No top level terms provided`}));
                 }
+            }
+            let topLevel = $('.condition-match-row:not([data-parent-id])');
+            let topLevelDataTerms = topLevel.attr('data-terms');
+            let button = topLevel.find('.mondo-picker');
+            if ((topLevel.attr('data-terms') || '').trim().length) {
+                button.css('opacity','1.0');
+                button.removeAttr('title');
+                button.tooltip('dispose');
+            } else {
+                button.css('opacity','0.3');
+                button.attr('title', 'It is recommend you choose gene level terms using the buttons below');
+                button.tooltip({html:true, trigger : 'hover'});
             }
 
             checkSuggestionCount();

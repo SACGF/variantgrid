@@ -28,9 +28,20 @@
                 {% if not term.is_stub %}
                     {% labelled label="Last imported" %}Import {{ term.from_import.id }} - {{ term.from_import.filename }} @ {% timestamp term.from_import.processed_date %}{% endlabelled %}
                 {% endif %}
+
+                <hr/>
+                {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
+                    {% if not parent_relationships %}-{% endif %}
+                    {% for relationship in parent_relationships %}
+                        <div class="mt-2">
+                            {% ontology_relationship relationship term %}
+                        </div>
+                    {% endfor %}
+                {% endlabelled %}
+
                 {% if gene_relationships is not None %}
                     <hr/>
-                    {% labelled label="Gene Relationships" %}
+                    {% labelled label="<i class='fas fa-dna'></i> Gene Relationships" %}
                         <p class="text-muted">Note that Panel App relationships are only retrieved as needed, and might not be represented
                         here yet.</p>
                         {% if not gene_relationships %}-{% endif %}
@@ -47,17 +58,6 @@
                 {% endif %}
                 <hr/>
 
-                {% labelled label="Parent Terms" %}
-                    {% if not parent_relationships %}-{% endif %}
-                    {% for relationship in parent_relationships %}
-                        <div class="mt-2">
-                            {% ontology_relationship relationship term %}
-                        </div>
-                    {% endfor %}
-                {% endlabelled %}
-
-                <hr/>
-
                 {% labelled label="Direct Relationships" %}
                     {% if not regular_relationships %}-{% endif %}
                     {% for relationship in regular_relationships %}
@@ -69,7 +69,7 @@
 
                 <hr/>
 
-                {% labelled label="Child Terms" %}
+                {% labelled label='<i class="fas fa-sitemap"></i> Child Terms' %}
                     {% if not child_relationships %}-{% endif %}
                     {% for relationship in child_relationships %}
                         <div class="mt-2">
