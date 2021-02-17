@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 import json
 import logging
 
-from genes.models import GeneListCategory, GeneVersion, GeneList
+from genes.models import GeneListCategory, GeneVersion, GeneList, GeneSymbol
 from genes.views import add_gene_list_unmatched_genes_message
 from library.django_utils import add_save_message
 from pathtests.forms import SelectPathologyTestForm, SelectPathologyTestVersionForm, \
@@ -191,7 +191,7 @@ def get_gene_modification_request(pathology_test_version):
     handled_requests = defaultdict(list)
 
     for gmr in pathology_test_version.pathologytestgenemodificationrequest_set.all():
-        gene_symbol = gmr.gene.gene_symbol
+        gene_symbol = gmr.gene_symbol_id
         if gmr.outcome == PathologyTestGeneModificationOutcome.PENDING:
             if gene_symbol in current_genes:
                 d = gene_deletion_requests
@@ -398,16 +398,15 @@ def modify_pathology_test_version(request, pk):
     pathology_test_version = get_object_or_404(PathologyTestVersion, pk=pk)
 
     operation = request.POST['operation']
-    gene_symbol = request.POST['gene_symbol']
+    symbol = request.POST['gene_symbol']
     comments = request.POST['comments']
 
-    # We only use the gene symbol (will insert multiple if needed later)
-    gene = GeneVersion.objects.filter(gene_symbol=gene_symbol).first()
+    gene_symbol = get_object_or_404(GeneSymbol, pk=symbol)
     mod_request = PathologyTestGeneModificationRequest.objects.create(pathology_test_version=pathology_test_version,
                                                                       operation=operation,
-                                                                      gene=gene,
+                                                                      gene_symbol=gene_symbol,
                                                                       user=request.user,
-                                                                      comments=comments,)
+                                                                      comments=comments)
     response_data = {"pk": mod_request.pk}
     return JsonResponse(response_data)
 
