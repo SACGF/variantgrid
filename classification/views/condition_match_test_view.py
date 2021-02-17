@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Optional
+
 from django.contrib import messages
 from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
@@ -60,6 +62,7 @@ def condition_match_test_view(request):
     auto_matches = list()
     attempted = False
     suggestion = None
+    gene_symbol: Optional[GeneSymbol] = None
 
     valid = False
     if condition_text:
@@ -80,6 +83,7 @@ def condition_match_test_view(request):
         "gene_symbol": gene_symbol_str,
         "auto_matches": auto_matches,
         "suggestion": suggestion,
+        "is_auto_assignable": suggestion.is_auto_assignable(gene_symbol) if suggestion else None,
         "attempted": attempted
     }
 

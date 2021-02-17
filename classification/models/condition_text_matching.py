@@ -297,9 +297,17 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             if root := condition_text.root:
                 if match := top_level_suggestion(condition_text.normalized_text, fallback_to_online=server_search):
                     if match.is_auto_assignable():
+                        print(f"{condition_text.root} : {match.terms}")
                         root.condition_xrefs = match.terms
                         root.last_edited_by = admin_bot()
                         root.save()
+                    else:
+                        for gene_symbol_level in condition_text.gene_levels:
+                            if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol):
+                                print(f"{condition_text.root} {gene_symbol_level.gene_symbol} : {match.terms}")
+                                gene_symbol_level.condition_xrefs = match.terms
+                                gene_symbol_level.last_edited_by = admin_bot()
+                                gene_symbol_level.save()
         except Exception:
             report_exc_info()
 
@@ -476,15 +484,24 @@ class ConditionMatchingSuggestion:
             "user": user_json
         }
 
-    def is_auto_assignable(self):
+    def is_auto_assignable(self, gene_symbol: Optional[GeneSymbol]):
         # FIXME need to know if was assigned via embedded terms or not
         if terms := self.terms:
             if len(terms) != 1:
                 return False
             if self.messages:
                 return False
-            if self.ids_found_in_text or self.is_all_leafs():
-                return True
+
+            if gene_symbol:
+                if self.is_all_leafs():
+                    # if we're at a gene level, and we have a relationship and we're leafs
+                    term = terms[0]
+                    if OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
+                        return True
+            else:
+                # embedded ID is the only thing that will give you a top level assignment
+                if self.ids_found_in_text:
+                    return True
         return False
 
     def validate(self):

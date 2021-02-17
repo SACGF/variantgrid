@@ -167,7 +167,7 @@ class SearchText:
 
     def effective_equals(self, other: 'SearchText') -> bool:
         # TODO handle a little bit off by 1 letter matching
-        return self.prefix_terms == other.prefix_terms and self.suffix_terms == other.suffix_terms
+        return self.prefix_terms == other.prefix_terms and self.suffix_terms == other.suffix_terms or self.all_terms == other.all_terms
 
 
 def pretty_set(s: Iterable[str]) -> str:
@@ -182,7 +182,7 @@ def normalize_condition_text(text: str):
     if text is None:
         return None
     text = text.lower()
-    text = re.sub("[,;./]", " ", text)  # replace , ; . with spaces
+    text = re.sub("[,;./?()]", " ", text)  # replace , ; . with spaces
     text = re.sub("[ ]{2,}", " ", text)  # replace multiple spaces with
     text = text.strip()
     return text
