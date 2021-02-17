@@ -452,7 +452,8 @@ class ConditionMatchingSuggestion:
         self.ids_found_in_text: Optional[bool] = None
 
     def add_term(self, term: OntologyTerm):
-        self.terms.append(term)
+        if term not in self.terms:
+            self.terms.append(term)
 
     def add_message(self, message: ConditionMatchingMessage):
         self.messages.append(message)

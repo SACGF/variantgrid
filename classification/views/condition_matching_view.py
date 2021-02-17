@@ -111,12 +111,15 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
     root_cms: Optional[ConditionMatchingSuggestion]
 
     root_cms = ConditionMatchingSuggestion(root_level)
+    display_root_cms = root_cms
     if not root_cms.terms:
         root_cms = top_level_suggestion(ct.normalized_text, fallback_to_online=True)
         root_cms.condition_text_match = root_level
+        if root_cms.ids_found_in_text:
+            display_root_cms = root_cms
 
     root_cms.validate()
-    suggestions.append(root_cms)
+    suggestions.append(display_root_cms)
 
     # filled in and gene level, exclude root as we take care of that before-hand
     filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
@@ -143,8 +146,9 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                         if is_descendant({gene_level}, root_level_mondo, set()):
                             matches_gene_level.add(gene_level)
 
-                    leafs = [term for term in matches_gene_level if term.is_leaf]
+                    matches_gene_level_leafs = [term for term in matches_gene_level if term.is_leaf]
                     root_level_str = ', '.join([term.id for term in root_level_mondo])
+
 
                     if not matches_gene_level:
                         cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Could not find relationship to {gene_symbol} via {root_level_str}"))
@@ -154,11 +158,14 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                             cms.add_message(ConditionMatchingMessage(severity="success",
                                                                      text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         else:
-                            if not root_cms.ids_found_in_text: # don't suggest children of embedded terms, if the parent level is
-                                cms.add_term(list(matches_gene_level)[0])  # not guaranteed to be a leaf, but no associations on child terms
-                    elif len(leafs) == 1:
-                        if not root_cms.ids_found_in_text:  # don't suggest children of embedded terms, if the parent level is
-                            cms.add_term(leafs[0])
+                            cms.add_message(ConditionMatchingMessage(severity="success",
+                                                                 text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                            cms.add_term(list(matches_gene_level)[0])  # not guaranteed to be a leaf, but no associations on child terms
+                    elif len(matches_gene_level_leafs) == 1:
+                        term = list(matches_gene_level_leafs)[0]
+                        cms.add_message(ConditionMatchingMessage(severity="success",
+                                                                 text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                        cms.add_term(matches_gene_level_leafs[0])
                     else:
                         cms.add_message(ConditionMatchingMessage(severity="info", text=f"Multiple children of {root_level_str} are associated to {gene_symbol}"))
 
@@ -177,10 +184,16 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                     for term in parent_term_has_gene:
                         cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
-                if root_cms.is_applied and not cms.terms:
-                    # if parent was applied, and all we have are warnings
-                    # put them in the applied column not suggestion
-                    cms.is_applied = True
+                if not cms.terms:
+                    if root_cms.is_applied:
+                        # if parent was applied, and all we have are warnings
+                        # put them in the applied column not suggestion
+                        cms.is_applied = True
+                    else:
+                        # if root was a suggestion, but we couldn't come up with a more specific suggestion
+                        # suggest the root at each gene level anyway (along with any warnings we may have generated)
+                        if not root_cms.ids_found_in_text:
+                            cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
 
     return suggestions
 

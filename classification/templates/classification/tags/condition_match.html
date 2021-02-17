@@ -20,9 +20,7 @@
             {% elif condition_match.gene_symbol %}
                 <div style="margin-left:16px" title="Default for condition text & this gene" data-toggle="tooltip" class="hover-detail">
                     <label>Gene Symbol</label> : {{ condition_match.gene_symbol }}<br/>
-                    {% if condition_match.classification_count > 2 %}
-                    <a data-toggle="collapse" class="toggle-link" href="#condition-children-{{ condition_match.id }}">Show {{ condition_match.classification_count }} Classifications</a>
-                    {% endif %}
+                    <a data-toggle="collapse" class="toggle-link" href="#condition-children-{{ condition_match.id }}">Show {{ condition_match.classification_count }} Classification{% if condition_match.classification_count != 1 %}s{% endif %}</a>
                 </div>
             {% else %}
                 <span title="Default for condition text" data-toggle="tooltip" class="hover-detail">{{ condition_match.condition_text.normalized_text }}</span>
@@ -32,18 +30,18 @@
             <div class="condition-match-values">
             </div>
         </div>
-        <div class="col-4">
-            <div class="condition-match-suggestion">
-            </div>
-        </div>
-        <div class="col-1 text-right">
+        <div class="col-1 text-center" style="border-left:1px dashed #ccc; border-right:1px dashed #ccc;">
             <button class="btn btn-outline-primary btn-rnd-rect mondo-picker">
             <i class="fas fa-edit"></i>
             </button>
         </div>
+        <div class="col-4">
+            <div class="condition-match-suggestion">
+            </div>
+        </div>
     </div>
 </div>
-{% if condition_match.is_gene_level and condition_match.classification_count > 2 %}
+{% if condition_match.is_gene_level %}
     <div class="collapse" id="condition-children-{{ condition_match.id }}">
         {% for child in condition_match.children %}
             {% condition_match child indent=indent %}

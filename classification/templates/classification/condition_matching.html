@@ -463,10 +463,10 @@
                     if (inheritedTerms) {
                         valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:inheritedTerms, title:`Inherits from ${parent}`}));
                     } else {
-                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`Inherits from ${parent}`}));
+                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:'-', title:`Inherits from ${parent}`}));
                     }
                 } else {
-                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`No terms set`}));
+                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`-`, title:`No top level terms provided`}));
                 }
             }
 
@@ -598,17 +598,17 @@
                     <div class="row">
                         <div class="col-3"><b>Group</b></div>
                         <div class="col-4"><b>Selected Terms</b></div>
+                        <div class="col-1 text-center"  style="border-left:1px dashed #ccc; border-right:1px dashed #ccc"><b>Edit</b></div>
                         <div class="col-4"><b>Quick Suggestions</b></div>
-                        <div class="col-1"><b>Manual</b></div>
                     </div>
                 </li>
                 {% condition_match condition_match %}
             </ul>
         </form>
         <div class="row">
-            <div class="col-7"></div>
-            <div class="col-5">
-                <button id="approve-suggestions" class="btn btn-primary" onclick="approveSuggestions()">
+            <div class="col-8"></div>
+            <div class="col-4">
+                <button id="approve-suggestions" class="btn btn-primary w-100" onclick="approveSuggestions()">
                     Approve suggestions
                 </button>
             </div>
