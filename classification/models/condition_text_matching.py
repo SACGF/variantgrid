@@ -484,7 +484,7 @@ class ConditionMatchingSuggestion:
             "user": user_json
         }
 
-    def is_auto_assignable(self, gene_symbol: Optional[GeneSymbol]):
+    def is_auto_assignable(self, gene_symbol: Optional[GeneSymbol] = None):
         # FIXME need to know if was assigned via embedded terms or not
         if terms := self.terms:
             if len(terms) != 1:
