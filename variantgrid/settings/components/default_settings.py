@@ -737,7 +737,9 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
     "classification_import_tool": False,
     "condition_aliases": False,
-    "clinvar_exports": False
+    "clinvar_exports": False,
+    "condition_matchings": False,
+    "condition_match_test": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 
