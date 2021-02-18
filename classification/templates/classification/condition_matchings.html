@@ -24,6 +24,7 @@
         }
         function datatableFilter(data) {
             data.text_filter = $("#text-filter").val();
+            data.filter_outstanding = $("#filter-outstanding").is(':checked');
         }
 
         function applyFilters() {
@@ -45,11 +46,19 @@
             Help will go here for matching text to conditions
             </p>
         {% end_page_help_embedded %}
-        <div class="input-group">
-            <input class="form-control" id="text-filter" placeholder="Text filter">
-            <span class="input-group-append">
-                <button class="btn btn-primary" type="submit" onclick="applyFilters()">Filter</button>
-            </span>
+        <div class="form-row align-items-center">
+            <div class="input-group col-8">
+                <input class="form-control" id="text-filter" placeholder="Text filter"/>
+                <span class="input-group-append">
+                    <button class="btn btn-primary" type="submit" onclick="applyFilters()">Filter</button>
+                </span>
+            </div>
+            <div class="input-check col-4">
+                <div class="ml-4">
+                    <input type="checkbox" class="form-check-input" id="filter-outstanding" checked="checked" onclick="applyFilters()"/>
+                    <label for="filter-outstanding">Only show outstanding records</label>
+                </div>
+            </div>
         </div>
         {% datatable datatable_config 'condition-text-datatable' class_name='condition-text-datatable responsive sticky-header' %}
     </div>

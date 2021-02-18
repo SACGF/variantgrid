@@ -22,7 +22,7 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
     hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
     panel_app = PanelAppServer.australia_instance()
     filename = panel_app.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
-    ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol), import_source=OntologyImportSource.PANEL_APP_AU)
+    ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol), import_source=OntologyImportSource.PANEL_APP_AU, processor_version=2)
     try:
         ontology_builder.ensure_old(max_age=timedelta(days=settings.PANEL_APP_CACHE_DAYS))
 
@@ -34,22 +34,24 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
         ontology_builder.ensure_hash_changed(data_hash=response_hash)
 
         for panel_app_result in results:
-            phenotype_row: str
-            for phenotype_row in panel_app_result.get("phenotypes", []):
-                # TODO look for terms other than OMIM in case panel app switches
-                for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
-                    omim_int = int(omim_match[1])  # not always a valid id
-                    omim_id = OntologyService.index_to_id(OntologyService.OMIM, omim_int)
-                    if omim_term := OntologyTerm.objects.filter(id=omim_id).first():
-                        ontology_builder.add_ontology_relation(
-                            source_term_id=omim_term.id,
-                            dest_term_id=hgnc_term.id,
-                            relation=OntologyRelation.PANEL_APP_AU,
-                            extra={
-                                "phenotype_row": phenotype_row,
-                                "evidence": panel_app_result.get('evidence') or []
-                            }
-                        )
+            if evidence := panel_app_result.get('evidence'):
+                # if "Expert Review Green" in evidence: # only look at green panels
+                phenotype_row: str
+                for phenotype_row in panel_app_result.get("phenotypes", []):
+                    # TODO look for terms other than OMIM in case panel app switches
+                    for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
+                        omim_int = int(omim_match[1])  # not always a valid id
+                        omim_id = OntologyService.index_to_id(OntologyService.OMIM, omim_int)
+                        if omim_term := OntologyTerm.objects.filter(id=omim_id).first():
+                            ontology_builder.add_ontology_relation(
+                                source_term_id=omim_term.id,
+                                dest_term_id=hgnc_term.id,
+                                relation=OntologyRelation.PANEL_APP_AU,
+                                extra={
+                                    "phenotype_row": phenotype_row,
+                                    "evidence": evidence
+                                }
+                            )
 
         ontology_builder.complete()
 

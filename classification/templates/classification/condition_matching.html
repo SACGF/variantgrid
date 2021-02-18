@@ -24,9 +24,18 @@
         .condition-match-suggestion .suggestion {
             padding: 10px;
             border: 1px solid #ddd;
-            background-color: #fbfffb;
             border-radius: 5px;
         }
+        .condition-match-suggestion .suggestion.success {
+            background-color: #f7fff7;
+        }
+        .condition-match-suggestion .suggestion.warning {
+            background-color: #fefee7;
+        }
+        .condition-match-suggestion .suggestion.error {
+            background-color: #fef7f7;
+        }
+
     </style>
     <script>
         const gene_symbol = "{{ clinvar_export.gene_symbol }}";
@@ -78,6 +87,21 @@
             return {
                 terms,
                 join
+            }
+        }
+
+        function worstMessage(suggestion) {
+            if (suggestion.messages) {
+                const severity = {
+                    "i": 1,
+                    "s": 2,
+                    "w": 3,
+                    "e": 4
+                }
+                let maxMessage = _.maxBy(suggestion.messages, (message) => {
+                    return severity[message.severity.toLowerCase()[0]] || 0;
+                });
+                return maxMessage.severity;
             }
         }
 
@@ -331,6 +355,10 @@
                 }
             }
             if (suggestion.messages && suggestion.messages.length) {
+                if (!suggestion.is_applied) {
+                    let maxSev = worstMessage(suggestion);
+                    dom.addClass(maxSev);
+                }
                 dom.addClass('suggestion');
                 for (let message of suggestion.messages) {
                     $('<div>', {html:[

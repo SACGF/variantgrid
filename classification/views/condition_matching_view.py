@@ -39,6 +39,9 @@ class ConditionTextColumns(DatatableConfig):
             words = [word.strip() for word in normal_text.split(" ")]
             for word in words:
                 qs = qs.filter(normalized_text__icontains=word)
+        if empty_to_none(self.get_query_param("filter_outstanding")) == "true":
+            qs = qs.exclude(classifications_count_outstanding=0)
+
         return qs
 
 
@@ -167,7 +170,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         cms.add_term(matches_gene_level_leafs[0])
                     else:
-                        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{root_level_str} : Multiple children are associated to {gene_symbol}"))
+                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple children are associated to {gene_symbol}"))
 
                 else:
                     # if not MONDO term, see if this term has a known relationship directly

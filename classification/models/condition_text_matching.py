@@ -654,15 +654,17 @@ def search_suggestion(text: str, fallback_to_online: bool = True) -> ConditionMa
     q = list()
     # TODO, can we leverage phenotype matching?
     for term in match_text.prefix_terms:
-        if len(term) > 2:
+        if len(term) >= 5:
             # TODO evaluate if it was worth it comparing aliases
             q.append(Q(name__icontains=term) | Q(aliases__icontains=term))
+        else:
+            q.append(Q(name__iexact=term) | Q(aliases__icontains=term))
     # don't bother with searching for suffix, just find them all and see how we go with the matching
     local_term_count = 0
     if q:
 
         for term in OntologyTerm.objects.filter(ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}).filter(reduce(
-                operator.and_, q)).order_by('ontology_service')[0:100]:
+                operator.and_, q)).order_by('ontology_service')[0:200]:
             local_term_count += 1
             if cms := search_text_to_suggestion(match_text, term):
                 return cms
