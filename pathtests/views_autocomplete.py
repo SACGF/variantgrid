@@ -23,4 +23,8 @@ class PathologyTestVersionAutocompleteView(AutocompleteView):
     fields = ['pathology_test__name']
 
     def get_user_queryset(self, user):
-        return PathologyTestVersion.objects.all()
+        active = self.forwarded.get('active', None)
+        qs = PathologyTestVersion.objects.all()
+        if active:
+            qs = qs.filter(activepathologytestversion__isnull=False)
+        return qs

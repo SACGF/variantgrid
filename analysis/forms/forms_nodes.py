@@ -37,7 +37,7 @@ from library.utils import md5sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, Company, ImportStatus, Sample, VCFFilter
+from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
@@ -326,10 +326,11 @@ class GeneListNodeForm(BaseNodeForm):
 
     class Meta:
         model = GeneListNode
-        fields = ("pathology_test_gene_list", "sample", "exclude", "accordion_panel")
+        fields = ("pathology_test_version", "sample", "exclude", "accordion_panel")
         widgets = {
-            "pathology_test_gene_list": autocomplete.ModelSelect2(url='category_gene_list_autocomplete',
-                                                                  attrs={'data-placeholder': 'Pathology Test...'}),
+            "pathology_test_version": autocomplete.ModelSelect2(url='pathology_test_version_autocomplete',
+                                                                attrs={'data-placeholder': 'Pathology Test...'},
+                                                                forward=(forward.Const(True, "active"),)),
             'accordion_panel': HiddenInput(),
         }
 
@@ -338,14 +339,6 @@ class GeneListNodeForm(BaseNodeForm):
 
         samples_queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
         self.fields['sample'].queryset = samples_queryset
-
-        path_test_field = self.fields["pathology_test_gene_list"]
-        company = Company.get_our_company()
-        if company:
-            forward_path_test = forward.Const(GeneListCategory.get_pathology_test_gene_category().pk, 'category')
-            path_test_field.widget.forward = [forward_path_test]
-        else:
-            path_test_field.disabled = True
 
     def save(self, commit=True):
         node = super().save(commit=False)
