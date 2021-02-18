@@ -477,7 +477,7 @@
             if (results.count_outstanding == 0) {
                 $("#no_outstanding").html(severityIcon("S"));
             } else {
-                $("#no_outstanding").html();
+                $("#no_outstanding").html(severityIcon("W"));
             }
 
             if (complete) {
@@ -665,7 +665,7 @@
                         <li>For a specific classification</li>
                     </ul>
                     At each level, if no value is set, it will inherit the values above it.<br/>
-                    The goal is to have all classifications linked to a standard term. e.g. to end with Outstanding Classifications : 0 of {{ condition_text.classifications_count }}<br/>
+                    The goal is to have all classifications linked to a standard term. e.g. to end with Outstanding Classifications : 0<br/>
                     New classifications will automatically inherit values set here.<br/>
                 </p>
                 <p>
@@ -684,7 +684,10 @@
                 </p>
             {% end_page_help_embedded %}
 
-            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications don't have a valid standard term assigned to them for the given text, and the total number of classifications for the given text.">Outstanding Classifications : <span id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> of {{ condition_text.classifications_count }} <span id="no_outstanding"></span></span>
+            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications share this condition text, and how many of those require a seleted term">
+                Total Classifications : <span class="mono">{{ condition_text.classifications_count }}</span>,
+                Outstanding Classifications : <span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>
+            </span>
             <ul id="condition-list" class="list-group mt-4">
                 <li class="list-group-item">
                     <div class="row">

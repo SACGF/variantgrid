@@ -284,7 +284,9 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "keycloak_admin": True,
     "classification_import_upload": True,
     "condition_aliases": True,
-    "clinvar_exports": True
+    "clinvar_exports": True,
+    "condition_matchings": True,
+    "condition_match_test": True
 })
 
 # mimic shariant

@@ -180,6 +180,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "download_uploaded_file": False,
 
     "classification_import_upload": True,
+    "condition_matchings": True,
+    "condition_match_test": True
     # "condition_aliases": True
 })
 

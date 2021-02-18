@@ -211,6 +211,7 @@ class ConditionTextMatchingAPI(APIView):
 
         suggestions = condition_matching_suggestions(ct)
         return Response({
+            "count_outstanding": ct.classifications_count_outstanding,
             "suggestions": [cms.as_json() for cms in suggestions]
         })
 
