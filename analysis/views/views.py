@@ -43,7 +43,7 @@ from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
 from analysis.views.nodes.node_view import NodeView
-from annotation.models.models import MutationalSignatureInfo, InvalidAnnotationVersionError, AnnotationVersion
+from annotation.models.models import MutationalSignatureInfo
 from classification.views.views import create_classification_object, CreateClassificationForVariantView
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
@@ -92,7 +92,8 @@ def get_analysis_settings(user, analysis):
                          "node_count_types": analysis.get_node_count_types(),
                          "show_igv_links": analysis.show_igv_links,
                          "igv_data": igv_data,
-                         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab}
+                         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,
+                         "genome_build": str(analysis.genome_build)}
     return analysis_settings
 
 

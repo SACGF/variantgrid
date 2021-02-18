@@ -59,8 +59,7 @@
 	const NODE_HELP = {{ node_help | jsonify }};
 	ANALYSIS_SETTINGS = {{ analysis_settings | jsonify }};
 
-	var panelResizeTimeout;
-	var panelResizeUpdateDelay = 150;
+    let panelResizeTimeout;
 	messagePoller = new AnalysisMessagePoller(Urls.nodes_status(ANALYSIS_ID));
 
 	var secondWindow; // set to window in dual screen mode
@@ -72,10 +71,11 @@
     analysisNodeVariables = {}; // { node_id: fields: Set()}
 
 	function loadInitialGridEditor() {
+	    let loadFinishedFunc;
     {% if analysis.get_errors or analysis.get_warnings %}
-	    let loadFinishedFunc = analysisSettings;
+	    loadFinishedFunc = analysisSettings;
 	{% else %}
-		let loadFinishedFunc = function() {
+		loadFinishedFunc = function() {
 			loadNodeData();
 			let activeNodeId = 0;
 		{% if active_node_id %}
