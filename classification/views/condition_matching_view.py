@@ -13,7 +13,7 @@ from classification.models import ConditionTextMatch, ConditionText, update_cond
 from library.utils import empty_to_none, ArrayLength
 from ontology.models import OntologyTerm, OntologySnake, OntologyService, OntologyTermRelation
 from ontology.ontology_matching import normalize_condition_text
-from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import re
 
 
@@ -25,8 +25,8 @@ class ConditionTextColumns(DatatableConfig):
         self.rich_columns = [
             RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text']),
             RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"], sort_keys=['normalized_text', 'lab__name']),
-            RichColumn(key="classifications_count", label="Classifications Affected", orderable=True, sort_keys=['classifications_count', 'normalized_text']),
-            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, sort_keys=['classifications_count_outstanding', 'normalized_text'])
+            RichColumn(key="classifications_count", label="Classification Count", orderable=True, sort_keys=['classifications_count', 'normalized_text']),
+            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count_outstanding', 'normalized_text'])
         ]
 
     def get_initial_queryset(self):
@@ -241,13 +241,15 @@ class ConditionTextMatchingAPI(APIView):
             cms = ConditionMatchingSuggestion(ctm)
             cms.validate()
             return Response({
-                "suggestions": [cms.as_json()]
+                "suggestions": [cms.as_json()],
+                "count_outstanding": ct.classifications_count_outstanding
             })
         else:
             # TODO this didn't seem to work, changing parent term didn't look like it re-calcualted gene nodes
             # will investigate
             suggestions = condition_matching_suggestions(ct)
             return Response({
-                "suggestions": [cms.as_json() for cms in suggestions]
+                "suggestions": [cms.as_json() for cms in suggestions],
+                "count_outstanding": ct.classifications_count_outstanding
             })
 

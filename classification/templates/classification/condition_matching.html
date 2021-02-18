@@ -473,6 +473,13 @@
 
         function applySuggestionUpdates(results, complete) {
             let suggestions = results.suggestions;
+            $("#count_outstanding").text(results.count_outstanding);
+            if (results.count_outstanding == 0) {
+                $("#no_outstanding").html(severityIcon("S"));
+            } else {
+                $("#no_outstanding").html();
+            }
+
             if (complete) {
                 $('.condition-match-row').removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied');
             }
@@ -645,10 +652,39 @@
             <h3>Condition Matching</h3>
             {% page_help_embedded title='Condition Matching' %}
                 <p>
-                    Help will go here for matching text to conditions
+                    Condition matching collects classifications that share the same "condition under curation", and allows you to assign standard ontology terms to them.<br/>
+                    e.g. The text "sifrim-hitz-weiss syndrome" can be assigned to MONDO:0014946<br/>
+                </p>
+                <p>
+                    <h5>Levels</h5>
+                    Standard terms can be assigned at the following levels:
+                    <ul>
+                        <li>Default for the condition text</li>
+                        <li>For a specific gene symbol within that condition text</li>
+                        <li>For a combination of mode of inheritance within the gene symbol</li>
+                        <li>For a specific classification</li>
+                    </ul>
+                    At each level, if no value is set, it will inherit the values above it.<br/>
+                    The goal is to have all classifications linked to a standard term. e.g. to end with Outstanding Classifications : 0 of {{ condition_text.classifications_count }}<br/>
+                    New classifications will automatically inherit values set here.<br/>
+                </p>
+                <p>
+                    <h5>Edit</h5>
+                    In many cases you'll need to edit a row to add terms.<br/>
+                    It is recommended that terms be provided at the gene symbol level.<br/>
+                    After clicking edit a popup will appear, with any chosen terms listed at the top (you can paste OMIM and MONDO terms here directly if needed).<br/>
+                    You will see any known gene level associations, and the top text matches.<br/>
+                    You can change the text that's being searched on and hit search for new text matches.<br/>
+                    Click toggle to add/remove a term, if multiple terms are selected you'll be required to choose "Co-occuring" or "uncertain"
+                </p>
+                <p>
+                    <h5>Quick Suggestions</h5>
+                    In some cases {{ site_name }} will be able to provide suggestions by looking at the text and gene symbols.<br/>
+                    Review any warnings with the suggestions, untick any that aren't appropriate, and hit "Approve" to bulk approve all the selected ones.
                 </p>
             {% end_page_help_embedded %}
 
+            <div>Outstanding Classifications : <span id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> of {{ condition_text.classifications_count }} <span id="no_outstanding"></span></div>
             <ul id="condition-list" class="list-group mt-4">
                 <li class="list-group-item">
                     <div class="row">
