@@ -35,23 +35,23 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
 
         for panel_app_result in results:
             if evidence := panel_app_result.get('evidence'):
-                # if "Expert Review Green" in evidence: # only look at green panels
-                phenotype_row: str
-                for phenotype_row in panel_app_result.get("phenotypes", []):
-                    # TODO look for terms other than OMIM in case panel app switches
-                    for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
-                        omim_int = int(omim_match[1])  # not always a valid id
-                        omim_id = OntologyService.index_to_id(OntologyService.OMIM, omim_int)
-                        if omim_term := OntologyTerm.objects.filter(id=omim_id).first():
-                            ontology_builder.add_ontology_relation(
-                                source_term_id=omim_term.id,
-                                dest_term_id=hgnc_term.id,
-                                relation=OntologyRelation.PANEL_APP_AU,
-                                extra={
-                                    "phenotype_row": phenotype_row,
-                                    "evidence": evidence
-                                }
-                            )
+                if "Expert Review Green" in evidence:  # only look at green panels
+                    phenotype_row: str
+                    for phenotype_row in panel_app_result.get("phenotypes", []):
+                        # TODO look for terms other than OMIM in case panel app switches
+                        for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
+                            omim_int = int(omim_match[1])  # not always a valid id
+                            omim_id = OntologyService.index_to_id(OntologyService.OMIM, omim_int)
+                            if omim_term := OntologyTerm.objects.filter(id=omim_id).first():
+                                ontology_builder.add_ontology_relation(
+                                    source_term_id=omim_term.id,
+                                    dest_term_id=hgnc_term.id,
+                                    relation=OntologyRelation.PANEL_APP_AU,
+                                    extra={
+                                        "phenotype_row": phenotype_row,
+                                        "evidence": evidence
+                                    }
+                                )
 
         ontology_builder.complete()
 

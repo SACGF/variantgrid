@@ -673,8 +673,8 @@
                     In many cases you'll need to edit a row to add terms.<br/>
                     It is recommended that terms be provided at the gene symbol level.<br/>
                     After clicking edit a popup will appear, with any chosen terms listed at the top (you can paste OMIM and MONDO terms here directly if needed).<br/>
-                    You will see any known gene level associations, and the top text matches.<br/>
-                    You can change the text that's being searched on and hit search for new text matches.<br/>
+                    You will see any known terms with gene level associations, and the top text matches.<br/>
+                    You can change the text that's being searched and click "Search" for updated results.<br/>
                     Click toggle to add/remove a term, if multiple terms are selected you'll be required to choose "Co-occuring" or "uncertain"
                 </p>
                 <p>
@@ -684,7 +684,7 @@
                 </p>
             {% end_page_help_embedded %}
 
-            <div>Outstanding Classifications : <span id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> of {{ condition_text.classifications_count }} <span id="no_outstanding"></span></div>
+            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications don't have a valid standard term assigned to them for the given text, and the total number of classifications for the given text.">Outstanding Classifications : <span id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> of {{ condition_text.classifications_count }} <span id="no_outstanding"></span></span>
             <ul id="condition-list" class="list-group mt-4">
                 <li class="list-group-item">
                     <div class="row">

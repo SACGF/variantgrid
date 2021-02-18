@@ -268,16 +268,6 @@ class OntologyMatching:
                         ontology_matches.find_or_create(f"OMIM:{omim_index}").direct_reference = True
 
             if not detected_ontology_id:
-                """
-                # technically this bit isn't a server search, but need to make the boolean more flexible
-                search_terms = set(SearchText.tokenize_condition_text(search_text))
-                qs = OntologyTerm.objects.filter(ontology_service=OntologyService.MONDO)
-                qs = qs.filter(reduce(operator.and_, [Q(name__icontains=term) for term in search_terms]))
-                qs = qs.order_by(Length('name')).values_list("id", flat=True)
-                result: OntologyTerm
-                for result in qs[0:20]:
-                    ontology_matches.searched_term(result)
-                """
                 # the actual server search
                 server_search_text = search_text
                 if gene_symbol:
