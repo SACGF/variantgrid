@@ -21,6 +21,7 @@ from annotation.models import AnnotationRun, AnnotationVersion, ClassificationMo
     VariantAnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import Event, create_event
+from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk
 from library.enums.log_level import LogLevel
@@ -386,6 +387,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                                        extra_context: dict = None):
     """ Main Variant Details page """
     variant = get_object_or_404(Variant, pk=variant_id)
+    g_hgvs = HGVSMatcher.static_variant_to_g_hgvs(variant)
     annotation_version = None
     latest_annotation_version = None
     variant_annotation = None
@@ -462,6 +464,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "classifications": latest_classifications,
         "clinvar": clinvar,
         "genes_canonical_transcripts": genes_canonical_transcripts,
+        "g_hgvs": g_hgvs,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
         "num_variant_annotation_versions": num_variant_annotation_versions,

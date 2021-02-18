@@ -254,11 +254,12 @@ $(document).ready(function() {
         <div class="card" id="clingen-allele">
             <div class="card-header">Variant</div>
             <div class="card-body">
+                {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{{ g_hgvs }}{% endlabelled %}
+                {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+                {% labelled label="Genome Build" %}{{ variant.genome_build }}{% endlabelled %}
                 {% if variant.can_have_annotation and variant_show_canonical_hgvs %}
                     {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
                 {% endif %}
-                {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
-                {% labelled label="Genome Build" %}{{ variant.genome_build }}{% endlabelled %}
                 {% labelled id="allele" label="Allele" %}Loading...{% endlabelled %}
                 {% labelled id="quick-links" label="Quick Links" %}Loading...{% endlabelled %}
             </div>
@@ -294,62 +295,66 @@ $(document).ready(function() {
 
 {% if variant.can_have_annotation %}
 
-    <div id='classifications' class='container-table mt-4'>
-        <h3>Classifications</h3>
-        {% if classifications %}
-            {% classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
-        {% else %}
-            <p>No internal classifications.</p>
-        {% endif %}
-    </div>
-{% endif %}
-
-{% if show_annotation and variant_annotation %}
-    {% if clinvar %}
-
+    {% if classifications %}
+        <!-- Needs to be full width to show data table -->
+        <div id='classifications' class='container-table mt-4'>
+            <h3>Classifications</h3>
+                {% classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
+        </div>
+    {% else %}
+        <!-- Nicer table that lines up with others -->
         <div class="container">
-            <h3>ClinVar</h3>
             <div class="card">
-                <div class="card-header">ClinVar Variation ID</div>
+                <div class="card-header">Classifications</div>
                 <div class="card-body">
-                    {% labelled label="Allele" hint="tiny" %}
-                     <a class='hover-link' target='_blank' href='https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}'>{{ clinvar.clinvar_variation_id }}</a>
-                        &nbsp;<b>AlleleID</b> {{ clinvar.clinvar_allele_id }}
-                    {% endlabelled %}
-                    {% labelled label="Highest pathogenicity" hint="tiny" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
-                    {% labelled label="Clinical significance" hint="tiny" %}{{ clinvar.clinical_significance }}{% endlabelled %}
-                    {% labelled label="Preferred disease name" hint="tiny" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
-                    {% labelled label="Disease database name" hint="tiny" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
-                    {% labelled label="Review status" hint="tiny" %}
-                        {% load clinvar_tags %}
-                        <a class='hover-link' target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/">
-                        {% clinvar_stars clinvar.stars %} {{ clinvar.get_clinvar_review_status_display }}
-                        </a>
-                    {% endlabelled %}
-                    {% labelled label="Clinical sources" hint="tiny" %}{{ clinvar.clinvar_clinical_sources }}{% endlabelled %}
-                    {% labelled label="Origin" hint="tiny" %}{{ clinvar.get_origin_display }}{% endlabelled %}
-                    {% if clinvar_suspect_reason_code %}
-                        {% labelled label="Suspect reason code" hint="tiny" %}{{ clinvar.get_suspect_reason_code_display }}{% endlabelled %}
-                    {% endif %}
-                    {% labelled label="Drug response" hint="tiny" %}{{ clinvar.drug_response }}{% endlabelled %}
-                    {% labelled label="Citations" hint="tiny" %}
-                        {% if num_clinvar_citations %}<a class='hover-link hide-citations' data-toggle="collapse" href='#clinvar-citation-div'>Show {{ num_clinvar_citations }} Literature Citations</a>
-                        {% else %}No Citations.
-                        {% endif %}
-                    {% endlabelled %}
-                    <div id="clinvar-citation-div" class="collapse"></div>
+                    No internal classifications.
                 </div>
             </div>
         </div>
-    
-    {% else %}
-        <div class="container-table my-4">
-        <b>ClinVar:</b> N/A
-        </div>
     {% endif %}
+{% endif %}
+
+{% if show_annotation and variant_annotation %}
+    <div class="container">
+        <div class="card">
+            <div class="card-header">ClinVar</div>
+            <div class="card-body">
+            {% if clinvar %}
+                {% labelled label="Allele" hint="tiny" %}
+                 <a class='hover-link' target='_blank' href='https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}'>{{ clinvar.clinvar_variation_id }}</a>
+                    &nbsp;<b>AlleleID</b> {{ clinvar.clinvar_allele_id }}
+                {% endlabelled %}
+                {% labelled label="Highest pathogenicity" hint="tiny" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
+                {% labelled label="Clinical significance" hint="tiny" %}{{ clinvar.clinical_significance }}{% endlabelled %}
+                {% labelled label="Preferred disease name" hint="tiny" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
+                {% labelled label="Disease database name" hint="tiny" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
+                {% labelled label="Review status" hint="tiny" %}
+                    {% load clinvar_tags %}
+                    <a class='hover-link' target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/">
+                    {% clinvar_stars clinvar.stars %} {{ clinvar.get_clinvar_review_status_display }}
+                    </a>
+                {% endlabelled %}
+                {% labelled label="Clinical sources" hint="tiny" %}{{ clinvar.clinvar_clinical_sources }}{% endlabelled %}
+                {% labelled label="Origin" hint="tiny" %}{{ clinvar.get_origin_display }}{% endlabelled %}
+                {% if clinvar_suspect_reason_code %}
+                    {% labelled label="Suspect reason code" hint="tiny" %}{{ clinvar.get_suspect_reason_code_display }}{% endlabelled %}
+                {% endif %}
+                {% labelled label="Drug response" hint="tiny" %}{{ clinvar.drug_response }}{% endlabelled %}
+                {% labelled label="Citations" hint="tiny" %}
+                    {% if num_clinvar_citations %}<a class='hover-link hide-citations' data-toggle="collapse" href='#clinvar-citation-div'>Show {{ num_clinvar_citations }} Literature Citations</a>
+                    {% else %}No Citations.
+                    {% endif %}
+                {% endlabelled %}
+                <div id="clinvar-citation-div" class="collapse"></div>
+            {% else %}
+                No ClinVar entry (version: {{ annotation_version.clinvar_version.annotation_date.date  }})
+                <a href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ g_hgvs }}">Search ClinVar</a>
+            {% endif %}
+            </div>
+        </div>
+    </div>
 
     <div class="container">
-        <h3>Nearby</h3>
         <div class="card">
             <div class="card-header">Nearby variants</div>
             <div class="card-body">
