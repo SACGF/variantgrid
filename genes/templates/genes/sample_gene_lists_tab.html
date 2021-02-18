@@ -122,7 +122,7 @@ $(document).ready(function() {
         <div id="sample-gene-list-{{ sample_gene_list.pk }}" class="sample-gene-list-details collapse card mt-4">
             <div class="card-header">
                 <div class="left icon32 check-mark-green active-sample-gene-list" title="Active Gene List"></div>
-                <span class="sample-gene-list-name">{{ sample_gene_list.gene_list.name }}</span> {{ sample_gene_list.modified | localtime }}
+                <span class="sample-gene-list-name">{{ sample_gene_list.gene_list.name }}</span> {{ sample_gene_list.created | localtime }}
             </div>
             <div class="card-body">
                 <div class="sample-gene-list-toolbar">

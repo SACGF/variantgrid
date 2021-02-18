@@ -42,10 +42,14 @@
         background-size: 16px 16px;
         background-position: 8px 50%;
         background-repeat: no-repeat;
-        background-color: #F0D9ED !important;
         padding: 16px 16px 16px 28px;
         border-radius: 4px;
     }
+
+    .not-installed {
+        background-color: #F0D9ED !important;
+    }
+
     .install-instructions-toggle {
         font-size: small;
     }
@@ -105,14 +109,13 @@
                     {% labelled label="Genome Fasta" %}
                         {% if details.reference_fasta %}
                             {{ details.reference_fasta }}
-                        {% elif user.is_superuser %}
-                            <div class='install-instructions'>
-                                <div class="mono">{{ details.reference_fasta_error }}</div>
-                                You need to download the annotations, or change <code>settings.GENOME_BUILD_REFERENCE_FASTA</code>
-                            </div>
                         {% else %}
                             <div class="not-installed">Not found</div>
                         {% endif %}
+                        {% install-instructions "Reference Fasta" installed=details.reference_fasta %}
+                            <div class="mono">{{ details.reference_fasta_error }}</div>
+                            You need to download the annotations, or change <code>settings.GENOME_BUILD_REFERENCE_FASTA</code>
+                        {% endinstall-instructions %}
                     {% endlabelled %}
                     {% labelled label="Contigs" %}
                         <div class="{{ build_name }}">
@@ -155,7 +158,7 @@
                             </div>
                         {% endfor %}
 
-                        {% install-instructions build_name %}
+                        {% install-instructions build_name installed=True %}
                             <p>
                             You can install both Ensembl and RefSeq transcripts (for HGVS) but you NEED the ones used by your variant annotation pipeline which is: '<b>{{ details.annotation_consortium }}</b>'
                             </p>
@@ -211,7 +214,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                         {% else %}
                             <div class="no-value">Not Installed</div>
                         {% endif %}
-                        {% install-instructions "Gene Annotation Release" %}
+                        {% install-instructions "Gene Annotation Release" installed=details.gene_annotation_release %}
                             The latest variant annotation version does not have a Gene Annotation Release set. We need this to be able to match to the
                             exact gene/transcript versions used in a VEP release.
 
@@ -237,7 +240,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                        {% else %}
                             <div class="no-value">Not Installed</div>
                        {% endif %}
-                        {% install-instructions "Gene Annotation" %}
+                        {% install-instructions "Gene Annotation" installed=details.gene_level_annotation %}
                             <code>{{ python_command }} manage.py gene_annotation --gene-annotation-release=(Gene Annotation Release ID)</code>
                         {% endinstall-instructions %}
                     {% endlabelled %}
@@ -247,7 +250,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                         {% else %}
                             <div class="no-value">Not installed</div>
                         {% endif %}
-                        {% install-instructions "Clinvar" %}
+                        {% install-instructions "Clinvar" installed=details.clinvar %}
                             Download VCF (with date in file name) from <a href="http://www.ncbi.nlm.nih.gov/clinvar/">NCBI ClinVar</a> site, then run:
 
                             <code>{{ python_command }} manage.py clinvar_import ${VARIANTGRID_SETUP_DATA}/clinvar_20180401.vcf.gz</code>
@@ -258,13 +261,12 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                         {% labelled label="Somalier" %}
                             {% if details.somalier %}
                                 {{ details.somalier }}
-                            {% elif user.is_superuser %}
-                                <div class='install-instructions'>
-                                    Upload the Somalier sites VCF for {{ build_name }}.
-                                </div>
-                           {% else %}
+                            {% else %}
                                Not installed
-                           {% endif %}
+                            {% endif %}
+                            {% install-instructions "Somalier" installed=details.somalier %}
+                                Upload the Somalier sites VCF for {{ build_name }}.
+                            {% endinstall-instructions %}
                         {% endlabelled %}
                     {% endif %}
                 </div>
@@ -281,7 +283,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     {% else %}
                         <div class="no-value">Not installed</div>
                     {% endif %}
-                    {% install-instructions label="ClinVar Citations" %}
+                    {% install-instructions label="ClinVar Citations" installed=clinvar_citations %}
                         Download 'var_citations.txt' from <a href="ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/">NCBI ClinVar FTP - Tab Delimited</a> then run:
                         <code>{{ python_command }} manage.py import_clinvar_citations ${VARIANTGRID_SETUP_DATA}/var_citations.txt</code>
                     {% endinstall-instructions %}
@@ -293,7 +295,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     {% else %}
                         <div class="no-value">Not installed</div>
                     {% endif %}
-                    {% install-instructions "Human Protein Atlas" %}
+                    {% install-instructions "Human Protein Atlas" installed=hpa_counts %}
                         <div>Go to <a href='http://v15.proteinatlas.org/about/download'>Protein Atlas Download Page</a> (We only support version &lt;=15 currently)> and download <b>rna_tissue.csv.zip</b> note the version (ie <b>15</b>):</div>
                         <code>{{ python_command }} manage.py human_protein_atlas_import --hpa-version 15 ${VARIANTGRID_SETUP_DATA}/rna_tissue.csv.zip</code>
                     {% endinstall-instructions %}
@@ -307,7 +309,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     {% else %}
                         <div class="no-value">Not installed</div>
                     {% endif %}
-                    {% install-instructions "Gene Symbol Aliases" %}
+                    {% install-instructions "Gene Symbol Aliases" installed=gene_symbol_alias_counts %}
 <code>wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
 {{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz</code>
                      {% endinstall-instructions %}
@@ -343,7 +345,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     {% for ontology_import in ontology_imports %}
                         <div><b>{{ ontology_import.context }}</b> : {% timestamp ontology_import.last_import.processed_date time_ago=True %}</div>
                     {% endfor %}
-                    {% install-instructions "Ontology Imports" %}
+                    {% install-instructions "Ontology Imports" installed=ontology_imports %}
                         <div>
                             <b>HGNC</b><br/>
                             OntologyTerms have a redundant copy of HGNC to help map relationships between terms and genes. To load HGNC OntologyTerms
@@ -389,7 +391,7 @@ If all the files are in place, the uploads can be triggered by a single command 
                         {% else %}
                             <div class="no-value">Not Installed</div>
                         {% endif %}
-                        {% install-instructions "Somalier" %}
+                        {% install-instructions "Somalier" installed=somalier %}
                             <p>
                                 Change install dir in settings.SOMALIER
                             <code>
