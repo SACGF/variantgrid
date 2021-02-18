@@ -701,7 +701,11 @@
             </ul>
         </form>
         <div class="row">
-            <div class="col-8"></div>
+            <div class="col-8">
+                {% if next_condition_text %}
+                <a class="btn btn-secondary" href="{% url 'condition_matching' next_condition_text.pk %}">Next Condition Text</a>
+                {% endif %}
+            </div>
             <div class="col-4">
                 <button id="approve-suggestions" class="btn btn-primary w-100" onclick="approveSuggestions()">
                     Approve suggestions

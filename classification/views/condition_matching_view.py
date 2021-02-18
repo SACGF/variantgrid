@@ -25,8 +25,8 @@ class ConditionTextColumns(DatatableConfig):
         self.rich_columns = [
             RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text']),
             RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"], sort_keys=['normalized_text', 'lab__name']),
-            RichColumn(key="classifications_count", label="Classification Count", orderable=True, sort_keys=['classifications_count', 'normalized_text']),
-            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count_outstanding', 'normalized_text'])
+            RichColumn(key="classifications_count", label="Classification Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', 'normalized_text']),
+            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True,  sort_keys=['classifications_count_outstanding', 'normalized_text'])
         ]
 
     def get_initial_queryset(self):
@@ -49,6 +49,18 @@ def condition_matchings_view(request):
     return render(request, 'classification/condition_matchings.html', context={
         'datatable_config': ConditionTextColumns(request)
     })
+
+
+def next_condition_text(current: ConditionText, user: User) -> Optional[ConditionText]:
+    qs = ConditionText.objects.filter(classifications_count__lte=current.classifications_count, classifications_count_outstanding__gte=1).order_by('-classifications_count', 'normalized_text')
+    qs = get_objects_for_user(user, ConditionText.get_read_perm(), qs, accept_global_perms=True)
+    for term in qs:
+        if term == current:
+            continue
+        if term.normalized_text < current.normalized_text:
+            continue
+        return term
+    return None
 
 
 def condition_matching_view(request, pk: int):
@@ -81,7 +93,8 @@ def condition_matching_view(request, pk: int):
 
     return render(request, 'classification/condition_matching.html', context={
         'condition_text': ct,
-        'condition_match': root_match
+        'condition_match': root_match,
+        'next_condition_text': next_condition_text(current=ct, user=request.user)
     })
 
 
@@ -170,7 +183,7 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         cms.add_term(matches_gene_level_leafs[0])
                     else:
-                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple children are associated to {gene_symbol}"))
+                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple children of this term are associated to {gene_symbol}"))
 
                 else:
                     # if not MONDO term, see if this term has a known relationship directly
