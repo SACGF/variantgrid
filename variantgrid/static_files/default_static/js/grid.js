@@ -466,7 +466,6 @@ function gnomADVariant(rowData) {
     if (chrom.startsWith("chr")) {
         chrom = chrom.substr(3);
     }
-    console.log(rowData);
     return [chrom, rowData["locus__position"], rowData["locus__ref__seq"], rowData["alt__seq"]].join("-");
 }
 
@@ -481,7 +480,9 @@ function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
         } else {
             filterDiv.text("Pass");
         }
-        const url = "http://gnomad.broadinstitute.org/variant/" + gnomADVariant(rowData);
+        const gv = gnomADVariant(rowData);
+        const dataset = ANALYSIS_SETTINGS["genome_build"] === 'GRCh38'? 'gnomad_r3' : 'gnomad_r2_1';
+        const url = `http://gnomad.broadinstitute.org/variant/${gv}?dataset=${dataset}`;
         const gnomADLink = $("<a />").addClass("gnomad-link").attr({
             "href": url,
             "target": "_blank",

@@ -14,6 +14,7 @@ from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol, SampleGeneList, \
     ActiveSampleGeneList, PanelAppPanelLocalCacheGeneList
+from pathtests.models import PathologyTestVersion
 from snpdb.models import Sample
 from snpdb.models.models_enums import ImportStatus
 
@@ -25,12 +26,11 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
     PATHOLOGY_TEST_GENE_LIST = 3
     PANEL_APP_GENE_LIST = 4
 
-    pathology_test_gene_list = models.ForeignKey(GeneList, null=True, blank=True, on_delete=SET_NULL,
-                                                 related_name='pathology_test_gene_list')
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
     sample_gene_list = models.ForeignKey(SampleGeneList, null=True, blank=True, on_delete=SET_NULL)
     has_gene_coverage = models.BooleanField(null=True)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
+    pathology_test_version = models.ForeignKey(PathologyTestVersion, null=True, blank=True, on_delete=SET_NULL)
     exclude = models.BooleanField(default=False)
     accordion_panel = models.IntegerField(default=0)
 
@@ -47,7 +47,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
             lambda: [gln_gl.gene_list for gln_gl in self.genelistnodegenelist_set.all()],
             lambda: [self.custom_text_gene_list.gene_list],
             lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
-            lambda: [self.pathology_test_gene_list],
+            lambda: [self.pathology_test_version.gene_list],
             lambda: [gln_pap.gene_list for gln_pap in self.genelistnodepanelapppanel_set.all()],
         ]
         getter = GENE_LISTS[self.accordion_panel]
