@@ -1964,7 +1964,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     def latest_for_user(cls,
                         user: User,
                         classification: Optional[Classification] = None,
-                        variant: Optional[Union[Variant, List[Variant]]] = None,
+                        variant: Optional[Union[Variant, Iterable[Variant]]] = None,
                         allele: Allele = None,
                         published: bool = None,
                         clinical_context: Optional['ClinicalContext'] = None,

@@ -25,7 +25,7 @@ from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     VariantAnnotationVersionDiff
 from annotation.models.models import ClinVarCitation, CachedCitation, \
-    CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation
+    CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation, ColumnVEPField
 from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
@@ -36,7 +36,7 @@ from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
 from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyTermRelation
-from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF
+from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
 
 
 def get_build_contigs():
@@ -379,16 +379,28 @@ def retry_annotation_run_upload(request, annotation_run_id):
     return retry_annotation_run(request, annotation_run_id, upload_only=True)
 
 
-@login_not_required
 @cache_page(WEEK_SECS)
 @vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
-def view_annotation_descriptions(request):
+def view_annotation_descriptions(request, genome_build_name=None):
+    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     variantgrid_columns_by_annotation_level = defaultdict(list)
+    vep_annotation_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
+    columns_and_vep_by_annotation_level = defaultdict(dict)
 
-    for vac in VariantGridColumn.objects.all().order_by("grid_column_name"):
-        variantgrid_columns_by_annotation_level[vac.annotation_level].append(vac)
+    vep_qs = ColumnVEPField.filter_for_build(genome_build)
+    for vgc in VariantGridColumn.objects.all().order_by("grid_column_name"):
+        if vgc.annotation_level in vep_annotation_levels:
+            # For Transcript/Variant that use VEP - only show if visible in that build
+            if vep := vep_qs.filter(variant_grid_column=vgc).first():
+                columns_and_vep_by_annotation_level[vgc.annotation_level][vgc] = vep
+        else:
+            variantgrid_columns_by_annotation_level[vgc.annotation_level].append(vgc)
 
-    context = {"variantgrid_columns_by_annotation_level": variantgrid_columns_by_annotation_level}
+    context = {
+        "genome_build": genome_build,
+        "variantgrid_columns_by_annotation_level": variantgrid_columns_by_annotation_level,
+        "columns_and_vep_by_annotation_level": columns_and_vep_by_annotation_level
+    }
     return render(request, "annotation/view_annotation_descriptions.html", context)
 
 

@@ -1,5 +1,7 @@
 {% extends menu_genes_base %}
 {% load static %}
+{% load help_tags %}
+{% load genome_build_tags %}
 
 {% block title %}Genes{% endblock title %}
 {% block submenu_page_content %}
@@ -78,9 +80,7 @@
     });
 </script>
 
-    {% load help_tags %}
     {% page_help user 'annotation/gene_annotations_help' ' ' %}
-    {% load genome_build_tags %}
     {% genome_build_url_arg genome_build 'genome_build_genes' %}
 
     <div>

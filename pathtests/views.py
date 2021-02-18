@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 import json
 import logging
 
-from genes.models import GeneListCategory, GeneVersion, GeneList
+from genes.models import GeneListCategory, GeneList, GeneSymbol
 from genes.views import add_gene_list_unmatched_genes_message
 from library.django_utils import add_save_message
 from pathtests.forms import SelectPathologyTestForm, SelectPathologyTestVersionForm, \
@@ -191,7 +191,7 @@ def get_gene_modification_request(pathology_test_version):
     handled_requests = defaultdict(list)
 
     for gmr in pathology_test_version.pathologytestgenemodificationrequest_set.all():
-        gene_symbol = gmr.gene.gene_symbol
+        gene_symbol = gmr.gene_symbol_id
         if gmr.outcome == PathologyTestGeneModificationOutcome.PENDING:
             if gene_symbol in current_genes:
                 d = gene_deletion_requests
@@ -219,6 +219,7 @@ def handle_modification_requests(post_dict, pathology_test_version, op_key, modi
     for gene_symbol, gene_modification_requests in modification_requests.items():
         # Looks like 'add-ALK' or 'del-ALK'
         key = '%s-%s' % (op_key, gene_symbol)
+        outcome = None
         op = post_dict.get(key)
         if op == IGNORE:
             continue
@@ -359,6 +360,7 @@ def view_pathology_test(request, name):
             msg = f"You are not the curator of pathology test {pathology_test}"
             raise PermissionError(msg)
 
+        msg = None
         level = messages.INFO
         restore_test = request.POST.get("restore_test")
         if restore_test:
@@ -378,7 +380,8 @@ def view_pathology_test(request, name):
                 msg = "This test was NOT deleted."
                 level = messages.WARNING
 
-        messages.add_message(request, level, msg, extra_tags='save-message')
+        if msg:
+            messages.add_message(request, level, msg, extra_tags='save-message')
 
     gene_grid_columns = []
     for ptv in pathology_test.pathologytestversion_set.all():
@@ -398,16 +401,15 @@ def modify_pathology_test_version(request, pk):
     pathology_test_version = get_object_or_404(PathologyTestVersion, pk=pk)
 
     operation = request.POST['operation']
-    gene_symbol = request.POST['gene_symbol']
+    symbol = request.POST['gene_symbol']
     comments = request.POST['comments']
 
-    # We only use the gene symbol (will insert multiple if needed later)
-    gene = GeneVersion.objects.filter(gene_symbol=gene_symbol).first()
+    gene_symbol = get_object_or_404(GeneSymbol, pk=symbol)
     mod_request = PathologyTestGeneModificationRequest.objects.create(pathology_test_version=pathology_test_version,
                                                                       operation=operation,
-                                                                      gene=gene,
+                                                                      gene_symbol=gene_symbol,
                                                                       user=request.user,
-                                                                      comments=comments,)
+                                                                      comments=comments)
     response_data = {"pk": mod_request.pk}
     return JsonResponse(response_data)
 

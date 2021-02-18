@@ -1,8 +1,10 @@
 {% extends "uicore/page/base.html" %}
 {% load static %}
 {% load js_tags %}
+{% load ui_help %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
+{% load genome_build_tags %}
 {% block submenu %}{% menu_bar_annotations %}{% endblock %}
 {% block title %}VariantGrid Annotations{% endblock title %}
 
@@ -91,7 +93,8 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
-	{% load ui_help %}
+    {% genome_build_url_arg genome_build 'view_annotation_descriptions_genome_build' %}
+
 	{% page_help page_id='annotation/view_annotation_descriptions_help' title="VariantGrid Annotations"%}
 
     <ul>
@@ -176,41 +179,41 @@
             </div>
             <div class="card-body">
                 <table class='annotations-table table'>
-                {% for v in variantgrid_columns_by_annotation_level.T %}
+                {% for v, columnvepfield in columns_and_vep_by_annotation_level.T.items %}
                     <tr class='annotation-row'>
                         <th>{{ v.pk }}
                         <td>
-                        {% if v.columnvepfield %}
-                            <div class='vep-category vep-category-{{ v.columnvepfield.category }}'>
-                                {{ v.columnvepfield.get_category_display }}
+                        {% if columnvepfield %}
+                            <div class='vep-category vep-category-{{ columnvepfield.category }}'>
+                                {{ columnvepfield.get_category_display }}
                             </div>
                         {% endif %}
                         </td>
                         <td>
-                        {% if v.columnvepfield %}
+                        {% if columnvepfield %}
                             <div class='vep-source-field'>
-                                {{ v.columnvepfield.source_field }}
-                                {% if v.columnvepfield.source_field_processing_description %}
-                                    ({{ v.columnvepfield.source_field_processing_description }})
+                                {{ columnvepfield.source_field }}
+                                {% if columnvepfield.source_field_processing_description %}
+                                    ({{ columnvepfield.source_field_processing_description }})
                                 {% endif %}
                             </div>
                         {% endif %}
                         </td>
                         <td>
-                        {% if v.columnvepfield %}
+                        {% if columnvepfield %}
                             <div class='vep-source-field'>
-                                {% if v.columnvepfield.vep_plugin %}
-                                    Plugin: <b>{{ v.columnvepfield.get_vep_plugin_display }}</b>
+                                {% if columnvepfield.vep_plugin %}
+                                    Plugin: <b>{{ columnvepfield.get_vep_plugin_display }}</b>
                                 {% endif %}
 
-                                {% if v.columnvepfield.vep_custom %}
+                                {% if columnvepfield.vep_custom %}
                                     (custom)
                                 {% endif %}
                             </div>
                         {% endif %}
                         </td>
                         <td>{{ v.description | safe }}
-                        {% if v.columnvepfield.vep_plugin == 'd' %}
+                        {% if columnvepfield.vep_plugin == 'd' %}
                             Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
                         {% endif %}
                         </td>
@@ -228,47 +231,81 @@
             </div>
             <div class="card-body">
         <table class='annotations-table table'>
-        {% for v in variantgrid_columns_by_annotation_level.V %}
+        {% for v, columnvepfield in columns_and_vep_by_annotation_level.V.items %}
             <tr class='annotation-row'>
                 <th>{{ v.pk }}
                 <td>
-                {% if v.columnvepfield %}
-                        <div class='vep-category vep-category-{{ v.columnvepfield.category }}'>
-                            {{ v.columnvepfield.get_category_display }}
+                {% if columnvepfield %}
+                        <div class='vep-category vep-category-{{ columnvepfield.category }}'>
+                            {{ columnvepfield.get_category_display }}
                         </div>
                 {% endif %}
                 </td>
                 <td>
-                {% if v.columnvepfield %}
+                {% if columnvepfield %}
                     <div class='vep-source-field'>
-                        {{ v.columnvepfield.source_field }}
-                        {% if v.columnvepfield.source_field_processing_description %}
-                            ({{ v.columnvepfield.source_field_processing_description }})
+                        {{ columnvepfield.source_field }}
+                        {% if columnvepfield.source_field_processing_description %}
+                            ({{ columnvepfield.source_field_processing_description }})
                         {% endif %}
                     </div>
                 {% endif %}                    
                 </td>
                 <td>
-                {% if v.columnvepfield %}
+                {% if columnvepfield %}
                     <div class='vep-source-field'>
-                        {% if v.columnvepfield.vep_plugin %}
-                            Plugin: <b>{{ v.columnvepfield.get_vep_plugin_display }}</b>
+                        {% if columnvepfield.vep_plugin %}
+                            Plugin: <b>{{ columnvepfield.get_vep_plugin_display }}</b>
                         {% endif %}
 
-                        {% if v.columnvepfield.vep_custom %}
+                        {% if columnvepfield.vep_custom %}
                             (custom)
                         {% endif %}
                     </div>
                 {% endif %}
                 </td>
                 <td>{{ v.description | safe }}
-                {% if v.columnvepfield.vep_plugin == 'd' %}
+                {% if columnvepfield.vep_plugin == 'd' %}
                     Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
                 {% endif %}
                 </td>
         {% endfor %}
         </table>
         </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header align-center">
+                <div class="color-box hgnc-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>HGNC</b> From <a class="hover-link" target="_blank" href="https://www.genenames.org/">HUGO Gene Nomenclature Committee</a></div>
+            </div>
+            <div class="card-body">
+                <table class='annotations-table table'>
+                {% for v in variantgrid_columns_by_annotation_level.H %}
+                    <tr>
+                        <th>{{ v.pk }}</th>
+                        <td>{{ v.description | safe }}</td>
+                    </tr>
+                {% endfor %}
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header align-center">
+                <div class="color-box uniprot-column">&nbsp;</div>
+                <div class="annotation-level-title"><b>UniProt</b> Protein function from <a class="hover-link" target="_blank" href="https://www.uniprot.org/">UniProt</a></div>
+            </div>
+            <div class="card-body">
+                <table class='annotations-table table'>
+                {% for v in variantgrid_columns_by_annotation_level.U %}
+                    <tr>
+                        <th>{{ v.pk }}</th>
+                        <td>{{ v.description | safe }}</td>
+                    </tr>
+                {% endfor %}
+                </table>
+            </div>
         </div>
 
         <div class="card mt-4">

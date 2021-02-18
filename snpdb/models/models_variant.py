@@ -12,7 +12,7 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
-from typing import Optional, Pattern, Tuple
+from typing import Optional, Pattern, Tuple, Iterable
 import collections
 import django.dispatch
 import re
@@ -410,11 +410,11 @@ class Variant(models.Model):
         return None
 
     @property
-    def equivalent_variants(self):
+    def equivalent_variants(self) -> Iterable['Variant']:
         allele = self.allele
         if not allele:
-            return self
-        return VariantAllele.objects.filter(allele=allele).values_list('variant', flat=True)
+            return [self]
+        return Variant.objects.filter(variantallele__allele=allele)
 
     @lazy
     def variant_annotation(self) -> Optional['VariantAnnotation']:

@@ -16,6 +16,7 @@ urlpatterns = [
     perm_path('annotation_run/retry_upload/<int:annotation_run_id>', views.retry_annotation_run_upload, name='retry_annotation_run_upload'),
     perm_path('create_manual_variant_entry_from_text/<genome_build_name>/<variants_text>', views.create_manual_variant_entry_from_text, name='create_manual_variant_entry_from_text'),
     perm_path('view_annotation_descriptions', views.view_annotation_descriptions, name='view_annotation_descriptions'),
+    perm_path('view_annotation_descriptions/<genome_build_name>', views.view_annotation_descriptions, name='view_annotation_descriptions_genome_build'),
     perm_path('about_new_vep_columns', views.about_new_vep_columns, name='about_new_vep_columns'),
     perm_path('view_annotation_version_details/<int:annotation_version_id>', views.view_annotation_version_details, name='view_annotation_version_details'),
     perm_path('clinvar_citations_tab/<int:clinvar_id>', views.clinvar_citations_tab, name='clinvar_citations_tab'),
