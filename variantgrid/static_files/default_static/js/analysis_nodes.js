@@ -106,7 +106,7 @@ function sendUpdateNodeMessage(nodeId, op, params, on_success_function) {
 function addNodesToDOM(selector, nodeDataArray, readOnly) {
 	selector = $(selector);
 	for (let i=0 ; i<nodeDataArray.length ; ++i) {
-		node = createNodeFromData(nodeDataArray[i]);
+		const node = createNodeFromData(nodeDataArray[i]);
 		selector.append(node);
 	}
 }
@@ -119,7 +119,7 @@ function getEndpoint(id, endpoint_type, side) {
         return null;    
 
 	for (let i=0 ; i<endpoints.length ; ++i) {
-		ep = endpoints[i];
+		const ep = endpoints[i];
 		if (endpoint_type === 'source') {
 			if (ep.isSource) {
 				return ep;
@@ -255,7 +255,7 @@ function attatchAnalysisNodeConnections(connections, readOnly) {
 
 
 function addNewNodeToPage(data) {
-	newNode = createNodeFromData(data);
+	const newNode = createNodeFromData(data);
 	newNode.appendTo($("#analysis"));
 	setupNodes(newNode);
 	return newNode;
@@ -312,7 +312,6 @@ function copyNode() {
 		attatchAnalysisNodeConnections(edges);
 	};
 
-	let nodeId = $(this).attr('node_id');
 	let data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
 	$.ajax({
 	    type: "POST",
@@ -418,7 +417,7 @@ function updateDirtyNode(node, refresh) {
 					const myNode = getNode(node_id); // get latest version
 					const version_id = myNode.attr("version_id");
 					const loading = myNode.attr("loading");
-					if (version_id == nodeVersion && !loading) {
+					if (version_id === nodeVersion && !loading) {
 						if (DEBUG) {
 							console.log(".animate()");
 						}
@@ -687,8 +686,7 @@ function setupNodeModifications(nodes_selector) {
 
 function getEndpointSide(ep) {
 	const uuid = ep.getUuid();
-	const side = uuid.split("-").reverse()[0];
-	return side;
+	return uuid.split("-").reverse()[0];
 }
 
 
@@ -815,7 +813,7 @@ function changeAnalysisSettings(oldAnalysisSettings) {
 		const newTypes = get_array_element_keys(newCountData, "label");
 
 		for (let i=0 ; i<newTypes.length ; ++i) {
-            count_type = newTypes[i];
+            const count_type = newTypes[i];
             if ($.inArray(count_type, oldTypes) == -1) {
                 requireReload = true;
                 break;
@@ -852,7 +850,7 @@ function updateNodeAppearance(data) {
     let wasActive = oldNode.hasClass(ACTIVE_CLASS);
     oldNode.remove();
 
-    newNode = createNodeFromData(data);
+    const newNode = createNodeFromData(data);
     if (wasActive) {
     	newNode.addClass(ACTIVE_CLASS);
 	}
