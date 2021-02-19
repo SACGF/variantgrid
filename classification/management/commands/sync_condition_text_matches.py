@@ -11,8 +11,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--reset', action='store_true', default=False)
-        parser.add_argument('--force', action='store_true', default=False)
-        parser.add_argument('--offline', action='store_true', default=False)
 
     def handle(self, *args, **options):
         if options["reset"]:
@@ -22,5 +20,5 @@ class Command(BaseCommand):
         force = options["force"]
 
         print("Syncing")
-        ConditionTextMatch.sync_all(force=force, offline=options["offline"])
+        ConditionTextMatch.sync_all()
         print("Complete")
