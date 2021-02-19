@@ -428,7 +428,7 @@ def load_biomart(filename: str, force: bool):
         descriptions_list = [x for x in str(description).split(";;")]
         name = descriptions_list[0]
         # aliases = [name] + [term for term in [term.strip() for term in str(description).split(";")] if term]
-        aliases = [term for term in [term.strip() for term in str(description).split(";")] if term]
+        aliases = [term for term in [term.strip() for term in str(description).split(";")] if term and term != name]
         ontology_builder.add_term(
             term_id=f"OMIM:{mim_accession_id}",
             name=name,
@@ -446,7 +446,7 @@ def load_omim(filename: str, force: bool):
         filename=filename,
         context="omim_file",
         import_source=OntologyImportSource.OMIM,
-        processor_version=3,
+        processor_version=4,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -493,7 +493,7 @@ def load_omim(filename: str, force: bool):
             else:
                 # aliases.append(preferred_title)  # other tables don't have the name copied into aliases
                 # so don't do it here
-                aliases += [term for term in [term.strip() for term in (preferred_title + ";" + alternative_terms).split(";")] if term]
+                aliases += [term for term in [term.strip() for term in (preferred_title + ";" + alternative_terms).split(";")] if term and term != preferred_title]
 
             extras = {"type": omim_type}
             if included_titles:

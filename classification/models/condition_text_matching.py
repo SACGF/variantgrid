@@ -639,8 +639,13 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
     cms = ConditionMatchingSuggestion()
     if match_info := search_text.matches(term):
         if match_info.alias_index:  # 0 alias is complete with acronymn, 1 alias without acronymn
-            if not term.ontology_service == OntologyService.OMIM or match_info.alias_index >= 2:
-                # the 0th and 1st alias of OMIM are just standard terms for it, not really an alias
+            safe_alias = False
+            if term.ontology_service == OntologyService.OMIM:
+                alias = term.aliases[match_info.alias_index]
+                if alias in [name_part.strip() for name_part in term.name.split(";")]:
+                    # alias is part one of the name parts, would barely refer to it as an alias
+                    safe_alias = True
+            if not safe_alias:
                 cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
         if term.ontology_service == OntologyService.OMIM:
             if mondo := OntologyTermRelation.as_mondo(term):
