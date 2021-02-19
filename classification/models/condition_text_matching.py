@@ -639,7 +639,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> ConditionMatchingSuggestion:
     cms = ConditionMatchingSuggestion()
     if match_info := search_text.matches(term):
-        if match_info.alias_index:  # 0 alias is complete with acronymn, 1 alias without acronymn
+        if match_info.alias_index is not None:  # 0 alias is complete with acronymn, 1 alias without acronymn
             safe_alias = False
             if term.ontology_service == OntologyService.OMIM:
                 alias = term.aliases[match_info.alias_index]
