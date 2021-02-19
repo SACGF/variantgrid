@@ -1,7 +1,7 @@
 from django.template import Library
 import uuid
 
-from genes.forms import GeneForm
+from genes.forms import GeneForm, GeneSymbolForm
 from ontology.forms import HPOForm, OMIMForm
 
 register = Library()
@@ -26,13 +26,13 @@ def phenotype_entry(context, form_entry_field, phenotype_description,
 
     hpo_form = None
     omim_form = None
-    gene_form = None
+    gene_symbol_form = None
     if show_hpo:
         hpo_form = HPOForm()
     if show_omim:
         omim_form = OMIMForm()
     if show_genes:
-        gene_form = GeneForm()
+        gene_symbol_form = GeneSymbolForm()
 
     return {'flattened_uuid': flattened_uuid,
             'user': context['user'],
@@ -40,7 +40,7 @@ def phenotype_entry(context, form_entry_field, phenotype_description,
             'edit': edit,
             'hpo_form': hpo_form,
             'omim_form': omim_form,
-            'gene_form': gene_form,
+            'gene_symbol_form': gene_symbol_form,
             "form_entry_field": form_entry_field,
             "patient_results": patient_results,
             "show_grid": show_grid,

@@ -147,12 +147,12 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             return;
         }
 
-        const raw_text = $(selector).text();
+        const raw_text = $("option:selected", selector).text();
         const match = new RegExp(regex).exec(raw_text);
         if (match) {
             const value = match[1].trim();
             // pass in 3rd param to tell it we're from autocomplete box (and leave it)
-            addTerm(term_type, value, term_type);             
+            addTerm(term_type, value, term_type);
         }
     }
     
@@ -228,8 +228,8 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             const regex = "OMIM:\\d+ ([^\\(]*)";
             searchForText('omim', regex, this);
         });
-        $('#id_gene', phenotypeEditorTag).change(function() {
-            const regex = "([^\\s\\(]*)\\s+\\(";
+        $('#id_gene_symbol', phenotypeEditorTag).change(function() {
+            const regex = "(.*)";
             searchForText('gene', regex, this);
         });
     {% endif %}
@@ -250,12 +250,12 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         <tr>
             {% if hpo_form %}<td style="width:30%"><div class='ontology-label hpo'>Human Phenotype Ontology</div></td>{% endif %}
             {% if omim_form %}<td style="width:30%"><div class='ontology-label omim'>OMIM</div></td>{% endif %}
-            {% if gene_form %}<td style="width:30%"><div class='ontology-label gene'>Genes</div></td>{% endif %}
+            {% if gene_symbol_form %}<td style="width:30%"><div class='ontology-label gene'>Genes</div></td>{% endif %}
         </tr>
         <tr>
             {% if hpo_form %}<td style="width:30%"><div class="hpo">{{ hpo_form.hpo }} {{ hpo_form.media }}</div></td>{% endif %}
             {% if omim_form %}<td style="width:30%"><div class='omim'>{{ omim_form.omim }}</div></td>{% endif %}
-            {% if gene_form %}<td style="width:30%"><div class='gene'>{{ gene_form.gene }}</div></td>{% endif %}
+            {% if gene_symbol_form %}<td style="width:30%"><div class='gene'>{{ gene_symbol_form.gene_symbol }}</div></td>{% endif %}
         </tr>
     </table>
     <div class="my-2">
