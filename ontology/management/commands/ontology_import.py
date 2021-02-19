@@ -79,7 +79,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=4)
+        processor_version=5)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -204,6 +204,17 @@ def load_mondo(filename: str, force: bool):
                                         dest_term_id=val.id,
                                         relation=OntologyRelation.XREF
                                     )
+
+                        if label and "MONDO" in full_id:
+                            if ";" in label:
+                                parts = [part.strip() for part in label.split(";")]
+                                if len(parts) == 2:
+                                    if parts[1].isupper():
+                                        for part in parts:
+                                            if part not in aliases:
+                                                aliases.append(part)
+                                        print(aliases)
+
                         ontology_builder.add_term(
                             term_id=full_id,
                             name=label,

@@ -673,8 +673,6 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
         else:
             for term_str in term_list:
                 if len(term_str) > 1:
-                    if term_str.endswith("s"):
-                        term_str = term_str[0:-1]
                     # problem with icontains in aliases is it converts array list to a string, and then finds text in there
                     # so "hamper,laundry" would be returned for icontains="ham"
                     q.append(Q(name__icontains=term_str) | Q(aliases__icontains=term_str))
@@ -692,7 +690,6 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
             if len(name_matches) == 1:
                 return name_matches[0]
     return None
-
 
 
 def search_suggestion(text: str) -> ConditionMatchingSuggestion:

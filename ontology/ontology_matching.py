@@ -137,11 +137,11 @@ class SearchText:
             self.prefix = sub_type_match.group(1).strip()
             self.suffix = sub_type_match.group(2).strip()
 
-            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deplural=True)) - PREFIX_SKIP_TERMS
+            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deroman=True, deplural=True)) - PREFIX_SKIP_TERMS
             self.suffix_terms = set(SearchText.tokenize_condition_text(self.suffix, deroman=True)) - SUFFIX_SKIP_TERMS
         else:
             self.prefix = normal_text
-            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deplural=True)) - PREFIX_SKIP_TERMS
+            self.prefix_terms = set(SearchText.tokenize_condition_text(self.prefix, deroman=True, deplural=True)) - PREFIX_SKIP_TERMS
 
     @property
     def prefix_terms_display(self) -> str:
