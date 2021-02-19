@@ -79,7 +79,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=3)
+        processor_version=4)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -115,15 +115,7 @@ def load_mondo(filename: str, force: bool):
                         if synonyms := meta.get("synonyms"):
                             extra["synonyms"] = synonyms
 
-                        # make the term early so we don't have to create stubs for it if we find relationships
-                        ontology_builder.add_term(
-                            term_id=full_id,
-                            name=label,
-                            definition=defn,
-                            extra=extra if extra else None,
-                            primary_source=True
-                        )
-
+                        aliases = list()
                         synonym_set = set()
                         if synonyms := meta.get("synonyms"):
 
@@ -134,6 +126,8 @@ def load_mondo(filename: str, force: bool):
                                 pred = synonym.get("pred")
                                 if pred == "hasExactSynonym":
                                     # val = synonym.get("val")
+                                    aliases.append(synonym.get("val"))
+
                                     for xref in synonym.get("xrefs", []):
                                         xref_term = TermId(xref)
                                         if xref_term.type in {"HP", "OMIM"}:
@@ -149,6 +143,8 @@ def load_mondo(filename: str, force: bool):
                                                 relation=OntologyRelation.EXACT
                                             )
                                             synonym_set.add(xref)
+                                            if xref_term.type == "OMIM":
+                                                aliases.append(label)
 
                             # look at related synonyms second, if we have RELATED, don't bother with any other relationships
                             for synonym in synonyms:
@@ -177,6 +173,8 @@ def load_mondo(filename: str, force: bool):
                             if val.type in {"HP", "OMIM"} and not val.id in synonym_set:
                                 pred = bp.get("pred")
                                 pred = MATCH_TYPES.get(pred, pred)
+                                # if pred == OntologyRelation.EXACT:
+                                    # add alias?
 
                                 ontology_builder.add_term(
                                     term_id=val.id,
@@ -206,6 +204,14 @@ def load_mondo(filename: str, force: bool):
                                         dest_term_id=val.id,
                                         relation=OntologyRelation.XREF
                                     )
+                        ontology_builder.add_term(
+                            term_id=full_id,
+                            name=label,
+                            definition=defn,
+                            extra=extra if extra else None,
+                            aliases=aliases,
+                            primary_source=True
+                        )
 
                 # copy of id for gene symbol to gene symbol
                 elif term.type == "HGNC":
@@ -421,7 +427,8 @@ def load_biomart(filename: str, force: bool):
     for mim_accession_id, description in description_series.items():
         descriptions_list = [x for x in str(description).split(";;")]
         name = descriptions_list[0]
-        aliases = [name] + [term for term in [term.strip() for term in str(description).split(";")] if term]
+        # aliases = [name] + [term for term in [term.strip() for term in str(description).split(";")] if term]
+        aliases = [term for term in [term.strip() for term in str(description).split(";")] if term]
         ontology_builder.add_term(
             term_id=f"OMIM:{mim_accession_id}",
             name=name,
@@ -476,7 +483,7 @@ def load_omim(filename: str, force: bool):
             alternative_terms = row[3]
             included_titles = row[4]
 
-            moved_to: Optional[int] = None
+            moved_to: Optional[str] = None
             aliases = []
 
             if match := MOVED_TO.match(preferred_title):
@@ -484,7 +491,8 @@ def load_omim(filename: str, force: bool):
                 moved_to = match.group(1)
                 preferred_title = f"obsolete, see OMIM:{moved_to}"
             else:
-                aliases.append(preferred_title)
+                # aliases.append(preferred_title)  # other tables don't have the name copied into aliases
+                # so don't do it here
                 aliases += [term for term in [term.strip() for term in (preferred_title + ";" + alternative_terms).split(";")] if term]
 
             extras = {"type": omim_type}

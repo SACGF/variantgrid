@@ -217,6 +217,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             # this way we only recognise ids we recognise
             # but do we want that?
             # also allows us to fix the length of ids
+            # also allows us to fix the length of ids
 
             # also assume any dangling number is a mondo term?
             db_refs = db_ref_regexes.search(terms_part, default_regex=DbRegexes.MONDO)
@@ -268,7 +269,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return self.conditiontextmatch_set.all().order_by(order_by)
 
     @staticmethod
-    def sync_all(force=False, offline=False):
+    def sync_all():
         """
         syncs ConditionTextMatch's to Classifications
         """
@@ -278,7 +279,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ConditionTextMatch.sync_condition_text_classification(cm=cm, update_counts=False)
 
         for ct in ConditionText.objects.all():
-            ConditionTextMatch.attempt_automatch(condition_text=ct, force=force, server_search=not offline)
+            ConditionTextMatch.attempt_automatch(condition_text=ct)
             update_condition_text_match_counts(ct)
             if ct.classifications_count == 0:
                 ct.delete()
@@ -286,23 +287,18 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText, force: bool = False, server_search=False):
-        if force or not condition_text.user_edited:
-            condition_text.clear()
-        else:
-            return False  # couldn't overwrite what we already had
-
+    def attempt_automatch(condition_text: ConditionText):
         try:
             if root := condition_text.root:
-                if match := top_level_suggestion(condition_text.normalized_text, fallback_to_online=server_search):
-                    if match.is_auto_assignable():
+                if match := top_level_suggestion(condition_text.normalized_text):
+                    if match.is_auto_assignable() and not root.condition_xrefs:
                         print(f"{condition_text.root} : {match.terms}")
                         root.condition_xrefs = match.term_str_array
                         root.last_edited_by = admin_bot()
                         root.save()
                     else:
                         for gene_symbol_level in condition_text.gene_levels:
-                            if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol):
+                            if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol) and not gene_symbol_level.condition_xrefs:
                                 print(f"{condition_text.root} {gene_symbol_level.gene_symbol} : {match.terms}")
                                 gene_symbol_level.condition_xrefs = match.term_str_array
                                 gene_symbol_level.last_edited_by = admin_bot()
@@ -311,7 +307,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             report_exc_info()
 
     @staticmethod
-    def sync_condition_text_classification(cm: ClassificationModification, update_counts=True):
+    def sync_condition_text_classification(cm: ClassificationModification, update_counts=True, attempt_automatch=False):
         classification = cm.classification
         if classification.withdrawn:
             ConditionTextMatch.objects.filter(classification=classification).delete()
@@ -343,14 +339,14 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             # if condition text has changed, remove the old entries
             ConditionTextMatch.objects.filter(classification=classification).exclude(condition_text=ct).delete()
 
-            root, _ = ConditionTextMatch.objects.get_or_create(
+            root, new_root = ConditionTextMatch.objects.get_or_create(
                 condition_text=ct,
                 gene_symbol=None,
                 mode_of_inheritance=None,
                 classification=None
             )
 
-            gene_level, _ = ConditionTextMatch.objects.get_or_create(
+            gene_level, new_gene_level = ConditionTextMatch.objects.get_or_create(
                 parent=root,
                 condition_text=ct,
                 gene_symbol=gene_symbol,
@@ -375,21 +371,17 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     # update existing to new hierarchy
                     # assume if a condition has been set for this classification specifically that it's
                     # still valid
-                    old_root = existing.condition_text
+                    old_text = existing.condition_text
                     existing.parent = mode_of_inheritance_level
                     existing.condition_text = ct
                     existing.mode_of_inheritance = mode_of_inheritance
                     existing.save()
 
-                    if update_counts:
-                        update_condition_text_match_counts(old_root)
-                        old_root.save()
-                        if old_root != ct:
-                            update_condition_text_match_counts(ct)
-                            ct.save()
+                    update_condition_text_match_counts(old_text)
+                    old_text.save()
                 else:
-                    # nothing has changed, no need to update count
-                    pass
+                    # nothing has changed, no need to update anything
+                    return
             else:
                 ConditionTextMatch.objects.create(
                     parent=mode_of_inheritance_level,
@@ -399,9 +391,17 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     classification=classification
                 )
 
-                if update_counts:
-                    update_condition_text_match_counts(ct)
-                    ct.save()
+            save_required = False
+            if attempt_automatch and (new_root or new_gene_level):
+                ConditionTextMatch.attempt_automatch(ct)
+                save_required = True
+
+            if update_counts:
+                update_condition_text_match_counts(ct)
+                save_required = True
+
+            if save_required:
+                ct.save()
 
 
 def update_condition_text_match_counts(ct: ConditionText):
@@ -474,7 +474,7 @@ class ConditionMatchingSuggestion:
         user_json = None
         if self.terms and self.is_applied: # only report on user who filled in values
             if condition_text_match := self.condition_text_match:
-                if user := self.condition_text_match.last_edited_by:
+                if user := condition_text_match.last_edited_by:
                     user_json = {"username": user.username}
 
         return {
@@ -492,8 +492,9 @@ class ConditionMatchingSuggestion:
         if terms := self.terms:
             if len(terms) != 1:
                 return False
-            if self.messages:
-                return False
+            for message in self.messages:
+                if message.severity not in {"success","info"}:
+                    return False
 
             if gene_symbol:
                 if self.is_all_leafs():
@@ -572,7 +573,7 @@ def published(sender,
     """
     Keeps condition_text_match in sync with the classifications when evidence changes
     """
-    ConditionTextMatch.sync_condition_text_classification(newly_published)
+    ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
 
 
 @receiver(flag_comment_action, sender=Flag)
@@ -584,13 +585,13 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
     if flag.flag_type == flag_types.classification_flag_types.classification_withdrawn:
         cl: Classification
         if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
-            ConditionTextMatch.sync_condition_text_classification(cl.last_published_version)
+            ConditionTextMatch.sync_condition_text_classification(cl.last_published_version, attempt_automatch=True, update_counts=True)
 
 
-def top_level_suggestion(text: str, fallback_to_online: bool = True) -> ConditionMatchingSuggestion:
+def top_level_suggestion(text: str) -> ConditionMatchingSuggestion:
     if suggestion := embedded_ids_check(text):
         return suggestion
-    return search_suggestion(text, fallback_to_online=fallback_to_online)
+    return search_suggestion(text)
 
 
 def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
@@ -637,10 +638,13 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> ConditionMatchingSuggestion:
     cms = ConditionMatchingSuggestion()
     if match_info := search_text.matches(term):
-        if match_info.alias_index and match_info.alias_index >= 2:  # 0 alias is complete with acronymn, 1 alias without acronymn
-            cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Text matched on alias of {term.id}"))
+        if match_info.alias_index:  # 0 alias is complete with acronymn, 1 alias without acronymn
+            if not term.ontology_service == OntologyService.OMIM or match_info.alias_index >= 2:
+                # the 0th and 1st alias of OMIM are just standard terms for it, not really an alias
+                cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
         if term.ontology_service == OntologyService.OMIM:
             if mondo := OntologyTermRelation.as_mondo(term):
+                cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Converted from OMIM term {term.id}"))
                 term = mondo
 
         cms.add_term(term)
@@ -649,43 +653,64 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
     return cms
 
 
-def search_suggestion(text: str, fallback_to_online: bool = True) -> ConditionMatchingSuggestion:
+def search_suggestion(text: str) -> ConditionMatchingSuggestion:
     match_text = SearchText(text)
-    q = list()
-    # TODO, can we leverage phenotype matching?
-    for term in match_text.prefix_terms:
-        if len(term) >= 5:
-            # TODO evaluate if it was worth it comparing aliases
-            q.append(Q(name__icontains=term) | Q(aliases__icontains=term))
-        else:
-            q.append(Q(name__iexact=term) | Q(aliases__icontains=term))
-    # don't bother with searching for suffix, just find them all and see how we go with the matching
-    local_term_count = 0
-    if q:
+    for service in [OntologyService.MONDO, OntologyService.OMIM]:
+        q = list()
+        # TODO, can we leverage phenotype matching?
+        if match_text.prefix_terms:
+            term_list = list(match_text.prefix_terms)
+            if len(term_list) == 1 and len(term_list[0]) <= 4:
+                term_str: str = term_list[0]
+                # check array contains (and hope we don't have any mixed case aliases)
+                q.append(Q(name__iexact=term_str) | Q(aliases__contains=[term_str.upper()]) | Q(aliases__contains=[term_str.lower()]))
+            else:
+                for term_str in term_list:
+                    # problem with icontains in aliases is it converts array list to a string, and then finds text in there
+                    # so "hamper,laundry" would be returned for icontains="ham"
+                    q.append(Q(name__icontains=term_str) | Q(aliases__icontains=term_str))
 
-        for term in OntologyTerm.objects.filter(ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}).filter(reduce(
-                operator.and_, q)).order_by('ontology_service')[0:200]:
-            local_term_count += 1
+        # don't bother with searching for suffix, just find them all and see how we go with the matching
+        local_term_count = 0
+        matches = list()
+        if q:
+            for term in OntologyTerm.objects.filter(ontology_service=service).filter(reduce(
+                    operator.and_, q)).order_by('ontology_service')[0:200]:
+                local_term_count += 1
+                if cms := search_text_to_suggestion(match_text, term):
+                    matches.append(cms)
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            combined = ConditionMatchingSuggestion()
+            for match in matches:
+                for term in match.terms:
+                    combined.add_term(term)
+                for message in match.messages:
+                    combined.add_message(message)
+            combined.add_message(ConditionMatchingMessage(severity="error", text="Text matched multiple terms"))
+            combined.condition_multi_operation = MultiCondition.UNCERTAIN  # TODO, should we make a "pick one" operation?
+            return combined
+        else:  # matches == 0
+            continue
+
+    try:
+        # TODO ensure "text" is safe, it should already be normalised
+        results = requests.get(
+            f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
+                "prefix": "MONDO",
+                "rows": 10,
+                "minimal_tokenizer": "false",
+                "category": "disease"
+            }).json().get("docs")
+
+        for result in results:
+            o_id = result.get('id')
+            # result.get('label') gives the label as it's known by the search server
+            term = OntologyTerm.get_or_stub(o_id)
             if cms := search_text_to_suggestion(match_text, term):
                 return cms
+    except:
+        print("Error searching server")
 
-    if fallback_to_online:
-        try:
-            # TODO ensure "text" is safe, it should already be normalised
-            results = requests.get(
-                f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
-                    "prefix": "MONDO",
-                    "rows": 10,
-                    "minimal_tokenizer": "false",
-                    "category": "disease"
-                }).json().get("docs")
-
-            for result in results:
-                o_id = result.get('id')
-                # result.get('label') gives the label as it's known by the search server
-                term = OntologyTerm.get_or_stub(o_id)
-                if cms := search_text_to_suggestion(match_text, term):
-                    return cms
-        except:
-            print("Error searching server")
     return ConditionMatchingSuggestion()

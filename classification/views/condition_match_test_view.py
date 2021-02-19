@@ -13,7 +13,6 @@ from ontology.ontology_matching import OntologyMatching, SearchText, normalize_c
 
 
 def condition_match_test_download_view(request):
-    check_sever = request.POST.get("external_search") == "True"
 
     def result_iterator():
         try:
@@ -28,7 +27,7 @@ def condition_match_test_download_view(request):
                               .select_related('lab')\
                               .order_by('-classifications_count'):
 
-                suggestion = top_level_suggestion(ct.normalized_text, fallback_to_online=check_sever)
+                suggestion = top_level_suggestion(ct.normalized_text)
                 term_text = ""
                 if terms := suggestion.terms:
                     term_text = "\t".join([f"{term.id} : {term.name}" for term in terms])
@@ -74,7 +73,7 @@ def condition_match_test_view(request):
                 valid = False
     if valid:
         auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
-        suggestion = top_level_suggestion(normalize_condition_text(condition_text), fallback_to_online=True)
+        suggestion = top_level_suggestion(normalize_condition_text(condition_text))
         attempted = True
 
     context = {

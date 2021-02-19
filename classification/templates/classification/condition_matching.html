@@ -652,8 +652,11 @@
             <h3>Condition Matching</h3>
             {% page_help_embedded title='Condition Matching' %}
                 <p>
-                    Condition matching collects classifications that share the same "condition under curation", and allows you to assign standard ontology terms to them.<br/>
-                    e.g. The text "sifrim-hitz-weiss syndrome" can be assigned to MONDO:0014946<br/>
+                    Condition matching collects classifications that share the same "condition under curation", and allows you to assign
+                    standard ontology terms to them.<br/>
+                    If a free text condition is provided, text will be matched to MONDO terms as a first pass
+                    (see <a class="external-link" href="https://mondo.monarchinitiative.org/" target="_blank">https://mondo.monarchinitiative.org/</a> for more information)<br/>
+                    e.g. The text "sifrim-hitz-weiss syndrome" can be assigned to MONDO:0014946
                 </p>
                 <p>
                     <h5>Levels</h5>
@@ -680,11 +683,11 @@
                 <p>
                     <h5>Quick Suggestions</h5>
                     In some cases {{ site_name }} will be able to provide suggestions by looking at the text and gene symbols.<br/>
-                    Review any warnings with the suggestions, untick any that aren't appropriate, and hit "Approve" to bulk approve all the selected ones.
+                    Review any warnings with the suggestions, untick any suggestions that are not appropriate, and hit "Approve" to bulk approve all the selected suggestions.
                 </p>
             {% end_page_help_embedded %}
 
-            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications share this condition text, and how many of those require a seleted term">
+            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications share this condition text, and how many of those require a selected term">
                 Total Classifications : <span class="mono">{{ condition_text.classifications_count }}</span>,
                 Outstanding Classifications : <span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>
             </span>

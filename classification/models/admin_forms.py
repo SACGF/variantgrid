@@ -494,10 +494,18 @@ class ConditionTextAdmin(ModelAdminBasics):
     def auto_match(self, request, queryset):
         condition_text: ConditionText
         for condition_text in queryset:
-            ConditionTextMatch.attempt_automatch(condition_text=condition_text, force=True, server_search=True)
+            ConditionTextMatch.attempt_automatch(condition_text=condition_text)
 
     auto_match.short_description = "Automatch (overwrite existing data)"
-    actions = [auto_match]
+
+    def clear(self, request, queryset):
+        condition_text: ConditionText
+        for condition_text in queryset:
+            condition_text.clear()
+
+    clear.short_description = "Clear any matches"
+
+    actions = [auto_match, clear]
 
 
 class ConditionTextMatchAdmin(ModelAdminBasics):

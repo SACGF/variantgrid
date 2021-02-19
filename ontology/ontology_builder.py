@@ -93,24 +93,23 @@ class OntologyBuilder:
         with the same context and ontology service) as deleted
         Will also complain about other records not included in this import but wont delete them
         """
-        if purge_old_relationships or purge_old_terms:
-            old_imports = set(OntologyImport.objects.filter(context=self.context, import_source=self.import_source).values_list("pk", flat=True))
-            if self._ontology_import.pk in old_imports:
-                old_imports.remove(self._ontology_import.pk)
+        old_imports = set(OntologyImport.objects.filter(context=self.context, import_source=self.import_source).values_list("pk", flat=True))
+        if self._ontology_import.pk in old_imports:
+            old_imports.remove(self._ontology_import.pk)
 
-            for model in [OntologyTermRelation, OntologyTerm]:
+        for model in [OntologyTermRelation, OntologyTerm]:
 
-                olds = model.objects.filter(from_import__in=old_imports)
-                for old in olds[0:3]:
-                    print(f"This appears stale: {old}")
+            olds = model.objects.filter(from_import__in=old_imports)
+            for old in olds[0:3]:
+                print(f"This appears stale: {old}")
 
-                count = olds.count()
-                self.counters[model].deletes += count
-                if (model == OntologyTermRelation and purge_old_relationships) or \
-                        (model == OntologyTerm and purge_old_terms):  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
-                    if count:
-                        print(f"Deleting {count} stale {model}")
-                        olds.delete()
+            count = olds.count()
+            self.counters[model].deletes += count
+            if (model == OntologyTermRelation and purge_old_relationships) or \
+                    (model == OntologyTerm and purge_old_terms):  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
+                if count:
+                    print(f"Deleting {count} stale {model}")
+                    olds.delete()
 
         self._ontology_import.completed = True
         self._ontology_import.save()
@@ -163,9 +162,7 @@ class OntologyBuilder:
                  extra: Optional[Dict] = None,
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True):
-        """
-        Returns the term_id
-        """
+
         if self.created_cache.get(term_id) == OntologyBuilder.CreatedState.DETAILED:
             return
 

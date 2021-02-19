@@ -118,21 +118,24 @@ def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: 
 
 
 def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingSuggestion]:
-    """
-    TODO: add some suggestions, not just known answers
-    """
     suggestions = list()
 
     root_level = ct.root
     root_cms: Optional[ConditionMatchingSuggestion]
 
     root_cms = ConditionMatchingSuggestion(root_level)
+    is_root_real: bool
     display_root_cms = root_cms
-    if not root_cms.terms:
-        root_cms = top_level_suggestion(ct.normalized_text, fallback_to_online=True)
+    if root_cms.terms:
+        is_root_real = True
+    else:
+        root_cms = top_level_suggestion(ct.normalized_text)
         root_cms.condition_text_match = root_level
         if root_cms.ids_found_in_text:
             display_root_cms = root_cms
+            is_root_real = True
+        else:
+            is_root_real = False
 
     root_cms.validate()
     suggestions.append(display_root_cms)
@@ -164,7 +167,6 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
 
                     matches_gene_level_leafs = [term for term in matches_gene_level if term.is_leaf]
                     root_level_str = ', '.join([term.id for term in root_level_mondo])
-
 
                     if not matches_gene_level:
                         cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Could not find relationship to {gene_symbol}"))
@@ -210,6 +212,8 @@ def condition_matching_suggestions(ct: ConditionText) -> List[ConditionMatchingS
                         # suggest the root at each gene level anyway (along with any warnings we may have generated)
                         if not root_cms.ids_found_in_text:
                             cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
+                            for message in root_cms.messages:
+                                cms.add_message(message)
 
     return suggestions
 
