@@ -660,50 +660,45 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
     return cms
 
 
-def search_suggestion(text: str) -> ConditionMatchingSuggestion:
-    match_text = SearchText(text)
-    for service in [OntologyService.MONDO, OntologyService.OMIM]:
-        q = list()
-        # TODO, can we leverage phenotype matching?
-        if match_text.prefix_terms:
-            term_list = list(match_text.prefix_terms)
-            if len(term_list) == 1 and len(term_list[0]) <= 4:
-                term_str: str = term_list[0]
-                # check array contains (and hope we don't have any mixed case aliases)
-                q.append(Q(name__iexact=term_str) | Q(aliases__contains=[term_str.upper()]) | Q(aliases__contains=[term_str.lower()]))
-            else:
-                for term_str in term_list:
+def find_local_term(match_text: SearchText, service: OntologyService) -> Optional[ConditionMatchingSuggestion]:
+    q = list()
+    # TODO, can we leverage phenotype matching?
+    if match_text.prefix_terms:
+        term_list = list(match_text.prefix_terms)
+        if len(term_list) == 1 and len(term_list[0]) <= 4:
+            term_str: str = term_list[0]
+            # check array contains (and hope we don't have any mixed case aliases)
+            q.append(Q(name__iexact=term_str) | Q(aliases__contains=[term_str.upper()]) | Q(
+                aliases__contains=[term_str.lower()]))
+        else:
+            for term_str in term_list:
+                if len(term_str) > 1:
+                    if term_str.endswith("s"):
+                        term_str = term_str[0:-1]
                     # problem with icontains in aliases is it converts array list to a string, and then finds text in there
                     # so "hamper,laundry" would be returned for icontains="ham"
                     q.append(Q(name__icontains=term_str) | Q(aliases__icontains=term_str))
 
-        # don't bother with searching for suffix, just find them all and see how we go with the matching
-        local_term_count = 0
-        matches = list()
-        if q:
-            for term in OntologyTerm.objects.filter(ontology_service=service).filter(reduce(
-                    operator.and_, q)).order_by('ontology_service')[0:200]:
-                local_term_count += 1
-                if cms := search_text_to_suggestion(match_text, term):
-                    matches.append(cms)
-        if len(matches) == 1:
-            return matches[0]
-        elif len(matches) > 1:
-            if name_matches := [match for match in matches if match.alias_index is None]:
-                if len(name_matches) == 1:
-                    return name_matches[0]
+    matches = list()
+    if q:
+        for term in OntologyTerm.objects.filter(ontology_service=service).filter(reduce(
+                operator.and_, q)).order_by('ontology_service')[0:200]:
+            if cms := search_text_to_suggestion(match_text, term):
+                matches.append(cms)
+    if len(matches) == 1:
+        return matches[0]
+    elif len(matches) > 1:
+        if name_matches := [match for match in matches if match.alias_index is None]:
+            if len(name_matches) == 1:
+                return name_matches[0]
+    return None
 
-            combined = ConditionMatchingSuggestion()
-            for match in matches:
-                for term in match.terms:
-                    combined.add_term(term)
-                for message in match.messages:
-                    combined.add_message(message)
-            combined.add_message(ConditionMatchingMessage(severity="error", text="Text matched multiple terms"))
-            combined.condition_multi_operation = MultiCondition.UNCERTAIN  # TODO, should we make a "pick one" operation?
-            return combined
-        else:  # matches == 0
-            continue
+
+
+def search_suggestion(text: str) -> ConditionMatchingSuggestion:
+    match_text = SearchText(text)
+    if local_mondo := find_local_term(match_text, OntologyService.MONDO):
+        return local_mondo
 
     try:
         # TODO ensure "text" is safe, it should already be normalised
@@ -723,5 +718,8 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
                 return cms
     except:
         print("Error searching server")
+
+    if local_omim := find_local_term(match_text, OntologyService.OMIM):
+        return local_omim
 
     return ConditionMatchingSuggestion()
