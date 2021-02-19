@@ -270,8 +270,8 @@ $(document).ready(function() {
             const regex = "OMIM:\\d+ ([^\\(]*)";
             searchForText('OMIM', regex, this);
         });
-        $('#id_gene').change(function () {
-            const regex = "([^\\s\\(]*)\\s+\\(";
+        $('#id_gene_symbol').change(function () {
+            const regex = "(.*)";
             searchForText('gene', regex, this);
         });
     }
@@ -393,7 +393,7 @@ $(document).ready(function() {
                     <tr><td><div class='ontology-label omim w-100'>OMIM</div>
                     <tr><td class='omim'> {{ omim_form.omim }}
                     <tr><td><div class='ontology-label gene w-100'>Genes</div>
-                    <tr><td class='gene'> {{ gene_form.gene }}
+                    <tr><td class='gene'> {{ gene_symbol_form.gene_symbol }}
                     <!-- Only need 1 media for entire page -->
                     {{ hpo_form.media }} 
                 </table>

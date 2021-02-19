@@ -7,7 +7,7 @@ import mimetypes
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from annotation.phenotype_matching import create_phenotype_description
-from genes.forms import GeneForm
+from genes.forms import GeneForm, GeneSymbolForm
 from library.django_utils import add_save_message, set_form_read_only
 from library.file_utils import rm_if_exists
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -266,7 +266,7 @@ def patients(request):
                "patient_search_form": PatientSearchForm(),
                'omim_form': OMIMForm(),
                'hpo_form': HPOForm(),
-               'gene_form': GeneForm(),
+               'gene_symbol_form': GeneSymbolForm(),
                "initially_hide_create_patient_form": initially_hide_create_patient_form,
                "form": form}
 
