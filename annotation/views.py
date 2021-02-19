@@ -14,7 +14,6 @@ from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-from global_login_required import login_not_required
 import os
 
 from htmlmin.decorators import not_minified_response

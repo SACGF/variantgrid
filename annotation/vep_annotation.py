@@ -5,7 +5,6 @@ import re
 from shlex import shlex
 
 from django.conf import settings
-from django.db.models import Q
 
 from annotation.fake_annotation import get_fake_vep_version
 from annotation.models.models import ColumnVEPField
@@ -122,7 +121,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                     cmd.extend(_get_custom_params_list(fields, prefix, cfg))
                 else:
                     logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
-                                    genome_build.name, prefix_lc)
+                                 genome_build.name, prefix_lc)
         except Exception as e:
             logging.warning(e)
             # Not all annotations available for all builds - ok to just warn
