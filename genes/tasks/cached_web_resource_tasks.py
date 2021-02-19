@@ -5,7 +5,6 @@ from genes.models import PanelAppServer
 from genes.panel_app import store_panel_app_panels_from_web
 from genes.pfam import store_pfam_from_web
 from genes.refseq import store_refseq_gene_summary_from_web
-from genes.rvis import store_rvis_from_web
 from genes.uniprot import store_uniprot_from_web
 from variantgrid.celery import app
 
@@ -42,11 +41,6 @@ class RefSeqGeneSummaryWebResourceTask(CachedWebResourceTask):
         store_refseq_gene_summary_from_web(cached_web_resource)
 
 
-class RVISWebResourceTask(CachedWebResourceTask):
-    def _load_cached_web_resource(self, cached_web_resource):
-        store_rvis_from_web(cached_web_resource)
-
-
 class UniProtWebResourceTask(CachedWebResourceTask):
     def _load_cached_web_resource(self, cached_web_resource):
         store_uniprot_from_web(cached_web_resource)
@@ -58,5 +52,4 @@ PanelAppEnglandPanelsWebResourceTask = app.register_task(PanelAppEnglandPanelsWe
 PanelAppAustraliaPanelsWebResourceTask = app.register_task(PanelAppAustraliaPanelsWebResourceTask())
 PfamWebResourceTask = app.register_task(PfamWebResourceTask())
 RefSeqGeneSummaryWebResourceTask = app.register_task(RefSeqGeneSummaryWebResourceTask())
-RVISWebResourceTask = app.register_task(RVISWebResourceTask())
 UniProtWebResourceTask = app.register_task(UniProtWebResourceTask())

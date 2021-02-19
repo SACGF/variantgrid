@@ -219,7 +219,6 @@ class GeneAnnotationVersion(SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_geneannotation"]
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, on_delete=CASCADE)
     last_ontology_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
-    rvis_import_date = models.DateTimeField()
     gnomad_import_date = models.DateTimeField()
 
     @property
@@ -239,7 +238,6 @@ class GeneAnnotation(models.Model):
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     hpo_terms = models.TextField(null=True)
     omim_terms = models.TextField(null=True)
-    rvis_oe_ratio_percentile = models.FloatField(null=True)  # Copied from genes.RVIS
     gnomad_oe_lof = models.FloatField(null=True)  # Copied from genes.GnomADGeneConstraint
 
     class Meta:

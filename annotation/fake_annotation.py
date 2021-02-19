@@ -53,7 +53,6 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                           })[0]
     gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
                                                                           last_ontology_import=last_ontology_import,
-                                                                          rvis_import_date=timezone.now(),
                                                                           gnomad_import_date=timezone.now())[0]
     clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
                                                            md5_hash="not_a_real_hash",

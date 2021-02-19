@@ -7,22 +7,22 @@ from django.utils import timezone
 from annotation.models import GeneAnnotationVersion, OntologyImport, OntologyTerm, GenomeBuild, AnnotationVersion, \
     InvalidAnnotationVersionError
 from genes.gene_matching import GeneMatcher
-from genes.models import GeneAnnotationRelease, RVIS, GnomADGeneConstraint
+from genes.models import GeneAnnotationRelease, GnomADGeneConstraint
 from library.django_utils.django_file_utils import get_import_processing_filename
 from ontology.models import OntologyService, OntologySnake
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
 class Command(BaseCommand):
-    GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "hpo_terms", "omim_terms",
-                              "rvis_oe_ratio_percentile", "gnomad_oe_lof"]
+    GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "hpo_terms", "omim_terms", "gnomad_oe_lof"]
     TERM_JOIN_STRING = " | "
 
     def add_arguments(self, parser):
         parser.add_argument('--force', action="store_true", help="Force create new GeneAnnotation for same release")
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument('--gene-annotation-release', type=int)
-        group.add_argument('--missing', action="store_true", help="Automatically create for latest AnnotationVersions for each build if missing")
+        group.add_argument('--missing', action="store_true",
+                           help="Automatically create for latest AnnotationVersions for each build if missing")
 
     def handle(self, *args, **options):
         print(f"Started: {timezone.now()}")
@@ -33,9 +33,7 @@ class Command(BaseCommand):
 
         self._validate_has_required_data()
 
-        gnomad_gene_symbols = GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True)
-        rvis_gene_symbols = RVIS.objects.all().values_list("gene_symbol_id", flat=True)
-        gene_symbols = set(gnomad_gene_symbols) | set(rvis_gene_symbols)
+        gene_symbols = set(GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True))
 
         if gar_id:
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
@@ -63,20 +61,15 @@ class Command(BaseCommand):
             if not OntologyTerm.objects.filter(ontology_service=ontology_service).exists():
                 raise ValueError(f"No {ontology_service.label} records - please import first")
 
-        if not RVIS.objects.exists():
-            raise ValueError("You need to import RVIS (see annotation page)")
-
         if not GnomADGeneConstraint.objects.exists():
             raise ValueError("You need to import gnomAD Gene Constraints (see annotation page)")
 
     def _create_gene_annotation_version(self, gene_annotation_release, gene_symbols):
-        rvis = RVIS.objects.first()
         gnomad_gene_constraint = GnomADGeneConstraint.objects.first()
 
-        # Only 1 of each of RVIS/Gnomad (CachedWebResource - deleted upon reload)
+        # Only 1 of each of Gnomad (CachedWebResource - deleted upon reload)
         gav = GeneAnnotationVersion.objects.create(gene_annotation_release=gene_annotation_release,
                                                    last_ontology_import=OntologyImport.objects.order_by("pk").last(),
-                                                   rvis_import_date=rvis.cached_web_resource.created,
                                                    gnomad_import_date=gnomad_gene_constraint.cached_web_resource.created)
 
         # 1st we need to make sure all symbols are matched in a GeneAnnotationRelease (HGNC already done)
@@ -113,15 +106,6 @@ class Command(BaseCommand):
             else:
                 print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - GnomADGeneConstraint")
                 missing_genes["gnomad_gene_constraints"] += 1
-
-        for gene_symbol_id, oe_ratio_percentile in RVIS.objects.all().values_list("gene_symbol_id", "oe_ratio_percentile"):
-            genes_qs = gene_annotation_release.genes_for_symbol(gene_symbol_id)
-            if genes_qs.exists():
-                for gene in genes_qs:
-                    annotation_by_gene[gene]["rvis_oe_ratio_percentile"] = oe_ratio_percentile
-            else:
-                print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - RVIS")
-                missing_genes["rvis"] += 1
 
         gene_annotation_records = []
         for gene, ga_data in annotation_by_gene.items():

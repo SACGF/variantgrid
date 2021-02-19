@@ -1450,17 +1450,6 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
         return GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).filter(**kwargs)
 
 
-class RVIS(models.Model):
-    """ Residual Variation Intolerance Score
-        @see https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1003709 """
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
-    gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
-    oe_ratio_percentile = models.FloatField(null=True)
-
-    def __str__(self):
-        return f"{self.gene_symbol_id}: {self.oe_ratio_percentile}"
-
-
 class GnomADGeneConstraint(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     gene = models.ForeignKey(Gene, null=True, on_delete=CASCADE)
