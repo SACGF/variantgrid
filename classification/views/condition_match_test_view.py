@@ -30,8 +30,8 @@ def condition_match_test_download_view(request):
                     continue
 
                 suggestions = condition_matching_suggestions(ct, ignore_existing=True)
-                status = None
                 for suggestion in suggestions:
+                    status = None
                     gene_symbol = suggestion.condition_text_match.gene_symbol
                     if suggestion.condition_text_match.is_root:
                         if suggestion.is_auto_assignable():
