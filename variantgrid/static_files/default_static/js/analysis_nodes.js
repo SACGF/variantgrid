@@ -10,7 +10,7 @@ function getNode(nodeId) {
 // Nodes should also create a "updateState(args)" method, this will be called after creation  
 
 function createDefaultNode(nodeData) {
-	var div = jQuery('<div></div>', nodeData["attributes"]);
+	const div = jQuery('<div></div>', nodeData["attributes"]);
 	div.addClass("default-node-container");
 	div.append("<div class='user-tag-colored node-overlay'><span class='node-name'>" + nodeData["name"] + "</span></div>");
 	div[0].updateState = function(args) { };
@@ -18,7 +18,7 @@ function createDefaultNode(nodeData) {
 }
 
 function createVennNode(nodeData) {
-	var div = jQuery('<div></div>', nodeData["attributes"]);
+	const div = jQuery('<div></div>', nodeData["attributes"]);
 	div.addClass("default-node-container");
 	venn2(div[0], 64, 45);
 
@@ -64,7 +64,7 @@ var waiting_for_message_callback = false;
 var update_message_buffer = [];
 
 function updateNode(nodeId, op, params, on_success_function) {
-	var message = [nodeId, op, params, on_success_function];
+	const message = [nodeId, op, params, on_success_function];
 	update_message_buffer.push(message);
 	checkSendMessage();
 }
@@ -72,13 +72,13 @@ function updateNode(nodeId, op, params, on_success_function) {
 
 function checkSendMessage() {
 	if (!waiting_for_message_callback) {
-		var message = update_message_buffer.shift();
+		const message = update_message_buffer.shift();
 		if (message) {
-			var nodeId = message[0];
-			var op = message[1];
-			var params = message[2];
-			var old_on_success_function = message[3]; 
-			var on_success_function = function(data) {
+			const nodeId = message[0];
+			const op = message[1];
+			const params = message[2];
+			const old_on_success_function = message[3];
+			const on_success_function = function (data) {
 				if (old_on_success_function) {
 					old_on_success_function(data);
 				}
@@ -92,7 +92,7 @@ function checkSendMessage() {
 
 function sendUpdateNodeMessage(nodeId, op, params, on_success_function) {
 	waiting_for_message_callback = true;
-	var data = '&op=' + op + '&params=' + JSON.stringify(params);
+	const data = '&op=' + op + '&params=' + JSON.stringify(params);
 	$.ajax({
 	    type: "POST",
 	    data: data,
@@ -105,7 +105,7 @@ function sendUpdateNodeMessage(nodeId, op, params, on_success_function) {
 
 function addNodesToDOM(selector, nodeDataArray, readOnly) {
 	selector = $(selector);
-	for (var i=0 ; i<nodeDataArray.length ; ++i) {
+	for (let i=0 ; i<nodeDataArray.length ; ++i) {
 		node = createNodeFromData(nodeDataArray[i]);
 		selector.append(node);
 	}
@@ -113,12 +113,12 @@ function addNodesToDOM(selector, nodeDataArray, readOnly) {
 
 
 function getEndpoint(id, endpoint_type, side) {
-	var selector = '#' + id;
-	var endpoints = jsPlumb.getEndpoints($(selector));
-    if (!endpoints)
+	const selector = '#' + id;
+	const endpoints = jsPlumb.getEndpoints($(selector));
+	if (!endpoints)
         return null;    
 
-	for (var i=0 ; i<endpoints.length ; ++i) {
+	for (let i=0 ; i<endpoints.length ; ++i) {
 		ep = endpoints[i];
 		if (endpoint_type === 'source') {
 			if (ep.isSource) {
@@ -140,7 +140,7 @@ function getEndpoint(id, endpoint_type, side) {
 function setupHideInvalidConnectionsOnDrag() {
 		// TODO: could possibly use endpointDropForbiddenClass etc to do this rather than switching fill styles
 		function setFillStyle(endpoint, color) {
-			var paintStyle = endpoint.getPaintStyle();
+			const paintStyle = endpoint.getPaintStyle();
 			paintStyle.fillStyle = color;
 			endpoint.setPaintStyle(paintStyle);
 		}
@@ -151,17 +151,17 @@ function setupHideInvalidConnectionsOnDrag() {
 
 		// Returns true if endpoint was "dirty"
 		function resetEndpoint(endpoint) {
-			var dirty = endpoint.isEnabled();
+			const dirty = endpoint.isEnabled();
 			endpoint.setEnabled(true);
 			setFillStyle(endpoint, endpointColor);
 			return dirty;
 		}
 
 		function getAncestors(id) {
-			var ancestors = [id];
-			var endpoint = getEndpoint(id, 'target');
+			let ancestors = [id];
+			const endpoint = getEndpoint(id, 'target');
 			if (endpoint) {
-				for (var i=0 ; i<endpoint.connections.length ; ++i) {
+				for (let i=0 ; i<endpoint.connections.length ; ++i) {
 					source = endpoint.connections[i].sourceId;
 					ancestors = ancestors.concat(getAncestors(source));
 				}
@@ -170,12 +170,12 @@ function setupHideInvalidConnectionsOnDrag() {
 		}
 
 		jsPlumb.bind("connectionDrag", function(c) {
-		    var id = c.endpoints[0].elementId;
-			var ancestors = getAncestors(id);
+			let id = c.endpoints[0].elementId;
+			const ancestors = getAncestors(id);
 
-			for (var i=0 ; i<ancestors.length ; ++i) {
+			for (let i=0 ; i<ancestors.length ; ++i) {
 				id = ancestors[i];
-				var endpoint = getEndpoint(id, 'target');
+				const endpoint = getEndpoint(id, 'target');
 				if (endpoint) {
 					setEndpointInvalid(endpoint);
 				}
@@ -185,10 +185,10 @@ function setupHideInvalidConnectionsOnDrag() {
 		// Make everything visible again
 		jsPlumb.bind("connectionDragStop", function(c) {
 			$(".window").each(function() {
-				var endpoints = jsPlumb.getEndpoints($(this));
-				var dirty = false;
-				for (var i=0 ; i<endpoints.length ; ++i) {
-					var endpoint = endpoints[i];
+				const endpoints = jsPlumb.getEndpoints($(this));
+				let dirty = false;
+				for (let i=0 ; i<endpoints.length ; ++i) {
+					const endpoint = endpoints[i];
 					dirty |= resetEndpoint(endpoint);
 				}
 				if (dirty) {
@@ -201,42 +201,43 @@ function setupHideInvalidConnectionsOnDrag() {
 
 
 function add_click_overlay(endpoint) {
-	var create_overlay = function(component) {
+	const create_overlay = function (component) {
 		return $('<span><span class="attach-label">+</span></span>');
 	};
 
-	var overlay = ["Custom", {
+	const overlay = ["Custom", {
 		create: create_overlay,
-		location: [ 0, 0 ],
+		location: [0, 0],
 	}];
 	endpoint.addOverlay(overlay);
 }
 
 function add_delete_overlay(connection) {
-	var create_overlay = function(component) {
-		var overlay = $('<span><svg width=18 height=18><circle cx="9" cy="9" r="9" version="1.1" xmlns="http://www.w3.org/1999/xhtml" style="" stroke="none"></circle></svg><span class="detach-label cancel">-</span></span>');
+	const create_overlay = function (component) {
+		const overlay = $('<span><svg width=18 height=18><circle cx="9" cy="9" r="9" version="1.1" xmlns="http://www.w3.org/1999/xhtml" style="" stroke="none"></circle></svg><span class="detach-label cancel">-</span></span>');
 		$('circle', overlay).css('fill', endpointColor);
 		return overlay;
 	};
 
-	var overlay = ["Custom", {
-		create: create_overlay,	    			        				 
+	const overlay = ["Custom", {
+		create: create_overlay,
 		label: "-",
 		location: 0.5,
 		events: {
-			"click": function(overlay, evt) {
+			"click": function (overlay, evt) {
 				jsPlumb.detach(overlay.component);
 			}
-	}}];
+		}
+	}];
 	connection.addOverlay(overlay);
 }
 
 
 function addConnection(sourceId, targetId, side, readOnly) {
-	var source = getEndpoint(sourceId, 'source');
-	var target = getEndpoint(targetId, 'target', side);
+	const source = getEndpoint(sourceId, 'source');
+	const target = getEndpoint(targetId, 'target', side);
 
-	var connection = jsPlumb.connect({source: source, target: target, fireEvent: false, detachable: !readOnly});
+	const connection = jsPlumb.connect({source: source, target: target, fireEvent: false, detachable: !readOnly});
 	if (!readOnly) {
 		add_delete_overlay(connection);
 	}
@@ -246,8 +247,8 @@ function addConnection(sourceId, targetId, side, readOnly) {
 
 
 function attatchAnalysisNodeConnections(connections, readOnly) {
-	for (var i=0 ; i<connections.length ; ++i) {
-		var conn = connections[i];
+	for (let i=0 ; i<connections.length ; ++i) {
+		const conn = connections[i];
 		addConnection(conn["source_id"], conn["target_id"], conn["side"], readOnly);
 	}
 }
@@ -261,10 +262,12 @@ function addNewNodeToPage(data) {
 }
 
 function addNewNodeAndFlash(data) {
-	var newNode = addNewNodeToPage(data);
-	var endPoints = jsPlumb.getEndpoints(newNode);
-	var endpointVis = function(visible) {
-		$.each(endPoints, function() { this.setVisible(visible); });
+	const newNode = addNewNodeToPage(data);
+	const endPoints = jsPlumb.getEndpoints(newNode);
+	const endpointVis = function (visible) {
+		$.each(endPoints, function () {
+			this.setVisible(visible);
+		});
 	};
 	endpointVis(false);
 	
@@ -275,8 +278,7 @@ function addNewNodeAndFlash(data) {
 
 function addNode() {
 	// Get node type from select
-	var nodeType = $("select#id_node_types").val();
-
+	const nodeType = $("select#id_node_types").val();
 	$.ajax({
 	    type: "POST",
 	    url: Urls.node_create(ANALYSIS_ID, nodeType),
@@ -285,9 +287,9 @@ function addNode() {
 }
 
 function getActiveNodesIds() {
-	var nodes = [];
+	const nodes = [];
 	$("." + ACTIVE_CLASS).each(function() {
-		var nodeId = $(this).attr('node_id');
+		const nodeId = $(this).attr('node_id');
 		if (nodeId) {
 		  nodes.push(nodeId);
 		}
@@ -299,9 +301,9 @@ function copyNode() {
 	let nodes = getActiveNodesIds();
 	unselectActive(); // Unselect old, so we can select new
 
-	var addNewNodesToPage = function(data) {
+	const addNewNodesToPage = function (data) {
 		let nodes_data = data['nodes'];
-		for (let i=0 ; i<nodes_data.length ; ++i) {
+		for (let i = 0; i < nodes_data.length; ++i) {
 			let node_data = nodes_data[i];
 			let node = addNewNodeToPage(node_data);
 			node.addClass(ACTIVE_CLASS);
@@ -322,14 +324,14 @@ function copyNode() {
 
 
 function deleteNodesFromDOM(nodes, data) {
-    for (var i=0 ; i<nodes.length ; ++i) {
-        var nodeId = nodes[i];
-        var node = getNode(nodeId);
-        
-        // Delete grid and editor if it's open
-        var node_version_select = "#" + nodeId + "_" + node.attr("version_id");
-        var loadedNode = $(node_version_select);
-        if (node.hasClass(ACTIVE_CLASS) || loadedNode.length) {
+    for (let i=0 ; i<nodes.length ; ++i) {
+		const nodeId = nodes[i];
+		const node = getNode(nodeId);
+
+		// Delete grid and editor if it's open
+		const node_version_select = "#" + nodeId + "_" + node.attr("version_id");
+		const loadedNode = $(node_version_select);
+		if (node.hasClass(ACTIVE_CLASS) || loadedNode.length) {
             loadNodeData(); // empty
         }
 
@@ -351,7 +353,7 @@ function deleteNodesFromDOM(nodes, data) {
 
 
 function deleteNodes(nodes) {
-	var data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
+	const data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
 	$.ajax({
 	    type: "POST",
 	    data: data,
@@ -364,7 +366,7 @@ function deleteNodes(nodes) {
 
 
 function deleteActiveNodes() {
-	var nodes = getActiveNodesIds();
+	const nodes = getActiveNodesIds();
 	if (nodes.length > 0) {
 		deleteNodes(nodes);
 	}
@@ -377,87 +379,99 @@ function intWithCommas(x) {
 }
 
 function setVariantCount(variant_count_selector, count) {
-	var countValue = $('.count-value', variant_count_selector);
+	const countValue = $('.count-value', variant_count_selector);
 	countValue.html(count);
 	variant_count_selector.show();
 }
 
 function updateDirtyNode(node, refresh) {
-	var node_id = node.attr("node_id");
+	const node_id = node.attr("node_id");
 
 	// Set to unknown while waiting for update
-	var node_counts = $(".node-counts", node);
+	const node_counts = $(".node-counts", node);
 	$(".count-value", node_counts).empty();
-	var variant_count = $(".node-count-__total", node_counts);
+	const variant_count = $(".node-count-__total", node_counts);
 	setVariantCount(variant_count, '?');
     node.attr("loading", "true"); // #616 - Don't flash red when loading - this will stop next cycle of shadow setting
 
-	var asyncUpdateNode = function(data) {
-		var DEBUG = 0;
+	const asyncUpdateNode = function (data) {
+		const DEBUG = 0;
 		// Flash between normal shadow and shadowColor
-		var DEFAULT_COLOR = "#aaa";
+		const DEFAULT_COLOR = "#aaa";
 
 		// Stopping animation ended up breaking "new node flash" so just let it time out
 		//node.stop(); // any previous colours
-		var shadow = $(".sample-shadow", node);
-		shadow.css({"fill" : DEFAULT_COLOR});
+		const shadow = $(".sample-shadow", node);
+		shadow.css({"fill": DEFAULT_COLOR});
 
-		var nodeVersion = data["version"];
+		const nodeVersion = data["version"];
 		node.attr("version_id", nodeVersion);
 		node.removeAttr("loading");
-		var shadowColor = data["shadow_color"];
+		const shadowColor = data["shadow_color"];
 
 		if (shadowColor) {
 			if (node.hasClass("default-node-container")) {
 				function defaultRunIt() {
-					if (DEBUG) { console.log("defaultRunIt()"); }
-					var myNode = getNode(node_id); // get latest version
-					var version_id = myNode.attr("version_id");
-					var loading = myNode.attr("loading");
-					if (version_id == nodeVersion && !loading) {
-						if (DEBUG) { console.log(".animate()"); }
-				        myNode.animate({ color: shadowColor }, 1000)
-				        	  .animate({ color: DEFAULT_COLOR }, 1000, defaultRunIt);
+					if (DEBUG) {
+						console.log("defaultRunIt()");
 					}
-					if (DEBUG) { console.log("end defaultRunIt()"); }
+					const myNode = getNode(node_id); // get latest version
+					const version_id = myNode.attr("version_id");
+					const loading = myNode.attr("loading");
+					if (version_id == nodeVersion && !loading) {
+						if (DEBUG) {
+							console.log(".animate()");
+						}
+						myNode.animate({color: shadowColor}, 1000)
+							.animate({color: DEFAULT_COLOR}, 1000, defaultRunIt);
+					}
+					if (DEBUG) {
+						console.log("end defaultRunIt()");
+					}
 
-			    }
-			    defaultRunIt();
-		   	} else if (node.hasClass("SampleNode")) {
+				}
+
+				defaultRunIt();
+			} else if (node.hasClass("SampleNode")) {
 				function sampleRunIt(i) {
-					if (DEBUG) { console.log("sampleRunIt()"); }
-					var SHADOW_COLORS = [shadowColor, DEFAULT_COLOR];
-					var myNode = getNode(node_id); // get latest version
-					var version_id = myNode.attr("version_id");
-                    var loading = myNode.attr("loading");
-					if (version_id == nodeVersion && !loading) {
-						setTimeout(function() {
-							shadow.css({"fill" : SHADOW_COLORS[i%2],
-										"transition" : '1.0s'});
-							sampleRunIt(i+1);
-					    }, 1000);
+					if (DEBUG) {
+						console.log("sampleRunIt()");
 					}
-			    }
-			    sampleRunIt(0);
-		   	}
+					const SHADOW_COLORS = [shadowColor, DEFAULT_COLOR];
+					const myNode = getNode(node_id); // get latest version
+					const version_id = myNode.attr("version_id");
+					const loading = myNode.attr("loading");
+					if (version_id === nodeVersion && !loading) {
+						setTimeout(function () {
+							shadow.css({
+								"fill": SHADOW_COLORS[i % 2],
+								"transition": '1.0s'
+							});
+							sampleRunIt(i + 1);
+						}, 1000);
+					}
+				}
+
+				sampleRunIt(0);
+			}
 		}
-	
-		if (DEBUG) { console.log("done setting shadowColor"); }
+
+		if (DEBUG) {
+			console.log("done setting shadowColor");
+		}
 
 		if (data.valid) {
-			var counts = data.counts;
-			for (var c in counts) {
-				var vc = $(".node-count-" + c, node_counts);
-				var count = counts[c];
+			const counts = data.counts;
+			for (let c in counts) {
+				const vc = $(".node-count-" + c, node_counts);
+				const count = counts[c];
 				if (count > 0 || vc.hasClass("show-zero")) {
 					setVariantCount(vc, intWithCommas(counts[c]));
 				} else {
-					vc.hide();				
+					vc.hide();
 				}
 			}
 		} else {
-			console.log("Error: Node " + node_id);
-			console.log(data);
 			setVariantCount(variant_count, "");
 		}
 	};
@@ -466,9 +480,9 @@ function updateDirtyNode(node, refresh) {
 
 function clickCounter(evt) {
     evt.stopPropagation(); // Don't pass through click and reload node
-	var node = $(this).parents(".window");
-	var nodeId = node.attr("node_id");
-	var countType = $(this).attr("count_type");
+	const node = $(this).parents(".window");
+	const nodeId = node.attr("node_id");
+	const countType = $(this).attr("count_type");
 
 	unselectActive();
     node.addClass(ACTIVE_CLASS);
@@ -483,22 +497,22 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 	const LOCK_SIZE = 16;
 	
 	nodes_selector.filter(".outputEndpoint").each(function() {
-		var counts_size = COUNTER_SIZE * nodeCountTypes.length;
+		const counts_size = COUNTER_SIZE * nodeCountTypes.length;
 
-		var node_width = $(this).width();
-		var count_overlay = $("<div class='count-overlay'><span class='node-counts'></span></div>");
+		const node_width = $(this).width();
+		const count_overlay = $("<div class='count-overlay'><span class='node-counts'></span></div>");
 		count_overlay.css({width: node_width + COUNTER_SIZE, height: $(this).height() + counts_size});
 		count_overlay.appendTo(this);
-		var node_counts = $(".node-counts", count_overlay);
+		const node_counts = $(".node-counts", count_overlay);
 		node_counts.css({height: counts_size});
 
-		for (var i=0 ; i<nodeCountTypes.length ;++i) {
-			var node_count_type = nodeCountTypes[i];
-			var name = node_count_type[0];
-			var data = node_count_type[1];
-			var label = data["label"];
-			var nodeCountContent = "<div class='user-tag-colored count-value'>?</div>";
-			var nodeCountDiv = $("<div count_type=" + name + " title='" + label + "' class='node-count node-count-" + name + "'>" + nodeCountContent + "</div>");
+		for (let i=0 ; i<nodeCountTypes.length ; ++i) {
+			const node_count_type = nodeCountTypes[i];
+			const name = node_count_type[0];
+			const data = node_count_type[1];
+			const label = data["label"];
+			const nodeCountContent = "<div class='user-tag-colored count-value'>?</div>";
+			const nodeCountDiv = $("<div count_type=" + name + " title='" + label + "' class='node-count node-count-" + name + "'>" + nodeCountContent + "</div>");
 			if (data["link"]) {
 				$(nodeCountDiv).addClass("clickable-count");
 				$(nodeCountDiv).click(clickCounter);
@@ -516,18 +530,18 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 
 function setupConnections(nodes_selector, readOnly) {
 	// configure some drop options for use by all endpoints.
-	let exampleDropOptions = {
+	const exampleDropOptions = {
 		tolerance:"touch",
 		hoverClass:"dropHover",
 		activeClass:"dragActive"
 	};
 
-	let connectorStyle = {
+	const connectorStyle = {
 		lineWidth : 3,
 		strokeStyle: endpointColor,
 	};
 	
-	let inputEndpoint = {
+	const inputEndpoint = {
 		endpoint: ["Dot", { radius:11 }],
 		paintStyle:{ width:25, height:21, fillStyle: endpointColor },
 		reattach:true,
@@ -535,32 +549,32 @@ function setupConnections(nodes_selector, readOnly) {
 		//maxConnections: -1,
 		isTarget:true,
 		dropOptions : exampleDropOptions
-	};			
-	
-	var outputEndpoint = {
-		endpoint:["Dot", { radius:11 }],
-		paintStyle:{ fillStyle: endpointColor },
+	};
+
+	const outputEndpoint = {
+		endpoint: ["Dot", {radius: 11}],
+		paintStyle: {fillStyle: endpointColor},
 		isSource: true,
 		enabled: !readOnly,
-		connectorStyle : connectorStyle,
-		connector: ["Bezier", { curviness:63 } ],
+		connectorStyle: connectorStyle,
+		connector: ["Bezier", {curviness: 63}],
 		maxConnections: -1,
-		dropOptions : exampleDropOptions
+		dropOptions: exampleDropOptions
 	};
 
 	nodes_selector.each(function() {
-        var uuid = "input-endpoint-" + $(this).attr("node_id");
-        var existingEndpoint = jsPlumb.getEndpoint(uuid);
+		const uuid = "input-endpoint-" + $(this).attr("node_id");
+		const existingEndpoint = jsPlumb.getEndpoint(uuid);
 
 		if ($(this).hasClass("inputEndpoint")) {
 			if ($(this).hasClass("VennNode")) {
-				var topLeft = uuid + "-left";
-				var topRight = uuid + "-right";
+				const topLeft = uuid + "-left";
+				const topRight = uuid + "-right";
 				jsPlumb.addEndpoint(this, { anchor: [0.25, 0, 0, -1], uuid: topLeft}, inputEndpoint);
 				jsPlumb.addEndpoint(this, { anchor: [0.75, 0, 0, -1], uuid: topRight}, inputEndpoint);
             } else if ($(this).hasClass("MergeNode")) {
-                var commonInputEndpoint = $.extend({}, inputEndpoint);
-                commonInputEndpoint["endpoint"] = ["Dot", { radius: 18 }];
+				const commonInputEndpoint = $.extend({}, inputEndpoint);
+				commonInputEndpoint["endpoint"] = ["Dot", { radius: 18 }];
                 commonInputEndpoint["maxConnections"] = -1;
                 jsPlumb.addEndpoint(this, { anchor:"TopCenter", uuid: uuid}, commonInputEndpoint);
 			} else {
@@ -576,7 +590,7 @@ function setupConnections(nodes_selector, readOnly) {
 		}
 		
 		if ($(this).hasClass("outputEndpoint")) {
-			var e = jsPlumb.addEndpoint(this, { anchor:"BottomCenter" }, outputEndpoint);
+			const e = jsPlumb.addEndpoint(this, {anchor: "BottomCenter"}, outputEndpoint);
 			if (!readOnly) {
 				add_click_overlay(e);
 			}
@@ -585,11 +599,11 @@ function setupConnections(nodes_selector, readOnly) {
 }
 
 function loadNodeWhenReady(node_id) {
-	var updateNode = function(node) {
+	const updateNode = function (node) {
 		// console.log("loadNodeWhenReady.updateNode:" + node);
 		// Reload the data container if it's showing for this node
-		var gew = getGridAndEditorWindow();
-		if (node_id == gew.getLoadedNodeId()) {
+		const gew = getGridAndEditorWindow();
+		if (node_id === gew.getLoadedNodeId()) {
 			loadNodeData(node_id);
 		}
 	};
@@ -598,7 +612,7 @@ function loadNodeWhenReady(node_id) {
 
 
 function unselectActive() {
-    var container = $("#analysis-container");
+	const container = $("#analysis-container");
 	$("." + ACTIVE_CLASS, container).removeClass(ACTIVE_CLASS);
     $("." + ACTIVE_NODE_COUNT_CLASS, container).removeClass(ACTIVE_NODE_COUNT_CLASS);
 }
@@ -672,38 +686,38 @@ function setupNodeModifications(nodes_selector) {
 
 
 function getEndpointSide(ep) {
-	var uuid = ep.getUuid();
-	var side = uuid.split("-").reverse()[0];
+	const uuid = ep.getUuid();
+	const side = uuid.split("-").reverse()[0];
 	return side;
 }
 
 
 jsPlumb.ready(function() {
-	var _initialised = false;
+	let _initialised = false;
 
-	var updateConnections = function(info, remove) {
-        var sourceId = $("#" + info.sourceId).attr("node_id");
-        var target = $("#" + info.targetId);
-		var targetId = target.attr("node_id");
-		var params = {parent_id: sourceId, remove: remove};
+	const updateConnections = function (info, remove) {
+		const sourceId = $("#" + info.sourceId).attr("node_id");
+		const target = $("#" + info.targetId);
+		const targetId = target.attr("node_id");
+		const params = {parent_id: sourceId, remove: remove};
 
 		if (!remove && target.hasClass("VennNode")) {
-			var ep = info.connection.endpoints[1];
-			params["side"] = getEndpointSide(ep); 
-		} 
+			const ep = info.connection.endpoints[1];
+			params["side"] = getEndpointSide(ep);
+		}
 
-		var on_success_function = function() {
-            var gew = getGridAndEditorWindow();
-            if (targetId == gew.getLoadedNodeId()) {
-                loadNodeData(targetId);
-            }
-            checkAndMarkDirtyNodes();
+		const on_success_function = function () {
+			const gew = getGridAndEditorWindow();
+			if (targetId == gew.getLoadedNodeId()) {
+				loadNodeData(targetId);
+			}
+			checkAndMarkDirtyNodes();
 		};
 
 		updateNode(targetId, 'update_connection', params, on_success_function);
 	};
 
-    window.variantgridPipeline = {init : function(readOnly) {
+	window.variantgridPipeline = {init : function(readOnly) {
 		// setup jsPlumb defaults.
 		jsPlumb.importDefaults({
 			DragOptions : { cursor: 'pointer', zIndex:2000 },
@@ -722,14 +736,14 @@ jsPlumb.ready(function() {
 			updateConnections(info, true);
 		});
 
-		setupHideInvalidConnectionsOnDrag();		
+		setupHideInvalidConnectionsOnDrag();
 
-		var nodes_selector = $(".window");
+		const nodes_selector = $(".window");
 		setupNodes(nodes_selector, readOnly);
 		
 		if (!_initialised) {
 			$(".drag").click(function() {
-				var s = jsPlumb.toggleDraggable($(this).attr("rel"));
+				const s = jsPlumb.toggleDraggable($(this).attr("rel"));
 				$(this).html(s ? 'disable dragging' : 'enable dragging');
 				if (!s)
 					$("#" + $(this).attr("rel")).addClass('drag-locked');
@@ -744,64 +758,63 @@ jsPlumb.ready(function() {
 
 			_initialised = true;
 		}
-	}
-};
+	}};
 });
 
 
 function drawCountLegend(nodeCountTypes) {
-    var legend = $("#node-count-legend");
-    legend.empty();
+	const legend = $("#node-count-legend");
+	legend.empty();
 
     if (nodeCountTypes && nodeCountTypes.length) {
         $("<div><b>Node Counts:</b></div>").appendTo(legend);
-        for (var i=0; i<nodeCountTypes.length ; ++i) {
-            var node_count_type = nodeCountTypes[i];
-            var name = node_count_type[0];
-            var data = node_count_type[1];
-            var row = $("<div class='legend-row node-count-legend-" + name + "'><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>" + data.label + "</div><div class='clear'></div></div>");
-            legend.append(row);
+        for (let i=0; i<nodeCountTypes.length ; ++i) {
+			const node_count_type = nodeCountTypes[i];
+			const name = node_count_type[0];
+			const data = node_count_type[1];
+			const row = $("<div class='legend-row node-count-legend-" + name + "'><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>" + data.label + "</div><div class='clear'></div></div>");
+			legend.append(row);
         }
     }
 }
 
 
 function get_array_second_dimension_elements(array, element_id) {
-    var element_values = [];
-    for (var i=0 ; i<array.length ; ++i) {
+	const element_values = [];
+	for (let i=0 ; i<array.length ; ++i) {
         element_values.push(array[i][element_id]);
     }
     return element_values; 
 }
 
 function get_array_element_keys(array, key_id) {
-    var element_values = [];
-    for (var i=0 ; i<array.length ; ++i) {
-        var value = array[i][key_id];
-        element_values.push(value);
+	const element_values = [];
+	for (let i=0 ; i<array.length ; ++i) {
+		const value = array[i][key_id];
+		element_values.push(value);
     }
     return element_values; 
 }
 
 
 function changeAnalysisSettings(oldAnalysisSettings) {
-    var requireReload = false;
-    var oldAnnotationVersion = oldAnalysisSettings.annotation_version;
-    var newAnnotationVersion = ANALYSIS_SETTINGS.annotation_version;
-    requireReload = oldAnnotationVersion != newAnnotationVersion;
+	let requireReload = false;
+	const oldAnnotationVersion = oldAnalysisSettings.annotation_version;
+	const newAnnotationVersion = ANALYSIS_SETTINGS.annotation_version;
+	requireReload = oldAnnotationVersion != newAnnotationVersion;
 
-	var oldNodeCountTypes = oldAnalysisSettings.node_count_types;
-	var newNodeCountTypes = ANALYSIS_SETTINGS.node_count_types;
-	var arraysAreDifferent = true; // TODO: Add a way to test this? Could save a flash of attaching/reattaching counters
+	const oldNodeCountTypes = oldAnalysisSettings.node_count_types;
+	const newNodeCountTypes = ANALYSIS_SETTINGS.node_count_types;
+	const arraysAreDifferent = true; // TODO: Add a way to test this? Could save a flash of attaching/reattaching counters
 	if (arraysAreDifferent) {
         // If we just removed some it's ok to just change the counters
         // If there are new ones, need to force reload 
-        var oldCountData = get_array_second_dimension_elements(oldNodeCountTypes, 1);
-        var newCountData = get_array_second_dimension_elements(newNodeCountTypes, 1);
-        var oldTypes = get_array_element_keys(oldCountData, "label");
-        var newTypes = get_array_element_keys(newCountData, "label");
-        
-        for (var i=0 ; i<newTypes.length ; ++i) {
+		const oldCountData = get_array_second_dimension_elements(oldNodeCountTypes, 1);
+		const newCountData = get_array_second_dimension_elements(newNodeCountTypes, 1);
+		const oldTypes = get_array_element_keys(oldCountData, "label");
+		const newTypes = get_array_element_keys(newCountData, "label");
+
+		for (let i=0 ; i<newTypes.length ; ++i) {
             count_type = newTypes[i];
             if ($.inArray(count_type, oldTypes) == -1) {
                 requireReload = true;
@@ -810,8 +823,8 @@ function changeAnalysisSettings(oldAnalysisSettings) {
         }
 
         $(".count-overlay").remove();
-        var nodes_selector = $(".window");
-        attachVariantCounters(nodes_selector, newNodeCountTypes);
+		const nodes_selector = $(".window");
+		attachVariantCounters(nodes_selector, newNodeCountTypes);
     }
     
     if (requireReload) {
@@ -821,11 +834,11 @@ function changeAnalysisSettings(oldAnalysisSettings) {
 
 
 function update_dirty_nodes(dirty_nodes) {
-	var nodeCountTypes = ANALYSIS_SETTINGS.node_count_types;
+	const nodeCountTypes = ANALYSIS_SETTINGS.node_count_types;
 	if (nodeCountTypes) {
-		for (i=0 ; i<dirty_nodes.length ; ++i) {
-			var node_id = dirty_nodes[i];
-			var node = getNode(node_id);
+		for (let i=0 ; i<dirty_nodes.length ; ++i) {
+			const node_id = dirty_nodes[i];
+			const node = getNode(node_id);
 			if (node.length) {
 				updateDirtyNode(node, true);
 			}
@@ -849,7 +862,7 @@ function updateNodeAppearance(data) {
 
 
 function retrieveAndUpdateNodeAppearances(nodeList) {
-    for (i=0 ; i<nodeList.length ; ++i) {
+    for (let i=0 ; i<nodeList.length ; ++i) {
         let nodeId = nodeList[i];
         $.ajax({
             url: Urls.node_data(nodeId),
@@ -860,10 +873,9 @@ function retrieveAndUpdateNodeAppearances(nodeList) {
 
 
 function addConnectedNode(data) {
-	var node = addNewNodeToPage(data);
-
-	var sourceId = data.node_id;
-	var targetId = node.attr('id');
+	const node = addNewNodeToPage(data);
+	const sourceId = data.node_id;
+	const targetId = node.attr('id');
 	addConnection(sourceId, targetId);
 }
 
@@ -881,10 +893,10 @@ function checkAndMarkDirtyNodes(aWin) {
     $.ajax({
         url: Urls.analysis_node_versions(ANALYSIS_ID),
         success: function(data) {
-            var dirty_nodes = [];
-            var appearance_update_nodes = [];
+			const dirty_nodes = [];
+			const appearance_update_nodes = [];
 
-            for (var i=0 ; i<data.node_versions.length ; ++i) {
+			for (let i=0 ; i<data.node_versions.length ; ++i) {
                 let nodeData = data.node_versions[i];
                 let nodeId = nodeData[0];
                 let nodeVersion = nodeData[1];
@@ -911,7 +923,7 @@ function checkAndMarkDirtyNodes(aWin) {
 
 
 function reloadNodeAndData(node_id) {
-    var aWin = getAnalysisWindow();
-    checkAndMarkDirtyNodes(aWin);
+	const aWin = getAnalysisWindow();
+	checkAndMarkDirtyNodes(aWin);
     aWin.loadNodeData(node_id);
 }
