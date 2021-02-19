@@ -458,6 +458,7 @@ class ConditionMatchingSuggestion:
         self.messages: List[ConditionMatchingMessage] = list()
         self.validated = False
         self.ids_found_in_text: Optional[bool] = None
+        self.alias_index: Optional[int] = None
 
     @property
     def term_str_array(self) -> List[str]:
@@ -647,6 +648,7 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                     safe_alias = True
             if not safe_alias:
                 cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
+                cms.alias_index = match_info.alias_index
         if term.ontology_service == OntologyService.OMIM:
             if mondo := OntologyTermRelation.as_mondo(term):
                 cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Converted from OMIM term {term.id}"))
@@ -687,6 +689,10 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
         if len(matches) == 1:
             return matches[0]
         elif len(matches) > 1:
+            if name_matches := [match for match in matches if match.alias_index is None]:
+                if len(name_matches) == 1:
+                    return name_matches[0]
+
             combined = ConditionMatchingSuggestion()
             for match in matches:
                 for term in match.terms:
