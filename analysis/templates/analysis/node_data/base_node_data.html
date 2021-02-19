@@ -29,7 +29,6 @@
                 $("#node-editor-container").html(html);
             },
             error: function(xhr, error) {
-                console.log(error);
                 let message = "Error Loading Node Editor. Status: " + xhr.status + ". ";
                 if (xhr.status >= 500) {
                     message += "Internal server error";
