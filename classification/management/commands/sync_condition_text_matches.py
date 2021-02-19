@@ -17,8 +17,6 @@ class Command(BaseCommand):
             print("Deleting old records")
             ConditionText.objects.all().delete()
 
-        force = options["force"]
-
         print("Syncing")
         ConditionTextMatch.sync_all()
         print("Complete")
