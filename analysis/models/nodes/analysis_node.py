@@ -701,13 +701,12 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         status, count = self.node_counts()
         logging.debug("node_counts returned (%s, %d)", status, count)
 
-        this = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
-        load_seconds = time() - start
-        this.update(status=status,
-                    count=count,
-                    celery_task=None,
-                    db_pid=None,
-                    load_seconds=load_seconds)
+        self.status = status
+        self.count = count
+        self.celery_task = None
+        self.db_pid = None
+        self.load_seconds = time() - start
+        self.save()  # Will re-calculate shadow colors etc based on status
 
     def add_parent(self, parent, *args, **kwargs):
         if not parent.visible:
@@ -732,7 +731,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         pass
 
     def save(self, **kwargs):
-        # print("save: pk=%s args=%s, kwargs=%s" % (self.pk, str(args), str(kwargs)))
+        # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
         super_save = super().save
 
         if self.parents_changed or self.ancestor_input_samples_changed:
@@ -768,7 +767,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         else:
             super_save(**kwargs)
 
-        # Modfiy our analyses last updated time
+        # Modify our analyses last updated time
         Analysis.objects.filter(pk=self.analysis.pk).update(modified=timezone.now())
 
     def set_node_task_and_status(self, celery_task, status):

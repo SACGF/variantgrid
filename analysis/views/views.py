@@ -35,6 +35,7 @@ from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, An
     AnalysisTemplateRun, AnalysisLock, Analysis
 from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
 from analysis.models.mutational_signatures import MutationalSignature
+from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import NodeHelp
@@ -629,11 +630,13 @@ def view_analysis_settings(request, analysis_id):
 
 def analysis_settings_details_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
+    old_annotation_version = analysis.annotation_version
     form = forms.AnalysisForm(request.POST or None, user=request.user, instance=analysis)
     has_write_permission = analysis.can_write(request.user)
     if not has_write_permission:
         set_form_read_only(form)
 
+    reload_analysis = False
     if request.method == "POST":
         analysis.check_can_write(request.user)
         if form.has_changed:
@@ -641,6 +644,8 @@ def analysis_settings_details_tab(request, analysis_id):
             if valid:
                 analysis = form.save()
                 analysis.save()
+                if reload_analysis := (old_annotation_version != analysis.annotation_version):
+                    node_utils.reload_analysis_nodes(analysis.pk)
 
             add_save_message(request, valid, "Analysis Settings")
 
@@ -654,7 +659,8 @@ def analysis_settings_details_tab(request, analysis_id):
     context = {"analysis": analysis,
                "form": form,
                "new_analysis_settings": analysis_settings,
-               "has_write_permission": has_write_permission}
+               "has_write_permission": has_write_permission,
+               "reload_analysis": reload_analysis}
     return render(request, 'analysis/analysis_settings_details_tab.html', context)
 
 

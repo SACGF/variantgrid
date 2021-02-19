@@ -49,13 +49,13 @@ def update_node_task(node_id, version):
         return
 
     errors = None
-    status = None
     node_errors = node.get_errors()
     if not node_errors:
         try:
             # Even if no errors now, parent nodes can be removed on us during load causing failure
             node.set_node_task_and_status(update_node_task.request.id, NodeStatus.LOADING)
-            node.load()  # Saves status + counts on success
+            node.load()
+            return  # load saves everything, no need to save again below
         except OperationalError:
             status = NodeStatus.CANCELLED
         except NodeConfigurationException:
