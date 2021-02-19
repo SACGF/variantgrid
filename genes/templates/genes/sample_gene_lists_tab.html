@@ -133,7 +133,7 @@ $(document).ready(function() {
 
                 <div class="sample-gene-list-analysis-templates">
                     <b>Analysis Templates - using this gene list</b>
-                    {% analysis_templates_tag sample_gene_list.sample.genome_build autocomplete_field=False requires_sample_gene_list=True has_somatic_sample=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
+                    {% analysis_templates_tag sample_gene_list.sample.genome_build autocomplete_field=False has_sample_gene_list=True requires_sample_gene_list=True has_somatic_sample=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
                 </div>
 
                 {% if sample_gene_list.gene_list.unmatched_genes.exists %}
