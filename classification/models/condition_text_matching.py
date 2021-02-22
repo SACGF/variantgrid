@@ -653,6 +653,9 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
             if mondo := OntologyTermRelation.as_mondo(term):
                 cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Converted from OMIM term {term.id}"))
                 term = mondo
+            else:
+                # slowly direct users to MONDO
+                cms.add_message(ConditionMatchingMessage(severity="warning", text="Matched on OMIM, please attempt to find MONDO term if possible"))
 
         cms.add_term(term)
         cms.validate()

@@ -44,8 +44,6 @@
         const highlightRegex = new RegExp(`(${basicHighlightStr})`, 'ig');
 
         function submitUserChoices() {
-            // FIXME
-            // POST a single change to the server
             let id = $('#mp-id').val();
 
             let selectedText = $('#mp-selected').val();
@@ -117,6 +115,7 @@
                 termDict[term] = true;
             }
             let termList = Object.keys(termDict);
+            updateMulti(termList.length);
             if (termList.length > 0) {
                 termList.sort();
                 return termList.join(", ");
@@ -185,10 +184,21 @@
             }
         }
 
+        function updateMulti(count) {
+            if (count > 1) {
+                $('#mp-multimode').show();
+                $('#mp-singlemode').hide();
+            } else {
+                $('#mp-multimode').hide();
+                $('#mp-singlemode').show();
+            }
+        }
+
         function searchMondo(data) {
             let searchText = data.searchText;
             let geneSymbol = data.geneSymbol;
             let selected = data.selected;
+            updateMulti(selected ? selected.split(",").length : 0)
 
             let url = '{% url "api_mondo_search" %}';
             let resultsDom = $("#mp-results");
@@ -305,17 +315,31 @@
             if (suggestion.terms && suggestion.terms.length) {
                 dom.addClass('suggestion');
                 let termStyle = '';
+
                 if (!suggestion.is_applied && canSuggest(suggestion)) {
+
+                    let suggest = true;
+                    let worst = worstMessage(suggestion);
+                    if (worst != null && ["s", "i"].indexOf(worst[0].toLowerCase()) == -1) {
+                        // we have a message and it's not success or info
+                        suggest = false;
+                    }
+                    let input = $('<input>', {
+                        type: 'checkbox',
+                        class: 'form-check-input suggestion-checkbox',
+                        click: () => {
+                            checkSuggestionCount()
+                        }
+                    });
+                    if (suggest) {
+                        input.attr('checked', 'checked');
+                    }
+
                     $('<label>', {
-                        style: 'margin-left:1.25rem', html: [
-                            $('<input>', {
-                                type: 'checkbox',
-                                class: 'form-check-input suggestion-checkbox',
-                                checked: 'checked',
-                                click: () => {
-                                    checkSuggestionCount()
-                                }
-                            }),
+                        style: 'margin-left:1.25rem',
+                            class: 'form-check-label',
+                            html: [
+                            input,
                             'Selected',
                         ]
                     }).appendTo(dom);
@@ -339,7 +363,7 @@
                     dom.append(termDom);
                 }
                 if (suggestion.terms.length > 1) {
-                    let joiner_text = 'combination type undecided';
+                    let joiner_text = 'Combination type undecided';
                     switch (suggestion.joiner) {
                         case 'U':
                             joiner_text = 'Uncertain';
@@ -348,7 +372,7 @@
                             joiner_text = 'Co-occurring';
                             break;
                     }
-                    $('<div>', {text: joiner_text}).appendTo(dom);
+                    $('<div>', {text: joiner_text, class:'font-italic'}).appendTo(dom);
                 }
                 if (suggestion.user) {
                     $('<div>', {text: `Set by ${suggestion.user.username}`, class:'text-secondary'}).appendTo(dom);
@@ -523,6 +547,7 @@
             let topLevel = $('.condition-match-row:not([data-parent-id])');
             let topLevelDataTerms = topLevel.attr('data-terms');
             let button = topLevel.find('.mondo-picker');
+            // if we already have data-terms on top level, don't provide warning
             if ((topLevel.attr('data-terms') || '').trim().length) {
                 button.css('opacity','1.0');
                 button.removeAttr('title');
@@ -600,15 +625,15 @@
                     <input id="mp-id" type="hidden" />
 
                     {% labelled label="Selected Terms" %}<input class="form-control" id="mp-selected" style="border-color:#444466"/>{% endlabelled %}
-                    {% labelled label="Mutli-Mode" %}
-                        <div id="mp-multimode" >
+                    {% labelled label="Multi-Mode" %}
+                        <div id="mp-multimode" class="collapse">
                             <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-n" value="N" checked="checked">?</label>
+                                <label class="btn btn-outline-danger"><input type="radio" name="mp-multimode" id="mp-multimode-n" value="N" checked="checked">Not Decided</label>
                                 <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-u" value="U">Uncertain</label>
                                 <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-c" value="C">Co-occurring</label>
                             </div>
                         </div>
-                        <div id="mp-singlemode" class="collapse no-value">N/A</div>
+                        <div id="mp-singlemode" class="no-value" style="height:33.5px;display:inline-flex;align-items:center">N/A</div>
                     {% endlabelled %}
                     <hr/>
 
