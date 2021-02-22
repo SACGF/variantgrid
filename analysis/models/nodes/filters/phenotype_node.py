@@ -76,7 +76,13 @@ class PhenotypeNode(AnalysisNode):
 
     def get_ontology_term_ids(self):
         """ For NodeOntologyGenesGrid """
-        return self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
+        ontology_term_ids = []
+        if self.accordion_panel == self.PANEL_PATIENT:
+            if self.patient:
+                ontology_term_ids = self.patient.get_ontology_term_ids()
+        else:
+            ontology_term_ids = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
+        return ontology_term_ids
 
     def get_gene_qs(self):
         gene_symbols_qs = self.get_gene_symbols_qs()

@@ -87,9 +87,9 @@
 				Patient: {{ form.patient }}
 		        {% if node.patient %}
 		        	<div id='patient-details'>
-					{% if patient_omim %}
+					{% if patient_hpo %}
 						<p>
-						<b>Phenotypes:</b>
+						<b>HPO:</b>
 						{% for hpo in patient_hpo %}
 							{{ hpo }}
 						{% endfor %}
