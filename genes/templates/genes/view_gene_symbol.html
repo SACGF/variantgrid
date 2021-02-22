@@ -43,7 +43,6 @@
         .gene-icon {
             float: none;
         }
-
         {% render_node_count_colors_css %}
     </style>
     <script>
@@ -393,9 +392,11 @@
         		<table id="grid"></table>
         		<div id="pager"></div>
                 <script>
-                    function initialHideFilter() {
+                    function geneVariantsGridComplete() {
+                        const searchToolBox = $("#searchmodfbox_gene-variants-grid");
+                        searchToolBox.width(650); // make space for data entry
                         if (!gridFilterVisible) {
-                            $("#searchmodfbox_gene-variants-grid").hide();
+                            searchToolBox.hide();
                         }
                     }
 
@@ -419,7 +420,7 @@
                     }
                 </script>
                 {% tag_counts_filter genome_build=genome_build gene_symbol=gene_symbol click_func='tagClick' show_all_func='clearGeneVariantsGrid' %}
-                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False download_grid_json_as_csv=True gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='initialHideFilter' %}
+                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False download_grid_json_as_csv=True gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='geneVariantsGridComplete' %}
             {% else %}
                 There are no variants for this gene.
             {% endif %}
