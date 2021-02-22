@@ -401,7 +401,10 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
         else:
             queryset = queryset.filter(user=user)
 
-        queryset = Variant.annotate_variant_string(queryset, path_to_variant="variant__")
+        # Need to go through Allele to get variant in this build
+        queryset = queryset.filter(variant__variantallele__allele__variantallele__genome_build=genome_build)
+        queryset = Variant.annotate_variant_string(queryset,
+                                                   path_to_variant="variant__variantallele__allele__variantallele__variant__")
         field_names = self.get_field_names() + ["variant_string"]
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'variant_string',
