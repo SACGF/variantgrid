@@ -8,6 +8,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import PROTECT, CASCADE, QuerySet, Q, F
 from django.urls import reverse
+from lazy import lazy
 from model_utils.models import TimeStampedModel, now
 
 from genes.models import GeneSymbol
@@ -150,6 +151,13 @@ class OntologyTerm(TimeStampedModel):
         if self.name:
             return "obsolete" in self.name.lower()
         return False
+
+    @lazy
+    def is_leaf(self) -> bool:
+        # Warning, just meant to be called on MONDO terms
+        if not self.is_stub and self.ontology_service == OntologyService.MONDO:
+            return not OntologyTermRelation.children_of(self).exists()
+        return True
 
     @property
     def url_safe_id(self):
@@ -311,6 +319,17 @@ class OntologyTermRelation(TimeStampedModel):
         return OntologyTerm.objects.filter(id__in=children_ids).order_by("-id")
 
     @staticmethod
+    def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
+        if term.ontology_service == OntologyService.MONDO:
+            return term
+        if mondo_rel := OntologyTermRelation.objects.filter(
+            (Q(source_term=term) & Q(dest_term__ontology_service=OntologyService.MONDO)) |
+            (Q(dest_term=term) & Q(source_term__ontology_service=OntologyService.MONDO))
+        ).filter(relation=OntologyRelation.EXACT).first():
+            return mondo_rel.other_end(term)
+        return None
+
+    @staticmethod
     def relations_of(term: OntologyTerm) -> List['OntologyTermRelation']:
         def sort_relationships(rel1, rel2):
             rel1source = rel1.source_term_id == term.id
@@ -406,6 +425,13 @@ class OntologySnake:
                 for relation in all_relations:
                     if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
                         other_term = relation.other_end(snake.leaf_term)
+                        # not going to find hgnc link via HPO
+                        # but would be better to exclude them all together, but really difficult with the
+                        # directional relationships
+                        if to_ontology == OntologyService.HGNC:
+                            if other_term.ontology_service == OntologyService.HPO:
+                                continue
+
                         new_snake = snake.snake_step(relation)
                         if other_term.ontology_service == to_ontology:
                             valid_snakes.append(new_snake)
@@ -416,7 +442,7 @@ class OntologySnake:
         return OntologySnakes(valid_snakes)
 
     @staticmethod
-    def terms_for_gene_symbol(gene_symbol: GeneSymbol, desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
+    def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
         """
         Important, this will NOT trigger PanelApp, to do that first call
         panel_app_ontology.update_gene_relations

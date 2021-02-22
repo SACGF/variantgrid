@@ -19,7 +19,7 @@ class SearchMondoText(APIView):
         urllib.parse.quote(search_term).replace('/', '%252F')  # a regular escape / gets confused for a URL divider
         selected = [term.strip() for term in (request.GET.get('selected') or '').split(",") if term.strip()]
 
-        ontology_matches = OntologyMatching.from_search(search_text=search_term, gene_symbol=gene_symbol, selected=selected, server_search=True)
+        ontology_matches = OntologyMatching.from_search(search_text=search_term, gene_symbol=gene_symbol, selected=selected)
 
         return Response(status=HTTP_200_OK, data=ontology_matches.as_json())
 

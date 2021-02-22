@@ -328,8 +328,17 @@ class Searcher:
         searches: List[Any]
         results = SearchResults(genome_build_preferred=genome_build)
         if genome_build:
-            variant_qs = get_visible_variants(self.user, genome_build)
-            searches = self.genome_build_searches
+            try:
+                variant_qs = get_visible_variants(self.user, genome_build)
+                searches = self.genome_build_searches
+            except Exception as e:
+                report_exc_info(extra_data={
+                    'search_string': self.search_string,
+                    'classify': self.classify,
+                    'genome_build_id': genome_build.name if genome_build else None
+                })
+                results.append_error(("variants", e, genome_build))
+                return results
         else:
             variant_qs = None
             searches = self.genome_agnostic_searches

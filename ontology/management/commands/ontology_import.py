@@ -1,8 +1,9 @@
 import itertools
 import json
 import re
+import csv
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 import pronto
@@ -78,7 +79,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=3)
+        processor_version=5)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -114,15 +115,7 @@ def load_mondo(filename: str, force: bool):
                         if synonyms := meta.get("synonyms"):
                             extra["synonyms"] = synonyms
 
-                        # make the term early so we don't have to create stubs for it if we find relationships
-                        ontology_builder.add_term(
-                            term_id=full_id,
-                            name=label,
-                            definition=defn,
-                            extra=extra if extra else None,
-                            primary_source=True
-                        )
-
+                        aliases = list()
                         synonym_set = set()
                         if synonyms := meta.get("synonyms"):
 
@@ -133,6 +126,8 @@ def load_mondo(filename: str, force: bool):
                                 pred = synonym.get("pred")
                                 if pred == "hasExactSynonym":
                                     # val = synonym.get("val")
+                                    aliases.append(synonym.get("val"))
+
                                     for xref in synonym.get("xrefs", []):
                                         xref_term = TermId(xref)
                                         if xref_term.type in {"HP", "OMIM"}:
@@ -148,6 +143,8 @@ def load_mondo(filename: str, force: bool):
                                                 relation=OntologyRelation.EXACT
                                             )
                                             synonym_set.add(xref)
+                                            if xref_term.type == "OMIM":
+                                                aliases.append(label)
 
                             # look at related synonyms second, if we have RELATED, don't bother with any other relationships
                             for synonym in synonyms:
@@ -176,6 +173,8 @@ def load_mondo(filename: str, force: bool):
                             if val.type in {"HP", "OMIM"} and not val.id in synonym_set:
                                 pred = bp.get("pred")
                                 pred = MATCH_TYPES.get(pred, pred)
+                                # if pred == OntologyRelation.EXACT:
+                                    # add alias?
 
                                 ontology_builder.add_term(
                                     term_id=val.id,
@@ -205,6 +204,25 @@ def load_mondo(filename: str, force: bool):
                                         dest_term_id=val.id,
                                         relation=OntologyRelation.XREF
                                     )
+
+                        if label and "MONDO" in full_id:
+                            if ";" in label:
+                                parts = [part.strip() for part in label.split(";")]
+                                if len(parts) == 2:
+                                    if parts[1].isupper():
+                                        for part in parts:
+                                            if part not in aliases:
+                                                aliases.append(part)
+                                        print(aliases)
+
+                        ontology_builder.add_term(
+                            term_id=full_id,
+                            name=label,
+                            definition=defn,
+                            extra=extra if extra else None,
+                            aliases=aliases,
+                            primary_source=True
+                        )
 
                 # copy of id for gene symbol to gene symbol
                 elif term.type == "HGNC":
@@ -402,7 +420,7 @@ def load_biomart(filename: str, force: bool):
         filename=filename,
         context="biomart_omim_aliases",
         import_source="biomart",
-        processor_version=2,
+        processor_version=3,
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)
@@ -418,20 +436,95 @@ def load_biomart(filename: str, force: bool):
     description_series = mim_biomart_df[MIM_DESCRIPTION]
 
     for mim_accession_id, description in description_series.items():
-        descriptions_list = [x.strip() for x in str(description).split(";;")]
+        descriptions_list = [x for x in str(description).split(";;")]
         name = descriptions_list[0]
-
-        aliases = descriptions_list[1:]
-
+        # aliases = [name] + [term for term in [term.strip() for term in str(description).split(";")] if term]
+        aliases = [term for term in [term.strip() for term in str(description).split(";")] if term and term != name]
         ontology_builder.add_term(
             term_id=f"OMIM:{mim_accession_id}",
             name=name,
             definition=None,
-            primary_source=True,
+            primary_source=False, # primary source is now the OMIM file if it's available
             aliases=aliases
         )
 
     ontology_builder.complete()
+    ontology_builder.report()
+
+
+def load_omim(filename: str, force: bool):
+    ontology_builder = OntologyBuilder(
+        filename=filename,
+        context="omim_file",
+        import_source=OntologyImportSource.OMIM,
+        processor_version=4,
+        force_update=force)
+
+    file_hash = file_md5sum(filename)
+    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+
+    with open(filename, "r") as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter='\t')
+        next(csv_reader) # title row
+        next(csv_reader) # date row (worth reading e.g. "Generated: 20201-02-04")
+        header = next(csv_reader)
+        OMIM_EXPECTED_HEADER = ["# Prefix", "MIM Number", "Preferred Title; symbol",	"Alternative Title(s); symbol(s)",	"Included Title(s); symbols"]
+        MOVED_TO = re.compile("MOVED TO ([0-9]+)")
+        if header != OMIM_EXPECTED_HEADER:
+            raise ValueError(f"Header not as expected, got {header}")
+
+        RELEVANT_PREFIXES = {
+            # "Asterisk": "Gene",
+            # "Plus": "Gene and phenotype, combined",
+            "Number Sign": "Phenotype, molecular basis known",
+            "Percent": "Phenotype or locus, molecular basis unknown",
+            "NULL": "Other, mainly phenotypes with suspected mendelian basis",
+            # "Caret": "Entry has been removed from the database or moved to another entry"
+        }
+
+        #["Number Sign", "Percent", "NULL"]
+
+        for row in csv_reader:
+            prefix = row[0]
+            omim_type = RELEVANT_PREFIXES.get(prefix)
+            if len(row) <= 1 or not omim_type:
+                continue
+            mim_number = row[1]
+            preferred_title = row[2]
+            alternative_terms = row[3]
+            included_titles = row[4]
+
+            moved_to: Optional[str] = None
+            aliases = []
+
+            if match := MOVED_TO.match(preferred_title):
+                # This will only happen if you uncomment Caret
+                moved_to = match.group(1)
+                preferred_title = f"obsolete, see OMIM:{moved_to}"
+            else:
+                # aliases.append(preferred_title)  # other tables don't have the name copied into aliases
+                # so don't do it here
+                aliases += [term for term in [term.strip() for term in (preferred_title + ";" + alternative_terms).split(";")] if term and term != preferred_title]
+
+            extras = {"type": omim_type}
+            if included_titles:
+                extras["included_titles"] = included_titles
+
+            ontology_builder.add_term(
+                term_id=f"OMIM:{mim_number}",
+                name=preferred_title,
+                definition=None,
+                aliases=aliases,
+                extra=extras,
+                primary_source=True
+            )
+            if moved_to:
+                ontology_builder.add_ontology_relation(
+                    source_term_id=f"OMIM:{mim_number}",
+                    dest_term_id=f"OMIM:{moved_to}",
+                    relation=OntologyRelation.REPLACED
+                )
+    ontology_builder.complete(purge_old_terms=True)
     ontology_builder.report()
 
 
@@ -473,6 +566,7 @@ class Command(BaseCommand):
         parser.add_argument('--omim_frequencies', required=False)
         parser.add_argument('--hgnc_sync', action="store_true", required=False)
         parser.add_argument('--biomart', required=False)
+        parser.add_argument('--omim', required=False)
 
     def handle(self, *args, **options):
         force = options.get("force")
@@ -480,6 +574,12 @@ class Command(BaseCommand):
         if options.get("hgnc_sync"):
             print("Syncing HGNC")
             sync_hgnc()
+
+        if filename := options.get("omim"):
+            try:
+                load_omim(filename, force=force)
+            except OntologyBuilderDataUpToDateException:
+                print("OMIM File hash is the same as last import")
 
         if filename := options.get("biomart"):
             try:

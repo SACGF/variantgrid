@@ -4,6 +4,7 @@
 {% load ui_menu_bars %}
 {% load ui_help %}
 {% load ui_utils %}
+{% load js_tags %}
 {% block title %}Condition Matching{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -14,9 +15,49 @@
         <h3>Condition Match Testing</h3>
         {% page_help_embedded title='Condition Match Testing' %}
             <p>
-            Help will go here for matching text to conditions
+            This page lets admin users test text to see what terms will be auto applied or suggested.
+            </p>
+            <p>
+                Download: this shows you top level suggestions across all records, it will not show gene level suggestions.<br/>
+                Note that some top level suggestions will actually be hidden and automatically converted to gene level suggestions
+                on the relevant page.<br/>
+                Enabling "Fallback to External Server Search" will take a *lot* longer but give you more accurate results.
+            </p>
+            <p>
+                Condition text will be normalised, split into terms, de-pluralised and split into prefix and suffix parts.<br/>
+                To be a top auto-assignment the text must have no warnings and be:<br/>
+                A directly embedded ID e.g. MONDO:0000777 <br/>
+                or<br/>
+                Text that matches a MONDO name where that MONDO term is a leaf (if it's not a leaf it will be used as a basis for making gene level suggestions).<br/>
+                or<br/>
+                Text that matches an OMIM name (if it matches an OMIM alias then it will only be a suggestion). In either scenario the OMIM term should be converted
+                to the equivalent MONDO term.
+            </p>
+            <p>
+                The following validation warnings can only happen in suggestions:
+                <ul>
+                <li>The term was found by converting a stray number to an OMIM ID</li>
+                <li>A single embedded ID was found, but it also has more than 3 words that don't line up to the term's name or description</li>
+                </ul>
+                The following validation warnings can occur on suggestions or user selected values:
+                <ul>
+                <li>Multiple terms are embedded and co-occuring/uncertain hasn't been selected yet (can't provide that in text just yet)</li>
+                <li>Multiple kinds of terms are embedded, e.g. "MONDO:0000777, OMIM:102403"</li>
+                <li>A term has the word "obsolete" in its name e.g. MONDO:0200001</li>
+                <li>The term doesn't exist in our database</li>
+                </ul>
             </p>
         {% end_page_help_embedded %}
+
+        <h4>Download</h4>
+        <form method="POST" action="{% url 'condition_match_test_download' %}">
+            {% csrf_token %}
+            Run and download auto matching attempts. (Note doesn't apply the results, just produces them for download).<br/>
+            This takes a while so it's recommended you limit your results.<br/>
+            <input class="btn btn-primary" type="submit" value="Download" />
+        </form>
+        <hr/>
+        <h4>Test Single Term</h4>
 
         <form method="GET">
             {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
@@ -26,10 +67,41 @@
             <button class="btn btn-primary">Search</button>
         </form>
 
-        <div class="text-muted">Note the following words will be ignored: "a", "an", "and", "disease", "disorder", "for", "or", "the", "the", "type"</div>
+        {% if search_text %}
+            <div class="text-muted">
+                {% labelled label="Prefix" %}{{ search_text.prefix }}{% endlabelled %}
+                {% labelled label="Prefix Terms" %}{{ search_text.prefix_terms_display }}{% endlabelled %}
+                {% labelled label="Suffix" %}{{ search_text.suffix }}{% endlabelled %}
+                {% labelled label="Suffix Terms" %}{{ search_text.suffix_terms_display }}{% endlabelled %}
+            </div>
+        {% endif %}
 
         {% if attempted %}
+            <div class="card">
+                <div class="card-header">Auto Assignment</div>
+                <div class="card-body">
+                    {% labelled label="Suggested Term" %}{% if suggestion.terms %}
+                        {% for term in suggestion.terms %}
+                            <a href="{% url 'ontology_term' term.url_safe_id %}">{{ term.id }}</a> {{ term.name }}
+                        {% endfor %}
+                    {% endif %}{% endlabelled %}
+                    {% labelled label="Can auto-assign (without confirmation)" %}{{ is_auto_assignable }}{% endlabelled %}
+                    {% if suggestion.messages %}
+                        {% labelled label="Term warnings" %}
+                            <ul class="list-group">
+                                {% for message in suggestion.messages %}
+                                    <li class="list-group-item">{{ message.severity | severity_icon }} {{ message.text }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endlabelled %}
+                    {% endif %}
+                    {% labelled label="Term IDs found in text" %}{{ suggestion.ids_found_in_text|default_if_none:'False' }}{% endlabelled %}
+                    {% labelled label="All terms are leafs" %}{{ suggestion.is_all_leafs }}{% endlabelled %}
+                </div>
+            </div>
+
             {% if auto_matches %}
+            <h4 class="mt-4">User Picker Suggestions</h4>
             <table class="table">
                 <thead>
                     <tr>
@@ -39,23 +111,15 @@
                 </thead>
                 {% for auto_match in auto_matches %}
                     <tr>
-                        <td width="30%">{{ auto_match.term.id }}<br/>
+                        <td><a href="{% url 'ontology_term' auto_match.term.url_safe_id %}" class="hover-link">{{ auto_match.term.id }}</a><br/>
                             {{ auto_match.term.name }}
                             {% if auto_match.term.definition %}<br/><span class="text-muted wy-text-small">{{ auto_match.term.definition }}</span>{% endif %}
                         </td>
-                        <td>
-                            <div class="row mb-1">
-                                <div class="col-1 text-right text-monospace border-bottom" style="font-weight: bold">
-                                    {{ auto_match.score | floatformat:0 }}
-                                </div>
-                                <div class="col-11"></div>
-                            </div>
-                            {% for part in auto_match.scores %}
-                                <div class="row mb-1">
-                                    <div class="col-1 text-right text-monospace">{{ part.score | floatformat:0 }}</div>
-                                    <div class="col-11">{{ part.name }} : <span class="text-secondary">{{ part.note }} - <span style="font-size:small">{{ part.percent | floatformat:0 }}% of {{ part.max | floatformat:0 }}</span></span></div>
-                                </div>
-                            {% endfor %}
+                        <td width="200px">
+                            {% if auto_match.gene_relationships %}<div>Gene Matches</div>{% endif %}
+                            {% if auto_match.direct_reference %}<div>Embedded ID</div>{% endif %}
+                            {% if auto_match.text_search %}<div>Text Search</div>{% endif %}<br/>
+                            {% if auto_match.term.is_obsolete %}<div>Obsolete</div>{% endif %}<br/>
                         </td>
                     </tr>
                 {% endfor %}

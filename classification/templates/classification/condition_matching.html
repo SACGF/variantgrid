@@ -12,55 +12,66 @@
         tr.selected {
             background-color: #ccffcc;
         }
-        .condition-match-input::placeholder {
-            color: #bbb;
-        }
         .toggle-cell {
             width: 100px;
         }
         .term-cell {
-            width: 200px;
-        }
-        .relevance-cell {
             width: 300px;
         }
+        .relevance-cell {
+            width: 250px;
+        }
+        .condition-match-suggestion .suggestion {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .condition-match-suggestion .suggestion.success {
+            background-color: #f7fff7;
+        }
+        .condition-match-suggestion .suggestion.warning {
+            background-color: #fefee7;
+        }
+        .condition-match-suggestion .suggestion.error {
+            background-color: #fef7f7;
+        }
+
     </style>
     <script>
         const gene_symbol = "{{ clinvar_export.gene_symbol }}";
         const basicHighlight = ["autosomal", "x-linked", "recessive", "dominant", gene_symbol];
         const basicHighlightStr = basicHighlight.join("|");
-        const highlightRegex = new RegExp(`(${basicHighlightStr})`, 'g');
+        const highlightRegex = new RegExp(`(${basicHighlightStr})`, 'ig');
 
-        function modalClosed() {
+        function submitUserChoices() {
             let id = $('#mp-id').val();
 
             let selectedText = $('#mp-selected').val();
-            let {terms, _} = parseTermText(selectedText);
+            let {terms, __} = parseTermText(selectedText);
 
             let finalText = terms.join(", ");
+            let mode = 'N';
             if (terms.length >= 2) {
-                let mode = $('[name=mp-multimode]:checked').val();
+                mode = $('[name=mp-multimode]:checked').val();
                 switch (mode) {
                     case "U": finalText += "; uncertain"; break;
-                    case "C": finalText += "; co-occuring"; break;
-                    default: finalText += "; uncertain/co-occuring"; break;
+                    case "C": finalText += "; co-occurring"; break;
+                    default: finalText += "; uncertain/co-occurring"; break;
                 }
             }
-            let input = $(`#condition-match-${id}`);
-            input.val(finalText);
-            applyInheritRoot(input);
+            applyChange(parseInt(id, 10), terms, mode);
         }
 
         function parseTermText(text) {
             let termText = null;
-            let join = 'X';
+            let join = 'N';
 
             let parts = text.split(";");
-            if (parts.length == 2) {
+            if (parts.length === 2) {
                 termText = parts[0].trim();
                 join = parts[1].trim().toLowerCase();
                 if (join.includes('/')) {
-                    join = 'X';
+                    join = 'N';
                 } else if (join.includes('un')) {
                     join = 'U';
                 } else if (join.includes('co')) {
@@ -77,6 +88,21 @@
             }
         }
 
+        function worstMessage(suggestion) {
+            if (suggestion.messages) {
+                const severity = {
+                    "i": 1,
+                    "s": 2,
+                    "w": 3,
+                    "e": 4
+                }
+                let maxMessage = _.maxBy(suggestion.messages, (message) => {
+                    return severity[message.severity.toLowerCase()[0]] || 0;
+                });
+                return maxMessage.severity;
+            }
+        }
+
         function toggleTerm(fullText, term) {
             let termArray = fullText.split(",").map(tt => tt.trim()).filter(tt => tt.length);
             let termDict = {};
@@ -89,6 +115,7 @@
                 termDict[term] = true;
             }
             let termList = Object.keys(termDict);
+            updateMulti(termList.length);
             if (termList.length > 0) {
                 termList.sort();
                 return termList.join(", ");
@@ -111,9 +138,10 @@
         function ontologyTr(onto) {
             let row = $('<tr>', {id: `result-${idSafe(onto.id)}`, class: 'onto-row'});
             let toggleButton = $('<button>', {class:'btn btn-outline-primary', text:'Toggle'}).click(() => {
-                let fullText = $('#mp-selected').val();
+                let mpSelected = $('#mp-selected');
+                let fullText = mpSelected.val();
                 let newText = toggleTerm(fullText, onto.id);
-                $('#mp-selected').val(newText);
+                mpSelected.val(newText);
                 updateOntoRowSelections();
             });
 
@@ -137,24 +165,6 @@
                 ]}).appendTo(description);
             }
 
-            let scoreDetail = $('<div>');
-            for (let score_part of onto.scores) {
-                let score = score_part.score.toFixed(0);
-
-                $('<div>', {class:'mt-2',
-                    html: [
-                        $('<div>', {html:[
-                            $('<span>', {class: 'text-monospace', html: score}),
-                            $('<span>', {text: " : " + score_part.name + " out of " + score_part.max})
-                        ]}),
-                        $('<div>', {class:'text-muted', html:score_part.note})
-                    ]
-                }).appendTo(scoreDetail);
-            }
-
-            let scoreCell = $('<td>', {class:'score-cell text-monospace text-right', 'data-toggle': 'popover', 'title': 'score', 'data-content': scoreDetail.prop('outerHTML')}).appendTo(row);
-            $('<div>', {text: onto.score.toFixed(0)}).appendTo(scoreCell);
-
             return row;
         }
 
@@ -167,12 +177,6 @@
         }
 
         function renderOntologies(ontos) {
-            ontos.sort((a, b) => {
-                let score1 = a.score + (a.selected ? 10000 : 0);
-                let score2 = b.score + (b.selected ? 10000 : 0);
-                return score2 - score1;
-            });
-
             let tbody = $('#mp-results tbody');
             tbody.empty();
             for (let onto of ontos) {
@@ -180,10 +184,21 @@
             }
         }
 
+        function updateMulti(count) {
+            if (count > 1) {
+                $('#mp-multimode').show();
+                $('#mp-singlemode').hide();
+            } else {
+                $('#mp-multimode').hide();
+                $('#mp-singlemode').show();
+            }
+        }
+
         function searchMondo(data) {
             let searchText = data.searchText;
             let geneSymbol = data.geneSymbol;
             let selected = data.selected;
+            updateMulti(selected ? selected.split(",").length : 0)
 
             let url = '{% url "api_mondo_search" %}';
             let resultsDom = $("#mp-results");
@@ -252,7 +267,7 @@
                         html.push( $('<span>', {class: 'text-muted', text: 'PanelApp AU', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
                     } else if (relationship.source === "hpo_disease") {
                         let tooltip = `Via related term: ${relationship.via}`;
-                        html.push( $('<span>', {class: 'text-muted', text: 'Entrez', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
+                        html.push( $('<span>', {class: 'text-muted', text: 'NCBI', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
                     } else if (relationship.source === "mondo_file") {
                         let tooltip = `Relationship: ${relationship.relation}`;
                         html.push( $('<span>', {class: 'text-muted', text: "MONDO", 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
@@ -283,74 +298,299 @@
             });
         }
 
-        // on form
-        function applyInheritRoot(input) {
-            let this$ = $(input);
-            console.log(`Applying root ${this$.length}`)
-            let useValue = this$.val();
-            let checkValueOf = this$;
-
-            // we may have blanked out the value, and now actually need to apply a parent value
-            while (_.isEmpty(useValue)) {
-                let parentId = checkValueOf.attr('data-parent-id');
-                if (parentId) {
-                    checkValueOf = $(`input[data-id=${parentId}]`);
-                    if (!checkValueOf.length) {
-                        break;
+        function canSuggest(suggestion) {
+            if (suggestion.terms.length >= 1) {
+                for (let message of suggestion.messages) {
+                    if (message.severity.toLowerCase().startsWith("e")) {
+                        return false;
                     }
-                } else {
-                    break;
                 }
-                useValue = checkValueOf.val();
+                return true;
             }
-            applyInherit(this$, useValue);
+            return false;
         }
 
-        function applyInherit(input, parentValue) {
-            let input$ = $(input);
-            let val = input$.val();
-            let inputId = input$.attr('data-id');
-            let inheritValue = _.isEmpty(val) ? parentValue : val;
-            input$.attr('placeholder', inheritValue);
+        function renderSuggestion(suggestion, id) {
+            let dom = $('<div>');
+            if (suggestion.terms && suggestion.terms.length) {
+                dom.addClass('suggestion');
+                let termStyle = '';
 
-            let children = $(`[data-parent-id=${inputId}]`);
-            for (let child of children) {
-                applyInherit(child, inheritValue);
+                if (!suggestion.is_applied && canSuggest(suggestion)) {
+
+                    let suggest = true;
+                    let worst = worstMessage(suggestion);
+                    if (worst != null && ["s", "i"].indexOf(worst[0].toLowerCase()) == -1) {
+                        // we have a message and it's not success or info
+                        suggest = false;
+                    }
+                    let input = $('<input>', {
+                        type: 'checkbox',
+                        class: 'form-check-input suggestion-checkbox',
+                        click: () => {
+                            checkSuggestionCount()
+                        }
+                    });
+                    if (suggest) {
+                        input.attr('checked', 'checked');
+                    }
+
+                    $('<label>', {
+                        style: 'margin-left:1.25rem',
+                            class: 'form-check-label',
+                            html: [
+                            input,
+                            'Selected',
+                        ]
+                    }).appendTo(dom);
+                    termStyle = 'opacity:0.5';
+                }
+                for (let term of suggestion.terms) {
+                    // TODO use generated URL
+                    let termDom = $('<div>', {
+                        style: termStyle, html: [
+                            $('<a>', {
+                                href: `/ontology/term/${term.id.replace(':', '_')}`,
+                                text: term.id,
+                                target: '_blank',
+                                title: term.definition,
+                                'data-toggle': 'tooltip'
+                            }),
+                            ' ',
+                            term.name
+                        ]
+                    });
+                    dom.append(termDom);
+                }
+                if (suggestion.terms.length > 1) {
+                    let joiner_text = 'Combination type undecided';
+                    switch (suggestion.joiner) {
+                        case 'U':
+                            joiner_text = 'Uncertain';
+                            break;
+                        case 'C':
+                            joiner_text = 'Co-occurring';
+                            break;
+                    }
+                    $('<div>', {text: joiner_text, class:'font-italic'}).appendTo(dom);
+                }
+                if (suggestion.user) {
+                    $('<div>', {text: `Set by ${suggestion.user.username}`, class:'text-secondary'}).appendTo(dom);
+                }
             }
+            if (suggestion.messages && suggestion.messages.length) {
+                if (!suggestion.is_applied) {
+                    let maxSev = worstMessage(suggestion);
+                    dom.addClass(maxSev);
+                }
+                dom.addClass('suggestion');
+                for (let message of suggestion.messages) {
+                    $('<div>', {html:[
+                            severityIcon(message.severity),
+                            ' ',
+                            message.text
+                    ]}).appendTo(dom);
+                }
+            }
+            return dom;
+        }
+
+        function checkSuggestionCount() {
+            let checkedCount = $('.suggestion-checkbox:checked').length;
+            let button = $('#approve-suggestions');
+            button.text(`Apply ${checkedCount} selected suggestion${checkedCount === 1 ? '' : 's'}`);
+            if (checkedCount === 0) {
+                button.hide();
+            } else {
+                button.show();
+            }
+        }
+
+        function approveSuggestions() {
+            let checked = $('.suggestion-checkbox:checked').parents('.condition-match-row');
+            let changes = [];
+            for (let placeholder of checked) {
+                placeholder = $(placeholder);
+                let cid = parseInt(placeholder.attr('data-id'));
+                let terms = placeholder.attr('data-terms').split(",");
+                let joiner = placeholder.attr('data-join');
+                changes.push({
+                    'ctm_id': cid,
+                    'terms': terms,
+                    'joiner': joiner
+                });
+            }
+            if (changes.length) {
+                console.log(changes);
+                applyChanges(changes);
+            }
+        }
+
+        function applyChange(id, terms, joiner) {
+            applyChanges([{
+                'ctm_id': id,
+                'terms': terms,
+                'joiner': joiner
+            }])
+        }
+
+        function applyChanges(changes) {
+            $('#condition-list').LoadingOverlay('show');
+            $.ajax({
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify({"changes": changes}),
+                url: '{% url 'condition_text_matching_api' condition_text.pk %}', // FIXME generate the URLS
+                type: 'POST',
+                error: (call, status, text) => {
+                    $('#condition-list').LoadingOverlay('hide');
+                    alert('There was an error updating this term');
+                    console.log(status);
+                    console.log(text);
+                },
+                success: async (results) => {
+                    console.log("SUCCESS");
+                    applySuggestionUpdates(results);
+                    $('#condition-list').LoadingOverlay('hide');
+                }
+            });
+        }
+
+        function updateSuggestions() {
+            $('#condition-list').LoadingOverlay('show');
+            $.ajax({
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                url: '{% url 'condition_text_matching_api' condition_text.pk %}', // FIXME generate the URLS
+                type: 'GET',
+                error: (call, status, text) => {
+                    $('#condition-list').LoadingOverlay('hide');
+                    alert('There was an error retrieving terms');
+                    console.log(status);
+                    console.log(text);
+                },
+                success: async (results) => {
+                    applySuggestionUpdates(results, true);
+                    $('#condition-list').LoadingOverlay('hide');
+                }
+            });
+        }
+
+        function parentTerms(rowDom) {
+            let parentId = rowDom.attr('data-parent-id');
+            if (parentId) {
+                let parent = $(`#condition-match-${parentId}`);
+                if (parent.is("[data-applied]")) {
+                    let terms = parent.attr('data-terms').split(",");
+                    if (terms.length) {
+                        return terms.map(t => t.trim()).join(", ");
+                    }
+                }
+                return parentTerms(parent);
+            }
+            return null;
+        }
+
+        function applySuggestionUpdates(results, complete) {
+            let suggestions = results.suggestions;
+            $("#count_outstanding").text(results.count_outstanding);
+            if (results.count_outstanding == 0) {
+                $("#no_outstanding").html(severityIcon("S"));
+            } else {
+                $("#no_outstanding").html(severityIcon("W"));
+            }
+
+            if (complete) {
+                $('.condition-match-row').removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied');
+            }
+            for (let suggestion of suggestions) {
+                let wrapper = $(`#condition-match-${suggestion.id}`);
+                wrapper.removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied');
+
+                let valuesDom = wrapper.find('.condition-match-values').empty();
+                let suggestionDom = wrapper.find('.condition-match-suggestion').empty();
+
+                wrapper.attr('data-terms', suggestion.terms.map(term => term.id).join(","));
+                wrapper.attr('data-join', suggestion.joiner);
+                if (suggestion.is_applied) {
+                    valuesDom.html(renderSuggestion(suggestion));
+                    if (suggestion.terms && suggestion.terms.length) {
+                        wrapper.attr('data-applied', 'true');
+                    }
+                } else {
+                    suggestionDom.html(renderSuggestion(suggestion));
+                }
+            }
+
+            let inheritings = $('.condition-match-row:not([data-applied])');
+            $('.inherit').remove();
+            for (let inheriting of inheritings) {
+                inheriting = $(inheriting);
+                let inheritedTerms = parentTerms(inheriting);
+                let valuesDom = inheriting.find('.condition-match-values');
+                let parentId = inheriting.attr('data-parent-id');
+                if (parentId) {
+                    let parent = $(`#condition-match-${parentId}`).attr('data-label');
+                    if (inheritedTerms) {
+                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:inheritedTerms, title:`Inherits from ${parent}`}));
+                    } else {
+                        valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', html:'none', title:`Inherits from ${parent}`}));
+                    }
+                } else {
+                    valuesDom.prepend($('<span>', {class:'inherit text-muted font-italic', text:`-`, title:`No top level terms provided`}));
+                }
+            }
+            let topLevel = $('.condition-match-row:not([data-parent-id])');
+            let topLevelDataTerms = topLevel.attr('data-terms');
+            let button = topLevel.find('.mondo-picker');
+            // if we already have data-terms on top level, don't provide warning
+            if ((topLevel.attr('data-terms') || '').trim().length) {
+                button.css('opacity','1.0');
+                button.removeAttr('title');
+                button.tooltip('dispose');
+            } else {
+                button.css('opacity','0.3');
+                button.attr('title', 'It is recommend you choose gene level terms using the buttons below');
+                button.tooltip({html:true, trigger : 'hover'});
+            }
+
+            checkSuggestionCount();
         }
 
         $(document).ready(() => {
-            // should be actual root, and will then filter down to all children
-            applyInheritRoot($('[data-parent-id=None]'));
-
-            $('input[data-id]').keyup(function() {
-                applyInheritRoot(this);
-            });
+            updateSuggestions();
+            checkSuggestionCount();
 
             // open MODAL
-
+            // TODO : Make it so you can't click this button until the server
             $('.mondo-picker').click(function () {
                 let mondoButton = $(this);
-                let geneSymbol = mondoButton.attr('data-gene-symbol');
-                let label = mondoButton.attr('data-label');
-                let inheritance = mondoButton.attr('data-mode-of-inheritance');
-                if (geneSymbol == '') {
+                let mondoRow = mondoButton.parents('.condition-match-row')
+                let geneSymbol = mondoRow.attr('data-gene-symbol');
+                let label = mondoRow.attr('data-label');
+                let inheritance = mondoRow.attr('data-mode-of-inheritance');
+                if (geneSymbol === '') {
                     $('#mp-gene-symbol').text('-').addClass('no-value');
                 } else {
                     $('#mp-gene-symbol').text(geneSymbol).removeClass('no-value');
                 }
-                let recordId = $(this).attr('data-id');
-                let selected = $(`#condition-match-${recordId}`).val();
-                let parsedMatch = parseTermText(selected);
-                $(`[name=mp-multimode][value=${parsedMatch.join}]`).trigger('click');
+                let recordId = mondoRow.attr('data-id');
+                let selected = mondoRow.attr('data-terms');
+                let joiner = mondoRow.attr('data-join');
+                // let parsedMatch = parseTermText(selected);
+                $(`[name=mp-multimode][value=${joiner}]`).trigger('click');
 
                 $('#mp-id').val(recordId);
                 $('#mp-search-text').val(`{{ condition_text.normalized_text }}`.trim());
                 $('#mp-selection-title').text(label);
-                $('#mp-selected').val(parsedMatch.terms.join(", "));
-                if (inheritance == 'N/A') {
+                $('#mp-selected').val(selected);
+                if (inheritance === 'N/A') {
                     $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'N/A'}));
-                } else if (inheritance == 'None') {
+                } else if (inheritance === 'None') {
                     $('#mp-mode-of-inheritance').html($('<span>', {class: 'no-value', text: 'Not Specified'}));
                 } else {
                     $('#mp-mode-of-inheritance').text(inheritance);
@@ -359,10 +599,6 @@
 
                 triggerSearchMondo();
                 return false;
-            });
-
-            $('#mondoModal').on('hide.bs.modal', () => {
-                modalClosed();
             });
 
             $('#mp-search-button').click(() => {
@@ -387,25 +623,30 @@
                 </div>
                 <div class="modal-body">
                     <input id="mp-id" type="hidden" />
+
+                    {% labelled label="Selected Terms" %}<input class="form-control" id="mp-selected" style="border-color:#444466"/>{% endlabelled %}
+                    {% labelled label="Multi-Mode" %}
+                        <div id="mp-multimode" class="collapse">
+                            <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                <label class="btn btn-outline-danger"><input type="radio" name="mp-multimode" id="mp-multimode-n" value="N" checked="checked">Not Decided</label>
+                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-u" value="U">Uncertain</label>
+                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-c" value="C">Co-occurring</label>
+                            </div>
+                        </div>
+                        <div id="mp-singlemode" class="no-value" style="height:33.5px;display:inline-flex;align-items:center">N/A</div>
+                    {% endlabelled %}
+                    <hr/>
+
+                    {% labelled label="Gene Symbol" %}<span id="mp-gene-symbol">None</span>{% endlabelled %}
+                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
+
                     {% labelled label="Search Text" %}
                         <div class="input-group">
                             <input class="form-control" type="text" id="mp-search-text" />
                             <span class="input-group-append"><button id="mp-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
                         </div>
                     {% endlabelled %}
-                    {% labelled label="Gene Symbol" %}<span id="mp-gene-symbol">None</span>{% endlabelled %}
-                    {% labelled label="Mode of Inheritance" %}<span id="mp-mode-of-inheritance">N/A</span>{% endlabelled %}
-                    {% labelled label="Mutli-Mode" %}
-                        <div id="mp-multimode" >
-                            <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-n" value="X" checked="checked">?</label>
-                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-u" value="U">Uncertain</label>
-                                <label class="btn btn-outline-secondary"><input type="radio" name="mp-multimode" id="mp-multimode-c" value="C">Co-occuring</label>
-                            </div>
-                        </div>
-                        <div id="mp-singlemode" class="collapse no-value">N/A</div>
-                    {% endlabelled %}
-                    {% labelled label="Terms" %}<input class="form-control" id="mp-selected" />{% endlabelled %}
+
 
                     <label>Select Relevant Ontology Terms Below</label>
                     <table class="table" id="mp-results">
@@ -415,14 +656,14 @@
                                 <th class="term-cell">Term</th>
                                 <th class="relevance-cell">Relevance</th>
                                 <th class="description-cell">Description</th>
-                                <th class="score-cell">Score</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
                     </table>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="submitUserChoices()">Save Selected Terms</button>
                 </div>
             </div>
         </div>
@@ -436,20 +677,68 @@
             <h3>Condition Matching</h3>
             {% page_help_embedded title='Condition Matching' %}
                 <p>
-                    Help will go here for matching text to conditions
+                    Condition matching collects classifications that share the same "condition under curation", and allows you to assign
+                    standard ontology terms to them.<br/>
+                    If a free text condition is provided, text will be matched to MONDO terms as a first pass
+                    (see <a class="external-link" href="https://mondo.monarchinitiative.org/" target="_blank">https://mondo.monarchinitiative.org/</a> for more information)<br/>
+                    e.g. The text "sifrim-hitz-weiss syndrome" can be assigned to MONDO:0014946
+                </p>
+                <p>
+                    <h5>Levels</h5>
+                    Standard terms can be assigned at the following levels:
+                    <ul>
+                        <li>Default for the condition text</li>
+                        <li>For a specific gene symbol within that condition text</li>
+                        <li>For a combination of mode of inheritance within the gene symbol</li>
+                        <li>For a specific classification</li>
+                    </ul>
+                    At each level, if no value is set, it will inherit the values above it.<br/>
+                    The goal is to have all classifications linked to a standard term. e.g. to end with Outstanding Classifications : 0<br/>
+                    New classifications will automatically inherit values set here.<br/>
+                </p>
+                <p>
+                    <h5>Edit</h5>
+                    In many cases you'll need to edit a row to add terms.<br/>
+                    It is recommended that terms be provided at the gene symbol level.<br/>
+                    After clicking edit a popup will appear, with any chosen terms listed at the top (you can paste OMIM and MONDO terms here directly if needed).<br/>
+                    You will see any known terms with gene level associations, and the top text matches.<br/>
+                    You can change the text that's being searched and click "Search" for updated results.<br/>
+                    Click toggle to add/remove a term, if multiple terms are selected you'll be required to choose "Co-occuring" or "uncertain"
+                </p>
+                <p>
+                    <h5>Quick Suggestions</h5>
+                    In some cases {{ site_name }} will be able to provide suggestions by looking at the text and gene symbols.<br/>
+                    Review any warnings with the suggestions, untick any suggestions that are not appropriate, and hit "Approve" to bulk approve all the selected suggestions.
                 </p>
             {% end_page_help_embedded %}
-            {% labelled label="Lab" %}{{ condition_text.lab.name }}{% endlabelled %}
-            {% labelled label="Text" %}{{ condition_text.normalized_text }}{% endlabelled %}
-            {% labelled label="Last Updated By" %}
-                {% if condition_text.last_edited_by %}
-                {% user condition_text.last_edited_by %}
-                {% else %}-{% endif %}
-            {% endlabelled %}
-            <ul class="list-group mt-4">
+
+            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications share this condition text, and how many of those require a selected term">
+                Total Classifications : <span class="mono">{{ condition_text.classifications_count }}</span>,
+                Outstanding Classifications : <span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>
+            </span>
+            <ul id="condition-list" class="list-group mt-4">
+                <li class="list-group-item">
+                    <div class="row">
+                        <div class="col-3"><b>Group</b></div>
+                        <div class="col-4"><b>Selected Terms</b></div>
+                        <div class="col-1 text-center" style="border-right:1px dashed #ccc"><b>Edit</b></div>
+                        <div class="col-4"><b>Quick Suggestions</b></div>
+                    </div>
+                </li>
                 {% condition_match condition_match %}
             </ul>
-            <input type="submit" class="btn btn-primary mt-4" value="Save Changes"></input>
         </form>
+        <div class="row">
+            <div class="col-8">
+                {% if next_condition_text %}
+                <a class="btn btn-secondary" href="{% url 'condition_matching' next_condition_text.pk %}">Next Condition Text</a>
+                {% endif %}
+            </div>
+            <div class="col-4">
+                <button id="approve-suggestions" class="btn btn-primary w-100" onclick="approveSuggestions()">
+                    Approve suggestions
+                </button>
+            </div>
+        </div>
     </div>
 {% endblock %}
