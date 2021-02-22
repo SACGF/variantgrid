@@ -699,7 +699,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
             v = self.variant
             gnomad_variant = f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
             url = f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}"
-            if self.version.genome_build == GenomeBuild.grch38():
+            if self.version.genome_build == GenomeBuild.grch37():
+                url += "?dataset=gnomad_r2_1"
+            elif self.version.genome_build == GenomeBuild.grch38():
                 url += "?dataset=gnomad_r3"
         return url
 
