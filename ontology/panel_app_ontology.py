@@ -1,13 +1,11 @@
 import re
 from datetime import timedelta
-from email import message
 
 from django.conf import settings
 from typing import Union
 
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
-from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
 from ontology.models import OntologyService, OntologyTerm, OntologyRelation, OntologyImportSource
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
