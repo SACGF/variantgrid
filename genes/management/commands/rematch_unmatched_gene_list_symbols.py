@@ -1,4 +1,5 @@
 from django.core.management import BaseCommand
+from django.db.models import Q
 
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneListGeneSymbol
@@ -6,6 +7,18 @@ from genes.models import GeneListGeneSymbol
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
+        # Some legacy gene list may not have been stripped properly.
+        stripped = []
+        q_strip = Q(gene_symbol__startswith=' ') | Q(gene_symbol__endswith=' ')
+        for glgs in GeneListGeneSymbol.objects.filter(q_strip):
+            glgs.original_name = glgs.original_name.strip()
+            stripped.append(glgs)
+        if stripped:
+            print(f"{len(stripped)} records stripped")
+            GeneListGeneSymbol.objects.bulk_update(stripped,
+                                                   fields=["original_name"],
+                                                   batch_size=2000)
+
         gsm = GeneSymbolMatcher()
         modified_records = []
         num_unmatched = 0
