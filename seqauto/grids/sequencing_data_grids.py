@@ -52,7 +52,7 @@ class SequencingRunListGrid(JqGridUserRowConfig):
               "vcffromsequencingrun__vcf",
               "vcffromsequencingrun__vcf__import_status",
               "path"]
-    colmodel_overrides = {'name': {'width': 150, 'formatter': 'viewSequencingRunLink'},
+    colmodel_overrides = {'name': {'width': 200, 'formatter': 'viewSequencingRunLink'},
                           'sequencer__name': {'width': 40, 'label': 'Sequencer'},
                           'sequencer__sequencer_model__model': {'width': 50, 'label': 'Model'},
                           "sequencingruncurrentsamplesheet__sample_sheet__illuminaflowcellqc__data_state": {'label': 'QC Loaded',
