@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.core.management import BaseCommand
 from django.db.models import Q
 
@@ -10,12 +12,32 @@ class Command(BaseCommand):
         # Some legacy gene list may not have been stripped properly.
         stripped = []
         q_strip = Q(original_name__startswith=' ') | Q(original_name__endswith=' ')
+        gene_lists = set()
         for glgs in GeneListGeneSymbol.objects.filter(q_strip):
             glgs.original_name = glgs.original_name.strip()
             stripped.append(glgs)
+            gene_lists.add(glgs.gene_list)
+
         if stripped:
             print(f"{len(stripped)} records stripped")
-            GeneListGeneSymbol.objects.bulk_update(stripped,
+            # Need to make sure that stripped record doesn't already exist
+            original_names_per_list = defaultdict(set)
+            glgs_qs = GeneListGeneSymbol.objects.filter(gene_list__in=gene_lists)
+            for gene_list_id, original_name in glgs_qs.values_list("gene_list_id", "original_name"):
+                original_names_per_list[gene_list_id].add(original_name)
+
+            stripped_ok = []
+            dupes_to_delete = []
+            for glg in stripped:
+                if glg.original_name in original_names_per_list[glg.gene_list_id]:
+                    dupes_to_delete.append(glg.pk)
+                else:
+                    stripped_ok.append(glg)
+
+            if dupes_to_delete:
+                print(f"{len(dupes_to_delete)} records stripped to dupes, deleting")
+                GeneListGeneSymbol.objects.filter(pk__in=dupes_to_delete).delete()
+            GeneListGeneSymbol.objects.bulk_update(stripped_ok,
                                                    fields=["original_name"],
                                                    batch_size=2000)
 
