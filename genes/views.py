@@ -24,7 +24,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGeneListForm, CustomGeneListForm, \
+from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
@@ -56,7 +56,7 @@ def genes(request, genome_build_name=None):
                                                                         initial={'release': gene_annotation_release})
 
     context = {"genome_build": genome_build,
-               "gene_form": GeneForm(),
+               "gene_symbol_form": GeneSymbolForm(),
                "gene_annotation_release_form": gene_annotation_release_form}
     return render(request, 'genes/genes.html', context)
 

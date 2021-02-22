@@ -67,9 +67,9 @@
             filterGrid();
         });
 
-        $('#id_gene').change(function() {
-            let geneId = $("#id_gene").val();
-            window.location = Urls.view_gene(geneId);
+        $('#id_gene_symbol').change(function() {
+            let geneSymbol = $("#id_gene_symbol").val();
+            window.location = Urls.view_gene_symbol(geneSymbol);
         });
 
         jQuery.extend($.fn.fmatter , {
@@ -88,8 +88,8 @@
 
         <form>
             <div class="horizontal-fields">
-                <label>Jump to gene</label>
-                <span>{{ gene_form.gene }} {{ gene_form.media }} </span>
+                <label>Jump to gene symbol</label>
+                <span>{{ gene_symbol_form.gene_symbol }} {{ gene_symbol_form.media }} </span>
             </div>
             <div class="horizontal-fields">
                 <label>Gene Annotation Release</label><span>{{ gene_annotation_release_form.release }} {{ gene_annotation_release_form.media }}</span>
