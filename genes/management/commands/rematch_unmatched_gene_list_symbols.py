@@ -9,7 +9,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         # Some legacy gene list may not have been stripped properly.
         stripped = []
-        q_strip = Q(gene_symbol__startswith=' ') | Q(gene_symbol__endswith=' ')
+        q_strip = Q(original_name__startswith=' ') | Q(original_name__endswith=' ')
         for glgs in GeneListGeneSymbol.objects.filter(q_strip):
             glgs.original_name = glgs.original_name.strip()
             stripped.append(glgs)
