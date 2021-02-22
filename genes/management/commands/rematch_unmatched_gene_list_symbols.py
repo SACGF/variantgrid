@@ -20,5 +20,8 @@ class Command(BaseCommand):
 
         print(f"Matched {len(modified_records)}, Unmatched: {num_unmatched}")
         if modified_records:
-            GeneListGeneSymbol.objects.bulk_update(modified_records, fields=["gene_symbol_id", "gene_symbol_alias"])
+            GeneListGeneSymbol.objects.bulk_update(modified_records,
+                                                   fields=["gene_symbol_id", "gene_symbol_alias"],
+                                                   batch_size=2000)
+            print("Matching to Gene Annotation Release")
             gsm._match_symbols_to_genes_in_releases()
