@@ -473,7 +473,7 @@ class ConditionMatchingSuggestion:
 
     def as_json(self):
         user_json = None
-        if self.terms and self.is_applied: # only report on user who filled in values
+        if self.terms and self.is_applied:  # only report on user who filled in values
             if condition_text_match := self.condition_text_match:
                 if user := condition_text_match.last_edited_by:
                     user_json = {"username": user.username}

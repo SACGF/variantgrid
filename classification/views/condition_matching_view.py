@@ -149,4 +149,3 @@ class ConditionTextMatchingAPI(APIView):
                 "suggestions": [cms.as_json() for cms in suggestions],
                 "count_outstanding": ct.classifications_count_outstanding
             })
-
