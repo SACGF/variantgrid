@@ -169,7 +169,7 @@ table.diff tbody tr .explain-icon {
   width: inherit !important;
 }
 
-.immutable-textarea span {
+.immutable-textarea {
   white-space: pre-wrap;
 }
 
