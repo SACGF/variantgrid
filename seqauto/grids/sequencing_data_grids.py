@@ -52,11 +52,11 @@ class SequencingRunListGrid(JqGridUserRowConfig):
               "vcffromsequencingrun__vcf",
               "vcffromsequencingrun__vcf__import_status",
               "path"]
-    colmodel_overrides = {'name': {'width': 200, 'formatter': 'viewSequencingRunLink'},
+    colmodel_overrides = {'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
                           'sequencer__name': {'width': 40, 'label': 'Sequencer'},
                           'sequencer__sequencer_model__model': {'width': 50, 'label': 'Model'},
                           "sequencingruncurrentsamplesheet__sample_sheet__illuminaflowcellqc__data_state": {'label': 'QC Loaded',
-                                                                                                             'width': 20},
+                                                                                                            'width': 20},
                           'experiment__name': {'label': 'Experiment', 'width': 60},
                           "enrichment_kit": {"hidden": True},
                           "enrichment_kit__name": {"label": "EnrichmentKit"},
@@ -65,8 +65,8 @@ class SequencingRunListGrid(JqGridUserRowConfig):
                           "hidden": {'label': 'Hidden', 'width': 20, 'formatter': 'showHiddenIcon'},
                           "bad": {'label': 'Bad', 'width': 20, 'formatter': 'showBadIcon'},
                           "vcffromsequencingrun__vcf": {'label': 'VCF',
-                                                         'formatter': 'viewVCFLink',
-                                                         'width': 20},
+                                                        'formatter': 'viewVCFLink',
+                                                        'width': 20},
                           "vcffromsequencingrun__vcf__import_status": {'hidden': True}}
 
     def __init__(self, user, **kwargs):
