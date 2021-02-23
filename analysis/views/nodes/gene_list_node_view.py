@@ -28,9 +28,8 @@ class GeneListNodeView(NodeView):
 
         for gln_pap in self.object.genelistnodepanelapppanel_set.all():
             for form_name, server in pa_servers.items():
-                panel_app_panel = gln_pap.panel_app_panel_local_cache_gene_list.panel_app_panel
-                if panel_app_panel.server == server:
-                    pa_panels[form_name].append(panel_app_panel.pk)
+                if gln_pap.panel_app_panel.server == server:
+                    pa_panels[form_name].append(gln_pap.panel_app_panel.pk)
 
         for form_name, pa_panel_list in pa_panels.items():
             form_initial[form_name] = PanelAppPanel.objects.filter(pk__in=pa_panel_list)

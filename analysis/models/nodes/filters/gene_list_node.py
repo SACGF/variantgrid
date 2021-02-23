@@ -13,7 +13,8 @@ from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol, SampleGeneList, \
-    ActiveSampleGeneList, PanelAppPanelLocalCacheGeneList
+    ActiveSampleGeneList, PanelAppPanelLocalCacheGeneList, PanelAppPanel
+from genes.panel_app import get_local_cache_gene_list
 from pathtests.models import PathologyTestVersion
 from snpdb.models import Sample
 from snpdb.models.models_enums import ImportStatus
@@ -39,6 +40,9 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         return self.accordion_panel == self.CUSTOM_GENE_LIST
 
     def modifies_parents(self):
+        # If you select panel app panels, they might not have loaded by this point, so handle that in a special case
+        if self.accordion_panel == self.PANEL_APP_GENE_LIST:
+            return self.genelistnodepanelapppanel_set.exists()
         return any(self.get_gene_lists())
 
     def get_gene_lists(self):
@@ -82,6 +86,22 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
             gene_names_set.update(gene_list.get_gene_names())
         return list(sorted(gene_names_set))
 
+    def _get_gene_list_names(self) -> List[str]:
+        # Panel App Panel may not have been saved here, so we don't know what version it is
+        # Just set it to be name w/o version - will change once node has loaded properly
+        gene_list_names = []
+        if self.accordion_panel == self.PANEL_APP_GENE_LIST:
+            for gln_pap in self.genelistnodepanelapppanel_set.all():
+                if gln_pap.panel_app_panel_local_cache_gene_list:
+                    gene_list_name = gln_pap.panel_app_panel_local_cache_gene_list.gene_list.name
+                else:
+                    gene_list_name = str(gln_pap.panel_app_panel)
+                gene_list_names.append(gene_list_name)
+        else:
+            gene_list_names = [gl.name for gl in self.get_gene_lists()]
+
+        return gene_list_names
+
     def get_node_name(self):
         MAX_NODE_NAME_LENGTH = 30
 
@@ -89,15 +109,13 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         if self.modifies_parents():
             if self.accordion_panel in (self.SELECTED_GENE_LIST, self.PANEL_APP_GENE_LIST):
                 filter_types = {self.SELECTED_GENE_LIST: "gene lists", self.PANEL_APP_GENE_LIST: "PanelApp"}
-                gene_list_names = [gl.name for gl in self.get_gene_lists()]
+                gene_list_names = self._get_gene_list_names()
                 gene_list_names_str = "\n".join(gene_list_names)
                 if len(gene_list_names_str) <= MAX_NODE_NAME_LENGTH:
                     name = gene_list_names_str
                 else:
                     name = f"{len(gene_list_names)} x {filter_types[self.accordion_panel]}"
 
-                if self.exclude:
-                    name = "Exclude: " + name
             elif self.accordion_panel == self.PATHOLOGY_TEST_GENE_LIST:
                 if self.pathology_test_version:
                     name = f"PathologyTest: {self.pathology_test_version}"
@@ -114,6 +132,8 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
 
             if len(name) >= MAX_NODE_NAME_LENGTH:
                 name = name[:MAX_NODE_NAME_LENGTH] + "..."
+            if self.exclude:
+                name = "Exclude: " + name
         return name
 
     def save_clone(self):
@@ -146,16 +166,15 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
                 pass  # Will have to select manually
         self.sample_gene_list = sample_gene_list
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def _load(self):
+        """ Load PanelApp Panels if not already """
+
+        for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache_gene_list__isnull=True):
+            gln_pap.panel_app_panel_local_cache_gene_list = get_local_cache_gene_list(gln_pap.panel_app_panel)
+            gln_pap.save()
+
         if self.use_custom_gene_list:
             create_custom_text_gene_list(self.custom_text_gene_list, self.analysis.user.username, hidden=True)
-
-        # I think we are ok with this - as we'll require it to be set in the form...
-
-#        if (self.accordion_panel == self.SAMPLE_QC_GENE_LIST) and not self.sample_gene_list:
-#            self.name = ''
-#            self.accordion_panel = self.SELECTED_GENE_LIST
 
         # TODO: Also add to analysis settings and require that too
         check_for_gene_coverage = settings.SEQAUTO_ENABLED
@@ -197,7 +216,16 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
 
     def _get_configuration_errors(self) -> List:
         errors = super()._get_configuration_errors()
-        for gene_list in self.get_gene_lists():
+
+        gene_lists_to_validate = []
+        if self.accordion_panel == self.PANEL_APP_GENE_LIST:
+            # May not have got local cache of PanelApp yet
+            for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache_gene_list__isnull=False):
+                gene_lists_to_validate.append(gln_pap.gene_list)
+        else:
+            gene_lists_to_validate = self.get_gene_lists()
+
+        for gene_list in gene_lists_to_validate:
             if gene_list.import_status != ImportStatus.SUCCESS:
                 errors.append(f"{gene_list}: {gene_list.error_message}")
 
@@ -220,8 +248,11 @@ class GeneListNodeGeneList(models.Model):
 
 
 class GeneListNodePanelAppPanel(models.Model):
+    # We want the GeneListNodeForm to save fast, so just store the required panel_app_panel
+    # We call the API and retrieve a local cache of the gene list async during node loading
     gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
-    panel_app_panel_local_cache_gene_list = models.ForeignKey(PanelAppPanelLocalCacheGeneList, on_delete=CASCADE)
+    panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
+    panel_app_panel_local_cache_gene_list = models.ForeignKey(PanelAppPanelLocalCacheGeneList, null=True, on_delete=CASCADE)
 
     @property
     def gene_list(self):

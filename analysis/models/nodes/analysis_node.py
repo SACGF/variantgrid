@@ -694,10 +694,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         return NodeStatus.READY, label_counts[BuiltInFilters.TOTAL]
 
+    def _load(self):
+        """ Override to do anything interesting """
+        pass
+
     def load(self):
         """ load is called after parents are run """
         # logging.debug("node %d (%d) load()", self.id, self.version)
         start = time()
+        self._load()  # Do before counts in case it affects anything
         status, count = self.node_counts()
         logging.debug("node_counts returned (%s, %d)", status, count)
 

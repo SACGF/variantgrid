@@ -375,8 +375,7 @@ class GeneListNodeForm(BaseNodeForm):
         pap_set.all().delete()
         for form_name in ["panel_app_panel_aus", "panel_app_panel_eng"]:
             for pap in self.cleaned_data[form_name]:
-                panel_app_panel_local_cache_gene_list = get_local_cache_gene_list(pap)
-                pap_set.create(panel_app_panel_local_cache_gene_list=panel_app_panel_local_cache_gene_list)
+                pap_set.create(panel_app_panel=pap)
 
         if commit:
             node.save()
