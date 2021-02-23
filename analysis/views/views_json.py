@@ -122,6 +122,7 @@ def nodes_copy(request, analysis_id):
             clone_node = template_node.save_clone()
             clone_node.x += 10
             clone_node.y += 10
+            clone_node.status = NodeStatus.DIRTY
             clone_node.save()
             old_new_map[node.id] = clone_node
 

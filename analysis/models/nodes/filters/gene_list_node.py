@@ -144,6 +144,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
             self.custom_text_gene_list = self.custom_text_gene_list.clone()
 
         genelistnode_gene_lists = list(self.genelistnodegenelist_set.all())
+        genelistnode_panel_app = list(self.genelistnodepanelapppanel_set.all())
 
         copy = super().save_clone()
         self.custom_text_gene_list = orig_custom_text_gene_list
@@ -151,27 +152,27 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         for gln_gl in genelistnode_gene_lists:
             copy.genelistnodegenelist_set.create(gene_list=gln_gl.gene_list)
 
+        for gln_pap in genelistnode_panel_app:
+            # Only copy panel app - will re-check how recent our local cache is when loading
+            copy.genelistnodepanelapppanel_set.create(panel_app_panel=gln_pap.panel_app_panel)
         return copy
 
     def _set_sample(self, sample):
         """ Called when sample changed due to ancestor change """
         super()._set_sample(sample)
         sample_gene_list = None
-        if self.sample and self.sample.samplegenelist_set.exists():
-            self.accordion_panel = self.SAMPLE_GENE_LIST  # They can choose themselves
+        # Only automatically set when sample gene list is set (ie from a template)
+        if self.sample and self.accordion_panel == self.SAMPLE_GENE_LIST:
             try:
                 sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
-                print("Set to active gene list")
             except ActiveSampleGeneList.DoesNotExist:
+                logging.warning("%s - couldn't set active gene list", self.node_version)
                 pass  # Will have to select manually
         self.sample_gene_list = sample_gene_list
 
     def _load(self):
-        """ Load PanelApp Panels if not already """
-
         for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache_gene_list__isnull=True):
-            gln_pap.panel_app_panel_local_cache_gene_list = get_local_cache_gene_list(gln_pap.panel_app_panel)
-            gln_pap.save()
+            _ = gln_pap.gene_list  # Lazy loading
 
         if self.use_custom_gene_list:
             create_custom_text_gene_list(self.custom_text_gene_list, self.analysis.user.username, hidden=True)
@@ -256,4 +257,10 @@ class GeneListNodePanelAppPanel(models.Model):
 
     @property
     def gene_list(self):
+        """ Lazily create - This may take a while for new panels (should only do this in node.load())
+        Will also be called if a node is cloned w/o a parent so it is invalid (in which case it should use cache) """
+
+        if self.panel_app_panel_local_cache_gene_list is None:
+            self.panel_app_panel_local_cache_gene_list = get_local_cache_gene_list(self.panel_app_panel)
+            self.save()
         return self.panel_app_panel_local_cache_gene_list.gene_list
