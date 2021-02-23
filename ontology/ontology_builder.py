@@ -181,7 +181,7 @@ class OntologyBuilder:
             # want to maintain order (so don't convert to a set)
             unique_aliases = list()
             for alias in aliases:
-                if alias not in unique_aliases:
+                if alias not in unique_aliases and alias != name:
                     unique_aliases.append(alias)
             aliases = unique_aliases
 
