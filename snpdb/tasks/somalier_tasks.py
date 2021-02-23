@@ -88,7 +88,11 @@ def _somalier_ancestry(vcf_extract: SomalierVCFExtract):
     somalier_bin = cfg.get_annotation("command")
     ancestry_cmd = [somalier_bin, "ancestry", "--labels", cfg.get_annotation("ancestry_labels"),
                     compare_samples, "++"] + ancestry_run.get_sample_somalier_filenames()
-    ancestry_run.execute(ancestry_cmd, cwd=ancestry_report_dir)
+    # Force Somalier to only use 1 thread - have had it run very slow with multi-core
+    # https://github.com/brentp/somalier/issues/61#issuecomment-750492570
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    ancestry_run.execute(ancestry_cmd, cwd=ancestry_report_dir, env=env)
 
     # Use TSV to write sample specific files
     df = pd.read_csv(ancestry_report_dir / "somalier-ancestry.somalier-ancestry.tsv", sep='\t', index_col=0)
