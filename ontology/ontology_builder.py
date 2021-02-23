@@ -177,6 +177,14 @@ class OntologyBuilder:
                     self.created_cache[term_id] = OntologyBuilder.CreatedState.DETAILED
                     return
 
+        if aliases:
+            # want to maintain order (so don't convert to a set)
+            unique_aliases = list()
+            for alias in aliases:
+                if alias not in unique_aliases:
+                    unique_aliases.append(alias)
+            aliases = unique_aliases
+
         parts = term_id.split(":")
         ontology_service = parts[0]
         ontology_index = int(parts[1])
