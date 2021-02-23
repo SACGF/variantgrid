@@ -602,7 +602,7 @@ function loadNodeWhenReady(node_id) {
 		// console.log("loadNodeWhenReady.updateNode:" + node);
 		// Reload the data container if it's showing for this node
 		const gew = getGridAndEditorWindow();
-		if (node_id === gew.getLoadedNodeId()) {
+		if (node_id == gew.getLoadedNodeId()) {
 			loadNodeData(node_id);
 		}
 	};
