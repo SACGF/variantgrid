@@ -47,7 +47,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
             lambda: [gln_gl.gene_list for gln_gl in self.genelistnodegenelist_set.all()],
             lambda: [self.custom_text_gene_list.gene_list],
             lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
-            lambda: [self.pathology_test_version.gene_list],
+            lambda: [self.pathology_test_version.gene_list] if self.pathology_test_version else [],
             lambda: [gln_pap.gene_list for gln_pap in self.genelistnodepanelapppanel_set.all()],
         ]
         getter = GENE_LISTS[self.accordion_panel]
