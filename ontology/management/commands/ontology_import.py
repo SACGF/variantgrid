@@ -79,7 +79,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=5)
+        processor_version=6)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -244,6 +244,14 @@ def load_mondo(filename: str, force: bool):
 
                 genus_ids = [TermId(genus) for genus in axiom.get("genusIds")]
                 mondo_genus = [term for term in genus_ids if term.type == "MONDO"]
+
+                for mondo_genu in mondo_genus:
+                    ontology_builder.add_ontology_relation(
+                        source_term_id=defined_class_id.id,
+                        dest_term_id=mondo_genu.id,
+                        relation=OntologyRelation.IS_A,
+                        extra={"subtype": "genus"}
+                    )
 
                 for restriction in axiom.get("restrictions"):
 

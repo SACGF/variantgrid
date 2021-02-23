@@ -18,7 +18,7 @@ def condition_match_test_download_view(request):
         try:
             row_count = 0
             yield delimited_row([
-                "id", "lab", "text", "gene", "terms", "messages"
+                "id", "lab", "text", "gene", "terms", "messages", "status"
             ])
 
             ct: ConditionText

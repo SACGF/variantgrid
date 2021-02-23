@@ -647,7 +647,7 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                     # alias is part one of the name parts, would barely refer to it as an alias
                     safe_alias = True
             if not safe_alias:
-                cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
+                cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Text matched on alias of {term.id}"))
                 cms.alias_index = match_info.alias_index
         if term.ontology_service == OntologyService.OMIM:
             if mondo := OntologyTermRelation.as_mondo(term):
