@@ -60,12 +60,15 @@ class TagNode(AnalysisNode):
 
     @staticmethod
     def get_analysis_tags_node(analysis):
+        from analysis.tasks.node_update_tasks import update_node_task
+
         node, created = TagNode.objects.get_or_create(analysis=analysis,
                                                       name=TagNode.ANALYSIS_TAGS_NAME,
                                                       analysis_wide=True,
                                                       visible=False)
         if created:
-            node.load()  # Should be fast, so no need for celery job
+            # Should be fast, so do sync (not as celery job)
+            update_node_task(node.pk, node.version)
         return node
 
 
