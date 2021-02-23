@@ -5,33 +5,34 @@ function AnalysisMessagePoller(url) {
 	this.observed_nodes = {};
 	this.update = function() {
 //		console.log("update!");
-		var nodes = Object.keys(this.observed_nodes);
+		const nodes = Object.keys(this.observed_nodes);
 		if (nodes.length) {
 			this.send_requests(nodes);
 		}	
 	};
 
 	this.send_requests = function(nodes) {
-		var that = this;
-		var on_success_function = function(data, status, xhr) {
-            var nodeStatusList = data.node_status;
-            if (nodeStatusList) {
-                that.process_nodes(nodeStatusList);
-            } else {
-                // This should have def been in the JSON response, so perhaps
-                // we've been logged out.
-                
-                that.stop_polling();
-                function loggedInHandler() {
-                    var message = "AnalysisMessagePoller couldn't handle response.";
+		const that = this;
+		const on_success_function = function (data, status, xhr) {
+			const nodeStatusList = data.node_status;
+			if (nodeStatusList) {
+				that.process_nodes(nodeStatusList);
+			} else {
+				// This should have def been in the JSON response, so perhaps
+				// we've been logged out.
+
+				that.stop_polling();
+
+				function loggedInHandler() {
+					const message = "AnalysisMessagePoller couldn't handle response.";
 					showReloadPageErrorDialog($("#error-dialog"), message, true);
-                }
-                
-                checkLoggedIn(loggedInHandler, loggedOutHandler);
-            }
+				}
+
+				checkLoggedIn(loggedInHandler, loggedOutHandler);
+			}
 		};
 
-		var data = 'nodes=' + JSON.stringify(nodes);
+		const data = 'nodes=' + JSON.stringify(nodes);
 		$.ajax({
 		    type: "GET",
 		    data: data,
@@ -41,19 +42,19 @@ function AnalysisMessagePoller(url) {
 	};
 
 	this.process_nodes = function(nodeStatusList) {
-        var nodeStatus;
-        var node_id;
+		let nodeStatus;
+		let node_id;
 		while (nodeStatus = nodeStatusList.pop()) {
 			node_id = nodeStatus.id;
-			var node_actions = this.observed_nodes[node_id];
-			var invalid = nodeStatus.valid == false;
-			for (var action in node_actions) {
+			const node_actions = this.observed_nodes[node_id];
+			const invalid = nodeStatus.valid === false;
+			for (let action in node_actions) {
 //				console.log("looking for action: " + action);
 				if (invalid || this.can_dispatch[action](nodeStatus)) {
 //					console.log("can dispatch");
-					
-					var callbacks = node_actions[action];
-					for (var i=0 ; i<callbacks.length ; ++i) {
+
+					const callbacks = node_actions[action];
+					for (let i=0 ; i<callbacks.length ; ++i) {
 						callbacks[i](nodeStatus);
 					}
 					delete node_actions[action];
@@ -63,7 +64,7 @@ function AnalysisMessagePoller(url) {
 		
 		// Clean up any now empty nodes / actions
 		for (node_id in this.observed_nodes) {
-			var action_keys = Object.keys(this.observed_nodes[node_id]);
+			const action_keys = Object.keys(this.observed_nodes[node_id]);
 //			console.log("action keys for " + node_id + " are: " + action_keys + " of length " + action_keys.length);
 			if (!action_keys.length) {
 				this.delete_node(node_id);
@@ -81,7 +82,7 @@ function AnalysisMessagePoller(url) {
 			this.observed_nodes[node_id] = {};
 		}
 
-		var node_actions = this.observed_nodes[node_id];
+		const node_actions = this.observed_nodes[node_id];
 		if (!(action in node_actions)) {
 			node_actions[action] = [];
 		}
@@ -93,7 +94,7 @@ function AnalysisMessagePoller(url) {
 	};
 
 	this.can_dispatch_count = function(node) {
-		return node.count !== null || node.status == 'C';
+		return node.count !== null || node.status === 'C';
 	};
 
 	this.can_dispatch_ready = function(node) {
@@ -102,9 +103,9 @@ function AnalysisMessagePoller(url) {
 
 	this.update_loop = function() {
 //		console.log("reschedule_update");
-		var that = this;
-		
-		var pollThis = function() {
+		const that = this;
+
+		const pollThis = function () {
 			that.update();
 			that.update_loop();
 		};
