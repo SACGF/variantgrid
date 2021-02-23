@@ -32,7 +32,7 @@ class NodeGridConfig(NodeJSONGetView):
 
     def _get_data(self, request, analysis_version, node_id, node_version, extra_filters):
         node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=node_version)
-        errors = node.get_errors()
+        errors = node.get_errors(flat=True)
 
         if errors:
             ret = {"errors": errors}

@@ -444,7 +444,7 @@ def load_biomart(filename: str, force: bool):
             term_id=f"OMIM:{mim_accession_id}",
             name=name,
             definition=None,
-            primary_source=False, # primary source is now the OMIM file if it's available
+            primary_source=False,  # primary source is now the OMIM file if it's available
             aliases=aliases
         )
 
@@ -465,10 +465,10 @@ def load_omim(filename: str, force: bool):
 
     with open(filename, "r") as csv_file:
         csv_reader = csv.reader(csv_file, delimiter='\t')
-        next(csv_reader) # title row
-        next(csv_reader) # date row (worth reading e.g. "Generated: 20201-02-04")
+        next(csv_reader)  # title row
+        next(csv_reader)  # date row (worth reading e.g. "Generated: 20201-02-04")
         header = next(csv_reader)
-        OMIM_EXPECTED_HEADER = ["# Prefix", "MIM Number", "Preferred Title; symbol",	"Alternative Title(s); symbol(s)",	"Included Title(s); symbols"]
+        OMIM_EXPECTED_HEADER = ["# Prefix", "MIM Number", "Preferred Title; symbol", "Alternative Title(s); symbol(s)", "Included Title(s); symbols"]
         MOVED_TO = re.compile("MOVED TO ([0-9]+)")
         if header != OMIM_EXPECTED_HEADER:
             raise ValueError(f"Header not as expected, got {header}")

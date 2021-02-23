@@ -473,7 +473,7 @@ class ConditionMatchingSuggestion:
 
     def as_json(self):
         user_json = None
-        if self.terms and self.is_applied: # only report on user who filled in values
+        if self.terms and self.is_applied:  # only report on user who filled in values
             if condition_text_match := self.condition_text_match:
                 if user := condition_text_match.last_edited_by:
                     user_json = {"username": user.username}
@@ -519,7 +519,7 @@ class ConditionMatchingSuggestion:
             if len(terms) > 1 and self.condition_multi_operation not in {MultiCondition.UNCERTAIN,
                                                                         MultiCondition.CO_OCCURRING}:
                 self.add_message(ConditionMatchingMessage(severity="error",
-                                                         text="Multiple terms provided, requires co-occurring/uncertain"))
+                                                          text="Multiple terms provided, requires co-occurring/uncertain"))
 
             if valid_terms := [term for term in terms if not term.is_stub]:
                 ontology_services: Set[str] = set()
@@ -527,7 +527,7 @@ class ConditionMatchingSuggestion:
                     ontology_services.add(term.ontology_service)
                 if len(ontology_services) > 1:
                     self.add_message(ConditionMatchingMessage(severity="error",
-                                                             text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
+                                                              text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
 
                 # validate that the terms have a known gene association if we're at gene level
                 if ctm := self.condition_text_match:
@@ -537,16 +537,16 @@ class ConditionMatchingSuggestion:
                         for term in valid_terms:
                             if not OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
                                 self.add_message(ConditionMatchingMessage(severity="warning",
-                                                                         text=f"{term.id} : no direct relationship on file to {gene_symbol.symbol}"))
+                                                                          text=f"{term.id} : no direct relationship on file to {gene_symbol.symbol}"))
                             else:
                                 self.add_message(ConditionMatchingMessage(severity="success",
-                                                                         text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                                                                          text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
 
             # validate that we have the terms being referenced (if we don't big chance that they're not valid)
             for term in terms:
                 if term.is_stub:
                     self.add_message(ConditionMatchingMessage(severity="warning",
-                                                             text=f"{term.id} : no copy of this term in our system"))
+                                                              text=f"{term.id} : no copy of this term in our system"))
                 elif term.is_obsolete:
                     self.add_message(
                         ConditionMatchingMessage(severity="error", text=f"{term.id} : is marked as obsolete"))
@@ -787,7 +787,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
             gene_symbol = ctm.gene_symbol
             if root_level_terms := root_cms.terms:  # uses suggestions and selected values
 
-                if root_level_mondo := set([term for term in root_level_terms if term.ontology_service == OntologyService.MONDO]):
+                if root_level_mondo := {term for term in root_level_terms if term.ontology_service == OntologyService.MONDO}:
                     gene_level_terms = set(OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO).leafs())
                     matches_gene_level = set()
                     for gene_level in gene_level_terms:
@@ -806,7 +806,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                                                                      text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         else:
                             cms.add_message(ConditionMatchingMessage(severity="success",
-                                                                 text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                                                                     text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                             cms.add_term(list(matches_gene_level)[0])  # not guaranteed to be a leaf, but no associations on child terms
                     elif len(matches_gene_level_leafs) == 1:
                         term = list(matches_gene_level_leafs)[0]
@@ -847,6 +847,5 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                             cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
                             for message in root_cms.messages:
                                 cms.add_message(message)
-                        pass
 
     return suggestions

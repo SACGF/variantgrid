@@ -6,6 +6,8 @@
 
 <script type="text/javascript">
     function on_error_function(errors) {
+        console.log("on_error_function:");
+        console.log(errors);
         hideLoadingOverlay();
 
         let html = "<div>Node errors:</div><ul class='messages'>";

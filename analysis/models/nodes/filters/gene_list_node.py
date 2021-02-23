@@ -98,6 +98,9 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
 
                 if self.exclude:
                     name = "Exclude: " + name
+            elif self.accordion_panel == self.PATHOLOGY_TEST_GENE_LIST:
+                if self.pathology_test_version:
+                    name = f"PathologyTest: {self.pathology_test_version}"
             else:
                 prefix = ""
                 if self.use_custom_gene_list:
@@ -107,7 +110,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
                 elif self.accordion_panel == self.SAMPLE_GENE_LIST:
                     prefix = "Sample Gene List"
 
-                name = prefix + ": " + ','.join(self._get_sorted_gene_names())
+                name = prefix + ": " + ', '.join(self._get_sorted_gene_names())
 
             if len(name) >= MAX_NODE_NAME_LENGTH:
                 name = name[:MAX_NODE_NAME_LENGTH] + "..."

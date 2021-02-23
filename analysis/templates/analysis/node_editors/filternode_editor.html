@@ -1,48 +1,54 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 {% block docreadyjs %}
-	var unique_code = "{{ node_id }}_{{ version_id }}"; // make sure only attach editor to grid that requested 
+    {% block finishedloadingeditor %}
+    // empty - we'll call hideLoadingOverlay manually once we're done
+    {% endblock finishedloadingeditor %}
+{% endblock docreadyjs %}
+{% block content %}
+<script>
+$(document).ready(function() {
+    const unique_code = "{{ node_id }}_{{ version_id }}"; // make sure only attach editor to grid that requested
 
 	function connectFilterNodeEditorToGrid() {
-		var grid_id = "grid-{{ node.pk }}";
-		var grid = $("#" + grid_id, "#" + unique_code);
-	
-		if (grid && grid.length > 0) {
+        const grid_id = "grid-{{ node.pk }}";
+        const grid = $("#" + grid_id, "#" + unique_code);
+
+        if (grid && grid.length > 0) {
 	        // Make search always appear
-			var searchOptions = {multipleSearch:true,overlay:false,drag:false, resize:false};
-	        grid.searchGrid(searchOptions);
+            const searchOptions = {multipleSearch: true, overlay: false, drag: false, resize: false};
+            grid.searchGrid(searchOptions);
 			// find the div which contain the searching dialog
-			var searchDialog = $("#searchmodfbox_"+ grid[0].id);
-		    searchDialog.addClass("ui-jqgrid ui-widget ui-widget-content ui-corner-all");
-		    searchDialog.css({position: 'static', width: '100%'})    
-		    var gbox = $("div#FilterNode-editor");
-		    searchDialog.appendTo(gbox);
+            const searchDialog = $("#searchmodfbox_" + grid[0].id);
+            searchDialog.addClass("ui-jqgrid ui-widget ui-widget-content ui-corner-all");
+		    searchDialog.css({position: 'static', width: '100%'})
+            const gbox = $("div#FilterNode-editor");
+            searchDialog.appendTo(gbox);
 			// Hide close button
 			searchDialog.find(".ui-jqdialog-titlebar-close").hide();
 			searchDialog.find(".ui-jqdialog-titlebar").hide();
-	
-			var save_filters = function(event) {
-				var filters = grid.getGridParam("postData")["filters"];
-                var data = 'filters=' + filters;
+
+            const save_filters = function (event) {
+                const filters = grid.getGridParam("postData")["filters"];
+                const data = 'filters=' + filters;
                 $.ajax({
                     type: "POST",
                     url: "{{ request.path }}",
                     data: data,
-                    success: function() {
-                        reloadNodeAndData({{ node.pk }});                    
+                    success: function () {
+                        reloadNodeAndData({{ node.pk }});
                     }
                 });
 
-				event.preventDefault();
-			}
+                event.preventDefault();
+            };
 
-        {% if has_write_permission %}
-			console.log("Has write permission");
+            {% if has_write_permission %}
 			grid.bind('jqGridFilterSearch', save_filters);
 			grid.bind('jqGridFilterReset', save_filters);
-			
-			var unsavedChanges = function() {
-				var UNSAVED_MESSAGE = "Warning: You have unsaved changes, press 'find' to save";
-				$("#filter-messages").text(UNSAVED_MESSAGE);
+
+			const unsavedChanges = function() {
+                const UNSAVED_MESSAGE = "Warning: You have unsaved changes, press 'find' to save";
+                $("#filter-messages").text(UNSAVED_MESSAGE);
 			};
 			$("select", searchDialog).change(unsavedChanges);
             $("input[type=button]", searchDialog).click(unsavedChanges);
@@ -56,12 +62,8 @@
 	}
 
 	registerComponent(unique_code, EDITOR, connectFilterNodeEditorToGrid);
-
-    {% block finishedloadingeditor %}
-    // empty - we'll call hideLoadingOverlay manually once we're done
-    {% endblock finishedloadingeditor %}
-{% endblock docreadyjs %}
-{% block content %}
+});
+</script>
 <div id="FilterNode-editor"></div>
 <div id="filter-messages"></div>
 {% endblock content %}

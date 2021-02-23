@@ -1251,6 +1251,9 @@ class PanelAppPanelLocalCacheGeneList(TimeStampedModel):
     class Meta:
         unique_together = ("panel_app_panel", "version")
 
+    def __str__(self):
+        return f"PanelApp GeneList cache for {self.panel_app_panel} v{self.version} (mod: {self.modified})"
+
 
 class CachedThirdPartyGeneList(models.Model):
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)

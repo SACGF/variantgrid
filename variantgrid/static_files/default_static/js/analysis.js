@@ -30,12 +30,13 @@ function loadNodeData(nodeId, extra_filters, fromSelectNode) {
 }
 
 function resizeGrid(pane, $Pane, paneState) {
-  if(grid = $('.ui-jqgrid-btable:visible')) {
-    grid.each(function(index) {
-      let gridId = $(this).attr('id');
-      $('#' + gridId).setGridWidth(paneState.innerWidth - 2);
-    });
-  }
+    let grid = $('.ui-jqgrid-btable:visible');
+    if(grid.length) {
+        grid.each(function(index) {
+            let gridId = $(this).attr('id');
+            $('#' + gridId).setGridWidth(paneState.innerWidth - 2);
+        });
+    }
 }
 
 function savePanelWidthSettings() {
@@ -84,12 +85,11 @@ function inputSamples() {
 
 
 function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections, readOnly) {
-    
     if (showAnalysisVariables) {
         $("#analysis-variables").show();
     }
 
-    var centerLayoutParams = {
+    const centerLayoutParams = {
         minWidth: 200,
     };
     if (!readOnly) {
@@ -180,7 +180,7 @@ function ajaxError(event, jqxhr, settings, thrownError) {
     // Ignore errors from navigating away from page
     // See https://stackoverflow.com/questions/9229005/how-to-handle-jquery-ajax-post-error-when-navigating-away-from-a-page
     if (jqxhr.readyState >= 4) {
-        var message = "Error making request to server.";
+        let message = "Error making request to server.";
         if (jqxhr.readyState == 4) {
             message += " status: " + jqxhr.status + " statusText: " + jqxhr.statusText;
         } else {
@@ -274,7 +274,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
         data += '&node_id=' + nodeId;
     }
 
-    var success = function() {
+    const success = function () {
         const aWin = getAnalysisWindow();
         let tagList = aWin.variantTags[variantId] || [];
         if (op == 'add') {
@@ -473,23 +473,23 @@ function layout_analysis_editor_and_grid() {
 }
 
 function getLoadedNodeId() {
-    var loaded_node_id = $('#node-data-container').attr('node_id'); 
-    return loaded_node_id;
+    const loadedNodeId = $('#node-data-container').attr('node_id');
+    return parseInt(loadedNodeId);
 }
 
 
 function showLoadingOverlay() {
-    var oc = $("#overlay-container");
+    const oc = $("#overlay-container");
     if (!oc.is(":visible")) {
         // Move to right-panel (with top z-order), then things can load underneath.
         oc.show();
         oc.appendTo("#right-panel");
     
         $("#loading-message").remove();
-    
-        var canvasAttributes = {class : 'node-load-animation'};
-        var container = $("#animation-container");
-        var canvas = $("<canvas />", canvasAttributes);
+
+        const canvasAttributes = {class: 'node-load-animation'};
+        const container = $("#animation-container");
+        const canvas = $("<canvas />", canvasAttributes);
         canvas.attr({ width: 50, height: 180 });
         canvas.css('opacity', 0.35);
         canvas.DoubleHelix({fps: 20, spinSpeed: 4});
@@ -503,18 +503,18 @@ function hideLoadingOverlay() {
         $('canvas.node-load-animation').each(function() {
              this.active = false;
         });
-        var container = $("#animation-container", this).empty();
+        $("#animation-container", this).empty();
         window.showingLoadOverlay = false;
     });
 }
 
 
 function finishedLoadingEditor(node_id, version_id) {
-    var everythingLoaded = function() {
+    const everythingLoaded = function () {
         hideLoadingOverlay();
     };
 
-    var unique_code = node_id + "_" + version_id; // make sure only attach editor to grid that requested 
+    const unique_code = node_id + "_" + version_id; // make sure only attach editor to grid that requested
     registerComponent(unique_code, EDITOR, everythingLoaded);
 }
 
