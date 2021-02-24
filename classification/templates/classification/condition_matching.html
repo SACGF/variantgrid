@@ -99,7 +99,7 @@
                 let maxMessage = _.maxBy(suggestion.messages, (message) => {
                     return severity[message.severity.toLowerCase()[0]] || 0;
                 });
-                return maxMessage.severity;
+                return maxMessage ? maxMessage.severity : null;
             }
         }
 

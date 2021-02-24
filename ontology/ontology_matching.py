@@ -94,7 +94,7 @@ ROMAN = {
     "vii": '7',
     "viii": '8',
     "ix": '9',
-    'x': '10', # matching on x could be dangerous
+    # 'x': '10', matching on x can be dangerous, has a lot of other meanings
     'xi': '11',
     'xii': '12',
     'xiii': '13',

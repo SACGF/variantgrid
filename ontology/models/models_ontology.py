@@ -67,6 +67,7 @@ class OntologyRelation:
     """
     IS_A = "is_a"
     EXACT = "exact"  # defined by HPO and MONDO
+    EXACTISH = "exact_synonym"
     RELATED = "related"  # defined by HPO and MONDO (also use relatedSynonymn from mondo to populate this)
     CLOSE = "close"  # defined by HPO and MONDO
     BROAD = "broad"  # defined by HPO and MONDO
@@ -82,6 +83,7 @@ class OntologyRelation:
 
     DISPLAY_NAMES = {
         IS_A: "is a",
+        EXACTISH: "has an exact synonym from",
         ALL_FREQUENCY: "frequently occurs with",
         ENTREZ_ASSOCIATION: "has an associated gene of",
         PANEL_APP_AU: "PanelApp AU association"

@@ -23,8 +23,19 @@
                     {% labelled label="Aliases" %}{% for alias in term.aliases %}{{ alias }}<br/>{% endfor %}{% endlabelled %}
                 {% endif %}
                 {% labelled label="URL" %}
-                    <a href="{{ term.url }}" class="external-link hover-link">{{ term.url }}</a>
+                    <a href="{{ term.url }}" class="external-link hover-link" target="_blank">{{ term.url }}</a>
                 {% endlabelled %}
+                {% labelled label="Cross Ontology URL" %}
+                    <a href="https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}" class="external-link" target="_blank">https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}</a>
+                {% endlabelled %}
+                {% if term.ontology_service == "MONDO" %}
+                    {% labelled label="Hierarchy URL" %}
+                        <a class="external-link" target="_blank"
+                           href="https://www.ebi.ac.uk/ols/ontologies/MONDO/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{{ term.url_safe_id }}">
+                        https://www.ebi.ac.uk/ols/ontologies/MONDO/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{{ term.url_safe_id }}
+                        </a>
+                    {% endlabelled %}
+                {% endif %}
                 {% if not term.is_stub %}
                     {% labelled label="Last imported" %}Import {{ term.from_import.id }} - {{ term.from_import.filename }} @ {% timestamp term.from_import.processed_date %}{% endlabelled %}
                 {% endif %}
@@ -49,7 +60,13 @@
                             <div class="mt-2">
                             <span class="text-muted text-monospace">{{ term.id }}</span>
                             {% for step in snake.show_steps %}
-                                <div class="text-center d-inline-block mx-2">{{ step.relation.relation_display }}</div>
+                                <div class="text-center d-inline-block mx-2 hover-detail"
+                                     title="Import {{ step.relation.from_import.import_source }}"
+                                    data-content="Last imported: {{ step.relation.from_import.processed_date }}<br/>
+                                    Context: {{ step.relation.from_import.context }}</br>
+                                    Filename: {{ step.relation.from_import.filename }}">&nbsp
+                                    {{ step.relation.relation_display }}
+                                </div>
                                 {% ontology_term step.dest_term %} &nbsp;
                             {% endfor %}
                             </div>

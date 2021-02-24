@@ -493,6 +493,10 @@ class ConditionMatchingSuggestion:
         if terms := self.terms:
             if len(terms) != 1:
                 return False
+
+            if self.alias_index is not None:
+                return False
+
             for message in self.messages:
                 if message.severity not in {"success", "info"}:
                     return False
@@ -647,7 +651,7 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                     # alias is part one of the name parts, would barely refer to it as an alias
                     safe_alias = True
             if not safe_alias:
-                cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Text matched on alias of {term.id}"))
+                cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
                 cms.alias_index = match_info.alias_index
         if term.ontology_service == OntologyService.OMIM:
             if mondo := OntologyTermRelation.as_mondo(term):
@@ -675,7 +679,8 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
                 aliases__contains=[term_str.lower()]))
         else:
             for term_str in term_list:
-                if len(term_str) > 1:
+                if len(term_str) > 1 and not term_str.isnumeric():
+                    # exclude numeric because the value might be stored as roman or arabic
                     # problem with icontains in aliases is it converts array list to a string, and then finds text in there
                     # so "hamper,laundry" would be returned for icontains="ham"
                     q.append(Q(name__icontains=term_str) | Q(aliases__icontains=term_str))

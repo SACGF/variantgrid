@@ -79,7 +79,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=6)
+        processor_version=7)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -117,8 +117,30 @@ def load_mondo(filename: str, force: bool):
 
                         aliases = list()
                         synonym_set = set()
-                        if synonyms := meta.get("synonyms"):
 
+                        for bp in meta.get("basicPropertyValues", []):
+                            val = TermId(bp.get("val"))
+                            if val.type in {"HP", "OMIM"}:
+                                pred = bp.get("pred")
+                                pred = MATCH_TYPES.get(pred, pred)
+                                # if pred == OntologyRelation.EXACT:
+                                    # add alias?
+
+                                ontology_builder.add_term(
+                                    term_id=val.id,
+                                    name=label,
+                                    definition=f"Name copied from {pred} synonym {full_id}",
+                                    primary_source=False
+                                )
+                                ontology_builder.add_ontology_relation(
+                                    source_term_id=full_id,
+                                    dest_term_id=val.id,
+                                    relation=pred,
+                                    extra={"source": "basic property value"}
+                                )
+                                synonym_set.add(val.id)
+
+                        if synonyms := meta.get("synonyms"):
                             # only allow 1 relationship between any 2 terms (though DB does allow more)
                             # storing all of them would be more "accurate" but gets in the way of our usage
                             # prioritise relationships as EXACT, RELATED, related terms, XREF
@@ -137,11 +159,13 @@ def load_mondo(filename: str, force: bool):
                                                 definition=f"Name copied from synonym {full_id}",
                                                 primary_source=False
                                             )
-                                            ontology_builder.add_ontology_relation(
-                                                source_term_id=full_id,
-                                                dest_term_id=xref,
-                                                relation=OntologyRelation.EXACT
-                                            )
+                                            if xref not in synonym_set:
+                                                ontology_builder.add_ontology_relation(
+                                                    source_term_id=full_id,
+                                                    dest_term_id=xref,
+                                                    relation=OntologyRelation.EXACTISH,
+                                                    extra={"source": "synonym"}
+                                                )
                                             synonym_set.add(xref)
                                             if xref_term.type == "OMIM":
                                                 aliases.append(label)
@@ -163,31 +187,11 @@ def load_mondo(filename: str, force: bool):
                                             ontology_builder.add_ontology_relation(
                                                 source_term_id=full_id,
                                                 dest_term_id=xref_term.id,
-                                                relation=OntologyRelation.RELATED
+                                                relation=OntologyRelation.RELATED,
+                                                extra={"source": "synonym"}
                                             )
                                             synonym_set.add(xref_term.id)
                         #end synonymns
-
-                        for bp in meta.get("basicPropertyValues", []):
-                            val = TermId(bp.get("val"))
-                            if val.type in {"HP", "OMIM"} and not val.id in synonym_set:
-                                pred = bp.get("pred")
-                                pred = MATCH_TYPES.get(pred, pred)
-                                # if pred == OntologyRelation.EXACT:
-                                    # add alias?
-
-                                ontology_builder.add_term(
-                                    term_id=val.id,
-                                    name=label,
-                                    definition=f"Name copied from {pred} synonym {full_id}",
-                                    primary_source=False
-                                )
-                                ontology_builder.add_ontology_relation(
-                                    source_term_id=full_id,
-                                    dest_term_id=val.id,
-                                    relation=pred
-                                )
-                            synonym_set.add(val.id)
 
                         if xrefs := meta.get("xrefs"):
                             for xref in xrefs:
@@ -202,7 +206,8 @@ def load_mondo(filename: str, force: bool):
                                     ontology_builder.add_ontology_relation(
                                         source_term_id=full_id,
                                         dest_term_id=val.id,
-                                        relation=OntologyRelation.XREF
+                                        relation=OntologyRelation.XREF,
+                                        extra={"source": "xref"}
                                     )
 
                         if label and "MONDO" in full_id:
@@ -219,7 +224,7 @@ def load_mondo(filename: str, force: bool):
                             term_id=full_id,
                             name=label,
                             definition=defn,
-                            extra=extra if extra else None,
+                            extra=meta,
                             aliases=aliases,
                             primary_source=True
                         )
