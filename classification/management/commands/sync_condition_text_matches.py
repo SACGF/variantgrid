@@ -11,11 +11,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--reset', action='store_true', default=False)
+        parser.add_argument('--clear', action='store_true', default=False)
 
     def handle(self, *args, **options):
         if options["reset"]:
             print("Deleting old records")
             ConditionText.objects.all().delete()
+        if options["clear"]:
+            print("Clearing all existing values")
+            ct: ConditionText
+            for ct in ConditionText.objects.all():
+                ct.clear()
 
         print("Syncing")
         ConditionTextMatch.sync_all()
