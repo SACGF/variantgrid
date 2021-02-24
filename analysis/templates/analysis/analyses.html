@@ -26,7 +26,7 @@
                         type: "POST",
                         url: Urls.clone_analysis(analysisId),
                         success: function(data) {
-                            grid.jqGrid('sortGrid', 'id', 'desc');
+                            grid.jqGrid('setGridParam', {sortname: 'modified', sortorder: "desc"}).trigger('reloadGrid');
                         },
                     });
                 }
