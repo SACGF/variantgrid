@@ -125,7 +125,7 @@ $(document).ready(function() {
             <li><a href="#sample-stats">Stats</a></li>
             {% endif %}
             {% if somalier_enabled and sample.somaliersampleextract.somalierancestry %}
-                <li><a href="#sample-ancestry">Ancestry</a></li>
+            <li><a href="#sample-ancestry">Ancestry</a></li>
             {% endif %}
             <li><a href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
             {% if sample.import_status == 'S' or sample.import_status == 'A' %}
