@@ -1284,7 +1284,10 @@ class CanonicalTranscriptCollection(TimeStampedModel):
         ctc_id = settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID
         ctc = None
         if ctc_id:
-            ctc = CanonicalTranscriptCollection.objects.get(pk=ctc_id)
+            try:
+                ctc = CanonicalTranscriptCollection.objects.get(pk=ctc_id)
+            except CanonicalTranscriptCollection.DoesNotExist:
+                logging.error("setting.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=%s - record not found", ctc_id)
         return ctc
 
     def get_absolute_url(self):
