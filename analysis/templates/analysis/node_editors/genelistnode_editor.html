@@ -77,6 +77,7 @@
                 <div>Sample: {{ form.sample  }}
                 </div>
                 </li>
+            {% if pathology_tests_enabled %}
                 <li id='pathology-test-gene-list'>
                 <h3>{{ pathology_test_category.name }}</h3>
                 <div>
@@ -86,6 +87,7 @@
                     </div>
                 </div>
                 </li>
+            {% endif %}
                 <li>
                     <h3>PanelApp Panels</h3>
                     <div>
