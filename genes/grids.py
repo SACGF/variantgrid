@@ -275,25 +275,23 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
     def __init__(self, user, gene_coverage_collection_id, gene_list_id_list=None):
         super().__init__(user)
         gene_coverage_collection = get_object_or_404(GeneCoverageCollection, pk=gene_coverage_collection_id)
-        genes = set()
+        gene_symbols = set()
         if gene_list_id_list:
             gene_list_ids = gene_list_id_list.split("/")
             if gene_list_ids:
-                vav = gene_coverage_collection.genome_build.latest_variant_annotation_version
-                release = vav.gene_annotation_release
                 for gene_list_id in gene_list_ids:
                     gene_list = get_object_or_404(GeneList, pk=gene_list_id)
-                    genes.update(gene_list.get_genes(release))
+                    gene_symbols.update(gene_list.get_gene_names())
 
-        queryset = self.get_coverage_queryset(gene_coverage_collection, genes)
+        queryset = self.get_coverage_queryset(gene_coverage_collection, gene_symbols)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def get_coverage_queryset(self, gene_coverage_collection, gene_list):
+    def get_coverage_queryset(self, gene_coverage_collection, gene_symbols):
         queryset = self.model.objects.filter(gene_coverage_collection=gene_coverage_collection)
-        if gene_list:
-            queryset = queryset.filter(gene__in=gene_list)
+        if gene_symbols:
+            queryset = queryset.filter(gene_symbol__in=gene_symbols)
 
         return queryset
 
@@ -304,6 +302,6 @@ class UncoveredGenesGrid(QCGeneCoverageGrid):
         self.min_depth = min_depth
         super().__init__(user, **kwargs)
 
-    def get_coverage_queryset(self, gene_coverage_collection, gene_list):
-        queryset = super().get_coverage_queryset(gene_coverage_collection, gene_list)
+    def get_coverage_queryset(self, gene_coverage_collection, gene_symbols):
+        queryset = super().get_coverage_queryset(gene_coverage_collection, gene_symbols)
         return queryset.filter(min__lt=self.min_depth)
