@@ -92,10 +92,8 @@ class HomozygosityPercentGraph(CacheableGraph):
 
             bin_count_array = chrom_density_bins.get(chrom, [])
             for bin_number, bin_count, zygosity in bin_count_array:
-                # I think we shouldn't count these at all, though
-                # an alternative would be to count them as het?
-                if zygosity != Zygosity.UNKNOWN_ZYGOSITY:
-                    bin_counts = bin_counts_dict[ZYGOSITY_MAPPINGS[zygosity]]
+                if z := ZYGOSITY_MAPPINGS.get(zygosity):
+                    bin_counts = bin_counts_dict[z]
                     bin_counts[bin_number] = bin_count
 
             het_array = bin_counts_dict['het']
