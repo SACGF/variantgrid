@@ -725,7 +725,7 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
     return ConditionMatchingSuggestion()
 
 
-def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: Set[OntologyTerm], check_levels: int = 4):
+def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: Set[OntologyTerm], check_levels: int = 7):
     # TODO move this to OntologyTerm class
     for term in terms:
         if term in ancestors:
