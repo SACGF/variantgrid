@@ -93,7 +93,17 @@ ROMAN = {
     "vi": '6',
     "vii": '7',
     "viii": '8',
-    "ix": '9'
+    "ix": '9',
+    'x': '10', # matching on x could be dangerous
+    'xi': '11',
+    'xii': '12',
+    'xiii': '13',
+    'xiv': '14',
+    'xv': '15',
+    'xvi': '16',
+    'xvii': '17',
+    'xviii': '18',
+    'ixx': '19'
 }
 
 
