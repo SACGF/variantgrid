@@ -539,7 +539,7 @@ class ConditionMatchingSuggestion:
                         gene_symbol = self.condition_text_match.gene_symbol
                         update_gene_relations(gene_symbol)
                         for term in valid_terms:
-                            if not OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
+                            if not OntologySnake.has_gene_relationship(term, gene_symbol):
                                 self.add_message(ConditionMatchingMessage(severity="warning",
                                                                          text=f"{term.id} : no direct relationship on file to {gene_symbol.symbol}"))
                             else:
@@ -828,7 +828,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     parent_term_missing_gene = list()
                     parent_term_has_gene = list()
                     for term in root_level_terms:
-                        if not OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
+                        if not OntologySnake.has_gene_relationship(term, gene_symbol):
                             parent_term_missing_gene.append(term)
                         else:
                             parent_term_has_gene.append(term)
