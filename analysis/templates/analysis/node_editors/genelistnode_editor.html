@@ -112,10 +112,8 @@
             {% endfor %}
             Save this node to check/update PanelApp panels
         {% endif %}
-		{% for gene_list in gene_lists %}
-            {% if gene_list.warning %}
-		        <div id='unmatched-genes-warning' class='warning'>{{ gene_list }}: {{ gene_list.warning }} (see genes tab)</div>
-            {%  endif %}
+		{% for gene_list, warning in gene_lists_warnings.items %}
+            <div id='unmatched-genes-warning' class='warning'>{{ gene_list }}: {{ warning }} (see genes tab)</div>
 		{% endfor %}
 		</div>
 

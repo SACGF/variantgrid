@@ -89,8 +89,7 @@ class GeneListGenesGrid(JqGridUserRowConfig):
         for release in GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds():
             field_name = f"release_{release.pk}"
             self.annotation_field_labels[field_name] = str(release)
-            annotation_kwargs[field_name] = StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True,
-                                                      filter=Q(gene_symbol__releasegenesymbol__release=release))
+            annotation_kwargs[field_name] = GeneListGeneSymbol.get_joined_genes_qs_annotation_for_release(release)
         queryset = queryset.annotate(**annotation_kwargs)
         field_names = self.get_field_names() + list(sorted(self.annotation_field_labels))
         self.queryset = queryset.values(*field_names)
@@ -100,7 +99,7 @@ class GeneListGenesGrid(JqGridUserRowConfig):
     def get_colmodels(self, remove_server_side_only=False):
         colmodels = super().get_colmodels(remove_server_side_only=False)
         for field_name, label in self.annotation_field_labels.items():
-            cm = {'index': field_name, 'name': field_name, 'label': label}
+            cm = {'index': field_name, 'name': field_name, 'label': label, "width": 400}
             colmodels.append(cm)
         return colmodels
 

@@ -1,5 +1,6 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 {% load jqgrid_tags %}
+{% load help_tags %}
 
 {% block docreadyjs %}
 	{% if node.has_gene_coverage != None %}
@@ -37,17 +38,19 @@
 {% block node_editor_tab_links_second %}
 {% if node.status == 'R' %}
 	{% if node.has_gene_coverage != None %}
-	    	<li id='gene-list-tab'><a href="#node-genes">Genes/Coverage</a></li>
+	    	<li id='gene-list-tab'><a href="#node-genes-tab">Genes/Coverage</a></li>
 	{% else %}
-	    	<li id='gene-list-tab'><a href="#node-genes">Genes</a></li>
+	    	<li id='gene-list-tab'><a href="#node-genes-tab">Genes</a></li>
 	{% endif %}
 {% endif %}
 {% endblock node_editor_tab_links_second %}
 
 {% block node_editor_tabs_second %}
     {% if node.status == 'R' %}
-		<div id="node-genes">
+		<div id="node-genes-tab">
 	    {% if gene_lists %}
+            {% page_help page_id='genes/gene_list_gene_matching_help' title="Gene List Gene Matching" show_title=False %}
+
             {% if node.has_gene_coverage != None %}
             <div id="gene-tabs">
                 <ul>

@@ -297,13 +297,12 @@ def gene_lists(request):
 
 
 def add_gene_list_unmatched_genes_message(request, gene_list, instructions=None):
-    unmatched_genes = list(gene_list.unmatched_genes)
-    if unmatched_genes:
+    if unmatched_symbols := list(gene_list.unmatched_gene_symbols):
         if instructions:
             messages.add_message(request, messages.WARNING, instructions)
 
-        for unmatched_gene in unmatched_genes:
-            msg = f"Unmatched gene symbol: {unmatched_gene.original_name}"
+        for glg in unmatched_symbols:
+            msg = f"Unmatched gene symbol: {glg.original_name}"
             messages.add_message(request, messages.WARNING, msg)
 
 

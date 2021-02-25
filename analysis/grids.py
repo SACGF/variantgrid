@@ -568,6 +568,12 @@ class KaromappingAnalysesGrid(JqGridUserRowConfig):
 
 
 class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
+    colmodel_overrides = {
+        "ID": {"width": 200},
+        "hpo": {"width": 400},
+        "omim": {"width": 400},
+    }
+
     def __init__(self, user, node_id, version):
         self.node = get_node_subclass_or_404(user, node_id, version=version)
         super().__init__()

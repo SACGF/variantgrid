@@ -1,12 +1,12 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 
 {% block node_editor_tab_links_second %}
-	    	<li id='gene-list-tab'><a href="#node-gene-list">Genes</a></li>
+	    	<li id='gene-list-tab'><a href="#node-genes-tab">Genes</a></li>
 {% endblock node_editor_tab_links_second %}
 
 {% block node_editor_tabs_second %}
-		<div id="node-gene-list">
-			{% block gene_list_grid %}{% endblock gene_list_grid %}
-		</div>
+    <div id="node-genes-tab">
+        {% block gene_list_grid %}{% endblock gene_list_grid %}
+    </div>
 {% endblock node_editor_tabs_second %}
 

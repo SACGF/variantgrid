@@ -982,36 +982,28 @@ class GeneList(models.Model):
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return user.has_perm(write_perm, self) and not self.locked
 
-    @lazy
-    def warning(self):
-        warnings = {"unmatched": self.unmatched_genes.count(),
-                    "aliased": self.aliased_genes.count()}
+    def get_warnings(self, release: GeneAnnotationRelease) -> List[str]:
+        counts = {"unmatched symbols": self.unmatched_gene_symbols.count(),
+                  "aliased": self.aliased_genes.count(),
+                  "unmatched genes": self.unmatched_genes(release).count()}
 
-        warning_list = []
-        prefix = None
-        for w, num in warnings.items():
+        warnings = []
+        for name, num in counts.items():
             if num:
-                if prefix is None:
-                    prefix = "There were " if num > 1 else "There was "
-
-                msg = f"{num} {w} gene"
-                if num > 1:
-                    msg += "s"
-                warning_list.append(msg)
-
-        if warning_list:
-            message = prefix + " and ".join(warning_list) + "."
-        else:
-            message = ""
-        return message
+                warnings.append(f"{name} x {num}")
+        return warnings
 
     @property
-    def unmatched_genes(self):
+    def unmatched_gene_symbols(self):
         return self.genelistgenesymbol_set.filter(gene_symbol__isnull=True).order_by("original_name")
 
     @property
     def aliased_genes(self):
         return self.genelistgenesymbol_set.filter(gene_symbol_alias__isnull=False)
+
+    def unmatched_genes(self, release: GeneAnnotationRelease):
+        string_agg = GeneListGeneSymbol.get_joined_genes_qs_annotation_for_release(release)
+        return self.genelistgenesymbol_set.annotate(matched_genes=string_agg).filter(matched_genes__isnull=True)
 
     def add_and_remove_gene_symbols(self, gene_symbol_additions, gene_symbol_deletions,
                                     gene_additions_modification_info=None):
@@ -1111,6 +1103,12 @@ class GeneListGeneSymbol(models.Model):
 
     class Meta:
         unique_together = ('gene_list', 'original_name')
+
+    @staticmethod
+    def get_joined_genes_qs_annotation_for_release(release: GeneAnnotationRelease):
+        """ Used to annotate GeneListGeneSymbol queryset """
+        return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True,
+                         filter=Q(gene_symbol__releasegenesymbol__release=release))
 
     def __str__(self):
         if self.gene_symbol:

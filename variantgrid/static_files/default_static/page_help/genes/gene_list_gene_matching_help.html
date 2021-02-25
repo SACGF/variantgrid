@@ -1,0 +1,15 @@
+<p>
+    GeneList records are processed as follows:
+    <ul>
+    <li><b>original name</b> is matched to a known symbol (perhaps via an alias which will be set in the <b>alias</b> column</li>
+    <li>For each <a target="_blank" href="https://variantgrid.readthedocs.io/en/latest/genes/genes.html#gene-annotation-release">GeneAnnotationRelease</a> - map the matched symbols to a Gene ID (or IDs)</li>
+    </ul>
+</p>
+<p>
+In an analysis <a target="_blank" href="https://variantgrid.readthedocs.io/en/latest/analysis/nodes.html#gene-list">GeneListNode</a> - filters variants where any transcript matches the Gene ID
+</p>
+<p>
+<b>Warning:</b> If a row has no Gene ID for a genome build, it will not filter any variants in an analysis using that build.
+</p>
+
+
