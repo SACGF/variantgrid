@@ -36,6 +36,7 @@
             background-color: #fef7f7;
         }
         .condition-match-suggestion .suggestion.info-only {
+            background-color: white !important;
             opacity: 0.7;
             border: none;
         }
@@ -565,7 +566,7 @@
                 button.tooltip('dispose');
             } else {
                 button.css('opacity','0.3');
-                button.attr('title', 'It is recommend you choose gene level terms using the buttons below');
+                button.attr('title', 'It is recommended you choose gene level terms using the buttons below');
                 button.tooltip({html:true, trigger : 'hover'});
             }
 
