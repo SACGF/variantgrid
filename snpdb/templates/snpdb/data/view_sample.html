@@ -302,53 +302,59 @@ $(document).ready(function() {
     {% related_data_for_samples samples show_sample_info=False %}
     {% related_analyses_for_samples samples show_sample_info=False %}
 
-    {% if somalier_enabled and related_samples.exists %}
+    {% if somalier_enabled %}
         <h3>Related Samples</h3>
-        <p>Relatedness of 0.5 is a parent/child or sibling.</p>
-        <table class="table">
-            <tr>
-                <th>Sample</th>
-                <th>relatedness</th>
-                <th>ibs0</th>
-                <th>ibs2</th>
-                <th>hom_concordance</th>
-                <th>hets_a</th>
-                <th>hets_b</th>
-                <th>hets_ab</th>
-                <th>shared_hets</th>
-                <th>hom_alts_a</th>
-                <th>hom_alts_b</th>
-                <th>shared_hom_alts</th>
-                <th>N</th>
-                <th>x_ibs0</th>
-                <th>x_ibs2</th>
-            </tr>
-            {% for rp in related_samples %}
+
+        {% page_help page_id='data/related_samples_help' title='Related Samples' show_title=False %}
+
+        {% if related_samples.exists %}
+            <table class="table">
                 <tr>
-                    <td>
-                        {% if rp.sample_a == sample %}
-                            <a href="{% url 'view_sample' rp.sample_b.pk %}">{{ rp.sample_b }}</a>
-                        {% else %}
-                            <a href="{% url 'view_sample' rp.sample_a.pk %}">{{ rp.sample_a }}</a>
-                        {% endif %}
-                    </td>
-                    <td>{{ rp.relatedness }}</td>
-                    <td>{{ rp.ibs0 }}</td>
-                    <td>{{ rp.ibs2 }}</td>
-                    <td>{{ rp.hom_concordance }}</td>
-                    <td>{{ rp.hets_a }}</td>
-                    <td>{{ rp.hets_b }}</td>
-                    <td>{{ rp.hets_ab }}</td>
-                    <td>{{ rp.shared_hets }}</td>
-                    <td>{{ rp.hom_alts_a }}</td>
-                    <td>{{ rp.hom_alts_b }}</td>
-                    <td>{{ rp.shared_hom_alts }}</td>
-                    <td>{{ rp.n }}</td>
-                    <td>{{ rp.x_ibs0 }}</td>
-                    <td>{{ rp.x_ibs2 }}</td>
+                    <th>Sample</th>
+                    <th>relatedness</th>
+                    <th>ibs0</th>
+                    <th>ibs2</th>
+                    <th>hom_concordance</th>
+                    <th>hets_a</th>
+                    <th>hets_b</th>
+                    <th>hets_ab</th>
+                    <th>shared_hets</th>
+                    <th>hom_alts_a</th>
+                    <th>hom_alts_b</th>
+                    <th>shared_hom_alts</th>
+                    <th>N</th>
+                    <th>x_ibs0</th>
+                    <th>x_ibs2</th>
                 </tr>
-            {% endfor %}
-        </table>
+                {% for rp in related_samples %}
+                    <tr>
+                        <td>
+                            {% if rp.sample_a == sample %}
+                                <a href="{% url 'view_sample' rp.sample_b.pk %}">{{ rp.sample_b }}</a>
+                            {% else %}
+                                <a href="{% url 'view_sample' rp.sample_a.pk %}">{{ rp.sample_a }}</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ rp.relatedness | floatformat:2 }}</td>
+                        <td>{{ rp.ibs0 }}</td>
+                        <td>{{ rp.ibs2 }}</td>
+                        <td>{{ rp.hom_concordance | floatformat:2 }}</td>
+                        <td>{{ rp.hets_a }}</td>
+                        <td>{{ rp.hets_b }}</td>
+                        <td>{{ rp.hets_ab }}</td>
+                        <td>{{ rp.shared_hets }}</td>
+                        <td>{{ rp.hom_alts_a }}</td>
+                        <td>{{ rp.hom_alts_b }}</td>
+                        <td>{{ rp.shared_hom_alts }}</td>
+                        <td>{{ rp.n }}</td>
+                        <td>{{ rp.x_ibs0 }}</td>
+                        <td>{{ rp.x_ibs2 }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% else %}
+            <p>No related samples exist.</p>
+        {% endif %}
     {% endif %}
 </div>
 <div id="error-dialog" class="no-close" title="Error">

@@ -710,6 +710,12 @@ SOMALIER = {
             "GRCh38": "sites.hg38.nochr.vcf.gz",  # No chr prefix on chromosome names
         },
     },
+    # Minimums for related samples to appear at bottom of view_sample page
+    "relatedness": {
+        "min_relatedness": 0.1,
+        "min_shared_hets": 1000,
+        "min_shared_hom_alts": 1000,
+    }
 }
 
 

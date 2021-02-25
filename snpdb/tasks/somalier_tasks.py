@@ -144,18 +144,15 @@ def somalier_trio_relate(trio_id: int):
 
 @celery.task
 def somalier_all_samples():
-    MIN_RELATEDNESS = 0.2
-    MIN_SHARED_HET = 1000
-    MIN_SHARED_HOM = 1000
-
+    somalier_settings = settings.SOMALIER["relatedness"]
     all_samples = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.PROCESSING)
     try:
         related_dir = _somalier_relate(all_samples)
         pairs_filename = os.path.join(related_dir, "somalier.pairs.tsv")
         df = pd.read_csv(pairs_filename, sep='\t')
-        shared_het_mask = df["shared_hets"] > MIN_SHARED_HET
-        shared_hom_mask = df["shared_hom_alts"] > MIN_SHARED_HOM
-        relateness_mask = df["relatedness"] > MIN_RELATEDNESS
+        shared_het_mask = df["shared_hets"] >= somalier_settings["min_shared_hets"]
+        shared_hom_mask = df["shared_hom_alts"] > somalier_settings["min_shared_hom_alts"]
+        relateness_mask = df["relatedness"] > somalier_settings["min_relatedness"]
         df = df[shared_het_mask & shared_hom_mask & relateness_mask]
 
         for _, row in df.iterrows():

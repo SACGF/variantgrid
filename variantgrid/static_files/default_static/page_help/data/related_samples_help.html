@@ -1,0 +1,92 @@
+<p>Calculated using <a class="reference external" href="https://github.com/brentp/somalier">Somalier</a> (<a class="reference external" href="https://doi.org/10.1186/s13073-020-00761-2">Paper</a>).
+See <a target="_blank" href="https://variantgrid.readthedocs.io/en/latest/data/relatedness.html">Relatedness help</a>
+</p>
+
+
+
+<p>
+    Samples with a minimum of 1000 shared HET, 1000 shared HOM and relatedness cooefficient >= 0.2 are displayed as a list at the bottom of the sample page.
+</p>
+
+<!-- Copy/pasted from read the docs -->
+<table border="1">
+<thead>
+<tr>
+<th>Column</th>
+<th align="right">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Relatedness</td>
+<td align="right"><a target="_blank" href="https://en.wikipedia.org/wiki/Coefficient_of_relationship">relatedness coefficient</a></td>
+</tr>
+<tr>
+<td>IBS0</td>
+<td align="right"># sites where one sample is hom-ref and another is hom-alt</td>
+</tr>
+<tr>
+<td>IBS2</td>
+<td align="right"># sites where the samples have the same genotype</td>
+</tr>
+<tr>
+<td>hom_concordance</td>
+<td align="right">not defined</td>
+</tr>
+<tr>
+<td>hets_a</td>
+<td align="right"># sites where sample a is heterozygotes</td>
+</tr>
+<tr>
+<td>hets_b</td>
+<td align="right"># sites where sample b is heterozygotes</td>
+</tr>
+<tr>
+<td>hets_ab</td>
+<td align="right"># sites where sample a or b are heterozygotes</td>
+</tr>
+<tr>
+<td>shared-hets</td>
+<td align="right"># sites where both samples are heterozygotes</td>
+</tr>
+<tr>
+<td>shared-hom-alts</td>
+<td align="right"># sites that are heterzygous in both samples</td>
+</tr>
+<tr>
+<td>hom_alts_a</td>
+<td align="right"># sites where sample a is homozygous alternate</td>
+</tr>
+<tr>
+<td>hom_alts_b</td>
+<td align="right"># sites where sample b is homozygous alternate</td>
+</tr>
+<tr>
+<td>shared_hom_alts</td>
+<td align="right"># sites that are homozygous alternate in both samples</td>
+</tr>
+<tr>
+<td>N</td>
+<td align="right">total sites</td>
+</tr>
+<tr>
+<td>x_ibs0</td>
+<td align="right">IBS0 on chrX</td>
+</tr>
+<tr>
+<td>x_ibs2</td>
+<td align="right">IBS2 on chrX</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Interpreting relatedness</h3>
+
+<ul>
+    <li>1.00 = Identical twins/Clones/Duplicate sample</li>
+    <li>0.50 = Parent/Child/Full Sibling/Parent’s Identical twin/Identical twin’s child</li>
+    <li>0.35 = 3/4 sibling (e.g. same mother, fathers are siblings)</li>
+    <li>0.25 = Grandparent/Grandchild/Half-sibling/Uncle/Aunt/Niece/Nephew/Double-1st Cousin</li>
+    <li>&lt;0.20 = Distant relative (cousins) / Not related</li>
+</ul>
+
