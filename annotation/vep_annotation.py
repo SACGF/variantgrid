@@ -88,7 +88,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--canonical",
         "--protein",
         "--biotype",
-        "--uniprot",
         "--af",
         "--pubmed",
         "--variant_class",
