@@ -233,7 +233,7 @@ def view_vcf(request, vcf_id):
         add_save_message(request, valid, "VCF")
 
     try:
-        # Test needed data exists ()
+        # Some legacy data was too hard to fix and relies on being re-imported
         _ = vcf.cohort
         _ = vcf.cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
