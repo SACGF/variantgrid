@@ -463,6 +463,16 @@ class OntologySnake:
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
     @staticmethod
+    def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str]) -> QuerySet:
+        if isinstance(term, str):
+            term = OntologyTerm.get_or_stub(term)
+            if term.is_stub:
+                return False
+        gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
+        hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()
+        return gene_term in hgnc_terms
+
+    @staticmethod
     def special_case_gene_symbols_for_terms(ontology_term_ids: Iterable[str]) -> QuerySet:
         """ Fast path for looking up gene symbols - doesn't work w/everything, use gene_symbols_for_term """
         hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_term_ids)

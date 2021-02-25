@@ -9,6 +9,7 @@ from classification.models import ConditionText, top_level_suggestion, condition
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
+from ontology.models import OntologySnake
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
@@ -86,6 +87,7 @@ def condition_match_test_view(request):
     attempted = False
     suggestion = None
     gene_symbol: Optional[GeneSymbol] = None
+    has_gene_symbol: Optional[bool] = None
 
     valid = False
     if condition_text:
@@ -98,6 +100,8 @@ def condition_match_test_view(request):
     if valid:
         auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
         suggestion = top_level_suggestion(normalize_condition_text(condition_text))
+        if suggestion and gene_symbol:
+            has_gene_symbol = OntologySnake.has_gene_relationship(suggestion.terms[0], gene_symbol)
         attempted = True
 
     context = {
@@ -107,6 +111,7 @@ def condition_match_test_view(request):
         "auto_matches": auto_matches,
         "suggestion": suggestion,
         "is_auto_assignable": suggestion.is_auto_assignable(gene_symbol) if suggestion else None,
+        "has_gene_symbol": has_gene_symbol,
         "attempted": attempted
     }
 

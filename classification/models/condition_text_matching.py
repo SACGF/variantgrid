@@ -505,7 +505,8 @@ class ConditionMatchingSuggestion:
                 if self.is_all_leafs():
                     # if we're at a gene level, and we have a relationship and we're leafs
                     term = terms[0]
-                    if OntologySnake.gene_symbols_for_term(term).filter(pk=gene_symbol.pk).exists():
+                    gene_symbol
+                    if OntologySnake.has_gene_relationship(term, gene_symbol):
                         return True
             else:
                 # embedded ID is the only thing that will give you a top level assignment

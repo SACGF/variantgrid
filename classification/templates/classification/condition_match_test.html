@@ -102,6 +102,7 @@
                     {% labelled label="Term IDs found in text" %}{{ suggestion.ids_found_in_text|default_if_none:'False' }}{% endlabelled %}
                     {% labelled label="All terms are leafs" %}{{ suggestion.is_all_leafs }}{% endlabelled %}
                     {% labelled label="Alias index" %}{{ suggestion.alias_index|default_if_none:'' }}{% endlabelled %}
+                    {% labelled label="Has gene symbol assoc" %}{{ has_gene_symbol|default_if_none:'' }}{% endlabelled %}
                 </div>
             </div>
 
