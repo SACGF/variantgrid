@@ -77,6 +77,8 @@ class OntologyRelation:
     XREF = "xref"  # listed in MONDO xrefs, probably is the same term
     REPLACED = "replaced"
 
+    CONSIDER = "consider"
+
     FREQUENCY = "frequency"
     PANEL_APP_AU = "panelappau"
     ALL_FREQUENCY = "frequency"  # used by OMIM_ALL_FREQUENCIES

@@ -2,8 +2,9 @@ import itertools
 import json
 import re
 import csv
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import pandas as pd
 import pronto
@@ -39,6 +40,7 @@ MATCH_TYPES = {
     "http://www.w3.org/2004/02/skos/core#broadMatch": OntologyRelation.BROAD,
     "http://www.w3.org/2004/02/skos/core#narrowMatch": OntologyRelation.NARROW,
     "http://www.geneontology.org/formats/oboInOwl#hasAlternativeId": OntologyRelation.ALTERNATIVE,
+    "http://www.geneontology.org/formats/oboInOwl#consider": OntologyRelation.CONSIDER,
     "http://purl.obolibrary.org/obo/IAO_0100001": OntologyRelation.REPLACED
 }
 
@@ -79,7 +81,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=9)
+        processor_version=10)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -116,27 +118,20 @@ def load_mondo(filename: str, force: bool):
                             extra["synonyms"] = synonyms
 
                         aliases = list()
-                        synonym_set = set()
+                        term_relation_types: Dict[str, List[str]] = defaultdict(list)
 
                         for bp in meta.get("basicPropertyValues", []):
                             val = TermId(bp.get("val"))
                             if val.type in {"HP", "OMIM"}:
                                 pred = bp.get("pred")
                                 pred = MATCH_TYPES.get(pred, pred)
+                                term_relation_types[val.id].append(pred)
 
-                                ontology_builder.add_term(
-                                    term_id=val.id,
-                                    name=label,
-                                    definition=f"Name copied from {pred} synonym {full_id}",
-                                    primary_source=False
-                                )
-                                ontology_builder.add_ontology_relation(
-                                    source_term_id=full_id,
-                                    dest_term_id=val.id,
-                                    relation=pred,
-                                    extra={"source": "basic property value"}
-                                )
-                                synonym_set.add(val.id)
+                        if xrefs := meta.get("xrefs"):
+                            for xref in xrefs:
+                                val = TermId(xref.get("val"))
+                                if val.type in {"HP", "OMIM"}:
+                                    term_relation_types[val.id].append("xref")
 
                         if synonyms := meta.get("synonyms"):
                             # only allow 1 relationship between any 2 terms (though DB does allow more)
@@ -150,46 +145,34 @@ def load_mondo(filename: str, force: bool):
                                     "hasExactSynonym": OntologyRelation.EXACT_SYNONYM,
                                     "hasRelatedSynonym": OntologyRelation.RELATED_SYNONYM
                                 }[pred_type]
-
                                 for synonym in synonyms:
                                     pred = synonym.get("pred")
                                     for xref in synonym.get("xrefs", []):
                                         xref_term = TermId(xref)
                                         if xref_term.type in {"HP", "OMIM"}:
-                                            if xref not in synonym_set:
-                                                ontology_builder.add_term(
-                                                    term_id=xref,
-                                                    name=label,
-                                                    definition=f"Name copied from synonym {full_id}",
-                                                    primary_source=False
-                                                )
-                                                ontology_builder.add_ontology_relation(
-                                                    source_term_id=full_id,
-                                                    dest_term_id=xref,
-                                                    relation=relation,
-                                                    extra={"source": "synonym"}
-                                                )
-                                                synonym_set.add(xref)
+                                            term_relation_types[xref].append(relation)
+
+                        for key, relations in term_relation_types.items():
+                            unique_relations = list()
+                            for relation in relations:
+                                if relation not in unique_relations:
+                                    unique_relations.append(relation)
+
+                            ontology_builder.add_term(
+                                term_id=key,
+                                name=label,
+                                definition=f"Name copied from xref synonym {full_id}",
+                                primary_source=False
+                            )
+                            ontology_builder.add_ontology_relation(
+                                source_term_id=full_id,
+                                dest_term_id=key,
+                                relation=relations[0],
+                                extra={"all_relations": unique_relations}
+                            )
+
                         #end synonymns
-
-                        if xrefs := meta.get("xrefs"):
-                            for xref in xrefs:
-                                val = TermId(xref.get("val"))
-                                if val.type in {"HP", "OMIM"} and val.id not in synonym_set:
-                                    ontology_builder.add_term(
-                                        term_id=val.id,
-                                        name=label,
-                                        definition=f"Name copied from xref synonym {full_id}",
-                                        primary_source=False
-                                    )
-                                    ontology_builder.add_ontology_relation(
-                                        source_term_id=full_id,
-                                        dest_term_id=val.id,
-                                        relation=OntologyRelation.XREF,
-                                        extra={"source": "xref"}
-                                    )
-                                    synonym_set.add(val.id)
-
+                        # occasionally split up MONDO name into different aliases
                         if label and "MONDO" in full_id:
                             if ";" in label:
                                 parts = [part.strip() for part in label.split(";")]
