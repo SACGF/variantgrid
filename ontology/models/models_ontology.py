@@ -12,6 +12,7 @@ from lazy import lazy
 from model_utils.models import TimeStampedModel, now
 
 from genes.models import GeneSymbol
+from library.log_utils import report_exc_info
 from library.utils import Constant
 
 """
@@ -473,9 +474,13 @@ class OntologySnake:
             term = OntologyTerm.get_or_stub(term)
             if term.is_stub:
                 return False
-        gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
-        hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()
-        return gene_term in hgnc_terms
+        try:
+            gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
+            hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()
+            return gene_term in hgnc_terms
+        except ValueError:
+            report_exc_info()
+            return False
 
     @staticmethod
     def special_case_gene_symbols_for_terms(ontology_term_ids: Iterable[str]) -> QuerySet:
