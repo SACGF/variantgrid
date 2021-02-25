@@ -67,22 +67,22 @@ class HGNC(models.Model):
     # pk = HGNC id with HGNC: stripped out
     alias_symbols = models.TextField()
     approved_name = models.TextField()
-    ccds_ids = models.TextField(null=True)
-    ensembl_gene_id = models.TextField(null=True)
-    gene_group_ids = models.TextField(null=True)
-    gene_groups = models.TextField(null=True)
+    ccds_ids = models.TextField(null=True, blank=True)
+    ensembl_gene_id = models.TextField(null=True, blank=True)
+    gene_group_ids = models.TextField(null=True, blank=True)
+    gene_groups = models.TextField(null=True, blank=True)
     # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
     gene_symbol = models.ForeignKey('GeneSymbol', on_delete=CASCADE)
     hgnc_import = models.ForeignKey(HGNCImport, on_delete=CASCADE)
-    location = models.TextField(null=True)
-    mgd_ids = models.TextField(null=True)
-    omim_ids = models.TextField(null=True)
-    previous_symbols = models.TextField(null=True)
-    refseq_ids = models.TextField(null=True)
-    rgd_ids = models.TextField(null=True)
+    location = models.TextField(null=True, blank=True)
+    mgd_ids = models.TextField(null=True, blank=True)
+    omim_ids = models.TextField(null=True, blank=True)
+    previous_symbols = models.TextField(null=True, blank=True)
+    refseq_ids = models.TextField(null=True, blank=True)
+    rgd_ids = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=1, choices=HGNCStatus.choices)
-    ucsc_ids = models.TextField(null=True)
-    uniprot_ids = models.TextField(null=True)
+    ucsc_ids = models.TextField(null=True, blank=True)
+    uniprot_ids = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \
@@ -124,11 +124,11 @@ class UniProt(models.Model):
     # accession = Primary (citable) accession number (1st element in SwissProt record)
     accession = models.TextField(primary_key=True)
     cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
-    function = models.TextField(null=True)
-    pathway = models.TextField(null=True)
-    pathway_interaction_db = models.TextField(null=True)
-    reactome = models.TextField(null=True)
-    tissue_specificity = models.TextField(null=True)
+    function = models.TextField(null=True, blank=True)
+    pathway = models.TextField(null=True, blank=True)
+    pathway_interaction_db = models.TextField(null=True, blank=True)
+    reactome = models.TextField(null=True, blank=True)
+    tissue_specificity = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.accession
@@ -321,7 +321,7 @@ class Gene(models.Model):
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
-    summary = models.TextField(null=True)  # Only used by RefSeq
+    summary = models.TextField(null=True, blank=True)  # Only used by RefSeq
 
     @property
     def is_legacy(self):
