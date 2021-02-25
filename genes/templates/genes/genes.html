@@ -101,8 +101,8 @@
             <img src="{% static 'icons/filter.svg' %}" width="20px" height="20px" title="Filter options to the right" />
             <a class="hover-link" href="javascript:filterGrid()">All</a>
             <a class="hover-link" href="javascript:showSearch()">Search</a>
-            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : false})">OMIM</a>
-            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : true})">No OMIM</a>
+            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : false})">OMIM Terms</a>
+            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : true})">No OMIM Terms</a>
         </div>
         <div id='gene-annotation-versions'>
         {% load jqgrid_tags %}
