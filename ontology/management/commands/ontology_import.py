@@ -81,7 +81,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=10)
+        processor_version=11)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -150,7 +150,7 @@ def load_mondo(filename: str, force: bool):
                                     for xref in synonym.get("xrefs", []):
                                         xref_term = TermId(xref)
                                         if xref_term.type in {"HP", "OMIM"}:
-                                            term_relation_types[xref].append(relation)
+                                            term_relation_types[xref_term.id].append(relation)
 
                         for key, relations in term_relation_types.items():
                             unique_relations = list()
