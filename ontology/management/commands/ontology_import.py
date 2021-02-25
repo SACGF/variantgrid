@@ -293,7 +293,7 @@ def load_gencc(filename: str, force: bool):
     # only want strong and definitive relationships
     gencc_df = gencc_df[gencc_df.classification_title.isin(["Definitive", "Strong"])]
     # Exclude PanelApp Australia from here
-    gencc_df = gencc_df[~gencc_df.isin(["PanelApp Australia"])]
+    # gencc_df = gencc_df[~gencc_df.isin(["PanelApp Australia"])]  # this still caused the rows to exist but a blank gencc??!!
     gencc_df = gencc_df.sort_values(by=["gene_curie", "disease_curie"])
     gencc_grouped = gencc_df.groupby(["gene_curie", "disease_curie"])
 
@@ -307,24 +307,26 @@ def load_gencc(filename: str, force: bool):
             classification_title = row["classification_title"]
             moi_title = row["moi_title"]
             submitter_title = row["submitter_title"]
-            sources.append({
-                "submitter": submitter_title if not isna(submitter_title) else None,
-                "gencc_classification": classification_title if not isna(classification_title) else None,
-                "mode_of_inheritance":  moi_title if not isna(moi_title) else None,
-            })
+            if submitter_title != "PanelApp Australia":
+                sources.append({
+                    "submitter": submitter_title if not isna(submitter_title) else None,
+                    "gencc_classification": classification_title if not isna(classification_title) else None,
+                    "mode_of_inheritance":  moi_title if not isna(moi_title) else None,
+                })
 
-        ontology_builder.add_term(
-            term_id=gene_id,
-            name=gene_symbol,
-            definition=None,
-            primary_source=False
-        )
-        ontology_builder.add_ontology_relation(
-            source_term_id=mondo_id,
-            dest_term_id=gene_id,
-            relation=OntologyRelation.RELATED,
-            extra={"sources": sources}
-        )
+        if sources:
+            ontology_builder.add_term(
+                term_id=gene_id,
+                name=gene_symbol,
+                definition=None,
+                primary_source=False
+            )
+            ontology_builder.add_ontology_relation(
+                source_term_id=mondo_id,
+                dest_term_id=gene_id,
+                relation=OntologyRelation.RELATED,
+                extra={"sources": sources}
+            )
 
     ontology_builder.complete()
 

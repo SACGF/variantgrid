@@ -270,17 +270,20 @@
                         let extra = relationship.extra || {};
                         let tooltip = `Phenotype: ${extra.phenotype_row}<br/>Evidence: ${extra.evidence ? extra.evidence.join(',') : ''}<br/>Via related term: ${relationship.via}`;
                         html.push( $('<span>', {class: 'text-muted', text: 'PanelApp AU', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
-                    } else if (relationship.source == "gencc") {
+                    } else if (relationship.source == "gencc_file") {
                         let extra = relationship.extra || {};
                         let sources = extra.sources || [];
                         let tooltip = "";
-                        for (let source in extra.sources) {
-                            tooltip += `${source.submitter} : ${source.mode_of_inheritance || '-'} : ${source.gencc_classification}<br/>`;
+                        for (let source of extra.sources) {
+                            if (tooltip.length) {
+                                tooltip += "<br/><br/>";
+                            }
+                            tooltip += `${source.submitter || 'Unknown source'} : ${source.mode_of_inheritance || '-'} : ${source.gencc_classification}`;
                         }
                         html.push( $('<span>', {class: 'text-muted', text: 'GenCC', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
                     } else if (relationship.source === "hpo_disease") {
                         let tooltip = `Via related term: ${relationship.via}`;
-                        html.push( $('<span>', {class: 'text-muted', text: 'DEPRECATED', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': "This relationship is from a deprecated file"}) );
+                        html.push( $('<span>', {class: 'text-muted', text: 'DEPRECATED', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': "This relationship is from a deprecated file. Other relationships listed are fine."}) );
                     } else if (relationship.source === "mondo_file") {
                         let tooltip = `Relationship: ${relationship.relation}`;
                         html.push( $('<span>', {class: 'text-muted', text: "MONDO", 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
