@@ -79,7 +79,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=7)
+        processor_version=8)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -123,8 +123,6 @@ def load_mondo(filename: str, force: bool):
                             if val.type in {"HP", "OMIM"}:
                                 pred = bp.get("pred")
                                 pred = MATCH_TYPES.get(pred, pred)
-                                # if pred == OntologyRelation.EXACT:
-                                    # add alias?
 
                                 ontology_builder.add_term(
                                     term_id=val.id,
@@ -145,52 +143,33 @@ def load_mondo(filename: str, force: bool):
                             # storing all of them would be more "accurate" but gets in the way of our usage
                             # prioritise relationships as EXACT, RELATED, related terms, XREF
                             for synonym in synonyms:
-                                pred = synonym.get("pred")
-                                if pred == "hasExactSynonym":
-                                    # val = synonym.get("val")
-                                    aliases.append(synonym.get("val"))
+                                aliases.append(synonym.get("val"))
 
+                            for pred_type in ["hasExactSynonym", "hasRelatedSynonym"]:
+                                relation = {
+                                    "hasExactSynonym": OntologyRelation.EXACTISH,
+                                    "hasRelatedSynonym": OntologyRelation.RELATED
+                                }[pred_type]
+
+                                for synonym in synonyms:
+                                    pred = synonym.get("pred")
                                     for xref in synonym.get("xrefs", []):
                                         xref_term = TermId(xref)
                                         if xref_term.type in {"HP", "OMIM"}:
-                                            ontology_builder.add_term(
-                                                term_id=xref,
-                                                name=label,
-                                                definition=f"Name copied from synonym {full_id}",
-                                                primary_source=False
-                                            )
                                             if xref not in synonym_set:
+                                                ontology_builder.add_term(
+                                                    term_id=xref,
+                                                    name=label,
+                                                    definition=f"Name copied from synonym {full_id}",
+                                                    primary_source=False
+                                                )
                                                 ontology_builder.add_ontology_relation(
                                                     source_term_id=full_id,
                                                     dest_term_id=xref,
-                                                    relation=OntologyRelation.EXACTISH,
+                                                    relation=relation,
                                                     extra={"source": "synonym"}
                                                 )
-                                            synonym_set.add(xref)
-                                            if xref_term.type == "OMIM":
-                                                aliases.append(label)
-
-                            # look at related synonyms second, if we have RELATED, don't bother with any other relationships
-                            for synonym in synonyms:
-                                pred = synonym.get("pred")
-                                if pred == "hasRelatedSynonym":
-                                    # val = synonym.get("val")
-                                    for xref in synonym.get("xrefs", []):
-                                        xref_term = TermId(xref)
-                                        if xref_term.type in {"HP", "OMIM"} and not xref_term.id in synonym_set:
-                                            ontology_builder.add_term(
-                                                term_id=xref_term.id,
-                                                name=label,
-                                                definition=f"Name copied from related synonym {full_id}",
-                                                primary_source=False
-                                            )
-                                            ontology_builder.add_ontology_relation(
-                                                source_term_id=full_id,
-                                                dest_term_id=xref_term.id,
-                                                relation=OntologyRelation.RELATED,
-                                                extra={"source": "synonym"}
-                                            )
-                                            synonym_set.add(xref_term.id)
+                                                synonym_set.add(xref)
                         #end synonymns
 
                         if xrefs := meta.get("xrefs"):
@@ -209,6 +188,7 @@ def load_mondo(filename: str, force: bool):
                                         relation=OntologyRelation.XREF,
                                         extra={"source": "xref"}
                                     )
+                                    synonym_set.add(val.id)
 
                         if label and "MONDO" in full_id:
                             if ";" in label:
@@ -218,7 +198,6 @@ def load_mondo(filename: str, force: bool):
                                         for part in parts:
                                             if part not in aliases:
                                                 aliases.append(part)
-                                        print(aliases)
 
                         ontology_builder.add_term(
                             term_id=full_id,
