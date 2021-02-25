@@ -81,6 +81,7 @@ class OntologyRelation:
 
     FREQUENCY = "frequency"
     PANEL_APP_AU = "panelappau"
+    ASSOCIATED = "associated"  # used by GenCC
     ALL_FREQUENCY = "frequency"  # used by OMIM_ALL_FREQUENCIES
     ENTREZ_ASSOCIATION = "associated condition"
 

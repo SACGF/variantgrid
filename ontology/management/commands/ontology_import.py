@@ -3,12 +3,14 @@ import json
 import re
 import csv
 from collections import defaultdict
-from dataclasses import dataclass
-from typing import List, Optional, Dict
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict, Set
 
 import pandas as pd
+import numpy as np
 import pronto
 from django.core.management import BaseCommand
+from pandas import DataFrame, isna
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC
@@ -273,6 +275,58 @@ def load_mondo(filename: str, force: bool):
     ontology_builder.complete()
     ontology_builder.report()
     print("Committing...")
+
+
+def load_gencc(filename: str, force: bool):
+    ontology_builder = OntologyBuilder(
+        filename=filename,
+        context="gencc_file",
+        import_source="gencc",
+        processor_version=2,
+        force_update=force)
+
+    file_hash = file_md5sum(filename)
+    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    print("About to load gencc")
+
+    gencc_df: DataFrame = pd.read_csv(filename, sep=",")
+    # only want strong and definitive relationships
+    gencc_df = gencc_df[gencc_df.classification_title.isin(["Definitive", "Strong"])]
+    # Exclude PanelApp Australia from here
+    gencc_df = gencc_df[~gencc_df.isin(["PanelApp Australia"])]
+    gencc_df = gencc_df.sort_values(by=["gene_curie", "disease_curie"])
+    gencc_grouped = gencc_df.groupby(["gene_curie", "disease_curie"])
+
+    for group_name, df_group in gencc_grouped:
+        gene_id = df_group["gene_curie"].iloc[0]
+        mondo_id = df_group["disease_curie"].iloc[0]
+        gene_symbol = df_group["gene_symbol"].iloc[0]
+        sources = []
+
+        for row_index, row in df_group.iterrows():
+            classification_title = row["classification_title"]
+            moi_title = row["moi_title"]
+            submitter_title = row["submitter_title"]
+            sources.append({
+                "submitter": submitter_title if not isna(submitter_title) else None,
+                "gencc_classification": classification_title if not isna(classification_title) else None,
+                "mode_of_inheritance":  moi_title if not isna(moi_title) else None,
+            })
+
+        ontology_builder.add_term(
+            term_id=gene_id,
+            name=gene_symbol,
+            definition=None,
+            primary_source=False
+        )
+        ontology_builder.add_ontology_relation(
+            source_term_id=mondo_id,
+            dest_term_id=gene_id,
+            relation=OntologyRelation.RELATED,
+            extra={"sources": sources}
+        )
+
+    ontology_builder.complete()
 
 
 def load_hpo(filename: str, force: bool):
@@ -542,6 +596,7 @@ class Command(BaseCommand):
         parser.add_argument('--hgnc_sync', action="store_true", required=False)
         parser.add_argument('--biomart', required=False)
         parser.add_argument('--omim', required=False)
+        parser.add_argument('--gencc', required=False)
 
     def handle(self, *args, **options):
         force = options.get("force")
@@ -549,6 +604,12 @@ class Command(BaseCommand):
         if options.get("hgnc_sync"):
             print("Syncing HGNC")
             sync_hgnc()
+
+        if filename := options.get("gencc"):
+            try:
+                load_gencc(filename, force=force)
+            except OntologyBuilderDataUpToDateException:
+                print("GenCC File hash is the same as last import")
 
         if filename := options.get("omim"):
             try:
