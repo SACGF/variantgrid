@@ -162,7 +162,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 def _get_gene_fields():
     q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
     columns_qs = VariantGridColumn.objects.filter(q_gene).order_by("pk")
-    first_fields = ["gene_version__gene_symbol", "gene_version__gene", "gene_version__version"]
+    first_fields = ["gene_version__gene_symbol__symbol", "gene_version__gene__identifier", "gene_version__version"]
     fields = []
     for variant_column in columns_qs.values_list("variant_column", flat=True):
         gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
@@ -179,7 +179,8 @@ class GenesGrid(JqGridUserRowConfig):
     caption = "Gene Release"
     fields = _get_gene_fields()
     colmodel_overrides = {
-        'gene_version__gene_symbol': {'formatter': 'geneSymbolLink'},
+        'gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},
+        "gene_version__hgnc__gene_symbol__symbol": {"label": "HGNC Symbol"},
     }
 
     def __init__(self, user, genome_build_name, **kwargs):

@@ -540,20 +540,24 @@ class JqGrid:
         types = [(fields.AutoField, {'sorttype': 'int', 'rule': 'integer'}),
                  (fields.IntegerField, {'sorttype': 'int', 'rule': 'integer'}),
                  (fields.FloatField, {'sorttype': 'float', 'rule': 'number'}),
-                 (fields.DateTimeField, {'sorttype': 'date', 'rule': 'date'}),
-                 (fields.related.ForeignKey, {'rule': 'integer'})]
+                 (fields.DateTimeField, {'sorttype': 'date', 'rule': 'date'})]
 
-        for t, type_info in types:
-            if isinstance(field, t):
-                sorttype = type_info.get('sorttype')
-                if sorttype:
-                    colmodel['sorttype'] = sorttype
+        if isinstance(field, fields.related.ForeignKey):
+            logging.warning("JQGrid colmodel field '%s' is ForeignKey - disabling search. "
+                            "Use full path to final column to avoid filter errors", field)
+            colmodel["search"] = False
+        else:
+            for t, type_info in types:
+                if isinstance(field, t):
+                    sorttype = type_info.get('sorttype')
+                    if sorttype:
+                        colmodel['sorttype'] = sorttype
 
-                rule = type_info.get('rule')
-                if rule:
-                    colmodel_rules[rule] = True
-                break
+                    rule = type_info.get('rule')
+                    if rule:
+                        colmodel_rules[rule] = True
+                    break
 
-        JqGrid.add_search_options(field, colmodel)
+            JqGrid.add_search_options(field, colmodel)
 
         return colmodel

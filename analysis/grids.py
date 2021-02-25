@@ -40,7 +40,7 @@ class VariantGrid(JqGridSQL):
         'variantallele__allele__clingen_allele': {'width': 90, 'formatter': 'formatClinGenAlleleId'},
         'variantannotation__cosmic_id': {'width': 90, 'formatter': 'cosmicLink'},
         'variantannotation__cosmic_legacy_id': {'width': 90, 'formatter': 'cosmicLink'},
-        'variantannotation__transcript_version__gene_version__gene_symbol': {'formatter': 'geneSymbolLink'},
+        'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},
         'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
         'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60, 'formatter': 'omimLink'},
         'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
@@ -357,13 +357,13 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
     """ List VariantTags (Tag-centric) """
     model = VariantTag
     caption = 'Variant Tags'
-    fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_symbol",
+    fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
               "variant__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
 
     colmodel_overrides = {
         'id': {'hidden': True},
         "variant__id": {"hidden": True},
-        "variant__variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
+        "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
         "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
         "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},
         "analysis__id": {'hidden': True},
@@ -427,8 +427,8 @@ class TaggedVariantGrid(AbstractVariantGrid):
     colmodel_overrides = {
         'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
         'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
-        "variantannotation__transcript_version__gene_version__gene_symbol": {'label': 'Gene',
-                                                                             'formatter': 'geneSymbolNewWindowLink'},
+        "variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene',
+                                                                                     'formatter': 'geneSymbolNewWindowLink'},
     }
 
     def __init__(self, user, genome_build_name, extra_filters=None):

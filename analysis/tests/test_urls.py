@@ -100,7 +100,7 @@ class Test(URLTestCase):
                                                                         name="test karyomapping",
                                                                         trio=cls.trio)
 
-        grid_column_name = "variantannotation__transcript_version__gene_version__gene_symbol"
+        grid_column_name = "variantannotation__transcript_version__gene_version__gene_symbol__symbol"
         analysis_params = {"analysis_id": cls.analysis.pk}
         node_version_params = {"node_id": cls.node.pk, "node_version": cls.node.version}
         analysis_version_and_node_version_params = {**node_version_params,
