@@ -451,7 +451,7 @@ class ConditionMatchingSuggestion:
         self.condition_text_match = condition_text_match
         self.terms: List[OntologyTerm] = condition_text_match.condition_xref_terms if condition_text_match and not ignore_existing else []
         self.is_applied = bool(self.terms)
-        self.hidden = False
+        self.info_only = False
         self.condition_multi_operation: MultiCondition = MultiCondition.NOT_DECIDED
         if self.is_applied:
             self.condition_multi_operation = condition_text_match.condition_multi_operation
@@ -481,7 +481,7 @@ class ConditionMatchingSuggestion:
         return {
             "id": self.condition_text_match.id if self.condition_text_match else None,
             "is_applied": self.is_applied,
-            "hidden": self.hidden,
+            "info_only": self.info_only,
             "terms": [{"id": term.id, "name": term.name, "definition": '???' if term.is_stub else term.definition} for term in self.terms],
             "joiner": self.condition_multi_operation,
             "messages": [message.as_json() for message in self.messages],
@@ -489,7 +489,6 @@ class ConditionMatchingSuggestion:
         }
 
     def is_auto_assignable(self, gene_symbol: Optional[GeneSymbol] = None):
-        # FIXME need to know if was assigned via embedded terms or not
         if terms := self.terms:
             if len(terms) != 1:
                 return False
@@ -768,6 +767,8 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
             display_root_cms = root_cms
             is_root_real = True
         else:
+            display_root_cms = root_cms
+            display_root_cms.info_only = True
             is_root_real = False
 
     root_cms.validate()
@@ -851,8 +852,8 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         # suggest the root at each gene level anyway (along with any warnings we may have generated)
                         if not root_cms.ids_found_in_text:
                             cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
-                            for message in root_cms.messages:
-                                cms.add_message(message)
+                            # for message in root_cms.messages:
+                            #    cms.add_message(message)
                         pass
 
     return suggestions
