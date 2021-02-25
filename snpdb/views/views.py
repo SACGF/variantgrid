@@ -232,6 +232,13 @@ def view_vcf(request, vcf_id):
 
         add_save_message(request, valid, "VCF")
 
+    try:
+        # Test needed data exists ()
+        _ = vcf.cohort
+        _ = vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+        messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
+
     if reload_vcf:
         set_vcf_and_samples_import_status(vcf, ImportStatus.IMPORTING)
         retry_upload_pipeline(vcf.uploadedvcf.uploaded_file.uploadpipeline)

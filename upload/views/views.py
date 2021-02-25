@@ -222,19 +222,21 @@ def view_upload_stats(request):
 
 def view_upload_pipeline(request, upload_pipeline_id):
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-    upload_pipeline.uploaded_file.check_can_view(request.user)
+    uploaded_file = upload_pipeline.uploaded_file
+    uploaded_file.check_can_view(request.user)
 
-    allow_retry_import = request.user.is_superuser
+    filename = uploaded_file.get_filename()
+    file_exists = os.path.exists(filename)
+    allow_retry_import = (uploaded_file.user == request.user or request.user.is_superuser) and file_exists
+
+    if not file_exists:
+        status = messages.WARNING
+        messages.add_message(request, status, "File does not exist on disk, cannot reload", extra_tags='import-message')
+
     if upload_pipeline.status == ProcessingStatus.ERROR:
         msg = f"Import Error: This file failed to import due to: {upload_pipeline.progress_status}. "
         status = messages.ERROR
         messages.add_message(request, status, msg, extra_tags='import-message')
-
-        try:
-            upload_pipeline.uploaded_file.get_file()
-            allow_retry_import = True
-        except:
-            pass
 
     step_order, step_start_end_lines = upload_stats.get_step_order_and_step_start_end_lines(upload_pipeline)
     more_warning_or_error_details = False

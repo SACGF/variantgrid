@@ -1,7 +1,7 @@
 {# Analysis can be turned off in that case URLs won't resolve so just skip #}
 {% if url_name_visible.analysis and url_name_visible.trio_wizard %}
     {% load static %}
-    {% if sample_count >= 3 %}
+    {% if cohort.cohort_genotype_collection and sample_count >= 3 %}
     <style>
     #create-trio-button {
         float: left;
