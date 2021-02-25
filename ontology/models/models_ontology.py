@@ -67,8 +67,9 @@ class OntologyRelation:
     """
     IS_A = "is_a"
     EXACT = "exact"  # defined by HPO and MONDO
-    EXACTISH = "exact_synonym"
+    EXACT_SYNONYM = "exact_synonym"
     RELATED = "related"  # defined by HPO and MONDO (also use relatedSynonymn from mondo to populate this)
+    RELATED_SYNONYM = "related_synonym"
     CLOSE = "close"  # defined by HPO and MONDO
     BROAD = "broad"  # defined by HPO and MONDO
     NARROW = "narrow"  # defined by HPO and MONDO
@@ -83,7 +84,8 @@ class OntologyRelation:
 
     DISPLAY_NAMES = {
         IS_A: "is a",
-        EXACTISH: "has an exact synonym from",
+        EXACT_SYNONYM: "has an exact synonym from",
+        RELATED_SYNONYM: "has a related synonym from",
         ALL_FREQUENCY: "frequently occurs with",
         ENTREZ_ASSOCIATION: "has an associated gene of",
         PANEL_APP_AU: "PanelApp AU association"
@@ -420,7 +422,7 @@ class OntologySnake:
                 OntologyTermRelation.objects.filter(
                     (Q(source_term__in=all_leafs) & ~Q(dest_term__in=seen)) |\
                     (Q(dest_term__in=all_leafs) & ~Q(source_term__in=seen)))\
-                    .exclude(relation=OntologyRelation.IS_A)\
+                    .exclude(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})\
                     .select_related("source_term", "dest_term"))
 
             for snake in snakes:

@@ -79,7 +79,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=8)
+        processor_version=9)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -147,8 +147,8 @@ def load_mondo(filename: str, force: bool):
 
                             for pred_type in ["hasExactSynonym", "hasRelatedSynonym"]:
                                 relation = {
-                                    "hasExactSynonym": OntologyRelation.EXACTISH,
-                                    "hasRelatedSynonym": OntologyRelation.RELATED
+                                    "hasExactSynonym": OntologyRelation.EXACT_SYNONYM,
+                                    "hasRelatedSynonym": OntologyRelation.RELATED_SYNONYM
                                 }[pred_type]
 
                                 for synonym in synonyms:
