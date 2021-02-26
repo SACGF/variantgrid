@@ -2,7 +2,7 @@ import csv
 import io
 import operator
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from operator import attrgetter
 from urllib.parse import urlparse
 
@@ -547,3 +547,15 @@ class ArrayLength(models.Func):
     MyModel.objects.all().annotate(field_len=ArrayLength('field')).order_by('field_len')
     """
     function = 'CARDINALITY'
+
+
+class DebugTimer:
+
+    def __init__(self):
+        self.start = datetime.now()
+
+    def tick(self, description:str):
+        now = datetime.now()
+        duration = now - self.start
+        print(f"{description} {duration}")
+        self.start = now

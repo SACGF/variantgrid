@@ -68,9 +68,6 @@ class OntologyBuilder:
         self.total_count = 0
         self.counters: Dict[Any, OperationCounter] = defaultdict(OperationCounter)
         self.created_cache: Dict[str, int] = dict()
-        self.gene_symbols: Dict[str, GeneSymbol] = dict()
-        for gene_symbol in GeneSymbol.objects.all():
-            self.gene_symbols[gene_symbol.symbol] = gene_symbol
 
     def ensure_old(self, max_age: timedelta):
         """

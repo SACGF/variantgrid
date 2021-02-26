@@ -780,7 +780,7 @@ def _is_descendat_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set
         return _is_descendat_ids(all_parent_terms, ancestors_ids, seen_ids, check_levels - 1)
 
 
-def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 7):
+def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 10):
     return _is_descendat_ids(set([term.id for term in terms]), set([term.id for term in ancestors]), set(), check_levels)
 
 
@@ -812,6 +812,9 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     # filled in and gene level, exclude root as we take care of that before-hand
     filled_in: QuerySet
     filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
+    root_level_mondo = set()
+    root_level_terms = root_cms.terms
+    root_level_mondo = set([term for term in root_level_terms if term.ontology_service == OntologyService.MONDO])
 
     for ctm in filled_in:
         if ctm.condition_xref_terms and not ignore_existing:
@@ -827,68 +830,65 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
             suggestions.append(cms)
 
             gene_symbol = ctm.gene_symbol
-            if root_level_terms := root_cms.terms:  # uses suggestions and selected values
+            if root_level_mondo:
+                gene_level_terms = OntologySnake.mondo_terms_for_gene_symbol(gene_symbol=gene_symbol)
+                matches_gene_level = set()
+                for gene_level in gene_level_terms:
+                    if is_descendant({gene_level}, root_level_mondo):
+                        matches_gene_level.add(gene_level)
 
-                if root_level_mondo := set([term for term in root_level_terms if term.ontology_service == OntologyService.MONDO]):
-                    gene_level_terms = OntologySnake.mondo_terms_for_gene_symbol(gene_symbol=gene_symbol)
-                    matches_gene_level = set()
-                    for gene_level in gene_level_terms:
-                        if is_descendant({gene_level}, root_level_mondo):
-                            matches_gene_level.add(gene_level)
+                not_root_gene_terms = list()
+                for term in matches_gene_level:
+                    if term not in root_level_terms:
+                        not_root_gene_terms.append(term)
 
-                    not_root_gene_terms = list()
-                    for term in matches_gene_level:
-                        if term not in root_level_terms:
-                            not_root_gene_terms.append(term)
+                matches_gene_level_leafs = [term for term in matches_gene_level if term.is_leaf]
+                root_level_str = ', '.join([term.id for term in root_level_mondo])
 
-                    matches_gene_level_leafs = [term for term in matches_gene_level if term.is_leaf]
-                    root_level_str = ', '.join([term.id for term in root_level_mondo])
-
-                    if not matches_gene_level:
-                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Could not find relationship to {gene_symbol}"))
-                    elif len(matches_gene_level) == 1:
-                        term = list(matches_gene_level)[0]
-                        if term in root_level_terms:
-                            cms.add_message(ConditionMatchingMessage(severity="success",
-                                                                     text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
-                            if len(root_level_terms) != 1 and not root_cms.ids_found_in_text:
-                                cms.add_term(term)
-                        else:
-                            cms.add_message(ConditionMatchingMessage(severity="success",
-                                                                 text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
-                            cms.add_term(term)  # not guaranteed to be a leaf, but no associations on child terms
-                    elif len(matches_gene_level_leafs) == 1:
-                        term = list(matches_gene_level_leafs)[0]
+                if not matches_gene_level:
+                    cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Could not find relationship to {gene_symbol}"))
+                elif len(matches_gene_level) == 1:
+                    term = list(matches_gene_level)[0]
+                    if term in root_level_terms:
                         cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
-                        cms.add_term(matches_gene_level_leafs[0])
-                        #for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
-                        #    if term != matches_gene_level_leafs[0]:
-                        #        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
-
-                    elif len(not_root_gene_terms) == 1:
-                        cms.add_term(not_root_gene_terms[0])
+                        if len(root_level_terms) != 1 and not root_cms.ids_found_in_text:
+                            cms.add_term(term)
                     else:
-                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple descendants of this term are associated to {gene_symbol}"))
-                        for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
-                            cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is associated to {gene_symbol}"))
-
-
-                else:
-                    # if not MONDO term, see if this term has a known relationship directly
-                    parent_term_missing_gene = list()
-                    parent_term_has_gene = list()
-                    for term in root_level_terms:
-                        if not OntologySnake.has_gene_relationship(term, gene_symbol):
-                            parent_term_missing_gene.append(term)
-                        else:
-                            parent_term_has_gene.append(term)
-
-                    for term in parent_term_missing_gene:
-                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{term.id} : no relationship on file to {gene_symbol.symbol}"))
-                    for term in parent_term_has_gene:
                         cms.add_message(ConditionMatchingMessage(severity="success",
-                                                                 text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                                                             text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                        cms.add_term(term)  # not guaranteed to be a leaf, but no associations on child terms
+                elif len(matches_gene_level_leafs) == 1:
+                    term = list(matches_gene_level_leafs)[0]
+                    cms.add_message(ConditionMatchingMessage(severity="success",
+                                                             text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                    cms.add_term(matches_gene_level_leafs[0])
+                    #for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
+                    #    if term != matches_gene_level_leafs[0]:
+                    #        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
+
+                elif len(not_root_gene_terms) == 1:
+                    cms.add_term(not_root_gene_terms[0])
+                else:
+                    cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple descendants of this term are associated to {gene_symbol}"))
+                    for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
+                        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is associated to {gene_symbol}"))
+
+            else:
+                # if not MONDO term, see if this term has a known relationship directly
+                parent_term_missing_gene = list()
+                parent_term_has_gene = list()
+                for term in root_level_terms:
+                    if not OntologySnake.has_gene_relationship(term, gene_symbol):
+                        parent_term_missing_gene.append(term)
+                    else:
+                        parent_term_has_gene.append(term)
+
+                for term in parent_term_missing_gene:
+                    cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{term.id} : no relationship on file to {gene_symbol.symbol}"))
+                for term in parent_term_has_gene:
+                    cms.add_message(ConditionMatchingMessage(severity="success",
+                                                             text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
 
                 if cms.terms == root_cms.terms and root_cms.ids_found_in_text:
                     cms.terms = []  # no need to duplicate when ids found in text
@@ -906,5 +906,4 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                             # for message in root_cms.messages:
                             #    cms.add_message(message)
                         pass
-
     return suggestions
