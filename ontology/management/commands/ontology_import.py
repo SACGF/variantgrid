@@ -83,7 +83,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=11)
+        processor_version=12)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -139,8 +139,6 @@ def load_mondo(filename: str, force: bool):
                             # only allow 1 relationship between any 2 terms (though DB does allow more)
                             # storing all of them would be more "accurate" but gets in the way of our usage
                             # prioritise relationships as EXACT, RELATED, related terms, XREF
-                            for synonym in synonyms:
-                                aliases.append(synonym.get("val"))
 
                             for pred_type in ["hasExactSynonym", "hasRelatedSynonym"]:
                                 relation = {
@@ -149,10 +147,12 @@ def load_mondo(filename: str, force: bool):
                                 }[pred_type]
                                 for synonym in synonyms:
                                     pred = synonym.get("pred")
-                                    for xref in synonym.get("xrefs", []):
-                                        xref_term = TermId(xref)
-                                        if xref_term.type in {"HP", "OMIM"}:
-                                            term_relation_types[xref_term.id].append(relation)
+                                    if pred == pred_type:
+                                        aliases.append(synonym.get("val"))
+                                        for xref in synonym.get("xrefs", []):
+                                            xref_term = TermId(xref)
+                                            if xref_term.type in {"HP", "OMIM"}:
+                                                term_relation_types[xref_term.id].append(relation)
 
                         for key, relations in term_relation_types.items():
                             unique_relations = list()

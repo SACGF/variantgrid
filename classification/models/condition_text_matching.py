@@ -458,6 +458,7 @@ class ConditionMatchingSuggestion:
         self.validated = False
         self.ids_found_in_text: Optional[bool] = None
         self.alias_index: Optional[int] = None
+        self.merged = False
 
     @property
     def term_str_array(self) -> List[str]:
@@ -675,6 +676,13 @@ def merge_matches(matches: List[ConditionMatchingSuggestion]) -> Optional[Condit
             if len(name_matches) == 1:
                 return name_matches[0]
 
+        if len(matches) == 2:
+            # if we matched 2 terms, and one is the child of the other, just return the parent most item
+            if is_descendant(terms={matches[0].terms[0]}, ancestors={matches[1].terms[0]}, check_levels=3):
+                return matches[1]
+            elif is_descendant(terms={matches[1].terms[0]}, ancestors={matches[0].terms[0]}, check_levels=3):
+                return matches[0]
+
         # we had multiple matches and couldn't pick a best option
         suggestion = ConditionMatchingSuggestion()
         for match in matches:
@@ -682,6 +690,7 @@ def merge_matches(matches: List[ConditionMatchingSuggestion]) -> Optional[Condit
                 suggestion.add_term(term)
         suggestion.condition_multi_operation = MultiCondition.UNCERTAIN
         suggestion.add_message(ConditionMatchingMessage(severity="error", text="Text matched multiple terms"))
+        suggestion.merged = True
         return suggestion
 
 
@@ -708,8 +717,9 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
         qs = OntologyTerm.objects.filter(ontology_service=service).filter(reduce(
                 operator.and_, q))
         for term in qs[0:200]:
-            if cms := search_text_to_suggestion(match_text, term):
-                matches.append(cms)
+            if not term.is_obsolete:
+                if cms := search_text_to_suggestion(match_text, term):
+                    matches.append(cms)
 
     return merge_matches(matches)
 
@@ -747,8 +757,10 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
     return ConditionMatchingSuggestion()
 
 
-def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: Set[OntologyTerm], check_levels: int = 10):
+def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: Optional[Set[OntologyTerm]] = None, check_levels: int = 10):
     # TODO move this to OntologyTerm class
+    if seen is None:
+        seen = set()
     for term in terms:
         if term in ancestors:
             return True
@@ -815,7 +827,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     gene_level_terms = set(OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO).leafs())
                     matches_gene_level = set()
                     for gene_level in gene_level_terms:
-                        if is_descendant({gene_level}, root_level_mondo, set()):
+                        if is_descendant({gene_level}, root_level_mondo):
                             matches_gene_level.add(gene_level)
 
                     matches_gene_level_leafs = [term for term in matches_gene_level if term.is_leaf]
@@ -828,10 +840,12 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         if term in root_level_terms:
                             cms.add_message(ConditionMatchingMessage(severity="success",
                                                                      text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                            if len(root_level_terms) != 1 and not root_cms.ids_found_in_text:
+                                cms.add_term(term)
                         else:
                             cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
-                            cms.add_term(list(matches_gene_level)[0])  # not guaranteed to be a leaf, but no associations on child terms
+                            cms.add_term(term)  # not guaranteed to be a leaf, but no associations on child terms
                     elif len(matches_gene_level_leafs) == 1:
                         term = list(matches_gene_level_leafs)[0]
                         cms.add_message(ConditionMatchingMessage(severity="success",
@@ -867,7 +881,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     else:
                         # if root was a suggestion, but we couldn't come up with a more specific suggestion
                         # suggest the root at each gene level anyway (along with any warnings we may have generated)
-                        if not root_cms.ids_found_in_text:
+                        if not root_cms.ids_found_in_text and not root_cms.merged:
                             cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
                             # for message in root_cms.messages:
                             #    cms.add_message(message)
