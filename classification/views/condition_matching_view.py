@@ -53,12 +53,12 @@ def condition_matchings_view(request):
 def next_condition_text(current: ConditionText, user: User) -> Optional[ConditionText]:
     qs = ConditionText.objects.filter(classifications_count__lte=current.classifications_count, classifications_count_outstanding__gte=1).order_by('-classifications_count', 'normalized_text')
     qs = get_objects_for_user(user, ConditionText.get_read_perm(), qs, accept_global_perms=True)
-    for term in qs:
-        if term == current:
+    for ct in qs:
+        if ct == current:
             continue
-        if term.normalized_text < current.normalized_text:
+        if ct.classifications_count == current.classifications_count and ct.normalized_text < current.normalized_text:
             continue
-        return term
+        return ct
     return None
 
 
