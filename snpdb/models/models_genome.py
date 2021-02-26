@@ -56,12 +56,6 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return GenomeBuild.builds_with_annotation().filter(pk=self.pk).exists()
 
     @staticmethod
-    @timed_cache(ttl=60)
-    def default_build():
-        """ Used for initialising user settings or worst case fallback """
-        return GenomeBuild.objects.get(name=settings.DEFAULT_BUILD)
-
-    @staticmethod
     def get_from_fuzzy_string(genome_build_str: str):
         if "h37" in genome_build_str:
             return GenomeBuild.grch37()

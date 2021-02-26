@@ -264,8 +264,10 @@ def view_classification(request, record_id):
     variant = ref.record.variant
     if variant:
         genome_build = variant.genome_build
+
     if genome_build is None:
-        genome_build = GenomeBuild.default_build()
+        user_settings = UserSettings.get_for_user(request.user)
+        genome_build = user_settings.default_genome_build
 
     vc: Classification = ref.record
 

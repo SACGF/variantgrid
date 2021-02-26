@@ -164,8 +164,6 @@ _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 BUILD_GRCH37 = "GRCh37"
 BUILD_GRCH38 = "GRCh38"
 
-DEFAULT_BUILD = BUILD_GRCH37  # User default
-
 ANNOTATION = {
     BUILD_GRCH37: {
         "enabled": True,
