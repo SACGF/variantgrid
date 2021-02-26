@@ -21,6 +21,7 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
     url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
     r = requests.get(url)
     data = r.json()
+    r.close()
     return data.get("results")
 
 
