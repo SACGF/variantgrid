@@ -506,9 +506,9 @@ class OntologySnake:
                 via_ids: QuerySet = None
                 exclude_mondo_omim = ~Q(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
                 if term.ontology_service == OntologyService.MONDO:
-                    via_ids = OntologyTermRelation.objects.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(exclude_mondo_omim).value_list("dest_term_id", flat=True)
+                    via_ids = OntologyTermRelation.objects.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(exclude_mondo_omim).values_list("dest_term_id", flat=True)
                 else:
-                    via_ids = OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(exclude_mondo_omim).value_list("source_term_id", flat=True)
+                    via_ids = OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(exclude_mondo_omim).values_list("source_term_id", flat=True)
                 return OntologyTermRelation.objects.filter(source_term_id__in=via_ids, dest_term=gene_term).exists()
 
             hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()
