@@ -1,6 +1,7 @@
 import operator
 from dataclasses import dataclass
 from functools import reduce
+from operator import attrgetter
 from typing import List, Optional, Dict, Any, Iterable, Set
 
 import requests
@@ -22,7 +23,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from library.utils import ArrayLength
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
 from snpdb.models import Lab
@@ -540,10 +541,10 @@ class ConditionMatchingSuggestion:
                         for term in valid_terms:
                             if not OntologySnake.has_gene_relationship(term, gene_symbol):
                                 self.add_message(ConditionMatchingMessage(severity="warning",
-                                                                         text=f"{term.id} : no direct relationship on file to {gene_symbol.symbol}"))
+                                                                         text=f"{term.id} : no direct association on file to {gene_symbol.symbol}"))
                             else:
                                 self.add_message(ConditionMatchingMessage(severity="success",
-                                                                         text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                                                                         text=f"{term.id} : is associated to {gene_symbol.symbol}"))
 
             # validate that we have the terms being referenced (if we don't big chance that they're not valid)
             for term in terms:
@@ -757,25 +758,30 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
     return ConditionMatchingSuggestion()
 
 
-def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], seen: Optional[Set[OntologyTerm]] = None, check_levels: int = 10):
+def _is_descendat_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set[int], check_levels: int):
     # TODO move this to OntologyTerm class
-    if seen is None:
-        seen = set()
-    for term in terms:
-        if term in ancestors:
+    for term in term_ids:
+        if term in ancestors_ids:
             return True
     if check_levels == 0:
         return False
 
     all_parent_terms = set()
-    for term in terms:
-        if parents := OntologyTermRelation.parents_of(term):
-            for parent in parents:
-                if parent not in seen:
-                    all_parent_terms.add(parent)
+    if term_ids:
+        parent_qs = OntologyTermRelation.objects.filter(source_term__pk__in=term_ids,
+                                                   relation=OntologyRelation.IS_A).values_list("dest_term",
+                                                                                               flat=True)
+        for parent in parent_qs:
+            if parent not in seen_ids:
+                all_parent_terms.add(parent)
+
     if all_parent_terms:
-        seen = seen.union(all_parent_terms)
-        return is_descendant(all_parent_terms, ancestors, seen, check_levels-1)
+        seen_ids = seen_ids.union(all_parent_terms)
+        return _is_descendat_ids(all_parent_terms, ancestors_ids, seen_ids, check_levels - 1)
+
+
+def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 10):
+    return _is_descendat_ids(set([term.id for term in terms]), set([term.id for term in ancestors]), set(), check_levels)
 
 
 def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> List[ConditionMatchingSuggestion]:
@@ -830,6 +836,11 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         if is_descendant({gene_level}, root_level_mondo):
                             matches_gene_level.add(gene_level)
 
+                    not_root_gene_terms = list()
+                    for term in matches_gene_level:
+                        if term not in root_level_terms:
+                            not_root_gene_terms.append(term)
+
                     matches_gene_level_leafs = [term for term in matches_gene_level if term.is_leaf]
                     root_level_str = ', '.join([term.id for term in root_level_mondo])
 
@@ -851,8 +862,17 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         cms.add_term(matches_gene_level_leafs[0])
+                        for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
+                            if term != matches_gene_level_leafs[0]:
+                                cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
+
+                    elif len(not_root_gene_terms) == 1:
+                        cms.add_term(not_root_gene_terms[0])
                     else:
-                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple children of this term are associated to {gene_symbol}"))
+                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple descendants of this term are associated to {gene_symbol}"))
+                        for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
+                            cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is associated to {gene_symbol}"))
+
 
                 else:
                     # if not MONDO term, see if this term has a known relationship directly

@@ -6,6 +6,7 @@ from typing import Union
 
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
+from library.cache import timed_cache
 from library.log_utils import report_exc_info
 from library.utils import md5sum_str
 from ontology.models import OntologyService, OntologyTerm, OntologyRelation, OntologyImportSource
@@ -13,11 +14,15 @@ from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDa
 
 
 def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
-    if not settings.PANEL_APP_CHECK_ENABLED:
-        return
-
     if isinstance(gene_symbol, GeneSymbol):
         gene_symbol = gene_symbol.symbol
+    return _update_gene_relations(gene_symbol)
+
+
+@timed_cache(size_limit=2, ttl=10, quick_key_access=True)
+def _update_gene_relations(gene_symbol: str):
+    if not settings.PANEL_APP_CHECK_ENABLED:
+        return
 
     # note that we only check PanelApp here, as other imports are done by file
     try:
