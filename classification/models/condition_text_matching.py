@@ -846,7 +846,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                 root_level_str = ', '.join([term.id for term in root_level_mondo])
 
                 if not matches_gene_level:
-                    cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Could not find relationship to {gene_symbol}"))
+                    cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Could not find association to {gene_symbol}"))
                 elif len(matches_gene_level) == 1:
                     term = list(matches_gene_level)[0]
                     if term in root_level_terms:
@@ -893,17 +893,17 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                 if cms.terms == root_cms.terms and root_cms.ids_found_in_text:
                     cms.terms = []  # no need to duplicate when ids found in text
 
-                if not cms.terms:
-                    if root_cms.is_applied:
-                        # if parent was applied, and all we have are warnings
-                        # put them in the applied column not suggestion
-                        cms.is_applied = True
-                    else:
-                        # if root was a suggestion, but we couldn't come up with a more specific suggestion
-                        # suggest the root at each gene level anyway (along with any warnings we may have generated)
-                        if not root_cms.ids_found_in_text and not root_cms.merged:
-                            cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
-                            # for message in root_cms.messages:
-                            #    cms.add_message(message)
-                        pass
+            if not cms.terms:
+                if root_cms.is_applied:
+                    # if parent was applied, and all we have are warnings
+                    # put them in the applied column not suggestion
+                    cms.is_applied = True
+                else:
+                    # if root was a suggestion, but we couldn't come up with a more specific suggestion
+                    # suggest the root at each gene level anyway (along with any warnings we may have generated)
+                    if not root_cms.ids_found_in_text and not root_cms.merged:
+                        cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
+                        # for message in root_cms.messages:
+                        #    cms.add_message(message)
+                    pass
     return suggestions
