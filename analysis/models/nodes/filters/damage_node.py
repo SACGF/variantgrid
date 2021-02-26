@@ -5,10 +5,10 @@ from django.db.models.query_utils import Q
 from functools import reduce
 import operator
 
+from analysis.models.enums import FilterSetting, NullableFilterSetting
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.models.damage_enums import PathogenicityImpact, SIFTPrediction, \
-    Polyphen2Prediction, MutationTasterPrediction, FATHMMPrediction, \
-    MutationAssessorPrediction
+from annotation.models.damage_enums import PathogenicityImpact, SIFTPrediction, Polyphen2Prediction, \
+    MutationTasterPrediction, FATHMMPrediction, MutationAssessorPrediction
 from annotation.models.models import VariantAnnotation
 
 
@@ -17,11 +17,24 @@ class DamageNode(AnalysisNode):
     INDIVIDUAL_DAMAGE_PREDICTION = 1
 
     impact_min = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
-    always_keep_splice_variants_regardless_of_impact = models.BooleanField(default=True)
+    splice_min = models.FloatField(null=True, blank=True)
     cadd_score_min = models.IntegerField(null=True, blank=True)
     revel_score_min = models.FloatField(null=True, blank=True)
+    protein_domain = models.BooleanField(default=False)
+    published = models.BooleanField(default=False)
+
+    impact_filter = models.CharField(max_length=1, choices=FilterSetting.choices, default=FilterSetting.OR)
+    splice_filter = models.CharField(max_length=1, choices=NullableFilterSetting.choices, default=NullableFilterSetting.OR)
+    cadd_filter = models.CharField(max_length=1, choices=NullableFilterSetting.choices, default=NullableFilterSetting.OR)
+    revel_filter = models.CharField(max_length=1, choices=NullableFilterSetting.choices, default=NullableFilterSetting.OR)
+    damage_filter = models.CharField(max_length=1, choices=NullableFilterSetting.choices, default=NullableFilterSetting.OR)
+    protein_filter = models.CharField(max_length=1, choices=NullableFilterSetting.choices, default=FilterSetting.OR)
+    published_filter = models.CharField(max_length=1, choices=NullableFilterSetting.choices, default=FilterSetting.OR)
+
+    # TODO: Remove these 2
+    always_keep_splice_variants_regardless_of_impact = models.BooleanField(default=True)
     allow_null = models.BooleanField(default=False)
-    remove_low_complexity_regions = models.BooleanField(default=False)
+
     # 2 modes - min damage predictions, or individual settings
     accordion_panel = models.IntegerField(default=0)
     min_damage_predictions = models.IntegerField(null=True, blank=True)
@@ -56,14 +69,10 @@ class DamageNode(AnalysisNode):
 
     def modifies_parents(self):
         return any([self.has_min_predictions, self.has_individual_damage,
-                    self.impact_min, self.cadd_score_min, self.revel_score_min, self.remove_low_complexity_regions])
+                    self.impact_min, self.cadd_score_min, self.revel_score_min])
 
     def _get_node_q(self) -> Optional[Q]:
         snp_only_filters = []
-
-        if self.remove_low_complexity_regions:
-            no_lc_q = Q(variantannotation__repeat_masker__isnull=True)
-            snp_only_filters.append(no_lc_q)
 
         if self.cadd_score_min:
             cadd_q = Q(variantannotation__cadd_phred__gte=self.cadd_score_min)
@@ -139,10 +148,6 @@ class DamageNode(AnalysisNode):
                 name = f"{self.min_damage_predictions} of {len(self.DAMAGE_PREDICTION)}"
             elif self.has_individual_damage:
                 name = "Custom Damage"
-
-            if self.remove_low_complexity_regions:
-                name += 'Remove low complexity'
-
         return name
 
     @staticmethod

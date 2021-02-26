@@ -11,7 +11,8 @@ from snpdb.models.models_enums import BuiltInFilters
 
 class BuiltInFilterNode(AnalysisNode):
     built_in_filter = models.CharField(max_length=1, choices=BuiltInFilters.FILTER_CHOICES, null=True)
-    min_clinvar_stars = models.IntegerField(default=0, null=True, blank=True)
+    min_clinvar_stars = models.IntegerField(default=0)
+    cosmic_count = models.IntegerField(default=0)
 
     def modifies_parents(self):
         return self.built_in_filter is not None
