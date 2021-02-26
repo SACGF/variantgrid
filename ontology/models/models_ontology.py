@@ -164,7 +164,7 @@ class OntologyTerm(TimeStampedModel):
     def is_leaf(self) -> bool:
         # Warning, just meant to be called on MONDO terms
         if not self.is_stub and self.ontology_service == OntologyService.MONDO:
-            return not OntologyTermRelation.children_of(self).exists()
+            return not OntologyTermRelation.objects.filter(dest_term=self, relation=OntologyRelation.IS_A).exists()
         return True
 
     @property
@@ -450,6 +450,26 @@ class OntologySnake:
         return OntologySnakes(valid_snakes)
 
     @staticmethod
+    def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> Set[OntologyTerm]:
+        gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
+        from ontology.panel_app_ontology import update_gene_relations
+        update_gene_relations(gene_symbol)
+        terms = set()
+
+        mondos = OntologyTermRelation.objects.filter(dest_term=gene_ontology, source_term__ontology_service=OntologyService.MONDO).values_list("source_term_id", flat=True)
+        terms = terms.union(set(mondos))
+        omim_ids = OntologyTermRelation.objects.filter(dest_term=gene_ontology, source_term__ontology_service=OntologyService.OMIM).values_list("source_term_id", flat=True)
+        if omim_ids:
+            # relationships are always MONDO -> OMIM, and MONDO -> HGNC, OMIM -> HGNC
+            via_omim_mondos = OntologyTermRelation.objects.filter(source_term__ontology_service=OntologyService.MONDO, dest_term_id__in=omim_ids).exclude(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
+            terms = terms.union(set(via_omim_mondos))
+        if terms:
+            return set(OntologyTerm.objects.filter(pk__in=terms))
+        else:
+            return None
+
+
+    @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
         # TODO, do this with hooks
         from ontology.panel_app_ontology import update_gene_relations
@@ -468,7 +488,7 @@ class OntologySnake:
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
     @staticmethod
-    def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str]) -> QuerySet:
+    def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str]) -> bool:
         # TODO, do this with hooks
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
@@ -478,6 +498,19 @@ class OntologySnake:
                 return False
         try:
             gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
+            # try direct link first
+            if OntologyTermRelation.objects.filter(source_term=term, dest_term=gene_term).exists():
+                return True
+            # optimisations for OMIM/MONDO
+            if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
+                via_ids: QuerySet = None
+                exclude_mondo_omim = ~Q(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
+                if term.ontology_service == OntologyService.MONDO:
+                    via_ids = OntologyTermRelation.objects.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(exclude_mondo_omim).value_list("dest_term_id", flat=True)
+                else:
+                    via_ids = OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(exclude_mondo_omim).value_list("source_term_id", flat=True)
+                return OntologyTermRelation.objects.filter(source_term_id__in=via_ids, dest_term=gene_term).exists()
+
             hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()
             return gene_term in hgnc_terms
         except ValueError:

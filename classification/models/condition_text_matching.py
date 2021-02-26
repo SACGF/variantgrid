@@ -780,7 +780,7 @@ def _is_descendat_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set
         return _is_descendat_ids(all_parent_terms, ancestors_ids, seen_ids, check_levels - 1)
 
 
-def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 10):
+def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 7):
     return _is_descendat_ids(set([term.id for term in terms]), set([term.id for term in ancestors]), set(), check_levels)
 
 
@@ -830,7 +830,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
             if root_level_terms := root_cms.terms:  # uses suggestions and selected values
 
                 if root_level_mondo := set([term for term in root_level_terms if term.ontology_service == OntologyService.MONDO]):
-                    gene_level_terms = set(OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO).leafs())
+                    gene_level_terms = OntologySnake.mondo_terms_for_gene_symbol(gene_symbol=gene_symbol)
                     matches_gene_level = set()
                     for gene_level in gene_level_terms:
                         if is_descendant({gene_level}, root_level_mondo):
@@ -862,9 +862,9 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         cms.add_term(matches_gene_level_leafs[0])
-                        for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
-                            if term != matches_gene_level_leafs[0]:
-                                cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
+                        #for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
+                        #    if term != matches_gene_level_leafs[0]:
+                        #        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
 
                     elif len(not_root_gene_terms) == 1:
                         cms.add_term(not_root_gene_terms[0])
