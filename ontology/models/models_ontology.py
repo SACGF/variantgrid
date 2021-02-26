@@ -466,7 +466,7 @@ class OntologySnake:
         if terms:
             return set(OntologyTerm.objects.filter(pk__in=terms))
         else:
-            return None
+            return set()
 
 
     @staticmethod
