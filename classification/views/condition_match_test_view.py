@@ -5,7 +5,9 @@ from django.contrib import messages
 from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
-from classification.models import ConditionText, top_level_suggestion, condition_matching_suggestions
+
+from classification.models import ConditionText, top_level_suggestion, condition_matching_suggestions, \
+    ConditionMatchingSuggestion
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
@@ -17,7 +19,6 @@ def condition_match_test_download_view(request):
 
     def result_iterator():
         try:
-            row_count = 0
             yield delimited_row([
                 "id", "lab", "text", "gene", "terms", "messages", "status"
             ])
@@ -29,39 +30,47 @@ def condition_match_test_download_view(request):
                               .order_by('-classifications_count'):
                 if ct.normalized_text == "not provided":
                     continue
+                try:
+                    suggestions = condition_matching_suggestions(ct, ignore_existing=True)
+                    root_suggestion: Optional[ConditionMatchingSuggestion] = None
+                    for suggestion in suggestions:
+                        if suggestion.condition_text_match.is_root:
+                            root_suggestion = suggestion
+                            break
+                    if root_suggestion is None:
+                        root_suggestion = top_level_suggestion(ct.normalized_text)
 
-                suggestions = condition_matching_suggestions(ct, ignore_existing=True)
-                for suggestion in suggestions:
-                    status = None
-                    gene_symbol = suggestion.condition_text_match.gene_symbol
-                    if suggestion.condition_text_match.is_root:
-                        if suggestion.is_auto_assignable():
-                            status = "auto-assign"
-                    elif suggestion.condition_text_match.is_gene_level:
-                        if suggestion.is_auto_assignable(gene_symbol):
-                            if auto_suggestion := top_level_suggestion(ct.normalized_text):
-                                if auto_suggestion.is_auto_assignable(gene_symbol):
-                                    suggestion = auto_suggestion
-                                    status = "auto-assign"
-                    if not suggestion.terms:
-                        if suggestion.messages:
-                            status = "notes"
-                        else:
-                            status = "manual only"
-                    elif status is None:
-                        status = "suggestion"
+                    for suggestion in suggestions:
+                        status = None
+                        gene_symbol = suggestion.condition_text_match.gene_symbol
+                        if suggestion.condition_text_match.is_root:
+                            if suggestion.is_auto_assignable():
+                                status = "auto-assign"
+                        elif suggestion.condition_text_match.is_gene_level:
+                            if suggestion.is_auto_assignable(gene_symbol):
+                                if auto_suggestion := root_suggestion:
+                                    if root_suggestion.is_auto_assignable(gene_symbol):
+                                        suggestion = auto_suggestion
+                                        status = "auto-assign"
+                        if not suggestion.terms:
+                            if suggestion.messages:
+                                status = "notes"
+                            else:
+                                status = "manual only"
+                        elif status is None:
+                            status = "suggestion"
 
-                    yield delimited_row([
-                        ct.id,
-                        ct.lab.name,
-                        ct.normalized_text,
-                        gene_symbol.symbol if gene_symbol else None,
-                        "\n".join([term.id + " " + term.name for term in suggestion.terms]),
-                        "\n".join([message.severity + " " + message.text for message in suggestion.messages]),
-                        status
-                    ])
-
-                row_count += 1
+                        yield delimited_row([
+                            ct.id,
+                            ct.lab.name,
+                            ct.normalized_text,
+                            gene_symbol.symbol if gene_symbol else None,
+                            "\n".join([term.id + " " + term.name for term in suggestion.terms]),
+                            "\n".join([message.severity + " " + message.text for message in suggestion.messages]),
+                            status
+                        ])
+                except:
+                    report_exc_info(extra_data={"condition_text_id": ct.id})
 
         except GeneratorExit:
             pass
