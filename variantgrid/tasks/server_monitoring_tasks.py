@@ -44,7 +44,7 @@ def get_disk_messages(directories_list: List[str] = None, info_messages=False) -
 def warn_low_disk_space():
     low_disk_messages = get_disk_messages(info_messages=False)
     if low_disk_messages:
-        message = "\n".join(low_disk_messages)
+        message = "\n".join([m[1] for m in low_disk_messages])
         report_message(message=message, level='warning')
 
 
