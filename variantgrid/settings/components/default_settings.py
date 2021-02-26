@@ -424,7 +424,7 @@ ROLLBAR = {
     'code_version': Git(BASE_DIR).hash,
 }
 
-ROLLBAR_MIN_DISK_WARNING_GIGS = 1
+SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 
 HEARTBEAT_URL = None  # URL to ping to prove scheduler is still alive

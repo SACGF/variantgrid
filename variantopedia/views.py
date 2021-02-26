@@ -42,6 +42,7 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
+from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs
 from variantopedia.search import search_data, SearchResults
@@ -200,12 +201,19 @@ def server_status(request):
         highest_variant_annotated["message"] = str(e)
 
     sample_enrichment_kits_df = get_sample_enrichment_kits_df()
+    disk_messages = get_disk_messages(info_messages=True)
+    disk_free = {"status": "info", "messages": []}
+    for status, message in disk_messages:
+        if status == "warning":
+            disk_free["status"] = "warning"
+        disk_free["messages"].append(message)
 
     dashboard_notices = get_dashboard_notices(request.user)
     context = {"celery_workers": celery_workers,
                "can_access_reference": can_access_reference,
                "redis_status": redis_status,
                "redis_message": redis_message,
+               "disk_free": disk_free,
                "highest_variant_annotated": highest_variant_annotated,
                "sample_enrichment_kits_df": sample_enrichment_kits_df,
                "dashboard_notices": dashboard_notices}
