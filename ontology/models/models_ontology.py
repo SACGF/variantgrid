@@ -451,10 +451,9 @@ class OntologySnake:
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
-        """
-        Important, this will NOT trigger PanelApp, to do that first call
-        panel_app_ontology.update_gene_relations
-        """
+        # TODO, do this with hooks
+        from ontology.panel_app_ontology import update_gene_relations
+        update_gene_relations(gene_symbol)
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology, max_depth=max_depth)
 
@@ -470,6 +469,9 @@ class OntologySnake:
 
     @staticmethod
     def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str]) -> QuerySet:
+        # TODO, do this with hooks
+        from ontology.panel_app_ontology import update_gene_relations
+        update_gene_relations(gene_symbol)
         if isinstance(term, str):
             term = OntologyTerm.get_or_stub(term)
             if term.is_stub:

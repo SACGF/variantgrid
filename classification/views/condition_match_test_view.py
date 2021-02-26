@@ -38,13 +38,10 @@ def condition_match_test_download_view(request):
                         if suggestion.is_auto_assignable():
                             status = "auto-assign"
                     elif suggestion.condition_text_match.is_gene_level:
-                        # got a gene level suggestion, but since we got it via condition_matching_suggstions
-                        # is auto-assignable isn't trustworthy as it may not match the root terms
-                        # TODO update condition_matching_suggestions so is_auto_assignable is accurate
                         if suggestion.is_auto_assignable(gene_symbol):
-                            if auto_suggstion := top_level_suggestion(ct.normalized_text):
-                                if auto_suggstion.is_auto_assignable(gene_symbol):
-                                    suggestion = auto_suggstion
+                            if auto_suggestion := top_level_suggestion(ct.normalized_text):
+                                if auto_suggestion.is_auto_assignable(gene_symbol):
+                                    suggestion = auto_suggestion
                                     status = "auto-assign"
                     if not suggestion.terms:
                         if suggestion.messages:

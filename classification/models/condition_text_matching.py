@@ -25,7 +25,6 @@ from library.utils import ArrayLength
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
-from ontology.panel_app_ontology import update_gene_relations
 from snpdb.models import Lab
 
 
@@ -537,7 +536,6 @@ class ConditionMatchingSuggestion:
                 if ctm := self.condition_text_match:
                     if ctm.is_gene_level:
                         gene_symbol = self.condition_text_match.gene_symbol
-                        update_gene_relations(gene_symbol)
                         for term in valid_terms:
                             if not OntologySnake.has_gene_relationship(term, gene_symbol):
                                 self.add_message(ConditionMatchingMessage(severity="warning",
@@ -667,6 +665,26 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
     return cms
 
 
+def merge_matches(matches: List[ConditionMatchingSuggestion]) -> Optional[ConditionMatchingSuggestion]:
+    if not matches:
+        return None
+    elif len(matches) == 1:
+        return matches[0]
+    elif len(matches) > 1:
+        if name_matches := [match for match in matches if match.alias_index is None]:
+            if len(name_matches) == 1:
+                return name_matches[0]
+
+        # we had multiple matches and couldn't pick a best option
+        suggestion = ConditionMatchingSuggestion()
+        for match in matches:
+            for term in match.terms:
+                suggestion.add_term(term)
+        suggestion.condition_multi_operation = MultiCondition.UNCERTAIN
+        suggestion.add_message(ConditionMatchingMessage(severity="error", text="Text matched multiple terms"))
+        return suggestion
+
+
 def find_local_term(match_text: SearchText, service: OntologyService) -> Optional[ConditionMatchingSuggestion]:
     q = list()
     # TODO, can we leverage phenotype matching?
@@ -687,17 +705,13 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
 
     matches = list()
     if q:
-        for term in OntologyTerm.objects.filter(ontology_service=service).filter(reduce(
-                operator.and_, q)).order_by('ontology_service')[0:200]:
+        qs = OntologyTerm.objects.filter(ontology_service=service).filter(reduce(
+                operator.and_, q))
+        for term in qs[0:200]:
             if cms := search_text_to_suggestion(match_text, term):
                 matches.append(cms)
-    if len(matches) == 1:
-        return matches[0]
-    elif len(matches) > 1:
-        if name_matches := [match for match in matches if match.alias_index is None]:
-            if len(name_matches) == 1:
-                return name_matches[0]
-    return None
+
+    return merge_matches(matches)
 
 
 def search_suggestion(text: str) -> ConditionMatchingSuggestion:
@@ -715,12 +729,15 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
                 "category": "disease"
             }).json().get("docs")
 
+        matches: List[ConditionMatchingSuggestion] = list()
         for result in results:
             o_id = result.get('id')
             # result.get('label') gives the label as it's known by the search server
             term = OntologyTerm.get_or_stub(o_id)
             if cms := search_text_to_suggestion(match_text, term):
-                return cms
+                matches.append(cms)
+        if search_match := merge_matches(matches):
+            return search_match
     except:
         print("Error searching server")
 
