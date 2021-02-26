@@ -811,7 +811,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
 
     # filled in and gene level, exclude root as we take care of that before-hand
     filled_in: QuerySet
-    filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
+    filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None).order_by('gene_symbol')
     root_level_mondo = set()
     root_level_terms = root_cms.terms
     root_level_mondo = set([term for term in root_level_terms if term.ontology_service == OntologyService.MONDO])
