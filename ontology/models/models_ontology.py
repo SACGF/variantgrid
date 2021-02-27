@@ -461,7 +461,7 @@ class OntologySnake:
         omim_ids = OntologyTermRelation.objects.filter(dest_term=gene_ontology, source_term__ontology_service=OntologyService.OMIM).values_list("source_term_id", flat=True)
         if omim_ids:
             # relationships are always MONDO -> OMIM, and MONDO -> HGNC, OMIM -> HGNC
-            via_omim_mondos = OntologyTermRelation.objects.filter(source_term__ontology_service=OntologyService.MONDO, dest_term_id__in=omim_ids).exclude(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
+            via_omim_mondos = OntologyTermRelation.objects.filter(source_term__ontology_service=OntologyService.MONDO, dest_term_id__in=omim_ids).exclude(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}).values_list("source_term_id", flat=True)
             terms = terms.union(set(via_omim_mondos))
         if terms:
             return set(OntologyTerm.objects.filter(pk__in=terms))
