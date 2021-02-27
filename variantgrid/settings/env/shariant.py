@@ -40,7 +40,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 MIDDLEWARE += (
-    'mozilla_django_oidc.middleware.SessionRefresh',
+    'auth.session_refresh.VariantGridSessionRefresh',
     'auth.oidc_error_handler.HandleOIDC400Middleware',
 )
 
