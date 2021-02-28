@@ -852,7 +852,8 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     if term in root_level_terms:
                         cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
-                        if len(root_level_terms) != 1 and not root_cms.ids_found_in_text:
+                        if len(root_level_terms) != 1 and not root_cms.ids_found_in_text: # if multiple terms from root level
+                            # just leave them the same (don't make a suggestion, just validate)
                             cms.add_term(term)
                     else:
                         cms.add_message(ConditionMatchingMessage(severity="success",
@@ -868,7 +869,10 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     #        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
 
                 elif len(not_root_gene_terms) == 1:
-                    cms.add_term(not_root_gene_terms[0])
+                    term = not_root_gene_terms[0]
+                    cms.add_term(term)
+                    cms.add_message(ConditionMatchingMessage(severity="success",
+                                                             text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                 else:
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple descendants of this term are associated to {gene_symbol}"))
                     for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
