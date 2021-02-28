@@ -84,10 +84,17 @@ class RichColumn:
             'dt-' + self.name.replace(' ', '-')
         ] if css is not None]).strip()
 
+    def sort_key(self, key: str, desc: bool) -> List[str]:
+        if key.startswith('-'):
+            if desc:
+                key = key[1:]
+        elif desc:
+            key = f'-{key}'
+        return key
+
     def sort_string(self, desc: bool) -> List[str]:
         use_keys = self.sort_keys or [self.key]
-        sdir = '-' if desc else ''
-        return [f'{sdir}{key}' for key in use_keys]
+        return [self.sort_key(key, desc) for key in use_keys]
 
     @property
     def value_columns(self) -> List[str]:
