@@ -64,17 +64,6 @@ class GroupOperation(models.TextChoices):
         return reduce(operator.or_, sequence)
 
 
-class FilterSetting(models.TextChoices):
-    OR = "O", "OR"
-    AND = "A", "Required"
-
-
-class NullableFilterSetting(models.TextChoices):
-    OR = "O", "OR"
-    AND_NULL = "L", "Required (allow null)"
-    AND = "A", "Required"
-
-
 class MinimisationResultType(models.TextChoices):
     FULL = 'F', "Full"
     BOOTSTRAPPED = 'B', "Bootstrapped"

@@ -1,43 +1,5 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
-
-{% block docreadyjs %}
-
-function setupSlider(inputSelector, sliderSelector) {
-	let sliderMinVal = Number(inputSelector.attr("min"));
-	let sliderMaxVal = Number(inputSelector.attr("max"));
-	let sliderVal = inputSelector.val();
-	let container = sliderSelector.parents(".slider-container");
-	let sliderValue = $(".slider-value", container);
-	sliderValue.html(sliderVal); // set initial
-
-	sliderSelector.slider({
-		min: sliderMinVal,
-		max: sliderMaxVal,
-		step: Number(inputSelector.attr("step") || 1),
-		value: sliderVal,
-		change: function( event, ui ) {
-            inputSelector.val(ui.value);
-		},
-		slide: function( event, ui ) {
-			sliderValue.html(ui.value);
-		},
-	});
-
-	$(".min-value", container).html(sliderMinVal);
-	$(".max-value", container).html(sliderMaxVal);
-}
-
-var damageForm = $("form#damage-filter");
-ajaxForm(damageForm);
-accordionForm(damageForm);
-
-setupSlider($("#id_cadd_score_min"), $("#cadd-slider"));
-setupSlider($("#id_revel_score_min"), $("#revel-slider"));
-setupSlider($("#id_min_damage_predictions"), $("#min_damage_predictions-slider"));
-
-{% endblock docreadyjs %}
-
-
+{% load js_tags %}
 {% block content %}
 <style>
 	.slider-container {
@@ -67,10 +29,94 @@ setupSlider($("#id_min_damage_predictions"), $("#min_damage_predictions-slider")
 	}
 
 	.slider-value {
+        min-width: 50px;
+        height: 25px;
 		margin-left: 15px;
 	}
 
 </style>
+<script>
+    var showRequiredFilter = {{ node.has_required | jsonify }};
+
+    function toggleRequiredFilter() {
+        showRequiredFilter = !showRequiredFilter;
+        if (showRequiredFilter) {
+            $(".filter-required").show();
+        } else {
+            $(".filter-required").hide();
+            // clear them so they don't apply if invisible
+            let frInputs = $("input", ".filter-required");
+            frInputs.prop("checked", false);
+        }
+    }
+
+    function setupSlider(inputSelector, sliderSelector, enableInput) {
+        let sliderMinVal = Number(inputSelector.attr("min"));
+        let sliderMaxVal = Number(inputSelector.attr("max"));
+        let sliderVal = inputSelector.val();
+        let container = sliderSelector.parents(".slider-container");
+        let sliderValue = $(".slider-value", container);
+        sliderValue.html(sliderVal); // set initial
+
+        sliderSelector.slider({
+            min: sliderMinVal,
+            max: sliderMaxVal,
+            step: Number(inputSelector.attr("step") || 1),
+            value: sliderVal,
+            change: function( event, ui ) {
+                inputSelector.val(ui.value);
+            },
+            slide: function( event, ui ) {
+                sliderValue.html(ui.value);
+            },
+        });
+
+        $(".min-value", container).html(sliderMinVal);
+        $(".max-value", container).html(sliderMaxVal);
+
+        let row = enableInput.parents("tr");
+        let filterRequired = $(".filter-required", row);
+        let frInputs = $("input", filterRequired);
+
+        enableInput.change(function() {
+            if ($(this).is(":checked")) {
+                sliderSelector.slider("enable");
+                frInputs.prop("disabled", false);
+            } else {
+                sliderSelector.slider("disable");
+                frInputs.prop("disabled", true);
+            }
+        });
+
+        if (sliderVal === '') {
+            enableInput.prop("checked", false);
+            sliderSelector.slider("disable");
+            frInputs.prop("disabled", true);
+        } else {
+            enableInput.prop("checked", true);
+            sliderSelector.slider("enable");
+            frInputs.prop("disabled", false);
+        }
+
+
+    }
+
+    $(document).ready(function() {
+        let damageForm = $("form#damage-filter");
+        ajaxForm(damageForm);
+        accordionForm(damageForm);
+
+        setupSlider($("#id_splice_min"), $("#splice-slider"), $("input#enable-splice"));
+        setupSlider($("#id_cadd_score_min"), $("#cadd-slider"), $("input#enable-cadd"));
+        setupSlider($("#id_revel_score_min"), $("#revel-slider"), $("input#enable-revel"));
+        setupSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"), $("input#enable-cosmic-count"));
+        setupSlider($("#id_damage_predictions_min"), $("#damage-predictions-min-slider"), $("input#damage-predictions-min"));
+
+        if (showRequiredFilter) {
+            $(".filter-required").show();
+        }
+    });
+</script>
 <div>
 	<form id="damage-filter" method="post" action="{{ request.path }}">
         {% csrf_token %}
@@ -79,104 +125,129 @@ setupSlider($("#id_min_damage_predictions"), $("#min_damage_predictions-slider")
         {% endfor %}
 
 		{{ form.non_field_errors }}
-		<div class="fieldWrapper">
-			{{ form.impact_min.errors }}
-			<label for="{{ form.impact_min.id_for_label }}">{{ form.impact_min.label }}:</label>
-			{{ form.impact_min }}
-		</div>
-		<div class="fieldWrapper">
-			{{ form.always_keep_splice_variants_regardless_of_impact.errors }}
-			<label for="{{ form.always_keep_splice_variants_regardless_of_impact.id_for_label }}">{{ form.always_keep_splice_variants_regardless_of_impact.label }}:</label>
-			{{ form.always_keep_splice_variants_regardless_of_impact }}
-		</div>
-		<div class="fieldWrapper">
-			{{ form.cadd_score_min.errors }}
-			<label for="{{ form.cadd_score_min.id_for_label }}">{{ form.cadd_score_min.label }}:</label>
-			<span class='slider-container'>
-				<div>
-					<div id="cadd-slider" class='slider'></div>
-					<span class='label slider-value'></span>
-				</div>
-				<div class='slider-labels'>
-					<span class='label min-value left'></span>
-					<span class='label max-value right'></span>
-				</div>
-			</span>
-		</div>
-		<div class="fieldWrapper">
-			{{ form.revel_score_min.errors }}
-			<label for="{{ form.revel_score_min.id_for_label }}">{{ form.revel_score_min.label }}:</label>
-			<span class='slider-container'>
-				<div>
-					<div id="revel-slider" class='slider'></div>
-					<span class='label slider-value'></span>
-				</div>
-				<div class='slider-labels'>
-					<span class='label min-value left'></span>
-					<span class='label max-value right'></span>
-				</div>
-			</span>
-		</div>
-		<div class="fieldWrapper">
-			{{ form.allow_null.errors }}
-			<label for="{{ form.allow_null.id_for_label }}">{{ form.allow_null.label }}:</label>
-			{{ form.allow_null }}
-		</div>
+        <table>
+            <tr>
+                <td></td>
+                <td></td>
+                <th><a class="hover-link" href="javascript:toggleRequiredFilter()">Required</a></th>
+                <th class="collapse filter-required">Allow Null</th>
+            </tr>
+            <tr>
+                <th>{{ form.impact_min.label }}</th>
+                <td>{{ form.impact_min.errors }} {{ form.impact_min }}</td>
+                <td class="collapse filter-required">{{ form.impact_required }}</td>
+                <td class="collapse filter-required"> <!-- impact_min is non-nullable --> </td>
+            </tr>
+            <tr>
+                <th>{{ form.splice_min.label }}</th>
+                <td>{{ form.splice_min.errors }}
+                    <input id="enable-splice"  title="Enable Splicing slider" class="enable-slider" type="checkbox" />
+                    <span class='slider-container'>
+                        <div class="display-flex">
+                            <div id="splice-slider" class='slider'></div>
+                            <div class='label slider-value'></div>
+                        </div>
+                        <div class='slider-labels'>
+                            <span class='label min-value left'></span>
+                            <span class='label max-value right'></span>
+                        </div>
+                    </span>
+                </td>
+                <td class="collapse filter-required">{{ form.splice_required }}</td>
+                <td class="collapse filter-required">{{ form.splice_allow_null }}</td>
+            </tr>
+            <tr>
+                <th>{{ form.cadd_score_min.label }}</th>
+                <td>{{ form.cadd_score_min.errors }}
+                    <input id="enable-cadd" title="Enable CADD slider" class="enable-slider" type="checkbox" />
+                    <span class='slider-container'>
+                        <div class="display-flex">
+                            <div id="cadd-slider" class='slider'></div>
+                            <div class='label slider-value'></div>
+                        </div>
+                        <div class='slider-labels'>
+                            <span class='label min-value left'></span>
+                            <span class='label max-value right'></span>
+                        </div>
+                    </span>
+                </td>
+                <td class="collapse filter-required">{{ form.cadd_score_required }}</td>
+                <td class="collapse filter-required">{{ form.cadd_score_allow_null }}</td>
+            </tr>
 
-		<div id="accordion-container">
-			<ul class="accordion">
-                <li>
-                <h3>Minimum damage predictions</h3>
-                <div>
-					<div class="fieldWrapper">
-						{{ form.min_damage_predictions.errors }}
-						<label for="{{ form.min_damage_predictions.id_for_label }}">{{ form.min_damage_predictions.label }}:</label>
-						<span class='slider-container'>
-							<div>
-								<div id="min_damage_predictions-slider" class='slider'></div>
-								<span class='label slider-value'></span>
-							</div>
-							<div class='slider-labels'>
-								<span class='label min-value left'></span>
-								<span class='label max-value right'></span>
-							</div>
-						</span>
-					</div>
-                </div>
-                </li>
-                <li>
-                <h3>Individual damage predictions</h3>
-                <div>
-					<div class="fieldWrapper">
-						{{ form.sift_prediction.errors }}
-						<label for="{{ form.sift_prediction.id_for_label }}">{{ form.sift_prediction.label }}:</label>
-						{{ form.sift_prediction }}
-					</div>
-					<div class="fieldWrapper">
-						{{ form.polyphen2_prediction.errors }}
-						<label for="{{ form.polyphen2_prediction.id_for_label }}">{{ form.polyphen2_prediction.label }}:</label>
-						{{ form.polyphen2_prediction }}
-					</div>
-					<div class="fieldWrapper">
-						{{ form.mutation_assessor_prediction.errors }}
-						<label for="{{ form.mutation_assessor_prediction.id_for_label }}">{{ form.mutation_assessor_prediction.label }}:</label>
-						{{ form.mutation_assessor_prediction }}
-					</div>
-					<div class="fieldWrapper">
-						{{ form.mutation_taster_prediction.errors }}
-						<label for="{{ form.mutation_taster_prediction.id_for_label }}">{{ form.mutation_taster_prediction.label }}:</label>
-						{{ form.mutation_taster_prediction }}
-					</div>
-					<div class="fieldWrapper">
-						{{ form.fathmm_prediction.errors }}
-						<label for="{{ form.fathmm_prediction.id_for_label }}">{{ form.fathmm_prediction.label }}:</label>
-						{{ form.fathmm_prediction }}
-					</div>
+            <tr>
+                <th>{{ form.revel_score_min.label }}</th>
+                <td>{{ form.revel_score_min.errors }}
+                    <input id="enable-revel"  title="Enable Revel slider" class="enable-slider" type="checkbox" />
+                    <span class='slider-container'>
+                        <div class="display-flex">
+                            <div id="revel-slider" class='slider'></div>
+                            <div class='label slider-value'></div>
+                        </div>
+                        <div class='slider-labels'>
+                            <span class='label min-value left'></span>
+                            <span class='label max-value right'></span>
+                        </div>
+                    </span>
+                </td>
+                <td class="collapse filter-required">{{ form.revel_score_required }}</td>
+                <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
+            </tr>
 
-                </div>
-                </li>
-			</ul>
-		</div>
+            <tr>
+                <th>{{ form.cosmic_count_min.label }}</th>
+                <td>{{ form.cosmic_count_min.errors }}
+                    <input id="enable-cosmic-count"  title="Enable COSMIC count slider" class="enable-slider" type="checkbox" />
+                    <span class='slider-container'>
+                        <div class="display-flex">
+                            <div id="cosmic-count-slider" class='slider'></div>
+                            <div class='label slider-value'></div>
+                        </div>
+                        <div class='slider-labels'>
+                            <span class='label min-value left'></span>
+                            <span class='label max-value right'></span>
+                        </div>
+                    </span>
+                </td>
+                <td class="collapse filter-required">{{ form.cosmic_count_required }}</td>
+                <td class="collapse filter-required"> <!-- cosmic_count is non-nullable --> </td>
+            </tr>
+
+            <tr>
+                <th>{{ form.damage_predictions_min.label }}</th>
+                <td>
+                    {{ form.damage_predictions_min.errors }}
+                    <input id="damage-predictions-min" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
+                    <span class='slider-container'>
+                        <div class="display-flex">
+                            <div id="damage-predictions-min-slider" class='slider'></div>
+                            <div class='label slider-value'></div>
+                        </div>
+                        <div class='slider-labels'>
+                            <span class='label min-value left'></span>
+                            <span class='label max-value right'></span>
+                        </div>
+                    </span>
+                </td>
+                <td class="collapse filter-required">{{ form.damage_predictions_required }}</td>
+                <td class="collapse filter-required">{{ form.damage_predictions_allow_null }}</td>
+            </tr>
+
+            <tr>
+                <th>{{ form.protein_domain.label }}</th>
+                <td>{{ form.protein_domain.errors }} {{ form.protein_domain }}</td>
+                <td class="collapse filter-required">{{ form.protein_domain_required }}</td>
+                <td class="collapse filter-required"> <!-- protein_domain is non-nullable --> </td>
+            </tr>
+
+            <tr>
+                <th>{{ form.published.label }}</th>
+                <td>{{ form.published.errors }} {{ form.published }}</td>
+                <td class="collapse filter-required">{{ form.published_required }}</td>
+                <td class="collapse filter-required"> <!-- published is non-nullable --> </td>
+            </tr>
+        </table>
+
         {% if has_write_permission %}
     		<button id='damage-save' class="btn btn-primary">save</button>
         {% endif %}
