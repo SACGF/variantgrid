@@ -24,8 +24,8 @@ class ConditionTextColumns(DatatableConfig):
         self.rich_columns = [
             RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text']),
             RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"], sort_keys=['normalized_text', 'lab__name']),
-            RichColumn(key="classifications_count", label="Classification Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', 'normalized_text']),
-            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", orderable=True,  sort_keys=['classifications_count_outstanding', 'normalized_text'])
+            RichColumn(key="classifications_count", label="Classification Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', '-normalized_text']),
+            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", default_sort=SortOrder.DESC, orderable=True, sort_keys=['classifications_count_outstanding', '-normalized_text'])
         ]
 
     def get_initial_queryset(self):
@@ -53,12 +53,12 @@ def condition_matchings_view(request):
 def next_condition_text(current: ConditionText, user: User) -> Optional[ConditionText]:
     qs = ConditionText.objects.filter(classifications_count__lte=current.classifications_count, classifications_count_outstanding__gte=1).order_by('-classifications_count', 'normalized_text')
     qs = get_objects_for_user(user, ConditionText.get_read_perm(), qs, accept_global_perms=True)
-    for term in qs:
-        if term == current:
+    for ct in qs:
+        if ct == current:
             continue
-        if term.normalized_text < current.normalized_text:
+        if ct.classifications_count == current.classifications_count and ct.normalized_text < current.normalized_text:
             continue
-        return term
+        return ct
     return None
 
 

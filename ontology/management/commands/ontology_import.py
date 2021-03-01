@@ -2,17 +2,21 @@ import itertools
 import json
 import re
 import csv
-from dataclasses import dataclass
-from typing import List, Optional
+from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict, Set
 
 import pandas as pd
+import numpy as np
 import pronto
 from django.core.management import BaseCommand
+from pandas import DataFrame, isna
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC
 from library.file_utils import file_md5sum
-from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport
+from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
+    OntologyTermRelation
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 from model_utils.models import now
 
@@ -39,6 +43,7 @@ MATCH_TYPES = {
     "http://www.w3.org/2004/02/skos/core#broadMatch": OntologyRelation.BROAD,
     "http://www.w3.org/2004/02/skos/core#narrowMatch": OntologyRelation.NARROW,
     "http://www.geneontology.org/formats/oboInOwl#hasAlternativeId": OntologyRelation.ALTERNATIVE,
+    "http://www.geneontology.org/formats/oboInOwl#consider": OntologyRelation.CONSIDER,
     "http://purl.obolibrary.org/obo/IAO_0100001": OntologyRelation.REPLACED
 }
 
@@ -79,7 +84,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=5)
+        processor_version=12)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -116,95 +121,61 @@ def load_mondo(filename: str, force: bool):
                             extra["synonyms"] = synonyms
 
                         aliases = list()
-                        synonym_set = set()
-                        if synonyms := meta.get("synonyms"):
-
-                            # only allow 1 relationship between any 2 terms (though DB does allow more)
-                            # storing all of them would be more "accurate" but gets in the way of our usage
-                            # prioritise relationships as EXACT, RELATED, related terms, XREF
-                            for synonym in synonyms:
-                                pred = synonym.get("pred")
-                                if pred == "hasExactSynonym":
-                                    # val = synonym.get("val")
-                                    aliases.append(synonym.get("val"))
-
-                                    for xref in synonym.get("xrefs", []):
-                                        xref_term = TermId(xref)
-                                        if xref_term.type in {"HP", "OMIM"}:
-                                            ontology_builder.add_term(
-                                                term_id=xref,
-                                                name=label,
-                                                definition=f"Name copied from synonym {full_id}",
-                                                primary_source=False
-                                            )
-                                            ontology_builder.add_ontology_relation(
-                                                source_term_id=full_id,
-                                                dest_term_id=xref,
-                                                relation=OntologyRelation.EXACT
-                                            )
-                                            synonym_set.add(xref)
-                                            if xref_term.type == "OMIM":
-                                                aliases.append(label)
-
-                            # look at related synonyms second, if we have RELATED, don't bother with any other relationships
-                            for synonym in synonyms:
-                                pred = synonym.get("pred")
-                                if pred == "hasRelatedSynonym":
-                                    # val = synonym.get("val")
-                                    for xref in synonym.get("xrefs", []):
-                                        xref_term = TermId(xref)
-                                        if xref_term.type in {"HP", "OMIM"} and not xref_term.id in synonym_set:
-                                            ontology_builder.add_term(
-                                                term_id=xref_term.id,
-                                                name=label,
-                                                definition=f"Name copied from related synonym {full_id}",
-                                                primary_source=False
-                                            )
-                                            ontology_builder.add_ontology_relation(
-                                                source_term_id=full_id,
-                                                dest_term_id=xref_term.id,
-                                                relation=OntologyRelation.RELATED
-                                            )
-                                            synonym_set.add(xref_term.id)
-                        #end synonymns
+                        term_relation_types: Dict[str, List[str]] = defaultdict(list)
 
                         for bp in meta.get("basicPropertyValues", []):
                             val = TermId(bp.get("val"))
-                            if val.type in {"HP", "OMIM"} and not val.id in synonym_set:
+                            if val.type in {"HP", "OMIM"}:
                                 pred = bp.get("pred")
                                 pred = MATCH_TYPES.get(pred, pred)
-                                # if pred == OntologyRelation.EXACT:
-                                    # add alias?
-
-                                ontology_builder.add_term(
-                                    term_id=val.id,
-                                    name=label,
-                                    definition=f"Name copied from {pred} synonym {full_id}",
-                                    primary_source=False
-                                )
-                                ontology_builder.add_ontology_relation(
-                                    source_term_id=full_id,
-                                    dest_term_id=val.id,
-                                    relation=pred
-                                )
-                            synonym_set.add(val.id)
+                                term_relation_types[val.id].append(pred)
 
                         if xrefs := meta.get("xrefs"):
                             for xref in xrefs:
                                 val = TermId(xref.get("val"))
-                                if val.type in {"HP", "OMIM"} and val.id not in synonym_set:
-                                    ontology_builder.add_term(
-                                        term_id=val.id,
-                                        name=label,
-                                        definition=f"Name copied from xref synonym {full_id}",
-                                        primary_source=False
-                                    )
-                                    ontology_builder.add_ontology_relation(
-                                        source_term_id=full_id,
-                                        dest_term_id=val.id,
-                                        relation=OntologyRelation.XREF
-                                    )
+                                if val.type in {"HP", "OMIM"}:
+                                    term_relation_types[val.id].append("xref")
 
+                        if synonyms := meta.get("synonyms"):
+                            # only allow 1 relationship between any 2 terms (though DB does allow more)
+                            # storing all of them would be more "accurate" but gets in the way of our usage
+                            # prioritise relationships as EXACT, RELATED, related terms, XREF
+
+                            for pred_type in ["hasExactSynonym", "hasRelatedSynonym"]:
+                                relation = {
+                                    "hasExactSynonym": OntologyRelation.EXACT_SYNONYM,
+                                    "hasRelatedSynonym": OntologyRelation.RELATED_SYNONYM
+                                }[pred_type]
+                                for synonym in synonyms:
+                                    pred = synonym.get("pred")
+                                    if pred == pred_type:
+                                        aliases.append(synonym.get("val"))
+                                        for xref in synonym.get("xrefs", []):
+                                            xref_term = TermId(xref)
+                                            if xref_term.type in {"HP", "OMIM"}:
+                                                term_relation_types[xref_term.id].append(relation)
+
+                        for key, relations in term_relation_types.items():
+                            unique_relations = list()
+                            for relation in relations:
+                                if relation not in unique_relations:
+                                    unique_relations.append(relation)
+
+                            ontology_builder.add_term(
+                                term_id=key,
+                                name=label,
+                                definition=f"Name copied from xref synonym {full_id}",
+                                primary_source=False
+                            )
+                            ontology_builder.add_ontology_relation(
+                                source_term_id=full_id,
+                                dest_term_id=key,
+                                relation=relations[0],
+                                extra={"all_relations": unique_relations}
+                            )
+
+                        #end synonymns
+                        # occasionally split up MONDO name into different aliases
                         if label and "MONDO" in full_id:
                             if ";" in label:
                                 parts = [part.strip() for part in label.split(";")]
@@ -213,13 +184,12 @@ def load_mondo(filename: str, force: bool):
                                         for part in parts:
                                             if part not in aliases:
                                                 aliases.append(part)
-                                        print(aliases)
 
                         ontology_builder.add_term(
                             term_id=full_id,
                             name=label,
                             definition=defn,
-                            extra=extra if extra else None,
+                            extra=meta,
                             aliases=aliases,
                             primary_source=True
                         )
@@ -244,6 +214,14 @@ def load_mondo(filename: str, force: bool):
 
                 genus_ids = [TermId(genus) for genus in axiom.get("genusIds")]
                 mondo_genus = [term for term in genus_ids if term.type == "MONDO"]
+
+                for mondo_genu in mondo_genus:
+                    ontology_builder.add_ontology_relation(
+                        source_term_id=defined_class_id.id,
+                        dest_term_id=mondo_genu.id,
+                        relation=OntologyRelation.IS_A,
+                        extra={"subtype": "genus"}
+                    )
 
                 for restriction in axiom.get("restrictions"):
 
@@ -298,6 +276,60 @@ def load_mondo(filename: str, force: bool):
     ontology_builder.complete()
     ontology_builder.report()
     print("Committing...")
+
+
+def load_gencc(filename: str, force: bool):
+    ontology_builder = OntologyBuilder(
+        filename=filename,
+        context="gencc_file",
+        import_source="gencc",
+        processor_version=2,
+        force_update=force)
+
+    file_hash = file_md5sum(filename)
+    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    print("About to load gencc")
+
+    gencc_df: DataFrame = pd.read_csv(filename, sep=",")
+    # only want strong and definitive relationships
+    gencc_df = gencc_df[gencc_df.classification_title.isin(["Definitive", "Strong"])]
+    # Exclude PanelApp Australia from here
+    # gencc_df = gencc_df[~gencc_df.isin(["PanelApp Australia"])]  # this still caused the rows to exist but a blank gencc??!!
+    gencc_df = gencc_df.sort_values(by=["gene_curie", "disease_curie"])
+    gencc_grouped = gencc_df.groupby(["gene_curie", "disease_curie"])
+
+    for group_name, df_group in gencc_grouped:
+        gene_id = df_group["gene_curie"].iloc[0]
+        mondo_id = df_group["disease_curie"].iloc[0]
+        gene_symbol = df_group["gene_symbol"].iloc[0]
+        sources = []
+
+        for row_index, row in df_group.iterrows():
+            classification_title = row["classification_title"]
+            moi_title = row["moi_title"]
+            submitter_title = row["submitter_title"]
+            if submitter_title != "PanelApp Australia":
+                sources.append({
+                    "submitter": submitter_title if not isna(submitter_title) else None,
+                    "gencc_classification": classification_title if not isna(classification_title) else None,
+                    "mode_of_inheritance":  moi_title if not isna(moi_title) else None,
+                })
+
+        if sources:
+            ontology_builder.add_term(
+                term_id=gene_id,
+                name=gene_symbol,
+                definition=None,
+                primary_source=False
+            )
+            ontology_builder.add_ontology_relation(
+                source_term_id=mondo_id,
+                dest_term_id=gene_id,
+                relation=OntologyRelation.RELATED,
+                extra={"sources": sources}
+            )
+
+    ontology_builder.complete()
 
 
 def load_hpo(filename: str, force: bool):
@@ -359,18 +391,26 @@ def load_hpo(filename: str, force: bool):
     print("Committing...")
 
 
-def load_hpo_disease(filename: str, force: bool):
+def load_phenotype_to_genes(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
-        context="hpo_disease",
+        context="phenotype_to_genes",
         import_source=OntologyImportSource.HPO,
-        processor_version=5,
+        processor_version=1,
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
-                     names=['disease_id', 'gene_symbol', 'gene_id', 'hpo_id', 'hpo_name'],
-                     dtype={"gene_id": int})
+                     names=['hpo_id', 'hpo_name', 'entrez_gene_id', 'entrez_gene_symbol', 'status', 'source', 'omim_id'])
+
+    df = df[df.source.isin(["mim2gene"])]
+
+    # first kill of old data
+    old_imports = OntologyImport.objects.filter(filename="OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt")
+    if old_imports.exists():
+        print("Removing any data from OMIM_ALL_FREQUENCIES")
+        deleted = OntologyTermRelation.objects.filter(from_import__in=old_imports).delete()
+        print(f"{deleted} relationships removed")
 
     by_hpo = df.groupby(["hpo_id"])
     for hpo_id, by_hpo_data in by_hpo:
@@ -383,27 +423,27 @@ def load_hpo_disease(filename: str, force: bool):
             primary_source=False
         )
 
-        by_omim = by_hpo_data.groupby(["disease_id"])
+        by_omim = by_hpo_data.groupby(["omim_id"])
         for omim_id, by_omim_data in by_omim:
             # link HPO -> OMIM
             ontology_builder.add_ontology_relation(
                 source_term_id=hpo_id,
                 dest_term_id=omim_id,
-                relation=OntologyRelation.ALL_FREQUENCY
+                relation=OntologyRelation.ASSOCIATED
             )
 
-    by_gene = df.groupby(["gene_symbol"])
+    by_gene = df.groupby(["entrez_gene_symbol"])
     for gene_symbol, gene_data in by_gene:
         # IMPORTANT, the gene_id is the entrez gene_id, not the HGNC gene id
         try:
             hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
 
-            by_omim = gene_data.groupby(["disease_id"])
+            by_omim = gene_data.groupby(["omim_id"])
             for omim_id, by_omim_data in by_omim:
                 ontology_builder.add_ontology_relation(
                     source_term_id=omim_id,
                     dest_term_id=hgnc_term.id,
-                    relation=OntologyRelation.ENTREZ_ASSOCIATION
+                    relation=OntologyRelation.MIM_2_GENE
                 )
         except ValueError:
             print(f"Could not resolve gene symbol {gene_symbol} to HGNC ID")
@@ -563,10 +603,12 @@ class Command(BaseCommand):
         parser.add_argument('--force', action="store_true")
         parser.add_argument('--mondo_json', required=False)
         parser.add_argument('--hpo_owl', required=False)
-        parser.add_argument('--omim_frequencies', required=False)
+        parser.add_argument('--omim_frequencies', required=False)  # note this is deprecated
+        parser.add_argument('--phenotype_to_genes', required=False)
         parser.add_argument('--hgnc_sync', action="store_true", required=False)
         parser.add_argument('--biomart', required=False)
         parser.add_argument('--omim', required=False)
+        parser.add_argument('--gencc', required=False)
 
     def handle(self, *args, **options):
         force = options.get("force")
@@ -574,6 +616,12 @@ class Command(BaseCommand):
         if options.get("hgnc_sync"):
             print("Syncing HGNC")
             sync_hgnc()
+
+        if filename := options.get("gencc"):
+            try:
+                load_gencc(filename, force=force)
+            except OntologyBuilderDataUpToDateException:
+                print("GenCC File hash is the same as last import")
 
         if filename := options.get("omim"):
             try:
@@ -599,8 +647,11 @@ class Command(BaseCommand):
             except OntologyBuilderDataUpToDateException:
                 print("HPO File hash is the same as last import")
 
-        if filename := options.get("omim_frequencies"):
+        if filename := options.get("phenotype_to_genes"):
             try:
-                load_hpo_disease(filename, force)
+                load_phenotype_to_genes(filename, force)
             except OntologyBuilderDataUpToDateException:
-                print("HPO Disease hash is the same as last import")
+                print("Phenotype to Genes File hash is the same as last import")
+
+        if filename := options.get("omim_frequencies"):
+            print("THIS FILE IS DEPRECATED, please use phenotype_to_genes.txt instead")

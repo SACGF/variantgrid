@@ -10,7 +10,6 @@ from classification.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake
-from ontology.panel_app_ontology import update_gene_relations
 
 
 class OntologyMatch:
@@ -93,7 +92,17 @@ ROMAN = {
     "vi": '6',
     "vii": '7',
     "viii": '8',
-    "ix": '9'
+    "ix": '9',
+    # 'x': '10', matching on x can be dangerous, has a lot of other meanings
+    'xi': '11',
+    'xii': '12',
+    'xiii': '13',
+    'xiv': '14',
+    'xv': '15',
+    'xvi': '16',
+    'xvii': '17',
+    'xviii': '18',
+    'ixx': '19'
 }
 
 
@@ -206,7 +215,7 @@ class OntologyMatching:
 
         return mondo
 
-    def populate_relationships(self, server_search=True):
+    def populate_relationships(self):
         if gene_symbol := self.gene_symbol:
             try:
                 OntologyTerm.get_gene_symbol(gene_symbol)
@@ -214,8 +223,6 @@ class OntologyMatching:
                 report_message(message=f"Could not resolve {gene_symbol} to HGNC OntologyTerm - can't do gene specific resolutions", level='warning')
                 return
 
-            if server_search:
-                update_gene_relations(gene_symbol)  # make sure panel app AU is up to date
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
             for snake in snakes:
                 mondo_term = snake.leaf_term
@@ -242,7 +249,7 @@ class OntologyMatching:
     def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None) -> 'OntologyMatching':
         search_text = empty_to_none(search_text)
         ontology_matches = OntologyMatching(search_term=search_text, gene_symbol=gene_symbol)
-        ontology_matches.populate_relationships(server_search=True)  # find all terms linked to the gene_symbol (if there is one)
+        ontology_matches.populate_relationships()  # find all terms linked to the gene_symbol (if there is one)
 
         if selected:
             for select in selected:

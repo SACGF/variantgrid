@@ -516,9 +516,25 @@ class ClinVarExportAdmin(ModelAdminBasics):
     list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
 
 
-class ConditionTextMatchAdmin(ModelAdminBasics):
-    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "created"]
+class ConditionTextMatchUserFilter(admin.SimpleListFilter):
+    list_per_page = 200
+    title = 'User Filter'
+    parameter_name = 'user'
+    default_value = None
 
+    def lookups(self, request, model_admin):
+        return [(user.id, user.username) for user in User.objects.all()]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(last_edited_by=self.value())
+        return queryset
+
+
+class ConditionTextMatchAdmin(ModelAdminBasics):
+    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "last_edited_by", "created", "modified"]
+    list_filter = [ConditionTextMatchUserFilter]
 
 class ClinVarExportAdmin(ModelAdminBasics):
     list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
+    list_filter = [ClassificationLabFilter]

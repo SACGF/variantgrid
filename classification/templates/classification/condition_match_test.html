@@ -80,6 +80,10 @@
             <div class="card">
                 <div class="card-header">Auto Assignment</div>
                 <div class="card-body">
+                    <div class="text-info mb-4">
+                        Top level terms can only be auto-assigned if they come from embedded ID matches.<br/>
+                        Gene level terms can be auto-assigned if:  no warnings/errors, gene association, and all leaf terms.
+                    </div>
                     {% labelled label="Suggested Term" %}{% if suggestion.terms %}
                         {% for term in suggestion.terms %}
                             <a href="{% url 'ontology_term' term.url_safe_id %}">{{ term.id }}</a> {{ term.name }}
@@ -97,6 +101,8 @@
                     {% endif %}
                     {% labelled label="Term IDs found in text" %}{{ suggestion.ids_found_in_text|default_if_none:'False' }}{% endlabelled %}
                     {% labelled label="All terms are leafs" %}{{ suggestion.is_all_leafs }}{% endlabelled %}
+                    {% labelled label="Alias index" %}{{ suggestion.alias_index|default_if_none:'' }}{% endlabelled %}
+                    {% labelled label="Has gene symbol assoc" %}{{ has_gene_symbol|default_if_none:'' }}{% endlabelled %}
                 </div>
             </div>
 

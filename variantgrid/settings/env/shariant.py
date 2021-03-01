@@ -40,7 +40,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 MIDDLEWARE += (
-    'mozilla_django_oidc.middleware.SessionRefresh',
+    'auth.session_refresh.VariantGridSessionRefresh',
     'auth.oidc_error_handler.HandleOIDC400Middleware',
 )
 
@@ -207,3 +207,5 @@ VIEW_GENE_SHOW_HOTSPOT_GRAPH = False
 
 LIFTOVER_NCBI_REMAP_ENABLED = True
 LIFTOVER_NCBI_REMAP_USE_PERLBREW = True
+
+PANEL_APP_CHECK_ENABLED = True

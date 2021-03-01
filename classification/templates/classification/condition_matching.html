@@ -35,6 +35,11 @@
         .condition-match-suggestion .suggestion.error {
             background-color: #fef7f7;
         }
+        .condition-match-suggestion .suggestion.info-only {
+            background-color: white !important;
+            opacity: 0.7;
+            border: none;
+        }
 
     </style>
     <script>
@@ -99,7 +104,7 @@
                 let maxMessage = _.maxBy(suggestion.messages, (message) => {
                     return severity[message.severity.toLowerCase()[0]] || 0;
                 });
-                return maxMessage.severity;
+                return maxMessage ? maxMessage.severity : null;
             }
         }
 
@@ -265,9 +270,20 @@
                         let extra = relationship.extra || {};
                         let tooltip = `Phenotype: ${extra.phenotype_row}<br/>Evidence: ${extra.evidence ? extra.evidence.join(',') : ''}<br/>Via related term: ${relationship.via}`;
                         html.push( $('<span>', {class: 'text-muted', text: 'PanelApp AU', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
+                    } else if (relationship.source == "gencc_file") {
+                        let extra = relationship.extra || {};
+                        let sources = extra.sources || [];
+                        let tooltip = "";
+                        for (let source of extra.sources) {
+                            if (tooltip.length) {
+                                tooltip += "<br/><br/>";
+                            }
+                            tooltip += `${source.submitter || 'Unknown source'} : ${source.mode_of_inheritance || '-'} : ${source.gencc_classification}`;
+                        }
+                        html.push( $('<span>', {class: 'text-muted', text: 'GenCC', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
                     } else if (relationship.source === "hpo_disease") {
                         let tooltip = `Via related term: ${relationship.via}`;
-                        html.push( $('<span>', {class: 'text-muted', text: 'NCBI', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
+                        html.push( $('<span>', {class: 'text-muted', text: 'DEPRECATED', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': "This relationship is from a deprecated file. Other relationships listed are fine."}) );
                     } else if (relationship.source === "mondo_file") {
                         let tooltip = `Relationship: ${relationship.relation}`;
                         html.push( $('<span>', {class: 'text-muted', text: "MONDO", 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
@@ -299,7 +315,7 @@
         }
 
         function canSuggest(suggestion) {
-            if (suggestion.terms.length >= 1) {
+            if (!suggestion.is_applied && !suggestion.info_only && suggestion.terms.length >= 1) {
                 for (let message of suggestion.messages) {
                     if (message.severity.toLowerCase().startsWith("e")) {
                         return false;
@@ -314,9 +330,13 @@
             let dom = $('<div>');
             if (suggestion.terms && suggestion.terms.length) {
                 dom.addClass('suggestion');
+                if (suggestion.info_only) {
+                    dom.addClass('info-only');
+                    dom.append($('<div>', {class: 'text-muted', text:'Text match to inform gene level suggestions:'}))
+                }
                 let termStyle = '';
 
-                if (!suggestion.is_applied && canSuggest(suggestion)) {
+                if (canSuggest(suggestion)) {
 
                     let suggest = true;
                     let worst = worstMessage(suggestion);
@@ -505,11 +525,11 @@
             }
 
             if (complete) {
-                $('.condition-match-row').removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied');
+                $('.condition-match-row').removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied').removeAttr('data-info');
             }
             for (let suggestion of suggestions) {
                 let wrapper = $(`#condition-match-${suggestion.id}`);
-                wrapper.removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied');
+                wrapper.removeAttr('data-terms').removeAttr('data-join').removeAttr('data-applied').removeAttr('data-info');
 
                 let valuesDom = wrapper.find('.condition-match-values').empty();
                 let suggestionDom = wrapper.find('.condition-match-suggestion').empty();
@@ -522,6 +542,9 @@
                         wrapper.attr('data-applied', 'true');
                     }
                 } else {
+                    if (suggestion.info_only) {
+                        wrapper.attr('data-info', 'true');
+                    }
                     suggestionDom.html(renderSuggestion(suggestion));
                 }
             }
@@ -548,13 +571,13 @@
             let topLevelDataTerms = topLevel.attr('data-terms');
             let button = topLevel.find('.mondo-picker');
             // if we already have data-terms on top level, don't provide warning
-            if ((topLevel.attr('data-terms') || '').trim().length) {
+            if ((topLevel.attr('data-terms') || '').trim().length && !topLevel.attr('data-info')) {
                 button.css('opacity','1.0');
                 button.removeAttr('title');
                 button.tooltip('dispose');
             } else {
                 button.css('opacity','0.3');
-                button.attr('title', 'It is recommend you choose gene level terms using the buttons below');
+                button.attr('title', 'It is recommended you choose gene level terms using the buttons below');
                 button.tooltip({html:true, trigger : 'hover'});
             }
 
