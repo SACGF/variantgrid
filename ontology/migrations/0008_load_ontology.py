@@ -9,10 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('ontology', '0007_ontologyterm_aliases'),
-    ]
-
-    dependencies = [
-        ('manual', '0002_deployment'),
+        ('manual', '0002_deployment')
     ]
 
     operations = [
