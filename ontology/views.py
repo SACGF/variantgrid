@@ -3,6 +3,7 @@ from typing import List
 from django.contrib import messages
 from django.views.generic import TemplateView
 
+from library.utils import LimitedCollection
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation
 
 
@@ -19,17 +20,24 @@ class OntologyTermView(TemplateView):
                 gene_relationships = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
 
             all_relationships:List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
-            family_relationships = [relationship for relationship in all_relationships if relationship.relation == OntologyRelation.IS_A]
-            regular_relationshiops = [relationship for relationship in all_relationships if relationship.relation != OntologyRelation.IS_A]
-            parent_relationships = [relationship for relationship in family_relationships if relationship.source_term == term]
-            child_relationships = [relationship for relationship in family_relationships if relationship.dest_term == term]
+            regular_relationships = list()
+            parent_relationships = list()
+            child_relationships = list()
+            for relationship in all_relationships:
+                if relationship.relation == OntologyRelation.IS_A:
+                    if relationship.source_term == term:
+                        parent_relationships.append(relationship)
+                    else:
+                        child_relationships.append(relationship)
+                else:
+                    regular_relationships.append(relationship)
 
             return {
                 "term": term,
-                "gene_relationships": gene_relationships,
-                "parent_relationships": parent_relationships,
-                "regular_relationships": regular_relationshiops,
-                "child_relationships": child_relationships
+                "gene_relationships": LimitedCollection(gene_relationships, 250),
+                "parent_relationships": LimitedCollection(parent_relationships, 250),
+                "regular_relationships": LimitedCollection(regular_relationships, 250),
+                "child_relationships": LimitedCollection(child_relationships, 250)
             }
         messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")
         return {"term": term}

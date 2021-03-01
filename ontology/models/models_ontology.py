@@ -1,6 +1,7 @@
 import functools
 import operator
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
@@ -38,6 +39,13 @@ class OntologyService(models.TextChoices):
         OMIM[0]: 6,
         HPO[0]: 7,
         HGNC[0]: 1  # HGNC ids aren't typically 0 padded, because they're not monsters
+    })
+
+    IMPORTANCE: Dict[str, int] = Constant({
+        MONDO[0]: 2,
+        OMIM[0]: 3,
+        HPO[0]: 4, # put HPO relationships last as they occasionally spam OMIM
+        HGNC[0]: 1  # show gene relationships first
     })
 
     URLS: Dict[str, str] = Constant({
@@ -82,9 +90,10 @@ class OntologyRelation:
 
     FREQUENCY = "frequency"
     PANEL_APP_AU = "panelappau"
-    ASSOCIATED = "associated"  # used by GenCC
+    ASSOCIATED = "associated"  # used by GenCC, phenotypes_to_genes
     ALL_FREQUENCY = "frequency"  # used by OMIM_ALL_FREQUENCIES
     ENTREZ_ASSOCIATION = "associated condition"
+    MIM_2_GENE = "mim2gene"
 
     DISPLAY_NAMES = {
         IS_A: "is a",
@@ -340,16 +349,14 @@ class OntologyTermRelation(TimeStampedModel):
     @staticmethod
     def relations_of(term: OntologyTerm) -> List['OntologyTermRelation']:
         def sort_relationships(rel1, rel2):
-            rel1source = rel1.source_term_id == term.id
-            rel2source = rel2.source_term_id == term.id
-            if rel1source != rel2source:
-                if rel1source:
-                    return -1
-                return 1
             other1 = rel1.other_end(term)
             other2 = rel2.other_end(term)
             if other1.ontology_service != other2.ontology_service:
-                return -1 if other1.ontology_service < other2.ontology_service else 1
+                return OntologyService.IMPORTANCE[other1.ontology_service] - OntologyService.IMPORTANCE[other2.ontology_service]
+            rel1source = rel1.source_term_id == term.id
+            rel2source = rel2.source_term_id == term.id
+            if rel1source != rel2source:
+                return -1 if rel1source else 1
             return -1 if other1.index < other2.index else 1
 
         items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)).select_related("source_term", "dest_term", "from_import"))
@@ -417,36 +424,44 @@ class OntologySnake:
         new_snakes: List[OntologySnake] = list([OntologySnake(source_term=term)])
         valid_snakes: List[OntologySnake] = list()
 
+        best_relationships = ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
+
+        iteration = -1
         while new_snakes:
-            snakes = list(new_snakes)
-            new_snakes = list()
-
-            all_leafs = [snake.leaf_term for snake in snakes]
-            all_relations = list(
-                OntologyTermRelation.objects.filter(
-                    (Q(source_term__in=all_leafs) & ~Q(dest_term__in=seen)) |\
-                    (Q(dest_term__in=all_leafs) & ~Q(source_term__in=seen)))\
-                    .exclude(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})\
-                    .select_related("source_term", "dest_term"))
-
+            iteration += 1
+            snakes: List[OntologySnake] = list(new_snakes)
+            new_snakes: List[OntologySnake] = list()
+            by_leafs: Dict[OntologyTerm, OntologySnake] = dict()
             for snake in snakes:
-                for relation in all_relations:
-                    if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
-                        other_term = relation.other_end(snake.leaf_term)
-                        # not going to find hgnc link via HPO
-                        # but would be better to exclude them all together, but really difficult with the
-                        # directional relationships
-                        if to_ontology == OntologyService.HGNC:
-                            if other_term.ontology_service == OntologyService.HPO:
-                                continue
+                if existing := by_leafs.get(snake.leaf_term):
+                    if len(snake.paths) < len(existing.paths):
+                        by_leafs[snake.leaf_term] = snake
+                else:
+                    by_leafs[snake.leaf_term] = snake
+            all_leafs = by_leafs.keys()
 
-                        new_snake = snake.snake_step(relation)
-                        if other_term.ontology_service == to_ontology:
-                            valid_snakes.append(new_snake)
-                            continue
-                        if len(new_snake.paths) <= max_depth:
-                            new_snakes.append(new_snake)
-                        seen.add(other_term)
+            outgoing = OntologyTermRelation.objects.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(best_relationships).select_related("source_term", "dest_term")
+            incoming = OntologyTermRelation.objects.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(best_relationships).select_related("source_term", "dest_term")
+            if to_ontology == OntologyService.HGNC:
+                outgoing = outgoing.exclude(dest_term__ontology_service=OntologyService.HPO)
+                incoming = incoming.exclude(source_term__ontology_service=OntologyService.HPO)
+
+            all_relations = list(outgoing) + list(incoming)
+
+            for relation in all_relations:
+                snake = by_leafs.get(relation.source_term) or by_leafs.get(relation.dest_term)
+
+                if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
+                    other_term = relation.other_end(snake.leaf_term)
+
+                    new_snake = snake.snake_step(relation)
+                    if other_term.ontology_service == to_ontology:
+                        valid_snakes.append(new_snake)
+                        continue
+                    if len(new_snake.paths) <= max_depth:
+                        new_snakes.append(new_snake)
+                    seen.add(other_term)
+
         return OntologySnakes(valid_snakes)
 
     @staticmethod
@@ -565,6 +580,9 @@ class OntologySnakes:
 
     def __len__(self):
         return len(self.snakes)
+
+    def __getitem__(self, item):
+        return self.snakes[item]
 
     def leafs(self) -> List[OntologyTerm]:
         return list(sorted({snake.leaf_term for snake in self}))

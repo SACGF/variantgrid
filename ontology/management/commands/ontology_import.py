@@ -15,7 +15,8 @@ from pandas import DataFrame, isna
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC
 from library.file_utils import file_md5sum
-from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport
+from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
+    OntologyTermRelation
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 from model_utils.models import now
 
@@ -390,18 +391,26 @@ def load_hpo(filename: str, force: bool):
     print("Committing...")
 
 
-def load_hpo_disease(filename: str, force: bool):
+def load_phenotype_to_genes(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
-        context="hpo_disease",
+        context="phenotype_to_genes",
         import_source=OntologyImportSource.HPO,
-        processor_version=5,
+        processor_version=1,
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
-                     names=['disease_id', 'gene_symbol', 'gene_id', 'hpo_id', 'hpo_name'],
-                     dtype={"gene_id": int})
+                     names=['hpo_id', 'hpo_name', 'entrez_gene_id', 'entrez_gene_symbol', 'status', 'source', 'omim_id'])
+
+    df = df[df.source.isin(["mim2gene"])]
+
+    # first kill of old data
+    old_imports = OntologyImport.objects.filter(filename="OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt")
+    if old_imports.exists():
+        print("Removing any data from OMIM_ALL_FREQUENCIES")
+        deleted = OntologyTermRelation.objects.filter(from_import__in=old_imports).delete()
+        print(f"{deleted} relationships removed")
 
     by_hpo = df.groupby(["hpo_id"])
     for hpo_id, by_hpo_data in by_hpo:
@@ -414,27 +423,27 @@ def load_hpo_disease(filename: str, force: bool):
             primary_source=False
         )
 
-        by_omim = by_hpo_data.groupby(["disease_id"])
+        by_omim = by_hpo_data.groupby(["omim_id"])
         for omim_id, by_omim_data in by_omim:
             # link HPO -> OMIM
             ontology_builder.add_ontology_relation(
                 source_term_id=hpo_id,
                 dest_term_id=omim_id,
-                relation=OntologyRelation.ALL_FREQUENCY
+                relation=OntologyRelation.ASSOCIATED
             )
 
-    by_gene = df.groupby(["gene_symbol"])
+    by_gene = df.groupby(["entrez_gene_symbol"])
     for gene_symbol, gene_data in by_gene:
         # IMPORTANT, the gene_id is the entrez gene_id, not the HGNC gene id
         try:
             hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
 
-            by_omim = gene_data.groupby(["disease_id"])
+            by_omim = gene_data.groupby(["omim_id"])
             for omim_id, by_omim_data in by_omim:
                 ontology_builder.add_ontology_relation(
                     source_term_id=omim_id,
                     dest_term_id=hgnc_term.id,
-                    relation=OntologyRelation.ENTREZ_ASSOCIATION
+                    relation=OntologyRelation.MIM_2_GENE
                 )
         except ValueError:
             print(f"Could not resolve gene symbol {gene_symbol} to HGNC ID")
@@ -594,7 +603,8 @@ class Command(BaseCommand):
         parser.add_argument('--force', action="store_true")
         parser.add_argument('--mondo_json', required=False)
         parser.add_argument('--hpo_owl', required=False)
-        parser.add_argument('--omim_frequencies', required=False)
+        parser.add_argument('--omim_frequencies', required=False)  # note this is deprecated
+        parser.add_argument('--phenotype_to_genes', required=False)
         parser.add_argument('--hgnc_sync', action="store_true", required=False)
         parser.add_argument('--biomart', required=False)
         parser.add_argument('--omim', required=False)
@@ -637,8 +647,11 @@ class Command(BaseCommand):
             except OntologyBuilderDataUpToDateException:
                 print("HPO File hash is the same as last import")
 
-        if filename := options.get("omim_frequencies"):
+        if filename := options.get("phenotype_to_genes"):
             try:
-                load_hpo_disease(filename, force)
+                load_phenotype_to_genes(filename, force)
             except OntologyBuilderDataUpToDateException:
-                print("HPO Disease hash is the same as last import")
+                print("Phenotype to Genes File hash is the same as last import")
+
+        if filename := options.get("omim_frequencies"):
+            print("THIS FILE IS DEPRECATED, please use phenotype_to_genes.txt instead")

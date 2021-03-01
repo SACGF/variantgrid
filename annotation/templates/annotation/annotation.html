@@ -350,7 +350,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                             using HGNC Gene Names as a basis, run
 <code>{{ python_command }} manage.py ontology_import --hgnc_sync</code>
                         </div>
-                        <div>
+                        <div class="mt-4">
                             <b>MONDO</b><br/>mondo.json can be downloaded from Download mondo.owl from <a href="http://www.obofoundry.org/ontology/mondo.html">Monarch Disease Ontology</a> on OBO foundry.<br/>
 <code>wget https://github.com/monarch-initiative/mondo/releases/download/current/mondo.json
 {{ python_command }} manage.py ontology_import --mondo_json (location of mondo.json)</code>
@@ -361,21 +361,29 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
 {{ python_command }} manage.py ontology_import --hpo_owl (location of hp.owl) </code>
                         </div>
                         <div class="mt-4">
-                            <b>HPO Diseases</b><br/>
-                            Download OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt from <a href="http://compbio.charite.de/hudson/job/hpo.annotations.monthly/lastStableBuild/">Human Phenotype Ontology</a><br/>
-<code>wget http://compbio.charite.de/jenkins/job/hpo.annotations.monthly/lastStableBuild/artifact/annotation/OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt
-{{ python_command }} manage.py ontology_import --omim_frequencies (location of OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes) </code>
-                        </div>
-                        <div class="mt-4">
-                            <b>OMIM</b><br/>Direct OMIM import is not currently supported, but will be populated via MONDO, HPO Diseases File and biomart<br/>
+                            <b>OMIM</b><br/>Direct OMIM import requires a license, but will be populated via MONDO, HPO Diseases File and biomart<br/>
                             Export: "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="http://www.ensembl.org/biomart/martview/">Ensembl Biomart</a><br/> as a TSV.
                             Use (GRC38 version or later as it has aliases) and make sure you tick "unique"
- <code>{{ python_command }} manage.py ontology_import --biomart (location of mart_export)</code>
+ <code>{{ python_command }} manage.py ontology_import --biomart (location of mart_export)</code><br/>
+                            If you are licensed to have access to mimTitles.txt it can be imported via
+ <code>{{ python_command }} manage.py ontology_import --omim (location of mimTitles.txt)</code><br/>
+                        </div>
+                        <div class="mt-4">
+                            <b>HPO/OMIM/HGNC phenotype_to_genes</b><br/>
+                            Download phenotype_to_genes.txt from <a href="https://hpo.jax.org/app/download/annotation">Human Phenotype Ontology</a><br/>
+<code>wget http://purl.obolibrary.org/obo/hp/hpoa/phenotype_to_genes.txt
+{{ python_command }} manage.py ontology_import --phenotype_to_genes (location of phenotype_to_genes.txt) </code>
+                        </div>
+                        <div class="mt-4">
+                            <b>MONDO/HGNC GenCC</b><br/>
+                            Download gencc-submissions.csv from <a href="https://search.thegencc.org/download">GenCC</a><br/>
+<code>wget https://search.thegencc.org/download/action/submissions-export-csv
+{{ python_command }} manage.py ontology_import --gencc (location of gencc-submissions.csv) </code>
                         </div>
                         <div class="mt-4">
                             <b>Bulk</b><br/>
 If all the files are in place, the uploads can be triggered by a single command rather than waiting for each step to finish, e.g.
-<code>{{ python_command }} manage.py ontology_import --mondo_json (location of mondo.json) --hpo_owl (location of hp.owl) --omim_frequencies (location of OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes) --biomart (location of mart_export)</code>
+<code>{{ python_command }} manage.py ontology_import --hgnc_sync --mondo_json (location of mondo.json) --hpo_owl (location of hp.owl) --biomart (location of mart_export) --phenotype_to_genes (location of phenotype_to_genes.txt) --gencc (location of gencc-submissions.csv)</code>
                         </div>
 
                     {% endinstall-instructions %}

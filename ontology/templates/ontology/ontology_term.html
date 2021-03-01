@@ -43,6 +43,7 @@
                 <hr/>
                 {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
                     {% if not parent_relationships %}-{% endif %}
+                    {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
                     {% for relationship in parent_relationships %}
                         <div class="mt-2">
                             {% ontology_relationship relationship term %}
@@ -55,6 +56,7 @@
                     {% labelled label="<i class='fas fa-dna'></i> Gene Relationships" %}
                         <p class="text-muted">Note that Panel App relationships are only retrieved as needed, and might not be represented
                         here yet.</p>
+                        {% if gene_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ gene_relationships.limit_str }}<br/>{% endif %}
                         {% if not gene_relationships %}-{% endif %}
                         {% for snake in gene_relationships %}
                             <div class="mt-2">
@@ -77,6 +79,7 @@
 
                 {% labelled label="Direct Relationships" %}
                     {% if not regular_relationships %}-{% endif %}
+                    {% if regular_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ regular_relationships.limit_str }}<br/>{% endif %}
                     {% for relationship in regular_relationships %}
                         <div class="mt-2">
                             {% ontology_relationship relationship term %}
@@ -88,6 +91,7 @@
 
                 {% labelled label='<i class="fas fa-sitemap"></i> Child Terms' %}
                     {% if not child_relationships %}-{% endif %}
+                    {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
                     {% for relationship in child_relationships %}
                         <div class="mt-2">
                             {% ontology_relationship relationship term %}

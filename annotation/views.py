@@ -180,9 +180,9 @@ def annotation(request):
             ontology_relationship_counts[f"{second_service}{first_service}"] = join_count
 
     ontology_imports = list()
-    for context in ["mondo_file", "hpo_file", "hpo_disease", "biomart_omim_aliases"]:
+    for context in ["mondo_file", "gencc_file", "hpo_file", "omim_file", "biomart_omim_aliases", "phenotype_to_genes"]:
         last_import = OntologyImport.objects.filter(context=context).order_by('-created').first()
-        if not last_import:
+        if not last_import and context != "omim_file":  # don't complain about omim_file not being imported as not available to environments without license
             all_ontologies_accounted_for = False
         ontology_imports.append({"context": context, "last_import": last_import})
 

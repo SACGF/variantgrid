@@ -559,3 +559,33 @@ class DebugTimer:
         duration = now - self.start
         print(f"{description} {duration}")
         self.start = now
+
+
+class LimitedCollection:
+
+    def __init__(self, data: List[Any], limit: int):
+        self.true_count = len(data)
+        self.data = data
+        if len(data) > limit:
+            self.data = data[0:limit]
+        self.limit = limit
+
+    @property
+    def limit_str(self):
+        return f"Limiting results to {len(self.data)} of {self.true_count}"
+
+    @property
+    def is_limited(self) -> bool:
+        return len(self.data) != self.true_count
+
+    def __len__(self):
+        return self.limit
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def __bool__(self):
+        return self.true_count > 0
