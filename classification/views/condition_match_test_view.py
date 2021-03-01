@@ -79,7 +79,7 @@ def condition_match_test_download_view(request):
             raise
 
     response = StreamingHttpResponse(result_iterator(), content_type='text/csv')
-    modified_str = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
+    modified_str = datetime.now().strftime('%Y-%m-%d-%H_%M_%S')  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
 
     response['Last-Modified'] = modified_str
     response['Content-Disposition'] = f'attachment; filename="text_automatching_{modified_str}.csv"'
