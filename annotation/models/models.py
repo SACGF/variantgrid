@@ -628,7 +628,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
-    DBSCSNV_CUTOFF = 0.6
     dbscsnv_ada_score = models.FloatField(null=True, blank=True)
     dbscsnv_rf_score = models.FloatField(null=True, blank=True)
     cosmic_id = models.TextField(null=True, blank=True)  # COSV - Genomic Mutation ID
@@ -641,7 +640,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     mastermind_mmid3 = models.TextField(null=True, blank=True)  # gene:key for mastermind_count_3_aa_change
     # SpliceAI - @see https://pubmed.ncbi.nlm.nih.gov/30661751/
     # This has so many columns, perhaps a highest score and summary col of "AG: -5, AL: 35, DG: -5, DL: 17"
-    SPLICEAI_CUTOFF = 0.5  # 0.2 = high recal, 0.5 = recommended, 0.8 = high precision
+    # 0.2 = high recal, 0.5 = recommended, 0.8 = high precision
     spliceai_pred_dp_ag = models.IntegerField(null=True, blank=True)
     spliceai_pred_dp_al = models.IntegerField(null=True, blank=True)
     spliceai_pred_dp_dg = models.IntegerField(null=True, blank=True)
