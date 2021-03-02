@@ -1,3 +1,4 @@
+import itertools
 from typing import Optional
 
 from django.db import models
@@ -6,120 +7,161 @@ from functools import reduce
 import operator
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.models.damage_enums import PathogenicityImpact, SIFTPrediction, \
-    Polyphen2Prediction, MutationTasterPrediction, FATHMMPrediction, \
-    MutationAssessorPrediction
+from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import VariantAnnotation
 
 
 class DamageNode(AnalysisNode):
-    MIN_DAMAGE_PREDICTION = 0
-    INDIVIDUAL_DAMAGE_PREDICTION = 1
-
     impact_min = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
-    always_keep_splice_variants_regardless_of_impact = models.BooleanField(default=True)
+    impact_required = models.BooleanField(default=False)
+
+    splice_min = models.FloatField(null=True, blank=True)
+    splice_required = models.BooleanField(default=False)
+    splice_allow_null = models.BooleanField(default=True)
+
     cadd_score_min = models.IntegerField(null=True, blank=True)
+    cadd_score_required = models.BooleanField(default=False)
+    cadd_score_allow_null = models.BooleanField(default=True)
+
     revel_score_min = models.FloatField(null=True, blank=True)
+    revel_score_required = models.BooleanField(default=False)
+    revel_score_allow_null = models.BooleanField(default=True)
+
+    cosmic_count_min = models.IntegerField(null=True, blank=True)
+    cosmic_count_required = models.BooleanField(default=False)
+
+    damage_predictions_min = models.IntegerField(null=True, blank=True)
+    damage_predictions_required = models.BooleanField(default=False)
+    damage_predictions_allow_null = models.BooleanField(default=True)
+
+    protein_domain = models.BooleanField(default=False)
+    protein_domain_required = models.BooleanField(default=False)
+
+    published = models.BooleanField(default=False)
+    published_required = models.BooleanField(default=False)
+
+    # TODO: Remove these 2
+    always_keep_splice_variants_regardless_of_impact = models.BooleanField(default=True)
     allow_null = models.BooleanField(default=False)
-    remove_low_complexity_regions = models.BooleanField(default=False)
-    # 2 modes - min damage predictions, or individual settings
-    accordion_panel = models.IntegerField(default=0)
-    min_damage_predictions = models.IntegerField(null=True, blank=True)
-    sift_prediction = models.CharField(max_length=1, choices=SIFTPrediction.CHOICES, null=True, blank=True)
-    polyphen2_prediction = models.CharField(max_length=1, choices=Polyphen2Prediction.CHOICES, null=True, blank=True)
-    mutation_assessor_prediction = models.CharField(max_length=1, choices=MutationAssessorPrediction.CHOICES, null=True,
-                                                    blank=True)
-    mutation_taster_prediction = models.CharField(max_length=1, choices=MutationTasterPrediction.CHOICES, null=True,
-                                                  blank=True)
-    fathmm_prediction = models.CharField(max_length=1, choices=FATHMMPrediction.CHOICES, null=True, blank=True)
-
-    DAMAGE_PREDICTION = {
-        "sift_prediction": SIFTPrediction,
-        "polyphen2_prediction": Polyphen2Prediction,
-        "mutation_assessor_prediction": MutationAssessorPrediction,
-        "mutation_taster_prediction": MutationTasterPrediction,
-        "fathmm_prediction": FATHMMPrediction,
-    }
-
-    @property
-    def has_min_predictions(self):
-        return self.accordion_panel == self.MIN_DAMAGE_PREDICTION and self.min_damage_predictions
-
-    @property
-    def has_individual_damage(self):
-        if self.accordion_panel == self.INDIVIDUAL_DAMAGE_PREDICTION:
-            for f in self.DAMAGE_PREDICTION:
-                val = getattr(self, f, None)
-                if val is not None:
-                    return True
-        return False
 
     def modifies_parents(self):
-        return any([self.has_min_predictions, self.has_individual_damage,
-                    self.impact_min, self.cadd_score_min, self.revel_score_min, self.remove_low_complexity_regions])
+        return any([self.impact_min, self.splice_min, self.cadd_score_min, self.revel_score_min,
+                    self.cosmic_count_min, self.damage_predictions_min, self.protein_domain, self.published])
+
+    def has_required(self):
+        return any([self.impact_required, self.splice_required, self.cadd_score_required, self.revel_score_required,
+                    self.cosmic_count_required, self.damage_predictions_required,
+                    self.protein_domain_required, self.published_required])
 
     def _get_node_q(self) -> Optional[Q]:
-        snp_only_filters = []
+        or_filters = []
+        and_filters = []
+        and_filters_snp_only = []
 
-        if self.remove_low_complexity_regions:
-            no_lc_q = Q(variantannotation__repeat_masker__isnull=True)
-            snp_only_filters.append(no_lc_q)
+        if self.impact_min is not None:
+            q_impact = PathogenicityImpact.get_q(self.impact_min)
+            if self.impact_required:
+                and_filters.append(q_impact)
+            else:
+                or_filters.append(q_impact)
 
-        if self.cadd_score_min:
-            cadd_q = Q(variantannotation__cadd_phred__gte=self.cadd_score_min)
-            if self.allow_null:
-                cadd_q |= Q(variantannotation__cadd_phred__isnull=True)
-            snp_only_filters.append(cadd_q)
+        if self.splice_min is not None:
+            # [consequence contains 'splice' OR not null splice region] AND [variant class not SNV]
+            q_splice_indels = Q(variantannotation__consequence__contains='splice') | Q(variantannotation__splice_region__isnull=False)
+            q_splice_indels &= ~Q(variantannotation__variant_class='SN')
+            splicing_q_list = [
+                q_splice_indels,
+                Q(variantannotation__dbscsnv_ada_score__gte=self.splice_min),
+                Q(variantannotation__dbscsnv_rf_score__gte=self.splice_min),
+            ]
+            if self.splice_required and self.splice_allow_null:
+                splicing_q_list.extend([
+                    Q(variantannotation__dbscsnv_ada_score__isnull=True),
+                    Q(variantannotation__dbscsnv_rf_score__isnull=True),
+                ])
+
+            for _, (ds, _) in VariantAnnotation.SPLICEAI_DS_DP.items():
+                q_spliceai = Q(**{f"variantannotation__{ds}__gte": self.splice_min})
+                splicing_q_list.append(q_spliceai)
+                if self.splice_required and self.splice_allow_null:
+                    q_spliceai_null = Q(**{f"variantannotation__{ds}__isnull": True})
+                    splicing_q_list.append(q_spliceai_null)
+
+            q_splicing = reduce(operator.or_, splicing_q_list)
+            if self.splice_required:
+                and_filters.append(q_splicing)
+            else:
+                or_filters.append(q_splicing)
+
+        if self.cadd_score_min is not None:
+            q_cadd = Q(variantannotation__cadd_phred__gte=self.cadd_score_min)
+            if self.cadd_score_required:
+                if self.cadd_score_allow_null:
+                    q_cadd |= Q(variantannotation__cadd_phred__isnull=True)
+                and_filters_snp_only.append(q_cadd)
+            else:
+                or_filters.append(q_cadd)
 
         if self.revel_score_min:
-            revel_q = Q(variantannotation__revel_score__gte=self.revel_score_min)
-            if self.allow_null:
-                revel_q |= Q(variantannotation__revel_score__isnull=True)
-            snp_only_filters.append(revel_q)
-
-        damage_or_filters = []
-        if self.has_min_predictions:
-            if self.allow_null:
-                max_benign = len(self.DAMAGE_PREDICTION) - self.min_damage_predictions
-                num_pred_q = Q(variantannotation__predictions_num_benign__lte=max_benign)
+            q_revel = Q(variantannotation__revel_score__gte=self.revel_score_min)
+            if self.revel_score_required:
+                if self.revel_score_allow_null:
+                    q_revel |= Q(variantannotation__revel_score__isnull=True)
+                and_filters_snp_only.append(q_revel)
             else:
-                num_pred_q = Q(variantannotation__predictions_num_pathogenic__gte=self.min_damage_predictions)
-            damage_or_filters.append(num_pred_q)
-        elif self.has_individual_damage:
-            for field, klass in self.DAMAGE_PREDICTION.items():
-                val = getattr(self, field, None)
-                if val is not None:
-                    damage_or_filters.append(klass.get_q(val, allow_null=self.allow_null))
+                or_filters.append(q_revel)
 
-        if damage_or_filters:
-            snp_only_filters.append(reduce(operator.or_, damage_or_filters))
+        if self.cosmic_count_min is not None:
+            q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)
+            if self.cosmic_count_required:
+                and_filters.append(q_cosmic_count)
+            else:
+                or_filters.append(q_cosmic_count)
 
-        and_filters = []
-        if snp_only_filters:
-            snp_only_filters_q = reduce(operator.and_, snp_only_filters)
+        if self.damage_predictions_min is not None:
+            q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
+            if self.damage_predictions_required:
+                if self.damage_predictions_allow_null:
+                    max_benign = len(VariantAnnotation.PATHOGENICITY_FIELDS) - self.damage_predictions_min
+                    q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
+                and_filters_snp_only.append(q_damage)
+            else:
+                or_filters.append(q_damage)
+
+        if self.protein_domain:
+            protein_domains_fields_or = []
+            for f in ["interpro_domain", "domains"]:  # TODO: What about UniProt??
+                q_domain_field = Q(**{f"variantannotation__{f}__isnull": False})
+                protein_domains_fields_or.append(q_domain_field)
+            q_protein_domain = reduce(operator.or_, protein_domains_fields_or)
+            if self.protein_domain_required:
+                and_filters.append(q_protein_domain)
+            else:
+                or_filters.append(q_protein_domain)
+
+        if self.published:
+            published_fields_or = []
+            for f in itertools.chain(["pubmed"], VariantAnnotation.MASTERMIND_FIELDS.keys()):
+                q_published_field = Q(**{f"variantannotation__{f}__isnull": False})
+                published_fields_or.append(q_published_field)
+
+            q_published = reduce(operator.or_, published_fields_or)
+            if self.published_required:
+                and_filters.append(q_published)
+            else:
+                or_filters.append(q_published)
+
+        if and_filters_snp_only:
+            q_snp_only_filters = reduce(operator.and_, and_filters_snp_only)
             allow_indels_q = Q(locus__ref__length__gt=1) | Q(alt__length__gt=1)
-            and_filters.append(snp_only_filters_q | allow_indels_q)
+            and_filters.append(allow_indels_q | q_snp_only_filters)
 
-        if self.impact_min:  # Always has impact_min on each VariantAnnotation so no worry about null
-            impact_q = PathogenicityImpact.get_q(self.impact_min)
-            and_filters.append(impact_q)
+        if or_filters:
+            q_or = reduce(operator.or_, or_filters)
+            and_filters.append(q_or)
 
         if and_filters:
-            and_q = reduce(operator.and_, and_filters)
-            final_or_filters = [and_q]
-            if self.always_keep_splice_variants_regardless_of_impact:
-                splicing_q_list = [
-                    Q(variantannotation__consequence__contains='splice'),
-                    Q(variantannotation__splice_region__isnull=False),
-                    Q(variantannotation__dbscsnv_ada_score__gte=VariantAnnotation.DBSCSNV_CUTOFF),
-                    Q(variantannotation__dbscsnv_rf_score__gte=VariantAnnotation.DBSCSNV_CUTOFF),
-                ]
-                for _, (ds, _) in VariantAnnotation.SPLICEAI_DS_DP.items():
-                    spliceai_q = Q(**{f"variantannotation__{ds}__gte": VariantAnnotation.SPLICEAI_CUTOFF})
-                    splicing_q_list.append(spliceai_q)
-                splicing_q = reduce(operator.or_, splicing_q_list)
-                final_or_filters.append(splicing_q)
-            q = reduce(operator.or_, final_or_filters)
+            q = reduce(operator.and_, and_filters)
         else:
             q = None
         return q
@@ -135,16 +177,10 @@ class DamageNode(AnalysisNode):
     def get_node_name(self):
         name = ''
         if self.modifies_parents():
-            if self.has_min_predictions:
-                name = f"{self.min_damage_predictions} of {len(self.DAMAGE_PREDICTION)}"
-            elif self.has_individual_damage:
-                name = "Custom Damage"
-
-            if self.remove_low_complexity_regions:
-                name += 'Remove low complexity'
-
+            if self.damage_predictions_min:
+                name = f"{self.damage_predictions_min} of {len(VariantAnnotation.PATHOGENICITY_FIELDS)}"
         return name
 
     @staticmethod
     def get_node_class_label():
-        return "Damage"
+        return "EffectNode"

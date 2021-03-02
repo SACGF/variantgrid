@@ -518,3 +518,57 @@ function finishedLoadingEditor(node_id, version_id) {
     registerComponent(unique_code, EDITOR, everythingLoaded);
 }
 
+
+function setupSlider(inputSelector, sliderSelector, enableInput) {
+    let sliderMinVal = Number(inputSelector.attr("min"));
+    let sliderMaxVal = Number(inputSelector.attr("max"));
+    let sliderVal = inputSelector.val();
+    let container = sliderSelector.parents(".slider-container");
+    let sliderValue = $(".slider-value", container);
+    sliderValue.html(sliderVal); // set initial
+
+    sliderSelector.slider({
+        min: sliderMinVal,
+        max: sliderMaxVal,
+        step: Number(inputSelector.attr("step") || 1),
+        value: sliderVal,
+        change: function( event, ui ) {
+            inputSelector.val(ui.value);
+        },
+        slide: function( event, ui ) {
+            sliderValue.html(ui.value);
+        },
+    });
+
+    $(".min-value", container).html(sliderMinVal);
+    $(".max-value", container).html(sliderMaxVal);
+
+    if (enableInput) {
+        let row = enableInput.parents("tr");
+        let filterRequired = $(".filter-required", row);
+        let frInputs = $("input", filterRequired);
+
+        enableInput.change(function () {
+            if ($(this).is(":checked")) {
+                sliderSelector.slider("enable");
+                frInputs.prop("disabled", false);
+            } else {
+                sliderSelector.slider("disable");
+                frInputs.prop("disabled", true);
+            }
+        });
+        if (sliderVal === '') {
+            enableInput.prop("checked", false);
+            frInputs.prop("disabled", true);
+        } else {
+            enableInput.prop("checked", true);
+            frInputs.prop("disabled", false);
+        }
+    }
+
+    if (sliderVal === '') {
+        sliderSelector.slider("disable");
+    } else {
+        sliderSelector.slider("enable");
+    }
+}

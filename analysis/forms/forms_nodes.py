@@ -28,10 +28,10 @@ from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygo
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
+from annotation.models import VariantAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
-from genes.panel_app import get_local_cache_gene_list
 from library.forms import NumberInput
 from library.utils import md5sum_str
 from ontology.models import OntologyTerm
@@ -193,8 +193,9 @@ class BuiltInFilterNodeForm(BaseNodeForm):
 
     class Meta:
         model = models.BuiltInFilterNode
-        fields = ("built_in_filter", "min_clinvar_stars")
-        widgets = {"min_clinvar_stars": Stars(stars=4)}
+        fields = ("built_in_filter", "clinvar_stars_min", "cosmic_count_min")
+        widgets = {"clinvar_stars_min": Stars(stars=4),
+                   "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1})}
 
 
 class ClassificationsNodeForm(BaseNodeForm):
@@ -272,9 +273,12 @@ class DamageNodeForm(BaseNodeForm):
         model = DamageNode
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {"accordion_panel": HiddenInput(),
+                   "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1}),
                    "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70}),
                    "revel_score_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
-                   "min_damage_predictions": HiddenInput(attrs={"min": 0, "max": len(DamageNode.DAMAGE_PREDICTION)})}
+                   "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
+                   "damage_predictions_min": HiddenInput(attrs={"min": 0,
+                                                                "max": len(VariantAnnotation.PATHOGENICITY_FIELDS)})}
 
 
 class ExpressionNodeForm(forms.Form):

@@ -535,6 +535,15 @@ class AbstractVariantAnnotation(models.Model):
     class Meta:
         abstract = True
 
+    PATHOGENICITY_FIELDS = {
+        "fathmm_pred_most_damaging": FATHMMPrediction,
+        "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
+        "mutation_taster_pred_most_damaging": MutationTasterPrediction,
+        "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
+        "sift": SIFTPrediction,
+    }
+
+
     @property
     def transcript_accession(self):
         """ Get transcript_id (with version if possible) """
@@ -546,16 +555,8 @@ class AbstractVariantAnnotation(models.Model):
 
     @lazy
     def flagged_pathogenicity(self):
-        PATHOGENICITY_FIELDS = {
-            "fathmm_pred_most_damaging": FATHMMPrediction,
-            "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
-            "mutation_taster_pred_most_damaging": MutationTasterPrediction,
-            "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
-            "sift": SIFTPrediction,
-        }
-
         fp = {}
-        for f, klass in PATHOGENICITY_FIELDS.items():
+        for f, klass in self.PATHOGENICITY_FIELDS.items():
             level = getattr(self, f)
             fp[f] = klass.is_level_flagged(level)
         return fp
