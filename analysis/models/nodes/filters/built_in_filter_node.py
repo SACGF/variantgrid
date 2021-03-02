@@ -46,6 +46,10 @@ class BuiltInFilterNode(AnalysisNode):
         if self.modifies_parents():
             extra_filters = self.get_extra_filters()
             name = extra_filters.replace("_", " ")
+            if self.built_in_filter == BuiltInFilters.CLINVAR and self.clinvar_stars_min:
+                name += f"\n★ >= {self.clinvar_stars_min}"
+            elif self.built_in_filter == BuiltInFilters.COSMIC and self.cosmic_count_min:
+                name += f"\n>= {self.cosmic_count_min}"
         return name
 
     def get_css_classes(self):

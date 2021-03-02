@@ -2,17 +2,51 @@
 
 {% block content %}
 <style>
-	#id_percent {
-		width: 100px;
+	.slider-container {
+		margin-left: 10px;
+		display: inline-block;
 	}
+
+	.slider {
+		display: inline-block;
+		width: 200px;
+	}
+
+	.slider label {
+	    position: absolute;
+	    width: 20px;
+	    margin-left: -10px;
+	    text-align: center;
+	    margin-top: 20px;
+	}
+
+	.slider-labels {
+		width: 200px;
+	}
+
+	.label {
+		font-weight: bold;
+	}
+
+	.slider-value {
+        min-width: 50px;
+        height: 25px;
+		margin-left: 15px;
+	}
+
 </style>
 <script>
-    function setupClinVarStars(bifForm) {
-        let bifSelect = $("#id_built_in_filter", bifForm);
+    function setupClinVarStars(bifSelect) {
         let starsContainer = $("#django-starfield-clinvar_stars_min");
 
         // We need to add a zero radio input, because it doesn't save to DB when none are selected.
-        let inputZero = $("<input/>", {id:"clinvar_stars_min-zero", name:"clinvar_stars_min", type:"radio", value:"0"})
+        let inputZero = $("<input/>", {
+            id:"clinvar_stars_min-zero", name:"clinvar_stars_min", type:"radio", value:"0",
+        });
+        // If nothing selected, make 0 selected
+        if (!getStarsRadioInputs().is(":checked")) {
+            inputZero.prop("checked", true);
+        }
         starsContainer.append(inputZero);
 
         // Make a "clear" link - to be able to have zero stars
@@ -21,7 +55,7 @@
 
         function checkSelectedStars() {
             let numStars = getStarsRadioInputs().filter(":checked").val();
-            if (numStars) {
+            if (parseInt(numStars) !== 0) {
                 clearLink.show();
             } else {
                 $("#zero-stars-link").hide();
@@ -56,20 +90,48 @@
         $("#clinvar_stars_min-zero").prop("checked", "checked");
     }
 
+    function setupCOSMICCount(bifSelect) {
+        function checkCOSMICCount() {
+            let ccw = $("#cosmic-count-widget");
+            if (bifSelect.val() === 'M') {
+                ccw.show();
+            } else {
+                ccw.hide();
+            }
+        }
+
+        bifSelect.change(checkCOSMICCount);
+        checkCOSMICCount();
+    }
+
     $(document).ready(function() {
         let bifForm = $("form#built-in-filter");
+        let bifSelect = $("#id_built_in_filter", bifForm);
+        setupClinVarStars(bifSelect);
+        setupCOSMICCount(bifSelect);
+        setupSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"));
         ajaxForm(bifForm);
-
-        setupClinVarStars(bifForm);
     });
 </script>
 <div>
 	<form id="built-in-filter" method="post" action="{{ request.path }}">
         {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
         {{ form.as_p }}
+
+        <div id="cosmic-count-widget">
+            <label>COSMIC count min</label>
+            <div class='slider-container'>
+                <div class="display-flex">
+                    <div id="cosmic-count-slider" class='slider'></div>
+                    <div class='label slider-value'></div>
+                </div>
+                <div class='slider-labels'>
+                    <span class='label min-value left'></span>
+                    <span class='label max-value right'></span>
+                </div>
+            </div>
+        </div>
+
         {% if has_write_permission %}
 		    <button id='built-in-filter-save' class="btn btn-primary">save</button>
         {% endif %}

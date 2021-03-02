@@ -193,7 +193,7 @@ class BuiltInFilterNodeForm(BaseNodeForm):
 
     class Meta:
         model = models.BuiltInFilterNode
-        fields = ("built_in_filter", "clinvar_stars_min")#, "cosmic_count_min")
+        fields = ("built_in_filter", "clinvar_stars_min", "cosmic_count_min")
         widgets = {"clinvar_stars_min": Stars(stars=4),
                    "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1})}
 
