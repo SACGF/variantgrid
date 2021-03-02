@@ -484,7 +484,7 @@ function clickCounter(evt) {
 	const countType = $(this).attr("count_type");
 
 	unselectActive();
-    node.addClass(ACTIVE_CLASS);
+	setActiveNode(node);
     $(this).addClass(ACTIVE_NODE_COUNT_CLASS);
 	loadNodeData(nodeId, countType, true);
 } 
@@ -610,6 +610,12 @@ function loadNodeWhenReady(node_id) {
 }
 
 
+function setActiveNode(node) {
+	node.addClass(ACTIVE_CLASS);
+	bringNodeToFront(node);
+}
+
+
 function unselectActive() {
 	const container = $("#analysis-container");
 	$("." + ACTIVE_CLASS, container).removeClass(ACTIVE_CLASS);
@@ -620,7 +626,7 @@ function unselectActive() {
 function setupNodes(nodes_selector, readOnly) {
 	nodes_selector.click(function() {
 		unselectActive();
-		$(this).addClass(ACTIVE_CLASS);
+		setActiveNode($(this));
 		let nodeId = $(this).attr('node_id');
 		loadNodeData(nodeId, null, true);
 	});
@@ -651,8 +657,28 @@ function setupNodes(nodes_selector, readOnly) {
 	}
 }
 
+function getMaxZIndex(nodes_selector) {
+	let maxZ = null;
+	nodes_selector.each(function() {
+		let zIndex = parseFloat($(this).css('z-index'));
+		maxZ = (zIndex > maxZ) ? zIndex : maxZ;
+	});
+	return maxZ;
+}
+
+function bringNodeToFront(node) {
+		let zIndex = getMaxZIndex($(".window")) + 1;
+		node.css("z-index", zIndex);
+}
+
 
 function setupNodeModifications(nodes_selector) {
+	function dragStart(event) {
+		let node = $(this);
+		// setActiveNode(node);
+		bringNodeToFront(node);
+	}
+
 	function dragStop(event) {
 		let nodeId = $(this).attr("node_id");
 		let position = $(this).position();
@@ -664,10 +690,14 @@ function setupNodeModifications(nodes_selector) {
 		$( event.toElement ).one('click', function(e){ e.stopImmediatePropagation(); } );
 	}
 
+	// It's not clear to me how to always get a drag so we listen on both
+	// This can causes 2 POST's for an update, but is better than losing it
 	let params = {
 		activeClass: ACTIVE_CLASS,
+		startNative: dragStart,
+		startAll: dragStart,
 		stopNative: dragStop,
-		stopAll: dragStop
+		stopAll: dragStop,
 	};
 	nodes_selector.multiDraggable(params);
 
@@ -682,7 +712,6 @@ function setupNodeModifications(nodes_selector) {
 		cancel: '.cancel'
 	});
 }
-
 
 function getEndpointSide(ep) {
 	const uuid = ep.getUuid();

@@ -35,6 +35,7 @@
                             var elemPos = $(value).position();
                             initLeftOffset[key] = elemPos.left - pos.left;
                             initTopOffset[key] = elemPos.top - pos.top;
+                            opts.startAll ? opts.startAll.call(this, event, ui) : {};
                         });
                         jsPlumb.repaint(items);
                     }
