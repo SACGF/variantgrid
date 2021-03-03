@@ -330,6 +330,11 @@ ul.customicons .ui-icon {
 	background-image: url(/static/images/node_icons/damage_node.png);
 }
 
+.DamageNode.EffectNodeSplicing {
+	background-image: url(/static/images/node_icons/effect_node_splicing.png);
+}
+
+
 .TissueNode { 
 	background-image: url(/static/images/node_icons/tissue_node.jpg);
 }

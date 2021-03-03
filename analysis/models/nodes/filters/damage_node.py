@@ -181,6 +181,12 @@ class DamageNode(AnalysisNode):
                 name = f"{self.damage_predictions_min} of {len(VariantAnnotation.PATHOGENICITY_FIELDS)}"
         return name
 
+    def get_css_classes(self):
+        css_classes = super().get_css_classes()
+        if self.splice_min is not None:
+            css_classes.append("EffectNodeSplicing")
+        return css_classes
+
     @staticmethod
     def get_node_class_label():
         return "EffectNode"

@@ -553,7 +553,10 @@ function setupSlider(inputSelector, sliderSelector, enableInput) {
                 sliderSelector.slider("enable");
                 frInputs.prop("disabled", false);
             } else {
+                sliderValue.html("");
+                sliderSelector.slider({value: 0})
                 sliderSelector.slider("disable");
+                inputSelector.val("");
                 frInputs.prop("disabled", true);
             }
         });
