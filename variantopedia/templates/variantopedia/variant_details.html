@@ -326,6 +326,9 @@ $(document).ready(function() {
                 {% endlabelled %}
                 {% labelled label="Highest pathogenicity" hint="tiny" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
                 {% labelled label="Clinical significance" hint="tiny" %}{{ clinvar.clinical_significance }}{% endlabelled %}
+                {% if clinvar.conflicting_clinical_significance %}
+                    {% labelled label="Conflicting clinical significance" hint="tiny" %}{{ clinvar.conflicting_clinical_significance }}{% endlabelled %}
+                {% endif %}
                 {% labelled label="Preferred disease name" hint="tiny" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
                 {% labelled label="Disease database name" hint="tiny" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
                 {% labelled label="Review status" hint="tiny" %}

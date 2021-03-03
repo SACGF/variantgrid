@@ -111,8 +111,10 @@ class ClinVar(models.Model):
     clinvar_allele_id = models.IntegerField()
     clinvar_preferred_disease_name = models.TextField(null=True, blank=True)
     clinvar_disease_database_name = models.TextField(null=True, blank=True)
-    clinvar_review_status = models.CharField(max_length=1, choices=ClinVarReviewStatus.choices)
-    clinical_significance = models.TextField(null=True, blank=True)  # Multiple values of above
+    clinvar_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
+    clinical_significance = models.TextField(null=True, blank=True)
+    # If clinical_significance = 'Conflicting_interpretations_of_pathogenicity'
+    conflicting_clinical_significance = models.TextField(null=True, blank=True)
     highest_pathogenicity = models.IntegerField(default=0)  # Highest of clinical_significance
     clinvar_clinical_sources = models.TextField(null=True, blank=True)
     clinvar_origin = models.IntegerField(default=0)

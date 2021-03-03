@@ -17,6 +17,7 @@ class BulkClinVarInserter:
         'CLNDISDB': 'clinvar_disease_database_name',
         'CLNREVSTAT': 'clinvar_review_status',
         'CLNSIG': 'clinical_significance',
+        'CLNSIGCONF': 'conflicting_clinical_significance',
         'CLNVI': 'clinvar_clinical_sources',
         'ORIGIN': 'clinvar_origin',
         'SSR': 'clinvar_suspect_reason_code',
@@ -30,17 +31,20 @@ class BulkClinVarInserter:
                           'clinvar_disease_database_name',
                           'clinvar_review_status',
                           'clinical_significance',
+                          'conflicting_clinical_significance',
                           'highest_pathogenicity',
                           'clinvar_clinical_sources',
                           'clinvar_origin',
                           'clinvar_suspect_reason_code',
                           'drug_response']
 
-    CLINSIG_TO_PATHOGENICITY = [("Benign", 1),
-                                ("Likely_benign", 2),
-                                ("Uncertain_significance", 3),
-                                ("Likely_pathogenic", 4),
-                                ("Pathogenic", 5)]
+    CLINSIG_TO_PATHOGENICITY = {
+        "Benign": 1,
+        "Likely_benign": 2,
+        "Uncertain_significance": 3,
+        "Likely_pathogenic": 4,
+        "Pathogenic": 5,
+    }
 
     def __init__(self, clinvar_version, upload_step):
         self.clinvar_version = clinvar_version
@@ -118,12 +122,16 @@ class BulkClinVarInserter:
                 kwargs[field] = value
 
         # clinical_significance is now a '|' separated string
-        clinical_significance = kwargs.get("clinical_significance")
-        if clinical_significance:
+        if clinical_significance := kwargs.get("clinical_significance"):
             drug_response = "drug_response" in clinical_significance
             highest_pathogenicity = 0
-            for clnsig, pathogenicity in BulkClinVarInserter.CLINSIG_TO_PATHOGENICITY:  # low->high
-                if clnsig in clinical_significance:
+            if clinical_significance.startswith("Conflicting_interpretations_of_pathogenicity"):
+                multiple_clinical_significances = kwargs.get("conflicting_clinical_significance")
+            else:
+                multiple_clinical_significances = clinical_significance
+
+            for clnsig, pathogenicity in BulkClinVarInserter.CLINSIG_TO_PATHOGENICITY.items():  # low->high
+                if clnsig in multiple_clinical_significances:
                     highest_pathogenicity = pathogenicity
 
             kwargs["highest_pathogenicity"] = highest_pathogenicity
