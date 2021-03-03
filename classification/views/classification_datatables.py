@@ -241,20 +241,14 @@ class ClassificationDatatableConfig(DatatableConfig):
         # We want to filter using the genes set via variant annotation
         genes: Optional[Iterable[Gene]] = None
         symbols: Optional[Iterable[str]] = None
-        if gene_id := self.get_query_param('gene'):
-            if gene := Gene.objects.filter(pk=gene_id).first():
-                genes = [gene]
-                symbols = gene.get_symbols().value_list('symbol', flat=True)
-        else:
-            gene_symbol_str = self.get_query_param("gene_symbol")
-            if gene_symbol_str:
-                gene_symbol: GeneSymbol
-                if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
-                    genes = gene_symbol.alias_meta.genes
-                    symbols = gene_symbol.alias_meta.alias_symbol_strs
-                    # used to do the below, which would include genes marked as "unknown"
-                    # now they wont be included, revert if this causes problems
-                    # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
+        if gene_symbol_str := self.get_query_param("gene_symbol"):
+            gene_symbol: GeneSymbol
+            if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
+                genes = gene_symbol.alias_meta.genes
+                symbols = gene_symbol.alias_meta.alias_symbol_strs
+                # used to do the below, which would include genes marked as "unknown"
+                # now they wont be included, revert if this causes problems
+                # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
 
         if genes:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
