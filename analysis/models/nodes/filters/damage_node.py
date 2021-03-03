@@ -56,7 +56,6 @@ class DamageNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
         and_filters = []
-        and_filters_snp_only = []
 
         if self.impact_min is not None:
             q_impact = PathogenicityImpact.get_q(self.impact_min)
@@ -98,7 +97,7 @@ class DamageNode(AnalysisNode):
             if self.cadd_score_required:
                 if self.cadd_score_allow_null:
                     q_cadd |= Q(variantannotation__cadd_phred__isnull=True)
-                and_filters_snp_only.append(q_cadd)
+                and_filters.append(q_cadd)
             else:
                 or_filters.append(q_cadd)
 
@@ -107,7 +106,7 @@ class DamageNode(AnalysisNode):
             if self.revel_score_required:
                 if self.revel_score_allow_null:
                     q_revel |= Q(variantannotation__revel_score__isnull=True)
-                and_filters_snp_only.append(q_revel)
+                and_filters.append(q_revel)
             else:
                 or_filters.append(q_revel)
 
@@ -124,7 +123,7 @@ class DamageNode(AnalysisNode):
                 if self.damage_predictions_allow_null:
                     max_benign = len(VariantAnnotation.PATHOGENICITY_FIELDS) - self.damage_predictions_min
                     q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
-                and_filters_snp_only.append(q_damage)
+                and_filters.append(q_damage)
             else:
                 or_filters.append(q_damage)
 
@@ -150,11 +149,6 @@ class DamageNode(AnalysisNode):
                 and_filters.append(q_published)
             else:
                 or_filters.append(q_published)
-
-        if and_filters_snp_only:
-            q_snp_only_filters = reduce(operator.and_, and_filters_snp_only)
-            allow_indels_q = Q(locus__ref__length__gt=1) | Q(alt__length__gt=1)
-            and_filters.append(allow_indels_q | q_snp_only_filters)
 
         if or_filters:
             q_or = reduce(operator.or_, or_filters)
