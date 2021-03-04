@@ -154,9 +154,9 @@ img.thumbnail {
 
 <script>
 	window.fileupload_ready = function() {
-		var $form = $('#fileupload');
-	{% if existing_files %}
-		var existingFiles = {{ existing_files | jsonify }};
+        const $form = $('#fileupload');
+        {% if existing_files %}
+		const existingFiles = {{ existing_files | jsonify }};
 		$form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
 	{% endif %}
 
@@ -187,12 +187,12 @@ img.thumbnail {
 	}
 
 	function process_upload_status(uploaded_file_dicts) {
-		var needsUpdate = false;
-		for (var i=0 ; i<uploaded_file_dicts.length ; ++i) {
-			var ufd = uploaded_file_dicts[i];
-			update_upload_status(ufd);
-			var status = ufd['processing_status'];
-			if (!(status == 'S' || status == 'E')) {
+        let needsUpdate = false;
+        for (let i=0 ; i<uploaded_file_dicts.length ; ++i) {
+            const ufd = uploaded_file_dicts[i];
+            update_upload_status(ufd);
+            const status = ufd['processing_status'];
+            if (!(status == 'S' || status == 'E')) {
 				needsUpdate = true;			
 			}
 		}
@@ -203,31 +203,31 @@ img.thumbnail {
 
 
     function createSample(name, sex, deceased) {
-        var nodeData = {name : name, attributes: {'class' : 'window', style: 'left: 50px'}};
-        var sample_node = createSampleNode(nodeData);
-        var patientDict = {name: name, sex : sex, deceased: deceased};
+        const nodeData = {name: name, attributes: {'class': 'window', style: 'left: 50px'}};
+        const sample_node = createSampleNode(nodeData);
+        const patientDict = {name: name, sex: sex, deceased: deceased};
         sample_node.each(function() { this.updateState({patient: patientDict}); });
         return sample_node;
     }
 
 
     function vcf_upload_data(nameDiv, upload_data) {
-        var MAX_SAMPLES = 10;
-    
-        var ftDiv = $(".file-type", nameDiv);
-        var importStatus = upload_data["import_status"];
-        var samples = upload_data["samples"];
-        var samplesDiv = $('<div/>');
+        const MAX_SAMPLES = 10;
+
+        const ftDiv = $(".file-type", nameDiv);
+        const importStatus = upload_data["import_status"];
+        const samples = upload_data["samples"];
+        const samplesDiv = $('<div/>');
         if (samples.length > MAX_SAMPLES) {
             // var sampleNode = createSample("samples", 'M', false);
-            var sampleNode = $("<span>samples</span>") ;
+            let sampleNode = $("<span>samples</span>");
             samplesDiv.append(sampleNode);
             samplesDiv.append(" x" + samples.length);
         } else {
-            for (var i=0 ; i<samples.length ; ++i) {
-                var sample = samples[i];
+            for (let i=0 ; i<samples.length ; ++i) {
+                const sample = samples[i];
                 // var sampleNode = createSample(sample["name"], 'M', false);
-                var sampleNode = $("<span>" + sample["name"] + "</span>");
+                let sampleNode = $("<span>" + sample["name"] + "</span>");
                 samplesDiv.append(sampleNode);
             }        
         }
@@ -237,46 +237,46 @@ img.thumbnail {
 
 
     function draw_upload_data(nameDiv, file_type_code, upload_data) {
-        var funcs = {"V" : vcf_upload_data,};
-        var func = funcs[file_type_code];
+        const funcs = {"V": vcf_upload_data,};
+        const func = funcs[file_type_code];
         if (func) {
             func(nameDiv, upload_data)
         }
     }
 
 	function update_upload_status(upload_status) {
-		var uploaded_file_id = upload_status['uploaded_file_id'];
-		var nameTd = $("td.upload-name[uploaded_file_id=" + uploaded_file_id + "]");
+        const uploaded_file_id = upload_status['uploaded_file_id'];
+        const nameTd = $("td.upload-name[uploaded_file_id=" + uploaded_file_id + "]");
 
-		// Thumbnail
-		var thumbnail = $("img.thumbnail", nameTd.parents("tr"));
-		thumbnail.attr("src", upload_status["status_image"]);
-		
-		var fileTypeDiv = $(".file-type", nameTd);
-		fileTypeDiv.empty();
-		var fileType = upload_status["file_type"];
-		var fileLink = fileType;
-		var processingStatus = upload_status["processing_status"];
-		if ((processingStatus == 'S' || processingStatus == 'T') && upload_status["data_url"]) {
+        // Thumbnail
+        const thumbnail = $("img.thumbnail", nameTd.parents("tr"));
+        thumbnail.attr("src", upload_status["status_image"]);
+
+        const fileTypeDiv = $(".file-type", nameTd);
+        fileTypeDiv.empty();
+        const fileType = upload_status["file_type"];
+        let fileLink = fileType;
+        const processingStatus = upload_status["processing_status"];
+        if ((processingStatus == 'S' || processingStatus == 'T') && upload_status["data_url"]) {
 			fileLink = '<a href="' + upload_status["data_url"] + '">' + fileType + '</a>';
 		}
 		fileTypeDiv.append(fileLink);
 
-        var upload_data = upload_status["upload_data"];
-        var file_type_code = upload_status["file_type_code"];
+        const upload_data = upload_status["upload_data"];
+        const file_type_code = upload_status["file_type_code"];
         //draw_upload_data(nameTd, file_type_code, upload_data);
 
-        var userTd = $("td.upload-user[uploaded_file_id=" + uploaded_file_id + "]");
+        const userTd = $("td.upload-user[uploaded_file_id=" + uploaded_file_id + "]");
         userTd.html(upload_status.user);
 
-        var dateTd = $("td.upload-date[uploaded_file_id=" + uploaded_file_id + "]");
+        const dateTd = $("td.upload-date[uploaded_file_id=" + uploaded_file_id + "]");
         dateTd.html(upload_status.time_since);
 	}
 
 
 	$(document).ready(function() {
-		var tabs = $("#tabs");
-		tabs.tabs();
+        const tabs = $("#tabs");
+        tabs.tabs();
 		tabs.bind('tabsselect', function(event, ui) {
    			$(".ui-tabs-panel", this).empty();
 		});
@@ -307,7 +307,7 @@ img.thumbnail {
 			{{ form.time_filter_value }}{{ form.time_filter_value.errors }}
 			{{ form.time_filter_method }}{{ form.time_filter_method.errors }}
 			<label>Show internal</label>{{ form.show_all }}{{ form.show_all.errors }}
-			<button class="jq">Show</button>
+			<button class="btn btn-secondary">Show</button>
 		</div>
 	</form>
 
