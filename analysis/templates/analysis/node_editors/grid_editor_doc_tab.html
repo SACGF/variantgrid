@@ -6,11 +6,11 @@ $(document).ready(function() {
         $(this).blur();
       }
     });
-    
-    var nodeDocForm = $("form#node-doc-form");
-    var options = {
+
+    const nodeDocForm = $("form#node-doc-form");
+    const options = {
         target: $("#node-doc"),
-        success: function() {
+        success: function () {
             retrieveAndUpdateNodeAppearances([{{ node.pk }}]);
         },
     };
@@ -20,7 +20,7 @@ $(document).ready(function() {
     });
     $("#id_auto_node_name", nodeDocForm).change(function() {
         if ($(this).is(":checked")) {
-            var autoNodeName = $("#id_auto_name", nodeDocForm).val()
+            const autoNodeName = $("#id_auto_name", nodeDocForm).val();
             $("#id_name", nodeDocForm).val(autoNodeName);
         }
     });
