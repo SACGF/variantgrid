@@ -36,6 +36,13 @@
 			const URL = Urls.view_sequencing_run(sequencingRunId);
 	    	return "<a class='sequencing-run-link' href='" + URL + "'>" + sequencingRunId + "</a>";
 		},
+        formatSequencingRunReady: function(ready) {
+            let value = ready;
+            if (!ready) {
+                value = `<span class="error">${ready}</span>`;
+            }
+            return value;
+        },
         viewVCFLink : function(vcfId, options, rowObject) {
             var vcfLink = '';
             if (vcfId) {

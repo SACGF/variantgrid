@@ -1,3 +1,5 @@
+from typing import List
+
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import DecimalRangeField
@@ -342,12 +344,18 @@ class SequencingRun(models.Model):
     gold_standard = models.BooleanField(default=False)
     bad = models.BooleanField(default=False)
     hidden = models.BooleanField(default=False)
+    ready = models.BooleanField(default=False)
     experiment = models.ForeignKey(Experiment, null=True, on_delete=SET_NULL)
     enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)  # Sequencing Run can be all one enrichment_kit, or SequencingSample can have own enrichment_kits
     data_state = models.CharField(max_length=1, choices=DataState.choices)  # This is for the SequencingRun directory
     has_basecalls = models.BooleanField(default=False)
     has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
+
+    def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
+        self.ready = not bool(self.get_errors())
+        super().save()
 
     def get_current_sample_sheet(self):
         try:
@@ -396,6 +404,24 @@ class SequencingRun(models.Model):
     def get_old_sample_sheets(self):
         current_sample_sheet = self.get_current_sample_sheet()
         return SampleSheet.objects.filter(sequencing_run=self).exclude(pk=current_sample_sheet.pk)
+
+    def get_errors(self) -> List[str]:
+        errors = []
+        if self.is_data_out_of_date_from_current_sample_sheet:
+            errors.append(f"SampleSheet has changed, please confirm in 'Admin' tab")
+        try:
+            illumina_qc = self.sequencingruncurrentsamplesheet.sample_sheet.illuminaflowcellqc
+            if illumina_qc.data_state != DataState.COMPLETE:
+                errors.append(f"QC data state={illumina_qc.get_data_state_display()}")
+        except SequencingRunCurrentSampleSheet.DoesNotExist:
+            errors.append("No Current SampleSheet set")
+        except:
+            errors.append("QC not loaded")
+        return errors
+
+    def get_warnings(self) -> List[str]:
+        warnings = []
+        return warnings
 
     @property
     def is_data_out_of_date_from_current_sample_sheet(self):

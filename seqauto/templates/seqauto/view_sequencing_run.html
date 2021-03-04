@@ -296,7 +296,7 @@
             <div id='experiment-info-text'>
                 <p>ExperimentID (
                 <a href="{% url 'view_experiment' sequencing_run.experiment.pk %}">{{ sequencing_run.experiment }}</a>) was read from RunParameters.xml (or if missing, RunInfo.xml) in the Sequencing Run directory labelled <b>Path</b> above.
-                <p>Change by modifying the files manually then <button id='reload-experiment-name'>reload experiment name</button>.
+                <p>Change by modifying the files manually then <button id='reload-experiment-name' class="btn btn-primary">reload experiment name</button>.
             </div>
 		</div>
 		{% endif %}

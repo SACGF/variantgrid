@@ -67,8 +67,7 @@ def seqauto_runs(request):
         task.apply_async()
 
         msg = 'Scanning disk for sequencing data...'
-        status = messages.INFO
-        messages.add_message(request, status, msg, extra_tags='import-message')
+        messages.add_message(request, messages.INFO, msg, extra_tags='import-message')
         enable_button = False
 
     context = {"last_success_datetime": SeqAutoRun.get_last_success_datetime(),
@@ -173,6 +172,18 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
         can_view_vcf = request.user.has_perm(read_perm, vcf)
     except:
         pass
+
+    has_errors = False
+    for error_message in sequencing_run.get_errors():
+        has_errors = True
+        messages.add_message(request, messages.ERROR, error_message)
+
+    if sequencing_run.ready is False and has_errors is False:
+        sequencing_run.save()  # clear
+        messages.add_message(request, messages.WARNING, "SequencingRun has no errors, setting ready=True")
+
+    for warning_message in sequencing_run.get_warnings():
+        messages.add_message(request, messages.WARNING, warning_message)
 
     context = {"sequencing_run": sequencing_run,
                "sequencing_run_form": sequencing_run_form,
