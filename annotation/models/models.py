@@ -545,7 +545,6 @@ class AbstractVariantAnnotation(models.Model):
         "sift": SIFTPrediction,
     }
 
-
     @property
     def transcript_accession(self):
         """ Get transcript_id (with version if possible) """

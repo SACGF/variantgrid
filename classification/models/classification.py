@@ -667,7 +667,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if option.get('default'):
                     return option
                 continue
-            elif not isinstance(check_value, str):
+            if not isinstance(check_value, str):
                 check_value = str(check_value)
 
             aliases = []

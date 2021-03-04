@@ -35,9 +35,9 @@ class FlagPermissionLevel(str, ChoicesEnum):
     def level(self):
         if self == FlagPermissionLevel.USERS:
             return 1
-        elif self == FlagPermissionLevel.OWNER:
+        if self == FlagPermissionLevel.OWNER:
             return 2
-        elif self == FlagPermissionLevel.ADMIN:
+        if self == FlagPermissionLevel.ADMIN:
             return 3
         return 0
 
@@ -283,10 +283,9 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             permission_level = self.permission_level(user)
             if not permission_level:
                 return Flag.objects.none()
-            else:
-                qs = Flag.objects.filter(collection=self)
-                if permission_level == FlagPermissionLevel.USERS:
-                    qs = qs.filter(Q(user_private=False) | Q(user=user))
+            qs = Flag.objects.filter(collection=self)
+            if permission_level == FlagPermissionLevel.USERS:
+                qs = qs.filter(Q(user_private=False) | Q(user=user))
         if only_open:
             qs = qs.filter(FlagCollection.Q_OPEN_FLAGS)
         return qs
@@ -344,7 +343,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             if open_only:
                 qs = qs.filter(FlagCollection.Q_OPEN_FLAGS)
             return qs.first()
-        elif flag_type_attributes:
+        if flag_type_attributes:
             ft_qs = FlagType.objects
             for key, value in flag_type_attributes.items():
                 ft_qs = ft_qs.filter(**{f'attributes__{key}': value})
@@ -425,23 +424,23 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             if add_comment_if_open:
                 existing.flag_action(user=user, comment=comment)
             return existing, False
-        else:
-            existing = relevant_qs.first()
-            if existing:
-                if reopen:
-                    resolution = existing.flag_type.resolution_for_status(FlagStatus.OPEN)
-                    existing.flag_action(user=user, resolution=resolution, comment=comment, permission_check=permission_check)
-                    return existing, False
-                elif only_if_new:
-                    return existing, False
 
-            return (self.add_flag(
-                flag_type=flag_type,
-                user=user,
-                comment=comment,
-                user_private=user_private,
-                permission_check=permission_check,
-                data=data), True)
+        existing = relevant_qs.first()
+        if existing:
+            if reopen:
+                resolution = existing.flag_type.resolution_for_status(FlagStatus.OPEN)
+                existing.flag_action(user=user, resolution=resolution, comment=comment, permission_check=permission_check)
+                return existing, False
+            if only_if_new:
+                return existing, False
+
+        return (self.add_flag(
+            flag_type=flag_type,
+            user=user,
+            comment=comment,
+            user_private=user_private,
+            permission_check=permission_check,
+            data=data), True)
 
     def add_flag(
             self,

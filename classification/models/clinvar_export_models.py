@@ -67,7 +67,7 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
         # FIXME, make 38 only
         if chgvs_str := cm.classification.chgvs_grch37:
             return CHGVS(chgvs_str)
-        elif chgvs_str := cm.get(SpecialEKeys.C_HGVS):
+        if chgvs_str := cm.get(SpecialEKeys.C_HGVS):
             return CHGVS(chgvs_str)
         return None
 

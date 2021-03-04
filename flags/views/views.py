@@ -200,15 +200,15 @@ class FlagHelper:
         labs = list(Lab.valid_labs_qs(user))
         if len(labs) == 0:
             return 'no affiliation'
-        elif len(labs) == 1:
+        if len(labs) == 1:
             return labs[0].name
-        else:
-            orgs = set()
-            for lab in labs:
-                orgs.add(lab.organization.name)
-            orgs = list(orgs)
-            orgs.sort()
-            return ', '.join(orgs)
+
+        orgs = set()
+        for lab in labs:
+            orgs.add(lab.organization.name)
+        orgs = list(orgs)
+        orgs.sort()
+        return ', '.join(orgs)
 
     def to_json(self):
         json_data = {}
