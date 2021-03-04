@@ -1,8 +1,9 @@
 {% extends menu_settings_base %}
 
-{% block title %}Settings{% endblock %}
+{% block title %}VariantGrid Custom Columns{% endblock %}
 
-{% block css %}
+{% block submenu_page_content %}
+<style>
 	.sort_placeholder {height: 15px; border: red 3px solid;}
 	.list_placeholder { font-weight: bolder; }
 	.columns-list {
@@ -15,7 +16,7 @@
 		height: 100%;
 		list-style: none;
 	}
-	
+
 	div#columns-widget {
 		padding-top: 10px;
 		height: 100%;
@@ -36,7 +37,7 @@
 	#selected-column-name {
 		font-weight: bold;
 	}
-	
+
 	li.user-column .column-name {
 		font-weight: bold;
 	}
@@ -45,61 +46,90 @@
 	    content: ': ';
 	}
 
-    /* Don't allow people to move magic column! */ 
+    /* Don't allow people to move magic column! */
     li#variant {
         display: none;
-    } 
-{% endblock css %}
-
-{% block jshead %}
+    }
+</style>
+<script>
 	// .sortable('serialize') doesn't work with multiple underscores
 	function serialize_columns(select) {
-		var ids = [];
-		$(select + ' .user-column').each(function() { ids.push($(this).attr("id")) });
+        const ids = [];
+        $(select + ' .user-column').each(function() { ids.push($(this).attr("id")) });
 		return ids.toString();
 	}
 
 	function clear_custom_columns() {
-		var my_columns = $("#my_columns_sortable");
-		my_columns.find("li.user-column").appendTo("#available_columns_sortable");
+        const my_columns = $("#my_columns_sortable");
+        my_columns.find("li.user-column").appendTo("#available_columns_sortable");
 
-	    var widget = my_columns.sortable("widget");
-	    if (widget) {
+        const widget = my_columns.sortable("widget");
+        if (widget) {
 	    	widget.trigger("sortupdate");
 	    }
 	}
 
 	$(document).ready(function(){
+        $("button#change-name-button").click(function() {
+            let nameInput = $("#custom-columns-name");
+            let name = nameInput.val();
+            let msgBox = $("#save-name-message");
+            msgBox.empty();
+            nameInput.prop("disabled", true);
+            $.ajax({
+                type: "POST",
+		        data: "name=" + encodeURIComponent(name),
+		        url: "{{ request.path }}",
+                success: function() {
+		            nameInput.prop("disabled", false);
+		            msgBox.append(`<li class='alert-info'>Name saved successfully</li>`);
+                    msgBox.fadeIn().delay(2000).fadeOut(1000);
+                },
+                error: function() {
+		            msgBox.append(`<li class='error'>Could not save name</li>`);
+                }
+            });
+        });
+
+
 		$("#my_columns_sortable").sortable({
 		    items: "li.user-column",
 		    placeholder: "sort_placeholder",
 		    connectWith: '#available_columns_sortable',
 		}).bind("sortupdate", function(event, ui) {
-		        var result_my_columns = serialize_columns("#my_columns_sortable");
+            const result_my_columns = serialize_columns("#my_columns_sortable");
 
-		        $.ajax({
-		            type: "POST",
-		            data: 'columns=' + result_my_columns + '&my_columns=true',
-		            url: "{{ request.path }}",
-		        });
+            $.ajax({
+                type: "POST",
+		        data: 'columns=' + result_my_columns + '&my_columns=true',
+		        url: "{{ request.path }}",
+            });
 		}).disableSelection();
-		
-		
+
+
 		$("#available_columns_sortable").sortable({
 		    items: "li.user-column",
 		    placeholder: "sort_placeholder",
 		    connectWith: '#my_columns_sortable',
 		}).disableSelection();
-		
+
 		// Set the height of both columns-list to be that of largest
-		var tallest = Math.max($("#my_columns")[0].scrollHeight, $("#available_columns")[0].scrollHeight);
-		$(".columns-list").height(tallest);
-	});	
-{% endblock jshead %}
+        const tallest = Math.max($("#my_columns")[0].scrollHeight, $("#available_columns")[0].scrollHeight);
+        $(".columns-list").height(tallest);
+	});
+</script>
 
-{% block submenu_page_content %}
 
-<h3>Customize Columns: {{ custom_columns.name }}</h3>
+<h3>Custom Columns</h3>
+
+<form id="custom-columns-form" method="post">
+    {% csrf_token %}
+    <label for="custom-columns-name">Name:</label>
+    <input id="custom-columns-name" size="50" value="{{ custom_columns.name }}" />
+    <button id='change-name-button' type="button" class="btn btn-primary">Change Name</button>
+    <ul id="save-name-message" class="messages">
+    </ul>
+</form>
 
 <div>
 	<table id="color-legend">
@@ -123,7 +153,7 @@
 </div>
 
 {% load ui_help %}
-{% page_help 'settings/view_custom_columns_help' 'Custom Columns' %}
+{% page_help 'settings/view_custom_columns_help' 'Custom Columns' show_title=False %}
 
 <div id="columns-widget">
 	<div id="my_columns" class="columns-list">

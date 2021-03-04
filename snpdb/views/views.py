@@ -732,20 +732,23 @@ def view_custom_columns(request, custom_columns_collection_id):
         variant_grid_columns[vgc.pk] = vgc
 
     if request.method == "POST":
+        if name := request.POST.get("name"):
+            ccc.name = name
+            ccc.save()
+        elif my_columns_str := request.POST.get("columns"):
+            def update_user_columns(id_list, active):
+                for i, col in enumerate(id_list):
+                    column = variant_grid_columns[col]
+                    CustomColumn.objects.update_or_create(custom_columns_collection=ccc, column=column,
+                                                          defaults={"sort_order": i})
+                # Delete any not in id_list
+                CustomColumn.objects.filter(custom_columns_collection=ccc).exclude(column__in=id_list).delete()
 
-        def update_user_columns(id_list, active):
-            for i, col in enumerate(id_list):
-                column = variant_grid_columns[col]
-                CustomColumn.objects.update_or_create(custom_columns_collection=ccc, column=column,
-                                                      defaults={"sort_order": i})
-            # Delete any not in id_list
-            CustomColumn.objects.filter(custom_columns_collection=ccc).exclude(column__in=id_list).delete()
 
-        my_columns_str = request.POST.get("columns")
-
-        my_columns_list = my_columns_str.split(',') if my_columns_str else []
-        active = 'my_columns' in request.POST
-        update_user_columns(my_columns_list, active)
+            my_columns_list = my_columns_str.split(',') if my_columns_str else []
+            active = 'my_columns' in request.POST
+            update_user_columns(my_columns_list, active)
+        return HttpResponse()  # Nobody ever looks at this
 
     context_dict = {'available_columns_list': available_columns,
                     'my_columns_list': my_columns,
