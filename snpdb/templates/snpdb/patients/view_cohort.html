@@ -344,7 +344,7 @@
 <form id="cohort-form" method="post">
     {% csrf_token %}
     <div>
-    {{ form.name }}<button id='change-name'>Change Name</button>
+    {{ form.name }}<button id='change-name' class="btn btn-primary">Change Name</button>
     <b>Genome Build:</b> {{ cohort.genome_build }}
     {% if cohort.parent_cohort %}
         <div>
