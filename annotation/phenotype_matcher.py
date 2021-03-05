@@ -9,6 +9,7 @@ from django.db.models.functions import Lower
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes
 from genes.models import GeneSymbol
 from library.log_utils import log_traceback
+from library.utils import is_not_none
 from ontology.models import OntologyTerm, OntologyService
 
 CodePK = Any
@@ -331,7 +332,7 @@ class PhenotypeMatcher:
                         pass
 
         for pk, name, aliases in omim_qs.values_list("pk", "name", "aliases"):
-            for term in [name] + aliases:
+            for term in filter(is_not_none, [name] + aliases):
                 # Remove commas, as phenotype to match will have that done also
                 term = term.strip().lower().replace(",", "")
                 omim_pks_by_term[term] = pk
