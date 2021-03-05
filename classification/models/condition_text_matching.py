@@ -449,7 +449,7 @@ class ConditionMatchingSuggestion:
 
     def __init__(self, condition_text_match: Optional[ConditionTextMatch] = None, ignore_existing: bool = False):
         self.condition_text_match = condition_text_match
-        self.terms: List[OntologyTerm] = condition_text_match.condition_xref_terms if condition_text_match and not ignore_existing else []
+        self.terms: List[OntologyTerm] = _sort_terms(condition_text_match.condition_xref_terms) if condition_text_match and not ignore_existing else []
         self.is_applied = bool(self.terms)
         self.info_only = False
         self.condition_multi_operation: MultiCondition = MultiCondition.NOT_DECIDED
@@ -784,6 +784,10 @@ def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_
     return _is_descendat_ids(set([term.id for term in terms]), set([term.id for term in ancestors]), set(), check_levels)
 
 
+def _sort_terms(terms: Iterable[OntologyTerm]):
+    return sorted(list(terms), key=attrgetter("name"))
+
+
 def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> List[ConditionMatchingSuggestion]:
     suggestions = list()
 
@@ -841,9 +845,10 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                 for term in matches_gene_level:
                     if term not in root_level_terms:
                         not_root_gene_terms.append(term)
+                not_root_gene_terms = _sort_terms(not_root_gene_terms)
 
                 matches_gene_level_leafs = [term for term in matches_gene_level if term.is_leaf]
-                root_level_str = ', '.join([term.id for term in root_level_mondo])
+                root_level_str = ', '.join([term.id for term in _sort_terms(root_level_mondo)])
 
                 if not matches_gene_level:
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Could not find association to {gene_symbol}"))
@@ -875,7 +880,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                                                              text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                 else:
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{root_level_str} : Multiple descendants of this term are associated to {gene_symbol}"))
-                    for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
+                    for term in not_root_gene_terms:
                         cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is associated to {gene_symbol}"))
 
             else:
@@ -887,6 +892,8 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         parent_term_missing_gene.append(term)
                     else:
                         parent_term_has_gene.append(term)
+                parent_term_missing_gene = _sort_terms(parent_term_missing_gene)
+                parent_term_has_gene = _sort_terms(parent_term_has_gene)
 
                 for term in parent_term_missing_gene:
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"{term.id} : no relationship on file to {gene_symbol.symbol}"))
