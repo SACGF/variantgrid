@@ -1384,9 +1384,15 @@ const VCForm = (function() {
             if (eKey.mandatory) {
                 label = '*' + label;
             }
-            let labelDom =  $('<div>', {class: 'col-4 text-right align-self-center', id: `label-${key}`, html:[
+            let labelDom =  $('<div>', {class: 'text-right align-self-center', id: `label-${key}`, html:[
                 $('<label>', {text: label})
             ]});
+            if (type === 'textarea') {
+                labelDom.addClass('col-12 mb-2');
+            } else {
+                labelDom.addClass('col-4');
+            }
+
             if (eKey.sub_label) {
                 labelDom.append($('<div>', {class: 'text-info', text: eKey.sub_label}));
             }
