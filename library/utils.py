@@ -287,7 +287,8 @@ def double_quote(s):
 
 
 def filename_safe(filename) -> str:
-    keepcharacters = {' ', '.', '_'}
+    keepcharacters = {'.', '_'}
+    filename = filename.replace(' ', '_')  # you can never trust spaces
     # leave room for an extension so make sure the filename is 250 characters
     filename = "".join(c for c in filename if c.isalnum() or c in keepcharacters).strip().lower()[0:250]
     return filename
