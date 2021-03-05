@@ -2,7 +2,7 @@ import celery
 from celery.canvas import chord
 from celery.contrib.abortable import AbortableTask
 from celery.result import AsyncResult, allow_join_result
-from django.db.utils import OperationalError
+from django.db.utils import OperationalError, IntegrityError
 import logging
 from time import sleep
 
@@ -73,7 +73,10 @@ def update_node_task(node_id, version):
         node.celery_task = None
         node.db_pid = None
         node.errors = errors
-        node.save()  # Will set background color etc based on errors
+        try:
+            node.save()  # Will set background color etc based on errors
+        except IntegrityError:
+            pass  # Analysis or node deleted... just ignore
 
 
 @celery.task

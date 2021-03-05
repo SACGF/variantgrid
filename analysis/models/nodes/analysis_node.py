@@ -8,7 +8,7 @@ from typing import Tuple, Sequence, List, Dict, Optional
 
 from celery.canvas import Signature
 from django.core.cache import cache
-from django.db import connection, models
+from django.db import connection, models, IntegrityError
 from django.db.models import Value, IntegerField
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -21,7 +21,7 @@ from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from analysis.exceptions import NonFatalNodeError, NodeParentErrorsException, NodeConfigurationException, \
-    NodeParentNotReadyException
+    NodeParentNotReadyException, NodeNotFoundException
 from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeErrorSource, AnalysisTemplateType
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
@@ -921,7 +921,10 @@ class NodeCount(models.Model):
 
     @staticmethod
     def load_for_node(node, label):
-        return NodeCount.objects.get(node_version=NodeVersion.get(node), label=label)
+        try:
+            return NodeCount.objects.get(node_version=NodeVersion.get(node), label=label)
+        except IntegrityError:
+            raise NodeNotFoundException(node.pk)
 
     def __str__(self):
         return f"NodeCount({self.node_version}, {self.label}) = {self.count}"
