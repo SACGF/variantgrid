@@ -3,7 +3,7 @@ from django.contrib import admin
 
 from snpdb.admin import ModelAdminBasics
 from classification.models import EvidenceKey, ClassificationReportTemplate, \
-    ClassificationReportTemplateAdmin
+    ClassificationReportTemplateAdmin, DiscordanceReportAdmin
 from classification.models import ClinVarExport, ClinVarExportAdmin, ConditionTextAdmin, ConditionText, \
     ConditionTextMatchAdmin, ConditionTextMatch
 from classification.models.admin_forms import EvidenceKeyAdmin, ClassificationAdmin, \
@@ -22,6 +22,6 @@ admin.site.register(ConditionText, ConditionTextAdmin)
 admin.site.register(ConditionTextMatch, ConditionTextMatchAdmin)
 admin.site.register(ClinVarExport, ClinVarExportAdmin)
 admin.site.register(ClinicalContext, ClinicalContextAdmin)
-admin.site.register(DiscordanceReport, ModelAdminBasics)
+admin.site.register(DiscordanceReport, DiscordanceReportAdmin)
 admin.site.register(DiscordanceReportClassification, ModelAdminBasics)
 admin.site.register(ClassificationReportTemplate, ClassificationReportTemplateAdmin)

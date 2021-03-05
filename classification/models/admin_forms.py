@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
 from django_admin_json_editor.admin import JSONEditorWidget
@@ -11,7 +12,7 @@ from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionText, \
-    ConditionTextMatch
+    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification
 from classification.models.classification import Classification, ClassificationImport
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.classification_import import process_classification_import
@@ -535,6 +536,58 @@ class ConditionTextMatchAdmin(ModelAdminBasics):
     list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "last_edited_by", "created", "modified"]
     list_filter = [ConditionTextMatchUserFilter]
 
+
 class ClinVarExportAdmin(ModelAdminBasics):
     list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
     list_filter = [ClassificationLabFilter]
+
+
+class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
+    title = "Labs Involved"
+    parameter_name = "labs_involved"
+
+    def lookups(self, request, model_admin):
+        return [("multilabs", "MultipleLabs")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "multilabs":
+            valid_ids = set()
+            for obj in queryset:
+                labs = set()
+                for drc in obj.discordancereportclassification_set.all():
+                    if c := drc.classification_original.classification:
+                        labs.add(c.lab)
+                if len(labs) > 1:
+                    valid_ids.add(obj.id)
+
+            queryset = DiscordanceReport.objects.filter(pk__in=valid_ids)
+        return queryset
+
+
+class DiscordanceReportAdmin(ModelAdminBasics):
+    list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "labs"]
+    list_filter = [DiscordanceReportAdminLabFilter]
+
+    def allele(self, obj: DiscordanceReport):
+        cc = obj.clinical_context
+        return str(cc.allele)
+
+    def days_open(self, obj: DiscordanceReport):
+        closed = obj.report_completed_date
+        if not closed:
+            delta = timezone.now() - obj.report_started_date
+            return f"{delta.days}+"
+        delta = closed - obj.report_started_date
+        return delta.days
+
+    def classification_count(self, obj: DiscordanceReport):
+        return obj.discordancereportclassification_set.count()
+
+    def labs(self, obj: DiscordanceReport):
+        labs = set()
+        drc: DiscordanceReportClassification
+        for drc in obj.discordancereportclassification_set.all():
+            if c := drc.classification_original.classification:
+                labs.add(c.lab)
+        labs = sorted(labs, key=lambda x: x.name)
+        return ", ".join([lab.name for lab in labs])
