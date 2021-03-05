@@ -6,6 +6,7 @@ from django.shortcuts import render
 from django.views import View
 
 from library.log_utils import report_event
+from library.utils import filename_safe
 from snpdb.models import Lab
 
 
@@ -23,7 +24,9 @@ class FileUploadView(View):
 
         lab_str = requests.POST.get('lab')
         if not lab_str:
-            raise ValueError("lab required")
+            messages.add_message(requests, messages.ERROR,
+                                 f"Lab required")
+            return self.get(requests)
 
         lab = Lab.objects.get(group_name=lab_str)
         if not lab.is_member(user=requests.user, admin_check=True):
@@ -34,7 +37,11 @@ class FileUploadView(View):
         if protocol == "s3":
             bucket, directory = path.split("/", maxsplit=1)
 
-            file_obj = requests.FILES.get('file', '')
+            file_obj = requests.FILES.get('file')
+            if not file_obj:
+                messages.add_message(requests, messages.ERROR,
+                                     f"No Upload File attached")
+                return self.get(requests)
 
             # do your validation here e.g. file size/type check
 
@@ -44,7 +51,7 @@ class FileUploadView(View):
             # synthesize a full file path; note that we included the filename
             file_path_within_bucket = os.path.join(
                 file_directory_within_bucket,
-                file_obj.name
+                filename_safe(file_obj.name)
             )
 
             media_storage = S3Boto3Storage(bucket_name=bucket)
