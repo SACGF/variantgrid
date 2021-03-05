@@ -24,12 +24,12 @@ from ontology.models import OntologyTerm
 from patients.models import ExternalPK, Patient
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
-from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, \
-    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, Allele
+from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
+    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
-from classification.models.classification import ClassificationModification, \
-    Classification, CreateNoClassificationForbidden
+from classification.models.classification import ClassificationModification, Classification, \
+    CreateNoClassificationForbidden
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
 
@@ -482,6 +482,8 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         hgvs_string = search_string
         try:
             variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
+        except Contig.ContigNotInBuildError:
+            return None  # g.HGVS from another genome build
         except (InvalidHGVSName, NotImplementedError) as original_error:
             original_hgvs_string = hgvs_string
             try:
