@@ -21,49 +21,50 @@ class FileUploadView(View):
     def post(self, requests, **kwargs):
         # lazily have s3boto3 requirements
         from storages.backends.s3boto3 import S3Boto3Storage
+        try:
+            lab_str = requests.POST.get('lab')
+            if not lab_str:
+                raise ValueError("Lab required")
 
-        lab_str = requests.POST.get('lab')
-        if not lab_str:
-            messages.add_message(requests, messages.ERROR,
-                                 f"Lab required")
-            return self.get(requests)
+            lab = Lab.objects.get(group_name=lab_str)
+            if not lab.is_member(user=requests.user, admin_check=True):
+                raise PermissionError("User does not have access to lab")
 
-        lab = Lab.objects.get(group_name=lab_str)
-        if not lab.is_member(user=requests.user, admin_check=True):
-            raise PermissionError("User does not have access to lab")
+            protocol, path = lab.upload_location.split(":", maxsplit=1)
 
-        protocol, path = lab.upload_location.split(":", maxsplit=1)
+            if protocol == "s3":
+                bucket, directory = path.split("/", maxsplit=1)
 
-        if protocol == "s3":
-            bucket, directory = path.split("/", maxsplit=1)
+                file_obj = requests.FILES.get('file')
+                if not file_obj:
+                    raise ValueError("No Upload File attached")
+                if not file_obj.name.endswith('.json'):
+                    raise ValueError("Only MVL .json uploads are supported")
 
-            file_obj = requests.FILES.get('file')
-            if not file_obj:
-                messages.add_message(requests, messages.ERROR,
-                                     f"No Upload File attached")
+                # do your validation here e.g. file size/type check
+
+                # organize a path for the file in bucket
+                file_directory_within_bucket = directory
+
+                # synthesize a full file path; note that we included the filename
+                file_path_within_bucket = os.path.join(
+                    file_directory_within_bucket,
+                    filename_safe(file_obj.name)
+                )
+
+                media_storage = S3Boto3Storage(bucket_name=bucket)
+
+                media_storage.save(file_path_within_bucket, file_obj)
+                file_url = media_storage.url(file_path_within_bucket)
+
+                report_event(name="s3 upload", request=requests, extra_data={
+                    "filename": file_obj.name,
+                    "destination": file_url
+                })
+                messages.add_message(requests, messages.INFO, f"File {file_obj.name} uploaded to {lab.name}, importing should begin shortly. See the classifications sub-menu.")
                 return self.get(requests)
-
-            # do your validation here e.g. file size/type check
-
-            # organize a path for the file in bucket
-            file_directory_within_bucket = directory
-
-            # synthesize a full file path; note that we included the filename
-            file_path_within_bucket = os.path.join(
-                file_directory_within_bucket,
-                filename_safe(file_obj.name)
-            )
-
-            media_storage = S3Boto3Storage(bucket_name=bucket)
-
-            media_storage.save(file_path_within_bucket, file_obj)
-            file_url = media_storage.url(file_path_within_bucket)
-
-            report_event(name="s3 upload", request=requests, extra_data={
-                "filename": file_obj.name,
-                "destination": file_url
-            })
-            messages.add_message(requests, messages.INFO, f"File {file_obj.name} uploaded to {lab.name}, importing should begin shortly. See the classifications sub-menu.")
+            else:
+                raise ValueError("Only s3 storage is currently supported for lab uploads")
+        except ValueError as ve:
+            messages.add_message(requests, messages.ERROR, str(ve))
             return self.get(requests)
-        else:
-            raise ValueError("Only s3 storage is currently supported for lab uploads")
