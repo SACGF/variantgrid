@@ -144,23 +144,21 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     def classification_count(self):
         if self.classification_id:
             return 1
-        elif self.mode_of_inheritance:
+        if self.mode_of_inheritance:
             return self.condition_text.conditiontextmatch_set.filter(parent=self).count()
-        elif self.gene_symbol_id:
+        if self.gene_symbol_id:
             return self.condition_text.conditiontextmatch_set.filter(classification_id__isnull=False, gene_symbol__pk=self.gene_symbol_id).count()
-        else:
-            return self.condition_text.conditiontextmatch_set.filter(classification_id__isnull=False).count()
+        return self.condition_text.conditiontextmatch_set.filter(classification_id__isnull=False).count()
 
     @property
     def leaf(self) -> Optional[Any]:
         if self.classification:
             return self.classification
-        elif self.mode_of_inheritance is not None:
+        if self.mode_of_inheritance is not None:
             return self.mode_of_inheritance
-        elif self.gene_symbol:
+        if self.gene_symbol:
             return self.gene_symbol
-        else:
-            return None
+        return None
 
     # resolved to this,
     condition_xrefs = ArrayField(models.TextField(blank=False), default=list)
@@ -175,8 +173,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         if not self.condition_xrefs:
             if not self.parent:
                 return None
-            else:
-                return self.parent.resolve_condition_xrefs
+            return self.parent.resolve_condition_xrefs
 
         rc = ResolvedCondition(search_term=None, gene_symbol=None)
         rc.condition_multi_operation = self.condition_multi_operation
@@ -326,82 +323,82 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 if update_counts:
                     update_condition_text_match_counts(ct)
             return
+
+        raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
+        normalized = ConditionText.normalize(raw_condition_text)
+
+        # need mode_of_inheritance to be not null
+        mode_of_inheritance = cm.get(SpecialEKeys.MODE_OF_INHERITANCE) or []
+
+        ct: ConditionText
+        ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
+
+        # if condition text has changed, remove the old entries
+        ConditionTextMatch.objects.filter(classification=classification).exclude(condition_text=ct).delete()
+
+        root, new_root = ConditionTextMatch.objects.get_or_create(
+            condition_text=ct,
+            gene_symbol=None,
+            mode_of_inheritance=None,
+            classification=None
+        )
+
+        gene_level, new_gene_level = ConditionTextMatch.objects.get_or_create(
+            parent=root,
+            condition_text=ct,
+            gene_symbol=gene_symbol,
+            mode_of_inheritance=None,
+            classification=None
+        )
+
+        mode_of_inheritance_level, _ = ConditionTextMatch.objects.get_or_create(
+            parent=gene_level,
+            condition_text=ct,
+            gene_symbol=gene_symbol,
+            mode_of_inheritance=mode_of_inheritance,
+            classification=None
+        )
+
+        if existing:
+            if existing.parent != mode_of_inheritance_level or \
+                    existing.condition_text != ct or \
+                    existing.gene_symbol != gene_symbol or \
+                    existing.mode_of_inheritance != mode_of_inheritance:
+
+                # update existing to new hierarchy
+                # assume if a condition has been set for this classification specifically that it's
+                # still valid
+                old_text = existing.condition_text
+                existing.parent = mode_of_inheritance_level
+                existing.condition_text = ct
+                existing.mode_of_inheritance = mode_of_inheritance
+                existing.save()
+
+                update_condition_text_match_counts(old_text)
+                old_text.save()
+            else:
+                # nothing has changed, no need to update anything
+                return
         else:
-            raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
-            normalized = ConditionText.normalize(raw_condition_text)
-
-            # need mode_of_inheritance to be not null
-            mode_of_inheritance = cm.get(SpecialEKeys.MODE_OF_INHERITANCE) or []
-
-            ct: ConditionText
-            ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
-
-            # if condition text has changed, remove the old entries
-            ConditionTextMatch.objects.filter(classification=classification).exclude(condition_text=ct).delete()
-
-            root, new_root = ConditionTextMatch.objects.get_or_create(
-                condition_text=ct,
-                gene_symbol=None,
-                mode_of_inheritance=None,
-                classification=None
-            )
-
-            gene_level, new_gene_level = ConditionTextMatch.objects.get_or_create(
-                parent=root,
-                condition_text=ct,
-                gene_symbol=gene_symbol,
-                mode_of_inheritance=None,
-                classification=None
-            )
-
-            mode_of_inheritance_level, _ = ConditionTextMatch.objects.get_or_create(
-                parent=gene_level,
+            ConditionTextMatch.objects.create(
+                parent=mode_of_inheritance_level,
                 condition_text=ct,
                 gene_symbol=gene_symbol,
                 mode_of_inheritance=mode_of_inheritance,
-                classification=None
+                classification=classification
             )
 
-            if existing:
-                if existing.parent != mode_of_inheritance_level or \
-                        existing.condition_text != ct or \
-                        existing.gene_symbol != gene_symbol or \
-                        existing.mode_of_inheritance != mode_of_inheritance:
+        save_required = False
+        if attempt_automatch and (new_root or new_gene_level):
+            ConditionTextMatch.attempt_automatch(ct)
+            save_required = True
 
-                    # update existing to new hierarchy
-                    # assume if a condition has been set for this classification specifically that it's
-                    # still valid
-                    old_text = existing.condition_text
-                    existing.parent = mode_of_inheritance_level
-                    existing.condition_text = ct
-                    existing.mode_of_inheritance = mode_of_inheritance
-                    existing.save()
+        if update_counts:
+            update_condition_text_match_counts(ct)
+            save_required = True
 
-                    update_condition_text_match_counts(old_text)
-                    old_text.save()
-                else:
-                    # nothing has changed, no need to update anything
-                    return
-            else:
-                ConditionTextMatch.objects.create(
-                    parent=mode_of_inheritance_level,
-                    condition_text=ct,
-                    gene_symbol=gene_symbol,
-                    mode_of_inheritance=mode_of_inheritance,
-                    classification=classification
-                )
-
-            save_required = False
-            if attempt_automatch and (new_root or new_gene_level):
-                ConditionTextMatch.attempt_automatch(ct)
-                save_required = True
-
-            if update_counts:
-                update_condition_text_match_counts(ct)
-                save_required = True
-
-            if save_required:
-                ct.save()
+        if save_required:
+            ct.save()
 
 
 def update_condition_text_match_counts(ct: ConditionText):
@@ -417,12 +414,11 @@ def update_condition_text_match_counts(ct: ConditionText):
     def check_hierarchy(ctm: ConditionTextMatch) -> bool:
         if ctm.is_valid:
             return True
-        elif not ctm.is_blank:
+        if not ctm.is_blank:
             return False
-        else:
-            if parent := by_id.get(ctm.parent_id):
-                return check_hierarchy(parent)
-            return False
+        if parent := by_id.get(ctm.parent_id):
+            return check_hierarchy(parent)
+        return False
 
     invalid_count = 0
     for ctm in classification_related:
@@ -474,7 +470,7 @@ class ConditionMatchingSuggestion:
 
     def as_json(self):
         user_json = None
-        if self.terms and self.is_applied: # only report on user who filled in values
+        if self.terms and self.is_applied:  # only report on user who filled in values
             if condition_text_match := self.condition_text_match:
                 if user := condition_text_match.last_edited_by:
                     user_json = {"username": user.username}
@@ -505,7 +501,6 @@ class ConditionMatchingSuggestion:
                 if self.is_all_leafs():
                     # if we're at a gene level, and we have a relationship and we're leafs
                     term = terms[0]
-                    gene_symbol
                     if OntologySnake.has_gene_relationship(term, gene_symbol):
                         return True
             else:
@@ -517,14 +512,13 @@ class ConditionMatchingSuggestion:
     def validate(self):
         if self.validated:
             return
-        else:
-            self.validated = True
+        self.validated = True
         if terms := self.terms:
             # validate if we have multiple terms without a valid joiner
             if len(terms) > 1 and self.condition_multi_operation not in {MultiCondition.UNCERTAIN,
-                                                                        MultiCondition.CO_OCCURRING}:
+                                                                         MultiCondition.CO_OCCURRING}:
                 self.add_message(ConditionMatchingMessage(severity="error",
-                                                         text="Multiple terms provided, requires co-occurring/uncertain"))
+                                                          text="Multiple terms provided, requires co-occurring/uncertain"))
 
             if valid_terms := [term for term in terms if not term.is_stub]:
                 ontology_services: Set[str] = set()
@@ -532,7 +526,7 @@ class ConditionMatchingSuggestion:
                     ontology_services.add(term.ontology_service)
                 if len(ontology_services) > 1:
                     self.add_message(ConditionMatchingMessage(severity="error",
-                                                             text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
+                                                              text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
 
                 # validate that the terms have a known gene association if we're at gene level
                 if ctm := self.condition_text_match:
@@ -541,16 +535,16 @@ class ConditionMatchingSuggestion:
                         for term in valid_terms:
                             if not OntologySnake.has_gene_relationship(term, gene_symbol):
                                 self.add_message(ConditionMatchingMessage(severity="warning",
-                                                                         text=f"{term.id} : no direct association on file to {gene_symbol.symbol}"))
+                                                                          text=f"{term.id} : no direct association on file to {gene_symbol.symbol}"))
                             else:
                                 self.add_message(ConditionMatchingMessage(severity="success",
-                                                                         text=f"{term.id} : is associated to {gene_symbol.symbol}"))
+                                                                          text=f"{term.id} : is associated to {gene_symbol.symbol}"))
 
             # validate that we have the terms being referenced (if we don't big chance that they're not valid)
             for term in terms:
                 if term.is_stub:
                     self.add_message(ConditionMatchingMessage(severity="warning",
-                                                             text=f"{term.id} : no copy of this term in our system"))
+                                                              text=f"{term.id} : no copy of this term in our system"))
                 elif term.is_obsolete:
                     self.add_message(
                         ConditionMatchingMessage(severity="error", text=f"{term.id} : is marked as obsolete"))
@@ -625,11 +619,14 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
         cms.ids_found_in_text = True
         if len(cms.terms) == 1:
             matched_term = cms.terms[0]
-            text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text), deplural=True, deroman=True)
-            term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name), deplural=True, deroman=True)
+            text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text),
+                                                             deplural=True, deroman=True)
+            term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
+                                                             deplural=True, deroman=True)
             if aliases := matched_term.aliases:
                 for alias in aliases:
-                    term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias), deplural=True, deroman=True))
+                    term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
+                                                                                       deplural=True, deroman=True))
             term_tokens.add(str(matched_term.id).lower())
             term_tokens.add(str(matched_term.id.split(":")[1]))
             extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS
@@ -643,7 +640,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> ConditionMatchingSuggestion:
     cms = ConditionMatchingSuggestion()
     if match_info := search_text.matches(term):
-        if match_info.alias_index is not None:  # 0 alias is complete with acronymn, 1 alias without acronymn
+        if match_info.alias_index is not None:  # 0 alias is complete with acronym, 1 alias without acronym
             safe_alias = False
             if term.ontology_service == OntologyService.OMIM:
                 alias = term.aliases[match_info.alias_index]
@@ -670,9 +667,9 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
 def merge_matches(matches: List[ConditionMatchingSuggestion]) -> Optional[ConditionMatchingSuggestion]:
     if not matches:
         return None
-    elif len(matches) == 1:
+    if len(matches) == 1:
         return matches[0]
-    elif len(matches) > 1:
+    if len(matches) > 1:
         if name_matches := [match for match in matches if match.alias_index is None]:
             if len(name_matches) == 1:
                 return name_matches[0]
@@ -768,10 +765,8 @@ def _is_descendat_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set
 
     all_parent_terms = set()
     if term_ids:
-        parent_qs = OntologyTermRelation.objects.filter(source_term__pk__in=term_ids,
-                                                   relation=OntologyRelation.IS_A).values_list("dest_term",
-                                                                                               flat=True)
-        for parent in parent_qs:
+        parent_qs = OntologyTermRelation.objects.filter(source_term__pk__in=term_ids, relation=OntologyRelation.IS_A)
+        for parent in parent_qs.values_list("dest_term", flat=True):
             if parent not in seen_ids:
                 all_parent_terms.add(parent)
 
@@ -781,7 +776,7 @@ def _is_descendat_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set
 
 
 def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 10):
-    return _is_descendat_ids(set([term.id for term in terms]), set([term.id for term in ancestors]), set(), check_levels)
+    return _is_descendat_ids({term.id for term in terms}, {term.id for term in ancestors}, set(), check_levels)
 
 
 def _sort_terms(terms: Iterable[OntologyTerm]):
@@ -815,12 +810,13 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
 
     # filled in and gene level, exclude root as we take care of that before-hand
     filled_in: QuerySet
-    filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None).order_by('gene_symbol')
+    filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs'))
+    filled_in = filled_in.filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
     root_level_mondo = set()
     root_level_terms = root_cms.terms
-    root_level_mondo = set([term for term in root_level_terms if term.ontology_service == OntologyService.MONDO])
+    root_level_mondo = {term for term in root_level_terms if term.ontology_service == OntologyService.MONDO}
 
-    for ctm in filled_in:
+    for ctm in filled_in.order_by('gene_symbol'):
         if ctm.condition_xref_terms and not ignore_existing:
             cms = ConditionMatchingSuggestion(ctm)
             cms.validate()
@@ -857,12 +853,12 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     if term in root_level_terms:
                         cms.add_message(ConditionMatchingMessage(severity="success",
                                                                  text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
-                        if len(root_level_terms) != 1 and not root_cms.ids_found_in_text: # if multiple terms from root level
+                        if len(root_level_terms) != 1 and not root_cms.ids_found_in_text:  # if multiple terms from root level
                             # just leave them the same (don't make a suggestion, just validate)
                             cms.add_term(term)
                     else:
                         cms.add_message(ConditionMatchingMessage(severity="success",
-                                                             text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
+                                                                 text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                         cms.add_term(term)  # not guaranteed to be a leaf, but no associations on child terms
                 elif len(matches_gene_level_leafs) == 1:
                     term = list(matches_gene_level_leafs)[0]

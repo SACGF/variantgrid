@@ -16,4 +16,3 @@ class AlleleTestCase(TestCase):
         allele_2 = Allele.objects.create()
 
         allele_1.merge(AlleleConversionTool.NCBI_REMAP, allele_2)
-

@@ -8,7 +8,6 @@ from django.utils import timezone
 from lazy import lazy
 from model_utils.models import now
 
-from genes.models import GeneSymbol
 from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport
 
 

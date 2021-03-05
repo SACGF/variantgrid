@@ -1,7 +1,6 @@
 import functools
 import operator
 import re
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
@@ -44,7 +43,7 @@ class OntologyService(models.TextChoices):
     IMPORTANCE: Dict[str, int] = Constant({
         MONDO[0]: 2,
         OMIM[0]: 3,
-        HPO[0]: 4, # put HPO relationships last as they occasionally spam OMIM
+        HPO[0]: 4,  # put HPO relationships last as they occasionally spam OMIM
         HGNC[0]: 1  # show gene relationships first
     })
 
@@ -339,10 +338,11 @@ class OntologyTermRelation(TimeStampedModel):
     def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
         if term.ontology_service == OntologyService.MONDO:
             return term
-        if mondo_rel := OntologyTermRelation.objects.filter(
-            (Q(source_term=term) & Q(dest_term__ontology_service=OntologyService.MONDO)) |
-            (Q(dest_term=term) & Q(source_term__ontology_service=OntologyService.MONDO))
-        ).filter(relation=OntologyRelation.EXACT).first():
+
+        q_dest_modo = Q(source_term=term) & Q(dest_term__ontology_service=OntologyService.MONDO)
+        q_source_modo = Q(dest_term=term) & Q(source_term__ontology_service=OntologyService.MONDO)
+        otr_qs = OntologyTermRelation.objects.filter(q_dest_modo | q_source_modo, relation=OntologyRelation.EXACT)
+        if mondo_rel := otr_qs.first():
             return mondo_rel.other_end(term)
         return None
 
@@ -482,7 +482,6 @@ class OntologySnake:
             return set(OntologyTerm.objects.filter(pk__in=terms))
         else:
             return set()
-
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':

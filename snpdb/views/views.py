@@ -744,7 +744,6 @@ def view_custom_columns(request, custom_columns_collection_id):
                 # Delete any not in id_list
                 CustomColumn.objects.filter(custom_columns_collection=ccc).exclude(column__in=id_list).delete()
 
-
             my_columns_list = my_columns_str.split(',') if my_columns_str else []
             active = 'my_columns' in request.POST
             update_user_columns(my_columns_list, active)

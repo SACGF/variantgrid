@@ -126,7 +126,7 @@ class SearchText:
         if deplural:
             new_tokens = list()
             for token in tokens:
-                if len(token) >= 5 and token.endswith('s'):  # make sure 5 or more characters long so not acronymn
+                if len(token) >= 5 and token.endswith('s'):  # make sure 5 or more characters long so not acronym
                     token = token[0:-1]
                 new_tokens.append(token)
             tokens = new_tokens
