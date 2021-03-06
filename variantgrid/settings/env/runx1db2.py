@@ -45,6 +45,9 @@ SITE_ID = 7
 
 PEDIGREE_MADELINE2_COMMAND = "madeline2"
 
+SOMALIER["enabled"] = True
+SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_BASE_DIR, "somalier")
+
 RUNX1_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "runx1_static")
 STATICFILES_DIRS = (RUNX1_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
