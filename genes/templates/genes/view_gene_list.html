@@ -39,9 +39,10 @@
             {% endif %}
         </ul>
         <div id="details">
+            {% page_help page_id='genes/view_gene_list_help' %}
+
             <form method="post" id='gene-form'>
                 {% csrf_token %}
-                {% page_help 'genes/view_gene_list_help' 'GeneList' %}
 
     			<fieldset class="form-fields small">
     			{{ gene_list_form.as_p }}
@@ -77,6 +78,7 @@
     </div>
     {% endif %}
 
+    {% page_help page_id='genes/gene_list_gene_matching_help' title="Gene List Gene Matching" show_title=False %}
 	{% load jqgrid_tags %}
 	{% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' 'gene_list_genes_grid_init_func' False gene_list_id=gene_list.pk %}
 

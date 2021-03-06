@@ -2,14 +2,18 @@ from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from classification.views import views, classification_dashboard_view, \
-    classification_export_view, views_autocomplete, classification_import_upload_view, classification_accumulation_graph
-from classification.views.condition_alias_view import ConditionAliasDatatableView, condition_aliases_view, \
-    condition_alias_view, SearchConditionView
+    classification_export_view, views_autocomplete, classification_import_upload_view, \
+    classification_accumulation_graph
+from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
+from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
+    ConditionTextColumns, ConditionTextMatchingAPI
+from classification.views.clinvar_export_view import clinvar_exports_view, \
+    clinvar_export_review_view, ClinVarExportColumns
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues
 from classification.views.classification_dashboard_view import problem_download
-from classification.views.classification_datatables import ClassificationModificationDatatableView
+from classification.views.classification_datatables import ClassificationDatatableConfig
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
@@ -17,6 +21,7 @@ from classification.views.classification_overlaps_view import view_overlaps, pos
     view_clinical_context
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.views import classification_import_tool, AutopopulateView
+from snpdb.views.datatable_view import DatabasetableView
 from variantgrid.perm_path import perm_path
 
 
@@ -26,8 +31,7 @@ urlpatterns = [
     perm_path('activity', views.activity, name='activity'),
     perm_path('activity/<str:latest_timestamp>', views.activity, name='activity_dated'),
     perm_path('classifications', views.classifications, name='classifications'),
-    perm_path('create_for_variant/<int:variant_id>', views.create_classification_for_variant, name='create_classification_for_variant'),
-    perm_path('create_for_variant_and_transcript/<int:variant_id>/<transcript_id>', views.create_classification_for_variant, name='create_classification_for_variant_and_transcript'),
+    perm_path('create_for_variant/<int:variant_id>', views.CreateClassificationForVariantView.as_view(), name='create_classification_for_variant'),
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),
@@ -42,10 +46,16 @@ urlpatterns = [
     perm_path('classification_grid/export/', views.export_classifications_grid, name='export_classifications_grid'),
     perm_path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
 
-    # condition aliases
-    perm_path('condition_alias', condition_aliases_view, name='condition_aliases'),
-    perm_path('condition_alias/datatable', ConditionAliasDatatableView.as_view(), name='condition_aliases_datatables'),
-    perm_path('condition_alias/<int:pk>', condition_alias_view, name='condition_alias'),
+    perm_path('clinvar_export', clinvar_exports_view, name='clinvar_exports'),
+    perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=ClinVarExportColumns), name='clinvar_exports_datatables'),
+    perm_path('clinvar_export/<int:pk>', clinvar_export_review_view, name='clinvar_export'),
+
+    perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
+    perm_path('condition_matching/datatable', DatabasetableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
+    perm_path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
+
+    perm_path('condition_match_test', condition_match_test_view, name='condition_match_test'),
+    perm_path('condition_match_test_download', condition_match_test_download_view, name='condition_match_test_download'),
 
     perm_path('diff/', views.view_classification_diff, name='classification_diff'),
     perm_path('redcap_data_dictionary.csv', classification_export_view.redcap_data_dictionary, name='redcap_data_dictionary'),
@@ -87,8 +97,6 @@ urlpatterns = [
 ]
 
 rest_urlpatterns = [
-    perm_path('api/classifications/condition_alias/search', SearchConditionView.as_view(), name='condition_search_api'),
-
     perm_path('api/classifications/auto_populate', AutopopulateView.as_view(), name='classification_auto_populate_api'),
 
     perm_path('api/classifications/record/', ClassificationView.as_view(), name='classification_api'),
@@ -102,10 +110,12 @@ rest_urlpatterns = [
     perm_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
     perm_path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
-    perm_path('api/classifications/datatables/', ClassificationModificationDatatableView.as_view(), name='classification_datatables'),
+    perm_path('api/classifications/datatables/', DatabasetableView.as_view(column_class=ClassificationDatatableConfig), name='classification_datatables'),
 
     perm_path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
               name='lab_gene_classification_counts_api'),
+
+    perm_path('api/condition_text_matching/<int:pk>', ConditionTextMatchingAPI.as_view(), name='condition_text_matching_api')
 ]
 
 urlpatterns += format_suffix_patterns(rest_urlpatterns)

@@ -1,7 +1,7 @@
 {# Analysis can be turned off in that case URLs won't resolve so just skip #}
 {% if url_name_visible.analysis and url_name_visible.trio_wizard %}
     {% load static %}
-    {% if sample_count >= 3 %}
+    {% if cohort.cohort_genotype_collection and sample_count >= 3 %}
     <style>
     #create-trio-button {
         float: left;
@@ -13,10 +13,10 @@
     </style>
     <script>
     function getTrioUrl(requireChecked) {
-       var sampleIdList = [];
+        const sampleIdList = [];
         $(".sample-select").each(function() {
             if (!requireChecked || $(this).is(":checked")) {
-                var sampleId = $(this).attr("sample_id");
+                const sampleId = $(this).attr("sample_id");
                 sampleIdList.push(sampleId);
             }
         });
@@ -30,23 +30,23 @@
     }
     
     function setupTrioButton() {
-        var numSelectedSamples = $("input.sample-select:checked").length;
+        const numSelectedSamples = $("input.sample-select:checked").length;
         $("#num-selected-samples").html(numSelectedSamples);
-        
-        var buttonEnabled = numSelectedSamples == 3;
-        $("#create-trio-button").button( "option", "disabled", !buttonEnabled );
+
+        const buttonEnabled = numSelectedSamples === 3;
+        $("#create-trio-button").prop("disabled", !buttonEnabled);
     }
     
     function initTrio() {
-        $("#create-trio-button").button({disabled: true}).click(trioClick);
+        $("#create-trio-button").click(trioClick);
         $(".sample-select").change(setupTrioButton);
         setupTrioButton();
     }
     
     $(document).ready(function() {
     {% if sample_count == 3 %}
-        var allSamplesUrl = getTrioUrl(false);
-        $("#create-trio-button").click(function() {
+        const allSamplesUrl = getTrioUrl(false);
+        $("#create-trio-button").prop("disabled", false).click(function() {
             window.location = allSamplesUrl;
         });
     {% else %}
@@ -56,9 +56,9 @@
         
     });
     </script>
-    <button id='create-trio-button' class="btn btn-outline-primary">
-      <img id="trio-icon" class="trio-button-component" src="{% static 'images/node_icons/trio.png' %}" width="28" height="28" />
-      <div class='trio-button-component'> Perform trio analysis using template</div>
+    <button id='create-trio-button' disabled class="btn btn-outline-primary">
+      <img id="trio-icon" class="trio-button-component" alt="Trio" src="{% static 'images/node_icons/trio.png' %}" width="28" height="28" />
+      Perform trio analysis using template
     </button>
     {% if sample_count > 3 %}
         <span>&gt;3 samples to choose from - select exactly 3 using checkboxes on the left to create Trio. <span id='num-selected-samples'></span> samples selected. </span>

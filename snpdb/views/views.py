@@ -7,7 +7,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured
-from django.db.models import Q
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
@@ -42,6 +41,8 @@ from library.guardian_utils import assign_permission_to_user_and_groups, DjangoP
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
 import pandas as pd
+
+from ontology.models import OntologyTerm
 from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
@@ -231,6 +232,13 @@ def view_vcf(request, vcf_id):
 
         add_save_message(request, valid, "VCF")
 
+    try:
+        # Some legacy data was too hard to fix and relies on being re-imported
+        _ = vcf.cohort
+        _ = vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
+        messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
+
     if reload_vcf:
         set_vcf_and_samples_import_status(vcf, ImportStatus.IMPORTING)
         retry_upload_pipeline(vcf.uploadedvcf.uploaded_file.uploadpipeline)
@@ -279,7 +287,7 @@ def view_sample(request, sample_id):
     patient_form = PatientForm(user=request.user)  # blank
     related_samples = None
     if settings.SOMALIER.get("enabled"):
-        related_samples = SomalierRelatePairs.objects.filter(Q(sample_a=sample) | Q(sample_b=sample))
+        related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
     context = {'sample': sample,
                'samples': [sample],
@@ -724,20 +732,22 @@ def view_custom_columns(request, custom_columns_collection_id):
         variant_grid_columns[vgc.pk] = vgc
 
     if request.method == "POST":
+        if name := request.POST.get("name"):
+            ccc.name = name
+            ccc.save()
+        elif my_columns_str := request.POST.get("columns"):
+            def update_user_columns(id_list, active):
+                for i, col in enumerate(id_list):
+                    column = variant_grid_columns[col]
+                    CustomColumn.objects.update_or_create(custom_columns_collection=ccc, column=column,
+                                                          defaults={"sort_order": i})
+                # Delete any not in id_list
+                CustomColumn.objects.filter(custom_columns_collection=ccc).exclude(column__in=id_list).delete()
 
-        def update_user_columns(id_list, active):
-            for i, col in enumerate(id_list):
-                column = variant_grid_columns[col]
-                CustomColumn.objects.update_or_create(custom_columns_collection=ccc, column=column,
-                                                      defaults={"sort_order": i})
-            # Delete any not in id_list
-            CustomColumn.objects.filter(custom_columns_collection=ccc).exclude(column__in=id_list).delete()
-
-        my_columns_str = request.POST.get("columns")
-
-        my_columns_list = my_columns_str.split(',') if my_columns_str else []
-        active = 'my_columns' in request.POST
-        update_user_columns(my_columns_list, active)
+            my_columns_list = my_columns_str.split(',') if my_columns_str else []
+            active = 'my_columns' in request.POST
+            update_user_columns(my_columns_list, active)
+        return HttpResponse()  # Nobody ever looks at this
 
     context_dict = {'available_columns_list': available_columns,
                     'my_columns_list': my_columns,
@@ -997,7 +1007,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
     if len(empty_gene_value) == 1:
         default_color = empty_gene_value[0].rgb
 
-    phenotypes = ["Age", "HPO", "MIM"]
+    phenotypes = ["Age", "HPO", "OMIM"]
     highlight_gene_labels = []
     other_gene_labels = []
 
@@ -1065,7 +1075,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
             color_df[sample_name] = default_color
             color_df.loc["Age", sample_name] = '#FFFFFF'
             color_df.loc["HPO", sample_name] = '#FFFFFF'
-            color_df.loc["MIM", sample_name] = '#FFFFFF'
+            color_df.loc["OMIM", sample_name] = '#FFFFFF'
 
             text_df[sample_name] = default_text
 
@@ -1080,8 +1090,9 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     def format_min(mim):
                         return f"<div title='{mim}'>{mim.description}</div>"
 
-                    hpo_text = " ".join(map(format_hpo, patient.get_hpo_qs()))
-                    mim_text = " ".join(map(format_min, patient.get_mim_qs()))
+                    hpo, omim = OntologyTerm.split_hpo_and_omim(patient.get_ontology_term_ids())
+                    hpo_text = " ".join(map(format_hpo, hpo))
+                    omim_text = " ".join(map(format_min, omim))
 
                     try:
                         age = sample.specimen.age_at_collection_date
@@ -1090,7 +1101,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
                     text_df.loc["Age", sample_name] = age or ''
                     text_df.loc["HPO", sample_name] = hpo_text
-                    text_df.loc["MIM", sample_name] = mim_text
+                    text_df.loc["OMIM", sample_name] = omim_text
                 except PermissionDenied:
                     pass
                 except Patient.DoesNotExist:

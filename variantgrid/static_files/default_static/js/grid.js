@@ -14,8 +14,8 @@ function export_grid(nodeId, unique_code, export_type) {
 }
 
 function load_variant_details(variant_id) {
-    var variant_details_url = Urls.variant_details(variant_id);
-    var aWin = getAnalysisWindow();
+    let variant_details_url = Urls.variant_details(variant_id);
+    const aWin = getAnalysisWindow();
     if (aWin.ANALYSIS_SETTINGS) {
         if (aWin.ANALYSIS_SETTINGS.open_variant_details_in_new_window) {
             const VARIANT_URL = Urls.view_variant(variant_id);
@@ -35,7 +35,7 @@ function load_variant_details(variant_id) {
 }
 
 function getAnalysisWindow() {
-    var aWin = window;
+    let aWin = window;
     if (typeof _getAnalysisWindow !== "undefined") {
         try {
             // Not sure what's going on here (leaking between tabs?) but I very rarely get
@@ -45,7 +45,7 @@ function getAnalysisWindow() {
             if (typeof RAISED_GET_ANALYIS_WINDOW_JS_ERROR == "undefined") {
                 RAISED_GET_ANALYIS_WINDOW_JS_ERROR = true;
                 console.log(e);
-                var exception_string = e.message + '\n' + e.stack;
+                const exception_string = e.message + '\n' + e.stack;
                 createJSEvent(exception_string, 'W', true); // log to server
             }
         }
@@ -55,18 +55,18 @@ function getAnalysisWindow() {
 
 
 function get_igv_data() {
-    var aWin = getAnalysisWindow();
+    const aWin = getAnalysisWindow();
     return aWin.ANALYSIS_SETTINGS["igv_data"];
 }
 
 function replaceFilePrefix(replaceDict, bamFiles) {
-    var replacedBamFiles = [];
+    let replacedBamFiles = [];
     if (replaceDict) {
-        for (var i=0 ; i<bamFiles.length ; ++i) {
-            var bamFile = bamFiles[i];
+        for (let i=0 ; i<bamFiles.length ; ++i) {
+            let bamFile = bamFiles[i];
             if (bamFile) {
-                for (var fromValue in replaceDict) {
-                    var toValue = replaceDict[fromValue];
+                for (let fromValue in replaceDict) {
+                    const toValue = replaceDict[fromValue];
                     if (bamFile.startsWith(fromValue)) {
                         bamFile = bamFile.replace(fromValue, toValue);
                         break;
@@ -83,27 +83,27 @@ function replaceFilePrefix(replaceDict, bamFiles) {
 
 
 function create_igv_url(locus, inputBams) {
-	var IGV_DATA = get_igv_data();
-	var url = IGV_DATA['base_url'];
-	var params = ["genome=" + IGV_DATA['genome']];
-	if (locus) {
+    const IGV_DATA = get_igv_data();
+    let url = IGV_DATA['base_url'];
+    const params = ["genome=" + IGV_DATA['genome']];
+    if (locus) {
     	params.push("locus=" + locus);
     }
-	var bamFiles = [];
-	var manual_zygosity_cohort = IGV_DATA["manual_zygosity_cohort"];
-	if (manual_zygosity_cohort && manual_zygosity_cohort.length) {
-    	for (var i=0 ; i<manual_zygosity_cohort.length ; ++i) {
+    let bamFiles = [];
+    const manual_zygosity_cohort = IGV_DATA["manual_zygosity_cohort"];
+    if (manual_zygosity_cohort && manual_zygosity_cohort.length) {
+    	for (let i=0 ; i<manual_zygosity_cohort.length ; ++i) {
     		bamFiles.push(manual_zygosity_cohort[i]);
     	}
     } else {
         bamFiles = inputBams;
     }
-    
-	var op = 'goto';
-	if (bamFiles.length > 0) {
-        var replaceDict = IGV_DATA["replace_dict"];
-        var replacedBamFiles = replaceFilePrefix(replaceDict, bamFiles);
-        var joinedFiles = replacedBamFiles.join()
+
+    let op = 'goto';
+    if (bamFiles.length > 0) {
+        const replaceDict = IGV_DATA["replace_dict"];
+        const replacedBamFiles = replaceFilePrefix(replaceDict, bamFiles);
+        const joinedFiles = replacedBamFiles.join();
         if (joinedFiles) {
     		params.push("file=" + joinedFiles);
     		op = "load";
@@ -118,7 +118,7 @@ function create_igv_url(locus, inputBams) {
 seen_igv_error = false;
 
 function open_igv_link(locus, getBamsFunc) {
-    var url = create_igv_url(locus, getBamsFunc);
+    const url = create_igv_url(locus, getBamsFunc);
 
     $.ajax({
         url: url,
@@ -128,11 +128,11 @@ function open_igv_link(locus, getBamsFunc) {
                 console.log(textStatus);
                 console.log(errorThrown);
 
-                var IGV_DATA = get_igv_data();
-                var base_url = IGV_DATA['base_url'];
-                var igvIntegrationUrl = Urls.igv_integration();
-    
-                var message = "<p>Could not connect to IGV - is it running and accepting connections on " + base_url + "?";
+                const IGV_DATA = get_igv_data();
+                const base_url = IGV_DATA['base_url'];
+                const igvIntegrationUrl = Urls.igv_integration();
+
+                let message = "<p>Could not connect to IGV - is it running and accepting connections on " + base_url + "?";
                 message += "<p>See also <a target='_blank' href='" + igvIntegrationUrl + "'>IGV Integration</a>";
                 
                 $("#error-dialog").html(message).dialog({
@@ -159,42 +159,44 @@ function noBamsHere() {
 
 
 function getViewVariantUrl(variantLink) {
-    var variantId = $(variantLink).parent(".variant_id-container").attr("variant_id");
+    const variantId = $(variantLink).parent(".variant_id-container").attr("variant_id");
     return Urls.view_variant(variantId);
 }
 
 function setFullscreenVariantLink() {
-  var url = getViewVariantUrl(this);
-  $(this).attr('href', url);
+    const url = getViewVariantUrl(this);
+    $(this).attr('href', url);
 }
 
 function restoreVariantLink() {
-  var orig_href = $(this).attr('orig_href');
-  $(this).attr('href', orig_href);
+    const orig_href = $(this).attr('orig_href');
+    $(this).attr('href', orig_href);
 }
 
 
 function createGridLink(title, url, contents, extraLinkClasses, extraIconClasses) {
-    var linkCSS = ['grid-link'];
+    let linkCSS = ['grid-link'];
     if (extraLinkClasses) {
         linkCSS = linkCSS.concat(extraLinkClasses);
     }
-    var iconCSS = ['grid-link-icon', 'user-tag-colored'];
+    let iconCSS = ['grid-link-icon', 'user-tag-colored'];
     if (extraIconClasses) {
         iconCSS = iconCSS.concat(extraIconClasses);
     }
 
-    var gridBox = "<div class='" + iconCSS.join(' ') + "'>" + contents + "</div>";
-    var link = $("<a/>").attr({"class" : linkCSS.join(' '),
-                               "title" : title,
-                               "orig_href" : url,
-                               "href" : url});
+    const gridBox = "<div class='" + iconCSS.join(' ') + "'>" + contents + "</div>";
+    const link = $("<a/>").attr({
+        "class": linkCSS.join(' '),
+        "title": title,
+        "orig_href": url,
+        "href": url
+    });
     link.append(gridBox);
     return link.prop("outerHTML");
 }
 
 function createIgvUrl(locus, getBamsFuncString) {
-    var aWin = getAnalysisWindow();
+    const aWin = getAnalysisWindow();
     if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS['show_igv_links']) {
         if (!getBamsFuncString) {
             getBamsFuncString = 'noBamsHere';
@@ -213,7 +215,7 @@ function create_igv_link(locus, getBamsFuncString) {
 }
 
 function showGridCell(gridColumn) {
-    var selector = $("td[aria-describedby*='" + gridColumn + "']");
+    const selector = $("td[aria-describedby*='" + gridColumn + "']");
     if (selector.length) {
         selector[0].scrollIntoView();
     }
@@ -304,17 +306,17 @@ function cosmicLink(cosmic_ids) {
     const COSMIC_PREFIX = "COSV";
     const COSMIC_LEGACY_PREFIX = "COSM";
 
-    var cosmic_string = '';
-    if (cosmic_ids) { 
-        var cosmic_ids_list = cosmic_ids.split("&");
-        var cosmic_links = [];
-        for(var i=0 ; i<cosmic_ids_list.length ; ++i) {
-            var cosmic_id = cosmic_ids_list[i];
+    let cosmic_string = '';
+    if (cosmic_ids) {
+        const cosmic_ids_list = cosmic_ids.split("&");
+        const cosmic_links = [];
+        for(let i=0 ; i<cosmic_ids_list.length ; ++i) {
+            let cosmic_id = cosmic_ids_list[i];
             if (cosmic_id.startsWith(COSMIC_PREFIX)) {
                 // #2637 - COSMIC switched to using COSV in 2019, I can't find a direct link but search works then you select transcript
                 cosmic_id = "<a title='View COSMIC entry in new window' target='_blank' href=' https://cancer.sanger.ac.uk/cosmic/search?q=" + cosmic_id + "'>" + cosmic_id + "</a>";
             } else if (cosmic_id.startsWith(COSMIC_LEGACY_PREFIX)) {
-                var cosmic_id_int = cosmic_id.replace("COSM", "");
+                const cosmic_id_int = cosmic_id.replace("COSM", "");
                 cosmic_id = "<a title='View COSMIC entry in new window' target='_blank' href='http://cancer.sanger.ac.uk/cosmic/mutation/overview?id=" + cosmic_id_int + "'>" + cosmic_id + "</a>";
             }
             cosmic_links.push(cosmic_id);
@@ -327,7 +329,7 @@ function cosmicLink(cosmic_ids) {
 
 
 function omimLink(omim_id) {
-    var omim_string = '';
+    let omim_string = '';
     if (omim_id) {
         omim_string = "<a title='View OMIM entry in new window' target='_blank' href='https://www.omim.org/entry/" + omim_id + "'>" + omim_id + "</a>";
     }
@@ -336,11 +338,11 @@ function omimLink(omim_id) {
 
 
 function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
-    var columnString = '';
+    let columnString = '';
     if (geneSymbolColumn) {
-        var geneSymbolList = geneSymbolColumn.split(",");
-        var geneSymbolLinks = [];
-        for(var i=0 ; i<geneSymbolList.length ; ++i) {
+        const geneSymbolList = geneSymbolColumn.split(",");
+        const geneSymbolLinks = [];
+        for(let i=0 ; i<geneSymbolList.length ; ++i) {
             let geneSymbol = geneSymbolList[i];
             let geneLinkString = '';
             if (filterChildLink) {
@@ -375,13 +377,13 @@ function showTagAutocomplete(variantId) {
     
     addTagButton.hide();
     container.load(Urls.tag_autocomplete_form(), function() {
-        var tagSelect = $("select#id_tag", container);
+        const tagSelect = $("select#id_tag", container);
         tagSelect.change(function() {
-            var tag = $(this).val(); 
+            const tag = $(this).val();
             if (tag) {
-                var successFunc = function() {
-                    var vtHtml = getVariantTagHtml(variantId, tag);
-                    var newTag = $(vtHtml);
+                const successFunc = function () {
+                    const vtHtml = getVariantTagHtml(variantId, tag);
+                    const newTag = $(vtHtml);
                     newTag.click(tagClickHandler);
                     container.parent().append(newTag);
                     container.empty();
@@ -460,30 +462,49 @@ function tagsGlobalFormatter(value, a, rowData) {
 
 
 function gnomADVariant(rowData) {
-    var chrom = rowData["locus__contig__name"];
+    let chrom = rowData["locus__contig__name"];
     if (chrom.startsWith("chr")) {
         chrom = chrom.substr(3);
     }
-    return [chrom, rowData["locus__position"], rowData["locus__ref"], rowData["alt"]].join("-");
+    return [chrom, rowData["locus__position"], rowData["locus__ref__seq"], rowData["alt__seq"]].join("-");
 }
 
 
 function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
-    var gnomadFilteredString = '';
+    let gnomadFilteredString = '';
     if (gnomadFilteredCellValue !== null) {
-        var filterDiv = $("<div/>").addClass("gnomad-flag-label");
+        const filterDiv = $("<div/>").addClass("gnomad-flag-label");
         if (gnomadFilteredCellValue) {
             filterDiv.addClass("gnomad-flagged");
             filterDiv.text("Fail");
         } else {
             filterDiv.text("Pass");
         }
-        var url = "http://gnomad.broadinstitute.org/variant/" + gnomADVariant(rowData);
-        var gnomADLink = $("<a />").addClass("gnomad-link").attr({"href" : url, "target" : "_blank", "title" : "View in gnomAD"});
+        const gv = gnomADVariant(rowData);
+        const dataset = ANALYSIS_SETTINGS["genome_build"] === 'GRCh38'? 'gnomad_r3' : 'gnomad_r2_1';
+        const url = `http://gnomad.broadinstitute.org/variant/${gv}?dataset=${dataset}`;
+        const gnomADLink = $("<a />").addClass("gnomad-link").attr({
+            "href": url,
+            "target": "_blank",
+            "title": "View in gnomAD"
+        });
         gnomADLink.append(filterDiv);
         gnomadFilteredString = gnomADLink.get(0).outerHTML;
     }
     return gnomadFilteredString;
+}
+
+
+function formatClinGenAlleleId(cellValue) {
+    // warning: doesn't use settings.CLINGEN_ALLELE_REGISTRY_DOMAIN as static JS
+    if (cellValue) {
+        let ca_id = "CA" + cellValue;
+        let url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${ca_id}`;
+        cellValue = `<a href="${url}" target="_blank">${ca_id}</a>`;
+    } else {
+        cellValue = "";
+    }
+    return cellValue;
 }
 
 
@@ -494,6 +515,7 @@ jQuery.extend($.fn.fmatter , {
     'clinvarLink' : clinvarLink,
     'cosmicLink' : cosmicLink,
     'omimLink' : omimLink,
+    'formatClinGenAlleleId': formatClinGenAlleleId,
     'geneSymbolLink' : geneSymbolLink,
     'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
     'gnomadFilteredFormatter' : gnomadFilteredFormatter,
@@ -502,7 +524,7 @@ jQuery.extend($.fn.fmatter , {
 
 // We need to do this, so that we don't send up a changing timestamp and thus never get cached
 function deleteNdParam(postData) {
-    var myPostData = $.extend({}, postData); // make a copy of the input parameter
+    const myPostData = $.extend({}, postData); // make a copy of the input parameter
     myPostData._filters = myPostData.filters;
     delete myPostData.nd;
     return myPostData;
@@ -511,9 +533,9 @@ function deleteNdParam(postData) {
 // FIXME: Duplicated in jqgrid.html
 function setRowChangeCallbacks(grid, gridName) {
 	$(".ui-pg-selbox").change(function() {
-		var gridRows = $(this).val();
-		var data = 'grid_name=' + gridName + '&grid_rows=' + gridRows;
-		$.ajax({
+        const gridRows = $(this).val();
+        const data = 'grid_name=' + gridName + '&grid_rows=' + gridRows;
+        $.ajax({
 		    type: "POST",
 		    data: data,
 		    url: Urls.set_user_row_config(),
@@ -523,12 +545,13 @@ function setRowChangeCallbacks(grid, gridName) {
 
 
 function tagClickHandler() {
-    var gridTag = $(this);
-    var innerSpan = $(".user-tag-colored", gridTag);
+    const gridTag = $(this);
+    const innerSpan = $(".user-tag-colored", gridTag);
+
     function removeClickHandler() {
-        var tagId = gridTag.attr('tag_id');
-        var variantId = gridTag.attr('variant_id');
-        var removeTagCallback = function() {
+        const tagId = gridTag.attr('tag_id');
+        const variantId = gridTag.attr('variant_id');
+        const removeTagCallback = function () {
             gridTag.remove();
         };
         removeVariantTag(variantId, tagId, removeTagCallback);
@@ -539,14 +562,14 @@ function tagClickHandler() {
 
 // This is always kicked off after grid is loaded (after passed in function gridComplete)
 function gridCompleteExtra() {
-    var aWin = getAnalysisWindow();
+    const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
         $(".grid-tag-deletable").click(tagClickHandler);
     }
 
     // We want to be able to right click to open full screen link new tab
     // but normal click does JS / load() call to open in the editor.
-    var variantLink = $('a.variant-link');
+    const variantLink = $('a.variant-link');
     variantLink.on("contextmenu", setFullscreenVariantLink);
     variantLink.on("mouseup", setFullscreenVariantLink);
     variantLink.on('click', restoreVariantLink);
@@ -559,12 +582,12 @@ function gridCompleteExtra() {
 function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function) {
 	$(function () {
     	$.getJSON(config_url, function(data) {
-			var errors = data["errors"];
-    		if (errors) {
+            const errors = data["errors"];
+            if (errors) {
 				on_error_function(errors);
     		} else {
-				var postData = data["postData"] || {};
-				// TODO: From issue #1041 6/6/2018 - remove this when nodes config cache expires in 1 week. 
+                const postData = data["postData"] || {};
+                // TODO: From issue #1041 6/6/2018 - remove this when nodes config cache expires in 1 week.
                 if (typeof postData["node_id"] == "undefined") {
                     postData["node_id"] = nodeId;
                 }
@@ -574,16 +597,16 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
 				data["serializeGridData"] = deleteNdParam;
 				data["shrinkToFit"] = false;
 
-				var pagerId = '#pager-' + nodeId;
-				data["pager"] = pagerId;
+                const pagerId = '#pager-' + nodeId;
+                data["pager"] = pagerId;
 				data["gridComplete"] = function() {
 				    gridComplete();
 				    gridCompleteExtra();
 				};
 				data["loadError"] = gridLoadError;
-	
-			    var grid = getGrid(nodeId, unique_code);
-			    grid.jqGrid(data).navGrid(pagerId,
+
+                const grid = getGrid(nodeId, unique_code);
+                grid.jqGrid(data).navGrid(pagerId,
 	                	{add: false, edit: false, del: false, view: false, search:false},
 			       		{}, // edit options
 			        	{}, // add options
@@ -621,15 +644,15 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
 }
 
 function gridLoadError(jqXHR, textStatus, errorThrown) {
-    var errorMessage = errorThrown;
-    var rj = jqXHR.responseJSON;
+    let errorMessage = errorThrown;
+    const rj = jqXHR.responseJSON;
     if (rj) {
         if (rj.message) {
             errorMessage = rj.message;
         }
     }
 
-    var ec = $("#error-container");
+    const ec = $("#error-container");
     ec.empty();
     ec.html("<ul class='messages'><li class='error'>Grid failed to load due to: " + errorMessage + "</li></ul>");
     $("#node-data-container").empty();

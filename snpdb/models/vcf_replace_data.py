@@ -97,7 +97,7 @@ def vcf_replace_data(old_vcf, new_vcf):
             pedigree.save()
 
             for cspfr in pedigree.cohortsamplepedfilerecord_set.all():
-                cspfr.cohort_sample = new_for_old_cohort_sample[cnzf.cohort_sample]
+                cspfr.cohort_sample = new_for_old_cohort_sample[cspfr.cohort_sample]
                 cspfr.save()
 
         for trio in old_cohort.trio_set.all():

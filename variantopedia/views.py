@@ -8,36 +8,44 @@ from celery.task.control import inspect  # @UnresolvedImport
 from django.conf import settings
 from django.contrib import messages
 from django.db.models import Q
+from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
+from django.views.decorators.http import require_POST
 
+from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import Analysis
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import Event, create_event
+from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk
 from library.enums.log_level import LogLevel
 from library.git import Git
+from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, log_traceback
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele
+from snpdb.clingen_allele import link_allele_to_existing_variants
+from snpdb.liftover import create_liftover_pipelines
+from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
+    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings, UserPageAck
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
+from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs
 from variantopedia.search import search_data, SearchResults
-from variantopedia.variant_column_utils import get_columns_qs, get_variant_annotation_data
 
 
 def variants(request):
@@ -193,12 +201,19 @@ def server_status(request):
         highest_variant_annotated["message"] = str(e)
 
     sample_enrichment_kits_df = get_sample_enrichment_kits_df()
+    disk_messages = get_disk_messages(info_messages=True)
+    disk_free = {"status": "info", "messages": []}
+    for status, message in disk_messages:
+        if status == "warning":
+            disk_free["status"] = "warning"
+        disk_free["messages"].append(message)
 
     dashboard_notices = get_dashboard_notices(request.user)
     context = {"celery_workers": celery_workers,
                "can_access_reference": can_access_reference,
                "redis_status": redis_status,
                "redis_message": redis_message,
+               "disk_free": disk_free,
                "highest_variant_annotated": highest_variant_annotated,
                "sample_enrichment_kits_df": sample_enrichment_kits_df,
                "dashboard_notices": dashboard_notices}
@@ -243,15 +258,11 @@ def view_variant_annotation_history(request, variant_id):
 
     annotation_versions = []
     variant_annotation_by_version = {}
-    av_qs = AnnotationVersion.objects.filter(variant_annotation_version__variantannotation__variant=variant)
-    for annotation_version in av_qs.order_by("pk"):
-        annotation_versions.append((annotation_version.pk, str(annotation_version)))
+    for va in variant.variantannotation_set.order_by("version"):
+        annotation_versions.append((va.version.pk, str(va.version)))
 
-        columns_qs = get_columns_qs()
-        variant_data = get_variant_annotation_data(variant, annotation_version, columns_qs)
-        variant_dict = {t[0]: t[2] for t in variant_data}
-        del variant_dict["variant"]
-        variant_annotation_by_version[annotation_version.pk] = variant_dict
+        va_dict = model_to_dict(va, exclude=["id", "variant_id"])
+        variant_annotation_by_version[va.version.pk] = va_dict
 
     context = {"variant": variant,
                "annotation_versions": annotation_versions,
@@ -268,7 +279,6 @@ def search(request):
         form = forms.SearchForm(request.GET)
 
     user_settings = UserSettings.get_for_user(request.user)
-    default_genome_build = user_settings.default_genome_build
 
     search_results: Optional[SearchResults] = None
     if form.is_valid() and form.cleaned_data['search']:
@@ -276,7 +286,7 @@ def search(request):
         classify = form.cleaned_data.get('classify')
         try:
             search_results = search_data(request.user, search_string, classify)
-            results, search_types, search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
+            results, _search_types, _search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
             details = f"'{search_string}' calculated {len(results)} results."
             create_event(request.user, 'search', details=details)
 
@@ -325,6 +335,8 @@ def view_allele_from_variant(request, variant_id):
 
 def view_allele(request, pk):
     allele: Allele = get_object_or_404(Allele, pk=pk)
+    link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+
     latest_classifications = ClassificationModification.latest_for_user(
         user=request.user,
         allele=allele,
@@ -339,6 +351,18 @@ def view_allele(request, pk):
                "classifications": latest_classifications,
                "annotated_builds": GenomeBuild.builds_with_annotation()}
     return render(request, "variantopedia/view_allele.html", context)
+
+
+@require_POST
+def create_variant_for_allele(request, allele_id, genome_build_name):
+    """ Shortcut to create manual variant, but as a POST """
+    allele = get_object_or_404(Allele, pk=allele_id)
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
+    if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
+        allele_source = VariantAlleleSource.objects.create(variant_allele=variant_allele)
+        create_liftover_pipelines(admin_bot(), allele_source, ImportSource.WEB, variant_allele.genome_build, [genome_build])
+    return redirect(allele)
 
 
 def variant_details(request, variant_id, template='variant_details.html', extra_context: dict = None):
@@ -371,6 +395,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                                        extra_context: dict = None):
     """ Main Variant Details page """
     variant = get_object_or_404(Variant, pk=variant_id)
+    g_hgvs = HGVSMatcher.static_variant_to_g_hgvs(variant)
     annotation_version = None
     latest_annotation_version = None
     variant_annotation = None
@@ -379,7 +404,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     genes_canonical_transcripts = None
     num_clinvar_citations = 0
     clinvar_citations = None
-    num_annotation_versions = AnnotationVersion.objects.filter(variant_annotation_version__variantannotation__variant=variant).count()
+    num_variant_annotation_versions = variant.variantannotation_set.count()
 
     latest_classifications = ClassificationModification.latest_for_user(
         user=request.user,
@@ -418,7 +443,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                 pass
 
             if clinvar:
-                clinvar_citations = [{'idx':c.citation_id, 'db': c.get_citation_source_display()} for c in clinvar.get_citations()]
+                clinvar_citations = [{'idx': c.citation_id, 'db': c.get_citation_source_display()} for c in clinvar.get_citations()]
                 num_clinvar_citations = len(clinvar_citations)
         except:  # May not have been annotated?
             log_traceback()
@@ -438,6 +463,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     except VariantAllele.DoesNotExist:
         variant_allele_data = None
 
+    variant_tags = VariantTag.get_for_build(variant.genome_build, variant_qs=variant.equivalent_variants)
+
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
         "annotation_version": annotation_version,
@@ -445,9 +472,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "classifications": latest_classifications,
         "clinvar": clinvar,
         "genes_canonical_transcripts": genes_canonical_transcripts,
+        "g_hgvs": g_hgvs,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
-        "num_annotation_versions": num_annotation_versions,
+        "num_variant_annotation_versions": num_variant_annotation_versions,
         "num_clinvar_citations": num_clinvar_citations,
         "clinvar_citations": clinvar_citations,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
@@ -455,6 +483,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        "variant_tags": variant_tags,
         "vts": vts,
     }
     if extra_context:

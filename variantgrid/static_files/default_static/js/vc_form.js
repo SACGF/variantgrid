@@ -67,6 +67,20 @@ const VCForm = (function() {
         messages: [],
         delayedPatch: {},
 
+        isEditMode() {
+            return this.record.can_write && window.location.toString().indexOf("edit=true") !== -1;
+        },
+
+        editMode() {
+            let url;
+            if (document.location.toString().indexOf('?') !== -1) {
+                url = document.location.toString() + "&edit=true";
+            } else {
+                url = document.location.toString() + "?edit=true";
+            }
+            window.open(url, '_self');
+        },
+
         clear() {
             let res = confirm('Are you sure you wish to clear the form data?');
             if (res) {
@@ -127,7 +141,7 @@ const VCForm = (function() {
             this.updateCitations();
             this.updateTitle();
             
-            if (!this.record.can_write || this.alwaysAsterix) {
+            if (!this.isEditMode() || this.alwaysAsterix) {
                 this.searchAsterix();
             } else {
                 /*
@@ -399,7 +413,7 @@ const VCForm = (function() {
                 ).addClass('list-group-item').addClass('list-group-item-action').appendTo(publishUL);
             }
 
-            if (this.record.can_write) {
+            if (this.isEditMode()) {
                 jShareButtons.find('[title]').tooltip('hide').tooltip('dispose');
                 jShareButtons.empty();
                 
@@ -730,6 +744,10 @@ const VCForm = (function() {
             }
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Clin Sig');
+
+            if (this.record.can_write && !this.isEditMode()) {
+                $('<button>', {class:"mt-2 btn btn-primary w-100", html:`<i class=\"fas fa-unlock-alt\"></i> EDIT`, click:this.editMode}).appendTo(jSyncStatus);
+            }
         },
 
         alleleVariantData() {
@@ -781,7 +799,7 @@ const VCForm = (function() {
                 
                 let immutableDiv = visualElement.siblings('.immutable');
                 if (immutable) {
-                    if (!vcform.record.can_write) {
+                    if (!vcform.isEditMode()) {
                         visualElement.parent().addClass('entry-readonly');
                     }
                     visualElement.hide();
@@ -862,7 +880,7 @@ const VCForm = (function() {
         },
 
         immutable(key) {
-            if (!this.record.can_write || this.record.withdrawn) {
+            if (!this.isEditMode() || this.record.withdrawn) {
                 return true;
             }
             let blob = this.data[key] || {};
@@ -947,7 +965,7 @@ const VCForm = (function() {
                 noteDom.popover('dispose');
                 noteDom.removeClass('fas');
                 noteDom.addClass('far');
-                if (!this.record.can_write) {
+                if (!this.isEditMode()) {
                     noteDom.addClass('d-none');
                 }
             }
@@ -1084,7 +1102,7 @@ const VCForm = (function() {
                 let scrollMe = $('.main-content');
                 let scroll = scrollMe.scrollTop();
                 scrollMe.scrollTop(scroll - event.originalEvent.wheelDeltaY);
-                return true;
+                return false;
             });
         },
 
@@ -1211,6 +1229,7 @@ const VCForm = (function() {
             let explain = this.explain(key);
             let refs = this.refs(key);
             let eKey = eKeys.key(key);
+            let immutable = this.immutable(key);
 
             jHelp.closest('.card').find('.card-title').text(eKey.label);
             jHelp.empty();
@@ -1260,7 +1279,7 @@ const VCForm = (function() {
                     $('<div>', {class: "my-1"}).append($('<label>', {text: 'Version: '}), $('<span>').html(eKey.version))
                 );
             }
-            if (eKey.examples) {
+            if (eKey.examples && !immutable) {
                 eKey.examples.forEach(example => {
                     content.append(
                         $('<div>', {class: "my-1"}).append($('<label>', {class:'mr-2', text: 'Example: '}), $('<span>').html(example))
@@ -1310,7 +1329,7 @@ const VCForm = (function() {
         },
         
         promptNote: function(key) {
-            if (!this.record.can_write || this.record.withdrawn) {
+            if (!this.isEditMode() || this.record.withdrawn) {
                 return;
             }
         
@@ -1365,9 +1384,15 @@ const VCForm = (function() {
             if (eKey.mandatory) {
                 label = '*' + label;
             }
-            let labelDom =  $('<div>', {class: 'col-4 text-right align-self-center', id: `label-${key}`, html:[
+            let labelDom =  $('<div>', {class: 'text-right align-self-center', id: `label-${key}`, html:[
                 $('<label>', {text: label})
             ]});
+            if (type === 'textarea') {
+                labelDom.addClass('col-12 mb-2');
+            } else {
+                labelDom.addClass('col-4');
+            }
+
             if (eKey.sub_label) {
                 labelDom.append($('<div>', {class: 'text-info', text: eKey.sub_label}));
             }

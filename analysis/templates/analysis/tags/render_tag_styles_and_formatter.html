@@ -5,13 +5,12 @@
     }
     
     {% render_rgb_css 'tagged-' user_tag_styles %}
-
 </style>
 <script>
     $(document).ready(function() {
         jQuery.extend($.fn.fmatter , {
             formatVariantTag : function(cellValue, options, rowObject) {
-                var variantId = rowObject["variant__id"];
+                let variantId = rowObject["variant__id"];
                 return getVariantTagHtml(variantId, cellValue);
             },
         {% if url_name_visible.analysis %}

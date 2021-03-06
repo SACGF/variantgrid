@@ -9,7 +9,6 @@ import json
 from functools import total_ordering
 
 from celery.result import AsyncResult
-from collections import defaultdict
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.cache import cache
@@ -20,7 +19,6 @@ from django.db.models.aggregates import Min, Count
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.timesince import timesince
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy

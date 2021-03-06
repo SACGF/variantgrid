@@ -1,0 +1,140 @@
+{% extends "uicore/page/base.html" %}
+{% load datatable_tags %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load english_tags %}
+{% load js_tags %}
+{% block title %}Clinvar Export{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        .term-cell {
+            width: 200px;
+        }
+        .relevance-cell {
+            width: 250px;
+        }
+        .relevance-cell div + div {
+            margin-top: 0.5rem;
+        }
+        .description-cell {
+            white-space: pre-line;
+            overflow-wrap: break-word;
+        }
+        /* need to do this for checkboxes inside tabs */
+        td {
+            position: relative;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <form method="POST" id="clinvar_form">
+        {% csrf_token %}
+        <input type="hidden" name="terms" />
+        <input type="hidden" name="multimode" />
+        <input type="hidden" name="apply" />
+    </form>
+    <div class="container">
+        <a href="{% url 'clinvar_exports' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all ClinVar Exports</a>
+        <h3>ClinVar Export</h3>
+        {% page_help_embedded title='ClinVar Export' %}
+            <p>
+            Help will go here for exporting to Clinvar
+            </p>
+        {% end_page_help_embedded %}
+
+        <div class="modal fade" id="saveModal" tabindex="-1" aria-labelledby="saveModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="saveModalLabel">Save</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                Apply condition terms to:
+
+                  <div class="list-group mt-2">
+                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="record" class="mr-2" checked>To this record only</label>
+                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="gene_symbol" class="mr-2">As default for records with condition text "<span class="text-muted">{{ clinvar_export.condition_text_normal }}</span>" and Gene {{ clinvar_export.gene_symbol }}
+                      <div class="text-muted">{% count same_text_gene_vcs singular="1 other existing ClinVar Export" plural="other existing ClinVar Exports" %}</div>
+                      </label>
+                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="text" class="mr-2">As default for records with condition text "<span class="text-muted">{{ clinvar_export.condition_text_normal }}</span>"
+                      <div class="text-muted">{% count same_text_vcs singular="1 other existing ClinVar Export" plural="other existing ClinVar Exports" %}</div>
+                      </label>
+                  </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submit()">Apply Changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Summary</div>
+            <div class="card-body">
+                {% labelled label="Genome Build" %}{{ clinvar_export.genome_build }}{% endlabelled %}
+                {% labelled label="c.hgvs" %}{{ clinvar_export.c_hgvs }}{% endlabelled %}
+                {% labelled label="Source Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
+                {% labelled label="Curated" %}{{ clinvar_export.curated_date }}{% endlabelled %}
+                {% labelled label="Clinical Significance" %}{{ clinvar_export.clinical_significance }}{% endlabelled %}
+                {% labelled label="Submit" %}
+                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                        <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="true" {% if not clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Under Review</label>
+                        <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="false" {% if clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Auto-Submit When Ready</label>
+                    </div>
+                {% endlabelled %}
+            </div>
+            <div class="card-footer">
+                <btn class="btn btn-primary" data-toggle="modal" data-target="#saveModal">Save</btn>
+            </div>
+        </div>
+        {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
+            {% labelled label="Allele Origin" %}{{ clinvar_export.allele_origin }}{% endlabelled %}
+            {% labelled label="Affected Status" %}{{ clinvar_export.affected_status }}{% endlabelled %}
+            {% comment %}TODO format intepretations summary with new lines{% endcomment %}
+            {% labelled label="Interpretation Summary" class="formatted-text"%}<div class="formatted-text">{{ clinvar_export.interpretation_summary }}</div>{% endlabelled %}
+            {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
+            {% labelled label="Assertion Method" %}{{ clinvar_export.assertion_method }}{% endlabelled %}
+            {% labelled label="Condition Text" %}{{ clinvar_export.condition }}{% endlabelled %}
+            {% labelled label="Condition Terms" %}
+                {% if condition_text_match %}
+                    <div class="pills">
+                    {% for ontology in condition_text_match.resolve_condition_xrefs.condition_xrefs %}
+                        {% ontology_meta ontology %}
+                    {% endfor %}
+                    </div>
+                    <a class="btn btn-outline-primary" target="_blank" href="{% url 'condition_matching' pk=condition_text_match.condition_text.pk %}"><i class="fas fa-edit"></i></a>
+                {% else %}
+                    <span class="text-danger">No condition matching found for this classification</span>
+                {% endif %}
+            {% endlabelled %}
+            {% labelled label="Curation Context" %}{{ clinvar_export.curation_context }}{% endlabelled %}
+            {% labelled label="Citations" %}
+                <div class="pills">
+                {% for ref_data in clinvar_export.citation_refs %}
+                    {% db_ref data=ref_data %}
+                {% endfor %}
+                </div>
+            {% endlabelled %}
+            <h4>Export Preview</h4>
+            <p class="text-muted">This is how the data will be submitted to ClinVar</p>
+            <div class="code formatted-text" id="submission_json">
+            {"TODO":"TODO"}
+            </div>
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded label="Submission History" tab_set="clinvar_tabs" %}
+            Submission is not yet implemented.
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_render_tabs tab_set="clinvar_tabs" %}
+    </div>
+{% endblock %}

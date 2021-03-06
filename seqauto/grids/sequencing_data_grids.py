@@ -40,8 +40,7 @@ class ExperimentsListGrid(JqGridUserRowConfig):
 class SequencingRunListGrid(JqGridUserRowConfig):
     model = SequencingRun
     caption = 'SequencingRuns'
-    fields = ["name", "sequencer__sequencer_model__model", "sequencer__name",
-              "sequencingruncurrentsamplesheet__sample_sheet__illuminaflowcellqc__data_state",
+    fields = ["name", "ready", "sequencer__sequencer_model__model", "sequencer__name",
               "experiment__name",
               "enrichment_kit",
               "enrichment_kit__name",
@@ -52,12 +51,11 @@ class SequencingRunListGrid(JqGridUserRowConfig):
               "vcffromsequencingrun__vcf",
               "vcffromsequencingrun__vcf__import_status",
               "path"]
-    colmodel_overrides = {'name': {'width': 150, 'formatter': 'viewSequencingRunLink'},
-                          'sequencer__name': {'width': 40, 'label': 'Sequencer'},
-                          'sequencer__sequencer_model__model': {'width': 50, 'label': 'Model'},
-                          "sequencingruncurrentsamplesheet__sample_sheet__illuminaflowcellqc__data_state": {'label': 'QC Loaded',
-                                                                                                             'width': 20},
-                          'experiment__name': {'label': 'Experiment', 'width': 60},
+    colmodel_overrides = {'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
+                          "ready": {'formatter': 'formatSequencingRunReady'},
+                          'sequencer__name': {'width': 60, 'label': 'Sequencer'},
+                          'sequencer__sequencer_model__model': {'width': 70, 'label': 'Model'},
+                          'experiment__name': {'label': 'Experiment', 'width': 120},
                           "enrichment_kit": {"hidden": True},
                           "enrichment_kit__name": {"label": "EnrichmentKit"},
                           "enrichment_kit__version": {"label": "Kit version", 'width': 20},
@@ -65,8 +63,8 @@ class SequencingRunListGrid(JqGridUserRowConfig):
                           "hidden": {'label': 'Hidden', 'width': 20, 'formatter': 'showHiddenIcon'},
                           "bad": {'label': 'Bad', 'width': 20, 'formatter': 'showBadIcon'},
                           "vcffromsequencingrun__vcf": {'label': 'VCF',
-                                                         'formatter': 'viewVCFLink',
-                                                         'width': 20},
+                                                        'formatter': 'viewVCFLink',
+                                                        'width': 20},
                           "vcffromsequencingrun__vcf__import_status": {'hidden': True}}
 
     def __init__(self, user, **kwargs):
@@ -80,13 +78,6 @@ class SequencingRunListGrid(JqGridUserRowConfig):
                 queryset = queryset.filter(enrichment_kit_id=enrichment_kit_id)
 
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if not user_grid_config.show_incomplete_data:
-            queryset = queryset.filter(data_state=DataState.COMPLETE)
-            queryset = queryset.filter(sequencingruncurrentsamplesheet__sample_sheet__illuminaflowcellqc__data_state=DataState.COMPLETE)
-
-            read_sample_sheet_ids = SampleSheet.objects.filter(sequencingsample__fastq__data_state=DataState.COMPLETE).values_list("pk", flat=True).distinct()
-            queryset = queryset.filter(sequencingruncurrentsamplesheet__sample_sheet__in=read_sample_sheet_ids)
-
         if not user_grid_config.show_hidden_data:
             queryset = queryset.filter(hidden=False)
 

@@ -283,7 +283,10 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "classification_import_tool": True,
     "keycloak_admin": True,
     "classification_import_upload": True,
-    "condition_aliases": True
+    "condition_aliases": True,
+    "clinvar_exports": True,
+    "condition_matchings": True,
+    "condition_match_test": True
 })
 
 # mimic shariant
@@ -302,3 +305,4 @@ SITE_MESSAGE = "This is the setting site message"
 VARIANT_CLASSIFICATION_MATCH_VARIANTS = False
 
 PREFER_ALLELE_LINKS = True
+PANEL_APP_CHECK_ENABLED = True

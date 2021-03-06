@@ -40,7 +40,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 MIDDLEWARE += (
-    'mozilla_django_oidc.middleware.SessionRefresh',
+    'auth.session_refresh.VariantGridSessionRefresh',
     'auth.oidc_error_handler.HandleOIDC400Middleware',
 )
 
@@ -180,6 +180,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "download_uploaded_file": False,
 
     "classification_import_upload": True,
+    "condition_matchings": True,
+    "condition_match_test": True
     # "condition_aliases": True
 })
 
@@ -205,3 +207,5 @@ VIEW_GENE_SHOW_HOTSPOT_GRAPH = False
 
 LIFTOVER_NCBI_REMAP_ENABLED = True
 LIFTOVER_NCBI_REMAP_USE_PERLBREW = True
+
+PANEL_APP_CHECK_ENABLED = True

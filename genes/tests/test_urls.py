@@ -1,9 +1,10 @@
 import json
+import uuid
 
 from django.contrib.auth.models import User
 import unittest
 
-from annotation.fake_annotation import get_fake_annotation_version, create_fake_gene_annotation
+from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import CachedWebResource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, GeneCoverage, GeneList, PanelAppPanel, \
@@ -24,8 +25,7 @@ class Test(URLTestCase):
         cls.user_owner = User.objects.get_or_create(username='testuser')[0]
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        annotation_version = get_fake_annotation_version(cls.grch37)
-        create_fake_gene_annotation(annotation_version.ensembl_gene_annotation_version)
+        get_fake_annotation_version(cls.grch37)
 
         trio = create_fake_trio(cls.user_owner, cls.grch37)
         cls.cohort = trio.cohort
@@ -87,15 +87,14 @@ class Test(URLTestCase):
                                                                   user=cls.user_owner,
                                                                   import_status=ImportStatus.SUCCESS)[0]
 
-        cwr = CachedWebResource.objects.get_or_create(name="Fake PanelAppPanels", import_status=ImportStatus.SUCCESS)[0]
+        _ = CachedWebResource.objects.get_or_create(name="Fake PanelAppPanels", import_status=ImportStatus.SUCCESS)[0]
 
         server = PanelAppServer.objects.order_by("pk").first()
         cls.panel_app_panel = PanelAppPanel.objects.get_or_create(server=server,
                                                                   panel_id=42,
-                                                                  cached_web_resource=cwr,
                                                                   disease_group='Tumour syndromes',
                                                                   disease_sub_group='Tumour syndromes',
-                                                                  name='Blah blah blah',
+                                                                  name=uuid.uuid4(),
                                                                   current_version='1.20')[0]
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
@@ -108,10 +107,6 @@ class Test(URLTestCase):
             ('category_gene_list_autocomplete', cls.gene_list, {"q": cls.gene_list.name}),
             ('gene_list_autocomplete', cls.gene_list, {"q": cls.gene_list.name}),
         ]
-
-        gene_list_id_list = "/".join([str(cls.gene_list.pk)])
-        coverage_kwargs = {"gene_coverage_collection_id": cls.gene_coverage_collection.pk,
-                           "gene_list_id_list": gene_list_id_list}
 
         cls.PRIVATE_GRID_LIST_URLS = [
             ("gene_lists_grid", {"gene_list_category_id": cls.gene_list_category.pk}, cls.gene_list_w_category),
@@ -142,7 +137,6 @@ class Test(URLTestCase):
             ("genome_build_genes", {"genome_build_name": self.grch37.name}, 200),
             ("view_gene", {"gene_id": self.gene.pk}, 200),
             ("view_gene_symbol", gene_symbol_kwargs, 200),
-            ("view_gene_annotation_history", {"genome_build_name": self.grch37.name, "gene_symbol": self.gene_symbol}, 200),
             ("view_transcript", {"transcript_id": self.transcript.pk}, 200),
             ("view_transcript_version", {"transcript_id": self.transcript_version.transcript_id,
                                          "version": self.transcript_version.version}, 200),

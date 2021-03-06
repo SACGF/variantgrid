@@ -22,12 +22,12 @@
 <script>
 
 function deleteSelectedRows() {
-	rowIds = [];
+	let rowIds = [];
 
 	$("input.sample-select").each(function() {
 		if ($(this).is(":checked")) {
-			var rowId = $(this).attr("sample_id");
-			rowIds.push(rowId);
+            const rowId = $(this).attr("sample_id");
+            rowIds.push(rowId);
 		}
 	});
 

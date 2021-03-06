@@ -16,7 +16,6 @@ from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
-from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
@@ -25,28 +24,17 @@ from annotation.external_search_terms import get_variant_search_terms, get_varia
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
-    TranscriptStatus, GenomicStrand, ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
+    ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
     VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
-from annotation.models.models_mim_hpo import MIMMorbid, HPOSynonym, MIMMorbidAlias
-from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
+from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease, UniProt
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
+from ontology.models import OntologyTerm, OntologyImport
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
-
-
-class MIMGene(models.Model):
-    mim_morbid = models.ForeignKey(MIMMorbid, on_delete=CASCADE)
-    gene = models.ForeignKey(Gene, on_delete=CASCADE)
-
-    class Meta:
-        unique_together = ("mim_morbid", "gene")
-
-    def __str__(self):
-        return f"{self.mim_morbid}: {self.gene}"
 
 
 class SubVersionPartition(RelatedModelsPartitionModel):
@@ -123,8 +111,10 @@ class ClinVar(models.Model):
     clinvar_allele_id = models.IntegerField()
     clinvar_preferred_disease_name = models.TextField(null=True, blank=True)
     clinvar_disease_database_name = models.TextField(null=True, blank=True)
-    clinvar_review_status = models.CharField(max_length=1, choices=ClinVarReviewStatus.choices)
-    clinical_significance = models.TextField(null=True, blank=True)  # Multiple values of above
+    clinvar_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
+    clinical_significance = models.TextField(null=True, blank=True)
+    # If clinical_significance = 'Conflicting_interpretations_of_pathogenicity'
+    conflicting_clinical_significance = models.TextField(null=True, blank=True)
     highest_pathogenicity = models.IntegerField(default=0)  # Highest of clinical_significance
     clinvar_clinical_sources = models.TextField(null=True, blank=True)
     clinvar_origin = models.IntegerField(default=0)
@@ -175,6 +165,8 @@ class Citation(models.Model):
     @staticmethod
     def citations_from_text(text):
         """ returns a list of (unsaved) Citation objects from text """
+        # TODO replace with code from dbregexes
+
         citation_source_codes = dict({k.lower(): v for k, v in CitationSource.CODES.items()})
         regex_pattern = r"(%s):\s*(\d+)" % '|'.join(citation_source_codes)
         pattern = re.compile(regex_pattern, flags=re.IGNORECASE)  # @UndefinedVariable
@@ -225,80 +217,37 @@ class CachedCitation(TimeStampedModel):
         return record
 
 
-class EnsemblGeneAnnotationVersion(SubVersionPartition):
-    RECORDS_BASE_TABLE_NAMES = ["annotation_ensemblgeneannotation"]
-    filename = models.TextField()
-    md5_hash = models.CharField(max_length=32)
-    ensembl_version = models.IntegerField()
-    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+class GeneAnnotationVersion(SubVersionPartition):
+    RECORDS_BASE_TABLE_NAMES = ["annotation_geneannotation"]
+    gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, on_delete=CASCADE)
+    last_ontology_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
+    gnomad_import_date = models.DateTimeField()
+
+    @property
+    def genome_build(self):
+        return self.gene_annotation_release.genome_build
 
 
-@receiver(pre_delete, sender=EnsemblGeneAnnotationVersion)
-def ensembl_gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):
+@receiver(pre_delete, sender=GeneAnnotationVersion)
+def gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):
     instance.delete_related_objects()
 
 
-class EnsemblGeneAnnotation(models.Model):
-    """ Populated from SACGF Gene Level Annotation (Frank Feng) """
-    version = models.ForeignKey(EnsemblGeneAnnotationVersion, on_delete=CASCADE)
+class GeneAnnotation(models.Model):
+    """ This is generated against genes found via GeneAnnotationRelease
+        so that data matches up in analyses """
+    version = models.ForeignKey(GeneAnnotationVersion, on_delete=CASCADE)
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
-    hgnc_symbol = models.TextField(null=True)
-    external_gene_name = models.TextField(null=True)
-    hgnc_symbol_lower = models.TextField(null=True)
-    hgnc_name = models.TextField(null=True)
-    synonyms = models.TextField(null=True)
-    previous_symbols = models.TextField(null=True)
-    hgnc_chromosome = models.TextField(null=True)
-    gene_family_tag = models.TextField(null=True)
-    gene_family_description = models.TextField(null=True)
-    hgnc_id = models.TextField(null=True)
-    entrez_gene_id = models.IntegerField(null=True)
-    uniprot_id = models.TextField(null=True)
-    ucsc_id = models.TextField(null=True)
-    omim_id = models.TextField(null=True)  # Can have multiple (comma sep)
-    enzyme_ids = models.TextField(null=True)
-    ccds_ids = models.TextField(null=True)
-    rgd_id = models.TextField(null=True)
-    mgi_id = models.TextField(null=True)
-    rvis_percentile = models.TextField(null=True)
-    refseq_gene_summary = models.TextField(null=True)
-    function_from_uniprotkb = models.TextField(null=True)
-    pathway_from_uniprotkb = models.TextField(null=True)
-    tissue_specificity_from_uniprotkb = models.TextField(null=True)
-    phenotypes_from_ensembl = models.TextField(null=True)
-    omim_phenotypes = models.TextField(null=True)
-    gene_biotype = models.TextField(null=True)
-    status = models.CharField(max_length=1, choices=TranscriptStatus.choices, null=True)
-    chromosome_name = models.TextField(null=True)
-    start_position = models.IntegerField(null=True)
-    end_position = models.IntegerField(null=True)
-    band = models.TextField(null=True)
-    strand = models.CharField(max_length=1, choices=GenomicStrand.choices, null=True)
-    percentage_gc_content = models.FloatField(null=True)
-    transcript_count = models.IntegerField(null=True)
-    in_cancer_gene_census = models.BooleanField(null=True)
+    hpo_terms = models.TextField(null=True)
+    omim_terms = models.TextField(null=True)
+    gnomad_oe_lof = models.FloatField(null=True)  # Copied from genes.GnomADGeneConstraint
 
     class Meta:
         unique_together = ("version", "gene")
 
     @staticmethod
-    def latest_qs():
-        latest_version = EnsemblGeneAnnotationVersion.objects.order_by("pk").last()
-        return EnsemblGeneAnnotation.objects.filter(version=latest_version)
-
-    @staticmethod
-    def get_for_symbol(genome_build: GenomeBuild, gene_symbol: GeneSymbol):
-        annotation_version = AnnotationVersion.latest(genome_build)
-        ega_qs = annotation_version.get_ensembl_gene_annotation()
-        ENSEMBL_ANNOTATION = [
-            Q(hgnc_symbol=gene_symbol),
-            Q(gene__in=gene_symbol.get_genes().filter(annotation_consortium=AnnotationConsortium.ENSEMBL)),
-        ]
-        gene_annotation = None
-        for q in ENSEMBL_ANNOTATION:
-            if gene_annotation := ega_qs.filter(q).first():
-                break
-        return gene_annotation
+    def get_for_gene_version(gene_version):
+        pass
 
 
 class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
@@ -330,7 +279,8 @@ class HumanProteinAtlasAnnotation(models.Model):
 class ColumnVEPField(models.Model):
     """ For VariantAnnotation/Transcript columns derived from VEP fields """
     column = models.TextField(unique=True)
-    variant_grid_column = models.OneToOneField(VariantGridColumn, null=True, on_delete=SET_NULL)
+    variant_grid_column = models.ForeignKey(VariantGridColumn, null=True, on_delete=SET_NULL)
+    genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
     category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
     source_field_processing_description = models.TextField(null=True)
@@ -351,8 +301,13 @@ class ColumnVEPField(models.Model):
         return vif
 
     @staticmethod
-    def get_source_fields(**columnvepfield_kwargs):
-        qs = ColumnVEPField.objects.filter(**columnvepfield_kwargs).distinct("source_field")
+    def filter_for_build(genome_build: GenomeBuild):
+        """ genome_build = NULL (no build) or matches provided build """
+        return ColumnVEPField.objects.filter(Q(genome_build=genome_build) | Q(genome_build__isnull=True))
+
+    @staticmethod
+    def get_source_fields(genome_build: GenomeBuild, **columnvepfield_kwargs):
+        qs = ColumnVEPField.filter_for_build(genome_build).filter(**columnvepfield_kwargs).distinct("source_field")
         return list(qs.values_list("source_field", flat=True).order_by("source_field"))
 
 
@@ -582,6 +537,14 @@ class AbstractVariantAnnotation(models.Model):
     class Meta:
         abstract = True
 
+    PATHOGENICITY_FIELDS = {
+        "fathmm_pred_most_damaging": FATHMMPrediction,
+        "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
+        "mutation_taster_pred_most_damaging": MutationTasterPrediction,
+        "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
+        "sift": SIFTPrediction,
+    }
+
     @property
     def transcript_accession(self):
         """ Get transcript_id (with version if possible) """
@@ -593,16 +556,8 @@ class AbstractVariantAnnotation(models.Model):
 
     @lazy
     def flagged_pathogenicity(self):
-        PATHOGENICITY_FIELDS = {
-            "fathmm_pred_most_damaging": FATHMMPrediction,
-            "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
-            "mutation_taster_pred_most_damaging": MutationTasterPrediction,
-            "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
-            "sift": SIFTPrediction,
-        }
-
         fp = {}
-        for f, klass in PATHOGENICITY_FIELDS.items():
+        for f, klass in self.PATHOGENICITY_FIELDS.items():
             level = getattr(self, f)
             fp[f] = klass.is_level_flagged(level)
         return fp
@@ -652,6 +607,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     af_1kg = models.FloatField(null=True, blank=True)
     af_uk10k = models.FloatField(null=True, blank=True)
     gnomad_af = models.FloatField(null=True, blank=True)
+    gnomad2_liftover_af = models.FloatField(null=True, blank=True)
+    gnomad_ac = models.IntegerField(null=True, blank=True)
+    gnomad_an = models.IntegerField(null=True, blank=True)
     gnomad_hom_alt = models.IntegerField(null=True, blank=True)
     gnomad_afr_af = models.FloatField(null=True, blank=True)
     gnomad_amr_af = models.FloatField(null=True, blank=True)
@@ -662,13 +620,15 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_oth_af = models.FloatField(null=True, blank=True)
     gnomad_sas_af = models.FloatField(null=True, blank=True)
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
+    gnomad_popmax_ac = models.IntegerField(null=True, blank=True)
+    gnomad_popmax_an = models.IntegerField(null=True, blank=True)
+    gnomad_popmax_hom_alt = models.IntegerField(null=True, blank=True)
     topmed_af = models.FloatField(null=True, blank=True)
     gnomad_filtered = models.BooleanField(null=True, blank=True)
     gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.choices, null=True, blank=True)
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
-    DBSCSNV_CUTOFF = 0.6
     dbscsnv_ada_score = models.FloatField(null=True, blank=True)
     dbscsnv_rf_score = models.FloatField(null=True, blank=True)
     cosmic_id = models.TextField(null=True, blank=True)  # COSV - Genomic Mutation ID
@@ -681,7 +641,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     mastermind_mmid3 = models.TextField(null=True, blank=True)  # gene:key for mastermind_count_3_aa_change
     # SpliceAI - @see https://pubmed.ncbi.nlm.nih.gov/30661751/
     # This has so many columns, perhaps a highest score and summary col of "AG: -5, AL: 35, DG: -5, DL: 17"
-    SPLICEAI_CUTOFF = 0.5  # 0.2 = high recal, 0.5 = recommended, 0.8 = high precision
+    # 0.2 = high recal, 0.5 = recommended, 0.8 = high precision
     spliceai_pred_dp_ag = models.IntegerField(null=True, blank=True)
     spliceai_pred_dp_al = models.IntegerField(null=True, blank=True)
     spliceai_pred_dp_dg = models.IntegerField(null=True, blank=True)
@@ -694,6 +654,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
     overlapping_symbols = models.TextField(null=True, blank=True)
 
     somatic = models.BooleanField(null=True, blank=True)
+    # Out of 2M records on my machine, 0.12% had multiple records, but linking just 1 is much simpler as it allows us
+    # to link through to UniProt via gene annotation for the columns on the analysis variant grid
+    # Just need to be aware that there may be multiple, and only 1st in list of VEP SWISSPROT is linked
+    uniprot = models.ForeignKey(UniProt, null=True, on_delete=SET_NULL)
     variant_class = models.CharField(max_length=2, choices=VariantClass.choices, null=True, blank=True)
     vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.choices, null=True, blank=True)
 
@@ -722,13 +686,25 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "DL": ("spliceai_pred_ds_dl", "spliceai_pred_dp_dl"),
     }
 
+    @lazy
+    def has_extended_gnomad_fields(self):
+        """ I grabbed a few new fields but haven't patched back to GRCh37 yet
+            TODO: remove this and if statements in variant_details.html once issue #231 is completed """
+        extended_fields = ["gnomad_ac", "gnomad_an", "gnomad_popmax_ac", "gnomad_popmax_an", "gnomad_popmax_hom_alt"]
+        return any(getattr(self, f) for f in extended_fields)
+
     @property
-    def gnomad_variant(self):
-        """ If you have gnomAD frequency - returns variant formatted as per 1-169519049-T-C """
+    def gnomad_url(self):
+        url = None
         if self.gnomad_af is not None:
             v = self.variant
-            return f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
-        return None
+            gnomad_variant = f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
+            url = f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}"
+            if self.version.genome_build == GenomeBuild.grch37():
+                url += "?dataset=gnomad_r2_1"
+            elif self.version.genome_build == GenomeBuild.grch38():
+                url += "?dataset=gnomad_r3"
+        return url
 
     @property
     def mastermind_url(self):
@@ -836,7 +812,7 @@ class ManualVariantEntry(models.Model):
 
     @staticmethod
     def get_entry_type(line: str) -> ManualVariantEntryType:
-        HGVS_MINIMAL_PATTERN = re.compile(r"[^:].+:(c|g|p)\..*\d+.*")
+        HGVS_MINIMAL_PATTERN = re.compile(r"[^:].+:[cgp]\..*\d+.*")
         MATCHERS = {
             DBSNP_PATTERN: ManualVariantEntryType.DBSNP,
             HGVS_MINIMAL_PATTERN: ManualVariantEntryType.HGVS,
@@ -861,13 +837,12 @@ class InvalidAnnotationVersionError(Exception):
 # We re-use this, if nobody has referenced it - as you may eg update
 # variant/gene/clinvar annotations every 6 months etc and no point having so many sub-versions
 class AnnotationVersion(models.Model):
-    SUB_ANNOTATIONS = ['variant_annotation_version', 'ensembl_gene_annotation_version', 'clinvar_version',
-                       'human_protein_atlas_version']
+    SUB_ANNOTATIONS = ['variant_annotation_version', 'gene_annotation_version', 'clinvar_version', 'human_protein_atlas_version']
 
     annotation_date = models.DateTimeField(auto_now=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, null=True, on_delete=PROTECT)
-    ensembl_gene_annotation_version = models.ForeignKey(EnsemblGeneAnnotationVersion, null=True, on_delete=PROTECT)
+    gene_annotation_version = models.ForeignKey(GeneAnnotationVersion, null=True, on_delete=PROTECT)
     clinvar_version = models.ForeignKey(ClinVarVersion, null=True, on_delete=PROTECT)
     human_protein_atlas_version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, null=True, on_delete=PROTECT)
 
@@ -904,6 +879,12 @@ class AnnotationVersion(models.Model):
             missing = ", ".join([str(s) for s in missing_sub_annotations])
             raise InvalidAnnotationVersionError(f"AnnotationVersion: {self} missing sub annotations: {missing}")
 
+        if vav_gar := self.variant_annotation_version.gene_annotation_release:
+            gene_gar = self.gene_annotation_version.gene_annotation_release
+            if vav_gar != gene_gar:
+                different_msg = f"GeneAnnotationRelease is different fro Variant {vav_gar.pk} vs Gene: {gene_gar.pk}"
+                raise InvalidAnnotationVersionError(different_msg)
+
     @staticmethod
     def latest(genome_build: GenomeBuild, validate=True):
         av: AnnotationVersion = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date").last()
@@ -921,8 +902,8 @@ class AnnotationVersion(models.Model):
         def latest(klass):
             return klass.objects.order_by('annotation_date').last()
 
-        def latest_for_build(klass, genome_build):
-            qs = klass.objects.filter(genome_build=genome_build)
+        def latest_for_build(klass, genome_build: GenomeBuild, genome_build_path: str = "genome_build"):
+            qs = klass.objects.filter(**{genome_build_path: genome_build})
             return qs.order_by('annotation_date').last()
 
         if sub_version_genome_build:
@@ -934,7 +915,7 @@ class AnnotationVersion(models.Model):
             kwargs = {
                 "genome_build": genome_build,
                 "variant_annotation_version": latest_for_build(VariantAnnotationVersion, genome_build),
-                "ensembl_gene_annotation_version": latest_for_build(EnsemblGeneAnnotationVersion, genome_build),
+                "gene_annotation_version": latest_for_build(GeneAnnotationVersion, genome_build, "gene_annotation_release__genome_build"),
                 "clinvar_version": latest_for_build(ClinVarVersion, genome_build),
                 "human_protein_atlas_version": latest(HumanProteinAtlasAnnotationVersion)
             }
@@ -960,8 +941,8 @@ class AnnotationVersion(models.Model):
     def get_variant_annotation(self):
         return VariantAnnotation.objects.filter(version=self.variant_annotation_version)
 
-    def get_ensembl_gene_annotation(self):
-        return EnsemblGeneAnnotation.objects.filter(version=self.ensembl_gene_annotation_version)
+    def get_gene_annotation(self):
+        return GeneAnnotation.objects.filter(version=self.gene_annotation_version)
 
     def get_clinvar(self):
         return ClinVar.objects.filter(version=self.clinvar_version)
@@ -972,7 +953,7 @@ class AnnotationVersion(models.Model):
     @property
     def long_description(self):
         sub_versions = [f"Variant: {self.variant_annotation_version}",
-                        f"Gene: {self.ensembl_gene_annotation_version}",
+                        f"Gene: {self.gene_annotation_version}",
                         f"ClinVar: {self.clinvar_version}",
                         f"HPA: {self.human_protein_atlas_version}"]
         sub_versions_str = ", ".join(sub_versions)
@@ -980,49 +961,6 @@ class AnnotationVersion(models.Model):
 
     def __str__(self):
         return f"{self.pk} ({self.annotation_date.date()})"
-
-
-class MonarchDiseaseOntology(models.Model):
-    # PK = Mondo ID
-    name = models.TextField()
-    definition = models.TextField(null=True)
-
-    # TODO: Mappings to all the other ontologies
-    # phenotype_mim = models.ForeignKey(MIMMorbid, on_delete=CASCADE)
-
-    @staticmethod
-    def mondo_id_as_int(mondo_text) -> int:
-        if isinstance(mondo_text, int):
-            return mondo_text
-        # MONDO:0005045 -> 0005045
-        return int(mondo_text.split(":")[1])
-
-    @property
-    def id_str(self) -> str:
-        return MonarchDiseaseOntology.mondo_int_as_id(self.id)
-
-    @staticmethod
-    def mondo_int_as_id(mondo_id: int) -> str:
-        num_part = str(mondo_id).rjust(7, '0')
-        return f"MONDO:{num_part}"
-
-
-class MonarchDiseaseOntologyGeneRelationship(models.Model):
-    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
-    relationship = models.TextField()
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-
-    class Meta:
-        unique_together = ('mondo', 'relationship', 'gene_symbol')
-
-
-class MonarchDiseaseOntologyMIMMorbid(models.Model):
-    mondo = models.ForeignKey(MonarchDiseaseOntology, on_delete=CASCADE)
-    relationship = models.TextField()
-    omim_id = models.IntegerField()  # could also link this to MIMMorbid records, but that gets out of date
-
-    class Meta:
-        unique_together = ('mondo', 'relationship', 'omim_id')
 
 
 class CachedWebResource(TimeStampedModel):
@@ -1054,14 +992,15 @@ class GeneDiseaseCurator(models.Model):
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     cached_web_resource = models.ForeignKey(CachedWebResource, null=True, on_delete=CASCADE)  # If from web
 
+    def __str__(self):
+        return self.name
+
 
 class DiseaseValidity(models.Model):
     gene_disease_curator = models.ForeignKey(GeneDiseaseCurator, on_delete=CASCADE)
     text_phenotype = models.TextField(blank=True)
     sop = models.TextField(blank=True)  # ClinGen Gene Clinical Validity SOP
-    mondo = models.ForeignKey(MonarchDiseaseOntology, null=True, on_delete=SET_NULL)
-    hpo_synonym = models.ForeignKey(HPOSynonym, null=True, on_delete=SET_NULL)
-    mim_morbid_alias = models.ForeignKey(MIMMorbidAlias, null=True, on_delete=SET_NULL)
+    ontology_term = models.ForeignKey(OntologyTerm, null=True, on_delete=SET_NULL)
     classification = models.CharField(max_length=1, choices=ClinGenClassification.choices)
     date = models.DateField(null=True)
     validity_summary_url = models.TextField()

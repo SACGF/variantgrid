@@ -211,6 +211,22 @@ a.list-group-item-action {
   height: 32px;
 }
 
+.btn-rnd-rect {
+  width: 40px;
+  height: 40px;
+  padding: 7px 8px 7px 12px;
+  border-radius: 15px;
+  text-align: center;
+}
+
+.btn-circle {
+  width: 50px;
+  height: 50px;
+  padding: 7px 8px 7px 12px;
+  border-radius: 25px;
+  text-align: center;
+}
+
 .accordion > .card {
   overflow: inherit;
 }
@@ -250,6 +266,21 @@ a {
   content: "";
   opacity: 0.6;
   margin-left: 4px;
+}
+
+.toggle-link:before {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  font-family: "FontAwesome";
+  content: "";
+  opacity: 0.6;
+  margin-right: 4px;
+}
+
+.toggle-link[aria-expanded=true]:before {
+  content: "";
 }
 
 .modal-header nav .breadcrumb {
@@ -418,6 +449,10 @@ div.background-image {
   display: none;
 }
 
+.toggle-link {
+  color: #88B;
+}
+
 .hover-detail {
   color: #446;
   text-decoration: none;
@@ -466,15 +501,14 @@ table.as_table td {
   pointer-events: none;
 }
 
-.hpo, .omim, .gene {
-  display: inline-block;
+.hp, .hpo, .omim, .gene {
   border: 3px solid white;
   margin: 0 4px 0 4px;
   border-radius: 3px;
   padding: 0 4px 0 4px;
 }
 
-.hpo {
+.hp, .hpo {
   background-color: #FF8C00;
   border-color: #FF8C00;
 }
@@ -512,6 +546,25 @@ table.as_table td {
   font-family: "FontAwesome";
   margin-right: 4px;
   content: "";
+}
+
+.list-group-small {
+  max-width: 300px;
+}
+
+.formatted-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.code {
+  font-family: monospace;
+  color: #444;
+  font-weight: 400;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 2px;
+  background-color: #eee;
 }
 
 /*# sourceMappingURL=global_bs.css.map */

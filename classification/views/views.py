@@ -1,18 +1,19 @@
 from datetime import datetime
 
 import rest_framework
-from crispy_forms.bootstrap import FieldWithButtons, StrictButton
-from crispy_forms.layout import Layout, Field, Button, Submit
+from crispy_forms.bootstrap import FieldWithButtons
+from crispy_forms.layout import Layout, Field, Submit
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
-from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.forms import formset_factory
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from jfu.http import upload_receive, UploadResponse, JFUResponse
 import json
@@ -50,7 +51,7 @@ from classification.classification_changes import ClassificationChanges
 from classification.views.classification_datatables import ClassificationDatatableConfig
 from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_redcap import ExportFormatterRedcap
-from variantopedia.forms import SearchForm, SearchAndClassifyForm
+from variantopedia.forms import SearchAndClassifyForm
 
 
 @user_passes_test(is_superuser)
@@ -167,8 +168,13 @@ class AutopopulateView(APIView):
         complete_values = sorted(complete_values, key=lambda entry: key_order(entry['key']))
         return rest_framework.response.Response(status=HTTP_200_OK, data={'data': complete_values})
 
+
 @require_POST
 def create_classification(request):
+    return redirect(create_classification_object(request).get_absolute_url() + "?edit=true")
+
+
+def create_classification_object(request) -> Classification:
     if not Classification.can_create_via_web_form(request.user):
         raise PermissionDenied('User cannot create classifications via web form')
 
@@ -223,7 +229,7 @@ def create_classification(request):
             make_patch_fields_immutable=False)
         classification.publish_latest(request.user)
 
-    return redirect(classification)
+    return classification
 
 
 def classification_history(request, record_id):
@@ -258,8 +264,10 @@ def view_classification(request, record_id):
     variant = ref.record.variant
     if variant:
         genome_build = variant.genome_build
+
     if genome_build is None:
-        genome_build = GenomeBuild.default_build()
+        user_settings = UserSettings.get_for_user(request.user)
+        genome_build = user_settings.default_genome_build
 
     vc: Classification = ref.record
 
@@ -465,34 +473,43 @@ def view_classification_file_attachment_thumbnail(request, pk):
     return view_classification_file_attachment(request, pk, thumbnail=True)
 
 
-def create_classification_for_variant(request, variant_id, transcript_id=None):
-    if not Classification.can_create_via_web_form(request.user):
-        raise PermissionDenied('User cannot create classifications via web form')
+class CreateClassificationForVariantView(TemplateView):
+    template_name = 'classification/create_classification_for_variant.html'
 
-    variant = Variant.objects.get(pk=variant_id)
-    if variant.is_reference:
-        msg = "We only classify variants - not reference alleles"
-        raise ValueError(msg)
+    def _get_variant(self):
+        return Variant.objects.get(pk=self.kwargs["variant_id"])
 
-    variant_sample_autocomplete_form = SampleChoiceForm()
-    variant_sample_autocomplete_form.fields['sample'].required = False
+    def _get_form_post_url(self):
+        return reverse("create_classification")
 
-    vts = VariantTranscriptSelections(variant,
-                                      variant.genome_build,
-                                      initial_transcript_id=transcript_id,
-                                      add_other_annotation_consortium_transcripts=True)
-    lab, lab_error = UserSettings.get_lab_and_error(request.user)
+    def _get_sample_form(self):
+        variant_sample_autocomplete_form = SampleChoiceForm()
+        variant_sample_autocomplete_form.fields['sample'].required = False
+        return variant_sample_autocomplete_form
 
-    consensus = ClassificationConsensus(variant, request.user)
+    def get_context_data(self, *args, **kwargs):
+        if not Classification.can_create_via_web_form(self.request.user):
+            raise PermissionDenied('User cannot create classifications via web form')
 
-    context = {'variant': variant,
-               'variant_sample_autocomplete_form': variant_sample_autocomplete_form,
-               "vts": vts,
-               "lab": lab,
-               "lab_error": lab_error,
-               "initially_require_sample": settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE,
-               "consensus": consensus}
-    return render(request, 'classification/create_classification_for_variant.html', context)
+        variant = self._get_variant()
+        if variant.is_reference:
+            msg = "We only classify variants - not reference alleles"
+            raise ValueError(msg)
+
+        vts = VariantTranscriptSelections(variant,
+                                          variant.genome_build,
+                                          add_other_annotation_consortium_transcripts=True)
+        lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
+
+        consensus = ClassificationConsensus(variant, self.request.user)
+        return {'variant': variant,
+                "form_post_url": self._get_form_post_url(),
+                'variant_sample_autocomplete_form': self._get_sample_form(),
+                "vts": vts,
+                "lab": lab,
+                "lab_error": lab_error,
+                "initially_require_sample": settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE,
+                "consensus": consensus}
 
 
 def create_classification_from_hgvs(request, genome_build_name, hgvs_string):

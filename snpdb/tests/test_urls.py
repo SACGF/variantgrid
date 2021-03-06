@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 import unittest
 
+from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -22,6 +23,7 @@ class Test(URLTestCase):
         super().setUpClass()
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(grch37)
 
         cls.user_owner = User.objects.get_or_create(username='testuser')[0]
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]

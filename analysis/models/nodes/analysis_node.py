@@ -8,10 +8,10 @@ from typing import Tuple, Sequence, List, Dict, Optional
 
 from celery.canvas import Signature
 from django.core.cache import cache
-from django.db import connection, models
+from django.db import connection, models, IntegrityError
 from django.db.models import Value, IntegerField
 from django.db.models.aggregates import Count
-from django.db.models.deletion import CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.dispatch import receiver
 from django.utils import timezone
@@ -21,15 +21,16 @@ from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from analysis.exceptions import NonFatalNodeError, NodeParentErrorsException, NodeConfigurationException, \
-    NodeParentNotReadyException
+    NodeParentNotReadyException, NodeNotFoundException
 from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeErrorSource, AnalysisTemplateType
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
-from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, ProcessingStatus, \
-    GenomeBuild
+from library.log_utils import report_event
+from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
+    ProcessingStatus, GenomeBuild, AlleleSource
 from snpdb.variant_collection import write_sql_to_variant_collection
 from classification.models import Classification, post_delete
 from variantgrid.celery import app
@@ -258,7 +259,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def get_single_parent_q(self):
         parent = self.get_single_parent()
-        return parent.get_q()
+        if parent.is_ready():
+            if parent.count == 0:
+                q = self.q_none()
+            else:
+                q = parent.get_q()
+        else:
+            # This should never happen...
+            raise ValueError("get_single_parent_q called when single parent not ready!!!")
+        return q
 
     def _get_annotation_kwargs_for_node(self) -> Dict:
         """ Override this method per-node.
@@ -483,10 +492,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_errors(self, include_parent_errors=True, flat=False):
         """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
         errors = []
-        try:
-            self.analysis.check_valid()
-        except ValueError as ve:
-            errors.append((NodeErrorSource.ANALYSIS, str(ve)))
+        for analysis_error in self.analysis.get_errors():
+            errors.append((NodeErrorSource.ANALYSIS, analysis_error))
+
         _, parent_errors = self.get_parents_and_errors()
         if include_parent_errors:
             errors.extend(parent_errors)
@@ -628,18 +636,26 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Override for optimisation """
 
         try:
-            parent = self.get_single_parent()
-            if parent.count == 0:
-                return 0  # True for all labels
+            if self.has_input():
+                parent_non_zero_label_counts = []
+                for parent in self.get_non_empty_parents():
+                    if parent.count != 0:  # count=0 has 0 for all labels
+                        parent_node_count = NodeCount.load_for_node(parent, label)
+                        if parent_node_count.count != 0:
+                            parent_non_zero_label_counts.append(parent_node_count.count)
 
-            parent_node_count = NodeCount.load_for_node(parent, label)
-            if parent_node_count.count == 0:
-                return 0
+                if not parent_non_zero_label_counts:
+                    # logging.info("all parents had 0 %s counts", label)
+                    return 0
 
-            if not self.modifies_parents():
-                return parent_node_count.count
-        except:
+                if not self.modifies_parents():
+                    if len(parent_non_zero_label_counts) == 1:
+                        # logging.info("Single parent, no modification, using that")
+                        return parent_non_zero_label_counts[0]
+        except NodeCount.DoesNotExist:
             pass
+        except Exception as e:
+            logging.warning("Trouble getting cached %s count: %s", label, e)
 
         return None
 
@@ -674,27 +690,28 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         node_version = NodeVersion.get(self)
         for label, count in label_counts.items():
-            NodeCount.objects.create(node_version=node_version,
-                                     label=label,
-                                     count=count)
-            logging.debug("saved... %r, %r, %r %r", self.pk, self.version, label, count)
+            NodeCount.objects.create(node_version=node_version, label=label, count=count)
 
         return NodeStatus.READY, label_counts[BuiltInFilters.TOTAL]
+
+    def _load(self):
+        """ Override to do anything interesting """
+        pass
 
     def load(self):
         """ load is called after parents are run """
         # logging.debug("node %d (%d) load()", self.id, self.version)
         start = time()
+        self._load()  # Do before counts in case it affects anything
         status, count = self.node_counts()
         logging.debug("node_counts returned (%s, %d)", status, count)
 
-        this = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
-        load_seconds = time() - start
-        this.update(status=status,
-                    count=count,
-                    celery_task=None,
-                    db_pid=None,
-                    load_seconds=load_seconds)
+        self.status = status
+        self.count = count
+        self.celery_task = None
+        self.db_pid = None
+        self.load_seconds = time() - start
+        self.save()  # Will re-calculate shadow colors etc based on status
 
     def add_parent(self, parent, *args, **kwargs):
         if not parent.visible:
@@ -719,7 +736,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         pass
 
     def save(self, **kwargs):
-        # print("save: pk=%s args=%s, kwargs=%s" % (self.pk, str(args), str(kwargs)))
+        # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
         super_save = super().save
 
         if self.parents_changed or self.ancestor_input_samples_changed:
@@ -755,7 +772,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         else:
             super_save(**kwargs)
 
-        # Modfiy our analyses last updated time
+        # Modify our analyses last updated time
         Analysis.objects.filter(pk=self.analysis.pk).update(modified=timezone.now())
 
     def set_node_task_and_status(self, celery_task, status):
@@ -830,6 +847,29 @@ class NodeWiki(Wiki):
         return self.node.analysis
 
 
+class AnalysisNodeAlleleSource(AlleleSource):
+    """ Used to link a nodes variants to alleleles and liftover to other builds """
+    node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)
+
+    def get_genome_build(self):
+        if self.node:
+            genome_build = self.node.analysis.genome_build
+        else:
+            genome_build = None
+        return genome_build
+
+    def get_variant_qs(self):
+        if self.node:
+            qs = self.node.get_subclass().get_queryset()
+        else:
+            qs = Variant.objects.none()
+        return qs
+
+    def liftover_complete(self, genome_build: GenomeBuild):
+        report_event('Completed AnalysisNode liftover',
+                     extra_data={'node_id': self.node_id, 'allele_count': self.get_allele_qs().count()})
+
+
 class NodeVersion(models.Model):
     """ This will be deleted once a node updates, so make all version specific caches cascade delete from this """
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
@@ -881,7 +921,10 @@ class NodeCount(models.Model):
 
     @staticmethod
     def load_for_node(node, label):
-        return NodeCount.objects.get(node_version=NodeVersion.get(node), label=label)
+        try:
+            return NodeCount.objects.get(node_version=NodeVersion.get(node), label=label)
+        except IntegrityError:
+            raise NodeNotFoundException(node.pk)
 
     def __str__(self):
         return f"NodeCount({self.node_version}, {self.label}) = {self.count}"

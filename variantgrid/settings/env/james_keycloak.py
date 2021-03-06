@@ -34,8 +34,8 @@ AUTHENTICATION_BACKENDS = (
 )
 
 MIDDLEWARE += (
-    'mozilla_django_oidc.middleware.SessionRefresh',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
+    'auth.session_refresh.VariantGridSessionRefresh',
+    # 'debug_toolbar.middleware.DebugToolbarMiddleware',
     'auth.oidc_error_handler.HandleOIDC400Middleware',
 )
 
@@ -311,3 +311,4 @@ VARIANT_VCF_DB_PREFIX = 'stv'
 PREFER_ALLELE_LINKS = True
 
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = False
+PANEL_APP_CHECK_ENABLED = True

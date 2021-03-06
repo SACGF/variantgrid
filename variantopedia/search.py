@@ -16,20 +16,20 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from annotation.models.models import AnnotationVersion
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias, \
-    gene_symbol_withdrawn_str
+from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
+from ontology.models import OntologyTerm
 from patients.models import ExternalPK, Patient
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
-from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, \
-    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, Allele
+from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
+    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
-from classification.models.classification import ClassificationModification, \
-    Classification, CreateNoClassificationForbidden
+from classification.models.classification import ClassificationModification, Classification, \
+    CreateNoClassificationForbidden
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
 
@@ -37,7 +37,7 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
 HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":(c|g|p)\..*\d+")
-
+ONTOLOGY_PATTERN = re.compile(r"\w+:\s*.*")
 
 class AbstractMetaVariant:
 
@@ -274,7 +274,8 @@ class Searcher:
             (SearchTypes.TRANSCRIPT, r"^(ENST|NM_)\d+\.?\d*$", search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
-            (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org)
+            (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org),
+            (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology)
         ]
 
         exclude_search_types = set()
@@ -327,8 +328,17 @@ class Searcher:
         searches: List[Any]
         results = SearchResults(genome_build_preferred=genome_build)
         if genome_build:
-            variant_qs = get_visible_variants(self.user, genome_build)
-            searches = self.genome_build_searches
+            try:
+                variant_qs = get_visible_variants(self.user, genome_build)
+                searches = self.genome_build_searches
+            except Exception as e:
+                report_exc_info(extra_data={
+                    'search_string': self.search_string,
+                    'classify': self.classify,
+                    'genome_build_id': genome_build.name if genome_build else None
+                })
+                results.append_error(("variants", e, genome_build))
+                return results
         else:
             variant_qs = None
             searches = self.genome_agnostic_searches
@@ -420,10 +430,17 @@ def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: Que
 def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
     # itertools.chain doesn't work
     # only return a GeneSymbol alias if we're not returning the source GeneSymbol
-    gene_symbols = list(GeneSymbol.objects.filter(symbol__iexact=search_string).exclude(symbol__endswith=gene_symbol_withdrawn_str))
+    gene_symbols = list(GeneSymbol.objects.filter(symbol__iexact=search_string))
     gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
     aliases = [alias for alias in GeneSymbolAlias.objects.filter(alias__iexact=search_string).all() if alias.alias not in gene_symbol_strs]
     return gene_symbols + aliases
+
+
+def search_ontology(search_string: str, **kwargs) -> Optional[SearchResult]:
+    try:
+        return [SearchResult(OntologyTerm.get_or_stub(search_string))]
+    except:
+        return []
 
 
 def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
@@ -465,6 +482,8 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         hgvs_string = search_string
         try:
             variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
+        except Contig.ContigNotInBuildError:
+            return None  # g.HGVS from another genome build
         except (InvalidHGVSName, NotImplementedError) as original_error:
             original_hgvs_string = hgvs_string
             try:

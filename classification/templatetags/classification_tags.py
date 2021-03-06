@@ -8,14 +8,15 @@ from typing import Union, Optional
 
 from django.utils.safestring import mark_safe
 
-from snpdb.models import VariantAllele
-from snpdb.models.models_genome import GenomeBuild
+from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from snpdb.models import VariantAllele, AlleleConversionTool
+from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
-from snpdb.models.models_variant import Allele, Variant
+from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS
+from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceReportClassification
@@ -28,6 +29,13 @@ from classification.templatetags.js_tags import jsonify
 
 register = Library()
 
+@register.inclusion_tag("classification/tags/condition_match.html")
+def condition_match(condition_match: ConditionTextMatch, indent=0):
+    return {
+        "condition_match": condition_match,
+        "indent": indent + 1,
+        "indent_px": (indent + 1) * 16 + 8
+    }
 
 @register.filter
 def ekey(val, key: str = None):
@@ -292,12 +300,30 @@ def variant_card(context, allele: Allele, build: GenomeBuild):
     va: VariantAllele = allele.variant_alleles().filter(genome_build=build).first()
     liftover_error_qs = allele.liftovererror_set.filter(liftover__genome_build=build)
 
+    unfinished_liftover = None
+    can_create_variant = False
+    if va is None:
+        unfinished_liftover = VariantAlleleSource.get_liftover_for_allele(allele, build)
+        if unfinished_liftover is None:
+            try:
+                check_can_create_variants(request.user)
+                try:
+                    conversion_tool, _ = allele.get_liftover_variant_tuple(build)
+                    can_create_variant = conversion_tool == AlleleConversionTool.CLINGEN_ALLELE_REGISTRY
+                except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
+                    pass
+            except CreateManualVariantForbidden:
+                pass
+
     return {
         "user": request.user,
+        "allele": allele,
+        "unfinished_liftover": unfinished_liftover,
         "genome_build": build,
         "variant_allele": va,
-        "can_create_classification": can_create_classification,
         "liftover_error_qs": liftover_error_qs,
+        "can_create_classification": can_create_classification,
+        "can_create_variant": can_create_variant,
     }
 
 
@@ -305,3 +331,10 @@ def variant_card(context, allele: Allele, build: GenomeBuild):
 def quick_link_data(variant: Variant):
     data = variant_link_info(variant)
     return jsonify(data)
+
+
+@register.inclusion_tag("classification/tags/db_ref.html")
+def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
+    context = dict(data)
+    context['css'] = css
+    return context

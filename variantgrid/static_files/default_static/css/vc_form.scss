@@ -178,6 +178,10 @@ table.diff {
     }
 }
 
+.immutable-textarea {
+    white-space: pre-wrap;
+}
+
 .submission-source {
     display: inline-block;
     width: 18px !important;
@@ -315,7 +319,7 @@ table.diff {
     display: flex;
     flex-wrap: wrap;
     flex-direction: column;
-    height: 100%;
+    height: calc(100% - 70px);
     width: 610px;
 
     .card {

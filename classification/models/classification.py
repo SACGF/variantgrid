@@ -100,6 +100,9 @@ class ClassificationImportAlleleSource(AlleleSource):
     """ A model to indicate that variants need to be linked to an allele and lifted over to other builds """
     classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
 
+    def get_genome_build(self):
+        return self.classification_import.genome_build
+
     def get_allele_qs(self):
         variants_qs = self.classification_import.get_variants_qs()
         return Allele.objects.filter(variantallele__variant__in=variants_qs)
@@ -119,14 +122,14 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     git_hash = models.TextField()
 
+    def get_genome_build(self):
+        return self.genome_build
+
     def get_variants_qs(self):
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, classification__isnull=False)
-
-    def get_allele_qs(self):
-        return Allele.objects.filter(variantallele__variant__in=self.get_variants_qs())
 
     def liftover_complete(self, genome_build: GenomeBuild):
         Classification.bulk_update_cached_c_hgvs()
@@ -664,7 +667,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if option.get('default'):
                     return option
                 continue
-            elif not isinstance(check_value, str):
+            if not isinstance(check_value, str):
                 check_value = str(check_value)
 
             aliases = []
@@ -845,7 +848,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    if not value.startswith("http"): # this makes beautiful soap angry thinking we're asking it to go to the URL
+                    if not value.startswith("http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
                         value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
@@ -1069,7 +1072,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence), evidence_keys=self.evidence_keys)  # make a deep copy so we don't accidentally mutate the data
-        patch = VCDataDict(data=EvidenceMixin.to_patch(patch), evidence_keys=self.evidence_keys) # the patch we're going to apply ontop of the evidence
+        patch = VCDataDict(data=EvidenceMixin.to_patch(patch), evidence_keys=self.evidence_keys)  # the patch we're going to apply ontop of the evidence
 
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
@@ -1397,9 +1400,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
         return self.lab.group_name + '/' + patient_id
 
-    def as_json(self,
-                params: ClassificationJsonParams) -> dict:
-
+    def as_json(self, params: ClassificationJsonParams) -> dict:
         current_user = params.current_user
         include_data = params.include_data
         version = params.version
@@ -1963,7 +1964,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     def latest_for_user(cls,
                         user: User,
                         classification: Optional[Classification] = None,
-                        variant: Optional[Union[Variant, List[Variant]]] = None,
+                        variant: Optional[Union[Variant, Iterable[Variant]]] = None,
                         allele: Allele = None,
                         published: bool = None,
                         clinical_context: Optional['ClinicalContext'] = None,

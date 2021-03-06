@@ -1,9 +1,11 @@
 from collections import Counter
 from collections import defaultdict
 from django.contrib.postgres.aggregates.general import StringAgg
+from django.db.models import Q
 from lazy import lazy
 
-from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_HPO_PATH, PATIENT_OMIM_PATH
+from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_ONTOLOGY_TERM_PATH
+from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
 from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection
@@ -18,8 +20,10 @@ class VariantSampleInformation:
         values_qs = self._cohort_genotype_to_sample_genotypes(values_qs)
 
         self.variant = variant
-        self.num_samples = Sample.objects.count()
-        self.user_sample_ids = set(Sample.filter_for_user(user).values_list("pk", flat=True))
+        self.genome_build = variant.genome_build
+        self.num_samples = Sample.objects.filter(vcf__genome_build=self.genome_build).count()
+        visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build=self.genome_build)
+        self.user_sample_ids = set(visible_samples_qs.values_list("pk", flat=True))
         self.num_user_samples = len(self.user_sample_ids)
 
         locus_counter = defaultdict(Counter)
@@ -106,8 +110,11 @@ class VariantSampleInformation:
             cgc = CohortGenotypeCollection.objects.get(pk=cgc_id)
             samples_qs = cgc.cohort.get_samples()
 
-            annotation_kwargs = {"patient_phenotype": StringAgg("patient__" + PATIENT_HPO_PATH + "__name", '|', distinct=True),
-                                 "patient_omim": StringAgg("patient__" + PATIENT_OMIM_PATH + "__description", '|', distinct=True)}
+            ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__name"
+            q_hpo = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
+            q_omim = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
+            annotation_kwargs = {"patient_hpo": StringAgg(ontology_path, '|', filter=q_hpo, distinct=True),
+                                 "patient_omim": StringAgg(ontology_path, '|', filter=q_omim, distinct=True)}
             samples_qs = samples_qs.annotate(**annotation_kwargs)
 
             COPY_SAMPLE_FIELDS = ["id", "name", "patient", SAMPLE_ENRICHMENT_KIT_PATH]

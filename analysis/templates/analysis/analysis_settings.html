@@ -103,7 +103,7 @@
                                 <th>{% if analysis_lock.locked %}Locked{% else %}Unlocked{% endif %}</th>
                                 <td>{{ analysis_lock.user }}</td>
                                 <td>{{ analysis_lock.date|localtime }} ({{ analysis_lock.date|timesince }} ago)</td>
-                            </td>
+                            </tr>
                         {% endfor %}
                     </table>
                 {% end_ui_register_tab_embedded %}

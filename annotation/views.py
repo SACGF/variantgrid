@@ -14,7 +14,6 @@ from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-from global_login_required import login_not_required
 import os
 
 from htmlmin.decorators import not_minified_response
@@ -23,22 +22,20 @@ from annotation.annotation_versions import get_variant_annotation_version
 from annotation.citations import get_citations, CitationDetails
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    EnsemblGeneAnnotationVersion, EnsemblGeneAnnotationVersionDiff, VariantAnnotationVersionDiff, MIMGene
-from annotation.models.models import ClinVarCitation, CachedCitation, MonarchDiseaseOntology, \
-    CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation
+    VariantAnnotationVersionDiff
+from annotation.models.models import ClinVarCitation, CachedCitation, \
+    CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation, ColumnVEPField
 from annotation.models.models_enums import AnnotationStatus, CitationSource
-from annotation.models.models_mim_hpo import MIMMorbid, MIMMorbidAlias, \
-    HumanPhenotypeOntology, PhenotypeMIM, HPOSynonym
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
-from genes.models import GeneListCategory, HGNCGeneNames, GeneAnnotationImport, \
-    GeneVersion, TranscriptVersion, GeneSymbolAlias
+from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
-from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF
+from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyTermRelation
+from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
 
 
 def get_build_contigs():
@@ -119,9 +116,8 @@ def _get_build_annotation_details(build_contigs, genome_build):
             if gene_annotation_release := av.variant_annotation_version.gene_annotation_release:
                 annotation_details["gene_annotation_release"] = str(gene_annotation_release)
 
-        ensembl_counts = av.get_ensembl_gene_annotation().count()
-        if ensembl_counts:
-            annotation_details["gene_level_annotation"] = f"{ensembl_counts} gene level annotations."
+        if gene_annotation_counts := av.get_gene_annotation().count():
+            annotation_details["gene_level_annotation"] = f"{gene_annotation_counts} gene annotations."
 
         clinvar_counts = av.get_clinvar().count()
         if clinvar_counts:
@@ -129,7 +125,7 @@ def _get_build_annotation_details(build_contigs, genome_build):
 
         clinvar_counts = av.get_clinvar().count()
         annotation_sub_components = [reference_ok, genes_and_transcripts, gene_annotation_release,
-                                     ensembl_counts, clinvar_counts]
+                                     gene_annotation_counts, clinvar_counts]
         if settings.SOMALIER.get("enabled"):
             somalier_cfg = SomalierConfig()
             try:
@@ -148,11 +144,6 @@ def _get_build_annotation_details(build_contigs, genome_build):
 def annotation(request):
     # Set Variables to None for uninstalled components, the template will show installation instructions
     ensembl_biomart_transcript_genes = None
-    hpa_counts_annotation = None
-    mim_import = None
-    human_phenotype_ontology_import = None
-    mondo_import = None
-    hgnc_gene_symbols_import = None
     diagnostic_gene_list = None
 
     build_contigs = get_build_contigs()
@@ -169,26 +160,30 @@ def annotation(request):
     if gene_symbol_alias_counts:
         gene_symbol_alias_counts = {GeneSymbolAliasSource(k).label: v for k, v in gene_symbol_alias_counts.items()}
 
-    mim_counts = MIMMorbid.objects.all().count()
-    mim_alias_counts = MIMMorbidAlias.objects.all().count()
-    mim_gene_counts = MIMGene.objects.count()
+    all_ontologies_accounted_for = True
+    ontology_counts = list()
+    for service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]:
+        # don't report HGNC as it's just there as a stub for other items to relate to
+        count = OntologyTerm.objects.filter(ontology_service=service).count()
+        ontology_counts.append({"service": service, "count": count})
 
-    if all([mim_counts, mim_alias_counts, mim_gene_counts]):
-        mim_import = f"MIM records: {mim_counts}, Aliases: {mim_alias_counts}, Genes: {mim_gene_counts}"
+    ontology_services = [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]
+    ontology_relationship_counts = dict()
+    for first_index, first_service in enumerate(ontology_services):
+        for second_service in ontology_services[first_index:]:
+            join_count = OntologyTermRelation.objects.filter(source_term__ontology_service=first_service, dest_term__ontology_service=second_service).count()
+            if first_service != second_service:
+                reverse_count = OntologyTermRelation.objects.filter(source_term__ontology_service=second_service, dest_term__ontology_service=first_service).count()
+                join_count += reverse_count
+            ontology_relationship_counts[f"{first_service}{second_service}"] = join_count
+            ontology_relationship_counts[f"{second_service}{first_service}"] = join_count
 
-    hpo_count = HumanPhenotypeOntology.objects.count()  # @UndefinedVariable
-    hpo_synonym_count = HPOSynonym.objects.count()
-    hpo_phenotype_count = PhenotypeMIM.objects.count()
-    if hpo_count and hpo_synonym_count and hpo_phenotype_count:
-        human_phenotype_ontology_import = f"{hpo_count} HPO terms ({hpo_synonym_count} synonyms)"
-
-    mondo_count = MonarchDiseaseOntology.objects.all().count()
-    if mondo_count:
-        mondo_import = f"Monarch Disease Ontology: {mondo_count} records."
-
-    hgnc_gene_names_count = HGNCGeneNames.objects.all().count()
-    if hgnc_gene_names_count:
-        hgnc_gene_symbols_import = f"{hgnc_gene_names_count} HGNC Gene Names"
+    ontology_imports = list()
+    for context in ["mondo_file", "gencc_file", "hpo_file", "omim_file", "biomart_omim_aliases", "phenotype_to_genes"]:
+        last_import = OntologyImport.objects.filter(context=context).order_by('-created').first()
+        if not last_import and context != "omim_file":  # don't complain about omim_file not being imported as not available to environments without license
+            all_ontologies_accounted_for = False
+        ontology_imports.append({"context": context, "last_import": last_import})
 
     diagnostic = GeneListCategory.objects.get(name='Diagnostic')
     diagnostic_gene_list_count = diagnostic.genelist_set.all().count()
@@ -202,8 +197,6 @@ def annotation(request):
 
     hpa_version = HumanProteinAtlasAnnotationVersion.objects.order_by("-annotation_date").first()
     hpa_counts = HumanProteinAtlasAnnotation.objects.filter(version=hpa_version).count()
-    if hpa_counts:
-        hpa_counts_annotation = f"{hpa_counts} HPA entries"
 
     somalier = None
     if somalier_enabled := settings.SOMALIER.get("enabled"):
@@ -211,12 +204,9 @@ def annotation(request):
 
     # These are empty/None if not set.
     annotations_ok = [all(builds_ok),
+                      all_ontologies_accounted_for,
                       clinvar_citations,
-                      hpa_counts_annotation,
-                      mim_import,
-                      human_phenotype_ontology_import,
-                      mondo_import,
-                      hgnc_gene_symbols_import]
+                      hpa_counts > 0]
     if somalier_enabled:
         annotations_ok.append(somalier)
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header
@@ -229,14 +219,14 @@ def annotation(request):
     context = {"annotations_all_imported": annotations_all_imported,
                "genome_build_annotations": genome_build_annotations,
                "ensembl_biomart_transcript_genes": ensembl_biomart_transcript_genes,
-               "mim_import": mim_import,
-               "human_phenotype_ontology_import": human_phenotype_ontology_import,
-               "mondo_import": mondo_import,
-               "hgnc_gene_symbols_import": hgnc_gene_symbols_import,
+               "ontology_services": ontology_services,
+               "ontology_counts": ontology_counts,
+               "ontology_relationship_counts": ontology_relationship_counts,
+               "ontology_imports": ontology_imports,
                "gene_symbol_alias_counts": gene_symbol_alias_counts,
                "diagnostic_gene_list": diagnostic_gene_list,
                "clinvar_citations": clinvar_citations,
-               "hpa_counts_annotation": hpa_counts_annotation,
+               "hpa_counts": hpa_counts,
                "num_annotation_columns": VariantGridColumn.objects.count(),
                "cached_web_resources": cached_web_resources,
                "python_command": settings.PYTHON_COMMAND,
@@ -305,8 +295,7 @@ def version_diffs(request):
 
         return data
 
-    VERSION_LEVELS = [('Gene', EnsemblGeneAnnotationVersion, EnsemblGeneAnnotationVersionDiff),
-                      ('Variant', VariantAnnotationVersion, VariantAnnotationVersionDiff)]
+    VERSION_LEVELS = [('Variant', VariantAnnotationVersion, VariantAnnotationVersionDiff)]
 
     version_levels = []
     for name, version_klass, version_diff_klass in VERSION_LEVELS:
@@ -389,16 +378,28 @@ def retry_annotation_run_upload(request, annotation_run_id):
     return retry_annotation_run(request, annotation_run_id, upload_only=True)
 
 
-@login_not_required
 @cache_page(WEEK_SECS)
 @vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
-def view_annotation_descriptions(request):
+def view_annotation_descriptions(request, genome_build_name=None):
+    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     variantgrid_columns_by_annotation_level = defaultdict(list)
+    vep_annotation_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
+    columns_and_vep_by_annotation_level = defaultdict(dict)
 
-    for vac in VariantGridColumn.objects.all().order_by("grid_column_name"):
-        variantgrid_columns_by_annotation_level[vac.annotation_level].append(vac)
+    vep_qs = ColumnVEPField.filter_for_build(genome_build)
+    for vgc in VariantGridColumn.objects.all().order_by("grid_column_name"):
+        if vgc.annotation_level in vep_annotation_levels:
+            # For Transcript/Variant that use VEP - only show if visible in that build
+            if vep := vep_qs.filter(variant_grid_column=vgc).first():
+                columns_and_vep_by_annotation_level[vgc.annotation_level][vgc] = vep
+        else:
+            variantgrid_columns_by_annotation_level[vgc.annotation_level].append(vgc)
 
-    context = {"variantgrid_columns_by_annotation_level": variantgrid_columns_by_annotation_level}
+    context = {
+        "genome_build": genome_build,
+        "variantgrid_columns_by_annotation_level": variantgrid_columns_by_annotation_level,
+        "columns_and_vep_by_annotation_level": columns_and_vep_by_annotation_level
+    }
     return render(request, "annotation/view_annotation_descriptions.html", context)
 
 

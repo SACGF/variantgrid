@@ -7,7 +7,7 @@ from typing import List, Union, Match, Dict, Optional
 from annotation.models.models import Citation
 from annotation.models.models_enums import CitationSource
 from library.log_utils import report_message
-from classification.external_database_ref_lookup import externalDatabaseRefLookupInstance
+from ontology.models import OntologyService, OntologyTerm
 
 
 class MatchType(Enum):
@@ -47,6 +47,10 @@ class DbRefRegex:
         self.expected_length = expected_length
         self._all_db_ref_regexes.append(self)
 
+    def link_for(self, idx: int) -> str:
+        id_str = self.fix_id(str(idx))
+        return self.link.replace("${1}", id_str)
+
     def fix_id(self, id_str: str) -> str:
         if self.expected_length:
             id_str = id_str.rjust(self.expected_length, '0')
@@ -58,12 +62,14 @@ class DbRegexes:
     CLINVAR = DbRefRegex(db="Clinvar", prefixes="VariationID", link="https://www.ncbi.nlm.nih.gov/clinvar/variation/${1}")
     COSMIC = DbRefRegex(db="COSMIC", prefixes="COSM", link="https://cancer.sanger.ac.uk/cosmic/mutation/overview?id=${1}")
     GTR = DbRefRegex(db="GTR", prefixes="GTR", link="https://www.ncbi.nlm.nih.gov/gtr/tests/${1}/overview/")
-    HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link="https://hpo.jax.org/app/browse/term/HP:${1}")
+    HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link=OntologyService.URLS[OntologyService.HPO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HPO])
+    HGNC = DbRefRegex(db="HGNC", prefixes="HGNC", link=OntologyService.URLS[OntologyService.HGNC], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HGNC])
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
-    MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link="https://vm-monitor.monarchinitiative.org/disease/MONDO:${1}", expected_length=7)
+    MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologyService.URLS[OntologyService.MONDO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.MONDO])
     NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
-    OMIM = DbRefRegex(db="OMIM", prefixes="OMIM", link="http://www.omim.org/entry/${1}")
+    # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
+    OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
     PMC = DbRefRegex(db="PMC", prefixes="PMCID", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}")
     PUBMED = DbRefRegex(db="PubMed", prefixes=["PubMed", "PMID", "PubMedCentral"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
@@ -82,15 +88,22 @@ class DbRefRegexResult:
         self.match = match
         self.internal_id = None
         self.summary = None
+
+        # this is where we check our database to see if we know what this reference is about
+        if self.db in OntologyService.VALID_ONTOLOGY_PREFIXES:
+            term_id = f"{self.db}:{self.idx}"
+            if term := OntologyTerm.objects.filter(id=term_id).first():
+                self.summary = term.name
         try:
-            # this is where we check our database to see if we know what this reference is about
-            self.summary = externalDatabaseRefLookupInstance.lookup(self.db, self.idx)
-            source = CitationSource.CODES.get(self.db)
-            if source:
+            if source := CitationSource.CODES.get(self.db):
                 citation, _ = Citation.objects.get_or_create(citation_source=source, citation_id=idx)
                 self.internal_id = citation.pk
         except:
-            report_message(message=f"Couldnt resolve external DB reference for {self.db}:{self.idx}")
+            report_message(message=f"Could not resolve external DB reference for {self.db}:{self.idx}")
+
+    @property
+    def id_fixed(self):
+        return f"{self.db}:{self.cregx.fix_id(self.idx)}"
 
     @property
     def url(self):

@@ -68,7 +68,7 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
         kwargs = self.get_annotation_kwargs()
         return qs.annotate(**kwargs), self.germline_counts_alias
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 

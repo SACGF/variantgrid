@@ -69,6 +69,7 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.predictions_num_benign, 3)
         self.assertTrue("COSV" in va.cosmic_id)
         self.assertTrue("COSM" in va.cosmic_legacy_id)
+        self.assertAlmostEqual(va.gnomad_af, 0.000145)
 
         va = VariantAnnotation.objects.get(variant_id=13638004)
         self.assertEqual(va.dbsnp_rs_id, "rs776172390")
@@ -98,6 +99,8 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.predictions_num_pathogenic, 2)
         self.assertEqual(va.predictions_num_benign, 3)
         self.assertEqual(va.cosmic_legacy_id, "COSM7286401")  # Test it has collapsed dupes
+        self.assertAlmostEqual(va.gnomad_af, 0.000354913)
+        self.assertEqual(va.gnomad_filtered, False)  # Test it converted FILTER properly to bool
 
         va = VariantAnnotation.objects.get(variant_id=42)
         self.assertEqual(va.dbsnp_rs_id, "rs776172390")

@@ -1,23 +1,29 @@
 {% extends menu_settings_base %}
 
-{% block title %}Settings{% endblock %}
+{% block title %}VariantGrid Custom Columns{% endblock %}
 
-{% block css %}
+{% block submenu_page_content %}
+<style>
 	.sort_placeholder {height: 15px; border: red 3px solid;}
 	.list_placeholder { font-weight: bolder; }
-	.columns-list { margin: 5px; float: left;}
+	.columns-list {
+		margin: 5px; float: left;
+		width: 40%;
+		height: 100%;
+		border: 1px solid black;
+	}
 	.columns-list ul {
 		height: 100%;
 		list-style: none;
 	}
-	
+
 	div#columns-widget {
 		padding-top: 10px;
+		height: 100%;
 	}
 
 	#columns-widget li
 	{
-		width: 300px;
 		margin: 0;
 		padding: 5px;
 		margin-right: 10px;
@@ -31,7 +37,7 @@
 	#selected-column-name {
 		font-weight: bold;
 	}
-	
+
 	li.user-column .column-name {
 		font-weight: bold;
 	}
@@ -40,100 +46,131 @@
 	    content: ': ';
 	}
 
-    /* Don't allow people to move magic column! */ 
+    /* Don't allow people to move magic column! */
     li#variant {
         display: none;
-    } 
-{% endblock css %}
-
-{% block jshead %}
+    }
+</style>
+<script>
 	// .sortable('serialize') doesn't work with multiple underscores
 	function serialize_columns(select) {
-		var ids = [];
-		$(select + ' .user-column').each(function() { ids.push($(this).attr("id")) });
+        const ids = [];
+        $(select + ' .user-column').each(function() { ids.push($(this).attr("id")) });
 		return ids.toString();
 	}
 
 	function clear_custom_columns() {
-		var my_columns = $("#my_columns_sortable");
-		my_columns.find("li.user-column").appendTo("#available_columns_sortable");
+        const my_columns = $("#my_columns_sortable");
+        my_columns.find("li.user-column").appendTo("#available_columns_sortable");
 
-	    var widget = my_columns.sortable("widget");
-	    if (widget) {
+        const widget = my_columns.sortable("widget");
+        if (widget) {
 	    	widget.trigger("sortupdate");
 	    }
 	}
 
 	$(document).ready(function(){
+        $("button#change-name-button").click(function() {
+            let nameInput = $("#custom-columns-name");
+            let name = nameInput.val();
+            let msgBox = $("#save-name-message");
+            msgBox.empty();
+            nameInput.prop("disabled", true);
+            $.ajax({
+                type: "POST",
+		        data: "name=" + encodeURIComponent(name),
+		        url: "{{ request.path }}",
+                success: function() {
+		            nameInput.prop("disabled", false);
+		            msgBox.append(`<li class='alert-info'>Name saved successfully</li>`);
+                    msgBox.fadeIn().delay(2000).fadeOut(1000);
+                },
+                error: function() {
+		            msgBox.append(`<li class='error'>Could not save name</li>`);
+                }
+            });
+        });
+
+
 		$("#my_columns_sortable").sortable({
 		    items: "li.user-column",
 		    placeholder: "sort_placeholder",
 		    connectWith: '#available_columns_sortable',
 		}).bind("sortupdate", function(event, ui) {
-		        var result_my_columns = serialize_columns("#my_columns_sortable");
+            const result_my_columns = serialize_columns("#my_columns_sortable");
 
-		        $.ajax({
-		            type: "POST",
-		            data: 'columns=' + result_my_columns + '&my_columns=true',
-		            url: "{{ request.path }}",
-		        });
+            $.ajax({
+                type: "POST",
+		        data: 'columns=' + result_my_columns + '&my_columns=true',
+		        url: "{{ request.path }}",
+            });
 		}).disableSelection();
-		
-		
+
+
 		$("#available_columns_sortable").sortable({
 		    items: "li.user-column",
 		    placeholder: "sort_placeholder",
 		    connectWith: '#my_columns_sortable',
 		}).disableSelection();
-		
-		// Set the height of both columns-list to be that of largest
-		var tallest = Math.max($("#my_columns").height(), $("#available_columns").height());
-		$(".columns-list").height(tallest);
-	});	
-{% endblock jshead %}
 
-{% block submenu_page_content %}
+		// Set the height of both columns-list to be that of largest
+        const tallest = Math.max($("#my_columns")[0].scrollHeight, $("#available_columns")[0].scrollHeight);
+        $(".columns-list").height(tallest);
+	});
+</script>
+
+
+<h3>Custom Columns</h3>
+
+<form id="custom-columns-form" method="post">
+    {% csrf_token %}
+    <label for="custom-columns-name">Name:</label>
+    <input id="custom-columns-name" size="50" value="{{ custom_columns.name }}" />
+    <button id='change-name-button' type="button" class="btn btn-primary">Change Name</button>
+    <ul id="save-name-message" class="messages">
+    </ul>
+</form>
 
 <div>
-	<h3>Customize Columns: {{ custom_columns.name }}</h3>
+	<table id="color-legend">
+	<tr><td><div class="color-box sample-column">&nbsp;</div>
+		<td><b>Sample Level</b> VCF sample/genotype information
+	<tr><td><div class="color-box transcript-column">&nbsp;</div>
+		<td><b>Transcript Level</b> Annotated at the variant level via VCF annotation process (different values per transcript)
+	<tr><td><div class="color-box variant-column">&nbsp;</div>
+		<td><b>Variant Level</b> Annotated at the variant level via VCF annotation process
+	<tr><td><div class="color-box database-column">&nbsp;</div>
+		<td><b>Database Level</b> Internal Database stats
+	<tr><td><div class="color-box gene-column">&nbsp;</div>
+		<td><b>Gene Level</b> Per-gene information, matched via gene associated with variant's assigned ensembl_transcript_id
+	<tr><td><div class="color-box hgnc-column">&nbsp;</div>
+		<td><b>HGNC</b> linked via gene (RefSeq/Ensembl assigns HGNC to their genes)
+	<tr><td><div class="color-box clinvar-column">&nbsp;</div>
+		<td><b>ClinVar</b> Clinical Variants
+	<tr><td><div class="color-box uniprot-column">&nbsp;</div>
+		<td><b>UniProt</b> UniProt linked via VEP "swissprot" call.
+	</table>
+</div>
 
-	<div>
-		<table id="color-legend">
-        <tr><td><div class="color-box sample-column">&nbsp;</div>
-            <td><b>Sample Level</b> VCF sample/genotype information 
-        <tr><td><div class="color-box transcript-column">&nbsp;</div>
-            <td><b>Transcript Level</b> Annotated at the variant level via VCF annotation process (different values per transcript) 
-		<tr><td><div class="color-box variant-column">&nbsp;</div>
-			<td><b>Variant Level</b> Annotated at the variant level via VCF annotation process
-        <tr><td><div class="color-box database-column">&nbsp;</div>
-            <td><b>Database Level</b> Internal Database stats 
-		<tr><td><div class="color-box gene-column">&nbsp;</div>
-			<td><b>Gene Level</b> Per-gene information, matched via gene associated with variant's assigned ensembl_transcript_id
-		<tr><td><div class="color-box clinvar-column">&nbsp;</div>
-			<td><b>ClinVar</b> Clinical Variants 
-		</table>
+{% load ui_help %}
+{% page_help 'settings/view_custom_columns_help' 'Custom Columns' show_title=False %}
+
+<div id="columns-widget">
+	<div id="my_columns" class="columns-list">
+		<ul id="my_columns_sortable">
+			<li id="active_placeholder" class="ui-state-disabled"><h2>My Columns</h2></li>
+			{% for column in my_columns_list %}
+				<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><div class="column-name">{{ column.pk }}</div><div class="column-description">{{ column.description | safe  }}</div></li>
+			{% endfor %}
+		</ul>
 	</div>
-
-    {% load ui_help %}
-    {% page_help 'settings/view_custom_columns_help' 'Custom Columns' %}
-
-	<div id="columns-widget">
-		<div id="my_columns" class="columns-list">
-			<ul id="my_columns_sortable">
-			    <li id="active_placeholder" class="ui-state-disabled"><h2>My Columns</h2></li>
-			    {% for column in my_columns_list %}
-				    <li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><span class="column-name">{{ column.pk }}</span><span class="column-description">{{ column.description | safe  }}</span></li>
-			    {% endfor %}
-			</ul>
-		</div>
-		<div id="available_columns" class="columns-list">
-			<ul id="available_columns_sortable">
-			    <li id="inactive_placeholder" class="ui-state-disabled"><h2>Available Columns</h2></li>
-			    {% for column in available_columns_list %}
-				    <li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><span class="column-name">{{ column.pk }}</span><span class="column-description">{{ column.description | safe }}</span></li>
-			    {% endfor %}
-			</ul>
-		</div>
+	<div id="available_columns" class="columns-list">
+		<ul id="available_columns_sortable">
+			<li id="inactive_placeholder" class="ui-state-disabled"><h2>Available Columns</h2></li>
+			{% for column in available_columns_list %}
+				<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}"><div class="column-name">{{ column.pk }}</div><div class="column-description">{{ column.description | safe }}</div></li>
+			{% endfor %}
+		</ul>
 	</div>
 </div>
 

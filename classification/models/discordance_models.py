@@ -13,13 +13,11 @@ from typing import Set, Optional, List
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from classification.enums import ClinicalSignificanceComparison
-from classification.enums.discordance_enums import DiscordanceReportResolution, \
-    ContinuedDiscordanceReason
+from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.enums.classification_enums import SpecialEKeys
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationModification, \
-    Classification
+from classification.models.classification import ClassificationModification, Classification
 
 
 class DiscordanceReport(TimeStampedModel):
@@ -38,6 +36,7 @@ class DiscordanceReport(TimeStampedModel):
     report_completed_date = models.DateTimeField(null=True, blank=True)
 
     cause_text = models.TextField(null=False, blank=True, default='')
+    resolved_text = models.TextField(null=False, blank=True, default='')
 
     def get_absolute_url(self):
         return reverse('discordance_report', kwargs={"report_id": self.pk})
@@ -57,7 +56,7 @@ class DiscordanceReport(TimeStampedModel):
         return ''
 
     @transaction.atomic
-    def close(self, expected_resolution: str = None):
+    def close(self, expected_resolution: Optional[str] = None, cause_text: Optional[str] = None):
         """
         @param expected_resolution this will be calculated, but if provided a ValueError will be raised if it doesn't match
         """
@@ -69,14 +68,15 @@ class DiscordanceReport(TimeStampedModel):
         if expected_resolution and expected_resolution != self.resolution:
             raise ValueError(f'Expected to close Discordance Report as {expected_resolution} but was {self.resolution}')
 
+        self.resolved_text = cause_text
         self.report_completed_date = datetime.now()
         self.save()
 
-        for drc in DiscordanceReportClassification.objects.filter(report=self):
+        for drc in DiscordanceReportClassification.objects.filter(report=self):  # type: DiscordanceReportClassification
             drc.close()
 
     @transaction.atomic
-    def update(self):
+    def update(self, cause_text: Optional[str] = None):
         if not self.is_active:
             raise ValueError('Cannot update non active Discordance Report')
 
@@ -101,7 +101,7 @@ class DiscordanceReport(TimeStampedModel):
 
         if not self.clinical_context.is_discordant():
             # hey we've reached concordance, let's close this
-            self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT)
+            self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
 
     @transaction.atomic
     def create_new_report(self, only_if_necessary: bool = True, cause: str = None):
@@ -147,7 +147,7 @@ class DiscordanceReport(TimeStampedModel):
         return False
 
     @staticmethod
-    def latest_report(clinical_context: ClinicalContext):
+    def latest_report(clinical_context: ClinicalContext) -> 'DiscordanceReport':
         return DiscordanceReport.objects.filter(clinical_context=clinical_context).order_by('-created').first()
 
     @staticmethod
@@ -155,7 +155,7 @@ class DiscordanceReport(TimeStampedModel):
         latest_report = DiscordanceReport.latest_report(clinical_context=clinical_context)
         if latest_report:
             if latest_report.is_active:
-                latest_report.update()
+                latest_report.update(cause_text=cause)
                 return latest_report
             if latest_report.resolution == DiscordanceReportResolution.CONCORDANT:
                 # most recent report ended with discordance, can start fresh
@@ -166,7 +166,7 @@ class DiscordanceReport(TimeStampedModel):
 
         if clinical_context.is_discordant():
             report = DiscordanceReport(clinical_context=clinical_context, cause_text=cause)
-            report.update()
+            report.update(cause_text=cause)
             return report
 
         # no report has been made
@@ -355,7 +355,6 @@ class DiscordanceReportClassification(TimeStampedModel):
 
         has_reclass_reason = False
         internal_reviewed = False
-        sig_change_date = None
 
         processed_flag = set()
         for flag_comment in relevant_comments_qs:  # : :type flag_comment: FlagComment

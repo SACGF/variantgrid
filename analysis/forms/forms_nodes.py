@@ -28,15 +28,16 @@ from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygo
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
-from annotation.models.models_mim_hpo import MIMMorbidAlias, HPOSynonym
+from annotation.models import VariantAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
-from genes.models import GeneListCategory, CustomTextGeneList, GeneList
+from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from library.forms import NumberInput
 from library.utils import md5sum_str
+from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, Company, ImportStatus, Sample, VCFFilter
+from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
@@ -192,8 +193,9 @@ class BuiltInFilterNodeForm(BaseNodeForm):
 
     class Meta:
         model = models.BuiltInFilterNode
-        fields = ("built_in_filter", "min_clinvar_stars")
-        widgets = {"min_clinvar_stars": Stars(stars=4)}
+        fields = ("built_in_filter", "clinvar_stars_min", "cosmic_count_min")
+        widgets = {"clinvar_stars_min": Stars(stars=4),
+                   "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1})}
 
 
 class ClassificationsNodeForm(BaseNodeForm):
@@ -271,9 +273,12 @@ class DamageNodeForm(BaseNodeForm):
         model = DamageNode
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {"accordion_panel": HiddenInput(),
+                   "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1}),
                    "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70}),
                    "revel_score_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
-                   "min_damage_predictions": HiddenInput(attrs={"min": 0, "max": len(DamageNode.DAMAGE_PREDICTION)})}
+                   "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
+                   "damage_predictions_min": HiddenInput(attrs={"min": 0,
+                                                                "max": len(VariantAnnotation.PATHOGENICITY_FIELDS)})}
 
 
 class ExpressionNodeForm(forms.Form):
@@ -313,26 +318,31 @@ class GeneListNodeForm(BaseNodeForm):
                                                widget=ModelSelect2Multiple(url='category_gene_list_autocomplete',
                                                                            attrs={'data-placeholder': 'Gene List...'},
                                                                            forward=(forward.Const(None, 'category'),)))
+    panel_app_panel_aus = forms.ModelMultipleChoiceField(required=False,
+                                                         queryset=PanelAppPanel.objects.all(),
+                                                         widget=autocomplete.ModelSelect2Multiple(url='panel_app_panel_aus_autocomplete',
+                                                                                                  attrs={'data-placeholder': 'Australian Genomics PanelApp panel...'}))
+
+    panel_app_panel_eng = forms.ModelMultipleChoiceField(required=False,
+                                                         queryset=PanelAppPanel.objects.all(),
+                                                         widget=autocomplete.ModelSelect2Multiple(url='panel_app_panel_eng_autocomplete',
+                                                                                                  attrs={'data-placeholder': 'Genomics England PanelApp panel...'}))
 
     class Meta:
         model = GeneListNode
-        fields = ("pathology_test_gene_list", "sample", "exclude", "accordion_panel")
+        fields = ("pathology_test_version", "sample", "exclude", "accordion_panel")
         widgets = {
-            "pathology_test_gene_list": autocomplete.ModelSelect2(url='category_gene_list_autocomplete',
-                                                                  attrs={'data-placeholder': 'Pathology Test...'}),
+            "pathology_test_version": autocomplete.ModelSelect2(url='pathology_test_version_autocomplete',
+                                                                attrs={'data-placeholder': 'Pathology Test...'},
+                                                                forward=(forward.Const(True, "active"),)),
             'accordion_panel': HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        path_test_field = self.fields["pathology_test_gene_list"]
-        company = Company.get_our_company()
-        if company:
-            forward_path_test = forward.Const(GeneListCategory.get_pathology_test_gene_category().pk, 'category')
-            path_test_field.widget.forward = [forward_path_test]
-        else:
-            path_test_field.disabled = True
+        samples_queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
+        self.fields['sample'].queryset = samples_queryset
 
     def save(self, commit=True):
         node = super().save(commit=False)
@@ -363,6 +373,13 @@ class GeneListNodeForm(BaseNodeForm):
         gl_set.all().delete()
         for gene_list in self.cleaned_data["gene_list"]:
             gl_set.create(gene_list=gene_list)
+
+        # PanelAppPanel app objects are the same
+        pap_set = node.genelistnodepanelapppanel_set
+        pap_set.all().delete()
+        for form_name in ["panel_app_panel_aus", "panel_app_panel_eng"]:
+            for pap in self.cleaned_data[form_name]:
+                pap_set.create(panel_app_panel=pap)
 
         if commit:
             node.save()
@@ -471,14 +488,14 @@ class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
 
 
 class PhenotypeNodeForm(BaseNodeForm):
-    mim_morbid_alias = forms.ModelMultipleChoiceField(required=False,
-                                                      queryset=MIMMorbidAlias.objects.all(),
-                                                      widget=ModelSelect2Multiple(url='mim_morbid_alias_autocomplete',
-                                                                                  attrs={'data-placeholder': 'OMIM term...'}))
-    hpo_synonym = forms.ModelMultipleChoiceField(required=False,
-                                                 queryset=HPOSynonym.objects.all(),
-                                                 widget=ModelSelect2Multiple(url='hpo_synonym_autocomplete',
-                                                                             attrs={'data-placeholder': 'Phenotype...'}))
+    omim = forms.ModelMultipleChoiceField(required=False,
+                                          queryset=OntologyTerm.objects.all(),
+                                          widget=ModelSelect2Multiple(url='omim_autocomplete',
+                                                                      attrs={'data-placeholder': 'OMIM...'}))
+    hpo = forms.ModelMultipleChoiceField(required=False,
+                                         queryset=OntologyTerm.objects.all(),
+                                         widget=ModelSelect2Multiple(url='hpo_autocomplete',
+                                                                     attrs={'data-placeholder': 'HPO...'}))
 
     class Meta:
         model = PhenotypeNode
@@ -496,17 +513,15 @@ class PhenotypeNodeForm(BaseNodeForm):
         node = super().save(commit=False)
 
         # TODO: I'm sure there's a way to get Django to handle this via save_m2m()
-        hpo_set = self.instance.phenotypenodehpo_set
-        omim_set = self.instance.phenotypenodeomim_set
+        ontology_term_set = self.instance.phenotypenodeontologyterm_set
 
-        hpo_set.all().delete()
-        omim_set.all().delete()
+        ontology_term_set.all().delete()
 
-        for hpo_synonym in self.cleaned_data["hpo_synonym"]:
-            hpo_set.create(hpo_synonym=hpo_synonym)
+        for ontology_term in self.cleaned_data["omim"]:
+            ontology_term_set.create(ontology_term=ontology_term)
 
-        for mim_morbid_alias in self.cleaned_data["mim_morbid_alias"]:
-            omim_set.create(mim_morbid_alias=mim_morbid_alias)
+        for ontology_term in self.cleaned_data["hpo"]:
+            ontology_term_set.create(ontology_term=ontology_term)
 
         if commit:
             node.save()

@@ -67,7 +67,7 @@ if settings.DISCORDANCE_EMAIL:
     }
 
 # Server monitoring tasks - send RollBar warnings
-if settings.ROLLBAR_MIN_DISK_WARNING_GIGS:
+if settings.SERVER_MIN_DISK_WARNING_GIGS:
     app.conf.beat_schedule['warn-low-disk-space'] = {
         'task': 'variantgrid.tasks.server_monitoring_tasks.warn_low_disk_space',
         'schedule': HOUR_SECS,

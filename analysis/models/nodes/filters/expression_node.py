@@ -83,7 +83,7 @@ class ExpressionNode(AnalysisNode):
                 exp_qs = exp_qs.filter(q_value__lte=SIGNIFICANT_QVALUE)
 
         column = self.get_column()
-        qs_path = self.COMPARISON_OPERATIONS_DJANGO_FILTER[self.comparison_op]
+        qs_path = dict(self.COMPARISON_OPERATIONS_DJANGO_FILTER)[self.comparison_op]
         kwargs = {f"{column}{qs_path}": self.value}
         exp_qs = exp_qs.filter(**kwargs)
 

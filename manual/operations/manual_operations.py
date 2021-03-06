@@ -52,7 +52,7 @@ class ManualOperation(Operation):
         ManualMigrationRequsted.objects.create(task=task, note=self.note)
 
     @staticmethod
-    def operation_manage(args: List[str], note:Optional[str] = None):
+    def operation_manage(args: List[str], note: Optional[str] = None):
         return ManualOperation(task_id=ManualOperation._task_id_generate("manage", args), note=note)
 
     @staticmethod

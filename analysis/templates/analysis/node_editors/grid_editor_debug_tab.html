@@ -1,4 +1,5 @@
 {% load js_tags %}
+{% load settings_tags %}
 <style>
     code {
         white-space: pre-wrap;
@@ -37,6 +38,19 @@
                 min_sql.show();
             }
         });
+
+        $("button#node-populate-clingen-alleles").click(function() {
+            let btn = $(this);
+            if (!btn.hasClass("disabled")) {
+                $.ajax({
+                    type: "POST",
+                    url: "{% url 'node_populate_clingen_alleles' node.pk %}",
+                    success: function(data) {
+                        btn.addClass("disabled");
+                    },
+                });
+            }
+        });
     });
     </script>
     {%  if node_sql or grid_sql %}
@@ -61,6 +75,13 @@
     {%  else %}
         Could not generate SQL
     {%  endif %}
+
+    {% if user.is_superuser %}
+        <button id="node-populate-clingen-alleles" class="btn btn-primary"
+                title="Retrieves max {% settings_value 'CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS' %} ClinGen Alleles">
+            Populate ClinGen Alleles
+        </button>
+    {% endif %}
 {% else %}
     The node has errors.
 {% endif %}

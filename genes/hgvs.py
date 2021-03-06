@@ -90,9 +90,8 @@ class CHGVS:
         if self.transcript:
             new_full_chgvs = f'{self.transcript}({gene_symbol}):{self.raw_c}'
             return CHGVS(new_full_chgvs)
-        else:
-            # if there's no transcript we're invalid, not much we can do
-            return self
+        # if there's no transcript we're invalid, not much we can do
+        return self
 
     def without_transcript_version(self) -> 'CHGVS':
         if self.transcript_parts:
@@ -332,6 +331,12 @@ class HGVSMatcher:
     def variant_to_hgvs(self, variant: Variant, transcript_name=None, max_allele_length=10) -> Optional[str]:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
         return self.variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name).format(max_allele_length=max_allele_length)
+
+    @staticmethod
+    def static_variant_to_g_hgvs(variant: Variant):
+        """ """
+        matcher = HGVSMatcher(variant.genome_build)
+        return matcher.variant_to_g_hgvs(variant)
 
     def variant_to_g_hgvs(self, variant: Variant):
         g_hgvs = self.variant_to_hgvs(variant)

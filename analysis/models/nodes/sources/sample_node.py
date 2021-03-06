@@ -10,7 +10,7 @@ import operator
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter
 from analysis.models.nodes.cohort_mixin import SampleMixin
 from annotation.models import SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, \
-    SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter, \
+    SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, \
     SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter
 from genes.models import SampleGeneList
 from patients.models_enums import Zygosity
@@ -146,11 +146,9 @@ class SampleNode(SampleMixin, AnalysisNode):
         return "\n".join(name_parts)
 
     def _has_filters_that_affect_label_counts(self):
-        try:
-            if self.nodeallelefrequencyfilter:
-                return True
-        except NodeAlleleFrequencyFilter.DoesNotExist:
-            pass
+        # This returns None if no filters to apply
+        if NodeAlleleFrequencyFilter.get_sample_q(self, self.sample):
+            return True
 
         return any([getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET])
 
@@ -159,7 +157,7 @@ class SampleNode(SampleMixin, AnalysisNode):
         CLASSES = {
             BuiltInFilters.TOTAL: (SampleStats, SampleStatsPassingFilter),
             BuiltInFilters.CLINVAR: (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter),
-            BuiltInFilters.OMIM: (SampleEnsemblGeneAnnotationStats, SampleEnsemblGeneAnnotationStatsPassingFilter),
+            BuiltInFilters.OMIM: (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter),
             BuiltInFilters.IMPACT_HIGH_OR_MODERATE: (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter),
         }
         annotation_version = self.analysis.annotation_version

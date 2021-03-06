@@ -1,7 +1,5 @@
 """
-At the moment, liftover is only via ClinGen Allele registry, but we have a model Allele
-which should work with everything (eventually) when we use other liftover tools
-
+Liftover via Clingen Allele Registry or NCBI remap
 """
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any
@@ -26,10 +24,11 @@ from upload.upload_processing import process_upload_pipeline
 
 def create_liftover_pipelines(user: User, allele_source: AlleleSource,
                               import_source: ImportSource,
-                              inserted_genome_build: GenomeBuild = None):
-    """ Creates and runs a liftover pipeline for each destination GenomeBuild """
+                              inserted_genome_build: GenomeBuild,
+                              destination_genome_builds: List[GenomeBuild] = None):
+    """ Creates and runs a liftover pipeline for each destination GenomeBuild (default = all other builds) """
 
-    build_liftover_vcf_tuples = _get_build_liftover_vcf_tuples(allele_source, inserted_genome_build)
+    build_liftover_vcf_tuples = _get_build_liftover_vcf_tuples(allele_source, inserted_genome_build, destination_genome_builds)
     for genome_build, liftover_vcf_tuples in build_liftover_vcf_tuples.items():
         for conversion_tool, vcf_tuples in liftover_vcf_tuples.items():
             liftover = Liftover.objects.create(user=user,
@@ -66,12 +65,16 @@ def create_liftover_pipelines(user: User, allele_source: AlleleSource,
 VCF_ROW = Tuple[str, int, int, str, str]
 
 
-def _get_build_liftover_vcf_tuples(allele_source: AlleleSource, inserted_genome_build: GenomeBuild) -> Dict[Any, Dict[Any, List[VCF_ROW]]]:
+def _get_build_liftover_vcf_tuples(allele_source: AlleleSource, inserted_genome_build: GenomeBuild,
+                                   destination_genome_builds: List[GenomeBuild] = None) -> Dict[Any, Dict[Any, List[VCF_ROW]]]:
     """ ID column set to allele_id """
+    if destination_genome_builds is None:
+        destination_genome_builds = GenomeBuild.builds_with_annotation()
+
     other_build_contigs_q_list = []
     other_builds = set()
     other_build_chrom_contig_id_mappings = {}
-    for genome_build in GenomeBuild.builds_with_annotation():
+    for genome_build in destination_genome_builds:
         if genome_build != inserted_genome_build:
             other_builds.add(genome_build)
             other_build_chrom_contig_id_mappings[genome_build] = genome_build.get_chrom_contig_id_mappings()

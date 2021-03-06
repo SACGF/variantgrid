@@ -19,3 +19,4 @@ class SearchTypes:
     UNKNOWN = "No known format"
     VARIANT = "Variant"
     CLASSIFICATION = "Classification"
+    ONTOLOGY = "Ontology"

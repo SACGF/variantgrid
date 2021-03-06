@@ -5,7 +5,9 @@ import json
 from analysis.models import VariantTag
 from analysis.models.nodes.node_counts import get_node_count_colors
 from library import tag_utils
-from snpdb.models import UserTagColors
+from library.django_utils import get_field_counts
+from snpdb.models import UserTagColors, GenomeBuild
+from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
 register = template.Library()
 
@@ -93,3 +95,19 @@ def render_tag_styles_and_formatter(context):
 
     return {"user_tag_styles": user_tag_styles,
             "url_name_visible": context["url_name_visible"]}
+
+
+@register.inclusion_tag("analysis/tags/tag_counts_filter.html", takes_context=True)
+def tag_counts_filter(context, genome_build: GenomeBuild, click_func=None, show_all_func=None, gene_symbol=None):
+    tag_kwargs = {}
+    if gene_symbol:
+        gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build,
+                                                               traverse_aliases=True)
+        tag_kwargs["variant_qs"] = gene_variant_qs
+    variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
+    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
+    return {
+        "tag_counts": tag_counts,
+        "click_func": click_func,
+        "show_all_func": show_all_func
+    }

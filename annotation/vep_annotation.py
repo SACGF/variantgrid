@@ -19,25 +19,26 @@ class VEPConfig:
 
     def __init__(self, genome_build: GenomeBuild):
         self.annotation_consortium = genome_build.annotation_consortium
+        self.genome_build = genome_build
         self.vep_data = genome_build.settings["vep_config"]
 
     def __getitem__(self, key):
-        value = self.vep_data[key]
-        return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
+        if value := self.vep_data.get(key):
+            return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
+        return None
 
 
-def _get_dbnsfp_plugin_command(vc: VEPConfig):
+def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
     """ Build from ColumnVEPField.source_field where vep_plugin = DBNSFP """
 
     dbnsfp_data_path = vc["dbnsfp"]
-    fields = ColumnVEPField.get_source_fields(vep_plugin=VEPPlugin.DBNSFP)
+    fields = ColumnVEPField.get_source_fields(genome_build, vep_plugin=VEPPlugin.DBNSFP)
     joined_columns = ",".join(fields)
     return f"dbNSFP,{dbnsfp_data_path},{joined_columns}"
 
 
-def _get_custom_params_list(vep_custom, prefix, data_path) -> list:
+def _get_custom_params_list(fields, prefix, data_path) -> list:
     extension = get_extension_without_gzip(data_path)
-    fields = ColumnVEPField.get_source_fields(vep_custom=vep_custom)
 
     if extension == 'vcf':
         joined_columns = ",".join(fields)
@@ -87,7 +88,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--canonical",
         "--protein",
         "--biotype",
-        "--uniprot",
         "--af",
         "--pubmed",
         "--variant_class",
@@ -100,7 +100,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     # Plugins that require data
     PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
                VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
-               VEPPlugin.DBNSFP: lambda: _get_dbnsfp_plugin_command(vc),
+               VEPPlugin.DBNSFP: lambda: _get_dbnsfp_plugin_command(genome_build, vc),
                VEPPlugin.DBSCSNV: lambda: f"dbscSNV,{vc['dbscsnv']}",
                VEPPlugin.SPLICEAI: lambda: f"SpliceAI,snv={vc['spliceai_snv']},indel={vc['spliceai_indel']}"}
 
@@ -114,12 +114,17 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     # Custom
     for vep_custom, prefix in dict(VEPCustom.choices).items():
         try:
-            cfg = vc[prefix.lower()]  # annotation settings are lower case
-            cmd.extend(_get_custom_params_list(vep_custom, prefix, cfg))
+            if fields := ColumnVEPField.get_source_fields(genome_build, vep_custom=vep_custom):
+                prefix_lc = prefix.lower()
+                if cfg := vc[prefix_lc]:  # annotation settings are lower case
+                    cmd.extend(_get_custom_params_list(fields, prefix, cfg))
+                else:
+                    logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
+                                 genome_build.name, prefix_lc)
         except Exception as e:
             logging.warning(e)
             # Not all annotations available for all builds - ok to just warn
-            logging.warning("No annotation set for custom annotation: %s", prefix)
+            logging.warning("Skipped custom annotation: %s", prefix)
 
     if annotation_consortium == AnnotationConsortium.REFSEQ:
         cmd.append("--refseq")

@@ -32,7 +32,7 @@ ANNOTATION[BUILD_GRCH37].update({
 })
 
 ANNOTATION[BUILD_GRCH38].update({
-    # "enabled": True,
+    "enabled": True,
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
 })
 

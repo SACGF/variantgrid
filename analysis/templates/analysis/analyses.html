@@ -26,7 +26,7 @@
                         type: "POST",
                         url: Urls.clone_analysis(analysisId),
                         success: function(data) {
-                            grid.jqGrid('sortGrid', 'id', 'desc');
+                            grid.jqGrid('setGridParam', {page: 1, sortname: 'id', sortorder: "desc"}).trigger('reloadGrid');
                         },
                     });
                 }
@@ -76,7 +76,7 @@
         {% page_help page_id='analysis/analyses_help' title='Analyses' %}
 
         <div id="analysis-form-container">
-          <form id="analysis-form" method="post">
+          <form method="post">
             {% csrf_token %}
             <div class="card">
                 <div class="card-header">Create</div>

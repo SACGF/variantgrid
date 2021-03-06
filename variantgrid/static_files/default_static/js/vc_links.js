@@ -94,6 +94,7 @@ let VCLinks = (function() {
             }
 
             links.push(this.generateBeacon());
+            links.push(this.makeLink('cBioPortal (Gene)', 'https://www.cbioportal.org', '/ln?q=@@:MUT', SpecialEKeys.GENE_SYMBOL));
             links.push(this.makeLink('ClinGen Allele Reg.', 'http://reg.clinicalgenome.org', '/redmine/projects/registry/genboree_registry/by_caid?caid=@@', SpecialEKeys.CLINGEN_ALLELE_ID, 'Clingen Allele Registry'));
             links.push(this.generateClingenKb());
             links.push(this.makeLink('Clinvar Variant', 'https://www.ncbi.nlm.nih.gov', '/clinvar/variation/@@', SpecialEKeys.CLINVAR_VARIANTION_ID));
@@ -107,7 +108,8 @@ let VCLinks = (function() {
             links.push(this.generateMonarchLink());
             links.push(this.makeLink('NCBI (Gene)', 'https://www.ncbi.nlm.nih.gov/gene/', '?term=@@', SpecialEKeys.GENE_SYMBOL));
             links.push(this.makeLink('OMIM (Gene)', 'https://www.omim.org', '/entry/@@', SpecialEKeys.GENE_OMIM_ID));
-            links.push(this.makeLink('PDB', 'https://www.rcsb.org/pdb', '/protein/@@', SpecialEKeys.UNIPROT_ID, 'Protein Data Bank'));
+            links.push(this.makeLink('OncoKB (Gene)', 'https://www.oncokb.org', '/gene/@@', SpecialEKeys.GENE_SYMBOL));
+            links.push(this.makeLink('PDB', 'https://www.rcsb.org', '/uniprot/@@', SpecialEKeys.UNIPROT_ID, 'Protein Data Bank'));
             links.push(this.generateUcsc());
             links.push(this.makeLink('Uniprot ID', 'https://www.uniprot.org/uniprot/', '@@', SpecialEKeys.UNIPROT_ID));
             links.push(this.generateVarsome());

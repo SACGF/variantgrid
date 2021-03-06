@@ -35,9 +35,9 @@ class FlagPermissionLevel(str, ChoicesEnum):
     def level(self):
         if self == FlagPermissionLevel.USERS:
             return 1
-        elif self == FlagPermissionLevel.OWNER:
+        if self == FlagPermissionLevel.OWNER:
             return 2
-        elif self == FlagPermissionLevel.ADMIN:
+        if self == FlagPermissionLevel.ADMIN:
             return 3
         return 0
 
@@ -202,7 +202,7 @@ class FlagInfos:
         sub_flags = extra_info['sub_flags']
         sub_flags.append({'label': label, 'letter': letter})
 
-    def extra_flag_info(self, flag: Flag) -> Dict[str,Any]:
+    def extra_flag_info(self, flag: Flag) -> Dict[str, Any]:
         return self._flag_extra_info.get(flag.id, {})
 
 
@@ -252,7 +252,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         if not self._source_object:
             # appears to be an orphaned set
-            report_message(f'Could not find source object for FlagCollection', extra_data={'flag_collection_id': self.id})
+            report_message('Could not find source object for FlagCollection', extra_data={'flag_collection_id': self.id})
 
         return self._source_object
 
@@ -274,7 +274,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
     def is_owner_or_admin(self, user: User) -> bool:
         permission = self.permission_level(user)
-        return permission == FlagPermissionLevel.ADMIN or permission == FlagPermissionLevel.OWNER
+        return permission in (FlagPermissionLevel.ADMIN, FlagPermissionLevel.OWNER)
 
     def flags(self, user: User = None, only_open=False) -> QuerySet:
         if not user:
@@ -283,10 +283,9 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             permission_level = self.permission_level(user)
             if not permission_level:
                 return Flag.objects.none()
-            else:
-                qs = Flag.objects.filter(collection=self)
-                if permission_level == FlagPermissionLevel.USERS:
-                    qs = qs.filter(Q(user_private=False) | Q(user=user))
+            qs = Flag.objects.filter(collection=self)
+            if permission_level == FlagPermissionLevel.USERS:
+                qs = qs.filter(Q(user_private=False) | Q(user=user))
         if only_open:
             qs = qs.filter(FlagCollection.Q_OPEN_FLAGS)
         return qs
@@ -307,12 +306,12 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         return qs.filter(flag_collection__in=starred)
 
     def close_open_flags_of_type(
-        self,
-        flag_type: FlagType,
-        comment: str = None,
-        user: User = None,
-        resolution: FlagResolution = None,
-        data: dict = None) -> int:
+            self,
+            flag_type: FlagType,
+            comment: str = None,
+            user: User = None,
+            resolution: FlagResolution = None,
+            data: dict = None) -> int:
         """
         For admin usage, closes all open flags of a certain type
         @param flag_type close all flags of this type
@@ -344,7 +343,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             if open_only:
                 qs = qs.filter(FlagCollection.Q_OPEN_FLAGS)
             return qs.first()
-        elif flag_type_attributes:
+        if flag_type_attributes:
             ft_qs = FlagType.objects
             for key, value in flag_type_attributes.items():
                 ft_qs = ft_qs.filter(**{f'attributes__{key}': value})
@@ -352,14 +351,9 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             if open_only:
                 qs = qs.filter(FlagCollection.Q_OPEN_FLAGS)
             return qs.first()
-        else:
-            raise ValueError('Must provide flag_type or flag_type_attributes')
+        raise ValueError('Must provide flag_type or flag_type_attributes')
 
-    def ensure_resolution(self,
-        flag_type: Union[FlagType,str],
-        resolution: Union[FlagResolution,str],
-        comment: str = None
-        ):
+    def ensure_resolution(self, flag_type: Union[FlagType, str], resolution: Union[FlagResolution, str], comment: str = None):
         flag_type = FlagType.get(flag_type)
         resolution = FlagResolution.get(resolution)
         if not flag_type.only_one:
@@ -380,17 +374,17 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
     @transaction.atomic()
     def get_or_create_open_flag_of_type(
-        self,
-        flag_type: FlagType,
-        user: Optional[User] = None,
-        comment: Optional[str] = None,
-        user_private: bool = False,
-        permission_check: bool = True,
-        reopen: bool = False,
-        add_comment_if_open: bool = False,
-        data: Optional[dict] = None,
-        close_other_data: bool = False,
-        only_if_new: bool = False) -> Tuple[Flag, bool]:
+            self,
+            flag_type: FlagType,
+            user: Optional[User] = None,
+            comment: Optional[str] = None,
+            user_private: bool = False,
+            permission_check: bool = True,
+            reopen: bool = False,
+            add_comment_if_open: bool = False,
+            data: Optional[dict] = None,
+            close_other_data: bool = False,
+            only_if_new: bool = False) -> Tuple[Flag, bool]:
         """
         Returns the existing open flag or returns a new one
         :param flag_type: The type of flag to create
@@ -430,23 +424,23 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             if add_comment_if_open:
                 existing.flag_action(user=user, comment=comment)
             return existing, False
-        else:
-            existing = relevant_qs.first()
-            if existing:
-                if reopen:
-                    resolution = existing.flag_type.resolution_for_status(FlagStatus.OPEN)
-                    existing.flag_action(user=user, resolution=resolution, comment=comment, permission_check=permission_check)
-                    return existing, False
-                elif only_if_new:
-                    return existing, False
 
-            return (self.add_flag(
-                flag_type=flag_type,
-                user=user,
-                comment=comment,
-                user_private=user_private,
-                permission_check=permission_check,
-                data=data), True)
+        existing = relevant_qs.first()
+        if existing:
+            if reopen:
+                resolution = existing.flag_type.resolution_for_status(FlagStatus.OPEN)
+                existing.flag_action(user=user, resolution=resolution, comment=comment, permission_check=permission_check)
+                return existing, False
+            if only_if_new:
+                return existing, False
+
+        return (self.add_flag(
+            flag_type=flag_type,
+            user=user,
+            comment=comment,
+            user_private=user_private,
+            permission_check=permission_check,
+            data=data), True)
 
     def add_flag(
             self,
@@ -502,10 +496,9 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         fw = FlagWatch.objects.filter(flag_collection=self, user=user).first()
         if not fw:
             return None
-        else:
-            #FIXME filter to only flags that the user can see
-            #excludes flags
-            return FlagComment.objects.filter(flag__collection=self, created__gte=fw.since).exclude(user=user).count()
+        #FIXME filter to only flags that the user can see
+        #excludes flags
+        return FlagComment.objects.filter(flag__collection=self, created__gte=fw.since).exclude(user=user).count()
 
 
 def fetch_flag_infos(flag_collections: List[FlagCollection], flags: Iterable[Flag], user: User = None) -> FlagInfos:
@@ -553,34 +546,30 @@ class FlagsMixin(models.Model):
     def flags_of_type(self, flag_type: FlagType) -> QuerySet:
         if not self.flag_collection:
             return Flag.objects.none()
-        else:
-            return Flag.objects.filter(collection=self.flag_collection, flag_type=flag_type)
+        return Flag.objects.filter(collection=self.flag_collection, flag_type=flag_type)
 
     @property
     def has_open_flags(self) -> bool:
         if not self.flag_collection:
             return False
-        else:
-            return Flag.objects.filter(collection=self.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS).exists()
+        return Flag.objects.filter(collection=self.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS).exists()
 
     def has_open_flag_with_attribute(self, attribute, value) -> bool:
         if not self.flag_collection:
             return False
-        else:
-            return Flag.objects.filter(collection=self.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS)\
-                .filter(**{'flag_type__attributes__%s' % attribute: value}).exists()
+        return Flag.objects.filter(collection=self.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS) \
+            .filter(**{'flag_type__attributes__%s' % attribute: value}).exists()
 
     def close_open_flags_of_type(
             self,
-            flag_type:FlagType,
+            flag_type: FlagType,
             comment=None,
             resolution: FlagResolution = None,
-            data:dict = None):
+            data: dict = None):
         if not self.flag_collection:
             return False
-        else:
-            fc = self.flag_collection_safe
-            fc.close_open_flags_of_type(flag_type, comment=comment, user=None, resolution=resolution, data=data)
+        fc = self.flag_collection_safe
+        fc.close_open_flags_of_type(flag_type, comment=comment, user=None, resolution=resolution, data=data)
 
     def has_flag_activity(self, since=None) -> bool:
         if since is None:

@@ -40,5 +40,6 @@ class FormHelperHelper:
         helper.form_show_labels = False
         return helper
 
+
 FORM_HELPER_HELPER = FormHelperHelper()
 FormHelperHelper.instance = FORM_HELPER_HELPER

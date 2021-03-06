@@ -12,7 +12,7 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
-from typing import Optional, Pattern, Tuple
+from typing import Optional, Pattern, Tuple, Iterable
 import collections
 import django.dispatch
 import re
@@ -151,12 +151,12 @@ class Allele(FlagsMixin, models.Model):
                 self.clingen_allele = other_clingen_allele
                 self.save()
 
-            other_fc = other_allele.flag_collection
-            other_fc.flag_set.update(collection=self.flag_collection)
-            other_fc.flagwatch_set.update(flag_collection=self.flag_collection)
-            existing_fc_cc_names = self.flag_collection.clinicalcontext_set.values_list("name", flat=True)
-            other_fc.clinicalcontext_set.exclude(name__in=existing_fc_cc_names).update(flag_collection=self.flag_collection)
-            other_fc.classification_set.update(flag_collection=self.flag_collection)
+            if other_fc := other_allele.flag_collection:
+                other_fc.flag_set.update(collection=self.flag_collection)
+                other_fc.flagwatch_set.update(flag_collection=self.flag_collection)
+                existing_fc_cc_names = self.flag_collection.clinicalcontext_set.values_list("name", flat=True)
+                other_fc.clinicalcontext_set.exclude(name__in=existing_fc_cc_names).update(flag_collection=self.flag_collection)
+                other_fc.classification_set.update(flag_collection=self.flag_collection)
             existing_allele_cc_names = self.clinicalcontext_set.values_list("name", flat=True)
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
             other_allele.variantallele_set.update(allele=self, conversion_tool=conversion_tool)
@@ -410,11 +410,11 @@ class Variant(models.Model):
         return None
 
     @property
-    def equivalent_variants(self):
+    def equivalent_variants(self) -> Iterable['Variant']:
         allele = self.allele
         if not allele:
-            return self
-        return VariantAllele.objects.filter(allele=allele).values_list('variant', flat=True)
+            return [self]
+        return Variant.objects.filter(variantallele__allele=allele)
 
     @lazy
     def variant_annotation(self) -> Optional['VariantAnnotation']:
@@ -507,12 +507,52 @@ class AlleleSource(models.Model):
     """ Provides a source of alleles for liftover pipelines. """
     objects = InheritanceManager()
 
+    def get_genome_build(self):
+        return None
+
+    def get_variants_qs(self):
+        return Variant.objects.none()
+
     def get_allele_qs(self):
-        return Allele.objects.none()
+        return Allele.objects.filter(variantallele__variant__in=self.get_variants_qs())
 
     def liftover_complete(self, genome_build: GenomeBuild):
         """ This is called at the end of a liftover pipeline (once per build) """
         pass
+
+
+class VariantAlleleSource(AlleleSource):
+    variant_allele = models.ForeignKey(VariantAllele, on_delete=CASCADE)
+
+    def get_genome_build(self):
+        return self.variant_allele.genome_build
+
+    def get_variants_qs(self):
+        return Variant.objects.filter(variantallele=self.variant_allele)
+
+    @staticmethod
+    def get_liftover_for_allele(allele, genome_build) -> Optional['Liftover']:
+        """ Only works if liftover was done via VariantAlleleSource """
+        allele_sources_qs = VariantAlleleSource.objects.filter(variant_allele__allele=allele)
+        return Liftover.objects.filter(allele_source__in=allele_sources_qs, genome_build=genome_build).first()
+
+
+class VariantAlleleCollectionSource(AlleleSource):
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+
+    def get_genome_build(self):
+        return self.genome_build
+
+    def get_variants_qs(self):
+        return Variant.objects.filter(variantallele__in=self.get_variant_allele_ids())
+
+    def get_variant_allele_ids(self):
+        return self.variantallelecollectionrecord_set.values_list("variant_allele", flat=True)
+
+
+class VariantAlleleCollectionRecord(models.Model):
+    collection = models.ForeignKey(VariantAlleleCollectionSource, on_delete=CASCADE)
+    variant_allele = models.ForeignKey(VariantAllele, on_delete=CASCADE)
 
 
 class Liftover(TimeStampedModel):

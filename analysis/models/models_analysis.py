@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Tuple, Sequence, Dict, List
+from typing import Tuple, Dict, List
 
 from django.apps import apps
 from django.contrib.auth.models import User
@@ -14,7 +14,7 @@ from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
 from analysis.models.enums import AnalysisType, AnalysisTemplateType
-from annotation.models import AnnotationVersion
+from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
 from snpdb.models import CustomColumnsCollection, CustomColumn, \
@@ -78,6 +78,12 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def lock_history(self):
         return self.analysislock_set.order_by("pk")
 
+    def get_permission_object(self):
+        """ Snapshots use template analysis for permission """
+        if self.template_type == AnalysisTemplateType.SNAPSHOT:
+            return self.analysistemplateversion.template.analysis
+        return self
+
     def can_write(self, user):
         """ Disable modification when locked """
         if super().can_write(user):
@@ -96,23 +102,36 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return reverse('analyses')
 
     def check_valid(self):
+        for e in self.get_errors():
+            raise ValueError(e)
 
-        def check_field(field):
+    def get_errors(self) -> List[str]:
+        errors = []
+        for field in ['custom_columns_collection', 'annotation_version']:
             value = getattr(self, field)
             if value is None:
                 msg = f"Analysis setting '{field}' is not set. "
                 msg += "<a href='javascript:analysisSettings()'>Open Analysis Settings</a>"
-                raise ValueError(msg)
+                errors.append(msg)
 
-        check_field('custom_columns_collection')
-        check_field('annotation_version')
+        try:
+            if self.annotation_version:
+                self.annotation_version.validate()
+        except InvalidAnnotationVersionError as ve:
+            errors.append(str(ve))
+        return errors
+
+    def get_warnings(self) -> List[str]:
+        warnings = []
+        if self.annotation_version:
+            latest_av = AnnotationVersion.latest(self.genome_build)
+            if self.annotation_version != latest_av:
+                warnings.append(f"Using AnnotationVersion {self.annotation_version} while most recent version "
+                                f"for build is : {latest_av}.")
+        return warnings
 
     def is_valid(self):
-        try:
-            self.check_valid()
-            return True
-        except ValueError:
-            return False
+        return not self.get_errors()
 
     def set_defaults_and_save(self, user):
         self.user = user
@@ -149,7 +168,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
         AbstractNodeCountSettings.save_count_configs_from_array(record_set, node_counts_array)
 
-    def get_samples(self) -> Sequence[Sample]:
+    def get_samples(self) -> List[Sample]:
         samples = set()
         for node in self.analysisnode_set.filter(analysisnode_parent__isnull=True).select_subclasses():
             samples.update(node.get_samples_from_node_only_not_ancestors())
@@ -217,7 +236,8 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
         return analysis_copy
 
-    def get_warnings(self, user: User) -> List[str]:
+    def get_toolbar_warnings(self, user: User) -> List[str]:
+        """ Warnings for top toolbar """
         warnings = []
         if self.lock_input_sources:
             warnings.append("INPUT LOCKED - cannot create new input source nodes.")
@@ -398,6 +418,7 @@ class AnalysisTemplateRun(TimeStampedModel):
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
         analysis.genome_build = genome_build
+        analysis.annotation_version = AnnotationVersion.latest(genome_build, validate=True)
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments

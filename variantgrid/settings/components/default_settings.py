@@ -91,7 +91,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 23  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 25  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "redis_cache.RedisCache",
@@ -164,8 +164,6 @@ _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 BUILD_GRCH37 = "GRCh37"
 BUILD_GRCH38 = "GRCh38"
 
-DEFAULT_BUILD = BUILD_GRCH37  # User default
-
 ANNOTATION = {
     BUILD_GRCH37: {
         "enabled": True,
@@ -181,7 +179,7 @@ ANNOTATION = {
             "cosmic": "annotation_data/GRCh37/CosmicCodingMuts.normal.grch37.vcf.gz",
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
-            "gnomad": "annotation_data/GRCh37/gnomad_GRCh37_combined_af.vcf.bgz",
+            "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2020.04.02-grch37.vcf.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh37/hg19.100way.phastCons.bw",
@@ -212,7 +210,8 @@ ANNOTATION = {
             "cosmic": "annotation_data/GRCh38/CosmicCodingMuts.normal.grch38.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP4.0a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
-            "gnomad": "annotation_data/GRCh38/gnomad_GRCh38_combined_af.vcf.bgz",
+            "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
+            "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2020.04.02-grch38.vcf.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
@@ -244,15 +243,24 @@ MUTATIONAL_SIGNATURE_DATA_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signature_analysis_data.formatted.txt")
 
 CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY = "ClinGenDiseaseValidity"
-CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS = "Genomics England PanelApp Panels"
-CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS = "PanelApp Australia Panels"
 CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT = "GnomADGeneConstraint"
+CACHED_WEB_RESOURCE_HGNC = "HGNC"
+CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS = "PanelApp Australia Panels"
+CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS = "Genomics England PanelApp Panels"
 CACHED_WEB_RESOURCE_PFAM = "Pfam"
-ANNOTATION_CACHED_WEB_RESOURCES = [CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY,
-                                   CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
-                                   CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS,
-                                   CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
-                                   CACHED_WEB_RESOURCE_PFAM]
+CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY = "RefSeq Gene Summary"
+CACHED_WEB_RESOURCE_UNIPROT = "UniProt"
+
+ANNOTATION_CACHED_WEB_RESOURCES = [
+    CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
+    CACHED_WEB_RESOURCE_HGNC,
+    CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS,
+    CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
+    CACHED_WEB_RESOURCE_PFAM,
+    CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY,
+    CACHED_WEB_RESOURCE_UNIPROT,
+    CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY,
+]
 
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['refseq_transcript_accession', 'ensembl_transcript_accession']
 VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
@@ -267,6 +275,7 @@ CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"
 CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
 CLINGEN_ALLELE_REGISTRY_LOGIN = get_secret("CLINGEN_ALLELE_REGISTRY.login")
 CLINGEN_ALLELE_REGISTRY_PASSWORD = get_secret("CLINGEN_ALLELE_REGISTRY.password")
+CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs
 
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - eg _NDC_ or -NDC_
 
@@ -291,6 +300,9 @@ LIFTOVER_TO_CHROMOSOMES_ONLY = True  # False = Liftover to alt/patches
 LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to dbSNP IDs being for loci
 LIFTOVER_NCBI_REMAP_ENABLED = False
 LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
+
+PANEL_APP_CACHE_DAYS = 30  # Automatically re-check after this time
+PANEL_APP_CHECK_ENABLED = False
 
 # Non-authenticated (no login) sample gene matrix
 PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD = None  # Must be set if system has multiple genome builds
@@ -413,7 +425,7 @@ ROLLBAR = {
     'code_version': Git(BASE_DIR).hash,
 }
 
-ROLLBAR_MIN_DISK_WARNING_GIGS = 1
+SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 
 HEARTBEAT_URL = None  # URL to ping to prove scheduler is still alive
@@ -565,8 +577,9 @@ INSTALLED_APPS = [
     #    'debug_toolbar',
     #    'debug_panel',
     # Internal apps
-    'analysis',
+    'analysis.apps.AnalysisConfig',
     'annotation.apps.AnnotationConfig',
+    'ontology',
     'eventlog',
     'expression',
     'flags',
@@ -696,6 +709,12 @@ SOMALIER = {
             "GRCh38": "sites.hg38.nochr.vcf.gz",  # No chr prefix on chromosome names
         },
     },
+    # Minimums for related samples to appear at bottom of view_sample page
+    "relatedness": {
+        "min_relatedness": 0.1,
+        "min_shared_hets": 1000,
+        "min_shared_hom_alts": 1000,
+    }
 }
 
 
@@ -720,7 +739,10 @@ _URLS_NAME_REGISTER_DEFAULT = True
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
     "classification_import_tool": False,
-    "condition_aliases": False
+    "condition_aliases": False,
+    "clinvar_exports": False,
+    "condition_matchings": False,
+    "condition_match_test": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 

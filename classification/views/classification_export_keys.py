@@ -1,6 +1,5 @@
 import json
-from collections import defaultdict
-from typing import Dict, Any, Optional, DefaultDict
+from typing import Dict, Any, Optional
 
 from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
@@ -17,8 +16,6 @@ the report just prints how many time each value was encountered.
 """
 
 MAX_EXAMPLES = 15
-
-
 MAX_EXAMPLE_LEN = 50
 
 
@@ -183,8 +180,6 @@ class ExportFormatterKeys(BaseExportFormatter):
         if as_attachment:
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
         return response
-
-        pass
 
     def count_classification(self, classification: ClassificationModification):
         data = classification.evidence

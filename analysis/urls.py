@@ -1,5 +1,5 @@
 from analysis.grids import AnalysesGrid, AnalysesVariantTagsGrid, NodeColumnSummaryGrid, \
-    KaromappingAnalysesGrid, AnalysisTemplatesGrid, AnalysisNodeIssuesGrid, TaggedVariantGrid
+    KaromappingAnalysesGrid, AnalysisTemplatesGrid, AnalysisNodeIssuesGrid, TaggedVariantGrid, NodeOntologyGenesGrid
 from analysis.views import views, views_json, views_grid, \
     views_karyomapping, views_autocomplete
 from library.django_utils.jqgrid_view import JQGridView
@@ -50,6 +50,8 @@ urlpatterns = [
     perm_path('analysis/<int:analysis_id>/edit_and_grid/stand_alone/', views.stand_alone_analysis_editor_and_grid, name='standalone_analysis_editor_and_grid'),
 
     perm_path('analysis/<int:analysis_id>/set_panel_size/', views_json.analysis_set_panel_size, name='analysis_set_panel_size'),
+    perm_path('analysis/<int:node_id>/node_populate_clingen_alleles/', views_json.node_populate_clingen_alleles,
+              name='node_populate_clingen_alleles'),
     perm_path('analysis/<int:analysis_id>/settings/lock', views.analysis_settings_lock, name='analysis_settings_lock'),
     perm_path('analysis/<int:analysis_id>/settings/', views.view_analysis_settings, name='analysis_settings'),
     perm_path('analysis/<int:analysis_id>/settings_details_tab/', views.analysis_settings_details_tab, name='analysis_settings_details_tab'),
@@ -63,8 +65,11 @@ urlpatterns = [
     perm_path('column_summary_boxplot/<int:node_id>/<label>/<slug:variant_column>/', views.column_summary_boxplot, name='column_summary_boxplot'),
     perm_path('analysis/<int:analysis_id>/set_variant_tag/', views_json.set_variant_tag, name='set_variant_tag'),
     perm_path('set_variant_selected/<int:node_id>/', views_json.set_variant_selected, name='set_variant_selected'),
-    perm_path('create_classification_from_variant_tag/<int:analysis_id>/<int:sample_id>/<int:variant_tag_id>/<transcript_id>/', views_json.create_classification_from_variant_tag, name='create_classification_with_transcript_from_variant_tag'),
-    perm_path('create_classification_from_variant_tag/<int:analysis_id>/<int:sample_id>/<int:variant_tag_id>/', views_json.create_classification_from_variant_tag, name='create_classification_from_variant_tag'),
+
+    perm_path('classification/create_for_variant_tag/<int:variant_tag_id>', views.CreateClassificationForVariantTagView.as_view(),
+              name='create_classification_for_variant_tag'),
+    perm_path('create_classification_for_analysis/<int:analysis_id>',
+              views.create_classification_for_analysis, name='create_classification_for_analysis'),
 
     # Node Data (bottom right window)
     perm_path('node_data_grid/cfg/<int:analysis_version>/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_data_grid, name='node_data_grid'),
@@ -89,6 +94,10 @@ urlpatterns = [
 
     perm_path('analysis_issues/grid/<slug:op>/',
               JQGridView.as_view(grid=AnalysisNodeIssuesGrid), name='analysis_node_issues_grid'),
+
+    perm_path('node/ontology/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
+              JQGridView.as_view(grid=NodeOntologyGenesGrid), name='node_ontology_genes_grid'),
+
     perm_path('analysis_issues', views.view_analysis_issues, name='analysis_issues'),
 
     # Mutational Signature

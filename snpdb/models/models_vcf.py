@@ -20,13 +20,13 @@ import operator
 
 from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
-from library.log_utils import log_traceback
+from library.log_utils import log_traceback, report_event
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
-from snpdb.models.models_variant import Variant, VariantCollection
+from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
 from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
 
 
@@ -259,8 +259,8 @@ class Sample(SortByPKMixin, models.Model):
         related_objects = [
             self.sampleclinvarannotationstats_set,
             self.sampleclinvarannotationstatspassingfilter_set,
-            self.sampleensemblgeneannotationstats_set,
-            self.sampleensemblgeneannotationstatspassingfilter_set,
+            self.samplegeneannotationstats_set,
+            self.samplegeneannotationstatspassingfilter_set,
             self.samplelocuscount_set,
             self.samplevariantannotationstats_set,
             self.samplevariantannotationstatspassingfilter_set,
@@ -371,6 +371,29 @@ class SampleTag(models.Model):
 
     def __str__(self):
         return f"{self.tag}:{self.sample}"
+
+
+class VCFAlleleSource(AlleleSource):
+    """ Used to link a VCF's variants to alleleles and liftover to other builds """
+    vcf = models.ForeignKey(VCF, null=True, on_delete=SET_NULL)
+
+    def get_genome_build(self):
+        if self.vcf:
+            genome_build = self.vcf.genome_build
+        else:
+            genome_build = None
+        return genome_build
+
+    def get_variant_qs(self):
+        if self.vcf:
+            qs = self.vcf.get_variant_qs()
+        else:
+            qs = Variant.objects.none()
+        return qs
+
+    def liftover_complete(self, genome_build: GenomeBuild):
+        report_event('Completed VCF liftover',
+                     extra_data={'vcf_id': self.vcf.pk, 'allele_count': self.get_allele_qs().count()})
 
 
 class AbstractVariantStats(models.Model):

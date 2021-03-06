@@ -2,6 +2,10 @@
 
 from django.db import migrations, models
 
+def _one_off_delete_clingen_disease_validity(apps, schema_editor):
+    # Will cascade delete diseasevalidity - will be re-loaded when visiting annotation page
+    CachedWebResource = apps.get_model("annotation", "CachedWebResource")
+    CachedWebResource.objects.filter(name="ClinGenDiseaseValidity").delete()
 
 class Migration(migrations.Migration):
 
@@ -10,6 +14,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(_one_off_delete_clingen_disease_validity),
         migrations.AlterField(
             model_name='clinvar',
             name='clinvar_review_status',

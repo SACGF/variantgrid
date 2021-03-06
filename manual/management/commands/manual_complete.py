@@ -1,7 +1,7 @@
 from django.core.management import CommandParser
 from django.core.management.base import BaseCommand
 
-from manual.models import ManualMigrationTask, ManualMigrationRequired, ManualMigrationAttempt
+from manual.models import ManualMigrationTask, ManualMigrationAttempt
 
 
 class Command(BaseCommand):

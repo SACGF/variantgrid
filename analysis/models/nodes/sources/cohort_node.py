@@ -13,7 +13,7 @@ from analysis.models import GroupOperation, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import Zygosity, SimpleZygosity
-from snpdb.models import Cohort, CohortSample, VariantsType, GenomeBuild
+from snpdb.models import Cohort, CohortSample, VariantsType
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):

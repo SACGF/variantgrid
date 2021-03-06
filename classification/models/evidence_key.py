@@ -14,6 +14,7 @@ from classification.enums import CriteriaEvaluation, SubmissionSource
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.json_serialize import strip_json
+from snpdb.views.datatable_view import RichColumn
 
 
 class EvidenceKey(TimeStampedModel):
@@ -292,6 +293,14 @@ class EvidenceKey(TimeStampedModel):
         else:
             name = self.key
         return name
+
+    def rich_column(self, prefix: str):
+        return RichColumn(
+            key=f"{prefix}__{self.key}__value",
+            orderable=True,
+            client_renderer=f"VCTable.evidence_key.bind(null, '{self.key}')",
+            label=self.pretty_label
+        )
 
 
 class EvidenceKeyMap:

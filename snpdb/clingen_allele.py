@@ -296,7 +296,8 @@ def get_clingen_allele(code: str) -> ClinGenAllele:
         api_response = clingen_allele_url_get(url)
         if "errorType" in api_response:
             raise ClinGenAlleleAPIException.from_api_response(api_response)
-        clingen_allele = ClinGenAllele.objects.create(pk=clingen_allele_id, api_response=api_response)
+        clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, pk=clingen_allele_id,
+                                                                      defaults={"api_response": api_response})
 
     allele, _ = Allele.objects.get_or_create(clingen_allele=clingen_allele)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
@@ -337,20 +338,27 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
     for genome_build in GenomeBuild.builds_with_annotation():
         try:
             try:
-                variant_tuple = allele.clingen_allele.get_variant_tuple(genome_build)
-                variant = Variant.get_from_tuple(variant_tuple, genome_build)
+                if clingen_allele := allele.clingen_allele:
+                    variant_tuple = clingen_allele.get_variant_tuple(genome_build)
+                    variant = Variant.get_from_tuple(variant_tuple, genome_build)
+                else:
+                    # no clingen allele, see if it's known
+                    # TODO should an error be thrown if it's not?
+                    variant = known_variants.get(genome_build)
+
             except ClinGenAllele.ClinGenBuildNotInResponseError:
                 variant = known_variants.get(genome_build)
                 if variant is None:
                     raise
 
-            defaults = {"genome_build": genome_build,
-                        "allele": allele,
-                        "origin": AlleleOrigin.variant_origin(variant),
-                        "conversion_tool": conversion_tool}
-            va, _ = VariantAllele.objects.get_or_create(variant=variant,
-                                                        defaults=defaults)
-            variant_allele_by_build[genome_build] = va
+            if variant:
+                defaults = {"genome_build": genome_build,
+                            "allele": allele,
+                            "origin": AlleleOrigin.variant_origin(variant),
+                            "conversion_tool": conversion_tool}
+                va, _ = VariantAllele.objects.get_or_create(variant=variant,
+                                                            defaults=defaults)
+                variant_allele_by_build[genome_build] = va
         except Variant.DoesNotExist:
             pass  # Variant may not be created for build
         except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError, ClinGenAllele.ClinGenBuildNotInResponseError) as e:

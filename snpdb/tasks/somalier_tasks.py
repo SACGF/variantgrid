@@ -88,7 +88,11 @@ def _somalier_ancestry(vcf_extract: SomalierVCFExtract):
     somalier_bin = cfg.get_annotation("command")
     ancestry_cmd = [somalier_bin, "ancestry", "--labels", cfg.get_annotation("ancestry_labels"),
                     compare_samples, "++"] + ancestry_run.get_sample_somalier_filenames()
-    ancestry_run.execute(ancestry_cmd, cwd=ancestry_report_dir)
+    # Force Somalier to only use 1 thread - have had it run very slow with multi-core
+    # https://github.com/brentp/somalier/issues/61#issuecomment-750492570
+    env = os.environ.copy()
+    env["OMP_NUM_THREADS"] = "1"
+    ancestry_run.execute(ancestry_cmd, cwd=ancestry_report_dir, env=env)
 
     # Use TSV to write sample specific files
     df = pd.read_csv(ancestry_report_dir / "somalier-ancestry.somalier-ancestry.tsv", sep='\t', index_col=0)
@@ -140,18 +144,15 @@ def somalier_trio_relate(trio_id: int):
 
 @celery.task
 def somalier_all_samples():
-    MIN_RELATEDNESS = 0.2
-    MIN_SHARED_HET = 1000
-    MIN_SHARED_HOM = 1000
-
+    somalier_settings = settings.SOMALIER["relatedness"]
     all_samples = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.PROCESSING)
     try:
         related_dir = _somalier_relate(all_samples)
         pairs_filename = os.path.join(related_dir, "somalier.pairs.tsv")
         df = pd.read_csv(pairs_filename, sep='\t')
-        shared_het_mask = df["shared_hets"] > MIN_SHARED_HET
-        shared_hom_mask = df["shared_hom_alts"] > MIN_SHARED_HOM
-        relateness_mask = df["relatedness"] > MIN_RELATEDNESS
+        shared_het_mask = df["shared_hets"] >= somalier_settings["min_shared_hets"]
+        shared_hom_mask = df["shared_hom_alts"] > somalier_settings["min_shared_hom_alts"]
+        relateness_mask = df["relatedness"] > somalier_settings["min_relatedness"]
         df = df[shared_het_mask & shared_hom_mask & relateness_mask]
 
         for _, row in df.iterrows():

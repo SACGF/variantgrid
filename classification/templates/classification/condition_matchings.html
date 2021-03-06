@@ -1,0 +1,65 @@
+{% extends "uicore/page/base.html" %}
+{% load datatable_tags %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% block title %}Condition Matching{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <script>
+        function idRenderer(data) {
+            let text = data.normalized_text;
+            let id = data.id;
+
+            let textDom;
+            if (!text) {
+                textDom = $('<span>', {class: 'no-value', text:'<blank>'});
+            } else {
+                textDom = $('<span>', {text: text});
+            }
+            // FIXME regenerate URLs
+            let aDom = $('<a>', {href:`/classification/condition_matching/${id}`, html: textDom});
+
+            return aDom.prop('outerHTML');
+        }
+        function datatableFilter(data) {
+            data.text_filter = $("#text-filter").val();
+            data.filter_outstanding = $("#filter-outstanding").is(':checked');
+        }
+
+        function applyFilters() {
+            $('#condition-text-datatable').DataTable().ajax.reload();
+        }
+
+        $(document).ready(() => {
+            EKeys.load().then(() => {
+                {% datatable_definition table_config=datatable_config data='datatableFilter' table_id='condition-text-datatable' url='condition_text_datatable' responsive=True %}
+            });
+        });
+    </script>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        <h3>Condition Matching Listing</h3>
+        {% page_help_embedded title='Condition Matching Listing' %}
+            <p>
+            Help will go here for matching text to conditions
+            </p>
+        {% end_page_help_embedded %}
+        <div class="form-row align-items-center">
+            <div class="input-group col-8">
+                <input class="form-control" id="text-filter" placeholder="Text filter"/>
+                <span class="input-group-append">
+                    <button class="btn btn-primary" type="submit" onclick="applyFilters()">Filter</button>
+                </span>
+            </div>
+            <div class="input-check col-4">
+                <div class="ml-4">
+                    <input type="checkbox" class="form-check-input" id="filter-outstanding" checked="checked" onclick="applyFilters()"/>
+                    <label for="filter-outstanding">Only show outstanding records</label>
+                </div>
+            </div>
+        </div>
+        {% datatable datatable_config 'condition-text-datatable' class_name='condition-text-datatable responsive sticky-header' %}
+    </div>
+{% endblock %}

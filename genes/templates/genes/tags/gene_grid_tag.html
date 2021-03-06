@@ -105,7 +105,7 @@ table#gene-grid tr {
     width: 40%;
 }
 
-.hpo-icon {
+.hp-icon {
     width: 35px;
     height: 55px;
     background-size: 35px 55px;
@@ -300,15 +300,6 @@ function addGeneSymbol(geneSymbol) {
     addGeneRows(tbody, 0, '', [geneSymbol]);
 }
 
-function geneAnnotationCallBack(gene_id, callBackFunc) {
-    $.ajax({
-        type: "GET",
-        url: Urls.api_view_gene_id(gene_id),
-        success: callBackFunc
-    });
-}
-
-
 function addAndRetrieveGeneListColumnIfNotExists(geneListId, selectElement, addEmptyGeneLists) {
     if (geneLists.indexOf(geneListId) > -1) {
         return;
@@ -330,12 +321,32 @@ function removeColumn(className) {
 
 function getGeneListColumn(geneListId, selectElement, addEmptyGeneLists) {
     addEmptyGeneLists = getValue(addEmptyGeneLists, true);
+    geneListId = String(geneListId);
     const className = 'gene-list-' + geneListId;
     removeColumn(className); // Remove any existing if this is a reload
 
+    // geneListId can contain prefixes to distinguish special case ones eg panel app etc - so can store in same hash
+    const SPECIAL_CASE_GENE_LISTS = {
+        "panel-app-": Urls.api_view_panel_app_gene_list,
+        "ontology-": Urls.api_ontology_term_gene_list,
+    };
+
+    let gene_list_url;
+    for (const [prefix, get_url_func] of Object.entries(SPECIAL_CASE_GENE_LISTS)) {
+        if (geneListId.startsWith(prefix)) {
+            let pk = geneListId.replace(prefix, "");
+            gene_list_url = get_url_func(pk);
+            break;
+        }
+    }
+
+    if (!gene_list_url) {
+        gene_list_url = Urls.api_view_gene_list(geneListId);
+    }
+
     $.ajax({
         type: "GET",
-        url: Urls.api_view_gene_list(geneListId),
+        url: gene_list_url,
         success: function(data) {
             let geneListId = data["pk"];
             let className = 'gene-list-' + geneListId;
@@ -541,8 +552,9 @@ function createRowColumns(tr, headerRow) {
     // You can use "extraClasses" to ensure a column has a (non-unique) class 
 
     let geneType = tr.attr("type");
-    if (!geneType || geneType === 'gene') {
-        columns = columns.concat(getGeneRowColumns(geneSymbol, headerRow));
+    if (!geneType || geneType === 'gene' || geneType === 'unmatched') {
+        let canAddGene = geneType != 'unmatched';
+        columns = columns.concat(getGeneRowColumns(geneSymbol, headerRow, canAddGene));
     } else {
         let colspan = getNumberOfColumns(headerRow);
         let initFunc;
@@ -554,10 +566,6 @@ function createRowColumns(tr, headerRow) {
                 let aliasLink = $("<a />").attr("href", "#gene-row-" + matchedGene).text(matchedGene);
                 let aliasMessage = $("<span />").append("Matched ").append(aliasLink).append(": " + matchInfo);
                 cell.append(aliasMessage);
-            };
-        } else if (geneType === 'unmatched') {
-            initFunc = function(cell, geneSymbol) {
-                cell.text('Could not match gene symbol');
             };
         }
         let singleMessageColumn = { "txType": "td",
@@ -571,7 +579,7 @@ function createRowColumns(tr, headerRow) {
 }
 
 
-function getGeneRowColumns(geneSymbol, headerRow) {
+function getGeneRowColumns(geneSymbol, headerRow, canAddGene) {
     let columns = [];
     for (let i=0 ; i<evidenceColumns.length ; ++i) {
         let evidenceType = evidenceColumns[i];
@@ -691,7 +699,7 @@ function getGeneRowColumns(geneSymbol, headerRow) {
                 "txType": 'td',
                 "class": className,
             };
-            if (canWriteGeneList(geneListId)) {
+            if (canAddGene && canWriteGeneList(geneListId)) {
                 columnData["hoverHandler"] = function(container) {
                     emptyGeneHoverHandler(container, pathologyTestVersionId, className, geneSymbol, addGeneToPathologyTest);
                 };
@@ -714,7 +722,7 @@ function getGeneRowColumns(geneSymbol, headerRow) {
                 "txType": 'td',
                 "class": geneListClass,
             };
-            if (canWriteGeneList(geneListId)) {
+            if (canAddGene && canWriteGeneList(geneListId)) {
                 columnData["hoverHandler"] = function(container) {
                     emptyGeneHoverHandler(container, geneListId, geneListClass, geneSymbol, addGeneToGeneList);
                 };
@@ -1071,7 +1079,7 @@ function addGeneDataRows(tbody, geneListId, geneListClass, geneDataList, geneCli
         let gene = geneData['gene'];
         let rowType = geneData['type'];
 
-        let addCellClickHandler = geneListId && rowType === "gene";
+        let addCellClickHandler = geneListId;
 
         while ( rowIndex<existingRows.length ) {
             tr = $(existingRows[rowIndex]);
@@ -1100,12 +1108,15 @@ function addGeneDataRows(tbody, geneListId, geneListClass, geneDataList, geneCli
         geneIconsDiv.addClass("gene-icons-container").addClass("left");
         geneLabel.append(geneIconsDiv);
 
-        if (rowType === 'gene') {
-            getGeneInfo(geneIconsDiv, gene);
-            const URL = Urls.view_gene_symbol(gene);
-            let geneLink = $("<a />").text(gene).attr({"class": 'hover-link', "href": URL, "target": "_blank"});
-            geneLabelDiv.append(geneLink);
-    
+        if (rowType === 'gene' || rowType === 'unmatched') {
+            if (rowType === 'gene') {
+                getGeneInfo(geneIconsDiv, gene);
+                const URL = Urls.view_gene_symbol(gene);
+                let geneLink = $("<a />").text(gene).attr({"class": 'hover-link', "href": URL, "target": "_blank"});
+                geneLabelDiv.append(geneLink);
+            } else {
+                geneLabelDiv.append($("<span/>").text(gene).attr("title", "Could not match gene symbol"));
+            }
             if (addCellClickHandler) {
                 setCellGene(tr, geneListId, geneListClass, gene, geneClickHandler);
             }
@@ -1573,9 +1584,9 @@ function clinGenCellInit(cell, gene_symbol) {
                     let classification = diseaseValidity["classification"];
                     let date = diseaseValidity["date"];
                     let gene_validity_summary_url = diseaseValidity["gene_validity_summary_url"];
-                    let mondo = diseaseValidity["mondo"];
-                    let diseaseName = mondo["name"];
-                    let diseaseDescription = mondo["description"];
+                    let ontologyTerm = diseaseValidity["ontology_term"];
+                    let diseaseName = ontologyTerm["name"];
+                    let diseaseDescription = ontologyTerm["definition"];
                     let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ":");
                     diseaseSpan.attr("title", diseaseDescription);
                     let dvSpan = $("<span />").addClass("disease-validity");
@@ -2123,26 +2134,18 @@ $(document).ready(function() {
         }
     });
 
+    function ontologyTermChange() {
+        const PREFIX = "ontology-";
+        let ontology_term_id = $(this).val();
+        if (ontology_term_id) {
+            let ontology_slug = ontology_term_id.replace(":", "_");
+            let geneListId = PREFIX + ontology_slug;
+            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
+        }
+    }
 
-    $('#id_hpo_synonym').change(function() {
-        let HPO_PREFIX = "hpo-synonym-";
-        let hpo_synonym_id = $(this).val();
-        if (hpo_synonym_id) {
-            let geneListId = HPO_PREFIX + hpo_synonym_id;
-            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
-        }
-    });
-    
-    
-    $('#id_mim_morbid_alias').change(function() {
-        let MIM_ALIAS_PREFIX = "mim-alias-";
-        let mim_alias_id = $(this).val();
-        if (mim_alias_id) {
-            let geneListId = MIM_ALIAS_PREFIX + mim_alias_id;
-            addAndRetrieveGeneListColumnIfNotExists(geneListId, this);
-        }
-    });
-    
+    $('#id_hpo').change(ontologyTermChange);
+    $('#id_omim').change(ontologyTermChange);
 
     $("input.evidence-checkbox").change(function() {
         let evidenceType = $(this).attr("evidence_type");

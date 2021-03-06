@@ -1,10 +1,7 @@
 from django.shortcuts import get_object_or_404
 
-from annotation.models import VariantAnnotationVersion, AnnotationRun, \
-    HumanProteinAtlasAbundance
-from annotation.models.models import HumanProteinAtlasAnnotationVersion, \
-    HumanProteinAtlasTissueSample
-from annotation.models.models_mim_hpo import HumanPhenotypeOntology, MIMMorbid
+from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance
+from annotation.models.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
 from genes.models import GeneVersion
 from library.jqgrid_abstract_genes_grid import AbstractGenesGrid
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -102,83 +99,3 @@ class TissueGeneGrid(AbstractGenesGrid):
     @property
     def csv_name(self):
         return f"{self.tissue_sample.name}_{self.min_abundance}_tissue_genes"
-
-
-class HPOGeneGrid(AbstractGenesGrid):
-    model = GeneVersion
-    caption = "Human Phenotype Ontology genes"
-
-    def __init__(self, user, hpo_id, genome_build_name):
-        super().__init__(user)
-
-        self.hpo = HumanPhenotypeOntology.objects.get(pk=hpo_id)  # @UndefinedVariable
-        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.extra_config.update({'sortname': 'name',
-                                  'sortorder': 'asc'})
-
-    def get_caption(self):
-        return f"{self.caption} ({self.genome_build})"
-
-    def get_column_names(self):
-        return ["identifier"]
-
-    def get_sql_params_and_columns(self, _request):
-        # Maybe my DB needs a vacuum but this was much faster than joins
-        sql = """   SELECT DISTINCT genes_geneversion.gene_symbol_id AS name, genes_geneversion.gene_id as identifier
-                    from genes_geneversion
-                    where gene_id IN (
-                        SELECT gene_id
-                        FROM annotation_mimgene
-
-                        INNER JOIN annotation_phenotypemim ON (annotation_phenotypemim.mim_morbid_id=annotation_mimgene.mim_morbid_id)
-                        WHERE annotation_phenotypemim.hpo_id = %s
-                    )
-                    AND genes_geneversion.genome_build_id = %s
-        """
-        params = [self.hpo.pk, self.genome_build.pk]
-        return sql, params, None, False
-
-    def get_labels(self):
-        return ['Gene Symbol', "Gene ID"]
-
-    @property
-    def csv_name(self):
-        return f"{self.hpo}_genes"
-
-
-class MIMGeneGrid(AbstractGenesGrid):
-    model = GeneVersion
-    caption = "MIM genes"
-
-    def __init__(self, user, mim_morbid_id, genome_build_name):
-        super().__init__(user)
-        self.mim_morbid = MIMMorbid.objects.get(pk=mim_morbid_id)
-        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.extra_config.update({'sortname': 'name',
-                                  'sortorder': 'asc'})
-
-    def get_caption(self):
-        return f"{self.caption} ({self.genome_build})"
-
-    def get_column_names(self):
-        return ["identifier"]
-
-    def get_sql_params_and_columns(self, _request):
-        sql = """   SELECT DISTINCT genes_geneversion.gene_symbol_id AS name, genes_geneversion.gene_id as identifier
-                    from genes_geneversion
-                    WHERE genes_geneversion.gene_id IN (
-                        SELECT gene_id
-                        FROM annotation_mimgene
-                        WHERE annotation_mimgene.mim_morbid_id = %s
-                    )
-                    AND genes_geneversion.genome_build_id = %s
-        """
-        params = [self.mim_morbid.pk, self.genome_build.pk]
-        return sql, params, None, False
-
-    def get_labels(self):
-        return ['Gene Symbol', "Gene ID"]
-
-    @property
-    def csv_name(self):
-        return f"{self.mim_morbid}_genes"

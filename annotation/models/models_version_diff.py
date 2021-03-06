@@ -7,7 +7,7 @@ from functools import reduce
 from model_utils.managers import InheritanceManager
 import operator
 
-from annotation.models.models import EnsemblGeneAnnotationVersion, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotationVersion
 from library.database_utils import dictfetchall
 import pandas as pd
 from snpdb.models import VariantGridColumn
@@ -197,35 +197,6 @@ class VersionDiffChangeCountResult(models.Model):
 
     def __str__(self):
         return f"{self.version_diff} {self.vg_column}: changed {self.count}"
-
-
-class EnsemblGeneAnnotationVersionDiff(VersionDiff):
-    VG_COLUMN_PREFIX = "variantannotation__gene__ensemblgeneannotation"
-    COLS_FROM_TO = []
-    COLS_CHANGE_COUNT = ['function_from_uniprotkb',
-                         'hgnc_name',
-                         'hgnc_symbol',
-                         'refseq_gene_summary',
-                         'tissue_specificity_from_uniprotkb']
-
-    version_from = models.ForeignKey(EnsemblGeneAnnotationVersion, related_name='version_diff_from', on_delete=CASCADE)
-    version_to = models.ForeignKey(EnsemblGeneAnnotationVersion, related_name='version_diff_to', on_delete=CASCADE)
-
-    def get_diff_sql(self, select_columns):
-        SQL_TEMPLATE = """  SELECT %(select_columns)s
-                            from genes_gene
-                            left outer join %(table_v1)s as v1 on (genes_gene.gene_id = v1.gene_id)
-                            left outer join %(table_v2)s as v2 on (genes_gene.gene_id = v2.gene_id)
-                            where
-                            (v1.id is not NULL OR v2.id is not NULL)"""
-
-        sql = SQL_TEMPLATE % {"select_columns": ", ".join(select_columns),
-                              "table_v1": self.version_from.get_partition_table(),
-                              "table_v2": self.version_to.get_partition_table()}
-        return sql
-
-    def __str__(self):
-        return self.description(self.version_from, self.version_to)
 
 
 class VariantAnnotationVersionDiff(VersionDiff):

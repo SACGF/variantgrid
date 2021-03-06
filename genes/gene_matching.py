@@ -7,7 +7,9 @@ from lazy import lazy
 import re
 
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAnnotationRelease, GeneVersion, \
-    ReleaseGeneSymbol, ReleaseGeneSymbolGene
+    ReleaseGeneSymbol, ReleaseGeneSymbolGene, HGNC
+from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
+from library.cache import timed_cache
 
 
 class GeneSymbolMatcher:
@@ -25,7 +27,7 @@ class GeneSymbolMatcher:
 
     def _match_symbols_to_genes_in_releases(self):
         for gm in self._release_gene_matchers:
-            gm.match_unmatched_in_gene_lists()
+            gm.match_unmatched_in_hgnc_and_gene_lists()
 
     def get_gene_symbol_id_and_alias_id(self, original_gene_symbol: str):
         uc_original_gene_symbol = original_gene_symbol.upper()
@@ -61,7 +63,35 @@ class GeneSymbolMatcher:
         return gene_list_gene_symbols
 
 
+class HGNCMatcher:
+    @staticmethod
+    @timed_cache(ttl=3600)
+    def instance():
+        return HGNCMatcher()
+
+    @lazy
+    def _aliases(self) -> Dict:
+        alias_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.HGNC)
+        alias_qs = alias_qs.annotate(uc_alias=Upper("alias"), uc_symbol=Upper("gene_symbol_id"))
+        return dict(alias_qs.values_list("uc_alias", "uc_symbol"))
+
+    @lazy
+    def _hgnc_by_uc_gene_symbol(self) -> Dict:
+        hgnc_qs = HGNC.objects.filter(status=HGNCStatus.APPROVED)
+        return {str(hgnc.gene_symbol_id).upper(): hgnc for hgnc in hgnc_qs}
+
+    def match_hgnc(self, gene_symbol: str):
+        gene_symbol = gene_symbol.upper()
+        if gs := self._aliases.get(gene_symbol):
+            gene_symbol = gs
+        return self._hgnc_by_uc_gene_symbol.get(gene_symbol)
+
+
 class GeneMatcher:
+    """ Genes and symbols change over time. This creates DB records connecting them for a particular
+        GeneAnnotationRelease.
+
+        To actually retrieve matched genes for a release, use GeneAnnotationRelease.genes_for_symbol(s) """
     def __init__(self, release: GeneAnnotationRelease):
         self.release = release
 
@@ -130,9 +160,11 @@ class GeneMatcher:
         gene_symbol_qs = GeneSymbol.objects.filter(pk__in=gene_symbol_list)
         return self._match_unmatched_gene_symbol_qs(gene_symbol_qs)
 
-    def match_unmatched_in_gene_lists(self):
-        """ Match any matched symbols without matched genes """
-        gene_symbol_qs = GeneSymbol.objects.filter(genelistgenesymbol__isnull=False)
+    def match_unmatched_in_hgnc_and_gene_lists(self):
+        """ Make sure symbols have matched genes for each release so they can be used in analyses """
+        q_gene_list = Q(genelistgenesymbol__isnull=False)
+        q_hgnc = Q(hgnc__isnull=False)
+        gene_symbol_qs = GeneSymbol.objects.filter(q_gene_list | q_hgnc)
         return self._match_unmatched_gene_symbol_qs(gene_symbol_qs)
 
 

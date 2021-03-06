@@ -30,10 +30,8 @@ ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
 # On laptop I get all kinds of errors using BigWig files, so just turn off
 ANNOTATION[BUILD_GRCH37]["vep_config"].update({
     'phastcons100way': None,
-    'phastcons30way': None,
     'phastcons46way': None,
     'phylop100way': None,
-    'phylop30way': None,
     'phylop46way': None,
     "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.head_100.hg19.vcf.gz",
     "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.head_100.hg19.vcf.gz",
@@ -41,10 +39,8 @@ ANNOTATION[BUILD_GRCH37]["vep_config"].update({
 ANNOTATION[BUILD_GRCH38]["vep_config"].update({
     'phastcons100way': None,
     'phastcons30way': None,
-    'phastcons46way': None,
     'phylop100way': None,
     'phylop30way': None,
-    'phylop46way': None,
     "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.head_100.hg38.vcf.gz",
     "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.head_100.hg38.vcf.gz",
 })
@@ -56,7 +52,6 @@ _SA_PATH_ENRICHMENT_KITS = [{"name": "roche_1k_disease", "version": 6}, {"name":
 SEQAUTO_COVERAGE_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 PATHOLOGY_TEST_SORTED_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
-PATHOLOGY_TESTS_ENABLED = True
 
 
 PEDIGREE_MADELINE2_COMMAND = "madeline2"
@@ -87,6 +82,7 @@ if _SAPATHOLOGY_MODE:
     SAPATHOLOGY_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/sapathology_templates")
     if os.path.exists(SAPATHOLOGY_TEMPLATES_DIR):
         TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
+    PATHOLOGY_TESTS_ENABLED = False
 elif _SHARIANT_MODE:
     VARIANT_CLASSIFICATION_STATS_USE_SHARED = True  # False=Use visible to user. True = Shared
 

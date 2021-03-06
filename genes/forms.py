@@ -7,7 +7,7 @@ from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import PanelAppPanel, GeneListCategory, GeneList, CustomTextGeneList, \
     GeneSymbol, Gene, Transcript, GeneAnnotationRelease
 from library.forms import ROFormMixin
-from snpdb.forms import BaseDeclareForm
+from snpdb.forms import BaseDeclareForm, GenomeBuildAutocompleteForwardMixin
 
 
 class GeneListForm(forms.ModelForm, ROFormMixin):
@@ -62,6 +62,10 @@ class GeneAnnotationReleaseForm(forms.Form):
                                      required=False,
                                      widget=autocomplete.ModelSelect2(url='gene_annotation_release_autocomplete',
                                                                       attrs={'data-placeholder': 'Gene Annotation Release...'}))
+
+
+class GeneAnnotationReleaseGenomeBuildForm(GenomeBuildAutocompleteForwardMixin, GeneAnnotationReleaseForm):
+    genome_build_fields = ["release"]
 
 
 class CustomGeneListForm(forms.Form):

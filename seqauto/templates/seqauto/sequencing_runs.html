@@ -3,7 +3,7 @@
 {% load crispy_forms_field %}
 
 <script>
-    gridExtraFilters = {};
+    var gridExtraFilters = {};
 
     function showAll() {
         clearAutoCompletes();
@@ -13,16 +13,16 @@
 
     function clearAutoCompletes(leave_autocomplete_term_type) {
         // Clear the autcompletes (temp disabling change handlers)
-        var AUTOCOMPLETE_IDS = {
-            'enrichment_kit' : 'id_enrichment_kit',
+        const AUTOCOMPLETE_IDS = {
+            'enrichment_kit': 'id_enrichment_kit',
         };
 
         ignoreAutcompleteChangeEvent = true;
-        for (var t in AUTOCOMPLETE_IDS) {
+        for (let t in AUTOCOMPLETE_IDS) {
             if (t == leave_autocomplete_term_type) {
                 continue; // leave this one
             }
-            var autocomplete_id = AUTOCOMPLETE_IDS[t];
+            const autocomplete_id = AUTOCOMPLETE_IDS[t];
             clearAutocompleteChoice("#" + autocomplete_id);
         }
         ignoreAutcompleteChangeEvent = false;
@@ -30,7 +30,7 @@
 
     // This is called when refreshing the grid
     function getExtraFilters() {
-        var extraFilters = '';
+        let extraFilters = '';
         if (gridExtraFilters) {
             extraFilters = JSON.stringify(gridExtraFilters);
         }
@@ -42,9 +42,9 @@
     }
 
     function filterGrid() {
-        var descriptionContainer = $("#sequencing-runs-filter-description");
+        const descriptionContainer = $("#sequencing-runs-filter-description");
         if (!$.isEmptyObject(gridExtraFilters)) {
-            var descriptions = [];
+            const descriptions = [];
             if (gridExtraFilters["enrichment_kit_id"]) {
                 descriptions.push("Enrichment Kit");
             }
@@ -66,7 +66,6 @@
         });
     });
 </script>
-
 <div>
     {% page_help page_id='seqauto/sequencing_runs_help' title='Sequencing Runs' show_title=False %}
 
@@ -83,7 +82,6 @@
     </div>
 
 	{% load jqgrid_tags %}
-    {% user_data_grid_filter 'SequencingRuns' 'SequencingRuns' group_data=False incomplete_data=True hidden_data=True %}
-
+    {% user_data_grid_filter 'SequencingRuns' 'SequencingRuns' group_data=False hidden_data=True %}
 	{% jqgrid 'sequencing_run_grid' 'SequencingRuns' False None 'seqauto/grids/sequencing_run_grid.html' delete=False init_func='initFunc' %}
 </div>

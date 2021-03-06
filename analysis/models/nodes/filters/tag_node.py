@@ -5,7 +5,7 @@ from django.db.models.query_utils import Q
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.nodes.analysis_node import Analysis, AnalysisNode
-from snpdb.models import Tag, Variant
+from snpdb.models import Tag, Variant, GenomeBuild, VariantAllele
 
 
 class TagNode(AnalysisNode):
@@ -60,16 +60,21 @@ class TagNode(AnalysisNode):
 
     @staticmethod
     def get_analysis_tags_node(analysis):
+        from analysis.tasks.node_update_tasks import update_node_task
+
         node, created = TagNode.objects.get_or_create(analysis=analysis,
                                                       name=TagNode.ANALYSIS_TAGS_NAME,
                                                       analysis_wide=True,
                                                       visible=False)
         if created:
-            node.load()  # Should be fast, so no need for celery job
+            # Should be fast, so do sync (not as celery job)
+            update_node_task(node.pk, node.version)
         return node
 
 
 class VariantTag(TimeStampedModel):
+    """ A tag in an analysis. Has create create/delete signal handlers:
+        @see analysis.signals.signal_handlers._update_analysis_on_variant_tag_change """
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
@@ -79,3 +84,17 @@ class VariantTag(TimeStampedModel):
 
     def can_write(self, user):
         return self.analysis.can_write(user)
+
+    @staticmethod
+    def get_for_build(genome_build: GenomeBuild, variant_qs=None):
+        """ Returns tags visible within a build
+            variant_qs - set to filter - default (None) = all variants """
+        va_kwargs = {
+            "genome_build": genome_build,
+            "allele__in": VariantTag.objects.all().values_list("variant__variantallele__allele")
+        }
+        if variant_qs is not None:
+            va_kwargs["variant__in"] = variant_qs
+
+        va_qs = VariantAllele.objects.filter(**va_kwargs)
+        return VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True))

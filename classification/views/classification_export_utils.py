@@ -338,7 +338,8 @@ class ExportFormatter(BaseExportFormatter):
 
             # no modifications passed the check, but maybe a flag has changed on the allele of classifications
             flag_collection_ids = list()
-            flag_collection_ids.append( Allele.objects.values_list("flag_collection_id", flat=True).first() )
+            if allele_flag_id := Allele.objects.filter(pk=ag.allele_id).values_list("flag_collection_id", flat=True).first():
+                flag_collection_ids.append(allele_flag_id)
             for cm in ag.data:
                 flag_collection_ids.append(cm.classification.flag_collection_id)
 

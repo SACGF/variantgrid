@@ -1,19 +1,18 @@
+from django.utils import timezone
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
 from django_admin_json_editor.admin import JSONEditorWidget
 import json
 from django.conf import settings
-from django_extensions.management.commands.admin_generator import AdminModel
 
 from annotation.models.models import AnnotationVersion
 from library.guardian_utils import admin_bot
 from snpdb.admin import ModelAdminBasics
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
-from classification.enums.classification_enums import EvidenceCategory, \
-    SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionAlias, \
-    ConditionAliasStatus
+from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
+from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionText, \
+    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification
 from classification.models.classification import Classification, ClassificationImport
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.classification_import import process_classification_import
@@ -258,12 +257,11 @@ class ClassificationAdmin(admin.ModelAdmin):
         imports_by_genome = {}
 
         for vc in qs:
-            genome_build = None
             try:
                 genome_build = vc.get_genome_build()
                 if not genome_build.pk in imports_by_genome:
                     imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=request.user,
-                                                                                                    genome_build=genome_build)
+                                                                                             genome_build=genome_build)
                 vc_import = imports_by_genome[genome_build.pk]
                 vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
                 vc.classification_import = vc_import
@@ -464,38 +462,6 @@ class EvidenceKeyAdmin(admin.ModelAdmin):
         }, **kwargs)
 
 
-class ConditionAliasStatusFilter(admin.SimpleListFilter):
-    title = 'Status Filter'
-    parameter_name = 'status'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return ConditionAliasStatus.choices
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(status=self.value())
-        return queryset
-
-
-class ConditionAliasAdmin(ModelAdminBasics):
-
-    list_display = ["pk", "lab", "source_text", "source_gene_symbol", "status", "records_affected", "aliases", "join_mode", "updated_by", "created"]
-    readonly_fields = ["pk", "lab"]
-    search_fields = ['source_text', 'source_gene_symbol', 'aliases']
-    list_filter = [ConditionAliasStatusFilter]
-
-    def auto_match(self, request, queryset):
-        ca: ConditionAlias
-        for ca in queryset:
-            attempt = ca.attempt_auto_match(update_record=True)
-            messages.add_message(request, messages.INFO, message=f"({ca.id}) -> {attempt}")
-
-    auto_match.short_description = "Attempt auto match"
-
-    actions = ["export_as_csv", auto_match]
-
-
 class ClassificationReportTemplateAdmin(admin.ModelAdmin):
     list_display = ('name', 'modified')
 
@@ -504,3 +470,124 @@ class ClassificationReportTemplateAdmin(admin.ModelAdmin):
             'name': admin.widgets.AdminTextInputWidget(),
             'template': admin.widgets.AdminTextareaWidget()
         }, **kwargs)
+
+
+class ConditionTextStatusFilter(admin.SimpleListFilter):
+    title = 'Status Filter'
+    parameter_name = 'status_filter'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [("outstanding", "Only with outstanding classifications")]
+
+    def queryset(self, request, queryset):
+        if value := self.value():
+            if value == "outstanding":
+                queryset = queryset.exclude(classifications_count_outstanding=0)
+        return queryset
+
+
+class ConditionTextAdmin(ModelAdminBasics):
+    search_fields = ('id', 'normalized_text')
+    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding"]
+    list_filter = [ConditionTextStatusFilter, ClassificationLabFilter]
+
+    def auto_match(self, request, queryset):
+        condition_text: ConditionText
+        for condition_text in queryset:
+            ConditionTextMatch.attempt_automatch(condition_text=condition_text)
+
+    auto_match.short_description = "Automatch (overwrite existing data)"
+
+    def clear(self, request, queryset):
+        condition_text: ConditionText
+        for condition_text in queryset:
+            condition_text.clear()
+
+    clear.short_description = "Clear any matches"
+
+    actions = [auto_match, clear]
+
+
+class ConditionTextMatchAdmin(ModelAdminBasics):
+    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "created", "last_edited_by"]
+
+
+class ClinVarExportAdmin(ModelAdminBasics):
+    list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
+
+
+class ConditionTextMatchUserFilter(admin.SimpleListFilter):
+    list_per_page = 200
+    title = 'User Filter'
+    parameter_name = 'user'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [(user.id, user.username) for user in User.objects.all()]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(last_edited_by=self.value())
+        return queryset
+
+
+class ConditionTextMatchAdmin(ModelAdminBasics):
+    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "last_edited_by", "created", "modified"]
+    list_filter = [ConditionTextMatchUserFilter]
+
+
+class ClinVarExportAdmin(ModelAdminBasics):
+    list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
+    list_filter = [ClassificationLabFilter]
+
+
+class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
+    title = "Labs Involved"
+    parameter_name = "labs_involved"
+
+    def lookups(self, request, model_admin):
+        return [("multilabs", "MultipleLabs")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "multilabs":
+            valid_ids = set()
+            for obj in queryset:
+                labs = set()
+                for drc in obj.discordancereportclassification_set.all():
+                    if c := drc.classification_original.classification:
+                        labs.add(c.lab)
+                if len(labs) > 1:
+                    valid_ids.add(obj.id)
+
+            queryset = DiscordanceReport.objects.filter(pk__in=valid_ids)
+        return queryset
+
+
+class DiscordanceReportAdmin(ModelAdminBasics):
+    list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "labs"]
+    list_filter = [DiscordanceReportAdminLabFilter]
+
+    def allele(self, obj: DiscordanceReport):
+        cc = obj.clinical_context
+        return str(cc.allele)
+
+    def days_open(self, obj: DiscordanceReport):
+        closed = obj.report_completed_date
+        if not closed:
+            delta = timezone.now() - obj.report_started_date
+            return f"{delta.days}+"
+        delta = closed - obj.report_started_date
+        return delta.days
+
+    def classification_count(self, obj: DiscordanceReport):
+        return obj.discordancereportclassification_set.count()
+
+    def labs(self, obj: DiscordanceReport):
+        labs = set()
+        drc: DiscordanceReportClassification
+        for drc in obj.discordancereportclassification_set.all():
+            if c := drc.classification_original.classification:
+                labs.add(c.lab)
+        labs = sorted(labs, key=lambda x: x.name)
+        return ", ".join([lab.name for lab in labs])

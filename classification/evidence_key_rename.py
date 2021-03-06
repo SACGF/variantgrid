@@ -98,8 +98,7 @@ class EvidenceSelectKeyRenamer:
 
     def _migrate_data(self):
         Classification = self.apps.get_model("classification", "Classification")
-        ClassificationModification = self.apps.get_model("classification",
-                                                                "ClassificationModification")
+        ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
         kwargs = {"evidence__%s__isnull" % self.key: False}
         for vc in Classification.objects.filter(**kwargs):

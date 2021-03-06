@@ -5,8 +5,6 @@ register = Library()
 
 @register.simple_tag(takes_context=True)
 def cohort_trio_wizard(context, cohort):
-    cohort.cohort_genotype_collection  # Ensure it's loaded
-
     context = {"url_name_visible": context["url_name_visible"],
                'cohort': cohort,
                'sample_count': cohort.cohortsample_set.count()}

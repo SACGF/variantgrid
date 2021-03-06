@@ -5,26 +5,26 @@
 NODE_ID = "#analysis-node-{{ node.pk }}";
 
 function ajaxForm(selector, beforeSerializeFunc, successFunc) {
-    var options = {
+    const options = {
         target: "#node-editor-wrapper",
-        beforeSerialize: function() {
+        beforeSerialize: function () {
             // Common hidden fields
             if (typeof getAlleleFrequencyValues !== 'undefined') {
-                var afData = getAlleleFrequencyValues();
-                var afVal = JSON.stringify(afData);
+                const afData = getAlleleFrequencyValues();
+                const afVal = JSON.stringify(afData);
                 $("input#id_allele_frequency").val(afVal);
             }
             if (typeof getVCFLocusFilters !== 'undefined') {
-                var vcfFiltersData = getVCFLocusFilters();
-                var vcfFiltersVal = JSON.stringify(vcfFiltersData);
+                const vcfFiltersData = getVCFLocusFilters();
+                const vcfFiltersVal = JSON.stringify(vcfFiltersData);
                 $("input#id_vcf_locus_filters").val(vcfFiltersVal);
             }
-        
+
             if (beforeSerializeFunc) {
                 beforeSerializeFunc();
             }
         },
-        success: function(res, status, xhr, a, b, c) {
+        success: function (res, status, xhr, a, b, c) {
             // JSON back = success, otherwise we'll get the form to re-render
             if (xhr.responseJSON) {
                 if (successFunc) {
@@ -41,15 +41,15 @@ function ajaxForm(selector, beforeSerializeFunc, successFunc) {
 function accordionForm(formSelector) {
     // Expects: ul.accordion and hidden input #id_accordion_panel that maps to accordion settings 
 
-    var accordion = $(".accordion", formSelector);
-    var accordionStateInput = $("#id_accordion_panel", formSelector);
-    
+    const accordion = $(".accordion", formSelector);
+    const accordionStateInput = $("#id_accordion_panel", formSelector);
+
     accordion.accordion({
         heightStyle: "content",
         widthStyle: "fill",
         active: parseInt(accordionStateInput.val()),
         activate: function() {
-            var accordionId = $(this).accordion("option", "active");
+            const accordionId = $(this).accordion("option", "active");
             accordionStateInput.val(accordionId);
         }
     });
@@ -62,36 +62,39 @@ function changeNodeSize(event, ui) {
 }
 
 function switch_node_data(activeTabLinkId) {
-	var DEFAULT_NODE_DATA = 'tab-link-grid';
-	var tabLookup = {'tab-link-summary' : '#node-data-summary',
-					 'tab-link-doc' : '#node-data-docs',
-					 'tab-link-graphs' : '#node-data-graphs', };
-	var nodeData = tabLookup[activeTabLinkId] || DEFAULT_NODE_DATA;
-	var dataContainer = $("#node-data-container");
-	var DEFAULT_LOAD_FUNC = function() {
-		$(nodeData, dataContainer).fadeIn();
-	};
+    const DEFAULT_NODE_DATA = 'tab-link-grid';
+    const tabLookup = {
+        'tab-link-summary': '#node-data-summary',
+        'tab-link-doc': '#node-data-docs',
+        'tab-link-graphs': '#node-data-graphs',
+    };
+    const nodeData = tabLookup[activeTabLinkId] || DEFAULT_NODE_DATA;
+    const dataContainer = $("#node-data-container");
+    const DEFAULT_LOAD_FUNC = function () {
+        $(nodeData, dataContainer).fadeIn();
+    };
 
-	var loadFuncLookup = {'tab-link-doc' : function() {
-			var loadDiv = $(nodeData, dataContainer);
-			var descriptionUrl = "{% url 'node_method_description' node.id node.version %}";
-			loadDiv.load(descriptionUrl).fadeIn();
-	}};
-	
-	var fadeInFunc = loadFuncLookup[activeTabLinkId] || DEFAULT_LOAD_FUNC;
-	$('.node-data', dataContainer).fadeOut().promise().done(fadeInFunc);
+    const loadFuncLookup = {
+        'tab-link-doc': function () {
+            const loadDiv = $(nodeData, dataContainer);
+            const descriptionUrl = "{% url 'node_method_description' node.id node.version %}";
+            loadDiv.load(descriptionUrl).fadeIn();
+        }
+    };
+
+    const fadeInFunc = loadFuncLookup[activeTabLinkId] || DEFAULT_LOAD_FUNC;
+    $('.node-data', dataContainer).fadeOut().promise().done(fadeInFunc);
 }
 
 function load_column_summary() {
-	var column = $("select#id_column", "form#column-summary-form").val();
-	var base_url = "{% url 'node_column_summary' node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
-	var url = base_url.replace('COLUMN', column); 
-	var nodeDataSummary = $("#node-data-summary");
+    const column = $("select#id_column", "form#column-summary-form").val();
+    const base_url = "{% url 'node_column_summary' node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
+    const url = base_url.replace('COLUMN', column);
+    const nodeDataSummary = $("#node-data-summary");
 
-	nodeDataSummary.load(url);
+    nodeDataSummary.load(url);
 }
 
-var CREATE_FILTER_CLASS = "create-filter";
 
 function createFilterChild(columnName, columnFilter) {
 	const CREATE_FILTER_CHILD_URL = "{% url 'create_filter_child' node.id %}";
@@ -116,42 +119,46 @@ function createExtraFilterChild(columnName, columnFilter) {
 
 
 function load_snp_matrix_summary() {
-	var snpmatrix_form = $("form#snp-matrix-form");
-	var conversion = $("#id_conversion", snpmatrix_form).val();
-	var significant_figures = $("#id_significant_figures", snpmatrix_form).val();
-	var base_url = "{% url 'node_snp_matrix' node.pk node.version 'CONVERSION' 0 %}";
-	var url = base_url.replace('CONVERSION', conversion)
-	url = url.substr(0, url.length-1) + significant_figures; // Replace last 0
-	var nodeDataSummary = $("#node-data-summary");
-	nodeDataSummary.html("Loading...");
+    const snpmatrix_form = $("form#snp-matrix-form");
+    const conversion = $("#id_conversion", snpmatrix_form).val();
+    const significant_figures = $("#id_significant_figures", snpmatrix_form).val();
+    const base_url = "{% url 'node_snp_matrix' node.pk node.version 'CONVERSION' 0 %}";
+    let url = base_url.replace('CONVERSION', conversion);
+    url = url.substr(0, url.length-1) + significant_figures; // Replace last 0
+    const nodeDataSummary = $("#node-data-summary");
+    nodeDataSummary.html("Loading...");
 	nodeDataSummary.load(url);
 }
 
 function load_node_graph() {
-	var graph_node_form = $("form#graph-node-form");
-	var graph_type = $("#id_graph_type", graph_node_form).val();
-	var cmap = $("#id_cmap", graph_node_form).val();
+    const graph_node_form = $("form#graph-node-form");
+    const graph_type = $("#id_graph_type", graph_node_form).val();
+    const cmap = $("#id_cmap", graph_node_form).val();
 
-	var base_url = "{% url 'node_data_graph' node.analysis.version node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
-	var url = base_url.replace('GRAPH_TYPE', graph_type).replace('CMAP', cmap);
-	var nodeDataGraph = $("#node-data-graphs");
-	nodeDataGraph.html("Loading...");
+    const base_url = "{% url 'node_data_graph' node.analysis.version node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
+    const url = base_url.replace('GRAPH_TYPE', graph_type).replace('CMAP', cmap);
+    const nodeDataGraph = $("#node-data-graphs");
+    nodeDataGraph.html("Loading...");
 	nodeDataGraph.load(url);
 }
 
 $(document).ready(function() {
-	var tab = $("#node-editor-tabs");
-	var params = {activate: function (event, ui) {
-        var active = tab.tabs('option', 'active');
-		var activeTabLinkId = $("ul>li a", tab).eq(active).attr("id");
-		switch_node_data(activeTabLinkId);
-    }};
-	tab.tabs(params);
+    const tab = $("#node-editor-tabs");
+    let params = {
+        activate: function (event, ui) {
+            const active = tab.tabs('option', 'active');
+            const activeTabLinkId = $("ul>li a", tab).eq(active).attr("id");
+            switch_node_data(activeTabLinkId);
+        }
+    };
+    tab.tabs(params);
 
-	var params = {activate: function (event, ui) {
-		$("#node-data-summary").html("Please select configuration above and select view.");
-	}};
-	$("#node-summary-tabs").tabs(params).addClass('ui-tabs-vertical ui-helper-clearfix');
+    params = {
+        activate: function (event, ui) {
+            $("#node-data-summary").html("Please select configuration above and select view.");
+        }
+    };
+    $("#node-summary-tabs").tabs(params).addClass('ui-tabs-vertical ui-helper-clearfix');
 
 	$("#column-summary-button").click(load_column_summary);
 	$("#snp-matrix-button").click(load_snp_matrix_summary);

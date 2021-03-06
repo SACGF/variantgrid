@@ -2,7 +2,6 @@ import json
 
 from django.core.serializers import serialize
 
-from django.apps import apps
 from django.contrib.auth.models import User
 
 from analysis.models.nodes.node_utils import reload_analysis_nodes
@@ -65,7 +64,6 @@ def analysis_import(user: User, genome_build: GenomeBuild, filename,
 
     for node_record in analysis_json["nodes"]:
         model_name = node_record["model"]
-        model = apps.get_model(model_name)
         data = node_record["fields"]
         old_pk = data.pop("id")
         data["analysis"] = analysis.pk

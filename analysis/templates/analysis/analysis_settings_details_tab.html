@@ -8,7 +8,7 @@
     IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
 
     function createCrossLink(select, id, linkText) {
-        var crossLink = $("<a target='_blank' id='" + id + "'>" + linkText + "</a>");
+        const crossLink = $(`<a target='_blank' id='${id}'>${linkText}</a>`);
         select.after(crossLink);
     }
     
@@ -20,31 +20,36 @@
             success: function(data) {
                 if (IN_ANALYSIS) {
                     // This is from before the page reload - ie old settings.
-                    var my_current_analysis_settings = {{ new_analysis_settings|jsonify }};
+                    const my_current_analysis_settings = {{ new_analysis_settings|jsonify }};
                     changeAnalysisSettings(my_current_analysis_settings);
                 }
             },
         };
-        var analysisForm = $('form#analysis-form');
+        const analysisForm = $('form#analysis-form');
         analysisForm.ajaxForm(options); 
 
         // Setup Links as per normal
-        var columnsSelect = $('#id_custom_columns_collection', '#analysis-form');
-        var columnsUrl = "{% url 'custom_columns' %}";
-        var columnsLink = $("<span> <a target='_blank' href='" + columnsUrl + "'>Manage Custom Columns</a> (opens in new window)</span>");
+        const columnsSelect = $('#id_custom_columns_collection', '#analysis-form');
+        const columnsUrl = "{% url 'custom_columns' %}";
+        const columnsLink = $(`<span><a target='_blank' href='${columnsUrl}'>Manage Custom Columns</a> (opens in new window)</span>`);
         columnsSelect.after(columnsLink);
         
         $('#force-reload-nodes-button').click(reloadNodes);
         
         $('#id_annotation_version').change(function() {
-            var warningId = 'annotation-version-warning';
-            var messages = $('.messages', analysisForm);
-            var warning = $('.' + warningId, messages);
+            const warningId = 'annotation-version-warning';
+            const messages = $('.messages', analysisForm);
+            const warning = $('.' + warningId, messages);
             if (!warning.length) {
-                $("<li class='info " + warningId + "'>Warning: Changing Annotation Version will reload all nodes.</li>").appendTo(messages);
+                $(`<li class='info ${warningId}'>Warning: Changing Annotation Version will reload all nodes.</li>`).appendTo(messages);
             }
         });
         initSmartSelectsInForm($("form#analysis-form"));
+
+        {% if reload_analysis %}
+            checkAndMarkDirtyNodes();
+        {% endif %}
+
     });
 </script>
 
@@ -57,7 +62,6 @@
                 <button class="btn btn-primary" id='save-analysis-settings' type="submit">Save</button>
             {% endif %}
         </div>
-
     </form>
 </div>
 </div>

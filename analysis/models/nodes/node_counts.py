@@ -15,7 +15,7 @@ from classification.models import Classification, GenomeBuild
 # Add the necessary fields to qs to create join:
 REQUIRED_FIELDS = [
     "clinvar__highest_pathogenicity",
-    "variantannotation__gene__ensemblgeneannotation__omim_phenotypes",
+    "variantannotation__gene__geneannotation__omim_terms",
     "variantannotation__impact"
 ]
 
@@ -36,7 +36,7 @@ where classification_classification.variant_id in (
 COUNTS = {
     BuiltInFilters.TOTAL: "count(*)",
     BuiltInFilters.CLINVAR: "sum(case when %(annotation_clinvar)s.highest_pathogenicity >= 4 then 1 else 0 end)",
-    BuiltInFilters.OMIM: "sum(case when %(annotation_ensemblgeneannotation)s.omim_phenotypes is not null then 1 else 0 end)",
+    BuiltInFilters.OMIM: "sum(case when %(annotation_geneannotation)s.omim_terms is not null then 1 else 0 end)",
     BuiltInFilters.IMPACT_HIGH_OR_MODERATE: "sum(case when %(annotation_variantannotation)s.impact in ('H', 'M') then 1 else 0 end)",
     BuiltInFilters.COSMIC: "sum(case when %(annotation_variantannotation)s.cosmic_id is not null then 1 else 0 end)",
     BuiltInFilters.CLASSIFIED: f"sum(case when exists ({CLASSIFICATION_COUNT_SQL}) then 1 else 0 end)",
@@ -48,7 +48,7 @@ def get_extra_filters_q(user: User, genome_build: GenomeBuild, extra_filters):
     if extra_filters == BuiltInFilters.CLINVAR:
         q = Q(clinvar__highest_pathogenicity__gte=4)
     elif extra_filters == BuiltInFilters.OMIM:
-        q = Q(variantannotation__gene__ensemblgeneannotation__omim_phenotypes__isnull=False)
+        q = Q(variantannotation__gene__geneannotation__omim_terms__isnull=False)
     elif extra_filters in [BuiltInFilters.CLASSIFIED, BuiltInFilters.CLASSIFIED_PATHOGENIC]:
         clinical_significance_list = None
         if extra_filters == BuiltInFilters.CLASSIFIED_PATHOGENIC:

@@ -292,3 +292,28 @@ def bulk_insert_class_data(apps, app_name: str, klass_name_and_data_list: List[T
         for kwargs in data:
             records.append(klass(**kwargs))
         klass.objects.bulk_create(records)
+
+
+def chunked_queryset(queryset, chunk_size):
+    """ Slice a queryset into chunks. From https://djangosnippets.org/snippets/10599/  """
+
+    start_pk = 0
+    queryset = queryset.order_by('pk')
+
+    while True:
+        # No entry left
+        if not queryset.filter(pk__gt=start_pk).exists():
+            break
+
+        try:
+            # Fetch chunk_size entries if possible
+            end_pk = queryset.filter(pk__gt=start_pk).values_list(
+                'pk', flat=True)[chunk_size - 1]
+
+            # Fetch rest entries if less than chunk_size left
+        except IndexError:
+            end_pk = queryset.values_list('pk', flat=True).last()
+
+        yield queryset.filter(pk__gt=start_pk).filter(pk__lte=end_pk)
+
+        start_pk = end_pk

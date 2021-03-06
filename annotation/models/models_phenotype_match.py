@@ -1,15 +1,17 @@
+from typing import List
+
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL
 
-from annotation.models.models_mim_hpo import HumanPhenotypeOntology, MIMMorbidAlias, MIMMorbid
-from genes.models import GeneSymbol, Gene
+from genes.models import GeneSymbol
+from ontology.models import OntologyTerm, OntologySnake
 from patients.models import Patient
 
 
 PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
-PATIENT_OMIM_PATH = PATIENT_TPM_PATH + "__omim_alias__mim_morbid"
-PATIENT_HPO_PATH = PATIENT_TPM_PATH + "__hpo"
+PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
 PATIENT_GENE_SYMBOL_PATH = PATIENT_TPM_PATH + "__gene_symbol"
 
 
@@ -41,29 +43,13 @@ class PhenotypeDescription(models.Model):
             results.extend(sentence.get_results())
         return results
 
-    def get_hpo_qs(self):
-        hpo_path = 'text_phenotype__textphenotypematch__hpo'
-        pheno_qs = self.textphenotypesentence_set.filter(**{hpo_path + "__isnull": False})
-        pheno_ids = pheno_qs.values_list(hpo_path, flat=True)
-        return HumanPhenotypeOntology.objects.filter(pk__in=pheno_ids)  # @UndefinedVariable
+    def get_ontology_term_ids(self) -> List[OntologyTerm]:
+        ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
+        return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
 
-    def get_mim_qs(self):
-        mim_morbid_alias_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__omim_alias__isnull=False)
-        omim_ids = mim_morbid_alias_qs.values_list("text_phenotype__textphenotypematch__omim_alias__mim_morbid_id", flat=True)
-        return MIMMorbid.objects.filter(pk__in=omim_ids)
-
-    def get_mim_and_pheno_mim_qs(self):
-        tps = self.textphenotypesentence_set
-        mim_morbid_qs = tps.filter(text_phenotype__textphenotypematch__omim_alias__isnull=False)
-        mim_morbid_values = mim_morbid_qs.values_list("text_phenotype__textphenotypematch__omim_alias__mim_morbid_id", flat=True)
-        pheno_morbid_qs = tps.filter(text_phenotype__textphenotypematch__hpo__phenotypemim__mim_morbid__isnull=False)
-        pheno_morbid_values = pheno_morbid_qs.values_list("text_phenotype__textphenotypematch__hpo__phenotypemim__mim_morbid", flat=True)
-        omim_ids = set(pheno_morbid_values) | set(mim_morbid_values)
-        return MIMMorbid.objects.filter(pk__in=omim_ids)
-
-    def get_gene_qs(self):
-        mimmorbid_qs = self.get_mim_and_pheno_mim_qs()
-        return Gene.objects.filter(mimgene__mim_morbid__in=mimmorbid_qs)
+    def get_gene_symbols(self) -> QuerySet:
+        ontology_term_ids = self.get_ontology_term_ids()
+        return OntologySnake.special_case_gene_symbols_for_terms(ontology_term_ids)
 
     def __str__(self):
         text = self.original_text[:50]
@@ -112,26 +98,30 @@ class PhenotypeMatchTypes(models.Model):
 
 
 class TextPhenotypeMatch(models.Model):
-    FIELDS = {PhenotypeMatchTypes.HPO: 'hpo',
-              PhenotypeMatchTypes.OMIM: 'omim_alias',
+    FIELDS = {PhenotypeMatchTypes.HPO: 'ontology_term',
+              PhenotypeMatchTypes.OMIM: 'ontology_term',
               PhenotypeMatchTypes.GENE: 'gene_symbol'}
 
     text_phenotype = models.ForeignKey(TextPhenotype, on_delete=CASCADE)
     match_type = models.CharField(max_length=1, choices=PhenotypeMatchTypes.CHOICES)
-    hpo = models.ForeignKey(HumanPhenotypeOntology, null=True, on_delete=CASCADE)
-    omim_alias = models.ForeignKey(MIMMorbidAlias, null=True, on_delete=CASCADE)
+    ontology_term = models.ForeignKey(OntologyTerm, null=True, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     offset_start = models.IntegerField()
     offset_end = models.IntegerField()
 
     def to_dict(self):
         """ This is what's sent as JSON back to client for highlighting and grids """
-        gene_symbols_qs = GeneSymbol.objects.filter(geneversion__gene__in=self.record.get_genes()).order_by("pk")
-        gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
+        if self.match_type == PhenotypeMatchTypes.GENE:
+            gene_symbols = [self.gene_symbol_id]
+        else:
+            gene_symbols_qs = OntologySnake.special_case_gene_symbols_for_terms([self.ontology_term_id])
+            gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
 
-        return {"accession": self.record.accession,
+        string = str(self.record)
+
+        return {"accession": string,
                 "gene_symbols": gene_symbols,
-                "match": str(self.record),
+                "match": string,
                 "match_type": self.match_type,
                 "name": self.record.name,
                 "offset_start": self.offset_start,

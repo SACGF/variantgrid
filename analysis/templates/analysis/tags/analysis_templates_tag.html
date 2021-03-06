@@ -13,7 +13,7 @@
 </script>
 <ul>
     {% for analysis_template in analysis_template_links %}
-    <li><a href="javascript:createAnalysis_{{ flattened_uuid }}({{ analysis_template.pk }})">
+    <li><a class='hover-link' href="javascript:createAnalysis_{{ flattened_uuid }}({{ analysis_template.pk }})">
             Perform {{ analysis_template.name }}
         </a>
         {{ analysis_template.description|safe }}

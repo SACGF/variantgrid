@@ -1,7 +1,9 @@
 {% extends "jqgrid/jqgrid.html" %}
+{% load settings_tags %}
 
 {% block formatter %}
         'detailsLink' : detailsLink,
         'tagsGlobalFormatter' : tagsGlobalFormatter,
         'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
+        'formatClinGenAlleleId': formatClinGenAlleleId,
 {% endblock %}

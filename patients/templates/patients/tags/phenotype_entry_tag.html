@@ -1,7 +1,7 @@
 <div id="phenotype-entry-{{ flattened_uuid }}">
 {% load static %}
 {% load js_tags %}
-{% load help_tags %}
+{% load ui_help %}
 <style>
 #patient-ontology .patient-ontology-term {
     color: #fff;
@@ -26,6 +26,9 @@
     float: left;
     margin: 5px;
 }
+span.select2-container {
+    min-width: auto !important;
+}
 
 </style>
 <script src="{% static 'js/include_jqgrid.js' %}"></script>
@@ -34,22 +37,21 @@
 <script>
 // Global scope functions - so need to be unique
 function showPhenotypeGrid_{{ flattened_uuid }}() {
-    var phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
+    const phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
     $("#phenotype-entry-terms-grid-container", phenotypeEditorTag).slideDown();
 }
 
 
 function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
-    var phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
-    var selector = $("#phenotype-entry-terms-grid", phenotypeEditorTag);
-    var grid = jQuery(selector).jqGrid();
-    var gridData = grid.getRowData();
+    const phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
+    const selector = $("#phenotype-entry-terms-grid", phenotypeEditorTag);
+    const grid = jQuery(selector).jqGrid();
+    const gridData = grid.getRowData();
 
-    var csv = JSON2CSV(gridData, true, true);
-    var downloadLink = document.createElement("a");
-    var blob = new Blob(["\ufeff", csv], {type : 'text/csv'});
-    var url = URL.createObjectURL(blob);
-    downloadLink.href = url;
+    const csv = JSON2CSV(gridData, true, true);
+    const downloadLink = document.createElement("a");
+    const blob = new Blob(["\ufeff", csv], {type: 'text/csv'});
+    downloadLink.href = URL.createObjectURL(blob);
     downloadLink.download = "phenotypes.csv";
     
     document.body.appendChild(downloadLink);
@@ -59,21 +61,20 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
 
 
 (function() {
-    var typingTimer;                //timer identifier
-    var doneTypingInterval = 2000;  //time in ms (2 seconds)
-    var ignoreAutcompleteChangeEvent = false;
-    var phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
-    var downloadPhenotypeGridAsCSV = downloadPhenotypeGridAsCSV_{{ flattened_uuid }};
+    let typingTimer;                //timer identifier
+    const doneTypingInterval = 2000;  //time in ms (2 seconds)
+    let ignoreAutcompleteChangeEvent = false;
+    const phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
+    const downloadPhenotypeGridAsCSV = downloadPhenotypeGridAsCSV_{{ flattened_uuid }};
     
     function getPhenotypeInput() {
         return $("#{{ form_entry_field.auto_id }}", phenotypeEditorTag);
     }
     
     function doneTyping () {
-        var phenotypeText = getPhenotypeInput().val();
-        var data = 'phenotype_text=' + encodeURIComponent(phenotypeText);
-
-        var descriptionBox = $("#description-highlighted", phenotypeEditorTag);
+        const phenotypeText = getPhenotypeInput().val();
+        const data = 'phenotype_text=' + encodeURIComponent(phenotypeText);
+        const descriptionBox = $("#description-highlighted", phenotypeEditorTag);
         descriptionBox.html('<img src="{% static 'icons/loading.gif' %}" /> Querying text for known terms');
     
         $.ajax({
@@ -82,7 +83,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             url: "{% url 'phenotypes_matches' %}",
             success: function(phenotypeMatches) {
                 displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches);
-                var gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
+                const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
                 if (gridData.length) {
                     $(".has-phenotypes-icon").show();
                     createTermGrid(gridData);
@@ -103,9 +104,9 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
     
     
     function addToDescription(text) {
-        var description = getPhenotypeInput();
-        var existingText = description.val();
-    
+        const description = getPhenotypeInput();
+        let existingText = description.val();
+
         if (existingText) {
             if ($("#new-terms-only", phenotypeEditorTag).is(":checked")) {
                 if (existingText.indexOf(text) != -1) {
@@ -121,16 +122,16 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
     
     function addTerm(term_type, value, leave_autcomplete_term_type) {
         addToDescription(value);
-    
-        var AUTOCOMPLETE_IDS = {
-            'hpo' : 'id_hpo_synonym',
-            'omim' : 'id_mim_morbid_alias',
-            'gene' : 'id_gene',
-        };    
+
+        const AUTOCOMPLETE_IDS = {
+            'hpo': 'id_hpo_synonym',
+            'omim': 'id_mim_morbid_alias',
+            'gene': 'id_gene',
+        };
         ignoreAutcompleteChangeEvent = true;
-        for (var t in AUTOCOMPLETE_IDS) {
-            var autocomplete_id = AUTOCOMPLETE_IDS[t];
-            var s = $("#" + autocomplete_id, phenotypeEditorTag);
+        for (const t in AUTOCOMPLETE_IDS) {
+            const autocomplete_id = AUTOCOMPLETE_IDS[t];
+            const s = $("#" + autocomplete_id, phenotypeEditorTag);
             clearAutocompleteChoice(s);
         }
         ignoreAutcompleteChangeEvent = false;    
@@ -145,33 +146,33 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         if (!$(selector).val()) { // empty
             return;
         }
-    
-        var raw_text = $(selector).text();
-        var match = new RegExp(regex).exec(raw_text);
+
+        const raw_text = $("option:selected", selector).text();
+        const match = new RegExp(regex).exec(raw_text);
         if (match) {
-            var value = match[1].trim();
+            const value = match[1].trim();
             // pass in 3rd param to tell it we're from autocomplete box (and leave it)
-            addTerm(term_type, value, term_type);             
+            addTerm(term_type, value, term_type);
         }
     }
     
     
     function createTermGrid(gridData) {
-        var selector = $("#phenotype-entry-terms-grid", phenotypeEditorTag);
-        var pagerId = "#phenotype-entry-terms-grid-pager-{{ flattened_uuid }}";
-    
-        var alreadyLoaded = selector[0].grid;
+        const selector = $("#phenotype-entry-terms-grid", phenotypeEditorTag);
+        const pagerId = "#phenotype-entry-terms-grid-pager-{{ flattened_uuid }}";
+
+        const alreadyLoaded = selector[0].grid;
         if (alreadyLoaded) {
             // update existing grid
             selector.jqGrid('setGridParam', {data: gridData}).trigger('reloadGrid');
         } else {
-            var grid = selector.jqGrid({
+            const grid = selector.jqGrid({
                 datatype: "local",
                 data: gridData,
-                colModel:[{name:'term_type', index: 'term_type', 'label' : 'Term Type'},
-                          {name:'accession', index: 'accession', 'label' : 'Accession'},
-                          {name:'name', index: 'name', 'label' : 'Name'},
-                          {name:'gene_symbols', index: 'gene_symbols', 'label' : 'Gene Symbols'},
+                colModel: [{name: 'term_type', index: 'term_type', 'label': 'Term Type'},
+                    {name: 'accession', index: 'accession', 'label': 'Accession'},
+                    {name: 'name', index: 'name', 'label': 'Name'},
+                    {name: 'gene_symbols', index: 'gene_symbols', 'label': 'Gene Symbols'},
                 ],
                 caption: "Matched Phenotype Terms",
                 height: 'auto',
@@ -204,31 +205,31 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
 
     
     $(document).ready(function() {
-        var phenotypeMatches = {{ patient_results | jsonify }};
+        const phenotypeMatches = {{ patient_results | jsonify }};
         if (phenotypeMatches) {
-            var descriptionBox = $("#description-highlighted", phenotypeEditorTag);
-            var phenotypeText = `{{ initial_phenotype_text }}`; // can have newlines
+            const descriptionBox = $("#description-highlighted", phenotypeEditorTag);
+            const phenotypeText = `{{ initial_phenotype_text }}`; // can have newlines
             displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches);
-            var gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
+            const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
             createTermGrid(gridData);
             $(".has-phenotypes-icon").show();
         }
 
     {% if edit %}
         //on keyup, start the countdown
-        var phenotypeInput = getPhenotypeInput();
+        const phenotypeInput = getPhenotypeInput();
         phenotypeInput.keyup(startDescriptionUpdateTimer);
     
-        $('#id_hpo_synonym', phenotypeEditorTag).change(function() {
-            var regex = "HP:\\d{7}: ([^\\(]*)";
+        $('#id_hpo', phenotypeEditorTag).change(function() {
+            const regex = "HP:\\d{7} ([^\\(]*)";
             searchForText('hpo', regex, this);
         });
-        $('#id_mim_morbid_alias', phenotypeEditorTag).change(function() {
-            var regex = "MIM: \\d+ ([^\\(]*)";
+        $('#id_omim', phenotypeEditorTag).change(function() {
+            const regex = "OMIM:\\d+ ([^\\(]*)";
             searchForText('omim', regex, this);
         });
-        $('#id_gene', phenotypeEditorTag).change(function() {
-            var regex = "([^\\s\\(]*)\\s+\\(";
+        $('#id_gene_symbol', phenotypeEditorTag).change(function() {
+            const regex = "(.*)";
             searchForText('gene', regex, this);
         });
     {% endif %}
@@ -241,26 +242,26 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
 })();
 </script>
 {% if show_page_help %}
-    {% page_help user 'patients/patient_phenotypes_help' 'Patient Phenotypes' %}
+    {% page_help 'patients/patient_phenotypes_help' 'Patient Phenotypes' header_tag="h4" %}
 {% endif %}
 {% if edit %}
 <div id='patient-ontology'>
     <table>
         <tr>
-            {% if hpo_form %}<td><div class='ontology-label hpo'>Human Phenotype Ontology</div></td>{% endif %}
-            {% if omim_form %}<td><div class='ontology-label omim'>OMIM</div></td>{% endif %}
-            {% if gene_form %}<td><div class='ontology-label gene'>Genes</div></td>{% endif %}
+            {% if hpo_form %}<td style="width:30%"><div class='ontology-label hpo'>Human Phenotype Ontology</div></td>{% endif %}
+            {% if omim_form %}<td style="width:30%"><div class='ontology-label omim'>OMIM</div></td>{% endif %}
+            {% if gene_symbol_form %}<td style="width:30%"><div class='ontology-label gene'>Genes</div></td>{% endif %}
         </tr>
         <tr>
-            {% if hpo_form %}<td class='hpo'> {{ hpo_form.hpo_synonym }} {{ hpo_form.media }}</td>{% endif %}
-            {% if omim_form %}<td class='omim'> {{ omim_form.mim_morbid_alias }}</td>{% endif %}
-            {% if gene_form %}<td class='gene'> {{ gene_form.gene }}</td>{% endif %}
+            {% if hpo_form %}<td style="width:30%"><div class="hpo">{{ hpo_form.hpo }} {{ hpo_form.media }}</div></td>{% endif %}
+            {% if omim_form %}<td style="width:30%"><div class='omim'>{{ omim_form.omim }}</div></td>{% endif %}
+            {% if gene_symbol_form %}<td style="width:30%"><div class='gene'>{{ gene_symbol_form.gene_symbol }}</div></td>{% endif %}
         </tr>
     </table>
-    <div>
-        Auto-complete terms in boxes above, or type free text into the large box below.
-        <input id='new-terms-only' type='checkbox' checked='checked' /> Only add new terms.
-        (See Patient Phenotypes Guide in help)
+    <div class="my-2">
+        Auto-complete terms in boxes above, or type free text into the large box below.<br/>
+        <label for="new-terms-only"><input id='new-terms-only' type='checkbox' checked='checked' /> Only add new terms.
+        (See Patient Phenotypes Guide in help)</label>
     </div>
 </div>
 {% endif %}

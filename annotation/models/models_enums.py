@@ -66,23 +66,12 @@ class CitationSource(models.TextChoices):
                       'PubMedCentral': PUBMED_CENTRAL[0]})
 
 
-class TranscriptStatus(models.TextChoices):
-    KNOWN = 'K', "KNOWN"
-    NOVEL = 'N', "NOVEL"
-    PUTATIVE = 'P', "PUTATIVE"
-
-
-class GenomicStrand(models.TextChoices):
-    SENSE = '+', '+'
-    ANTISENSE = '-', '-'
-
-
 class ClinGenClassification(models.TextChoices):
     DEFINITIVE = 'D', 'Definitive'
     STRONG = 'S', 'Strong'
     MODERATE = 'M', 'Moderate'
     LIMITED = 'L', 'Limited'
-    NO_REPORTED_EVIDENCE = 'N', 'No Reported Evidence'
+    NO_KNOWN_DISEASE_RELATIONSHIP = 'N', 'No Known Disease Relationship'
     REFUTED = 'R', 'Refuted'
     DISPUTED = 'P', 'Disputed'
 
@@ -151,7 +140,8 @@ class VEPPlugin(models.TextChoices):
 
 
 class VEPCustom(models.TextChoices):
-    GNOMAD = 'g', 'gnomAD'
+    GNOMAD_2 = 'g', 'gnomAD2'
+    GNOMAD_3 = 'n', 'gnomAD3'
     PHASTCONS_100_WAY = '1', 'phastCons100way'
     PHASTCONS_30_WAY = '2', 'phastCons30way'
     PHASTCONS_46_WAY = '3', 'phastCons46way'

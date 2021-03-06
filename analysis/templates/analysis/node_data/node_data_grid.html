@@ -1,22 +1,22 @@
 {% extends "analysis/node_data/base_node_data.html" %}
 {% load js_tags %}
-{% block javascript %}
-
+{% block content %}
+<script>
 var nodeId = {{ node_id }};
 
 function selectVariant() {
-	var variantId = $(this).attr("variant_id");
-	var checked = $(this).is(":checked");
+    const variantId = $(this).attr("variant_id");
+    const checked = $(this).is(":checked");
 
-	var data = 'variant_id=' + variantId + '&checked=' + checked;
-	$.ajax({
+    const data = 'variant_id=' + variantId + '&checked=' + checked;
+    $.ajax({
 	    type: "POST",
 	    data: data,
 	    url: '{% url 'set_variant_selected' node_id %}',
 	    success: function() {
-			var aWin = getAnalysisWindow();
-    		var variants = aWin.selectedVariants[nodeId] || {};
-	    	aWin.selectedVariants[nodeId] = variants;
+            const aWin = getAnalysisWindow();
+            const variants = aWin.selectedVariants[nodeId] || {};
+            aWin.selectedVariants[nodeId] = variants;
 	    	if (checked) {
 				variants[variantId] = 1;
 				revealSelectedTab(nodeId, true); // Could need to turn on...
@@ -30,47 +30,44 @@ function selectVariant() {
 
 
 function gridComplete() {
-	var aWin = getAnalysisWindow();
-	var variants = aWin.selectedVariants[nodeId];
-	if (variants) {
+    const aWin = getAnalysisWindow();
+    const variants = aWin.selectedVariants[nodeId];
+    if (variants) {
 		$("input.variant-select").each(function() {
-			var variantId = $(this).attr("variant_id");
-			if (variantId in variants) {
+            const variantId = $(this).attr("variant_id");
+            if (variantId in variants) {
 				$(this).prop('checked', true);
 			}
 		});
 	}
-	
+
 	$("input.variant-select").click(selectVariant);
-	var unique_code = "{{ node_id }}_{{ node_version }}";
-	registerComponent(unique_code, GRID);
+    const unique_code = "{{ node_id }}_{{ node_version }}";
+    registerComponent(unique_code, GRID);
 }
 
 
 function getBams() {
-    var SAMPLE_BAMS = {{ bams_dict | jsonify }};
-    var bams = [];
-    for (var k in SAMPLE_BAMS) {
-        var v = SAMPLE_BAMS[k];
+    const SAMPLE_BAMS = {{ bams_dict | jsonify }};
+    const bams = [];
+    for (let k in SAMPLE_BAMS) {
+        let v = SAMPLE_BAMS[k];
         bams.push(v);
-    } 
+    }
     return bams;
 }
 
+$(document).ready(function() {
+    const node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
+    load_node_editor(node_view_url);
 
-{% endblock javascript %}
+    // Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back
+    const grid_url = "{% url 'node_grid_config' analysis_version node_id node_version extra_filters %}";
+    const unique_code = "{{ node_id }}_{{ node_version }}";
+    setupGrid(grid_url, {{ node_id }}, {{ node_version }}, unique_code, gridComplete, gridLoadError, on_error_function);
 
-{% block docreadyjs %}
-		var node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
-		load_node_editor(node_view_url);
-
-		// Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back 
-		var grid_url = "{% url 'node_grid_config' analysis_version node_id node_version extra_filters %}";
-		var unique_code = "{{ node_id }}_{{ node_version }}";
-		setupGrid(grid_url, {{ node_id }}, {{ node_version }}, unique_code, gridComplete, gridLoadError, on_error_function);
-{% endblock docreadyjs %}
-
-{% block content %}
+});
+</script>
 <div id="{{ node_id }}_{{ node_version }}">
 	<div id='node-data-grid' class='node-data'>
 	<table id='grid-{{ node_id }}' class='grid'>

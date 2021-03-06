@@ -137,8 +137,7 @@ class SampleChromosomeDensityGraph(AbstractChromosomeDensityGraph):
 
     def get_queryset(self):
         qs = self.sample.get_variant_qs()
-        qs = qs.filter(Variant.get_no_reference_q(), **{f"{self.zygosity_alias}__in": Zygosity.VARIANT})
-        return qs
+        return qs.filter(Variant.get_no_reference_q(), **{f"{self.sample.zygosity_alias}__in": Zygosity.VARIANT})
 
     def get_genome_build(self):
         return self.sample.vcf.genome_build

@@ -232,10 +232,16 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
                 return {ss.sample_id: s for ss, s in get_samples_by_sequencing_sample(sample_sheet, vcf).items()}
 
             old_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(old_sample_sheet)
-            new_ss_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(new_sample_sheet)
+            new_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(new_sample_sheet)
 
             for sequencing_sample_id, sample in old_samples_by_sequencing_sample_id.items():
-                new_ss = new_ss_by_sequencing_sample_id[sequencing_sample_id]
+                new_sample = new_samples_by_sequencing_sample_id[sequencing_sample_id]
+                try:
+                    new_ss = new_sample.samplefromsequencingsample.sequencing_sample
+                except SampleFromSequencingSample.DoesNotExist:
+                    # Does this matter? maybe vcf wasn't imported etc...
+                    logging.info("There was no SampleFromSequencingSample for sample %s", new_sample)
+                    continue
 
                 try:
                     sfss = sample.samplefromsequencingsample
@@ -266,7 +272,11 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
                 unaligned_reads.sequencing_sample = new_ss
                 unaligned_reads.save()
 
-    sequencing_run_current_sample_sheet_changed_signal.send(sender=os.path.basename(__file__), sequencing_run=sequencing_run, meaningfully_changed=meaningfully_changed)
+    sequencing_run_current_sample_sheet_changed_signal.send(sender=os.path.basename(__file__),
+                                                            sequencing_run=sequencing_run,
+                                                            meaningfully_changed=meaningfully_changed)
+
+    sequencing_run.save()  # Re-validate ready based on errors
 
 
 def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
@@ -321,7 +331,8 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
             existing_fastq_files.add(fastq.path)
 
     fastq_pairs = defaultdict(dict)
-    create_fastqs_for_sample_sheet(current_sample_sheet, existing_fastq_files, existing_fastq_records, fastq_pairs, assign_to_most_recent_sample_sheet=True)
+    create_fastqs_for_sample_sheet(current_sample_sheet, existing_fastq_files, existing_fastq_records, fastq_pairs,
+                                   assign_to_most_recent_sample_sheet=True)
     unaligned_reads_list_from_fastqs(fastq_pairs)
 
     # Delete anything left...
@@ -331,6 +342,8 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
     SequencingRunModification.objects.create(sequencing_run=sequencing_run,
                                              user=user,
                                              message=message)
+
+    sequencing_run.save()  # Re-validate "ready"
 
 
 def process_flowcells(seqauto_run, existing_files, results):

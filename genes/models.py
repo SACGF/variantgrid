@@ -4,6 +4,7 @@ import os
 import re
 from collections import namedtuple
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import total_ordering
 from typing import Tuple, Optional, Dict, List, Set
 
@@ -21,6 +22,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
+from django.utils import timezone
 from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
@@ -40,7 +42,7 @@ from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 
 
-class HGNCGeneNamesImport(TimeStampedModel):
+class HGNCImport(TimeStampedModel):
     pass
 
 
@@ -61,31 +63,79 @@ class BadTranscript(ValueError):
     pass
 
 
-class HGNCGeneNames(models.Model):
+class HGNC(models.Model):
     # pk = HGNC id with HGNC: stripped out
-    hgnc_import = models.ForeignKey(HGNCGeneNamesImport, on_delete=CASCADE)
-    approved_symbol = models.TextField()
+    alias_symbols = models.TextField()
     approved_name = models.TextField()
+    ccds_ids = models.TextField(null=True, blank=True)
+    ensembl_gene_id = models.TextField(null=True, blank=True)
+    gene_group_ids = models.TextField(null=True, blank=True)
+    gene_groups = models.TextField(null=True, blank=True)
+    # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
+    gene_symbol = models.ForeignKey('GeneSymbol', on_delete=CASCADE)
+    hgnc_import = models.ForeignKey(HGNCImport, on_delete=CASCADE)
+    location = models.TextField(null=True, blank=True)
+    mgd_ids = models.TextField(null=True, blank=True)
+    omim_ids = models.TextField(null=True, blank=True)
+    previous_symbols = models.TextField(null=True, blank=True)
+    refseq_ids = models.TextField(null=True, blank=True)
+    rgd_ids = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=1, choices=HGNCStatus.choices)
-    previous_symbols = models.TextField()
-    synonyms = models.TextField()
-    refseq_ids = models.TextField()
+    ucsc_ids = models.TextField(null=True, blank=True)
+    uniprot_ids = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f"HGNC:{self.pk} approved symbol: {self.approved_symbol}, " \
-               f"previous symbols: {self.previous_symbols}, synonyms: {self.synonyms}"
+        return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \
+               f"previous symbols: {self.previous_symbols}, alias_symbols: {self.alias_symbols}"
+
+    def url(self):
+        return f"https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:{self.pk}"
+
+    @lazy
+    def ccds_list(self):
+        return (self.ccds_ids or '').split(",")
+
+    @lazy
+    def gene_group_id_list(self):
+        return (self.gene_group_ids or '').split(",")
+
+    @lazy
+    def mgd_list(self):
+        return (self.mgd_ids or '').split(",")
+
+    @lazy
+    def rgd_list(self):
+        return (self.rgd_ids or '').split(",")
+
+    @lazy
+    def ucsc_list(self):
+        return (self.ucsc_ids or '').split(",")
+
+    @lazy
+    def uniprot_list(self) -> List['UniProt']:
+        ulist = []
+        if self.uniprot_ids:
+            uniprot_ids = self.uniprot_ids.split(",")
+            ulist = list(UniProt.objects.filter(pk__in=uniprot_ids))
+        return ulist
 
 
-gene_symbol_withdrawn_str = '~withdrawn'
+class UniProt(models.Model):
+    # accession = Primary (citable) accession number (1st element in SwissProt record)
+    accession = models.TextField(primary_key=True)
+    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    function = models.TextField(null=True, blank=True)
+    pathway = models.TextField(null=True, blank=True)
+    pathway_interaction_db = models.TextField(null=True, blank=True)
+    reactome = models.TextField(null=True, blank=True)
+    tissue_specificity = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.accession
 
 
 class GeneSymbol(models.Model):
     symbol = models.TextField(primary_key=True)
-
-    @property
-    def accession(self):
-        """ For use by TextPhenotypeMatch """
-        return self.symbol
 
     @property
     def name(self):
@@ -271,11 +321,12 @@ class Gene(models.Model):
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
+    summary = models.TextField(null=True, blank=True)  # Only used by RefSeq
 
     @property
     def is_legacy(self):
         """ Required internally, but probably shouldn't be shown to the user """
-        return self.identifier.startswith('unknown_')
+        return self.identifier.startswith(Gene.FAKE_GENE_ID_PREFIX)
 
     def get_external_url(self):
         if self.annotation_consortium == AnnotationConsortium.REFSEQ:
@@ -314,8 +365,8 @@ class Gene(models.Model):
         qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
         ret = qs.delete()
         if ret:
-             print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
-             print(ret)
+            print(f"Deleted orphaned {Gene.FAKE_GENE_ID_PREFIX} records:")
+            print(ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
@@ -340,7 +391,7 @@ class GeneVersion(models.Model):
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     version = models.IntegerField()  # RefSeq GeneIDs are always 1 (not versioned)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    hgnc = models.ForeignKey(HGNCGeneNames, null=True, on_delete=CASCADE)
+    hgnc = models.ForeignKey(HGNC, null=True, on_delete=CASCADE)
     description = models.TextField(null=True)
     biotype = models.TextField(null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
@@ -718,10 +769,18 @@ class GeneAnnotationRelease(models.Model):
         """ """
         gene_annotation_releases = []
         for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
-            vav = genome_build.latest_variant_annotation_version
-            if vav.gene_annotation_release:
-                gene_annotation_releases.append(vav.gene_annotation_release)
+            if vav := genome_build.latest_variant_annotation_version:
+                if vav.gene_annotation_release:
+                    gene_annotation_releases.append(vav.gene_annotation_release)
         return gene_annotation_releases
+
+    def genes_for_symbols(self, gene_symbols) -> QuerySet:
+        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=self,
+                                                       release_gene_symbol__gene_symbol__in=gene_symbols)
+        return Gene.objects.filter(pk__in=rgsg_qs.values_list("gene_id", flat=True))
+
+    def genes_for_symbol(self, gene_symbol) -> QuerySet:
+        return self.genes_for_symbols([gene_symbol])
 
     def __str__(self):
         return f"{self.genome_build.name}/{self.get_annotation_consortium_display()} - v{self.version}"
@@ -802,6 +861,7 @@ class GeneListCategory(models.Model):
     QC_COVERAGE_CUSTOM_TEXT = 'QCCoverageCustomText'
     PATHOLOGY_TEST = 'PathologyTest'
     PATHOLOGY_TEST_ORDER = 'PathologyTestOrder'
+    PANEL_APP_CACHE = 'PanelAppCache'
     GENE_INFO = "GeneInfo"
 
     name = models.TextField()
@@ -922,36 +982,28 @@ class GeneList(models.Model):
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return user.has_perm(write_perm, self) and not self.locked
 
-    @lazy
-    def warning(self):
-        warnings = {"unmatched": self.unmatched_genes.count(),
-                    "aliased": self.aliased_genes.count()}
+    def get_warnings(self, release: GeneAnnotationRelease) -> List[str]:
+        counts = {"unmatched symbols": self.unmatched_gene_symbols.count(),
+                  "aliased": self.aliased_genes.count(),
+                  "unmatched genes": self.unmatched_genes(release).count()}
 
-        warning_list = []
-        prefix = None
-        for w, num in warnings.items():
+        warnings = []
+        for name, num in counts.items():
             if num:
-                if prefix is None:
-                    prefix = "There were " if num > 1 else "There was "
-
-                msg = f"{num} {w} gene"
-                if num > 1:
-                    msg += "s"
-                warning_list.append(msg)
-
-        if warning_list:
-            message = prefix + " and ".join(warning_list) + "."
-        else:
-            message = ""
-        return message
+                warnings.append(f"{name} x {num}")
+        return warnings
 
     @property
-    def unmatched_genes(self):
+    def unmatched_gene_symbols(self):
         return self.genelistgenesymbol_set.filter(gene_symbol__isnull=True).order_by("original_name")
 
     @property
     def aliased_genes(self):
         return self.genelistgenesymbol_set.filter(gene_symbol_alias__isnull=False)
+
+    def unmatched_genes(self, release: GeneAnnotationRelease):
+        string_agg = GeneListGeneSymbol.get_joined_genes_qs_annotation_for_release(release)
+        return self.genelistgenesymbol_set.annotate(matched_genes=string_agg).filter(matched_genes__isnull=True)
 
     def add_and_remove_gene_symbols(self, gene_symbol_additions, gene_symbol_deletions,
                                     gene_additions_modification_info=None):
@@ -974,7 +1026,9 @@ class GeneList(models.Model):
             if created:
                 num_added += 1
 
-        qs = self.genelistgenesymbol_set.filter(gene_symbol__in=gene_symbol_deletions)
+        # Match original name and symbol so we can delete non-matched
+        name_or_symbol_match = Q(original_name__in=gene_symbol_deletions) | Q(gene_symbol__in=gene_symbol_deletions)
+        qs = self.genelistgenesymbol_set.filter(name_or_symbol_match)
         num_deleted = qs.delete()
         return num_added, num_deleted
 
@@ -982,7 +1036,7 @@ class GeneList(models.Model):
     def get_for_user(user, gene_list_id, success_only=True):
         try:
             return GeneList.filter_for_user(user, success_only).get(pk=gene_list_id)
-        except:
+        except GeneList.DoesNotExist:
             # Need to distinguish between does not exist and no permission
             get_object_or_404(GeneList, pk=gene_list_id)  # potentially throws GeneList.DoesNotExist
             # If we're here, object exists but we have a permission error
@@ -1049,6 +1103,12 @@ class GeneListGeneSymbol(models.Model):
 
     class Meta:
         unique_together = ('gene_list', 'original_name')
+
+    @staticmethod
+    def get_joined_genes_qs_annotation_for_release(release: GeneAnnotationRelease):
+        """ Used to annotate GeneListGeneSymbol queryset """
+        return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True,
+                         filter=Q(gene_symbol__releasegenesymbol__release=release))
 
     def __str__(self):
         if self.gene_symbol:
@@ -1140,20 +1200,34 @@ class PanelAppServer(models.Model):
     def __str__(self):
         return self.name
 
+    @staticmethod
+    def australia_instance() -> 'PanelAppServer':
+        return PanelAppServer.objects.get(name="PanelApp Australia")
 
-class PanelAppPanel(models.Model):
-    """ Name, used in autocomplete list, actual gene list retrieved by API call (panel_app.py)
-        Cleared when cached web resource reloads """
+    @staticmethod
+    def england_instance() -> 'PanelAppServer':
+        return PanelAppServer.objects.get(name="Genomics England PanelApp")
+
+
+class PanelAppPanel(TimeStampedModel):
+    """ Populated from PanelApp cached web resource task, updated to latest version
+        It's not clear how PanelApp removes panels, so we don't do that. """
     server = models.ForeignKey(PanelAppServer, on_delete=CASCADE)
     panel_id = models.IntegerField()
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
     disease_group = models.TextField()
     disease_sub_group = models.TextField()
     name = models.TextField()
+    status = models.TextField()
     current_version = models.TextField()
 
     class Meta:
         unique_together = ('server', 'panel_id')
+
+    @property
+    def cache_valid(self) -> bool:
+        # Attempt to use cache if recent and present, otherwise fall through and do a query
+        max_age = timedelta(days=settings.PANEL_APP_CACHE_DAYS)
+        return timezone.now() < self.modified + max_age
 
     def __str__(self):
         return self.name
@@ -1162,6 +1236,21 @@ class PanelAppPanel(models.Model):
 class PanelAppPanelRelevantDisorders(models.Model):
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     name = models.TextField()
+
+    class Meta:
+        unique_together = ('panel_app_panel', 'name')
+
+
+class PanelAppPanelLocalCacheGeneList(TimeStampedModel):
+    panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
+    version = models.TextField()
+    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ("panel_app_panel", "version")
+
+    def __str__(self):
+        return f"PanelApp GeneList cache for {self.panel_app_panel} v{self.version} (mod: {self.modified})"
 
 
 class CachedThirdPartyGeneList(models.Model):
@@ -1193,7 +1282,10 @@ class CanonicalTranscriptCollection(TimeStampedModel):
         ctc_id = settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID
         ctc = None
         if ctc_id:
-            ctc = CanonicalTranscriptCollection.objects.get(pk=ctc_id)
+            try:
+                ctc = CanonicalTranscriptCollection.objects.get(pk=ctc_id)
+            except CanonicalTranscriptCollection.DoesNotExist:
+                logging.error("setting.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=%s - record not found", ctc_id)
         return ctc
 
     def get_absolute_url(self):
@@ -1428,7 +1520,6 @@ class GnomADGeneConstraint(models.Model):
                 url = ggc.gene_symbol_url
                 method = "gene symbol"
         return ggc, method, url
-
 
 
 class ProteinDomain(models.Model):

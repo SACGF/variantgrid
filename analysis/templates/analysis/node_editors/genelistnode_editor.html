@@ -77,22 +77,43 @@
                 <div>Sample: {{ form.sample  }}
                 </div>
                 </li>
+            {% if pathology_tests_enabled %}
                 <li id='pathology-test-gene-list'>
                 <h3>{{ pathology_test_category.name }}</h3>
                 <div>
                     <div>
-                        <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div> {{ form.pathology_test_gene_list }}<a class="cross-link" id="pathology-test-gene-list-link"></a>
+                        <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div> {{ form.pathology_test_version }}<a class="cross-link" id="pathology-test-gene-list-link"></a>
                         <div class='clear'></div>
                     </div>
                 </div>
                 </li>
+            {% endif %}
+                <li>
+                    <h3>PanelApp Panels</h3>
+                    <div>
+                        <div class="fieldWrapper">
+                            {{ form.panel_app_panel_aus.errors }}
+                            <label for="{{ form.panel_app_panel_aus.id_for_label }}">PanelApp Australia:</label>
+                            {{ form.panel_app_panel_aus }}
+                        </div>
+                        <div class="fieldWrapper">
+                            {{ form.panel_app_panel_eng.errors }}
+                            <label for="{{ form.panel_app_panel_eng.id_for_label }}">PanelApp England :</label>
+                            {{ form.panel_app_panel_eng }}
+                        </div>
+                    </div>
+                </li>
 			</ul>
 		</div>
         <div>
-		{% for gene_list in gene_lists %}
-            {% if gene_list.warning %}
-		        <div id='unmatched-genes-warning' class='warning'>{{ gene_list }}: {{ gene_list.warning }} (see genes tab)</div>
-            {%  endif %}
+        {% if node.accordion_panel == 4 and panel_app_warnings %}
+            {% for w in panel_app_warnings %}
+                <div class='warning'>{{ w }}</div>
+            {% endfor %}
+            Save this node to check/update PanelApp panels
+        {% endif %}
+		{% for gene_list, warning in gene_lists_warnings.items %}
+            <div id='unmatched-genes-warning' class='warning'>{{ gene_list }}: {{ warning }} (see genes tab)</div>
 		{% endfor %}
 		</div>
 

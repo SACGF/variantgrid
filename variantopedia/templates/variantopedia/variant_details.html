@@ -18,7 +18,7 @@
 <script type="text/javascript">
 
 function getBams() {
-    var bams = [];
+    const bams = [];
     {% if sample.bam_file_path %}
         bams.push("{{ sample.bam_file_path }}");
     {% endif %}
@@ -74,7 +74,7 @@ function transcriptFunc(transcriptId, data) {
 
 function geneFunc(geneId, geneSymbol, data) {
     if (geneSymbol) {
-        var currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
+        const currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
         console.log("currentCoverageGeneId:");
         console.log(currentCoverageGeneId);
         if (currentCoverageGeneId != geneSymbol) {
@@ -82,7 +82,7 @@ function geneFunc(geneId, geneSymbol, data) {
         }
     }
 
-    var gic = $("#gene-info-container");
+    const gic = $("#gene-info-container");
     if (data) {
         $(".no-gene-info", gic).hide();
         $(".has-gene-info", gic).show();
@@ -92,7 +92,7 @@ function geneFunc(geneId, geneSymbol, data) {
         return;
     }
 
-    var geneInfoTable = $('#gene-info');
+    const geneInfoTable = $('#gene-info');
     $.each(data, function(name, value) {
         if (value === null) {
             value = $('<span>', {class: 'no-value', text:'-'});
@@ -100,8 +100,8 @@ function geneFunc(geneId, geneSymbol, data) {
         $("#" + name, geneInfoTable).html(value);
     });
 
-    var gene_url = Urls.view_gene_symbol(geneSymbol);
-    var linkHtml = "<a id='gene-link' target='_blank' href='" + gene_url + "'>" + geneSymbol + "</a>";
+    const gene_url = Urls.view_gene_symbol(geneSymbol);
+    const linkHtml = "<a id='gene-link' target='_blank' href='" + gene_url + "'>" + geneSymbol + "</a>";
     $("#hgnc_symbol", geneInfoTable).html(linkHtml);
 }
 
@@ -140,7 +140,7 @@ function handlePubMedLinks(pubmed) {
 }
 
 function showVariantCoordinate() {
-    var variant_coordinate = $("#show-variant-coordinate-link").attr("variant_coordinate");
+    const variant_coordinate = $("#show-variant-coordinate-link").attr("variant_coordinate");
     $("#variant_coordinate").text(variant_coordinate);
 }
 
@@ -158,10 +158,10 @@ function populateVariantAllele(data) {
 
     $("#variant_coordinate").text(data.link_data.variant_string);
     if (data.link_data.variant_string !== data.link_data.variant_coordinate) {
-        var link = $("<a />").text("show all bases").attr({
-                id: "show-variant-coordinate-link",
-                variant_coordinate: data.link_data.variant_coordinate,
-                href: "javascript:showVariantCoordinate();",
+        const link = $("<a />").text("show all bases").attr({
+            id: "show-variant-coordinate-link",
+            variant_coordinate: data.link_data.variant_coordinate,
+            href: "javascript:showVariantCoordinate();",
         });
         $("#variant_coordinate").append(link);
     }
@@ -234,8 +234,8 @@ $(document).ready(function() {
                     This is not the most recent version (which is {{ latest_annotation_version }}).
                 {% endif %}
 
-                {% if num_annotation_versions > 1 %}
-                    <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_annotation_versions }} historical versions</a>.
+                {% if num_variant_annotation_versions > 1 %}
+                    <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>.
                 {% endif %}
             {% endif %}
 
@@ -254,11 +254,12 @@ $(document).ready(function() {
         <div class="card" id="clingen-allele">
             <div class="card-header">Variant</div>
             <div class="card-body">
+                {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{{ g_hgvs }}{% endlabelled %}
+                {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+                {% labelled label="Genome Build" %}{{ variant.genome_build }}{% endlabelled %}
                 {% if variant.can_have_annotation and variant_show_canonical_hgvs %}
                     {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
                 {% endif %}
-                {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
-                {% labelled label="Genome Build" %}{{ variant.genome_build }}{% endlabelled %}
                 {% labelled id="allele" label="Allele" %}Loading...{% endlabelled %}
                 {% labelled id="quick-links" label="Quick Links" %}Loading...{% endlabelled %}
             </div>
@@ -273,14 +274,14 @@ $(document).ready(function() {
         </div>
     </div>
 
-    {% if variant.varianttag_set.exists %}
+    {% if variant_tags %}
         <div class="container mt-4">
             <h4>Tags</h4>
             <table id='tags-table' class="table">
                 <thead>
                     <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th>
                 </thead>
-                {% for vt in variant.varianttag_set.all %}
+                {% for vt in variant_tags %}
                     <tr>
                         <td><span class='grid-tag tagged-{{ vt.tag }}' title='Tagged as {{ vt.tag }}' tag_id='{{ vt.tag }}'><span class='user-tag-colored'>{{ vt.tag }}</span></span></td>
                         <td><a class='hover-link' href="{% url 'analysis' vt.analysis.pk %}">{{ vt.analysis }}</a></td>
@@ -294,62 +295,69 @@ $(document).ready(function() {
 
 {% if variant.can_have_annotation %}
 
-    <div id='classifications' class='container-table mt-4'>
-        <h3>Classifications</h3>
-        {% if classifications %}
-            {% classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
-        {% else %}
-            <p>No internal classifications.</p>
-        {% endif %}
-    </div>
-{% endif %}
-
-{% if show_annotation and variant_annotation %}
-    {% if clinvar %}
-
+    {% if classifications %}
+        <!-- Needs to be full width to show data table -->
+        <div id='classifications' class='container-table mt-4'>
+            <h3>Classifications</h3>
+                {% classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
+        </div>
+    {% else %}
+        <!-- Nicer table that lines up with others -->
         <div class="container">
-            <h3>ClinVar</h3>
             <div class="card">
-                <div class="card-header">ClinVar Variation ID</div>
+                <div class="card-header">Classifications</div>
                 <div class="card-body">
-                    {% labelled label="Allele" hint="tiny" %}
-                     <a class='hover-link' target='_blank' href='https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}'>{{ clinvar.clinvar_variation_id }}</a>
-                        &nbsp;<b>AlleleID</b> {{ clinvar.clinvar_allele_id }}
-                    {% endlabelled %}
-                    {% labelled label="Highest pathogenicity" hint="tiny" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
-                    {% labelled label="Clinical significance" hint="tiny" %}{{ clinvar.clinical_significance }}{% endlabelled %}
-                    {% labelled label="Preferred disease name" hint="tiny" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
-                    {% labelled label="Disease database name" hint="tiny" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
-                    {% labelled label="Review status" hint="tiny" %}
-                        {% load clinvar_tags %}
-                        <a class='hover-link' target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/">
-                        {% clinvar_stars clinvar.stars %} {{ clinvar.get_clinvar_review_status_display }}
-                        </a>
-                    {% endlabelled %}
-                    {% labelled label="Clinical sources" hint="tiny" %}{{ clinvar.clinvar_clinical_sources }}{% endlabelled %}
-                    {% labelled label="Origin" hint="tiny" %}{{ clinvar.get_origin_display }}{% endlabelled %}
-                    {% if clinvar_suspect_reason_code %}
-                        {% labelled label="Suspect reason code" hint="tiny" %}{{ clinvar.get_suspect_reason_code_display }}{% endlabelled %}
-                    {% endif %}
-                    {% labelled label="Drug response" hint="tiny" %}{{ clinvar.drug_response }}{% endlabelled %}
-                    {% labelled label="Citations" hint="tiny" %}
-                        {% if num_clinvar_citations %}<a class='hover-link hide-citations' data-toggle="collapse" href='#clinvar-citation-div'>Show {{ num_clinvar_citations }} Literature Citations</a>
-                        {% else %}No Citations.
-                        {% endif %}
-                    {% endlabelled %}
-                    <div id="clinvar-citation-div" class="collapse"></div>
+                    No internal classifications.
                 </div>
             </div>
         </div>
-    
-    {% else %}
-        <div class="container-table my-4">
-        <b>ClinVar:</b> N/A
-        </div>
     {% endif %}
+{% endif %}
+
+{% if show_annotation and variant_annotation %}
+    <div class="container">
+        <div class="card">
+            <div class="card-header">ClinVar</div>
+            <div class="card-body">
+            {% if clinvar %}
+                {% labelled label="Allele" hint="tiny" %}
+                 <a class='hover-link' target='_blank' href='https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}'>{{ clinvar.clinvar_variation_id }}</a>
+                    &nbsp;<b>AlleleID</b> {{ clinvar.clinvar_allele_id }}
+                {% endlabelled %}
+                {% labelled label="Highest pathogenicity" hint="tiny" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
+                {% labelled label="Clinical significance" hint="tiny" %}{{ clinvar.clinical_significance }}{% endlabelled %}
+                {% if clinvar.conflicting_clinical_significance %}
+                    {% labelled label="Conflicting clinical significance" hint="tiny" %}{{ clinvar.conflicting_clinical_significance }}{% endlabelled %}
+                {% endif %}
+                {% labelled label="Preferred disease name" hint="tiny" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
+                {% labelled label="Disease database name" hint="tiny" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
+                {% labelled label="Review status" hint="tiny" %}
+                    {% load clinvar_tags %}
+                    <a class='hover-link' target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/">
+                    {% clinvar_stars clinvar.stars %} {{ clinvar.get_clinvar_review_status_display }}
+                    </a>
+                {% endlabelled %}
+                {% labelled label="Clinical sources" hint="tiny" %}{{ clinvar.clinvar_clinical_sources }}{% endlabelled %}
+                {% labelled label="Origin" hint="tiny" %}{{ clinvar.get_origin_display }}{% endlabelled %}
+                {% if clinvar_suspect_reason_code %}
+                    {% labelled label="Suspect reason code" hint="tiny" %}{{ clinvar.get_suspect_reason_code_display }}{% endlabelled %}
+                {% endif %}
+                {% labelled label="Drug response" hint="tiny" %}{{ clinvar.drug_response }}{% endlabelled %}
+                {% labelled label="Citations" hint="tiny" %}
+                    {% if num_clinvar_citations %}<a class='hover-link hide-citations' data-toggle="collapse" href='#clinvar-citation-div'>Show {{ num_clinvar_citations }} Literature Citations</a>
+                    {% else %}No Citations.
+                    {% endif %}
+                {% endlabelled %}
+                <div id="clinvar-citation-div" class="collapse"></div>
+            {% else %}
+                No ClinVar entry (version: {{ annotation_version.clinvar_version.annotation_date.date  }})
+                <a href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ g_hgvs }}">Search ClinVar</a>
+            {% endif %}
+            </div>
+        </div>
+    </div>
 
     <div class="container">
-        <h3>Nearby</h3>
         <div class="card">
             <div class="card-header">Nearby variants</div>
             <div class="card-body">
@@ -460,18 +468,30 @@ $(document).ready(function() {
                             {% labelled id='af_1kg' label='1000 genomes' hint="tiny" %}{{ variant_annotation.af_1kg|floatformat:6 }}{% endlabelled %}
                             {% labelled id='af_uk10k' label='UK10K' hint="tiny" %}{{ variant_annotation.af_uk10k|floatformat:6 }}{% endlabelled %}
                             {% labelled id='topmed_af' label='TopMed' hint="tiny"  %}{{ variant_annotation.topmed_af|floatformat:6 }}{% endlabelled %}
-                            {% if variant_annotation.gnomad_variant %}
+                            {% if variant_annotation.gnomad_url %}
                                 {% labelled label="View in gnomAD" hint="tiny" %}
-                                    <a target='_blank' class="hover-link" href='http://gnomad.broadinstitute.org/variant/{{ variant_annotation.gnomad_variant }}'>Click here</a>
+                                    <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
                                 {% endlabelled %}
                                 {% if variant_annotation.gnomad_flag %}
                                     {% labelled label="Is Flagged" label_css="gnomad-flagged-label gnomad-flagged" hint="tiny" %}{{ variant_annotation.gnomad_flag }}{% endlabelled %}
                                 {% else %}
                                     {% labelled label="Is Flagged" label_css="gnomad-flagged-label" hint="tiny" %}{% endlabelled %}
                                 {% endif %}
+                                {% labelled id='gnomad_af' label='Allele Frequency' hint="tiny" %}{{ variant_annotation.gnomad_af|floatformat:6 }}{% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' hint="tiny" %}{{ variant_annotation.gnomad2_liftover_af|floatformat:6 }}{% endlabelled %}
+                                {% endif %}
+
                                 {% labelled id='gnomad_total_homozygotes' label='Total Homozygotes' hint="tiny" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
-                                {% labelled id='gnomad_total' label='Total' hint="tiny" %}{{ variant_annotation.gnomad_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" %}{{ variant_annotation.gnomad_popmax_af|floatformat:6 }}{% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                    {% labelled id='gnomad_ac' label='Alt Allele Count' hint="tiny" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
+                                    {% labelled id='gnomad_an' label='Total number of alleles' hint="tiny" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
+                                {% endif %}
+                                {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" %}{{ variant_annotation.gnomad_popmax_af|floatformat:6 }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                    {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
+                                    {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
+                                {% endif %}
 
                                 {% labelled id='gnomad_afr_af' label='African' hint="tiny" %}{{ variant_annotation.gnomad_afr_af|floatformat:6 }}{% endlabelled %}
                                 {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" %}{{ variant_annotation.gnomad_asj_af|floatformat:6 }}{% endlabelled %}
@@ -548,68 +568,6 @@ $(document).ready(function() {
                                 {% labelled label="Mastermind" hint="tiny" %}No local Mastermind entry<br><i>may be others on site</i>{% endlabelled %}
                             {% endif %}
 
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 mt-4 has-gene-info" id="gene-info">
-                    <div class="card">
-                        <div class="card-header">Gene</div>
-                        <div class="card-body">
-                            {% labelled id='hgnc_symbol' %}{% endlabelled %}
-                            {% labelled id='hgnc_name' %}{% endlabelled %}
-                            {% labelled id='gene_biotype' %}{% endlabelled %}
-                            {% labelled id='gene_family_tag' %}{% endlabelled %}
-                            {% labelled id='gene_family_description'%}{% endlabelled %}
-                            {% labelled id='refseq_gene_summary' %}{% endlabelled %}
-                            {% labelled id='function_from_uniprotkb' %}{% endlabelled %}
-                            {% labelled id='pathway_from_uniprotkb' %}{% endlabelled %}
-
-                            {% labelled id='tissue_specificity_from_uniprotkb' %}{% endlabelled %}
-                            {% labelled id='phenotypes_from_ensembl' %}{% endlabelled %}
-                            {% labelled id='omim_phenotypes' %}{% endlabelled %}
-                            {% labelled id='omim_id' %}{% endlabelled %}
-
-                            <div id="extra-gene-info" class="collapse">
-                                {% labelled id='hgnc_id' %}{% endlabelled %}
-                                {% labelled id='in_cancer_gene_census' %}{% endlabelled %}
-                                {% labelled id='entrez_gene_id' %}{% endlabelled %}
-                                {% labelled id='uniprot_id' %}{% endlabelled %}
-                                {% labelled id='ucsc_id' %}{% endlabelled %}
-                                {% labelled id='enzyme_ids' %}{% endlabelled %}
-                                {% labelled id='ccds_ids' %}{% endlabelled %}
-                                {% labelled id='rgd_id' %}{% endlabelled %}
-                                {% labelled id='mgi_id' %}{% endlabelled %}
-                                {% labelled id='rvis_percentile' %}{% endlabelled %}
-                                {% labelled id='status' %}{% endlabelled %}
-                                {% labelled id='band' %}{% endlabelled %}
-                                {% labelled id='strand' %}{% endlabelled %}
-                                {% labelled id='percentage_gc_content' %}{% endlabelled %}
-                                {% labelled id='transcript_count' %}{% endlabelled %}
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <a id='show-more-gene-info-link' data-toggle="collapse" class="hover-link has-gene-info" href='#extra-gene-info'>More...</a>
-                            <div class="hidden no-gene-info">
-                                No gene annotation available.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6 mt-4">
-                    {% load gene_disease_tags %}
-                    {% gene_disease variant_annotation.transcript_version.gene_version.gene_symbol %}
-                </div>
-                <div class="col-md-6 mt-4">
-                    <div class="card">
-                        <div class="card-header">gnomAD Gene Constraints</div>
-                        <div class="card-body">
-                            {% labelled label="LOF summary" id='gnomad_gene_constraint_oe_lof_summary' %}{% endlabelled %}
-                            <div class="hidden">
-                                {% labelled id='gnomad_gene_constraint_method' %}{% endlabelled %}
-                                {% labelled label="Url" id='gnomad_gene_constraint_url' %}{% endlabelled %}
-                            </div>
-                            {% labelled label="Retrieved Via" id='gnomad_gene_constraint_retrieval' %}{% endlabelled %}
                         </div>
                     </div>
                 </div>

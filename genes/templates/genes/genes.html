@@ -1,5 +1,7 @@
 {% extends menu_genes_base %}
 {% load static %}
+{% load help_tags %}
+{% load genome_build_tags %}
 
 {% block title %}Genes{% endblock title %}
 {% block submenu_page_content %}
@@ -27,11 +29,9 @@
 
     function filterGrid(extra_filters) {
         gridExtraFilters = extra_filters || {};
+        gridExtraFilters['gene_annotation_release_id'] = $("#id_release").val();
 
-        let versionId = $("#id_version").val();
-        gridExtraFilters['version'] = versionId;    
-
-        var grid = $("#gene-annotation-versions-grid");
+        let grid = $("#gene-annotation-versions-grid");
         grid.trigger("reloadGrid");
     }
 
@@ -57,21 +57,30 @@
         }
     }
 
+    function geneSymbolLink(v) {
+        let url = Urls.view_gene_symbol(v);
+        return `<a href='${url}'>${v}</a>`;
+    }
+
     $(document).ready(function() {
-        $("#id_version").change(function() {
+        $("#id_release").change(function() {
             filterGrid();
         });
 
-        $('#id_gene').change(function() {
-            let geneId = $("#id_gene").val();
-            window.location = Urls.view_gene(geneId);
+        $('#id_gene_symbol').change(function() {
+            let geneSymbol = $("#id_gene_symbol").val();
+            window.location = Urls.view_gene_symbol(geneSymbol);
         });
+
+        jQuery.extend($.fn.fmatter , {
+            'geneSymbolLink' : geneSymbolLink,
+        });
+
+
     });
 </script>
 
-    {% load help_tags %}
     {% page_help user 'annotation/gene_annotations_help' ' ' %}
-    {% load genome_build_tags %}
     {% genome_build_url_arg genome_build 'genome_build_genes' %}
 
     <div>
@@ -79,21 +88,21 @@
 
         <form>
             <div class="horizontal-fields">
-                <label>Jump to gene</label>
-                <span>{{ gene_form.gene }} {{ gene_form.media }} </span>
+                <label>Jump to gene symbol</label>
+                <span>{{ gene_symbol_form.gene_symbol }} {{ gene_symbol_form.media }} </span>
+            </div>
+            <div class="horizontal-fields">
+                <label>Gene Annotation Release</label><span>{{ gene_annotation_release_form.release }} {{ gene_annotation_release_form.media }}</span>
             </div>
         </form>
 
-        <div class="horizontal-fields">
-            <label>Version</label><span>{{ version_form.version }}</span>
-        </div>
 
         <div class="horizontal-fields">
             <img src="{% static 'icons/filter.svg' %}" width="20px" height="20px" title="Filter options to the right" />
             <a class="hover-link" href="javascript:filterGrid()">All</a>
             <a class="hover-link" href="javascript:showSearch()">Search</a>
-            <a class="hover-link" href="javascript:filterGrid({'column' : 'omim_phenotypes', 'is_null' : false})">OMIM</a>
-            <a class="hover-link" href="javascript:filterGrid({'column' : 'omim_phenotypes', 'is_null' : true})">No OMIM</a>
+            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : false})">OMIM Terms</a>
+            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : true})">No OMIM Terms</a>
         </div>
         <div id='gene-annotation-versions'>
         {% load jqgrid_tags %}

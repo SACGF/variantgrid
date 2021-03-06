@@ -2,7 +2,7 @@ import csv
 import io
 import operator
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from operator import attrgetter
 from urllib.parse import urlparse
 
@@ -11,6 +11,7 @@ from dateutil import parser
 from decimal import Decimal
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
+from django.db import models
 from enum import Enum
 from itertools import islice
 from json.encoder import JSONEncoder
@@ -285,8 +286,9 @@ def double_quote(s):
     return f'"{s}"'
 
 
-def filename_safe(self, filename) -> str:
-    keepcharacters = {' ', '.', '_'}
+def filename_safe(filename) -> str:
+    keepcharacters = {'.', '_'}
+    filename = filename.replace(' ', '_')  # you can never trust spaces
     # leave room for an extension so make sure the filename is 250 characters
     filename = "".join(c for c in filename if c.isalnum() or c in keepcharacters).strip().lower()[0:250]
     return filename
@@ -298,9 +300,9 @@ def html_link(url: str, title: str) -> SafeString:
     return mark_safe(f"<a href='{url}'>{html.escape(title)}</a>")
 
 
-def batch_iterator(iteratable, batch_size: int = 10):
+def batch_iterator(iterable, batch_size: int = 10):
     batch = []
-    for record in iteratable:
+    for record in iterable:
         batch.append(record)
         if len(batch) >= batch_size:
             yield batch
@@ -538,3 +540,53 @@ class Constant:
         return self.value
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.value)
+
+
+class ArrayLength(models.Func):
+    """
+    Can annotate with array length now e.g.
+    MyModel.objects.all().annotate(field_len=ArrayLength('field')).order_by('field_len')
+    """
+    function = 'CARDINALITY'
+
+
+class DebugTimer:
+
+    def __init__(self):
+        self.start = datetime.now()
+
+    def tick(self, description:str):
+        now = datetime.now()
+        duration = now - self.start
+        print(f"{description} {duration}")
+        self.start = now
+
+
+class LimitedCollection:
+
+    def __init__(self, data: List[Any], limit: int):
+        self.true_count = len(data)
+        self.data = data
+        if len(data) > limit:
+            self.data = data[0:limit]
+        self.limit = limit
+
+    @property
+    def limit_str(self):
+        return f"Limiting results to {len(self.data)} of {self.true_count}"
+
+    @property
+    def is_limited(self) -> bool:
+        return len(self.data) != self.true_count
+
+    def __len__(self):
+        return self.limit
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def __bool__(self):
+        return self.true_count > 0

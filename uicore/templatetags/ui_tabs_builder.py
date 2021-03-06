@@ -48,7 +48,7 @@ class TabBuilder:
 def ui_register_tab(context, tab_set: str, label: str, url: str = None, param: Any = None,
                     url_check=False, active=False):
     if url_check:
-        if url not in context["url_name_visible"]:
+        if not context["url_name_visible"].get(url) == True:
             return ""
 
     tab_key = f"ui-tab-{tab_set}"
@@ -95,10 +95,7 @@ def ui_register_tab_embedded(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_ui_register_tab_embedded',))
     parser.delete_first_token()
-    return LocalTabContent(nodelist,
-                            tab_set=kwargs.get('tab_set'),
-                            label=kwargs.get('label')
-    )
+    return LocalTabContent(nodelist, tab_set=kwargs.get('tab_set'), label=kwargs.get('label'))
 
 
 class LocalTabContent(template.Node):

@@ -1,0 +1,7 @@
+<span {% if ontology.definition %}title="{{ ontology.definition }}" data-toggle="tooltip"{% endif %}>
+    {% if ontology.url %}
+        <a class="external-link" href="{{ ontology.url }}" target="_blank">{{ ontology.term_id }}{% if ontology.name %} - {{ ontology.name }}{% endif %}</a>
+    {% else %}
+        {{ ontology.term_id }}{% if ontology.name %} - {{ ontology.name }}{% endif %}
+    {% endif %}
+</span>

@@ -148,8 +148,8 @@ class VariantTranscriptSelections:
                     self.transcript_data.append(t_data)
 
                     if vsta.gene_id not in self.gene_annotations:
-                        version = annotation_version.ensembl_gene_annotation_version
-                        gene_annotation = vsta.gene.ensemblgeneannotation_set.filter(version=version).first()
+                        version = annotation_version.gene_annotation_version
+                        gene_annotation = vsta.gene.geneannotation_set.filter(version=version).first()
                         if gene_annotation:
                             self.gene_annotations[vsta.gene_id] = model_to_dict(gene_annotation)
         except VariantAnnotation.DoesNotExist:

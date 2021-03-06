@@ -1,5 +1,5 @@
+from django.conf import settings
 from django.db.models import Max
-from django.db.models.query_utils import Q
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
@@ -9,11 +9,11 @@ import random
 
 from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, AnalysisTemplateVersion
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisClassification, AnalysisEdge, NodeVersion
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion, AnalysisNodeAlleleSource
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
-from analysis.models.nodes.filters.tag_node import VariantTag, TagNode
+from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes, \
@@ -21,10 +21,9 @@ from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes
 from analysis.views.node_json_view import NodeJSONPostView
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
-from genes.models import TranscriptVersion
-from genes.models_enums import AnnotationConsortium
-from snpdb.models import Sample, Tag, BuiltInFilters
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import create_classification_for_sample_and_variant_objects
+from library.django_utils import require_superuser
+from snpdb.models import Tag, BuiltInFilters
+from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
 
 
 @require_POST
@@ -123,6 +122,7 @@ def nodes_copy(request, analysis_id):
             clone_node = template_node.save_clone()
             clone_node.x += 10
             clone_node.y += 10
+            clone_node.status = NodeStatus.DIRTY
             clone_node.save()
             old_new_map[node.id] = clone_node
 
@@ -179,29 +179,16 @@ def set_variant_tag(request, analysis_id):
     tag_id = request.POST['tag_id']
     op = request.POST['op']
 
-    dirty_tags = set()
     tag = get_object_or_404(Tag, pk=tag_id)
     if op == 'add':
         variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
                                                                 analysis=analysis, user=request.user)
         variant_tag.node_id = node_id
         variant_tag.save()
-        if created:
-            dirty_tags.add(tag_id)
     elif op == 'del':
         # Deletion of tags is for analysis (all users)
         VariantTag.objects.filter(variant_id=variant_id, analysis=analysis, tag=tag).delete()
-        dirty_tags.add(tag_id)
 
-    # Bump versions so cache will expire
-    if dirty_tags:
-        tag_filter = Q(tag__isnull=True) | Q(tag__in=dirty_tags)
-        # TagNode doesn't have any output, so no need to check children
-        for node in TagNode.objects.filter(analysis=analysis).filter(tag_filter):
-            node.queryset_dirty = True
-            node.save()
-
-    update_nodes(analysis.pk)
     return JsonResponse({})
 
 
@@ -309,38 +296,21 @@ def nodes_status(request, analysis_id):
     return JsonResponse({"node_status": node_status_list})
 
 
-def create_classification_from_variant_tag(request, analysis_id, sample_id, variant_tag_id, transcript_id=None):
-    """ Created from a 'RequiresClassification' VariantTag """
-    analysis = get_analysis_or_404(request.user, analysis_id)
-    sample = Sample.get_for_user(request.user, sample_id)
-    variant_tag = get_object_or_404(VariantTag, pk=variant_tag_id, analysis_id=analysis_id)
-
-    kwargs = {"annotation_version": analysis.annotation_version}
-    # Put transcript_id into either refseq/ensembl kwargs
-    if transcript_id:
-        genome_build = analysis.annotation_version.genome_build
-        transcript_version = TranscriptVersion.filter_by_accession(transcript_id, genome_build=genome_build).first()
-        if transcript_version.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
-            kwargs["refseq_transcript_accession"] = transcript_version.accession
-        elif transcript_version.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
-            kwargs["ensembl_transcript_accession"] = transcript_version.accession
-    else:
-        genome_build = None
-
-    classification = create_classification_for_sample_and_variant_objects(request.user, sample,
-                                                                          variant_tag.variant,
-                                                                          genome_build, **kwargs)
-    AnalysisClassification.objects.create(analysis=analysis, classification=classification)
-    data = {"classification_id": classification.pk}
-    return JsonResponse(data)
-
-
 @require_POST
 def analysis_set_panel_size(request, analysis_id):
     """ This is set from AJAX queries, ie dragging a panel border """
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     analysis.analysis_panel_fraction = request.POST["analysis_panel_fraction"]
     analysis.save()
+    return JsonResponse({})
+
+
+@require_POST
+@require_superuser
+def node_populate_clingen_alleles(request, node_id):
+    node = get_node_subclass_or_404(request.user, node_id)
+    an_as, _ = AnalysisNodeAlleleSource.objects.get_or_create(node=node)
+    populate_clingen_alleles_from_allele_source.si(an_as.pk, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
     return JsonResponse({})
 
 

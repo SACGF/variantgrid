@@ -101,12 +101,21 @@ function setupAjaxTabs(element) {
     });
 }
 
+function setupListGroupCheckboxes() {
+    $('.list-group-checkbox').click(function(event) {
+        console.log("Clickity clickity");
+        $(this).find('input[type=radio]').prop("checked", true); //.trigger("click");
+        // return false;
+    });
+}
+
 function globalSetup() {
     convertTimestamps();
     setupAjaxTabs();
     handleAjaxErrors();
     setupTooltips();
     highlightImportStatus();
+    setupListGroupCheckboxes();
 
     $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
     $('.radio-row').click(event => {
@@ -334,6 +343,30 @@ function highlightImportStatus() {
     }
 }
 
+function update_django_messages(messages) {
+    if (messages.length === 0) {
+        return;
+    }
+    let messagesDom = $("#django-messages");
+    messagesDom.empty();
+    for (let message of messages) {
+        let text = message.text;
+        let timestamp = "";
+        if (text.indexOf("saved successfully") !== -1) {
+            let m = moment();
+            timestamp= $('<time>', {'class': 'float-right', 'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
+        }
+        $('<div>', {class: `alert ${message.tags}`, role:"alert", html:[
+            "<i class=\"fas fa-exclamation-circle\"></i>",
+            $('<span>', {text: text}),
+            timestamp
+        ]}).appendTo(messagesDom);
+    }
+    messagesDom.hide();
+    messagesDom.fadeIn('slow');
+    $('body').scrollTop(0); // needed when in phone size
+    $('.main-content').scrollTop(0); // needed when in desktop size
+}
 
 function createMessage(className, message) {
     let errorMessageUl = $("<ul/>", {class: "messages"});
@@ -365,6 +398,7 @@ function checkLoggedIn(loggedInHandler, loggedOutHandler) {
 }
 
 const JS_DATE_FORMAT_DETAILED = 'YYYY-MM-DD HH:mm:ss ZZ';
+const JS_DATE_FORMAT_SECONDS = 'YYYY-MM-DD HH:mm:ss';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'lll';
 function convertTimestamps() {
@@ -392,21 +426,25 @@ function convertTimestamps() {
     $('.convert-timestamp').each((index, elem) => {
         elem = $(elem);
         let unix = Number(elem.attr('data-timestamp'));
+        let m = moment();
         if (unix) {
-            let m = moment(unix * 1000);
-            if (elem.hasClass('time-ago')) {
-                let isFuture = moment().diff(m) < 0;
-                let newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.format(JS_DATE_FORMAT_DETAILED)});
-                if (isFuture) {
-                    newElement.addClass('future');
-                }
-                elem.replaceWith(newElement);
-                newElement.timeago();
-                newElement.tooltip();
-            } else {
-                let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
-                elem.replaceWith(newElement);
+            m = moment(unix * 1000);
+        }
+        if (elem.hasClass('time-ago')) {
+            let isFuture = moment().diff(m) < 0;
+            let newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.format(JS_DATE_FORMAT_DETAILED)});
+            if (isFuture) {
+                newElement.addClass('future');
             }
+            elem.replaceWith(newElement);
+            newElement.timeago();
+            newElement.tooltip();
+        } else if (elem.hasClass('seconds')) {
+            let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
+            elem.replaceWith(newElement);
+        } else {
+            let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
+            elem.replaceWith(newElement);
         }
     });
 }
@@ -565,6 +603,17 @@ TableFormat.detailRenderer = function ( api, rowIdx, columns ) {
     }
     return fieldset;
 };
+TableFormat.boolean = function(style, data, type, columns) {
+    console.log(data);
+    if (style == 'warning') {
+        if (data) {
+            return '<i class="fas fa-exclamation-circle"></i>';
+        }
+    } else {
+        return data ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="far fa-circle"></i>';
+    }
+    return null;
+}
 
 // Dialogs
 function createModalShell(id, title) {
@@ -673,6 +722,7 @@ jQuery.fn.extend({multitooltip: function(mode, params) {
 function showReloadPageErrorDialog(selector, message, allowClose) {
     let buttons = [
         {   text: "Reload Page",
+            class: "btn",
             click: function() {
                 $(this).dialog("close");
                 location.reload();
@@ -682,6 +732,7 @@ function showReloadPageErrorDialog(selector, message, allowClose) {
     if (allowClose) {
         let closeButton = {
             text: "Close and continue (not recommended)",
+            class: "btn btn-outline-danger",
             click: function () {
                 $(this).dialog("close");
             },
@@ -694,4 +745,16 @@ function showReloadPageErrorDialog(selector, message, allowClose) {
         minWidth: 500,
         buttons: buttons,
     });
+}
+
+function severityIcon(severity) {
+    let first = severity.toUpperCase()[0];
+    switch (first) {
+        case 'C': return $('<i class="fas fa-bomb text-danger"></i>'); // critical
+        case 'E': return $('<i class="fas fa-exclamation-circle text-danger"></i>'); // error
+        case 'W': return $('<i class="fas fa-exclamation-triangle text-warning"></i>'); // warning
+        case 'I': return $('<i class="fas fa-info-circle text-info"></i>'); // info
+        case 'S': return $('<i class="fas fa-check-circle text-success"></i>'); // success
+        default: return $(severity);
+    }
 }

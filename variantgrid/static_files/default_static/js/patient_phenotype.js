@@ -9,43 +9,41 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
       return 0;
     }
     
-    phenotypeMatches = phenotypeMatches.sort(compareByStart);  
-    var overlapping_matches = [];
+    phenotypeMatches = phenotypeMatches.sort(compareByStart);
+    let overlapping_matches = [];
 
-    var phenoLen = phenotypeText.length;
-    var phenotypeHTML = '';
-    var phenoOffsetStart = 0;
-    
-    for(var i=0; i<phenoLen ;i++) {
-        var char = phenotypeText.charAt(i);
-        var j, pm;
-        
-        var sliceEnd = 0;
-        for (j=phenoOffsetStart ; j<phenotypeMatches.length ; ++j) {
-            pm = phenotypeMatches[j];
+    const phenoLen = phenotypeText.length;
+    let phenotypeHTML = '';
+    let phenoOffsetStart = 0;
+
+    for(let i=0; i<phenoLen ; i++) {
+        const char = phenotypeText.charAt(i);
+
+        let sliceEnd = 0;
+        for (let j=phenoOffsetStart ; j<phenotypeMatches.length ; ++j) {
+            let pm = phenotypeMatches[j];
             if (pm.offset_start <= i) {
-                sliceEnd = j + 1; 
-                var termClass = TERM_CLASSES[pm.match_type];
-                var termTitle = termClass + ": " + pm.match;
-                phenotypeHTML += "<span accession='" + pm.accession + "' title='" + termTitle + "' class='term-match " + termClass + "'>";
+                sliceEnd = j + 1;
+                const termClass = TERM_CLASSES[pm.match_type];
+                phenotypeHTML += `<span title='${pm.match}' class='term-match ${termClass}'>`;
             } else {
                 break;
             }
         }
         if (sliceEnd) {
-              var sliced = phenotypeMatches.slice(phenoOffsetStart, sliceEnd);
-              overlapping_matches = overlapping_matches.concat(sliced);
-              phenoOffsetStart = sliceEnd;
+            const sliced = phenotypeMatches.slice(phenoOffsetStart, sliceEnd);
+            overlapping_matches = overlapping_matches.concat(sliced);
+            phenoOffsetStart = sliceEnd;
         }
         
-        if (char == '\n') {
+        if (char === '\n') {
             phenotypeHTML += "<br />";
         } else {
             phenotypeHTML += char;
         }
         
-        for (j=overlapping_matches.length - 1 ; j>= 0 ; --j) {
-            pm = overlapping_matches[j];
+        for (let j=overlapping_matches.length - 1 ; j>= 0 ; --j) {
+            let pm = overlapping_matches[j];
             if (pm.offset_end <= i) {
                 phenotypeHTML += "</span>";
                 overlapping_matches.splice(j, 1);
@@ -59,17 +57,17 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
 
 
 function phenotypeMatchesToJqGridData(phenotypeMatches) {
-    var gridData = [];
-    var accessionSet = new Set(); // unique terms only
-    for (var i=0 ; i<phenotypeMatches.length ; ++i) {
-        var pm = phenotypeMatches[i];
+    const gridData = [];
+    const accessionSet = new Set(); // unique terms only
+    for (let i=0 ; i<phenotypeMatches.length ; ++i) {
+        const pm = phenotypeMatches[i];
         if (!accessionSet.has(pm.accession)) {
-            var termType = TERM_CLASSES[pm.match_type];
-            var row = {
-                'term_type' : termType,
-                'accession' : pm.accession,
-                'name' : pm.name,
-                'gene_symbols' : pm.gene_symbols.join(', '), 
+            const termType = TERM_CLASSES[pm.match_type];
+            const row = {
+                'term_type': termType,
+                'accession': pm.accession,
+                'name': pm.name,
+                'gene_symbols': pm.gene_symbols.join(', '),
             };
             gridData.push(row);
             accessionSet.add(pm.accession);

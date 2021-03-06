@@ -2,11 +2,10 @@ from django.contrib.auth.models import User
 import unittest
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
-    create_fake_gene_annotation, create_fake_variant_annotation
-from annotation.models import HPOSynonym, MIMMorbidAlias, HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
+    create_fake_variant_annotation
+from annotation.models import HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
     ClinVar, Citation, CitationSource
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from annotation.tests.test_data_mim_hpo import create_mim_hpo_test_data
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -23,12 +22,8 @@ class Test(URLTestCase):
 
         cls.annotation_version_grch37 = get_fake_annotation_version(cls.grch37)
         cls.annotation_version_grch38 = get_fake_annotation_version(cls.grch38)
-        create_mim_hpo_test_data()
 
         cls.human_protein_atlas_tissue_sample = HumanProteinAtlasTissueSample.objects.get_or_create(name="foo")[0]
-
-        cls.mm_alias = MIMMorbidAlias.objects.last()
-        cls.hpo_synonym = HPOSynonym.objects.last()
 
         create_fake_clinvar_data(cls.annotation_version_grch37.clinvar_version)
         clinvar = ClinVar.objects.filter(version=cls.annotation_version_grch37.clinvar_version).first()
@@ -44,9 +39,6 @@ class Test(URLTestCase):
         cls.citations_ids_list = "/".join((str(c) for c in Citation.objects.all().values_list("pk", flat=True)[:2]))
         cls.citations_ids_list_pubmed = pubmed_citation
         transcript_version = create_fake_transcript_version(cls.grch37)
-
-        create_fake_gene_annotation(cls.annotation_version_grch37.ensembl_gene_annotation_version)
-        create_fake_gene_annotation(cls.annotation_version_grch38.ensembl_gene_annotation_version)
 
         cls.gene_id = transcript_version.gene_version.gene_id
         cls.gene_symbol = transcript_version.gene_version.gene_symbol
@@ -68,9 +60,7 @@ class Test(URLTestCase):
             ("citations_tab", {"citations_ids_list": self.citations_ids_list}, 200),
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
             # API
-            ("api_view_gene_id", {"gene_id": self.gene_id}, 200),
             ("api_view_gene_disease_validity", {"gene_symbol": self.gene_symbol}, 200),
-            ("api_gene_annotation", {"gene_symbol": self.gene_symbol}, 200),
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
@@ -82,25 +72,12 @@ class Test(URLTestCase):
                          "tissue_sample_id": self.human_protein_atlas_tissue_sample.pk,
                          "min_abundance": HumanProteinAtlasAbundance.MEDIUM,
                          "op": "config"}
-        hpo_kwargs = {"hpo_id": self.hpo_synonym.hpo_id}
-        hpo_kwargs.update(build_kwargs)
-        mim_kwargs = {"mim_morbid_id": self.mm_alias.mim_morbid_id}
-        mim_kwargs.update(build_kwargs)
         GRID_LIST_URLS = [
             ("variant_annotation_version_grid", build_kwargs, 200),
             ("annotation_run_grid", build_kwargs, 200),
             ("tissue_gene_grid", tissue_kwargs, 200),
-            ("hpo_genes_grid", hpo_kwargs, 200),
-            ("mim_genes_grid", mim_kwargs, 200),
         ]
         self._test_urls(GRID_LIST_URLS, self.user)
-
-    def testAutocompleteUrls(self):
-        AUTOCOMPLETE_URLS = [
-            ('mim_morbid_alias_autocomplete', self.mm_alias, {"q": self.mm_alias.name}),
-            ('hpo_synonym_autocomplete', self.hpo_synonym, {"q": self.hpo_synonym.name}),
-        ]
-        self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user, True)
 
 
 if __name__ == "__main__":

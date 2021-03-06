@@ -59,8 +59,7 @@
 	const NODE_HELP = {{ node_help | jsonify }};
 	ANALYSIS_SETTINGS = {{ analysis_settings | jsonify }};
 
-	var panelResizeTimeout;
-	var panelResizeUpdateDelay = 150;
+    let panelResizeTimeout;
 	messagePoller = new AnalysisMessagePoller(Urls.nodes_status(ANALYSIS_ID));
 
 	var secondWindow; // set to window in dual screen mode
@@ -72,8 +71,10 @@
     analysisNodeVariables = {}; // { node_id: fields: Set()}
 
 	function loadInitialGridEditor() {
-	    let loadFinishedFunc = analysisSettings;
-	{% if analysis.is_valid %}
+	    let loadFinishedFunc;
+    {% if analysis.get_errors or analysis.get_warnings %}
+	    loadFinishedFunc = analysisSettings;
+	{% else %}
 		loadFinishedFunc = function() {
 			loadNodeData();
 			let activeNodeId = 0;
@@ -198,7 +199,7 @@
                     <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"></a>
                     <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"></a>
                 {% endif %}
-                    <a id="settings-button" class="toolbar-button" href="javascript:analysisSettings()" title="Analysis Settings"></a>
+                    <a class="toolbar-button settings-icon" href="javascript:analysisSettings()" title="Analysis Settings"></a>
                     <a href="javascript:viewTags()" class='left no-link-style' title="Tags">
                         <span id="view-tags-button" class="toolbar-button"></span>
                         <span id="number-of-tags"></span>

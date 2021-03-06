@@ -6,11 +6,9 @@ from rest_framework.views import APIView
 from typing import Iterable, Dict, Any, Union, List, Optional
 import datetime
 
-from flags.models import Flag, \
-    FlagComment, FlagType, FlagCollection, FlagPermissionLevel, FlagWatch
+from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagWatch
 from flags.models.enums import FlagStatus
-from flags.models.models import FlagResolution, FlagTypeResolution, \
-    fetch_flag_infos
+from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none
 from snpdb.models import Lab
@@ -24,7 +22,7 @@ class CommentDetails:
         self.helper = helper
         self.detailed = False
 
-    def to_json(self) -> Dict[str,Any]:
+    def to_json(self) -> Dict[str, Any]:
         status = None
         resolution = self.comment.resolution
         if resolution:
@@ -52,7 +50,7 @@ class CommentDetails:
 
 class FlagHelper:
 
-    def __init__(self, flag_collections: Union[FlagCollection,Iterable[FlagCollection]], user: User):
+    def __init__(self, flag_collections: Union[FlagCollection, Iterable[FlagCollection]], user: User):
 
         if flag_collections is None:
             flag_collections = []
@@ -202,15 +200,15 @@ class FlagHelper:
         labs = list(Lab.valid_labs_qs(user))
         if len(labs) == 0:
             return 'no affiliation'
-        elif len(labs) == 1:
+        if len(labs) == 1:
             return labs[0].name
-        else:
-            orgs = set()
-            for lab in labs:
-                orgs.add(lab.organization.name)
-            orgs = list(orgs)
-            orgs.sort()
-            return ', '.join(orgs)
+
+        orgs = set()
+        for lab in labs:
+            orgs.add(lab.organization.name)
+        orgs = list(orgs)
+        orgs.sort()
+        return ', '.join(orgs)
 
     def to_json(self):
         json_data = {}
@@ -251,7 +249,6 @@ class FlagHelper:
         json_data['collections'] = flag_collections_json
 
         for flag in self.flags.values():
-            created = flag.created
             flag_type = self.flag_types[flag.flag_type_id]
             if flag_type.only_one:
                 # find when flag was last opened
@@ -392,7 +389,7 @@ class FlagView(APIView):
     def post(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_id')
         f = Flag.objects.get(pk=pk)  # type: Flag
-        data = request.data;
+        data = request.data
         resolution = data.get('resolution', None)
         if resolution:
             resolution = FlagResolution.objects.get(pk=resolution)

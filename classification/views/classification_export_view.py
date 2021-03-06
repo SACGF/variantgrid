@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from urllib.parse import unquote_plus
 
-from django.conf import settings
 from django.db.models import QuerySet
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
@@ -38,7 +37,7 @@ import re
 
 def parse_since(since_str: str) -> datetime:
     try:
-        return datetime.datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        return datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
     except:
         pass
 

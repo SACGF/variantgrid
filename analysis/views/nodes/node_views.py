@@ -1,11 +1,16 @@
+from typing import Tuple
+
+from django.conf import settings
+from django.db.models import QuerySet
 from django.http.response import HttpResponse
 import json
 
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
-    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TissueNodeForm, TrioNodeForm, \
+    PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
     VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm
+from analysis.models import TagNode, OntologyTerm
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -26,9 +31,10 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
-from annotation.models import MIMMorbidAlias, HPOSynonym
+from classification.views.classification_datatables import ClassificationDatatableConfig
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
+from ontology.models import OntologyService
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import Sample
 from classification.models.classification import Classification
@@ -192,30 +198,30 @@ class PhenotypeNodeView(NodeView):
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
-        mim_morbid_alias_ids = self.object.phenotypenodeomim_set.all().values_list("mim_morbid_alias", flat=True)
-        hpo_synonym_ids = self.object.phenotypenodehpo_set.all().values_list("hpo_synonym", flat=True)
-        form_initial["mim_morbid_alias"] = MIMMorbidAlias.objects.filter(pk__in=mim_morbid_alias_ids)
-        form_initial["hpo_synonym"] = HPOSynonym.objects.filter(pk__in=hpo_synonym_ids)
+        ontology_terms = self.object.phenotypenodeontologyterm_set.all().values_list("ontology_term", flat=True)
+        hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_terms)
+        form_initial["hpo"] = hpo
+        form_initial["omim"] = omim
         return form_initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
         node = self.object
-        patient_phenotypes = []
-        patient_mim = []
+        patient_hpo = []
+        patient_omim = []
         patient = node.patient
         if patient:
-            patient_phenotypes = patient.get_hpo_qs()
-            patient_mim = patient.get_mim_qs()
+            ontology_term_ids = patient.get_ontology_term_ids()
+            patient_hpo, patient_omim = OntologyTerm.split_hpo_and_omim(ontology_term_ids)
 
         patient_queryset = node.get_patients_qs()
         has_patients = patient_queryset.exists()
 
         context.update({
             'has_patients': has_patients,
-            "patient_phenotypes": patient_phenotypes,
-            "patient_mim": patient_mim
+            "patient_hpo": patient_hpo,
+            "patient_omim": patient_omim
         })
         return context
 
@@ -240,6 +246,16 @@ class SelectedInParentNodeView(NodeView):
     model = SelectedInParentNode
     form_class = SelectedInParentNodeForm
 
+
+class TagNodeView(NodeView):
+    model = TagNode
+    form_class = TagNodeForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["datatable_config"] = ClassificationDatatableConfig(self.request)
+        context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(tag=settings.TAG_REQUIRES_CLASSIFICATION)
+        return context
 
 class TissueNodeView(NodeView):
     model = TissueNode

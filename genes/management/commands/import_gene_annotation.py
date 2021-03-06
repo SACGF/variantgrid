@@ -12,10 +12,11 @@ import os
 import re
 
 from genes.gene_matching import GeneMatcher
-from genes.models import GeneAnnotationImport, HGNCGeneNames, \
+from genes.models import GeneAnnotationImport, HGNC, \
     GeneSymbol, Gene, GeneVersion, Transcript, TranscriptVersion, GeneAnnotationRelease, ReleaseGeneVersion, \
     ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
+from genes.refseq import retrieve_refseq_gene_summaries
 from library.django_utils import highest_pk
 from library.file_utils import open_handle_gzip
 from library.utils import invert_dict
@@ -31,7 +32,7 @@ class Command(BaseCommand):
         self.annotation_consortium = None
         self.genome_build = None
         self.contig_id_to_fasta = None
-        self.hgnc_ids = set(HGNCGeneNames.objects.values_list("pk", flat=True))
+        self.hgnc_ids = set(HGNC.objects.values_list("pk", flat=True))
         # Known objects containers are updated with new inserts
         self.known_gene_symbols = set(GeneSymbol.objects.all().values_list("pk", flat=True))
         self.known_gene_versions_by_gene_id = defaultdict(dict)
@@ -103,6 +104,10 @@ class Command(BaseCommand):
                                          replace=replace, release_version=release_version)
 
         Gene.delete_orphaned_fake_genes()
+
+        if replace:
+            print(f"Please run command classification_cache_chgvs to update classification records with new gene symbols")
+            print(f"Please run command allele_validate to update warnings about alleles")
 
     def update_known_gene_versions_by_gene_id(self, gv_qs):
         for gv in gv_qs:
@@ -335,7 +340,11 @@ class Command(BaseCommand):
 
             print("Matching existing gene list symbols to this release...")
             gm = GeneMatcher(release)
-            gm.match_unmatched_in_gene_lists()
+            gm.match_unmatched_in_hgnc_and_gene_lists()
+
+            if unknown_gene_ids and self.annotation_consortium == AnnotationConsortium.REFSEQ:
+                print("Created new RefSeq genes - retrieving gene summaries via API")
+                retrieve_refseq_gene_summaries()
 
     @staticmethod
     def set_transcript_data(existing_transcript_version, data):
@@ -502,6 +511,7 @@ class RefSeqParser(GFFParser):
         hgnc = dbxref.get("HGNC")
         if hgnc:
             hgnc = hgnc.replace("HGNC:", "")
+            hgnc = int(hgnc)
             if hgnc in self.hgnc_ids:
                 hgnc_id = hgnc
 
@@ -553,7 +563,7 @@ class EnsemblParser(GFFParser):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.hgnc_pattern = re.compile(r"(.*) \[Source:HGNC.*Acc:HGNC:(\d+)\]")
+        self.hgnc_pattern = re.compile(r"(.*) \[Source:HGNC.*Acc:HGNC:(\d+)]")
 
     def is_gene(self, feature_type, attributes):
         return 'gene_id' in attributes
@@ -573,6 +583,7 @@ class EnsemblParser(GFFParser):
         if description:
             if m := self.hgnc_pattern.match(description):
                 description, potential_hgnc_id = m.groups()
+                potential_hgnc_id = int(potential_hgnc_id)
                 if potential_hgnc_id in self.hgnc_ids:
                     hgnc_id = potential_hgnc_id
 

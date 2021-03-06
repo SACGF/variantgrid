@@ -1,10 +1,11 @@
 import csv
 
-from django.contrib import admin
-from django.db.models import AutoField, ForeignKey
+from django.contrib import admin, messages
+from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse
 from guardian.admin import GuardedModelAdmin
 
+from classification.models.clinvar_export_models import ClinVarExport
 from snpdb import models
 from snpdb.models import Allele
 from snpdb.models.models_genome import GenomeBuild
@@ -23,28 +24,34 @@ class AdminExportCsvMixin:
 
         writer.writerow(field_names)
         for obj in queryset:
-            row = writer.writerow([getattr(obj, field) for field in field_names])
+            writer.writerow([getattr(obj, field) for field in field_names])
         return response
 
     export_as_csv.short_description = "Export Selected"
 
+    def _is_readonly(self, f) -> bool:
+        if isinstance(f, (AutoField, ForeignKey)):
+            return True
+        if isinstance(f, DateTimeField):
+            if f.auto_now or f.auto_now_add:
+                return True
+        return False
+
     def _get_readonly_fields(self, request, obj=None):
-        readonly = []
-        for f in self.model._meta.fields:
-            if isinstance(f, (AutoField, ForeignKey)):
-                readonly.append(f.name)
-        return readonly
+        return [f.name for f in self.model._meta.fields if self._is_readonly(f)]
 
     def _get_fields(self, request, obj=None, **kwargs):
-        readonly = []
-        mutable = []
+        first = []
+        second = []
         for f in self.model._meta.fields:
             if isinstance(f, (AutoField, ForeignKey)):
-                readonly.append(f.name)
+                # put ids and foreign keys first
+                # first.append(f.name)
+                first.append(f.name)
             else:
-                mutable.append(f.name)
+                second.append(f.name)
 
-        return readonly + mutable
+        return first + second
 
 
 class ModelAdminBasics(admin.ModelAdmin, AdminExportCsvMixin):
@@ -76,7 +83,17 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
             allele.validate()
 
     validate.short_description = 'Validate'
-    actions = ["export_as_csv", validate]
+
+    def prepare_clinvar(self, request, queryset):
+        allele: Allele
+        for allele in queryset:
+            updated = ClinVarExport.sync_allele(allele=allele)
+            self.message_user(request, message=f'Changes to ClinvarExports for allele {allele.id} - {updated}',
+                              level=messages.INFO)
+
+    prepare_clinvar.short_description = 'ClinVar Export Prepare'
+
+    actions = ["export_as_csv", validate, prepare_clinvar]
     search_fields = ('id', 'clingen_allele__id')
     # flag collection and clingen allele blow up as drop downs as there's so many choices in them
     fieldsets = (

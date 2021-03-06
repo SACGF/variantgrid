@@ -11,7 +11,7 @@ class NodeGraphType(models.Model):
     graph_class = models.TextField()
     description = models.TextField()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -19,7 +19,7 @@ class NodeHelp(models.Model):
     node_class_name = models.TextField()
     help_text = models.TextField()
 
-    def __str__(self):
+    def __str__(self) -> str:
         text = self.help_text
         if len(text) > 20:
             text = text[:20] + "..."

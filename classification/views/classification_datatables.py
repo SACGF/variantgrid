@@ -8,13 +8,11 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from lazy import lazy
 
 from flags.models import FlagCollection, FlagStatus
-from genes.hgvs import CHGVS
 from genes.models import Gene, Transcript, TranscriptVersion, GeneSymbol
 from snpdb.models import UserSettings, GenomeBuild, Allele, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, BaseDatatableView, SortOrder
 from classification.enums import SpecialEKeys, EvidenceCategory
-from classification.models import ClassificationModification, classification_flag_types, \
-    Classification, EvidenceKeyMap
+from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
 ALLELE_SOMATIC_VALUES = ['somatic', 'likely_somatic']
@@ -42,8 +40,7 @@ class ClassificationDatatableConfig(DatatableConfig):
         }
 
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
-            p_hgvs = row.get('published_evidence__p_hgvs__value')
-            if p_hgvs:
+            if p_hgvs := row.get('published_evidence__p_hgvs__value'):
                 p_dot = p_hgvs.find('p.')
                 if p_dot != -1:
                     p_hgvs = p_hgvs[p_dot::]
@@ -53,8 +50,7 @@ class ClassificationDatatableConfig(DatatableConfig):
 
     def classification_id(self, row: Dict[str, Any]):
         matches: Optional[Dict[str, str]] = None
-        id_filter = self.get_query_param("id_filter")
-        if id_filter:
+        if id_filter := self.get_query_param("id_filter"):
             matches = dict()
             id_keys = self.id_columns
             for key in id_keys:
@@ -192,7 +188,7 @@ class ClassificationDatatableConfig(DatatableConfig):
         # So VUS-A is actually VUS-Pathogenicness, VUS-C is VUS-Benigness
         # so when sorting within VUS we want to do so in reverse alphabetical order
         # but when sorting outside of VUS we want alphabetical order
-        # note that Clinical Significance will first be sorted by the clinical significant int and then fall back to this
+        # Note: Clinical Significance will first be sorted by the clinical significant int and then fall back to this
         whens = [
             When(published_evidence__clinical_significance__value='VUS_A', then=Value('VUS_3')),
             When(published_evidence__clinical_significance__value='VUS_B', then=Value('VUS_2')),
@@ -213,34 +209,28 @@ class ClassificationDatatableConfig(DatatableConfig):
 
     def value_columns(self) -> List[str]:
         all_columns = super().value_columns()
-        id_filter = self.get_query_param("id_filter")
-        if id_filter:
+        if self.get_query_param("id_filter"):
             id_keys = self.id_columns
             for id_key in id_keys:
                 all_columns.append(f'published_evidence__{id_key}__value')
         return all_columns
 
     def filter_queryset(self, qs):
-
         filters = []
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME:
-            user_id = self.get_query_param('user')
-            if user_id:
+            if user_id := self.get_query_param('user'):
                 filters.append(Q(classification__user__pk=user_id))
 
-        lab_id = self.get_query_param('lab')
-        if lab_id:
+        if lab_id := self.get_query_param('lab'):
             filters.append(Q(classification__lab__pk=lab_id))
 
-        flags = self.get_query_json("flags")
-        if flags:
+        if flags := self.get_query_json("flags"):
             # Use inner query vs join to only return unique results
             flag_collections = FlagCollection.objects.filter(flag__flag_type__in=flags,
                                                              flag__resolution__status=FlagStatus.OPEN)
             filters.append(Q(classification__flag_collection__in=flag_collections))
 
-        id_filter = self.get_query_param("id_filter")
-        if id_filter:
+        if id_filter := self.get_query_param("id_filter"):
             id_keys = self.id_columns
             ids_contain_q_list: List[Q] = list()
             for id_key in id_keys:
@@ -251,21 +241,14 @@ class ClassificationDatatableConfig(DatatableConfig):
         # We want to filter using the genes set via variant annotation
         genes: Optional[Iterable[Gene]] = None
         symbols: Optional[Iterable[str]] = None
-        gene_id = self.get_query_param('gene')
-        if gene_id:
-            if gene := Gene.objects.filter(pk=gene_id).first():
-                genes = [gene]
-                symbols = gene.get_symbols().value_list('symbol', flat=True)
-        else:
-            gene_symbol_str = self.get_query_param("gene_symbol")
-            if gene_symbol_str:
-                gene_symbol: GeneSymbol
-                if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
-                    genes = gene_symbol.alias_meta.genes
-                    symbols = gene_symbol.alias_meta.alias_symbol_strs
-                    # used to do the below, which would include genes marked as "unknown"
-                    # now they wont be included, revert if this causes problems
-                    # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
+        if gene_symbol_str := self.get_query_param("gene_symbol"):
+            gene_symbol: GeneSymbol
+            if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
+                genes = gene_symbol.alias_meta.genes
+                symbols = gene_symbol.alias_meta.alias_symbol_strs
+                # used to do the below, which would include genes marked as "unknown"
+                # now they wont be included, revert if this causes problems
+                # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
 
         if genes:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
@@ -296,9 +279,7 @@ class ClassificationDatatableConfig(DatatableConfig):
                         Q(published_evidence__allele_origin__value__isnull=True)
                     )
 
-        issues_type = self.get_query_param("issues")
-        if issues_type:
-
+        if issues_type := self.get_query_param("issues"):
             flag_types = None
             if issues_type == 'data':
                 flag_types = [
@@ -329,12 +310,10 @@ class ClassificationDatatableConfig(DatatableConfig):
 
         # ClassificationListGrid is also used on patient/sample page so we
         # need to filter by samples
-        sample_ids = self.get_query_json("sample_ids")
-        if sample_ids:
+        if sample_ids := self.get_query_json("sample_ids"):
             filters.append(Q(classification__sample__in=sample_ids))
 
-        protein_position = self.get_query_param("protein_position")
-        if protein_position:
+        if protein_position := self.get_query_param("protein_position"):
             protein_position_transcript_version_id = self.get_query_param("protein_position_transcript_version_id")
             transcript_version = TranscriptVersion.objects.get(pk=protein_position_transcript_version_id)
             variant_qs = Variant.objects.filter(varianttranscriptannotation__transcript_version=transcript_version,
@@ -342,14 +321,11 @@ class ClassificationDatatableConfig(DatatableConfig):
             # Join through allele so it works across genome builds
             filters.append(Q(classification__variant__variantallele__allele__variantallele__variant__in=variant_qs))
 
+        if analysis_id := self.get_query_json("analysis_id"):
+            filters.append(Q(classification__analysisclassification__analysis_id=analysis_id))
+
         if filters:
             q = reduce(operator.and_, filters)
             qs = qs.filter(q)
 
         return super().filter_queryset(qs)
-
-
-class ClassificationModificationDatatableView(BaseDatatableView):
-
-    def config_for_request(self, request):
-        return ClassificationDatatableConfig(request)

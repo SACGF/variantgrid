@@ -7,16 +7,15 @@ class AnnotationConfig(AppConfig):
     name = 'annotation'
 
     def ready(self):
+        from Bio import Entrez
         from django.conf import settings
         from annotation.models import CachedWebResource
         from annotation.signals import clingen_post_save_handler
 
         # Entrez wants both email and API key
         if entrez_api_key := getattr(settings, "ANNOTATION_ENTREZ_API_KEY", None):
-            from Bio import Entrez
             Entrez.api_key = entrez_api_key
         if entrez_email := getattr(settings, "ANNOTATION_ENTREZ_EMAIL", None):
-            from Bio import Entrez
             Entrez.email = entrez_email
 
         post_save.connect(clingen_post_save_handler, sender=CachedWebResource)

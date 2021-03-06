@@ -5,7 +5,7 @@ celery==4.4.7
 ConfigArgParse==1.2.3
 coreapi==2.3.3
 cyvcf2==0.20.1
-Django==3.1
+Django==3.1.6
 django_admin_json_editor==0.2.3
 django_autocomplete_light==3.5.1
 django-avatar==5.0.0
@@ -45,7 +45,7 @@ nltk==3.5
 numpy==1.17.4
 oauthlib==3.1.0
 pandas==1.1.0
-pronto==2.2.3
+pronto==2.2
 psycopg2==2.8.5
 PyPDF2==1.26.0
 pysam==0.16.0.1
@@ -62,7 +62,7 @@ scipy==1.5.2
 sqlparse==0.2.4
 toposort==1.5
 Unidecode==1.1.1
-django-crispy-forms==1.9.2
+django-crispy-forms==1.10.0
 # below are only required for environments directly integrating with s3
 # separate to django-amazon-ses
 boto3==1.14.51

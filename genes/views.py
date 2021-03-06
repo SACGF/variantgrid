@@ -1,13 +1,12 @@
 import uuid
 from collections import defaultdict
-from typing import Tuple
+from typing import Tuple, List
 
 from django.conf import settings
 from django.contrib import messages
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from django.forms.models import model_to_dict
-from django.http.response import JsonResponse, Http404
+from django.http.response import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
@@ -20,42 +19,45 @@ from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from lazy import lazy
 
+from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.forms import EnsemblGeneAnnotationVersionForm
-from annotation.models.models import AnnotationVersion, EnsemblGeneAnnotation, Citation, VariantAnnotation, MIMGene
+from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.forms import GeneListForm, NamedCustomGeneListForm, GeneForm, UserGeneListForm, CustomGeneListForm, \
-    GeneSymbolForm
+from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
+    GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, gene_symbol_withdrawn_str, PanelAppServer, SampleGeneList
+    PfamSequenceIdentifier, PanelAppServer, SampleGeneList
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
+from library.log_utils import report_exc_info
 from library.utils import defaultdict_to_dict
+from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
+from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample, AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
-from snpdb.variant_queries import get_has_classifications_q, get_has_variant_tags, get_variant_queryset_for_gene_symbol
+from snpdb.variant_queries import get_has_classifications_q, get_variant_queryset_for_gene_symbol
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification
 from classification.views.classification_datatables import ClassificationDatatableConfig
-from variantopedia.variant_column_utils import get_gene_annotation_column_data
 
 
 def genes(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     av = AnnotationVersion.latest(genome_build)
-    ensembl_gene_annotation_version = av.ensembl_gene_annotation_version
-    version_form = EnsemblGeneAnnotationVersionForm(initial={'version': ensembl_gene_annotation_version})
+    gene_annotation_release = av.gene_annotation_version.gene_annotation_release
+
+    gene_annotation_release_form = GeneAnnotationReleaseGenomeBuildForm(genome_build=genome_build,
+                                                                        initial={'release': gene_annotation_release})
 
     context = {"genome_build": genome_build,
-               "gene_form": GeneForm(),
-               "version_form": version_form}
+               "gene_symbol_form": GeneSymbolForm(),
+               "gene_annotation_release_form": gene_annotation_release_form}
     return render(request, 'genes/genes.html', context)
 
 
@@ -65,57 +67,65 @@ def view_gene(request, gene_id):
     gene_versions_by_build = defaultdict(dict)
 
     versions = set()
-    for tv in gene.geneversion_set.order_by("version"):
-        genome_build_id = tv.genome_build.pk
-        version = tv.version or 0  # 0 = unknown
-        gene_versions_by_build[genome_build_id][version] = tv
-        versions.add(version)
+    for gv in gene.geneversion_set.order_by("version"):
+        genome_build_id = gv.genome_build.pk
+        gene_versions_by_build[genome_build_id][gv.version] = gv
+        versions.add(gv.version)
 
-    genome_build_ids = sorted(gene_versions_by_build.keys())
+    gene_genome_build_ids = sorted(gene_versions_by_build.keys())
     gene_versions = []
     for version in sorted(versions):
         data = [version]
-        for genome_build_id in genome_build_ids:
+        for genome_build_id in gene_genome_build_ids:
             gv = gene_versions_by_build.get(genome_build_id, {}).get(version)
             data.append(gv)
         gene_versions.append(data)
 
-    transcript_versions = defaultdict(OrderedSet)
+    transcript_versions_by_id_and_build = defaultdict(lambda: defaultdict(OrderedSet))
+    transcript_genome_build_ids = set()
     transcript_biotype = defaultdict(set)
     for tv in TranscriptVersion.objects.filter(gene_version__gene=gene).order_by("transcript_id", "version"):
-        transcript_versions[tv.transcript_id].add(tv.version)
-        if tv.biotype:
-            transcript_biotype[tv.transcript_id].add(tv.biotype)
-    transcripts = {}
-    for transcript_id, versions in transcript_versions.items():
-        biotype = ", ".join(transcript_biotype.get(transcript_id, []))
-        transcripts[transcript_id] = (versions, biotype)
+        transcript_genome_build_ids.add(tv.genome_build_id)
+        transcript_versions_by_id_and_build[tv.transcript_id][tv.genome_build_id].add(tv)
+        transcript_biotype[tv.transcript_id].add(tv.biotype)
+
+    transcript_genome_build_ids = sorted(transcript_genome_build_ids)
+    transcript_versions = []  # ID, biotype, [[GRCh37 versions...], [GRCh38 versions]]
+    has_biotype = False
+    for transcript_id, biotype_set in transcript_biotype.items():
+        biotype = ", ".join(sorted(b for b in biotype_set if b is not None))
+        if biotype:
+            has_biotype = True
+        build_versions = []
+        for genome_build_id in transcript_genome_build_ids:
+            tv_set = transcript_versions_by_id_and_build[transcript_id].get(genome_build_id, [])
+            build_versions.append(tv_set)
+        transcript_versions.append([transcript_id, biotype, build_versions])
 
     context = {
         "gene": gene,
-        "genome_build_ids": genome_build_ids,
+        "gene_genome_build_ids": gene_genome_build_ids,
         "gene_versions": gene_versions,
-        "transcripts": transcripts,
+        "has_biotype": has_biotype,
+        "transcript_versions": transcript_versions,
+        "transcript_genome_build_ids": transcript_genome_build_ids,
     }
     return render(request, "genes/view_gene.html", context)
 
 
-def _get_mim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol):
-    genes = gene_symbol.genes
-    mim_set = set((mim_gene.mim_morbid for mim_gene in MIMGene.objects.filter(gene__in=genes)))
-    mim_and_hpo_for_gene = []
-    for mim in sorted(mim_set, key=lambda m: m.accession):
-        hpo_set = set((pm.hpo for pm in mim.phenotypemim_set.order_by("pk")))
-        hpo_list = sorted(hpo_set, key=lambda h: h.pk)
-        mim_and_hpo_for_gene.append((mim, hpo_list))
-    return mim_and_hpo_for_gene
+def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
+    omim_and_hpo_for_gene = []
+    try:
+        for omim in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=0).leafs():  # direct links only
+            hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
+            omim_and_hpo_for_gene.append((omim, hpo_list))
+    except ValueError:  # in case we don't have this gene symbol available
+        report_exc_info()
+
+    return omim_and_hpo_for_gene
 
 
 def view_gene_symbol(request, gene_symbol, genome_build_name=None):
-    # determines if this gene symbol might ONLY be an alias
-    if gene_symbol.endswith(gene_symbol_withdrawn_str):
-        raise Http404('Withdrawn GeneSymbols not valid')
-
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
     for gene in gene_symbol.genes:
@@ -128,6 +138,14 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     has_classified_variants = False
     has_observed_variants = False
     has_tagged_variants = False
+
+    # There cn be multiple HGNCs per symbol (eg MMP21) - take Approved (A) over others
+    hgnc = gene_symbol.hgnc_set.order_by("status").first()
+    # Gene Summary only populated in RefSeq
+    gene_summary = None
+    if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
+                                          geneversion__gene_symbol=gene_symbol).first():
+        gene_summary = refseq_gene.summary
 
     gene_versions = gene_symbol.geneversion_set.all()
     if gene_versions.exists():
@@ -146,11 +164,10 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
         has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
 
-        q = get_has_variant_tags()
-        has_tagged_variants = gene_variant_qs.filter(q).exists()
+        has_tagged_variants = VariantTag.get_for_build(genome_build, variant_qs=gene_variant_qs).exists()
 
-        # has classifications isn't 100% in sync with the classification table:
-        # this code looks at VariantAlleles wheras the classification table will filter on gene symbol and transcript evidence keys
+        # has classifications isn't 100% in sync with the classification table: this code looks at VariantAlleles
+        # wheras the classification table will filter on gene symbol and transcript evidence keys
         q = get_has_classifications_q(genome_build)
         has_classified_variants = gene_variant_qs.filter(q).exists()
     else:
@@ -158,16 +175,7 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
 
     has_variants = has_observed_variants or has_classified_variants or has_tagged_variants
 
-    gene_annotation = EnsemblGeneAnnotation.get_for_symbol(genome_build, gene_symbol)
-    if gene_annotation:
-        gene_level_columns = get_gene_annotation_column_data(gene_annotation)
-        ega_qs = gene_annotation.gene.ensemblgeneannotation_set.filter(version__genome_build=genome_build)
-        num_gene_annotation_versions = ega_qs.count()
-    else:
-        gene_level_columns = None
-        num_gene_annotation_versions = 0
-
-    mim_and_hpo_for_gene = _get_mim_and_hpo_for_gene_symbol(gene_symbol)
+    omim_and_hpo_for_gene = _get_omim_and_hpo_for_gene_symbol(gene_symbol)
     gene_lists_qs = GeneList.filter_for_user(request.user)
     gene_in_gene_lists = GeneList.visible_gene_lists_containing_gene_symbol(gene_lists_qs, gene_symbol).exists()
 
@@ -180,48 +188,23 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "consortium_genes_and_aliases": defaultdict_to_dict(consortium_genes_and_aliases),
         "citations": citations,
         "gene_symbol": gene_symbol,
-        "gene_annotation": gene_annotation,
         "gene_in_gene_lists": gene_in_gene_lists,
         "gene_infos": GeneInfo.get_for_gene_symbol(gene_symbol),
-        "gene_level_columns": gene_level_columns,
+        "gene_summary": gene_summary,
         "genome_build": genome_build,
         "has_classified_variants": has_classified_variants,
+        "hgnc": hgnc,
         "panel_app_servers": PanelAppServer.objects.order_by("pk"),
         "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
         "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
         "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
-        "has_tagged_variants": has_tagged_variants,
         "has_variants": has_variants,
-        "mim_and_hpo_for_gene": mim_and_hpo_for_gene,
-        "num_gene_annotation_versions": num_gene_annotation_versions,
+        "omim_and_hpo_for_gene": omim_and_hpo_for_gene,
         "show_wiki": settings.VIEW_GENE_SHOW_WIKI,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
         "datatable_config": ClassificationDatatableConfig(request)
     }
     return render(request, "genes/view_gene_symbol.html", context)
-
-
-def view_gene_annotation_history(request, genome_build_name, gene_symbol):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-
-    ega = EnsemblGeneAnnotation.get_for_symbol(genome_build, gene_symbol)
-    if ega is None:
-        raise Http404(f"No EnsemblGeneAnnotation for {genome_build}/{gene_symbol}")
-
-    gene_annotation_dicts_by_version = {}
-    versions = []
-    for ega in ega.gene.ensemblgeneannotation_set.filter(version__genome_build=genome_build):
-        ega_dict = model_to_dict(ega)
-        del ega_dict["id"]
-        del ega_dict["version"]
-        gene_annotation_dicts_by_version[ega.version.pk] = ega_dict
-        versions.append((ega.version.pk, str(ega.version)))
-
-    context = {"gene": ega.gene,
-               "gene_annotation_dicts_by_version": gene_annotation_dicts_by_version,
-               "versions": versions}
-    return render(request, "genes/view_gene_annotation_history.html", context)
 
 
 def view_transcript(request, transcript_id):
@@ -270,7 +253,6 @@ def view_transcript_version(request, transcript_id, version):
                "version_count": version_count}
 
     if not tv:
-        # https://www.theonion.com/area-man-constantly-mentioning-he-doesnt-own-a-televisi-1819565469
         return render(request, "genes/view_transcript_version.html", context)
 
     accession = tv.accession
@@ -315,13 +297,12 @@ def gene_lists(request):
 
 
 def add_gene_list_unmatched_genes_message(request, gene_list, instructions=None):
-    unmatched_genes = list(gene_list.unmatched_genes)
-    if unmatched_genes:
+    if unmatched_symbols := list(gene_list.unmatched_gene_symbols):
         if instructions:
             messages.add_message(request, messages.WARNING, instructions)
 
-        for unmatched_gene in unmatched_genes:
-            msg = f"Unmatched gene symbol: {unmatched_gene.original_name}"
+        for glg in unmatched_symbols:
+            msg = f"Unmatched gene symbol: {glg.original_name}"
             messages.add_message(request, messages.WARNING, msg)
 
 

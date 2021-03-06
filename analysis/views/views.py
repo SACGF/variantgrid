@@ -22,18 +22,21 @@ import inspect
 import logging
 
 from htmlmin.decorators import not_minified_response
+from lazy import lazy
 
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
 from analysis.exceptions import NonFatalNodeError
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, AnalysisChoiceForm
+from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, AnalysisChoiceForm, \
+    InputSamplesForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
     AnalysisTemplateRun, AnalysisLock, Analysis
 from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
 from analysis.models.mutational_signatures import MutationalSignature
-from analysis.models.nodes.analysis_node import NodeVCFFilter
+from analysis.models.nodes import node_utils
+from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import NodeHelp
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
@@ -42,6 +45,7 @@ from analysis.views.analysis_permissions import get_analysis_or_404, get_node_su
     get_node_subclass_or_non_fatal_exception
 from analysis.views.nodes.node_view import NodeView
 from annotation.models.models import MutationalSignatureInfo
+from classification.views.views import create_classification_object, CreateClassificationForVariantView
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.database_utils import run_sql
@@ -89,7 +93,8 @@ def get_analysis_settings(user, analysis):
                          "node_count_types": analysis.get_node_count_types(),
                          "show_igv_links": analysis.show_igv_links,
                          "igv_data": igv_data,
-                         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab}
+                         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,
+                         "genome_build": str(analysis.genome_build)}
     return analysis_settings
 
 
@@ -119,7 +124,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
                "node_help": node_help_dict,
                "analysis_variables": analysis_variables,
                "has_write_permission": analysis.can_write(request.user),
-               "warnings": analysis.get_warnings(request.user),
+               "warnings": analysis.get_toolbar_warnings(request.user),
                "ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED": settings.ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED}
     return render(request, 'analysis/analysis.html', context)
 
@@ -280,10 +285,11 @@ def node_debug(request, analysis_version, node_id, node_version, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     model_name = node._meta.label
     node_serializers = AnalysisNodeSerializer.get_node_serializers()
-    serializer = node_serializers.get(model_name, AnalysisNodeSerializer)
+    serializer_klass = node_serializers.get(model_name, AnalysisNodeSerializer)
+    serializer = serializer_klass(node, context={"request": request})
 
     context = {"node": node,
-               "node_data": dict(sorted(serializer(node).data.items()))}
+               "node_data": dict(sorted(serializer.data.items()))}
     if node.valid:
         grid = VariantGrid(request.user, node, extra_filters)
         try:
@@ -624,11 +630,13 @@ def view_analysis_settings(request, analysis_id):
 
 def analysis_settings_details_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
+    old_annotation_version = analysis.annotation_version
     form = forms.AnalysisForm(request.POST or None, user=request.user, instance=analysis)
     has_write_permission = analysis.can_write(request.user)
     if not has_write_permission:
         set_form_read_only(form)
 
+    reload_analysis = False
     if request.method == "POST":
         analysis.check_can_write(request.user)
         if form.has_changed:
@@ -636,17 +644,23 @@ def analysis_settings_details_tab(request, analysis_id):
             if valid:
                 analysis = form.save()
                 analysis.save()
+                if reload_analysis := (old_annotation_version != analysis.annotation_version):
+                    node_utils.reload_analysis_nodes(analysis.pk)
 
             add_save_message(request, valid, "Analysis Settings")
-    else:
-        if analysis.annotation_version is None:
-            messages.add_message(request, messages.ERROR, "Analysis setting 'annotation_version' is required.")
+
+    for error in analysis.get_errors():
+        messages.add_message(request, messages.ERROR, error)
+
+    for warning in analysis.get_warnings():
+        messages.add_message(request, messages.WARNING, warning)
 
     analysis_settings = get_analysis_settings(request.user, analysis)
     context = {"analysis": analysis,
                "form": form,
                "new_analysis_settings": analysis_settings,
-               "has_write_permission": has_write_permission}
+               "has_write_permission": has_write_permission,
+               "reload_analysis": reload_analysis}
     return render(request, 'analysis/analysis_settings_details_tab.html', context)
 
 
@@ -797,3 +811,67 @@ def view_mutational_signature(request, pk):
                "mutation_type_counts": mutation_type_counts,
                "sorted_data": sorted_data}
     return render(request, 'analysis/view_mutational_signature.html', context)
+
+
+class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
+    template_name = "analysis/create_classification_for_variant_tag.html"
+
+    def _get_variant(self):
+        return self.variant_tag.variant
+
+    def _get_form_post_url(self) -> str:
+        return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis.pk})
+
+    def _get_sample_form(self):
+        # If we have a node with input samples, use that. Then fall back on all samples in analysis.
+        # Otherwise fall back on default (all samples in DB visible to user)
+        samples = None
+        if self.variant_tag.node:
+            samples = self.variant_tag.node.get_subclass().get_samples()
+
+        if not samples:
+            samples = self.variant_tag.analysis.get_samples()
+
+        if samples:
+            form = InputSamplesForm(samples=samples)
+            form.fields['sample'].required = False
+        else:
+            form = super()._get_sample_form()
+        return form
+
+    @lazy
+    def variant_tag(self):
+        variant_tag_id = self.kwargs["variant_tag_id"]
+        variant_tag = VariantTag.objects.get(pk=variant_tag_id)
+        variant_tag.analysis.check_can_view(self.request.user)
+        return variant_tag
+
+    def get_context_data(self, *args, **kwargs):
+        try:
+            context = super().get_context_data(*args, **kwargs)
+            context["variant_tag"] = self.variant_tag
+
+            if not self.variant_tag.analysis.can_write(self.request.user):
+                read_only_message = "You have read-only access to this analysis. You can create a classification but " \
+                                    "it will not be linked to the analysis and the " \
+                                    "{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
+                messages.add_message(self.request, messages.WARNING, read_only_message)
+        except VariantTag.DoesNotExist:
+            variant_tag_id = self.kwargs["variant_tag_id"]
+            msg = f"The VariantTag ({variant_tag_id}) does not exist. It may have been deleted or already classified."
+            context = {"error_message": msg}
+        return context
+
+
+@require_POST
+def create_classification_for_analysis(request, analysis_id):
+    classification = create_classification_object(request)
+    analysis = Analysis.get_for_user(request.user, pk=analysis_id)
+
+    if analysis.can_write(request.user):
+        AnalysisClassification.objects.create(analysis=analysis, classification=classification)
+
+        # Remove "Requires classification" tag
+        VariantTag.objects.filter(variant=classification.variant, analysis=analysis,
+                                  tag_id=settings.TAG_REQUIRES_CLASSIFICATION).delete()
+    return redirect(classification)

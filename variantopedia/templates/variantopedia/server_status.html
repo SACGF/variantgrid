@@ -59,7 +59,13 @@
 
         {% labelled id="redis" label="Redis" %}<div class="alert alert-{{ redis_status }}">{{  redis_message }}</div>{% endlabelled %}
         {% labelled id="highest_variant" label="Highest Variant Annotated w/latest" %}<div class="alert alert-{{ highest_variant_annotated.status }}">{{  highest_variant_annotated.message }}</div>{% endlabelled %}
-
+        {% labelled id="low_disk" label="Disk Free" %}
+            <div class="alert alert-{{ disk_free.status }}">
+                {% for message in disk_free.messages %}
+                    <div>{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endlabelled %}
 
         {% if celery_workers %}
             <h3>Celery Workers</h3>

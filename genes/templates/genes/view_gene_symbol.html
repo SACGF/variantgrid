@@ -4,6 +4,7 @@
 {% load ui_utils %}
 {% load ui_menu_bars %}
 {% load static %}
+{% load tz %}
 {% load js_tags %}
 {% load jqgrid_tags %}
 {% load user_tag_color_tags %}
@@ -42,7 +43,6 @@
         .gene-icon {
             float: none;
         }
-
         {% render_node_count_colors_css %}
     </style>
     <script>
@@ -222,50 +222,88 @@
         {% endif %}
 
         {% if show_annotation %}
-            <h4>Gene Annotations</h4>
-            {% if gene_annotation %}
-                <p>Gene Annotation Version: <a class="hover-link" href="{% url 'annotation_versions' %}">{{ gene_annotation.version }}</a>
-                {% if num_gene_annotation_versions > 1 %}
-                    - <a href="{% url 'view_gene_annotation_history' gene_symbol.pk %}">Compare {{ num_gene_annotation_versions }} historical versions</a>.
-                {% endif %}
+            {% if gene_summary %}
+                <div class="card">
+                    <div class="card-header">Summary</div>
+                    <div class="card-body">
+                        {{ gene_summary }}
+                    </div>
+                </div>
             {% endif %}
 
-            <div id='gene-info' class="mt-2">
-                {% if gene_annotation %}
-                    <div class='short-summary'>
-                        <p>
-                            <b>{{ gene_annotation.hgnc_name }}:</b> {{ gene_annotation.refseq_gene_summary }}
-                        </p>
-                        <div id='summary-gene-icons-container'></div>
-                    </div>
+            {% if hgnc %}
+                <div class="card">
+                    <div class="card-header">HGNC</div>
+                    <div class="card-body">
+                        {% labelled label="Approved Name" %}{{ hgnc.approved_name }}{% endlabelled %}
+                        {% labelled label="HGNC ID" %}<a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }}){% endlabelled %}
+                        {% labelled label="Location" %}{{ hgnc.location }}{% endlabelled %}
+                        {% labelled label="Gene Groups" %}
+                            {{ hgnc.gene_groups }}
+                            {% if hgnc.gene_group_id_list %}
+                                ({% for gene_group_id in hgnc.gene_group_id_list %}<a href="https://www.genenames.org/data/genegroup/#!/group/{{ gene_group_id }}">{{ gene_group_id }}</a>{% endfor %})
+                            {% endif %}
+                        {% endlabelled %}
 
-                    <div class="accordion indicator-plus-before round-indicator mb-4">
-                        <div class="card">
-                            <div class="card-header collapsed" data-toggle="collapse" data-target="#full-gene-info" >
-                                <a class="card-title">Full Annotation Summary</a>
-                            </div>
-                            <div id="full-gene-info" class="collapse" aria-labelledby="heading-{{ page_id }}">
-                                <div class="card-body">
-                                    {% for grid_column in gene_level_columns %}
-                                        {% labelled id=grid_column.id label=grid_column.description shorten_label=True %}{{ grid_column.value | safe}}{% endlabelled %}
+                        <a data-toggle="collapse" href="#more-hgnc">More HGNC...</a>
+                        <div id="more-hgnc" class="collapse">
+                            {% if hgnc.ccds_list %}
+                                {% labelled label="CCDS" %}
+                                    {% for ccds_id in hgnc.ccds_list %}
+                                        <a href="https://www.ncbi.nlm.nih.gov/projects/CCDS/CcdsBrowse.cgi?REQUEST=ALLFIELDS&DATA={{ ccds_id }}">{{ ccds_id }}</a>
                                     {% endfor %}
-                                    {% if gene_infos.exists %}
-                                    <h5>Gene Info</h5>
-                                    <div class='gene-info-container'>
-                                        {% for gi in gene_infos %}
-                                            <div class='gene-icon {{ gi.icon_css_class }}' title='{{ gi.name }}'></div>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                                </div>
-                            </div>
+                                {% endlabelled %}
+                            {% endif %}
+                            {% if hgnc.mgd_list %}
+                                {% labelled label="Mouse" %}
+                                    {% for mgd_id in hgnc.mgd_list %}
+                                        <a href="http://www.informatics.jax.org/marker/{{ mgd_id }}">{{ mgd_id }}</a>
+                                    {% endfor %}
+                                {% endlabelled %}
+                            {% endif %}
+                            {% if hgnc.rgd_list %}
+                                {% labelled label="Rat" %}
+                                    {% for rgd_id in hgnc.rgd_list %}
+                                        <a href="http://rgd.mcw.edu/rgdweb/report/gene/main.html?id={{ rgd_id }}">{{ rgd_id }}</a>
+                                    {% endfor %}
+                                {% endlabelled %}
+                            {% endif %}
+                            {% if hgnc.ucsc_list %}
+                                {% labelled label="UCSC" %}
+                                    {% for ucsc_id in hgnc.ucsc_list %}
+                                        <a href="http://genome.cse.ucsc.edu/cgi-bin/hgGene?org=Human&hgg_chrom=none&hgg_type=knownGene&hgg_gene={{ ucsc_id }}">{{ ucsc_id }}</a>
+                                    {% endfor %}
+                                {% endlabelled %}
+                            {% endif %}
+
+                            {% labelled label="Retrieved from HGNC" %}
+                                {{ hgnc.hgnc_import.modified | localtime }} ({{ hgnc.hgnc_import.modified | timesince }} ago)
+                            {% endlabelled %}
                         </div>
                     </div>
+                </div>
 
-                {% else %}
-                    <!-- No annotation for this gene -->
+                {% if hgnc.uniprot_list %}
+                    <div class="card">
+                        <div class="card-header">UniProt</div>
+                        <div class="card-body">
+                            {% labelled label="UniProt IDs" %}
+                                {{ hgnc.uniprot_ids }}
+                            {% endlabelled %}
+                            <a data-toggle="collapse" href="#more-uniprot">More UniProt...</a>
+                            <div id="more-uniprot" class="collapse">
+                            {% for uniprot in hgnc.uniprot_list %}
+                                <h4>{{ accession }}</h4>
+                                {% labelled label="Function" %}{{ uniprot.function }}{% endlabelled %}
+                                {% labelled label="Pathway" %}{{ uniprot.pathway }}{% endlabelled %}
+                                {% labelled label="Pathway Interaction DB" %}{{ uniprot.pathway_interaction_db }}{% endlabelled %}
+                                {% labelled label="Reactome" %}{{ uniprot.reactome }}{% endlabelled %}
+                                {% labelled label="Tissue Specificity" %}{{ uniprot.tissue_specificity }}{% endlabelled %}
+                            {% endfor %}
+                        </div>
+                    </div>
                 {% endif %}
-            </div>
+            {% endif %}
 
             {% gene_disease gene_symbol %}
 
@@ -275,21 +313,21 @@
                 {% panel_app_gene_evidence server gene_symbol %}
             {% endfor %}
 
-            {% if mim_and_hpo_for_gene %}
+            {% if omim_and_hpo_for_gene %}
                 <h4>OMIM and Human Phenotype Ontology</h4>
 
                 <table class="table">
                     <thead>
-                    <tr><th>MIM Morbid</th><th>Description</th><th>HPOs</th>
+                    <tr><th>OMIM</th><th>Name</th><th>HPOs</th>
                     </thead>
                     <tbody>
-                    {% for mim, hpo_list in mim_and_hpo_for_gene %}
-                        <tr><td><a class="hover-link" href="https://www.omim.org/entry/{{ mim.accession }}">{{ mim.accession }}</a>
-                            <td>{{ mim.description }}
+                    {% for omim, hpo_list in omim_and_hpo_for_gene %}
+                        <tr><td><a class="hover-link" href="{{ omim.url }}">{{ omim.id }}</a>
+                            <td>{{ omim.name }}
                             <td>
                             {% if hpo_list %}
                                 {% for hpo in hpo_list %}
-                                    <a class="hover-link" href="http://compbio.charite.de/hpoweb/showterm?id={{ hpo.hpo_id }}">{{ hpo }}</a>&#160;
+                                    <a class="hover-link" href="{{ hpo.url }}">{{ hpo.id }} {{ hpo.name }}</a>&#160;
                                 {% endfor %}
                             {% endif %}
                     {% endfor %}
@@ -336,28 +374,6 @@
             <a class='hover-link' href="javascript:clearGeneClassificationsGrid()">Show all...</a>
         </span>
         {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
-
-        {% if has_tagged_variants %}
-            <script>
-                function getGeneGridExtraFilters() {
-                    var gridParams = {
-                        gene_symbol : "{{ gene_symbol }}",
-                    };
-                    return JSON.stringify(gridParams);
-                }
-
-                function getGeneGridConfigUrl() {
-                    return "extra_filters=" + getGeneGridExtraFilters();
-                }
-
-                function geneGridInitFunc(grid, pagerId) {
-                    grid[0].p.postData["extra_filters"] = getGeneGridExtraFilters;
-                }
-            </script>
-            <h3>Tagged Variants</h3>
-            {% user_data_grid_filter 'gene_variant_tags' 'Analyses Variant Tags' %}
-            {% jqgrid 'analyses_variant_tags_grid' 'gene_variant_tags' genome_build_name=genome_build.name search=False jqgrid_config_get_parameters_func='getGeneGridConfigUrl' init_func='geneGridInitFunc' %}
-        {% endif %}
     </div>
     <div class="container">
         {% if show_annotation %}
@@ -376,9 +392,11 @@
         		<table id="grid"></table>
         		<div id="pager"></div>
                 <script>
-                    function initialHideFilter() {
+                    function geneVariantsGridComplete() {
+                        const searchToolBox = $("#searchmodfbox_gene-variants-grid");
+                        searchToolBox.width(650); // make space for data entry
                         if (!gridFilterVisible) {
-                            $("#searchmodfbox_gene-variants-grid").hide();
+                            searchToolBox.hide();
                         }
                     }
 
@@ -395,8 +413,14 @@
                     function geneVariantsGridInitFunc(grid, pagerId) {
                         grid[0].p.postData["extra_filters"] = getGeneVariantsGridExtraFilters;
                     }
+
+                    function tagClick(tagId) {
+                        geneVariantsGridParams = {"tag" : tagId};
+                        $("#gene-variants-grid").trigger("reloadGrid");
+                    }
                 </script>
-                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='initialHideFilter' %}
+                {% tag_counts_filter genome_build=genome_build gene_symbol=gene_symbol click_func='tagClick' show_all_func='clearGeneVariantsGrid' %}
+                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False download_grid_json_as_csv=True gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='geneVariantsGridComplete' %}
             {% else %}
                 There are no variants for this gene.
             {% endif %}
@@ -407,8 +431,7 @@
             {% jqgrid 'gene_lists_for_gene_symbol_grid' category.name search=False delete=False gene_symbol=gene_symbol.pk %}
         {% endif %}
 
-        <div id='qc-gene-coverage-graph-container'>
-        </div>
+        <div id='qc-gene-coverage-graph-container'></div>
 	</div>
 
 {% endblock content %}

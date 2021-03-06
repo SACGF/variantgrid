@@ -48,7 +48,7 @@
     });
 </script>
 <style>
-    tr.excluded td, tr.excluded td span {
+    tr.excluded td, tr.excluded td:not(.reasons) span {
         text-decoration: line-through;
     }
     tr.excluded td.reasons {
@@ -59,22 +59,10 @@
     }
     .code {
         min-width: 30px;
-        text-align: right;
+        text-align: center;
 
         display: inline-block;
         font-family: monospace;
-    }
-    .code::after {
-        content: ')';
-        opacity: 0.5;
-        position: relative;
-        bottom: 1px;
-    }
-    .code::before {
-        content: '(';
-        opacity: 0.5;
-        position: relative;
-        bottom: 1px;
     }
 </style>
 {% endblock %}
@@ -109,6 +97,9 @@
                     {% endlabelled %}
                 {% endif %}
                 {% labelled label="Initial Trigger for Discordance" %}{{ report.cause_text | default:"Unknown" }}{% endlabelled %}
+                {% if report.resolved_text %}
+                    {% labelled label="Final Trigger to end Discordance" %}{{ report.resolved_text }}{% endlabelled %}
+                {% endif %}
 
                 {% if report.continued_discordance_reason %}
                     {% labelled label="Reason for Continued Discordance" %}{{ report.get_continued_discordance_reason_display }}{% endlabelled %}

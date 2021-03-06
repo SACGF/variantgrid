@@ -1,0 +1,105 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load ontology_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% load js_tags %}
+{% load ui_tabs_builder %}
+{% block title %}{{ term.id }}{% endblock title %}
+{% block content %}
+    <div class="container">
+        <div class="card">
+            <div class="card-header">{{ term.id }}</div>
+            <div class="card-body">
+                {% labelled label="Name" %}{{ term.name }}{% endlabelled %}
+                {% labelled label="Definition" value_css="white-space:pre-wrap" %}{{ term.definition }}{% endlabelled %}
+                {% labelled label="Extra" %}
+                    {% if term.extra %}
+                    <a href="#ontology-extra" data-toggle="collapse" class="toggle-link">Toggle raw extra data (technical)</a>
+                    <div id="ontology-extra" class="text-monospace collapse" style="white-space: pre-wrap; font-size: small">{{ term.extra | jsonify_pretty }}</div>
+                    {% else %}<div class="no-value">-</div>{% endif %}
+                {% endlabelled %}
+                {% if term.aliases %}
+                    {% labelled label="Aliases" %}{% for alias in term.aliases %}{{ alias }}<br/>{% endfor %}{% endlabelled %}
+                {% endif %}
+                {% labelled label="URL" %}
+                    <a href="{{ term.url }}" class="external-link hover-link" target="_blank">{{ term.url }}</a>
+                {% endlabelled %}
+                {% labelled label="Cross Ontology URL" %}
+                    <a href="https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}" class="external-link" target="_blank">https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}</a>
+                {% endlabelled %}
+                {% if term.ontology_service == "MONDO" %}
+                    {% labelled label="Hierarchy URL" %}
+                        <a class="external-link" target="_blank"
+                           href="https://www.ebi.ac.uk/ols/ontologies/MONDO/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{{ term.url_safe_id }}">
+                        https://www.ebi.ac.uk/ols/ontologies/MONDO/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{{ term.url_safe_id }}
+                        </a>
+                    {% endlabelled %}
+                {% endif %}
+                {% if not term.is_stub %}
+                    {% labelled label="Last imported" %}Import {{ term.from_import.id }} - {{ term.from_import.filename }} @ {% timestamp term.from_import.processed_date %}{% endlabelled %}
+                {% endif %}
+
+                <hr/>
+                {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
+                    {% if not parent_relationships %}-{% endif %}
+                    {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
+                    {% for relationship in parent_relationships %}
+                        <div class="mt-2">
+                            {% ontology_relationship relationship term %}
+                        </div>
+                    {% endfor %}
+                {% endlabelled %}
+
+                {% if gene_relationships is not None %}
+                    <hr/>
+                    {% labelled label="<i class='fas fa-dna'></i> Gene Relationships" %}
+                        <p class="text-muted">Note that Panel App relationships are only retrieved as needed, and might not be represented
+                        here yet.</p>
+                        {% if gene_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ gene_relationships.limit_str }}<br/>{% endif %}
+                        {% if not gene_relationships %}-{% endif %}
+                        {% for snake in gene_relationships %}
+                            <div class="mt-2">
+                            <span class="text-muted text-monospace">{{ term.id }}</span>
+                            {% for step in snake.show_steps %}
+                                <div class="text-center d-inline-block mx-2 hover-detail"
+                                     title="Import {{ step.relation.from_import.import_source }}"
+                                    data-content="Last imported: {{ step.relation.from_import.processed_date }}<br/>
+                                    Context: {{ step.relation.from_import.context }}</br>
+                                    Filename: {{ step.relation.from_import.filename }}">&nbsp
+                                    {{ step.relation.relation_display }}
+                                </div>
+                                {% ontology_term step.dest_term %} &nbsp;
+                            {% endfor %}
+                            </div>
+                        {% endfor %}
+                    {% endlabelled %}
+                {% endif %}
+                <hr/>
+
+                {% labelled label="Direct Relationships" %}
+                    {% if not regular_relationships %}-{% endif %}
+                    {% if regular_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ regular_relationships.limit_str }}<br/>{% endif %}
+                    {% for relationship in regular_relationships %}
+                        <div class="mt-2">
+                            {% ontology_relationship relationship term %}
+                        </div>
+                    {% endfor %}
+                {% endlabelled %}
+
+                <hr/>
+
+                {% labelled label='<i class="fas fa-sitemap"></i> Child Terms' %}
+                    {% if not child_relationships %}-{% endif %}
+                    {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
+                    {% for relationship in child_relationships %}
+                        <div class="mt-2">
+                            {% ontology_relationship relationship term %}
+                        </div>
+                    {% endfor %}
+                {% endlabelled %}
+
+            </div>
+        </div>
+    </div>
+{% endblock %}

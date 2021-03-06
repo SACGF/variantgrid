@@ -1,3 +1,5 @@
+import json
+import uuid
 from typing import Optional, Any
 
 from django import template
@@ -7,6 +9,20 @@ import re
 from django.utils.safestring import SafeString
 
 register = template.Library()
+
+@register.simple_tag(takes_context=True)
+def update_django_messages(context):
+    """
+    Use when you've loaded messages in an ajax tab, and need to update the page messages with save etc messages
+    """
+    message_json = []
+    if messages := context.get("messages"):
+        for message in messages:
+            tags = message.tags
+            text = str(message)
+            message_json.append({"tags": tags, "text": text})
+    message_json_string = json.dumps(message_json)
+    return SafeString(f"update_django_messages({message_json_string});")
 
 
 # Taken from https://www.caktusgroup.com/blog/2017/05/01/building-custom-block-template-tag/
@@ -43,6 +59,56 @@ def parse_tag(token, parser):
             args.append(FilterExpression(bit, parser))
 
     return (tag_name, args, kwargs)
+
+
+@register.tag(name='install-instructions')
+def render_install_instructions(parser, token):
+    tag_name, args, kwargs = parse_tag(token, parser)
+    nodelist = parser.parse(('endinstall-instructions',))
+    parser.delete_first_token()
+    label = kwargs.get('label')
+    installed = kwargs.get('installed')
+    if not label:
+        if len(args) > 0:
+            label = args[0]
+        else:
+            raise ValueError("install-instructions required requires 'label' argument")
+
+    return InstallInstructionsTag(nodelist, label=label, installed=installed)
+
+
+class InstallInstructionsTag(template.Node):
+
+    def __init__(self, nodelist, installed: bool, label: FilterExpression = None):
+        self.nodelist = nodelist
+        self.installed = installed
+        self.label = label
+
+    def render(self, context):
+        if not context.request.user.is_superuser:
+            return ""
+
+        label_str = TagUtils.value_str(context, self.label)
+        if not label_str:
+            label_str = ""
+            id_safe = str(uuid.uuid4()).replace("-", "_") + "_instructions"
+        else:
+            id_safe = re.sub("\W", "_", label_str).lower()
+        css_classes = ["install-instructions"]
+        if self.installed.resolve(context):
+            css_classes.append("collapse")
+        else:
+            css_classes.append("not-installed")
+
+        return f"""
+        <div>
+        <a class='toggle-link install-instructions-toggle' data-toggle='collapse' href='#{id_safe}'>{label_str} Install/Update Instructions</a>
+        <div class='{' '.join(css_classes)}' id='{id_safe}'>
+        {self.nodelist.render(context)}
+        </div>
+        </div>
+        """
+
 
 @register.tag(name='labelled')
 def render_labelled(parser, token):
@@ -114,17 +180,17 @@ class LabelledValueTag(template.Node):
         row_css = "form-group row mb-4 mb-md-3"
 
         if hint == "tiny":
-            label_css = f"col-12 col-md-6 text-md-right"
-            value_css = f"col-12 col-md-6 text-left align-self-center text-break"
+            label_css = "col-12 col-md-6 text-md-right"
+            value_css = "col-12 col-md-6 text-left align-self-center text-break"
         elif hint == "chunky":
-            label_css = f"col-12"
-            value_css = f"col-12 text-break"
+            label_css = "col-12"
+            value_css = "col-12 text-break"
         elif hint == "inline":
             label_css = "m-2 align-self-center"
             value_css = "m-2"
         else:
-            label_css = f"col-12 col-md-3 text-md-right align-self-center"
-            value_css = f"col-12 col-md-9 text-left text-break"
+            label_css = "col-12 col-md-3 text-md-right align-self-center"
+            value_css = "col-12 col-md-9 text-left text-break"
 
         label_css_extra = TagUtils.value_str(context, self.label_css, '')
         label_css = f"{label_css} {label_css_extra}".strip()
@@ -148,7 +214,7 @@ class LabelledValueTag(template.Node):
             div_id = f"id=\"{complete_id}\""
             for_id = f"for=\"{complete_id}\""
 
-        if output == "":
+        if output in ("", "None"):
             output = "<span class=\"no-value\">-</span>"
         elif LabelledValueTag.big_zero.match(output):
             output = f"<span class=\"zero-value\">{output}</span>"
@@ -162,8 +228,7 @@ class LabelledValueTag(template.Node):
 
         if hint == "inline":
             return content
-        else:
-            return f'<div class="{row_css}">{content}</div>'
+        return f'<div class="{row_css}">{content}</div>'
 
 
 @register.filter()
@@ -173,15 +238,21 @@ def severity_icon(severity: str) -> str:
     severity = severity.upper()
     if severity.startswith('C'):  # critical
         return SafeString('<i class="fas fa-bomb text-danger"></i>')
-    elif severity.startswith('E'):  # error
+    if severity.startswith('E'):  # error
         return SafeString('<i class="fas fa-exclamation-circle text-danger"></i>')
-    elif severity.startswith('W'):  # warning
+    if severity.startswith('W'):  # warning
         return SafeString('<i class="fas fa-exclamation-triangle text-warning"></i>')
-    elif severity.startswith('I'):  # info
+    if severity.startswith('I'):  # info
         return SafeString('<i class="fas fa-info-circle text-info"></i>')
-    else:  # debug
-        return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
+    # debug
+    return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
 
+
+@register.filter()
+def checked(test: bool) -> str:
+    if test:
+        return SafeString('checked="checked"')
+    return ''
 
 class TagUtils:
 
