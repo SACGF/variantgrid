@@ -8,14 +8,17 @@ from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
-from django_downloadview import BaseDownloadView
+from django_downloadview import PathDownloadView
 from jfu.http import upload_receive, UploadResponse, JFUResponse
 import json
 import logging
 import os
 
+from lazy import lazy
+
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
+from library.cache import timed_cache
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
 from snpdb.models import VCF
@@ -312,9 +315,9 @@ def accept_vcf_import_info_tag(request, vcf_import_info_id):
     return JsonResponse({})
 
 
-class DownloadUploadedFile(BaseDownloadView):
-
-    def get_file(self):
+class DownloadUploadedFile(PathDownloadView):
+    @lazy
+    def uploaded_file(self):
         uploaded_file_id = self.kwargs["pk"]
         uploaded_file = get_object_or_404(UploadedFile, pk=uploaded_file_id)
         upload_data = get_upload_data_for_uploaded_file(uploaded_file)
@@ -322,4 +325,16 @@ class DownloadUploadedFile(BaseDownloadView):
         # TODO: use check_can_view once everything implements GuardianPermissionsMixin
         if not data.can_view(self.request.user):
             raise PermissionDenied(f"You do not have permission to access: {data}")
-        return uploaded_file.get_file()
+        return uploaded_file
+
+    def get_mimetype(self):
+        """ Firefox 86 downloads XX.vcf.gz as XX.vcf.vcf - so provide mimetype to force .gz extension
+            @see https://stackoverflow.com/a/65596550/295724 """
+        mimetype = super().get_mimetype()
+        filename = self.get_path()
+        if filename.endswith(".gz"):
+            mimetype = "application/gzip"
+        return mimetype
+
+    def get_path(self):
+        return self.uploaded_file.get_filename()
