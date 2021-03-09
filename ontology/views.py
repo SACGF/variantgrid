@@ -19,7 +19,7 @@ class OntologyTermView(TemplateView):
             if term.ontology_service != OntologyService.HGNC:
                 gene_relationships = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
 
-            all_relationships:List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
+            all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
             regular_relationships = list()
             parent_relationships = list()
             child_relationships = list()

@@ -4,6 +4,13 @@ from django.db import migrations
 import pandas as pd
 
 from library.file_utils import mk_path
+from manual.operations.manual_operations import ManualOperation
+
+
+def _test_has_legacy_phenotype_node_ontology(apps, schema_editor):
+    PhenotypeNodeOMIM = apps.get_model("analysis", "PhenotypeNodeOMIM")
+    PhenotypeNodeHPO = apps.get_model("analysis", "PhenotypeNodeHPO")
+    return PhenotypeNodeOMIM.objects.exists() or PhenotypeNodeHPO.objects.exists()
 
 
 def _one_off_save_phenotype_node_ontology(apps, schema_editor):
@@ -35,5 +42,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_legacy_phenotype_nodes"]),
+                        test=_test_has_legacy_phenotype_node_ontology),
         migrations.RunPython(_one_off_save_phenotype_node_ontology)
     ]

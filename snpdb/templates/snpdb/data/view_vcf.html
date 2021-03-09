@@ -446,6 +446,18 @@ $(document).ready(function() {
                 </span>
             </p>
             <p>
+                <label>Variant Zygosity Count</label>
+                <span>
+                    {% if vcf.has_genotype and vcf.variant_zygosity_count %}
+                        {% for vzc in vcf.variantzygositycountforvcf_set.all %}
+                            {{ vzc.collection.name }}
+                        {% endfor %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </span>
+            </p>
+            <p>
                 <label>Header</label>
                 <span>
                     <a id='show-vcf-header' href="javascript:showVCFHeader()">Show VCF header...</a>

@@ -10,7 +10,7 @@ import subprocess
 from library.log_utils import get_traceback
 from library.utils import import_class
 from upload.models import UploadPipeline, ProcessingStatus, \
-    UploadStep, PipelineFailedJobTerminateEarlyException, VCFPipelineStage
+    UploadStep, PipelineFailedJobTerminateEarlyException, VCFPipelineStage, SkipUploadStepException
 
 
 class ImportVCFStepTask(Task):
@@ -84,6 +84,8 @@ class ImportVCFStepTask(Task):
         except PipelineFailedJobTerminateEarlyException:
             logging.error("ImportVCFStepTask: Got PipelineFailedJobTerminateEarlyException")
             upload_step.status = ProcessingStatus.TERMINATED_EARLY
+        except SkipUploadStepException:
+            upload_step.status = ProcessingStatus.SKIPPED
         except subprocess.CalledProcessError as e:
             message = e.output
             upload_step.error_exception(message)

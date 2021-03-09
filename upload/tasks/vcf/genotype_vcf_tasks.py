@@ -17,7 +17,7 @@ from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_
     create_variant_zygosity_counts
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, \
-    UploadPipeline, SimpleVCFImportInfo
+    UploadPipeline, SimpleVCFImportInfo, SkipUploadStepException
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
 from upload.vcf.vcf_import import create_vcf_from_vcf, import_vcf_file, \
@@ -129,8 +129,11 @@ class UpdateVariantZygosityCountsTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
+        vcf = uploaded_vcf.vcf
+        if vcf.variant_zygosity_count is False:
+            raise SkipUploadStepException()
         create_variant_zygosity_counts()
-        update_all_variant_zygosity_counts_for_vcf(uploaded_vcf.vcf, '+')
+        update_all_variant_zygosity_counts_for_vcf(vcf, '+')
 
 
 class SampleLocusCountsTask(ImportVCFStepTask):

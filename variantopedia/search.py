@@ -570,12 +570,9 @@ def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **k
 
 def search_variant_match(m: Match, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
     if m:
-        (chrom, position, ref, alt) = m.groups()
-        ref = ref.upper()
-        alt = alt.upper()
-        if ref == alt:
-            alt = Variant.REFERENCE_ALT
-        chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
+        chrom, position, ref, alt = m.groups()
+        chrom, position, ref, alt = Variant.clean_fields(chrom, position, ref, alt,
+                                                         want_chr=genome_build.reference_fasta_has_chr)
         results = get_results_from_variant_tuples(variant_qs, (chrom, position, ref, alt))
         if results.exists():
             return results
