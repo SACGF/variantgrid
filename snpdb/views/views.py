@@ -1085,7 +1085,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     patient = Patient.get_for_user(request.user, sample.patient.pk)
 
                     def format_ontology(ontology_term):
-                        return f"<div title='{hpo}'>{hpo.name}</div>"
+                        return f"<div title='{ontology_term}'>{ontology_term.name}</div>"
 
                     hpo, omim = OntologyTerm.split_hpo_and_omim(patient.get_ontology_term_ids())
                     hpo_text = " ".join(map(format_ontology, hpo))
