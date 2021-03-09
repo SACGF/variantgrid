@@ -20,6 +20,7 @@ import re
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
+from library.genomics import format_chrom
 from library.utils import md5sum_str
 from snpdb.models import Wiki
 from snpdb.models.flag_types import allele_flag_types
@@ -328,6 +329,8 @@ class Variant(models.Model):
         variant_tuple = None
         if m := regex_pattern.match(variant_string):
             chrom, position, ref, alt = m.groups()
+            chrom, position, ref, alt = Variant.clean_fields(chrom, position, ref, alt,
+                                                             want_chr=genome_build.reference_fasta_has_chr)
             contig = genome_build.chrom_contig_mappings[chrom]
             variant_tuple = VariantCoordinate(contig.name, int(position), ref, alt)
         return variant_tuple
@@ -440,6 +443,16 @@ class Variant(models.Model):
     @property
     def end(self):
         return self.locus.position + max(self.locus.ref.length, self.alt.length)
+
+    @staticmethod
+    def clean_fields(chrom, position, ref, alt, want_chr):
+        ref = ref.upper()
+        alt = alt.upper()
+        if ref == alt:
+            alt = Variant.REFERENCE_ALT
+        chrom = format_chrom(chrom, want_chr)
+        return chrom, position, ref, alt
+
 
 
 class VariantWiki(Wiki):
