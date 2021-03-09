@@ -454,6 +454,7 @@ $(document).ready(function() {
                                 {% labelled id="spliceai_pred_dp_dg" label="SpliceAI DG pos'n" hint="tiny" %}{{ variant_annotation.spliceai_pred_dp_dg }}{% endlabelled %}
                                 {% labelled id="spliceai_pred_ds_dl" label="SpliceAI DL score" hint="tiny" %}{{ variant_annotation.spliceai_pred_ds_dl|floatformat:6 }}{% endlabelled %}
                                 {% labelled id="spliceai_pred_dp_dl" label="SpliceAI DL pos'n" hint="tiny" %}{{ variant_annotation.spliceai_pred_dp_dl }}{% endlabelled %}
+                                {% labelled id="spliceai_gene_symbol" label="SpliceAI Gene Symbol'n" hint="tiny" %}{{ variant_annotation.spliceai_gene_symbol }}{% endlabelled %}
                             {% else %}
                                 {% labelled id='spliceai_none' label='No SpliceAI data' hint="tiny" %}{% endlabelled %}
                             {% endif %}

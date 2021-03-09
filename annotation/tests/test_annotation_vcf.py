@@ -119,6 +119,7 @@ class TestAnnotationVCF(TestCase):
         self.assertAlmostEqual(va.spliceai_pred_ds_al, 0.17)
         self.assertAlmostEqual(va.spliceai_pred_ds_dg, 0.01)
         self.assertAlmostEqual(va.spliceai_pred_ds_dl, 0.04)
+        self.assertEqual(va.spliceai_gene_symbol, "OR4F5")
 
         # RPE65:G197E | 1&1&1
         va = VariantAnnotation.objects.get(variant_id=131167)
