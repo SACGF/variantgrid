@@ -454,7 +454,6 @@ class Variant(models.Model):
         return chrom, position, ref, alt
 
 
-
 class VariantWiki(Wiki):
     variant = models.OneToOneField(Variant, on_delete=CASCADE)
 
