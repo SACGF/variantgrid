@@ -92,6 +92,11 @@ class PipelineFailedJobTerminateEarlyException(Exception):
     pass
 
 
+class SkipUploadStepException(Exception):
+    """ Throw this to set task to skipped """
+    pass
+
+
 class UploadPipeline(models.Model):
     INITIAL_PROGRESS_STATUS = "Processing"
     status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)

@@ -93,8 +93,9 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
     try:
         check_valid_count_ops(operation)
         logging.info("update_variant_zygosity_count_for_vcf(%s, %s, %s)", collection, vcf, operation)
-        if not vcf.has_genotype:
-            logging.info("VCF %s has no genotype - skipping VariantZygosityCount", vcf)
+        if not (vcf.has_genotype and vcf.variant_zygosity_count):
+            logging.info("VCF %s genotype=%s, variant_zygosity_count=%s - skipping VariantZygosityCount",
+                         vcf, vcf.has_genotype, vcf.variant_zygosity_count)
             return
 
         try:

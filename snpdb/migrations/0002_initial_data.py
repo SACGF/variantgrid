@@ -1451,23 +1451,6 @@ def create_columns(apps, schema_editor):
         CustomColumn.objects.bulk_create(records)
 
 
-def create_default_vcf_source_settings(apps, schema_editor):
-    MIXED = 'M'
-    SOMATIC_ONLY = 'S'  # Eg Tumor/Normal subtraction
-    SAMPLE_VARIANTS_TYPE_VCF_SOURCE_SETTINGS = [
-        ("^freeBayes", MIXED),  # eg freeBayes v1.1.0-9-g09d4ecf
-        ("combine_caller_data", SOMATIC_ONLY),  # Paul's subtracted pipeline
-    ]
-
-    VCFSourceSettings = apps.get_model("snpdb", "VCFSourceSettings")
-
-    operation = 'set_sample_variants_type'
-    for source_regex, value in SAMPLE_VARIANTS_TYPE_VCF_SOURCE_SETTINGS:
-        VCFSourceSettings.objects.create(source_regex=source_regex,
-                                         operation=operation,
-                                         value=value)
-
-
 def add_requires_classification_tag(apps, schema_editor):
     Tag = apps.get_model("snpdb", "Tag")
     Tag.objects.get_or_create(id=settings.TAG_REQUIRES_CLASSIFICATION)
@@ -1656,7 +1639,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(snpdb_initial_data),
         migrations.RunPython(create_columns),
-        migrations.RunPython(create_default_vcf_source_settings),
         migrations.RunPython(add_requires_classification_tag),
         migrations.RunPython(create_bot_user),
         migrations.RunPython(import_contigs),

@@ -191,10 +191,10 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
 def handle_vcf_source(vcf):
     if vcf.source:
         for vss in VCFSourceSettings.objects.all():
-            if m := re.match(vss.source_regex, vcf.source):
-                if vss.operation == VCFSourceSettings.SET_SAMPLE_VARIANTS_TYPE:
-                    print(f"VCF: {vcf} has source {vcf.source} -> variants_type {vss.value}")
-                    vcf.sample_set.all().update(variants_type=vss.value)
+            if re.match(vss.source_regex, vcf.source):
+                vcf.sample_set.all().update(variants_type=vss.sample_variants_type)
+                vcf.variant_zygosity_count = vss.variant_zygosity_count
+                vcf.save()
 
 
 def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info):
