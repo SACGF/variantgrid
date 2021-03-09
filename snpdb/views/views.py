@@ -1084,15 +1084,12 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     # Check you have Patient permissions
                     patient = Patient.get_for_user(request.user, sample.patient.pk)
 
-                    def format_hpo(hpo):
+                    def format_ontology(ontology_term):
                         return f"<div title='{hpo}'>{hpo.name}</div>"
 
-                    def format_min(mim):
-                        return f"<div title='{mim}'>{mim.description}</div>"
-
                     hpo, omim = OntologyTerm.split_hpo_and_omim(patient.get_ontology_term_ids())
-                    hpo_text = " ".join(map(format_hpo, hpo))
-                    omim_text = " ".join(map(format_min, omim))
+                    hpo_text = " ".join(map(format_ontology, hpo))
+                    omim_text = " ".join(map(format_ontology, omim))
 
                     try:
                         age = sample.specimen.age_at_collection_date
