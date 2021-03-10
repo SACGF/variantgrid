@@ -555,7 +555,7 @@ class DebugTimer:
     def __init__(self):
         self.start = datetime.now()
 
-    def tick(self, description:str):
+    def tick(self, description: str):
         now = datetime.now()
         duration = now - self.start
         print(f"{description} {duration}")

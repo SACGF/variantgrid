@@ -27,7 +27,7 @@ from snpdb.models.models import Tag, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
+from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus, AlleleFrequencySource
 
 
 class Project(models.Model):
@@ -56,11 +56,15 @@ class VCF(models.Model):
     source = models.TextField(blank=True)
     # Most callers put allele depths in AD eg AD=[10,12] but some can split into separate ref/alt fields
     allele_depth_field = models.TextField(null=True)
+    allele_frequency_field = models.TextField(null=True)
     ref_depth_field = models.TextField(null=True)
     alt_depth_field = models.TextField(null=True)
     read_depth_field = models.TextField(null=True)
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
+    allele_frequency_source = models.CharField(max_length=1, choices=AlleleFrequencySource.choices, default=AlleleFrequencySource.CALCULATED)
+    # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
+    variant_zygosity_count = models.BooleanField(default=True)
 
     @lazy
     def has_filters(self):
@@ -508,14 +512,14 @@ class SampleLabProject(models.Model):
 
 
 class VCFSourceSettings(models.Model):
-    """ Performs operation after VCF import based on 'source' header field """
-    SET_SAMPLE_VARIANTS_TYPE = "set_sample_variants_type"
+    """ Modifies VCF based on 'source' header field - applied in upload.vcf.vcf_import.handle_vcf_source """
     source_regex = models.TextField()
-    operation = models.TextField()
-    value = models.TextField()
+    sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    variant_zygosity_count = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.source_regex} ({self.operation} => {self.value})"
+        return f"{self.source_regex} sample_variants_type={self.get_sample_variants_type_display()}, " \
+               f"variant_zygosity_count={self.variant_zygosity_count}"
 
 
 class VCFBedIntersection(models.Model):

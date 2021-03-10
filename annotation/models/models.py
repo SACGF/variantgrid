@@ -650,6 +650,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     spliceai_pred_ds_al = models.FloatField(null=True, blank=True)
     spliceai_pred_ds_dg = models.FloatField(null=True, blank=True)
     spliceai_pred_ds_dl = models.FloatField(null=True, blank=True)
+    spliceai_gene_symbol = models.TextField(null=True, blank=True)
     repeat_masker = models.TextField(null=True, blank=True)
     overlapping_symbols = models.TextField(null=True, blank=True)
 

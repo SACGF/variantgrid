@@ -712,8 +712,7 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
 
     matches = list()
     if q:
-        qs = OntologyTerm.objects.filter(ontology_service=service).filter(reduce(
-                operator.and_, q))
+        qs = OntologyTerm.objects.filter(ontology_service=service).filter(reduce(operator.and_, q))
         for term in qs[0:200]:
             if not term.is_obsolete:
                 if cms := search_text_to_suggestion(match_text, term):
