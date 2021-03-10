@@ -298,13 +298,13 @@ class BulkInserter:
             return json_data
 
         except ClassificationProcessError as ve:
-            print(ve)
+            # expected error
+            report_exc_info(request=request)
             return {'fatal_error': str(ve)}
         except Exception as e:
-            print(e)
+            # unexpected error
             report_exc_info(request=request)
-            raise e
-            # return {'internal_error': True}  # don't tell client
+            return {'internal_error': str(e)}
 
     def finish(self):
         if settings.VARIANT_CLASSIFICATION_MATCH_VARIANTS:
