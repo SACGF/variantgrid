@@ -82,12 +82,13 @@ class GeneListNodeView(NodeView):
         # TODO: Give a warning if panel app is out of date...
         warnings = []
         for gln_pap in self.object.genelistnodepanelapppanel_set.all():
-            panel_app_panel = gln_pap.panel_app_panel_local_cache_gene_list.panel_app_panel
-            cache_version = gln_pap.panel_app_panel_local_cache_gene_list.version
-            if cache_version != panel_app_panel.current_version:
-                msg = f"Using {panel_app_panel} v.{cache_version} while latest is {panel_app_panel.current_version}"
-                warnings.append(msg)
-            elif not panel_app_panel.cache_valid:
-                msg = f"{panel_app_panel} may be out of date (last checked {timesince(panel_app_panel.modified)} ago)"
-                warnings.append(msg)
+            if gl := gln_pap.panel_app_panel_local_cache_gene_list:
+                panel_app_panel = gl.panel_app_panel
+                cache_version = gl.version
+                if cache_version != panel_app_panel.current_version:
+                    msg = f"Using {panel_app_panel} v.{cache_version} while latest is {panel_app_panel.current_version}"
+                    warnings.append(msg)
+                elif not panel_app_panel.cache_valid:
+                    msg = f"{panel_app_panel} may be out of date (last checked {timesince(panel_app_panel.modified)} ago)"
+                    warnings.append(msg)
         return {"panel_app_warnings": warnings}
