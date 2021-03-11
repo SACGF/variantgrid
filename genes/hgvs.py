@@ -401,7 +401,6 @@ class HGVSMatcher:
         return None  # No fix
 
 
-
 def get_hgvs_variant_tuple(hgvs_name: str, genome_build: GenomeBuild) -> VariantCoordinate:
     """ Convenience method for 1 off HGVS - for batches use HGVSMatcher """
     matcher = HGVSMatcher(genome_build)
