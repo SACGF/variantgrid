@@ -6,7 +6,6 @@ block external postgres connections. See discussion at:
 https://github.com/SACGF/variantgrid/issues/839
 
 """
-
 from django.conf import settings
 import enum
 from lazy import lazy
@@ -17,7 +16,7 @@ from typing import List, Optional, Tuple
 
 from pyhgvs import HGVSName
 
-from genes.models import TranscriptVersion, TranscriptParts
+from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
 from library.log_utils import report_exc_info
 from snpdb.models import Variant, AssemblyMoleculeType, Contig
 from snpdb.models.models_genome import GenomeBuild
@@ -376,6 +375,31 @@ class HGVSMatcher:
         cleaned_hgvs = cls.TRANSCRIPT_NO_UNDERSCORE.sub(cls.TRANSCRIPT_UNDERSCORE_REPLACE, cleaned_hgvs)
         cleaned_hgvs = cls.HGVS_SLOPPY_PATTERN.sub(cls.HGVS_SLOPPY_REPLACE, cleaned_hgvs)
         return cleaned_hgvs
+
+    @classmethod
+    def fix_swapped_gene_transcript(cls, hgvs_name) -> Optional[str]:
+        """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' - returns nothing if swap wasn't ok """
+        hgvs = HGVSName(hgvs_name)
+        if hgvs.transcript:
+            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(hgvs.transcript)
+            if Transcript.objects.filter(pk=transcript_id).exists():
+                return  # Normal transcript
+
+        # GATA2(NM_032638.5):c.1082G>C => transcript=GATA2, gene=NM_032638.5
+        # GATA2:c.1082G>C => transcript='', gene=GATA2
+
+        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(hgvs.gene)
+        if Transcript.objects.filter(pk=transcript_id).exists():  # gene is transcript
+            old_transcript = hgvs.transcript
+            hgvs.transcript = hgvs.gene
+            if old_transcript and GeneSymbol.objects.filter(pk=old_transcript).exists():
+                hgvs.gene = old_transcript  # Old transcript was a gene symbol
+            return hgvs.format()
+        elif GeneSymbol.objects.filter(pk=hgvs.gene).exists():
+            pass  # TODO: Need to work out canonical for gene
+
+        return None  # No fix
+
 
 
 def get_hgvs_variant_tuple(hgvs_name: str, genome_build: GenomeBuild) -> VariantCoordinate:

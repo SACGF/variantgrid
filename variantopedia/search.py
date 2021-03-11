@@ -481,6 +481,9 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         search_messages = []
         hgvs_string = search_string
         try:
+            if fixed_hgvs := HGVSMatcher.fix_swapped_gene_transcript(hgvs_string):
+                hgvs_string = fixed_hgvs
+                search_messages.append(f"Warning: swapped gene/transcript, ie '{search_string}' => '{hgvs_string}'")
             variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
         except Contig.ContigNotInBuildError:
             return None  # g.HGVS from another genome build
