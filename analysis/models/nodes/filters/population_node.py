@@ -85,6 +85,8 @@ class PopulationNode(AnalysisNode):
             if self.max_samples is not None:
                 if self.zygosity == SimpleZygosity.ANY_GERMLINE:
                     column = vzcc.germline_counts_alias
+                elif self.zygosity == SimpleZygosity.ANY_ZYGOSITY:
+                    column = vzcc.all_zygosity_counts_alias
                 elif self.zygosity == SimpleZygosity.HET:
                     column = vzcc.het_alias
                 elif self.zygosity == SimpleZygosity.HOM_ALT:
