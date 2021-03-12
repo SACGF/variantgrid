@@ -283,7 +283,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.delete()
             else:
                 ct.save()
-        sync_all_condition_resolutions()
 
     @staticmethod
     def attempt_automatch(condition_text: ConditionText):
