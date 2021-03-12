@@ -32,7 +32,7 @@ class OntologyTermGeneListView(APIView):
         name = str(ontology_term)
         gene_list = FakeGeneList(name=name, user=None)
         gene_list_genes = []
-        for gene_symbol in OntologySnake.special_case_gene_symbols_for_terms([ontology_term.pk]):
+        for gene_symbol in OntologySnake.gene_symbols_for_terms([ontology_term.pk]):
             glg = GeneListGeneSymbol(gene_list=gene_list, original_name=gene_symbol, gene_symbol=gene_symbol)
             gene_list_genes.append(glg)
 

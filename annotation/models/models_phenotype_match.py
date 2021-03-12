@@ -49,7 +49,7 @@ class PhenotypeDescription(models.Model):
 
     def get_gene_symbols(self) -> QuerySet:
         ontology_term_ids = self.get_ontology_term_ids()
-        return OntologySnake.special_case_gene_symbols_for_terms(ontology_term_ids)
+        return OntologySnake.gene_symbols_for_terms(ontology_term_ids)
 
     def __str__(self):
         text = self.original_text[:50]
@@ -114,7 +114,7 @@ class TextPhenotypeMatch(models.Model):
         if self.match_type == PhenotypeMatchTypes.GENE:
             gene_symbols = [self.gene_symbol_id]
         else:
-            gene_symbols_qs = OntologySnake.special_case_gene_symbols_for_terms([self.ontology_term_id])
+            gene_symbols_qs = OntologySnake.gene_symbols_for_terms([self.ontology_term_id])
             gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
 
         string = str(self.record)
