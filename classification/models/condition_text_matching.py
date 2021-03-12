@@ -8,6 +8,7 @@ import requests
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import CASCADE, QuerySet, SET_NULL, Q
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from lazy import lazy
@@ -15,7 +16,7 @@ from model_utils.models import TimeStampedModel
 from django.db import models, transaction
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
-    flag_types, EvidenceKeyMap
+    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolvedTermDict
 from classification.regexes import db_ref_regexes, DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
@@ -282,6 +283,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.delete()
             else:
                 ct.save()
+        sync_all_condition_resolutions()
 
     @staticmethod
     def attempt_automatch(condition_text: ConditionText):
@@ -399,6 +401,22 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         if save_required:
             ct.save()
+
+    def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
+        if terms := self.condition_xref_terms:
+            terms = _sort_terms(terms)  # sorts by name, should it be by id so always consistent?
+            text = ", ".join([f"{term.id} {term.name}" for term in terms])
+            if len(terms) > 1:
+                text = f"{text}; {MultiCondition(self.condition_multi_operation).label}"
+
+            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolvedTermDict(term_id=term.id, name=term.name or "") for term in terms]
+            return ConditionResolvedDict(
+                display_text=text,
+                resolved_terms=resolved_term_dicts,
+                resolved_join=self.condition_multi_operation
+            )
+        else:
+            return None
 
 
 def update_condition_text_match_counts(ct: ConditionText):
@@ -913,3 +931,54 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         #    cms.add_message(message)
                     pass
     return suggestions
+
+
+def apply_condition_resolution(ctm: ConditionTextMatch):
+    if ctm.classification_id:
+        classification = ctm.classification
+        if matching := match_for_classification_id(ctm.classification_id):
+            classification.condition_resolution = matching.as_resolved_condition()
+        else:
+            classification.condition_resolution = None
+        classification.save()
+    else:
+        # we're higher level than a classification now
+        lowest_valid = ctm
+        while lowest_valid and not lowest_valid.is_valid:
+            lowest_valid = lowest_valid.parent
+        condition_resolution = lowest_valid.as_resolved_condition() if lowest_valid else None
+        # now to find all condition text matches under this one, that don't have an override
+        children = ConditionTextMatch.objects.filter(parent=ctm).select_related("classification")
+        while children:
+            new_children: List[ConditionTextMatch] = list()
+            for child in children:
+                if not child.is_valid:  # if child is valid then it already has a value unaffected by this
+                    if classification := child.classification:
+                        classification.condition_resolution = condition_resolution
+                        classification.save()
+                    else:
+                        new_children.append(child)
+            children = ConditionTextMatch.objects.filter(parent__in=new_children)
+
+
+@receiver(post_save, sender=ConditionTextMatch)
+def classification_created(sender, instance: ConditionTextMatch, created: bool, raw, using, update_fields, **kwargs):
+    apply_condition_resolution(instance)
+
+
+def sync_all_condition_resolutions():
+    Classification.objects.update(condition_resolution=None)
+    ctms = ConditionTextMatch.objects.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(condition_xrefs_length__gt=0)
+    for ctm in ctms:
+        if ctm.is_valid:
+            apply_condition_resolution(ctm)
+
+
+def match_for_classification_id(cid: int) -> Optional[ConditionTextMatch]:
+    try:
+        ctm: ConditionTextMatch = ConditionTextMatch.objects.get(classification__id=cid)
+        while ctm and not ctm.is_valid:
+            ctm = ctm.parent
+        return ctm
+    except ConditionTextMatch.DoesNotExist:
+        return None

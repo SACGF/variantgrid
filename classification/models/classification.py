@@ -20,7 +20,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
 import logging
 import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
@@ -199,6 +199,17 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:
         flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
 
 
+class ConditionResolvedTermDict(TypedDict):
+    term_id: str
+    name: str
+
+
+class ConditionResolvedDict(TypedDict):
+    display_text: str
+    resolved_terms: List[ConditionResolvedTermDict]
+    resolved_join: str
+
+
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
     """
     A Variant Classification, belongs to a lab and user. Keeps a full history using ClassificationModification
@@ -242,6 +253,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     withdrawn = models.BooleanField(default=False)
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
+    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
 
     class Meta:
         unique_together = ('lab', 'lab_record_id')
@@ -293,6 +305,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def imported_genome_build(self):
         return self.get(SpecialEKeys.GENOME_BUILD)
+
+    @property
+    def condition_text_match(self):
+        from classification.models import match_for_classification_id
+        return match_for_classification_id(self.id)
 
     def flag_type_context(self):
         return FlagTypeContext.objects.get(pk='classification')

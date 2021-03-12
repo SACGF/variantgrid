@@ -1954,6 +1954,36 @@ VCTable.c_hgvs = (data, type, row) => {
         return dom.prop('outerHTML');
     }
 };
+VCTable.condition = (data, type, row) => {
+    if (data.resolved_terms) {
+        let dom = $('<span>');
+        let first = true;
+        for (let term of data.resolved_terms) {
+            if (!first) {
+                $('<br>').appendTo(dom);
+            }
+            first = false;
+            $('<span>', {html: [
+                $('<a>', {
+                    text: term.term_id,
+                    href:Urls.ontology_term(term.term_id.replace(':','_')),
+                    class: 'hover-link'
+                }),
+                " ",
+                term.name
+            ]}).appendTo(dom);
+        }
+        if (data.resolved_terms.length > 1) {
+            $('<br>').appendTo(dom);
+            let joinText = 'Uncertain';
+            $('<span>', {class: 'font-italic', text:data.resolved_join === 'C' ? 'Co-occuring' : 'Uncertain'}).appendTo(dom);
+        }
+
+        return dom.prop('outerHTML');
+    } else {
+        return data.display_text;
+    }
+};
 VCTable.clinical_significance = (data, type, row) => {
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
     let label = csKey.prettyValue(data);
