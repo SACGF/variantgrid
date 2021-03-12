@@ -291,14 +291,12 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             if root := condition_text.root:
                 if match := top_level_suggestion(condition_text.normalized_text):
                     if match.is_auto_assignable() and not root.condition_xrefs:
-                        print(f"{condition_text.root} : {match.terms}")
                         root.condition_xrefs = match.term_str_array
                         root.last_edited_by = admin_bot()
                         root.save()
                     else:
                         for gene_symbol_level in condition_text.gene_levels:
                             if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol) and not gene_symbol_level.condition_xrefs:
-                                print(f"{condition_text.root} {gene_symbol_level.gene_symbol} : {match.terms}")
                                 gene_symbol_level.condition_xrefs = match.term_str_array
                                 gene_symbol_level.last_edited_by = admin_bot()
                                 gene_symbol_level.save()
