@@ -403,12 +403,14 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         if terms := self.condition_xref_terms:
             terms = _sort_terms(terms)  # sorts by name, should it be by id so always consistent?
             text = ", ".join([f"{term.id} {term.name}" for term in terms])
+            sort_text = ", ".join([term.name for term in terms]).lower()
             if len(terms) > 1:
                 text = f"{text}; {MultiCondition(self.condition_multi_operation).label}"
 
             resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolvedTermDict(term_id=term.id, name=term.name or "") for term in terms]
             return ConditionResolvedDict(
                 display_text=text,
+                sort_text=sort_text,
                 resolved_terms=resolved_term_dicts,
                 resolved_join=self.condition_multi_operation
             )

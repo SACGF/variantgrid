@@ -27,7 +27,21 @@ class ExportFormatterCSV(ExportFormatter):
 
         # hard-code columns that aren't in evidence
 
-        header = ['id', 'lab', 'lab_record_id', 'share_level', 'version', 'liftover_error', 'target_genome_build', 'target_c_hgvs', 'acmg_criteria', 'evidence_weights', 'citations', 'in_discordance'] + self.used_keys.header()
+        header = [
+                     'id',
+                     'lab',
+                     'lab_record_id',
+                     'share_level',
+                     'version',
+                     'liftover_error',
+                     'target_genome_build',
+                     'target_c_hgvs',
+                     'processed_condition',
+                     'acmg_criteria',
+                     'evidence_weights',
+                     'citations',
+                     'in_discordance'
+                 ] + self.used_keys.header()
         return ExportFormatter.write_single_row(header, delimiter=',')
 
     def to_row(self, c_parts: Optional[CHGVS], vcm: ClassificationModification, message=None) -> list:
@@ -50,6 +64,7 @@ class ExportFormatterCSV(ExportFormatter):
             message,
             self.genome_build.name,
             full_chgvs,
+            vcm.condition_text,
             acmg_criteria,
             evidence_weights,
             citations,

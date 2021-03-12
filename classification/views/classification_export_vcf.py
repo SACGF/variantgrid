@@ -19,7 +19,7 @@ class ExportFormatterVCF(ExportFormatter):
 
     def __init__(self, encoding:str = VCFEncoding.BASIC, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.report_keys = [self.ekeys.get(key) for key in [SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.CONDITION]]
+        self.report_keys = [self.ekeys.get(key) for key in [SpecialEKeys.CLINICAL_SIGNIFICANCE]]
         self.db_prefix = settings.VARIANT_VCF_DB_PREFIX
         self.encoding = encoding
 
@@ -60,8 +60,9 @@ class ExportFormatterVCF(ExportFormatter):
         out += f'##INFO=<ID=chgvs,Number=.,Type=String,Description="The c.hgvs for the variants in {self.genome_build.name}">\n'
         out += f'##INFO=<ID=multiple_clinical_significances,Number=0,Type=Flag,Description="Present if there are multiple clinical significances for the variant">\n'
         out += f'##INFO=<ID=discordant,Number=.,Type=Number,Description="If 1, indicates that the corresponding classification is in discordance">\n'
-        for ekey in self.report_keys:
-            out += self.generate_info_for_key(ekey)
+        out += f'##INFO=<ID=condition,Number=.,Type=String,Description="Condition Under Curation">\n'
+        for e_key in self.report_keys:
+            out += self.generate_info_for_key(e_key)
 
         site = Site.objects.get_current()
         out += f'##readme=Generated from {site.name} using VariantGrid technology\n'
@@ -97,6 +98,7 @@ class ExportFormatterVCF(ExportFormatter):
         lab_names = []
         c_hgvses = []
         discordances = []
+        conditions = []
 
         for record in vcms:
             lab_names.append(self.vcf_safe(record.classification.lab.name))
@@ -107,11 +109,13 @@ class ExportFormatterVCF(ExportFormatter):
 
             c_hgvses.append(self.vcf_safe(c_hgvs.full_c_hgvs) if c_hgvs else '')
             discordances.append('1' if self.is_discordant(record.classification) else '0')
+            conditions.append(self.vcf_safe(record.condition_text))
 
         info += f';lab=' + ','.join(lab_names) + ';chgvs=' + ','.join(c_hgvses)
         if len(cs_counts) > 1:
             info += ';multiple_clinical_significances'
         info += f';discordant=' + ','.join(discordances)
+        info += f';condition=' + ','.join(conditions)
 
         # loop through all the keys we're choosing to print out
         for ekey in self.report_keys:

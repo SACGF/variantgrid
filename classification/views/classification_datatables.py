@@ -135,7 +135,7 @@ class ClassificationDatatableConfig(DatatableConfig):
                 key='published_evidence__condition__value',
                 name='condition',
                 label='Condition',
-                sort_keys=['classification__condition_resolution__display_text', 'published_evidence__condition__value'],
+                sort_keys=['classification__condition_resolution__sort_text', 'published_evidence__condition__value'],
                 renderer=self.render_condition,
                 client_renderer='VCTable.condition',
                 orderable=True,

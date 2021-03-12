@@ -206,6 +206,7 @@ class ConditionResolvedTermDict(TypedDict):
 
 class ConditionResolvedDict(TypedDict):
     display_text: str
+    sort_text: str
     resolved_terms: List[ConditionResolvedTermDict]
     resolved_join: str
 
@@ -254,6 +255,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
     condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
+
+    @property
+    def condition_resolution_dict(self) -> Optional[ConditionResolvedDict]:
+        return self.condition_resolution
 
     class Meta:
         unique_together = ('lab', 'lab_record_id')
@@ -305,11 +310,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def imported_genome_build(self):
         return self.get(SpecialEKeys.GENOME_BUILD)
-
-    @property
-    def condition_text_match(self):
-        from classification.models import match_for_classification_id
-        return match_for_classification_id(self.id)
 
     def flag_type_context(self):
         return FlagTypeContext.objects.get(pk='classification')
@@ -1478,6 +1478,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             'can_write_latest': can_write,
             'clinical_context': clinical_context,
             'data': self.get_visible_evidence(self.evidence, lowest_share_level),
+            'resolved_condition': self.condition_resolution_dict,
             'withdrawn': self.withdrawn
         }
         if latest_modification:
@@ -1895,6 +1896,13 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     # changing the share level does not change the actual logic of sharing
     # it's useful if we have to rework permissions though
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
+
+    @property
+    def condition_text(self):
+        if crd := self.classification.condition_resolution_dict:
+            return crd.get('display_text')
+        else:
+            return self.get(SpecialEKeys.CONDITION)
 
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, use_full: bool = False):

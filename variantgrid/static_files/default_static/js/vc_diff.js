@@ -41,6 +41,7 @@ const Diff = (function() {
                 dict.eKeys.push(k);
             }
         });
+
         let groups = Object.keys(groupMap).map(g => {
             let combined = Object.assign({}, groupMap[g]);
             combined.eKeys = criteriaMap[g].eKeys.concat(combined.eKeys);
@@ -307,10 +308,19 @@ const Diff = (function() {
                     height: '16px',
                     display: 'inline-block'
                 }).appendTo(flagRow);
+                let clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+                let clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
+                let clinSigRow = $('<div>', {class:'text-center my-1', text:clin_sig.val});
+                let conditionRow = $('<div>', {class:'my-1'});
+                if (v.resolved_condition) {
+                    VCForm.format_condition(v.resolved_condition).appendTo(conditionRow);
+                } else {
+                    conditionRow.text((v.condition || {}).value);
+                }
                 $('<div>', {'class': 'ml-2 text-center', 'data-flags': v.flag_collection, text: ''}).appendTo(flagRow);
                 $('<div>', {class:'flex-grow'}).appendTo(flagRow);
 
-                let th = $('<th>', {html: [titleDom, flagRow]}).appendTo(headerRow);
+                let th = $('<th>', {html: [titleDom, clinSigRow, flagRow, conditionRow]}).appendTo(headerRow);
             });
             let all_db_refs = {};
 

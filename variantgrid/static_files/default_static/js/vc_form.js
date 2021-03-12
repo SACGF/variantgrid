@@ -734,6 +734,10 @@ const VCForm = (function() {
             }
             appendLabelHeading('Variant', variantElement);
 
+            if (this.record.resolved_condition) {
+                appendLabelHeading('Condition', VCForm.format_condition(this.record.resolved_condition));
+            }
+
             let p_hgvs = this.value(SpecialEKeys.P_HGVS);
             if (p_hgvs) {
                 p_dot = p_hgvs.indexOf('p.');
@@ -1884,6 +1888,35 @@ const VCForm = (function() {
     return VCForm;
 })();
 
+VCForm.format_condition = function(condition_json) {
+    let dom = $('<span>');
+    if (!condition_json) {
+        return dom;
+    }
+
+    let first = true;
+    for (let term of condition_json.resolved_terms) {
+        if (!first) {
+            $('<br>').appendTo(dom);
+        }
+        first = false;
+        $('<span>', {html: [
+            $('<a>', {
+                text: term.term_id,
+                href:Urls.ontology_term(term.term_id.replace(':','_')),
+                class: 'hover-link'
+            }),
+            " ",
+            term.name
+        ]}).appendTo(dom);
+    }
+    if (condition_json.resolved_terms.length > 1) {
+        let joinText = 'Uncertain';
+        $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occuring' : ' Uncertain'}).appendTo(dom);
+    }
+    return dom;
+};
+
 let VCTable = (function() {
     let VCTable = function() {};
     VCTable.prototype = {};
@@ -1956,30 +1989,7 @@ VCTable.c_hgvs = (data, type, row) => {
 };
 VCTable.condition = (data, type, row) => {
     if (data.resolved_terms) {
-        let dom = $('<span>');
-        let first = true;
-        for (let term of data.resolved_terms) {
-            if (!first) {
-                $('<br>').appendTo(dom);
-            }
-            first = false;
-            $('<span>', {html: [
-                $('<a>', {
-                    text: term.term_id,
-                    href:Urls.ontology_term(term.term_id.replace(':','_')),
-                    class: 'hover-link'
-                }),
-                " ",
-                term.name
-            ]}).appendTo(dom);
-        }
-        if (data.resolved_terms.length > 1) {
-            $('<br>').appendTo(dom);
-            let joinText = 'Uncertain';
-            $('<span>', {class: 'font-italic', text:data.resolved_join === 'C' ? 'Co-occuring' : 'Uncertain'}).appendTo(dom);
-        }
-
-        return dom.prop('outerHTML');
+        return VCForm.format_condition(data).prop('outerHTML');
     } else {
         return data.display_text;
     }
