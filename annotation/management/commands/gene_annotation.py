@@ -39,6 +39,7 @@ class Command(BaseCommand):
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
             if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
                 raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")
+            self._create_gene_annotation_version(gene_annotation_release, gene_symbols)
         else:
             for genome_build in GenomeBuild.builds_with_annotation():
                 av = AnnotationVersion.latest(genome_build, validate=False)
