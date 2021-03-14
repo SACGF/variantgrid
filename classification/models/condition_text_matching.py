@@ -22,7 +22,7 @@ from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info
+from library.log_utils import report_exc_info, report_message
 from library.utils import ArrayLength
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
@@ -316,6 +316,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification).first()
 
         if not gene_symbol or classification.withdrawn:
+            if not gene_symbol:
+                report_message("Classification has no gene symbol, cannot link it to condition text", extra_data={"classification_id": classification.id})
             if existing:
                 ct = existing.condition_text
                 existing.delete()
