@@ -44,16 +44,18 @@ def get_queryset_for_annotation_version(klass, annotation_version):
     assert annotation_version, "Must provide 'annotation_version'"
     qs = get_queryset_with_transformer_hook(klass=klass)
     qs.add_sql_transformer(annotation_version.sql_partition_transformer)
+    qs = qs.filter(Variant.get_contigs_q(annotation_version.genome_build))
     return qs
 
 
 def get_unannotated_variants_qs(annotation_version, min_variant_id=None, max_variant_id=None):
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
-    q_filters = [Q(variantannotation__isnull=True),     # Not annotated
-                 Variant.get_no_reference_q(),
-                 ~Q(alt__seq__in=['.', '*', "<DEL>"]),  # Exclude non-standard variants
-                 Q(locus__contig__genomebuildcontig__genome_build=annotation_version.genome_build)]
+    q_filters = [
+        Q(variantannotation__isnull=True),     # Not annotated
+        Variant.get_no_reference_q(),
+        ~Q(alt__seq__in=['.', '*', "<DEL>"]),  # Exclude non-standard variants
+    ]
 
     if min_variant_id:
         q_filters.append(Q(pk__gte=min_variant_id))

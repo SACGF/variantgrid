@@ -292,7 +292,8 @@ class Variant(models.Model):
 
     @staticmethod
     def get_contigs_q(genome_build: GenomeBuild):
-        return Q(locus__contig__in=genome_build.contigs)
+        """ Restrict to contigs in a genome build """
+        return Q(locus__contig__genomebuildcontig__genome_build=genome_build)
 
     @staticmethod
     def get_no_reference_q():
