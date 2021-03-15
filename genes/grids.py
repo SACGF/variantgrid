@@ -77,7 +77,7 @@ class GeneListGenesGrid(JqGridUserRowConfig):
     colmodel_overrides = {
         'gene_symbol_alias__source': {"label": "Alias"},
     }
-    fields = ["original_name", "gene_symbol", "gene_symbol_alias__source"]
+    fields = ["original_name", "gene_symbol__symbol", "gene_symbol_alias__source"]
 
     def __init__(self, user, gene_list_id):
         super().__init__(user)
