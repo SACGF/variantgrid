@@ -565,6 +565,8 @@ class DebugTimer:
 class LimitedCollection:
 
     def __init__(self, data: List[Any], limit: int):
+        if data is None:
+            data = []
         self.true_count = len(data)
         self.data = data
         if len(data) > limit:
