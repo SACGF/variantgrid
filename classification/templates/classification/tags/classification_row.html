@@ -31,10 +31,14 @@
     <td class="cs">{% clinical_significance evidence.clinical_significance.value %}
     {% if show_allele_origin %}<td class="allele_origin">{{ evidence.allele_origin.value | ekey:'allele_origin' }}</td>{% endif %}
     <td class="condition">
-        {% if evidence.condition.value %}
-        {{ evidence.condition.value | limit_length }}
+        {% if condition_obj %}
+            {% condition condition_obj %}
         {% else %}
-        <span class="no-value">-</span>
+            {% if evidence.condition.value %}
+            {{ evidence.condition.value | limit_length }}
+            {% else %}
+            <span class="no-value">-</span>
+            {% endif %}
         {% endif %}
     <td class="date">
     {% if curated %}

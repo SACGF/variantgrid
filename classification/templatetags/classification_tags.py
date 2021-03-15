@@ -16,7 +16,7 @@ from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch
+from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolvedDict, ConditionResolved
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceReportClassification
@@ -231,6 +231,7 @@ def classification_row(
 
     return {
         "evidence": record.evidence,
+        "condition_obj": vc.condition_resolution_obj,
         "curated": curated,
         "best_hgvs": best_hgvs,
         "gene_symbol": vcm.get(SpecialEKeys.GENE_SYMBOL),
@@ -284,6 +285,7 @@ def classification_discordance_row(row: DiscordanceReportClassification, show_fl
         "vc": vc,
         "icon": icon,
         "action_log": row.action_log,
+        "condition_obj": vc.condition_resolution_obj,
         "best_hgvs": row.classfication_effective.get(SpecialEKeys.C_HGVS, None),
         "starting": row.classification_original,
         "closing": row.classfication_effective,
@@ -338,3 +340,8 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
     context = dict(data)
     context['css'] = css
     return context
+
+
+@register.inclusion_tag("classification/tags/condition.html")
+def condition(condition_obj: ConditionResolved):
+    return {"condition": condition_obj}

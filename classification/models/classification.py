@@ -1,5 +1,6 @@
 from collections import Counter, namedtuple
 import copy
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 
@@ -33,6 +34,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text
+from ontology.models import OntologyTerm
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
@@ -211,6 +213,12 @@ class ConditionResolvedDict(TypedDict):
     resolved_join: str
 
 
+@dataclass
+class ConditionResolved:
+    terms: List[OntologyTerm]
+    join: Optional[Any]
+
+
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
     """
     A Variant Classification, belongs to a lab and user. Keeps a full history using ClassificationModification
@@ -259,6 +267,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def condition_resolution_dict(self) -> Optional[ConditionResolvedDict]:
         return self.condition_resolution
+
+    @lazy
+    def condition_resolution_obj(self) -> Optional[ConditionResolved]:
+        if cr_dict := self.condition_resolution_dict:
+            terms = [OntologyTerm.get_or_stub(term.get("term_id")) for term in cr_dict.get("resolved_terms")]
+            join = None
+            if len(terms) > 1:
+                from classification.models import MultiCondition
+                join = MultiCondition(cr_dict.get("resolved_join"))
+            return ConditionResolved(terms=terms, join=join)
 
     class Meta:
         unique_together = ('lab', 'lab_record_id')

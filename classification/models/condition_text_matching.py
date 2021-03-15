@@ -83,13 +83,6 @@ class MultiCondition(models.TextChoices):
     CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
 
 
-class ResolvedCondition:
-
-    def __init__(self, search_term: Optional[str], gene_symbol: Optional[str]):
-        self.condition_multi_operation = MultiCondition.NOT_DECIDED
-        self.condition_xrefs = OntologyMatching(search_term=search_term, gene_symbol=gene_symbol)
-
-
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     condition_text = models.ForeignKey(ConditionText, on_delete=CASCADE)
     last_edited_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True)
@@ -164,23 +157,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     # resolved to this,
     condition_xrefs = ArrayField(models.TextField(blank=False), default=list)
     condition_multi_operation = models.CharField(max_length=1, choices=MultiCondition.choices, default=MultiCondition.NOT_DECIDED)
-
-    @lazy
-    def resolve_condition_xrefs(self) -> Optional[ResolvedCondition]:
-        """
-        Return the effective terms for this element
-        If no terms have been set for this match, check the parent match
-        """
-        if not self.condition_xrefs:
-            if not self.parent:
-                return None
-            return self.parent.resolve_condition_xrefs
-
-        rc = ResolvedCondition(search_term=None, gene_symbol=None)
-        rc.condition_multi_operation = self.condition_multi_operation
-        for term in self.condition_xrefs:
-            rc.condition_xrefs.select_term(term)
-        return rc
 
     @property
     def condition_matching_str(self) -> str:

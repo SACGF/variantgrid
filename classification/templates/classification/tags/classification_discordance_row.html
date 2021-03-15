@@ -12,10 +12,14 @@
         {{ best_hgvs }}
         {% endif %}
     <td class="condition">
-        {% if closing.evidence.condition.value %}
-        {{ closing.evidence.condition.value }}
+        {% if condition_obj %}
+            {% condition condition_obj %}
         {% else %}
-        <span class="no-value">not-set</span>
+            {% if closing.evidence.condition.value %}
+            {{ closing.evidence.condition.value }}
+            {% else %}
+            <span class="no-value">not-set</span>
+            {% endif %}
         {% endif %}
     <td class="cs">
         {% if starting_curated %}
