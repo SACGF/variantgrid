@@ -331,20 +331,25 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             @see https://docs.djangoproject.com/en/2/topics/db/queries/#spanning-multi-valued-relationships
         """
+        # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
+        # for some nodes (Comp HET / pheno) so cache it
+        cache_key = f"{self.pk}_{self.version}_get_q_cache_{disable_cache}"
+        q = cache.get(cache_key)
+        if q is None:
+            if disable_cache is False:
+                if cache_q := self._get_node_cache_q():
+                    return cache_q
 
-        if disable_cache is False:
-            if cache_q := self._get_node_cache_q():
-                return cache_q
-
-        if self.has_input():
-            q = self.get_parent_q()
-            if self.modifies_parents():
+            if self.has_input():
+                q = self.get_parent_q()
+                if self.modifies_parents():
+                    if node_q := self._get_node_q():
+                        q &= node_q
+            else:
+                q = self.q_all()
                 if node_q := self._get_node_q():
-                    q &= node_q
-        else:
-            q = self.q_all()
-            if node_q := self._get_node_q():
-                q = node_q
+                    q = node_q
+            cache.set(cache_key, q)
         return q
 
     def get_parent_q(self):
