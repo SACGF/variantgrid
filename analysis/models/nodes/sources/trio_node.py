@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Set, Tuple
 
 from django.db import models
+from django.db.models import Count
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
@@ -126,8 +127,14 @@ class CompHet(AbstractTrioInheritance):
             qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
             return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
 
+        # This ends up doing 3 queries (where we call set() - to work out what Q we need to return)
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
-        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(common_genes)
+        q_in_genes = Q(varianttranscriptannotation__gene__in=common_genes)
+        parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
+        parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
+        two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
+        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True))
+        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(two_hit_genes)
         return parent.get_q() & comp_het_q & comp_het_genes
 
     def get_method(self) -> str:
