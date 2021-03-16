@@ -102,7 +102,7 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
     single_model_args = {"sample", "cohort", "trio", "pedigree"}
     params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
 
-    hidden_inputs = {}
+    hidden_inputs = {}  # values should be primary keys
     klass = None
     for k, v in kwargs.items():
         if isinstance(v, Model):
@@ -115,6 +115,10 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
         hidden_inputs[k] = v
     if klass is None:
         raise ValueError(params_error_message)
+
+    # Hack to add proband as sample
+    if trio := kwargs.get("trio"):
+        hidden_inputs["sample"] = trio.proband.sample_id
 
     class_name = klass._meta.label
     # Show/Hide AnalysisTemplateVersions based on requires_sample_gene_list
