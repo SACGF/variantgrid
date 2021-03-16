@@ -497,7 +497,7 @@ class ConditionTextAdmin(ModelAdminBasics):
         for condition_text in queryset:
             ConditionTextMatch.attempt_automatch(condition_text=condition_text)
 
-    auto_match.short_description = "Automatch (overwrite existing data)"
+    auto_match.short_description = "Automatch (leaves existing data)"
 
     def clear(self, request, queryset):
         condition_text: ConditionText
