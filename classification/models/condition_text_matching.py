@@ -213,8 +213,24 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @property
     def is_valid(self):
-        return len(self.condition_xrefs) == 1 or \
-               (len(self.condition_xrefs) > 1 and self.condition_multi_operation != MultiCondition.NOT_DECIDED)
+        if len(self.condition_xrefs) == 0:
+            return False
+        if len(self.condition_xrefs) == 1:
+            return True
+        # we have 2+ terms from this point
+        if self.condition_multi_operation == MultiCondition.NOT_DECIDED:
+            # requires a joiner
+            return False
+        ontology_services = set()
+        for xref in self.condition_xrefs:
+            parts = xref.split(":")
+            if len(parts) == 2:
+                ontology_services.add(parts[0])
+        if len(ontology_services) >= 2:
+            # can't mix ontology terms
+            return False
+
+        return True
 
     @lazy
     def condition_xref_terms(self) -> List[OntologyTerm]:
@@ -275,6 +291,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                                 gene_symbol_level.condition_xrefs = match.term_str_array
                                 gene_symbol_level.last_edited_by = admin_bot()
                                 gene_symbol_level.save()
+            update_condition_text_match_counts(condition_text)
+            condition_text.save()
         except Exception:
             report_exc_info()
 
