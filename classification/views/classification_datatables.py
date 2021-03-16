@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional, Iterable
 from django.conf import settings
 from django.db.models import Q, Subquery, When, Case, TextField, Value
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
+from django.db.models.functions import Lower, Cast
 from lazy import lazy
 
 from flags.models import FlagCollection, FlagStatus
@@ -50,7 +51,6 @@ class ClassificationDatatableConfig(DatatableConfig):
         return response
 
     def render_condition(self, row:Dict[str, Any]):
-        cr: ConditionResolvedDict
         if cr := row['classification__condition_resolution']:
             return cr
         else:
@@ -135,7 +135,7 @@ class ClassificationDatatableConfig(DatatableConfig):
                 key='published_evidence__condition__value',
                 name='condition',
                 label='Condition',
-                sort_keys=['classification__condition_resolution__sort_text', 'published_evidence__condition__value'],
+                sort_keys=['condition_sort'],
                 renderer=self.render_condition,
                 client_renderer='VCTable.condition',
                 orderable=True,
@@ -211,6 +211,16 @@ class ClassificationDatatableConfig(DatatableConfig):
         case = Case(*whens, default=KeyTextTransform('value', KeyTransform('clinical_significance', 'published_evidence')),
                     output_field=TextField())
         initial_qs = initial_qs.annotate(clin_sig_sort=case)
+
+        case = Case(
+            When(
+                classification__condition_resolution__sort_text__isnull=False,
+                then=Cast(KeyTextTransform('sort_text', 'classification__condition_resolution'), TextField())
+            ),
+            default=Lower(Cast(KeyTextTransform('value', KeyTransform('condition', 'published_evidence')), TextField())),
+            output_field=TextField()
+        )
+        initial_qs = initial_qs.annotate(condition_sort=case)
 
         return initial_qs
 
