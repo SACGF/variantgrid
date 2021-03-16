@@ -79,11 +79,11 @@ class ExportFormatterMVL(ExportFormatter):
         def get_value(ekey: EvidenceKey) -> str:
             return ExportFormatterMVL.mvl_safe(ekey.pretty_value(vcm.get(ekey.key))) or 'None'
 
-        def format_key(ekey: EvidenceKey) -> str:
+        def format_key(ekey: EvidenceKey, override_value = None) -> str:
             nonlocal vcm
 
             label = ekey.pretty_label
-            value = get_value(ekey)
+            value = override_value or get_value(ekey)
             value = db_ref_regexes.link_html(value)
             return f'{format_label(label)} {value}'
 
@@ -111,7 +111,7 @@ class ExportFormatterMVL(ExportFormatter):
 
         cs = format_key(self.ekeys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
         curated = format_key(self.ekeys.get(SpecialEKeys.CURATION_DATE))
-        condition = vcmc.vcm.condition_text
+        condition = ExportFormatterMVL.mvl_safe(vcmc.vcm.condition_text)
 
         criteria_summary = format_label('Criteria met') + (vcm.criteria_strength_summary(self.ekeys) or 'None')
         #citation_anchors = [html_link(cd.citation_link, f'{cd.source}:{cd.citation_id}') + ' ' + citation_title(cd) for cd in get_citations(vcm.citations)]
