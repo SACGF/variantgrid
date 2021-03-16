@@ -515,14 +515,14 @@ class ConditionMatchingSuggestion:
                 self.add_message(ConditionMatchingMessage(severity="error",
                                                           text="Multiple terms provided, requires co-occurring/uncertain"))
 
-            if valid_terms := [term for term in terms if not term.is_stub]:
-                ontology_services: Set[str] = set()
-                for term in valid_terms:
-                    ontology_services.add(term.ontology_service)
-                if len(ontology_services) > 1:
-                    self.add_message(ConditionMatchingMessage(severity="error",
-                                                              text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
+            ontology_services: Set[str] = set()
+            for term in terms:
+                ontology_services.add(term.ontology_service)
+            if len(ontology_services) > 1:
+                self.add_message(ConditionMatchingMessage(severity="error",
+                                                          text=f"Only one ontology type is supported per level, {' and '.join(ontology_services)} found"))
 
+            if valid_terms := [term for term in terms if not term.is_stub]:
                 # validate that the terms have a known gene association if we're at gene level
                 if ctm := self.condition_text_match:
                     if ctm.is_gene_level:
@@ -538,8 +538,12 @@ class ConditionMatchingSuggestion:
             # validate that we have the terms being referenced (if we don't big chance that they're not valid)
             for term in terms:
                 if term.is_stub:
-                    self.add_message(ConditionMatchingMessage(severity="warning",
-                                                              text=f"{term.id} : no copy of this term in our system"))
+                    if term.ontology_service in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
+                        self.add_message(ConditionMatchingMessage(severity="warning",
+                                                                  text=f"{term.id} : no copy of this term in our system"))
+                    else:
+                        self.add_message(ConditionMatchingMessage(severity="info",
+                                                                  text=f"We do not store {term.ontology_service}, please verify externally"))
                 elif term.is_obsolete:
                     self.add_message(
                         ConditionMatchingMessage(severity="error", text=f"{term.id} : is marked as obsolete"))
@@ -593,7 +597,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 
     db_matches = db_ref_regexes.search(text)
     detected_any_ids = bool(db_matches)  # see if we found any prefix suffix, if we do,
-    db_matches = [match for match in db_matches if match.db in ["OMIM", "HP", "MONDO"]]
+    db_matches = [match for match in db_matches if match.db in OntologyService.CONDITION_ONTOLOGIES]
 
     for match in db_matches:
         cms.add_term(OntologyTerm.get_or_stub(match.id_fixed))
@@ -601,7 +605,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
     found_stray_omim = False
 
     # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
-    if not detected_any_ids:
+    if not detected_any_ids and ':' not in text:
         stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(text)
         stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
         if stray_omim_matches:
@@ -614,19 +618,20 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
         cms.ids_found_in_text = True
         if len(cms.terms) == 1:
             matched_term = cms.terms[0]
-            text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text),
-                                                             deplural=True, deroman=True)
-            term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
-                                                             deplural=True, deroman=True)
-            if aliases := matched_term.aliases:
-                for alias in aliases:
-                    term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
-                                                                                       deplural=True, deroman=True))
-            term_tokens.add(str(matched_term.id).lower())
-            term_tokens.add(str(matched_term.id.split(":")[1]))
-            extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS
-            if len(extra_words) >= 3:
-                cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
+            if not matched_term.is_stub:
+                text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text),
+                                                                 deplural=True, deroman=True)
+                term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
+                                                                 deplural=True, deroman=True)
+                if aliases := matched_term.aliases:
+                    for alias in aliases:
+                        term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
+                                                                                           deplural=True, deroman=True))
+                term_tokens.add(str(matched_term.id).lower())
+                term_tokens.add(str(matched_term.id.split(":")[1]))
+                extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS
+                if len(extra_words) >= 3:
+                    cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
 
     cms.validate()
     return cms
@@ -878,10 +883,11 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                 parent_term_missing_gene = list()
                 parent_term_has_gene = list()
                 for term in root_level_terms:
-                    if not OntologySnake.has_gene_relationship(term, gene_symbol):
-                        parent_term_missing_gene.append(term)
-                    else:
-                        parent_term_has_gene.append(term)
+                    if not term.is_stub:
+                        if not OntologySnake.has_gene_relationship(term, gene_symbol):
+                            parent_term_missing_gene.append(term)
+                        else:
+                            parent_term_has_gene.append(term)
                 parent_term_missing_gene = _sort_terms(parent_term_missing_gene)
                 parent_term_has_gene = _sort_terms(parent_term_has_gene)
 

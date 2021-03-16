@@ -256,17 +256,18 @@ class OntologyMatching:
                 ontology_matches.select_term(select)
 
         if search_text:
+            # WARNING, this code is duplicated in condition_text_matching.embedded_ids_check
             matches = db_ref_regexes.search(search_text)
             detected_any_ids = not not matches
             detected_ontology_id = False
-            matches = [match for match in matches if match.db in ["OMIM", "HP", "MONDO"]]
+            matches = [match for match in matches if match.db in OntologyService.CONDITION_ONTOLOGIES]
 
             for match in matches:
                 detected_ontology_id = True
                 ontology_matches.find_or_create(match.id_fixed).direct_reference = True
 
             # fall back to looking for stray OMIM terms if we haven't found any ids e.g. PMID:123456 should stop this code
-            if not detected_any_ids:
+            if not detected_any_ids and ':' not in search_text:
                 stray_omim_matches = OPRPHAN_OMIM_TERMS.findall(search_text)
                 stray_omim_matches = [term for term in stray_omim_matches if len(term) == 6]
                 if stray_omim_matches:

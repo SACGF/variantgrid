@@ -33,17 +33,24 @@ class OntologyService(models.TextChoices):
     HPO = "HP", "HP"
     HGNC = "HGNC", "HGNC"
 
+    DOID = "DOID", "DOID"
+    ORPHANET = "Orphanet", "Orphanet"
+
     EXPECTED_LENGTHS: Dict[str, int] = Constant({
         MONDO[0]: 7,
         OMIM[0]: 6,
         HPO[0]: 7,
-        HGNC[0]: 1  # HGNC ids aren't typically 0 padded, because they're not monsters
+        HGNC[0]: 1,  # HGNC ids aren't typically 0 padded, because they're not monsters
+        DOID[0]: None,  # variable length with padded 0s
+        ORPHANET[0]: 1  # ORPHANET ids aren't typically 0 padded
     })
 
     IMPORTANCE: Dict[str, int] = Constant({
         MONDO[0]: 2,
         OMIM[0]: 3,
         HPO[0]: 4,  # put HPO relationships last as they occasionally spam OMIM
+        DOID[0]: 5,
+        ORPHANET[0]: 6,
         HGNC[0]: 1  # show gene relationships first
     })
 
@@ -51,20 +58,31 @@ class OntologyService(models.TextChoices):
         MONDO[0]: "https://vm-monitor.monarchinitiative.org/disease/MONDO:${1}",
         OMIM[0]: "http://www.omim.org/entry/${1}",
         HPO[0]: "https://hpo.jax.org/app/browse/term/HP:${1}",
-        HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}"
+        HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}",
+        DOID[0]: "https://www.ebi.ac.uk/ols/ontologies/doid/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FDOID_${1}",
+        ORPHANET[0]: "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=EN&Expert=${1}"
     })
 
-    VALID_ONTOLOGY_PREFIXES: Set[str] = Constant({
+    LOCAL_ONTOLOGY_PREFIXES: Set[str] = Constant({
         MONDO[0],
         OMIM[0],
         HPO[0],
         HGNC[0]
     })
 
+    CONDITION_ONTOLOGIES: Set[str] = Constant({
+        MONDO[0],
+        OMIM[0],
+        HPO[0],
+        DOID[0],
+        ORPHANET[0]
+    })
+
     @staticmethod
     def index_to_id(ontology_service: 'OntologyService', index: int):
-        expected_length = OntologyService.EXPECTED_LENGTHS.get(ontology_service, 0)
-        num_part = str(index).rjust(expected_length, '0')
+        num_part = str(index)
+        if expected_length := OntologyService.EXPECTED_LENGTHS.get(ontology_service):
+            num_part = str(index).rjust(expected_length, '0')
         return f"{ontology_service}:{num_part}"
 
 
@@ -136,7 +154,7 @@ class OntologyTerm(TimeStampedModel):
     MONDO:0000043, OMIM:0000343
     """
     id = models.TextField(primary_key=True)
-    ontology_service = models.CharField(max_length=5, choices=OntologyService.choices)
+    ontology_service = models.CharField(max_length=10, choices=OntologyService.choices)
     index = models.IntegerField()
     name = models.TextField(null=True, blank=True)  # should only be null if we're using it as a placeholder reference
     definition = models.TextField(null=True, blank=True)
@@ -244,7 +262,10 @@ class OntologyTerm(TimeStampedModel):
         if len(parts) != 2:
             raise ValueError(f"Can not convert {id_str} to a proper id")
 
-        prefix = OntologyService(parts[0].strip().upper())
+        prefix = parts[0].strip().upper()
+        if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
+            prefix = "Orphanet"
+        prefix = OntologyService(prefix)
         postfix = parts[1].strip()
         try:
             num_part = int(postfix)
@@ -257,7 +278,7 @@ class OntologyTerm(TimeStampedModel):
                 id=clean_id,
                 ontology_service=prefix,
                 index=num_part,
-                name="Not stored locally"
+                name=""
             )
         except ValueError:
             if existing := OntologyTerm.objects.filter(ontology_service=prefix, name=postfix).first():

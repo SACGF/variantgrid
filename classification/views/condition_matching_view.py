@@ -33,6 +33,7 @@ class ConditionTextColumns(DatatableConfig):
         return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
 
     def filter_queryset(self, qs: QuerySet) -> QuerySet:
+        qs = qs.filter(classifications_count__gt=0)
         if filter_text := empty_to_none(self.get_query_param("text_filter")):
             normal_text = normalize_condition_text(filter_text)
             words = [word.strip() for word in normal_text.split(" ")]
