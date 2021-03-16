@@ -42,7 +42,8 @@ from classification.classification_stats import get_grouped_classification_count
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.forms import EvidenceKeyForm
 from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames
+    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
+    ConditionResolvedDict
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -338,8 +339,16 @@ def view_classification_diff(request):
         current_user=request.user,
         include_data=True,
         hardcode_extra_data=extra_data.get(vcm.id),
-        fix_data_types=True
+        fix_data_types=True,
+        api_version=1,
     )) for vcm in records]
+
+    for record in records_json:
+        condition_dict: ConditionResolvedDict
+        if condition_dict := record.get('resolved_condition'):
+            condition_ekey = record.get('data').get(SpecialEKeys.CONDITION, {})
+            condition_ekey["processed"] = condition_dict.get("display_text")
+            record.get('data')[SpecialEKeys.CONDITION] = condition_ekey
 
     context = {
         'records_json': records_json
