@@ -360,7 +360,7 @@ const Diff = (function() {
                         }
                     });
 
-                    for (let show of ['value', 'note', 'processed']) {
+                    for (let show of ['value', 'resolved', 'note']) {
                         let labelText = eKey.label;
                         if (show !== 'value') {
                             labelText += ` ${show}`;
@@ -386,7 +386,7 @@ const Diff = (function() {
                         includedVersions.forEach((v, index) => {
 
                             let blob = v[key] || {};
-                            let {note, explain, processed, value, hidden, db_refs} = blob;
+                            let {note, explain, resolved, value, hidden, db_refs} = blob;
 
                             let cell = $('<td>').appendTo(row);
                             let val = null;
@@ -407,9 +407,13 @@ const Diff = (function() {
                             } else if (show === 'note') {
                                 val = Diff.emptyToNull(note);
                                 cell.text(val);
-                            } else if (show === 'processed') {
-                                val = Diff.emptyToNull(processed);
-                                cell.text(val);
+                            } else if (show === 'resolved') {
+                                if (resolved) {
+                                    val = resolved.display_text;
+                                    cell.html(VCTable.condition(resolved));
+                                } else {
+                                    val = null;
+                                }
                             }
 
                             let valueKey = Diff.hash(val);

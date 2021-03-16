@@ -347,7 +347,7 @@ def view_classification_diff(request):
         condition_dict: ConditionResolvedDict
         if condition_dict := record.get('resolved_condition'):
             condition_ekey = record.get('data').get(SpecialEKeys.CONDITION, {})
-            condition_ekey["processed"] = condition_dict.get("display_text")
+            condition_ekey["resolved"] = condition_dict
             record.get('data')[SpecialEKeys.CONDITION] = condition_ekey
 
     context = {
