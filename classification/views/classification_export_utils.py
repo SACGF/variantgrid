@@ -18,6 +18,7 @@ from flags.models.models import Flag
 from genes.hgvs import CHGVS
 from library.log_utils import log_traceback, report_exc_info, report_message
 from library.utils import delimited_row
+from snpdb.models import Contig
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_genome import GenomeBuild, GenomeBuildContig
 from snpdb.models.models_variant import VariantAllele, Allele
@@ -184,16 +185,17 @@ class AlleleGroup:
         self.allele_id = allele_id
         self.target_variant = None
         self.genome_build = genome_build
-        self.variant_ids = []
-        self.data: List[ClassificationModification] = []
+        self.variant_ids = list()
+        self.data: List[ClassificationModification] = list()
+        self.withdrawn: List[ClassificationModification] = list()
         self.source = source
 
     def filter_out_transcripts(self, transcripts: Set[str]) -> List[ClassificationModification]:
         """
         Returns ClassificationModificats there weren't included due to errors
         """
-        passes: List[ClassificationModification] = []
-        fails: List[ClassificationModification] = []
+        passes: List[ClassificationModification] = list()
+        fails: List[ClassificationModification] = list()
 
         for vcm in self.data:
             if vcm.transcript in transcripts:
@@ -260,9 +262,9 @@ class ExportFormatter(BaseExportFormatter):
 
     def __init__(self, genome_build: GenomeBuild, qs: QuerySet, user: User = None, since: datetime = None):
         self.genome_build = genome_build
-        self.used_contigs = set()
+        self.used_contigs: Set[Contig] = set()
         self.user = user
-        self.allele_groups = []
+        self.allele_groups: List[AlleleGroup] = list()
         self.since = since
 
         self.error_message_ids = dict()
@@ -271,6 +273,16 @@ class ExportFormatter(BaseExportFormatter):
         self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
 
         super().__init__()
+
+    @property
+    def supports_fully_withdrawn(self) -> bool:
+        """
+        If True, then alleles that only have withdrawn classifications will be returned by iter_group_by_allele
+        If False, a completely withdrawn allele will not be returned. If False the only impact will be that
+        an allele could pass a since check if the only thing in it that has changed is withdrawn
+        Note this is only relevant if since date is present, otherwise withdrawns are excluded
+        """
+        return False
 
     @property
     def use_full_chgvs(self) -> bool:
@@ -341,6 +353,8 @@ class ExportFormatter(BaseExportFormatter):
             if allele_flag_id := Allele.objects.filter(pk=ag.allele_id).values_list("flag_collection_id", flat=True).first():
                 flag_collection_ids.append(allele_flag_id)
             for cm in ag.data:
+                flag_collection_ids.append(cm.classification.flag_collection_id)
+            for cm in ag.withdrawn:
                 flag_collection_ids.append(cm.classification.flag_collection_id)
 
             if FlagComment.objects.filter(flag__collection_id__in=flag_collection_ids, created__gt=self.since).exists():
@@ -434,11 +448,19 @@ class ExportFormatter(BaseExportFormatter):
     def iter_group_by_allele(self):
         for allele_group in self.allele_groups:
             # actually populate the allele group data now
-            allele_group.data = [vcm for vcm in self.qs.filter(classification__variant__in=allele_group.variant_ids) if self.passes_flag_check(vcm)]
+            all_allele_group_data = [vcm for vcm in self.qs.filter(classification__variant__in=allele_group.variant_ids) if self.passes_flag_check(vcm)]
+            vcm: ClassificationModification
+            for vcm in all_allele_group_data:
+                if vcm.classification.withdrawn:
+                    allele_group.withdrawn.append(vcm)
+                else:
+                    allele_group.data.append(vcm)
+
             self.filter_mismatched_transcripts(allele_group)
 
-            if allele_group.data and self.passes_since_check(allele_group):
-                yield allele_group
+            if self.passes_since_check(allele_group):
+                if allele_group.data or (allele_group.withdrawn and self.supports_fully_withdrawn):
+                    yield allele_group
 
     def row_iterator(self) -> Iterable[AlleleGroup]:
         return self.iter_group_by_allele()

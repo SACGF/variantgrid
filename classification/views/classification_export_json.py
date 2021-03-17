@@ -17,6 +17,10 @@ class ExportFormatterJSON(ExportFormatter):
         super().__init__(*args, **kwargs)
         self.first_row = True
 
+    @property
+    def supports_fully_withdrawn(self) -> bool:
+        return True
+
     def header(self) -> str:
         return '{"records":[\n'
 
@@ -31,13 +35,16 @@ class ExportFormatterJSON(ExportFormatter):
                                                  strip_complicated=True,
                                                  include_messages=False)
 
-    def to_row(self, vcm: ClassificationModification) -> Optional[str]:
+    def to_row(self, vcm: ClassificationModification, withdrawn=False) -> Optional[str]:
         json_values = vcm.as_json(self.json_params)
         if 'fatal_error' in json_values:
             return None
 
         if self.is_discordant(vcm.classification):
             json_values['discordant'] = True
+        if withdrawn:
+            json_values['delete'] = True
+
         json_str = json.dumps(json_values)
 
         if self.first_row:
@@ -49,6 +56,8 @@ class ExportFormatterJSON(ExportFormatter):
         row_str = ''
         for vcm in group.data:
             row_str += self.to_row(vcm)
+        for vcm in group.withdrawn:
+            row_str += self.to_row(vcm, withdrawn=True)
         return row_str
 
     def content_type(self) -> str:
