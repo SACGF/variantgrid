@@ -137,7 +137,7 @@ class GeneMatcher:
 
         if release_gene_symbols:
             # Need ignore_conflicts=False so we get back PKs
-            release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols)
+            release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols, batch_size=2000)
             matches = []
             for release_gene_symbol in release_gene_symbols:
                 gene_symbol = release_gene_symbol.gene_symbol_id
@@ -148,7 +148,7 @@ class GeneMatcher:
                                                              match_info=match_info))
 
             if matches:
-                ReleaseGeneSymbolGene.objects.bulk_create(matches, ignore_conflicts=True)
+                ReleaseGeneSymbolGene.objects.bulk_create(matches, ignore_conflicts=True, batch_size=2000)
 
     def _match_unmatched_gene_symbol_qs(self, gene_symbol_qs):
         """ Match any matched symbols without matched genes """
