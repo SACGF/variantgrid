@@ -16,6 +16,7 @@ import operator
 
 from annotation.models import AnnotationVersion
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
+from library.log_utils import log_traceback
 from snpdb.models import Variant, VariantZygosityCountCollection
 
 
@@ -30,6 +31,8 @@ def get_variant_queryset_for_annotation_version(annotation_version):
     # We need to add global counts to every node, as we hardcode VariantGridColumn variant columns to
     # eg 'global_variant_zygosity__hom_count' or 'global_variant_zygosity__het_count'
     qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
+    # Ensure Variant QS is constrained to genome build
+    qs = qs.filter(Variant.get_contigs_q(annotation_version.genome_build))
     return qs
 
 
@@ -44,7 +47,6 @@ def get_queryset_for_annotation_version(klass, annotation_version):
     assert annotation_version, "Must provide 'annotation_version'"
     qs = get_queryset_with_transformer_hook(klass=klass)
     qs.add_sql_transformer(annotation_version.sql_partition_transformer)
-    qs = qs.filter(Variant.get_contigs_q(annotation_version.genome_build))
     return qs
 
 
