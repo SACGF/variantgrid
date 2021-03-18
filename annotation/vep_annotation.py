@@ -91,6 +91,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--af",
         "--pubmed",
         "--variant_class",
+        # TODO: put this in config
+        "--pick_order", "biotype,rank,mane,canonical,ccds,length",
         # Plugins that don't require data
         "--plugin", "Grantham",
         "--plugin", "SpliceRegion",
