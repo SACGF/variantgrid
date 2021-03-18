@@ -11,11 +11,15 @@ fi
 for gff3 in *.gff3.gz
 do
     GENEPRED="$(basename ${gff3} .gff3.gz).genePred"
-    ${GFF3_TO_GENEPRED} -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ${gff3} ${GENEPRED}
+    if [[ ! -e ${GENEPRED} ]]; then
+        ${GFF3_TO_GENEPRED} -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ${gff3} ${GENEPRED}
+    fi
 done
 
 for gff in *.gff.gz
 do
     GENEPRED="$(basename ${gff} .gff.gz).genePred"
-    ${GFF3_TO_GENEPRED} -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ${gff} ${GENEPRED}
+    if [[ ! -e ${GENEPRED} ]]; then
+        ${GFF3_TO_GENEPRED} -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ${gff} ${GENEPRED}
+    fi
 done
