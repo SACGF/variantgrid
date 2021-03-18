@@ -23,9 +23,9 @@ class VEPConfig:
         self.vep_data = genome_build.settings["vep_config"]
 
     def __getitem__(self, key):
-        if value := self.vep_data.get(key):
-            return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
-        return None
+        """ Throws KeyError if missing """
+        value = self.vep_data[key]  # All callers need to catch KeyError
+        return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
 
 
 def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):

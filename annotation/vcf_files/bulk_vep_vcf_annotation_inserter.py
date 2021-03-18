@@ -104,6 +104,7 @@ class BulkVEPVCFAnnotationInserter:
             logging.warning("BulkVEPVCFAnnotationInserter: Not actually inserting variants")
 
         self.vep_columns = self._get_vep_columns_from_csq(infos)
+        logging.debug("CSQ: %s", self.vep_columns)
         self._setup_vep_fields_and_db_columns(validate_columns)
 
     @staticmethod
@@ -180,7 +181,6 @@ class BulkVEPVCFAnnotationInserter:
                     prefix = cvf.get_vep_custom_display()
                     setting_key = prefix.lower()
                     _ = vc[setting_key]  # May throw exception if not setup
-
                     if cvf.source_field_has_custom_prefix:
                         self.ignored_vep_fields.append(prefix)
 
@@ -216,7 +216,7 @@ class BulkVEPVCFAnnotationInserter:
         self.variant_only_columns = self.all_variant_columns - self.transcript_columns
 
         if validate_columns:
-            # Display any unused VEP columns
+            # Display any unused VEP columns -
             handled_vep_columns = set(self.ignored_vep_fields)
             handled_vep_columns.update(self.source_field_to_columns)
 

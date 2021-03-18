@@ -269,7 +269,12 @@ class OntologyTerm(TimeStampedModel):
         postfix = parts[1].strip()
         try:
             num_part = int(postfix)
-            clean_id = OntologyService.index_to_id(prefix, num_part)
+            clean_id: str
+            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
+                clean_id = OntologyService.index_to_id(prefix, num_part)
+            else:
+                # variable length IDs like DOID
+                clean_id = f"{prefix}:{postfix}"
 
             if existing := OntologyTerm.objects.filter(id=clean_id).first():
                 return existing
@@ -287,8 +292,8 @@ class OntologyTerm(TimeStampedModel):
 
     @property
     def padded_index(self) -> str:
-        expected_length = OntologyService.EXPECTED_LENGTHS[self.ontology_service]
-        return str(self.index).rjust(expected_length, '0')
+        # ID should already be padded to right number of indexes
+        return self.id.split(":")[1]
 
     @property
     def url(self):
