@@ -181,7 +181,6 @@ class BulkVEPVCFAnnotationInserter:
                     prefix = cvf.get_vep_custom_display()
                     setting_key = prefix.lower()
                     _ = vc[setting_key]  # May throw exception if not setup
-                    print(f"Still going with {setting_key}")
                     if cvf.source_field_has_custom_prefix:
                         self.ignored_vep_fields.append(prefix)
 
