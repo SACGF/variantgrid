@@ -8,8 +8,8 @@ from library.utils import single_quote
 
 LOCI_HEADER = ['contig_id', 'position', 'ref_id']
 VARIANTS_HEADER = ['locus_id', 'alt_id']
-# Remember if you change COHORT_GENOTYPE_HEADER columns below, to modify COHORT_GT_VAF_INDEX
-COHORT_GENOTYPE_HEADER = ['collection_id', 'variant_id', "filters", 'ref_count', 'het_count', 'hom_count',
+COHORT_GENOTYPE_HEADER = ['collection_id', 'variant_id', "filters",
+                          'ref_count', 'het_count', 'hom_count', 'unk_count',
                           'samples_zygosity', 'samples_allele_depth', 'samples_allele_frequency',
                           'samples_read_depth', 'samples_genotype_quality', 'samples_phred_likelihood']
 MODIFIED_IMPORTED_VARIANT_HEADER = ['import_info_id', 'variant_id',

@@ -125,11 +125,6 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
             sample_stats_list = [s[cohort_sample.sample] for s in stats_list]
 
             for ss in [sl[SAMPLE_STATS] for sl in sample_stats_list]:
-                if zygosity not in Zygosity.VARIANT:
-                    if zygosity == Zygosity.UNKNOWN_ZYGOSITY:
-                        ss.unk_count += 1
-                    continue
-
                 ss.variant_count += 1
 
                 if ref_len == 1 and alt_len == 1:
@@ -145,6 +140,8 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
                     ss.hom_count += 1
                 elif zygosity == Zygosity.HOM_REF:
                     ss.ref_count += 1
+                elif zygosity == Zygosity.UNKNOWN_ZYGOSITY:
+                    ss.unk_count += 1
 
                 if chrom == 'X':
                     if zygosity == Zygosity.HET:
@@ -182,6 +179,8 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
                             gs.hom_omim_phenotype_count += 1
                         elif zygosity == Zygosity.HOM_REF:
                             gs.ref_omim_phenotype_count += 1
+                        elif zygosity == Zygosity.UNKNOWN_ZYGOSITY:
+                            gs.unk_omim_phenotype_count += 1
 
             if clinvar_highest_pathogenicity:
                 for cs in [sl[SAMPLE_CLINVAR_STATS] for sl in sample_stats_list]:
@@ -193,6 +192,8 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
                             cs.hom_clinvar_pathogenic_count += 1
                         elif zygosity == Zygosity.HOM_REF:
                             cs.ref_clinvar_pathogenic_count += 1
+                        elif zygosity == Zygosity.UNKNOWN_ZYGOSITY:
+                            cs.unk_clinvar_pathogenic_count += 1
 
     for stats_dict in [stats_per_sample, stats_passing_filters_per_sample or {}]:
         for stats in stats_dict.values():

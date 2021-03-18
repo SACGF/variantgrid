@@ -62,6 +62,7 @@ class VCF(models.Model):
     read_depth_field = models.TextField(null=True)
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
+    sample_filters = models.BooleanField(default=False)
     allele_frequency_source = models.CharField(max_length=1, choices=AlleleFrequencySource.choices, default=AlleleFrequencySource.CALCULATED)
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
