@@ -7,7 +7,7 @@ from library.file_utils import mk_path
 from manual.operations.manual_operations import ManualOperation
 
 
-def _test_has_legacy_phenotype_node_ontology(apps, schema_editor):
+def _test_has_legacy_phenotype_node_ontology(apps):
     PhenotypeNodeOMIM = apps.get_model("analysis", "PhenotypeNodeOMIM")
     PhenotypeNodeHPO = apps.get_model("analysis", "PhenotypeNodeHPO")
     return PhenotypeNodeOMIM.objects.exists() or PhenotypeNodeHPO.objects.exists()
