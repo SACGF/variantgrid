@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, Optional, List, Any, Set, Iterable
+from typing import Dict, Optional, List, Any, Set, Iterable, TypedDict
 
 import requests
 from django.urls import reverse
@@ -10,6 +10,13 @@ from classification.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake
+
+
+class OntologySnakeJson(TypedDict):
+    via: str
+    extra: Dict[Any]
+    relation: str
+    source: str
 
 
 class OntologyMatch:
@@ -46,18 +53,18 @@ class OntologyMatch:
         return self._score < other._score
 
     @staticmethod
-    def _snake_as_json(snake: OntologySnake):
+    def _snake_as_json(snake: OntologySnake) -> OntologySnakeJson:
         via = None
         steps = snake.show_steps()
         if len(steps) > 1:
             via = steps[0].dest_term.id
         last_step = steps[0]
-        return {
-            "via": via,
-            "extra": last_step.relation.extra,
-            "relation": last_step.relation.relation,
-            "source": last_step.relation.from_import.context
-        }
+        return OntologySnakeJson(
+            via=via,
+            extra=last_step.relation.extra,
+            relation=last_step.relation.relation,
+            source=last_step.relation.from_import.context
+        )
 
     def as_json(self) -> Dict:
         data = {
@@ -109,9 +116,15 @@ ROMAN = {
 @dataclass
 class MatchInfo:
     alias_index: Optional[int] = None
+    """ What alias (if any) did we use to match, None if matched on name or embedded ID """
 
 
-class SearchText:
+class SearchText:  # TODO shold be renamed ConditionSearchText
+    """
+    Text broken up into tokens, optionally de-pluralised, de-roman numeraled
+    split into prefix and suffix (if we detect a splitter word like 'type')
+    see the SUB_TYPE regex for details
+    """
 
     @staticmethod
     def roman_to_arabic(numeral: str):
@@ -198,6 +211,9 @@ def normalize_condition_text(text: str):
 
 
 class OntologyMatching:
+    """
+    Used to build up a big list of suggestions, typically on the MondoPicker
+    """
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
         self.term_map: Dict[str, OntologyMatch] = dict()
@@ -216,6 +232,9 @@ class OntologyMatching:
         return mondo
 
     def populate_relationships(self):
+        """
+        Given a gene symbol, provide all terms that have a relationship to that gene symbol
+        """
         if gene_symbol := self.gene_symbol:
             try:
                 OntologyTerm.get_gene_symbol(gene_symbol)

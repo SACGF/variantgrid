@@ -25,12 +25,17 @@ from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message
 from library.utils import ArrayLength
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
-from ontology.ontology_matching import OntologyMatching, normalize_condition_text, \
+from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
 from snpdb.models import Lab
 
 
 class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
+    """
+    For each normalized text/lab combo there'll be one ConditionText.
+    Then there will be a hierarchy of ConditionTextMatches for the ConditionText which can be assigned standard
+    terms and then apply that to the corresponding classification.
+    """
     normalized_text = models.TextField()
     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
 
@@ -49,23 +54,31 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     # TODO is this better done as an before save hook?
     def save(self, **kwargs):
-
         super().save(**kwargs)
         assign_perm(self.get_read_perm(), self.lab.group, self)
         assign_perm(self.get_write_perm(), self.lab.group, self)
 
     @transaction.atomic
     def clear(self):
+        """
+        Clears any condition matching at any level for this condition text
+        """
         self.conditiontextmatch_set.update(condition_xrefs=list(), condition_multi_operation=MultiCondition.NOT_DECIDED, last_edited_by=None)
         self.classifications_count_outstanding = self.classifications_count
         self.save()
 
     @property
     def classification_match_count(self) -> int:
+        """
+        How many classifications with this text have valid terms assigned to them
+        """
         return self.classifications_count - self.classifications_count_outstanding
 
     @property
     def user_edited(self) -> bool:
+        """
+        Has a user (other than admin bot) edited this
+        """
         return self.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(condition_xrefs_length__gt=0).exclude(last_edited_by=admin_bot()).exists()
 
     @property
@@ -78,12 +91,28 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
 
 class MultiCondition(models.TextChoices):
+    """
+    For when multiple terms exist, are we uncertain which one it is, or are we curating for multiple.
+    NOT_DECIDED means a choice is still required
+    """
     NOT_DECIDED = 'N', 'Not decided'
     UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
     CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
 
 
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
+    """
+    Represents a level of hierarchy for given ConditionText
+    - root
+    -- gene (e.g. BRCA1)
+    --- mode_of_inheritance (e.g. [autosomal_dominant] (multiple modes are also supported)
+    ---- classification X
+    Where each item on the hierarchy should have 1 to many direct children
+    To resolve classification X, go up the chain to find the first valid.
+
+    To determine position in hierarchy see which elements are null.
+    e.g. gene_symbol null means root level, gene_symbol with value but mode of inheritance null means gene level, etc
+    """
     condition_text = models.ForeignKey(ConditionText, on_delete=CASCADE)
     last_edited_by = models.ForeignKey(User, on_delete=SET_NULL, null=True, blank=True)
 
@@ -94,6 +123,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @property
     def name(self):
+        """
+        name of the item as it pertains to the hierarchy
+        """
         if self.classification:
             return self.classification.friendly_label
         if self.mode_of_inheritance:
@@ -111,17 +143,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return ConditionText
 
     @property
-    def hierarchy(self) -> List[Any]:
-        h_list = list()
-        if self.gene_symbol:
-            h_list.append(self.gene_symbol)
-        if self.mode_of_inheritance is not None:
-            h_list.append(self.mode_of_inheritance)
-        if self.classification:
-            h_list.append(self.classification)
-        return h_list
-
-    @property
     def is_root(self):
         return not self.gene_symbol
 
@@ -129,30 +150,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     def is_gene_level(self):
         # just used for templates
         return not self.classification_id and self.mode_of_inheritance is None and self.gene_symbol_id is not None
-
-    @property
-    def is_classification_level(self):
-        return self.classification_id
-
-    @lazy
-    def classification_count(self):
-        if self.classification_id:
-            return 1
-        if self.mode_of_inheritance:
-            return self.condition_text.conditiontextmatch_set.filter(parent=self).count()
-        if self.gene_symbol_id:
-            return self.condition_text.conditiontextmatch_set.filter(classification_id__isnull=False, gene_symbol__pk=self.gene_symbol_id).count()
-        return self.condition_text.conditiontextmatch_set.filter(classification_id__isnull=False).count()
-
-    @property
-    def leaf(self) -> Optional[Any]:
-        if self.classification:
-            return self.classification
-        if self.mode_of_inheritance is not None:
-            return self.mode_of_inheritance
-        if self.gene_symbol:
-            return self.gene_symbol
-        return None
 
     # resolved to this,
     condition_xrefs = ArrayField(models.TextField(blank=False), default=list)
@@ -176,43 +173,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 result += "; uncertain"
         return result
 
-    def update_with_condition_matching_str(self, text: str):
-        """
-        Update teh condition text match with a single line of text e.g.
-        MONDO:00001233; MONDO:0553533; co-occurring
-        So the inverse of condition_matching_str
-        """
-        terms = list()
-        condition_multi_operation = MultiCondition.NOT_DECIDED
-
-        parts = text.split(";")
-        if len(parts) >= 1:
-            terms_part = parts[0]
-            # this way we only recognise ids we recognise
-            # but do we want that?
-            # also allows us to fix the length of ids
-            # also allows us to fix the length of ids
-
-            # also assume any dangling number is a mondo term?
-            db_refs = db_ref_regexes.search(terms_part, default_regex=DbRegexes.MONDO)
-            terms = [db_ref.id_fixed for db_ref in db_refs]
-        if len(parts) >= 2:
-            operation_part = parts[1].lower()
-            if '/' in operation_part:
-                condition_multi_operation = MultiCondition.NOT_DECIDED
-            elif 'co' in operation_part:
-                condition_multi_operation = MultiCondition.CO_OCCURRING
-            elif 'un' in operation_part:
-                condition_multi_operation = MultiCondition.UNCERTAIN
-
-        self.condition_xrefs = terms
-        self.condition_multi_operation = condition_multi_operation
-
     class Meta:
         unique_together = ("condition_text", "gene_symbol", "mode_of_inheritance", "classification")
 
     @property
     def is_valid(self):
+        """
+        Could this be used as a valid resolution of condition terms, if blank or significant errors then false
+        Used to determine what parts of the hierarchy are valid
+        """
         if len(self.condition_xrefs) == 0:
             return False
         if len(self.condition_xrefs) == 1:
@@ -246,18 +215,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     def is_blank(self):
         return len(self.condition_xrefs) == 0
 
-    @lazy
-    def children(self) -> QuerySet:
-        order_by: str
-        if self.is_root:
-            order_by = 'gene_symbol__symbol'
-        elif self.is_gene_level:
-            order_by = 'mode_of_inheritance'
-        else:
-            order_by = 'classification__id'
-
-        return self.conditiontextmatch_set.all().order_by(order_by)
-
     @staticmethod
     def sync_all():
         """
@@ -272,12 +229,16 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ConditionTextMatch.attempt_automatch(condition_text=ct)
             update_condition_text_match_counts(ct)
             if ct.classifications_count == 0:
+                # classifications have moved around
                 ct.delete()
             else:
                 ct.save()
 
     @staticmethod
     def attempt_automatch(condition_text: ConditionText):
+        """
+        Set terms that we're effectively certain of, do not override what's already there
+        """
         try:
             if root := condition_text.root:
                 if match := top_level_suggestion(condition_text.normalized_text):
@@ -298,25 +259,30 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     @staticmethod
     def sync_condition_text_classification(cm: ClassificationModification, update_counts=True, attempt_automatch=False):
+        """
+        @param cm ClassificationModification - verify or create ConditionTextMatches for this classification
+        @param update_counts - Update the counts on the ConditionText (set to False if you intend update counts of all ConditionTexts after)
+        @param attempt_automatch - If true, attempt to automatch on the resulting ConditionText
+        This method will save any created ConditionTexts
+        """
         classification = cm.classification
+        existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification).first()
+
         if classification.withdrawn:
-            ConditionTextMatch.objects.filter(classification=classification).delete()
+            # don't worry about withdrawn records
+            if existing:
+                ct = existing.condition_text
+                existing.delete()
+                if update_counts:
+                    update_condition_text_match_counts(ct)
             return
 
         lab = classification.lab
         gene_str = cm.get(SpecialEKeys.GENE_SYMBOL)
         gene_symbol = GeneSymbol.objects.filter(symbol=gene_str).first()
 
-        existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification).first()
-
-        if not gene_symbol or classification.withdrawn:
-            if not gene_symbol:
-                report_message("Classification has no gene symbol, cannot link it to condition text", extra_data={"classification_id": classification.id})
-            if existing:
-                ct = existing.condition_text
-                existing.delete()
-                if update_counts:
-                    update_condition_text_match_counts(ct)
+        if not gene_symbol:
+            report_message("Classification has no gene symbol, cannot link it to condition text", extra_data={"classification_id": classification.id})
             return
 
         raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
@@ -331,6 +297,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         # if condition text has changed, remove the old entries
         ConditionTextMatch.objects.filter(classification=classification).exclude(condition_text=ct).delete()
 
+        # ensure each step of the hierarchy is present
         root, new_root = ConditionTextMatch.objects.get_or_create(
             condition_text=ct,
             gene_symbol=None,
@@ -354,6 +321,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             classification=None
         )
 
+        save_required = False
         if existing:
             if existing.parent != mode_of_inheritance_level or \
                     existing.condition_text != ct or \
@@ -367,10 +335,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 existing.parent = mode_of_inheritance_level
                 existing.condition_text = ct
                 existing.mode_of_inheritance = mode_of_inheritance
-                existing.save()
-
-                update_condition_text_match_counts(old_text)
-                old_text.save()
+                save_required = True
+                if update_counts:
+                    update_condition_text_match_counts(old_text)
+                    old_text.save()
             else:
                 # nothing has changed, no need to update anything
                 return
@@ -383,7 +351,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 classification=classification
             )
 
-        save_required = False
         if attempt_automatch and (new_root or new_gene_level):
             ConditionTextMatch.attempt_automatch(ct)
             save_required = True
@@ -396,8 +363,12 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             ct.save()
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
+        """
+        Converts this specific ConditionTextMatch to a ConditionResolvedDict (suitabe for saving on a classification).
+        will not look up the hierarchy for a valid term, do that beforehand
+        """
         if terms := self.condition_xref_terms:
-            terms = _sort_terms(terms)  # sorts by name, should it be by id so always consistent?
+            terms = _sort_terms(terms)  # sorts by name
             text = ", ".join([f"{term.id} {term.name}" for term in terms])
             sort_text = ", ".join([term.name for term in terms]).lower()
             if len(terms) > 1:
@@ -415,8 +386,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
 
 def update_condition_text_match_counts(ct: ConditionText):
-    # let's us count by doing one select all of the database, rather than continually
-    # selecting parents from the DB
+    """
+    condition count texts are cached in DB, call this method to make sure they're up to date
+    does not save after
+    """
     by_id: Dict[int, ConditionTextMatch] = dict()
     classification_related: List[ConditionTextMatch] = list()
     for ctm in ct.conditiontextmatch_set.all():
@@ -449,7 +422,7 @@ class ConditionMatchingMessage:
 
     def as_json(self):
         return {
-            "severity": self.severity,
+            "severity": self.severity,  # todo should have severity enum
             "text": self.text
         }
 
@@ -457,21 +430,44 @@ class ConditionMatchingMessage:
 class ConditionMatchingSuggestion:
 
     def __init__(self, condition_text_match: Optional[ConditionTextMatch] = None, ignore_existing: bool = False):
+        """
+        @param condition_text_match The ConditionTextMatch this suggestion is for (Optional)
+        @param ignore_existing If true, ignore any existing assignments
+        (useful for producing debug files of how we think all condition matching should go)
+        """
         self.condition_text_match = condition_text_match
         self.terms: List[OntologyTerm] = _sort_terms(condition_text_match.condition_xref_terms) if condition_text_match and not ignore_existing else []
+        """ A list of terms that are being suggested """
+
         self.is_applied = bool(self.terms)
+        """ if true, this has been saved and retrieved from the DB, otherwise we're making it as a suggestion """
+
         self.info_only = False
+        """ is this suggestion just validation on how a parent term applies to this level of the hierarchy, e.g. has messages but no terms """
+
         self.condition_multi_operation: MultiCondition = MultiCondition.NOT_DECIDED
+        """ the way to deal with multiple terms, only set by users at this stage """
         if self.is_applied:
             self.condition_multi_operation = condition_text_match.condition_multi_operation
+
         self.messages: List[ConditionMatchingMessage] = list()
+        """ errors, warnings, info to inform the user of - or use to determine if this auto-assign appropriate """
+
         self.validated = False
+        """ has validate been run yet"""
+
         self.ids_found_in_text: Optional[bool] = None
+        """ Are the terms we found just straight from the condition text e.g. 'OMIM:32433', useful to determine auto-assign """
+
         self.alias_index: Optional[int] = None
+        """ If not null, the index of the alias of the term we matched via text, useful to determine auto-assign """
+
         self.merged = False
+        """ Was this suggestion merged, e.g. if there was an condition text 'BAM' that matched Best At Motoneuron and Blood Attacked Myliver """
 
     @property
     def term_str_array(self) -> List[str]:
+        """ For saving back to ConditionTextMatches """
         return [term.id for term in self.terms]
 
     def add_term(self, term: OntologyTerm):
@@ -499,6 +495,13 @@ class ConditionMatchingSuggestion:
         }
 
     def is_auto_assignable(self, gene_symbol: Optional[GeneSymbol] = None):
+        """ Is this suggestion so certain we can just assign it
+        Has to be a single term (since we don't support uncertain/co-occuring in text yet).
+        Can't be found via an alias.
+        Can't be any warnings or errors.
+        If we're a gene symbol, the term has to be a leaf term and have a relationship to the gene.
+        Or if we're top level, the ID has to be found within text.
+        """
         if terms := self.terms:
             if len(terms) != 1:
                 return False
@@ -523,6 +526,9 @@ class ConditionMatchingSuggestion:
         return False
 
     def validate(self):
+        """
+        Perform validation to populate messages
+        """
         if self.validated:
             return
         self.validated = True
@@ -595,7 +601,7 @@ def published(sender,
 @receiver(flag_comment_action, sender=Flag)
 def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
     """
-    Keeps condition_text_match in sync with the classifications when withdraws happen/finish
+    Keeps condition_text_match in sync with the classifications when withdraws start/finish
     """
     flag = flag_comment.flag
     if flag.flag_type == flag_types.classification_flag_types.classification_withdrawn:
@@ -605,12 +611,17 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
 
 
 def top_level_suggestion(text: str) -> ConditionMatchingSuggestion:
+    """ Make a suggestion at the root level for the given normalised text """
     if suggestion := embedded_ids_check(text):
         return suggestion
     return search_suggestion(text)
 
 
 def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
+    """
+    Check the condition text for IDs e.g. 'OMIM:343233' this makes things easy
+    Will also validate if there's an embedded ID with text that doesn't seem to match the term
+    """
     cms = ConditionMatchingSuggestion()
 
     db_matches = db_ref_regexes.search(text)
@@ -656,6 +667,9 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 
 
 def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> ConditionMatchingSuggestion:
+    """
+    Does this term match the search_text, if so, add it as a suggestion (possibly with some validation)
+    """
     cms = ConditionMatchingSuggestion()
     if match_info := search_text.matches(term):
         if match_info.alias_index is not None:  # 0 alias is complete with acronym, 1 alias without acronym
@@ -711,6 +725,11 @@ def merge_matches(matches: List[ConditionMatchingSuggestion]) -> Optional[Condit
 
 
 def find_local_term(match_text: SearchText, service: OntologyService) -> Optional[ConditionMatchingSuggestion]:
+    """
+    Note that local search is pretty dumb, uses SearchText which already simplifies a bunch of words
+    Code looks through local database, erring of false positives, then uses search_text_to_suggestion to
+    see if returned result is a genuine positive
+    """
     q = list()
     # TODO, can we leverage phenotype matching?
     if match_text.prefix_terms:
@@ -740,6 +759,9 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
 
 
 def search_suggestion(text: str) -> ConditionMatchingSuggestion:
+    """
+    embedded ids have already been searched for, check the MONDO search database
+    """
     match_text = SearchText(text)
     if local_mondo := find_local_term(match_text, OntologyService.MONDO):
         return local_mondo
@@ -772,7 +794,7 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
     return ConditionMatchingSuggestion()
 
 
-def _is_descendat_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set[int], check_levels: int):
+def _is_descendant_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set[int], check_levels: int):
     # TODO move this to OntologyTerm class
     for term in term_ids:
         if term in ancestors_ids:
@@ -789,11 +811,11 @@ def _is_descendat_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set
 
     if all_parent_terms:
         seen_ids = seen_ids.union(all_parent_terms)
-        return _is_descendat_ids(all_parent_terms, ancestors_ids, seen_ids, check_levels - 1)
+        return _is_descendant_ids(all_parent_terms, ancestors_ids, seen_ids, check_levels - 1)
 
 
 def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 10):
-    return _is_descendat_ids({term.id for term in terms}, {term.id for term in ancestors}, set(), check_levels)
+    return _is_descendant_ids({term.id for term in terms}, {term.id for term in ancestors}, set(), check_levels)
 
 
 def _sort_terms(terms: Iterable[OntologyTerm]):
@@ -807,20 +829,15 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     root_cms: Optional[ConditionMatchingSuggestion]
 
     root_cms = ConditionMatchingSuggestion(root_level, ignore_existing=ignore_existing)
-    is_root_real: bool
     display_root_cms = root_cms
-    if root_cms.terms:
-        is_root_real = True
-    else:
+    if not root_cms.terms:
         root_cms = top_level_suggestion(ct.normalized_text)
         root_cms.condition_text_match = root_level
         if root_cms.ids_found_in_text:
             display_root_cms = root_cms
-            is_root_real = True
         else:
             display_root_cms = root_cms
             display_root_cms.info_only = True
-            is_root_real = False
 
     root_cms.validate()
     suggestions.append(display_root_cms)
@@ -829,9 +846,8 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     filled_in: QuerySet
     filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs'))
     filled_in = filled_in.filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
-    root_level_mondo = set()
     root_level_terms = root_cms.terms
-    root_level_mondo = {term for term in root_level_terms if term.ontology_service == OntologyService.MONDO}
+    root_level_mondo: Set[OntologyTerm] = {term for term in root_level_terms if term.ontology_service == OntologyService.MONDO}
 
     for ctm in filled_in.order_by('gene_symbol'):
         if ctm.condition_xref_terms and not ignore_existing:
@@ -882,7 +898,8 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     cms.add_message(ConditionMatchingMessage(severity="success",
                                                              text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                     cms.add_term(matches_gene_level_leafs[0])
-                    #for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
+                    # code that used to tell you which other leaf terms were related, but got too messy
+                    # for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
                     #    if term != matches_gene_level_leafs[0]:
                     #        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
 
@@ -934,10 +951,14 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     return suggestions
 
 
-def apply_condition_resolution(ctm: ConditionTextMatch):
+def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
+    """
+    Updates classification's cached condition_resolution (where appropriate) for the ConditionTextMatch
+    Call when the ConditionTextMatch has changed
+    """
     if ctm.classification_id:
         classification = ctm.classification
-        if matching := match_for_classification_id(ctm.classification_id):
+        if matching := condition_text_match_for_classification_id(ctm.classification_id):
             classification.condition_resolution = matching.as_resolved_condition()
         else:
             classification.condition_resolution = None
@@ -967,18 +988,18 @@ def condition_text_saved(sender, instance: ConditionTextMatch, created: bool, ra
     if not created or instance.classification_id:
         # only worth doing this for new classification links or already existing ctms
         # e.g. a newly created root, gene level, inheritance level wont have any terms to assign
-        apply_condition_resolution(instance)
+        apply_condition_resolution_to_classifications(instance)
 
 
-def sync_all_condition_resolutions():
+def sync_all_condition_resolutions_to_classifications():
     Classification.objects.update(condition_resolution=None)
     ctms = ConditionTextMatch.objects.annotate(condition_xrefs_length=ArrayLength('condition_xrefs')).filter(condition_xrefs_length__gt=0)
     for ctm in ctms:
         if ctm.is_valid:
-            apply_condition_resolution(ctm)
+            apply_condition_resolution_to_classifications(ctm)
 
 
-def match_for_classification_id(cid: int) -> Optional[ConditionTextMatch]:
+def condition_text_match_for_classification_id(cid: int) -> Optional[ConditionTextMatch]:
     try:
         ctm: ConditionTextMatch = ConditionTextMatch.objects.get(classification__id=cid)
         while ctm and not ctm.is_valid:
