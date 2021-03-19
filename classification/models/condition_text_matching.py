@@ -152,6 +152,18 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         # just used for templates
         return not self.classification_id and self.mode_of_inheritance is None and self.gene_symbol_id is not None
 
+    @lazy
+    def children(self) -> QuerySet:
+        order_by: str
+        if self.is_root:
+            order_by = 'gene_symbol__symbol'
+        elif self.is_gene_level:
+            order_by = 'mode_of_inheritance'
+        else:
+            order_by = 'classification__id'
+
+        return self.conditiontextmatch_set.all().order_by(order_by)
+
     # resolved to this,
     condition_xrefs = ArrayField(models.TextField(blank=False), default=list)
     condition_multi_operation = models.CharField(max_length=1, choices=MultiCondition.choices, default=MultiCondition.NOT_DECIDED)
