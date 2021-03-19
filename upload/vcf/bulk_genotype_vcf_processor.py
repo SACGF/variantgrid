@@ -1,3 +1,4 @@
+import csv
 from typing import Optional
 
 import cyvcf2
@@ -11,6 +12,7 @@ from library.git import Git
 from library.postgres_utils import postgres_arrays
 import numpy as np
 
+from library.utils import double_quote
 from library.vcf_utils import VCFConstant
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import ProcessingStatus
@@ -18,11 +20,7 @@ from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyExcepti
     VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
-from upload.vcf.sql_copy_files import write_sql_copy_csv
-
-
-# This is not the index in COHORT_GENOTYPE_HEADER - it is less as extra cols are added before writing
-COHORT_GT_VAF_INDEX = 5
+from upload.vcf.sql_copy_files import write_sql_copy_csv, COHORT_GENOTYPE_HEADER
 
 
 class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
@@ -38,7 +36,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v11. ?
     # v12. Ensure missing data in FreeBayes is -1 not -2147483648 (CyVCF2 returns this from format)
     # v13. Support CLCAD2 from CLC workbench
-    VCF_IMPORTER_VERSION = 13  # Change this if you make a major change to the code.
+    # v14. Use AF from VCF if provided. Support for sample level filters (FT)
+    VCF_IMPORTER_VERSION = 14  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -55,6 +54,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     CYVCF_DIPLOID_PL_INDEX = [0, 1, DOESNT_MATTER, 2]
     CYVCF_PL_INDEX_FOR_PLOIDY = [None, CYVCF_HAPLOID_PL_INDEX, CYVCF_DIPLOID_PL_INDEX]
     EMPTY_PL_ARRAY = "{-1,-1,-1}"  # Shortcut for PL = '.'
+    # Used to adjust cohort_gt_vaf_index, numbers come from fields at top of process_cohort_genotypes
+    COHORT_GT_NUM_ADDED_FIELDS = 3
 
     @staticmethod
     def get_vcf_importer_version():
@@ -100,6 +101,10 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.vcf_filter_map = uploaded_vcf.vcf.get_filter_dict()
         self.last_read_depth_str = None
         self.child_processes = []
+        self.cohort_gt_vaf_index = COHORT_GENOTYPE_HEADER.index("samples_allele_frequency")
+        if self.cohort_gt_vaf_index < 0:
+            raise ValueError(f"Could not find 'samples_allele_frequency' in {COHORT_GENOTYPE_HEADER}")
+        self.cohort_gt_vaf_index -= self.COHORT_GT_NUM_ADDED_FIELDS
 
     def get_max_variant_id(self):
         """ 0 means it was never set, so we return None """
@@ -160,7 +165,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         raise ValueError(f"Don't know how to get ref and alt allele depth for {vcf}")
 
     @staticmethod
-    def get_format_array_str(variant, field, as_type=None):
+    def get_format_array_str(variant, field, as_type=None) -> Optional[str]:
         format_array_str = None
         if field:
             format_array = variant.format(field)
@@ -171,7 +176,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 format_array_str = postgres_arrays(format_array.flat)
         return format_array_str
 
-    def get_phred_likelihood_str(self, variant):
+    def get_phred_likelihood_str(self, variant) -> Optional[str]:
         phred_likelihood_str = None
         if self.vcf.phred_likelihood_field:
             phred_likelihood = []
@@ -195,6 +200,19 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 phred_likelihood_str = postgres_arrays(phred_likelihood)
         return phred_likelihood_str
 
+    def get_samples_filters_str(self, variant) -> Optional[str]:
+        samples_filters_str = None
+        if self.vcf.sample_filters_field:
+            sample_filters = []
+            s_filters = variant.format(self.vcf.sample_filters_field)
+            if s_filters is not None:
+                for sf in s_filters:
+                    sample_filters.append(self.convert_filters(sf))
+                if any(sample_filters):  # Skip if all were PASS
+                    # https://www.postgresql.org/docs/9.1/arrays.html - Postgres arrays use double quotes
+                    samples_filters_str = postgres_arrays([double_quote(sf) for sf in sample_filters])
+        return samples_filters_str
+
     def finished_locus(self):
         """ sum(AD) for this locus and add data to arrays """
 
@@ -203,12 +221,16 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.modified_imported_variant_hashes.extend(self.locus_modified_imported_variant_hashes)
         self.modified_imported_variants.extend(self.locus_modified_imported_variants)
 
-        for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):
-            vaf = 100.0 * ad / self.locus_ad_sum
-            vaf[np.isnan(vaf)] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
-            cgt[COHORT_GT_VAF_INDEX] = postgres_arrays(vaf)
-
-            self.cohort_genotypes.append(cgt)
+        if self.vcf.allele_frequency_field:
+            # AF will already be there
+            self.cohort_genotypes.extend(self.locus_cohort_genotypes)
+        else:
+            # Calculate ourselves across locus
+            for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):
+                vaf = 100.0 * ad / self.locus_ad_sum
+                vaf[np.isnan(vaf)] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                cgt[self.cohort_gt_vaf_index] = postgres_arrays(vaf)
+                self.cohort_genotypes.append(cgt)
 
         self.locus_variant_hashes = []
         self.locus_filters = []
@@ -231,40 +253,51 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         empty_as_zero_alt_allele_depth = alt_allele_depth.copy()
         empty_as_zero_alt_allele_depth[empty_as_zero_alt_allele_depth < 0] = 0
 
+        if self.vcf.allele_frequency_field:
+            allele_frequency_str = self.get_format_array_str(variant, self.vcf.allele_frequency_field, as_type=float)
+        else:
+            # We'll calculate ourselves across locus
+            allele_frequency_str = None
+
         read_depth_str = self.get_format_array_str(variant, self.vcf.read_depth_field, as_type=int)
         genotype_quality_str = self.get_format_array_str(variant, self.vcf.genotype_quality_field, as_type=int)
         phred_likelihood_str = self.get_phred_likelihood_str(variant)
+        samples_filters_str = self.get_samples_filters_str(variant)
+
         ref_count = variant.num_hom_ref
         het_count = variant.num_het
         hom_count = variant.num_hom_alt
-        if any([ref_count, het_count, hom_count]):
-            if self.last_locus_tuple:
-                if self.last_locus_tuple != locus_tuple:
-                    self.finished_locus()
+        unk_count = variant.num_unknown
 
-            alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt)
-            alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
-            alt_allele_depth_str = postgres_arrays(alt_allele_depth)
+        if self.last_locus_tuple:
+            if self.last_locus_tuple != locus_tuple:
+                self.finished_locus()
 
-            cohort_gt = [str(ref_count),
-                         str(het_count),
-                         str(hom_count),
-                         ''.join(alt_zygosity),
-                         alt_allele_depth_str,
-                         '',  # VAF - will be set in finished_locus - this position *must* match COHORT_GT_VAF_INDEX
-                         read_depth_str,
-                         genotype_quality_str,
-                         phred_likelihood_str]
+        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt)
+        alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
+        alt_allele_depth_str = postgres_arrays(alt_allele_depth)
 
-            self.locus_variant_hashes.append(alt_hash)
-            self.locus_filters.append(self.convert_filters(variant.FILTER))
-            self.locus_cohort_genotypes.append(cohort_gt)
-            self.locus_allele_depths.append(empty_as_zero_alt_allele_depth)
+        cohort_gt = [str(ref_count),
+                     str(het_count),
+                     str(hom_count),
+                     str(unk_count),
+                     ''.join(alt_zygosity),
+                     alt_allele_depth_str,
+                     allele_frequency_str,
+                     read_depth_str,
+                     genotype_quality_str,
+                     phred_likelihood_str,
+                     samples_filters_str]
 
-            if self.preprocess_vcf_import_info:
-                self.add_modified_imported_variant(variant, alt_hash,
-                                                   miv_hash_list=self.locus_modified_imported_variant_hashes,
-                                                   miv_list=self.locus_modified_imported_variants)
+        self.locus_variant_hashes.append(alt_hash)
+        self.locus_filters.append(self.convert_filters(variant.FILTER))
+        self.locus_cohort_genotypes.append(cohort_gt)
+        self.locus_allele_depths.append(empty_as_zero_alt_allele_depth)
+
+        if self.preprocess_vcf_import_info:
+            self.add_modified_imported_variant(variant, alt_hash,
+                                               miv_hash_list=self.locus_modified_imported_variant_hashes,
+                                               miv_list=self.locus_modified_imported_variants)
 
         self.locus_ad_sum += empty_as_zero_ref_allele_depth + empty_as_zero_alt_allele_depth
         self.last_read_depth_str = read_depth_str
@@ -314,12 +347,14 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     def process_cohort_genotypes(self, variant_ids):
         cohort_genotypes = []
+        # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
         for variant_id, filters, cohort_gt in zip(variant_ids, self.variant_filters, self.cohort_genotypes):
             cohort_genotypes.append([self.cohort_genotype_collection.pk, variant_id, filters] + cohort_gt)
 
         cg_basename = f"cohort_genotype_step_{self.upload_step.pk}_batch_{self.cohort_genotype_file_id}.csv"
         cohort_genotypes_filename = get_import_processing_filename(self.upload_pipeline.pk, cg_basename)
-        write_sql_copy_csv(cohort_genotypes, cohort_genotypes_filename)
+        write_sql_copy_csv(cohort_genotypes, cohort_genotypes_filename,
+                           quoting=csv.QUOTE_NONE, escapechar='', quotechar='')
         table_name = self.cohort_genotype_collection.get_partition_table()
         num_cohort_genotypes = len(cohort_genotypes)
         self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)

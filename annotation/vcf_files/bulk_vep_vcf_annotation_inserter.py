@@ -23,7 +23,7 @@ from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 VEP_SEPARATOR = '&'
 EMPTY_VALUES = {'', '.'}
-SEPARATOR = '\t'
+DELIMITER = '\t'
 EXTENSIONS = {",": "csv",
               "\t": "tsv"}
 
@@ -459,19 +459,19 @@ class BulkVEPVCFAnnotationInserter:
 
         for base_table_name, annotations_list in ANNOTATION_TYPE.items():
             logging.info("bulk_insert")
-            extension = EXTENSIONS[SEPARATOR]
+            extension = EXTENSIONS[DELIMITER]
             base_filename = f"{self.PREFIX}_{base_table_name}_{self.batch_id}.{extension}"
             data_filename = get_import_processing_filename(self.annotation_run.pk, base_filename, prefix=self.PREFIX)
             header = self.get_sql_csv_header(base_table_name)
             row_data = self._annotations_list_to_row_data(header, annotations_list)
-            write_sql_copy_csv(row_data, data_filename, separator=SEPARATOR)
+            write_sql_copy_csv(row_data, data_filename, delimiter=DELIMITER)
 
             if self.insert_variants:
                 vav = self.annotation_run.variant_annotation_version
                 partition_table = vav.get_partition_table(base_table_name=base_table_name)
 
                 logging.info("Inserting file '%s' into partition %s", data_filename, partition_table)
-                sql_copy_csv(data_filename, partition_table, header, separator=SEPARATOR)
+                sql_copy_csv(data_filename, partition_table, header, delimiter=DELIMITER)
                 logging.info("Done!")
 
             annotations_list.clear()

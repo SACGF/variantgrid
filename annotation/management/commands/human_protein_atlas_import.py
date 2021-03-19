@@ -74,12 +74,12 @@ class Command(BaseCommand):
             data = (version_id, ensembl_gene_id, tissue_sample, abundance)
             records.append(data)
 
-        separator = '\t'  # Was having trouble with quoting CSVs
+        delimiter = '\t'  # Was having trouble with quoting CSVs
         logging.info("Creating TSV to insert into database...")
         csv_filename = get_import_processing_filename(version_id, "human_protein_annotation.csv", prefix='human_protein_atlas')
         if os.path.exists(csv_filename):
             os.remove(csv_filename)
-        write_sql_copy_csv(records, csv_filename, separator=separator)
+        write_sql_copy_csv(records, csv_filename, delimiter=delimiter)
         partition_table = hpa_version.get_partition_table()
         logging.info("Inserting file '%s' into partition %s", csv_filename, partition_table)
 
@@ -87,5 +87,5 @@ class Command(BaseCommand):
                       'gene_id',
                       'tissue_sample_id',
                       'abundance']
-        sql_copy_csv(csv_filename, partition_table, HPA_HEADER, separator=separator)
+        sql_copy_csv(csv_filename, partition_table, HPA_HEADER, delimiter=delimiter)
         logging.info("Done!")

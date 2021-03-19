@@ -29,8 +29,8 @@ def create_variant_zygosity_counts():
 
             params = {"table_name": collection.get_partition_table()}
             sql = """INSERT INTO %(table_name)s
-                    (variant_id, collection_id, ref_count, het_count, hom_count)\n""" % params
-            sql += """select id, %s, 0, 0, 0 from snpdb_variant where id > %s;"""
+                    (variant_id, collection_id, ref_count, het_count, hom_count, unk_count)\n""" % params
+            sql += """select id, %s, 0, 0, 0, 0 from snpdb_variant where id > %s;"""
             run_sql(sql, [collection.pk, max_vzc_variant_id])
 
 

@@ -422,14 +422,16 @@ class CohortGenotype(models.Model):
     ref_count = models.IntegerField(default=0)
     het_count = models.IntegerField(default=0)
     hom_count = models.IntegerField(default=0)  # hom_alt
+    unk_count = models.IntegerField(default=0)  # Unknown (ie ./.)
     filters = models.TextField(null=True)
     # samples_ fields below packed in sorted order of CohortSample.cohort_genotype_packed_field_index
-    samples_zygosity = models.TextField()
+    samples_zygosity = models.TextField()  # 1 character per sample of Zygosity
     samples_allele_depth = ArrayField(models.IntegerField(), null=True)
     samples_allele_frequency = ArrayField(PostgresRealField(), null=True)
     samples_read_depth = ArrayField(models.IntegerField(), null=True)
     samples_genotype_quality = ArrayField(models.IntegerField(), null=True)
     samples_phred_likelihood = ArrayField(models.IntegerField(), null=True)
+    samples_filters = ArrayField(models.TextField(), null=True)  # Same codes as filters, at sample level
 
     def get_sample_genotype(self, sample: Sample) -> SampleGenotype:
         sample_index = self.collection.get_array_index_for_sample_id(sample.pk)

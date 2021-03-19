@@ -83,6 +83,7 @@ class VariantZygosityCount(models.Model):
     ref_count = models.IntegerField(default=0)  # HOM_REF - some reads, no zyg call (usually somatic)
     het_count = models.IntegerField(default=0)
     hom_count = models.IntegerField(default=0)  # hom_alt
+    unk_count = models.IntegerField(default=0)  # Unknown (ie ./.)
 
     class Meta:
         unique_together = ("variant", "collection")
