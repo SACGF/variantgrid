@@ -16,7 +16,6 @@ import operator
 
 from annotation.models import AnnotationVersion
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
-from library.log_utils import log_traceback
 from snpdb.models import Variant, VariantZygosityCountCollection
 
 
