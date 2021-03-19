@@ -963,8 +963,11 @@ def apply_condition_resolution(ctm: ConditionTextMatch):
 
 
 @receiver(post_save, sender=ConditionTextMatch)
-def classification_created(sender, instance: ConditionTextMatch, created: bool, raw, using, update_fields, **kwargs):
-    apply_condition_resolution(instance)
+def condition_text_saved(sender, instance: ConditionTextMatch, created: bool, raw, using, update_fields, **kwargs):
+    if not created or instance.classification_id:
+        # only worth doing this for new classification links or already existing ctms
+        # e.g. a newly created root, gene level, inheritance level wont have any terms to assign
+        apply_condition_resolution(instance)
 
 
 def sync_all_condition_resolutions():

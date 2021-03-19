@@ -2119,6 +2119,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             previous_share_level=old_share_level,
             newly_published=self,
             user=user)
+        vc.refresh_from_db()
         return True
 
     @lazy
