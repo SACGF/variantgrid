@@ -12,7 +12,7 @@ from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
 from upload.vcf.bulk_allele_linking_vcf_processor import BulkAlleleLinkingVCFProcessor
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
-from upload.vcf.vcf_import import read_vcf_file_set_max_variant
+from upload.vcf.vcf_import import import_vcf_file, get_preprocess_vcf_import_info
 from upload.vcf.vcf_preprocess import preprocess_vcf
 from variantgrid.celery import app
 
@@ -91,7 +91,9 @@ class ProcessVCFSetMaxVariantTask(ImportVCFStepTask):
         Can run in parallel on split VCFs """
 
     def process_items(self, upload_step):
-        items_processed = read_vcf_file_set_max_variant(upload_step, BulkMinimalVCFProcessor)
+        preprocess_vcf_import_info = get_preprocess_vcf_import_info(upload_step.upload_pipeline)
+        bulk_inserter = BulkMinimalVCFProcessor(upload_step, preprocess_vcf_import_info)
+        items_processed = import_vcf_file(upload_step, bulk_inserter)
         return items_processed
 
 
@@ -101,7 +103,9 @@ class ProcessVCFLinkAllelesSetMaxVariantTask(ImportVCFStepTask):
         Can run in parallel on split VCFs """
 
     def process_items(self, upload_step):
-        items_processed = read_vcf_file_set_max_variant(upload_step, BulkAlleleLinkingVCFProcessor)
+        preprocess_vcf_import_info = get_preprocess_vcf_import_info(upload_step.upload_pipeline)
+        bulk_inserter = BulkAlleleLinkingVCFProcessor(upload_step, preprocess_vcf_import_info)
+        items_processed = import_vcf_file(upload_step, bulk_inserter)
         return items_processed
 
 

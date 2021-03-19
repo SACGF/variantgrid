@@ -9,9 +9,9 @@ from library.utils import single_quote
 LOCI_HEADER = ['contig_id', 'position', 'ref_id']
 VARIANTS_HEADER = ['locus_id', 'alt_id']
 COHORT_GENOTYPE_HEADER = ['collection_id', 'variant_id', "filters",
-                          'ref_count', 'het_count', 'hom_count', 'unk_count',
-                          'samples_zygosity', 'samples_allele_depth', 'samples_allele_frequency',
-                          'samples_read_depth', 'samples_genotype_quality', 'samples_phred_likelihood']
+                          'ref_count', 'het_count', 'hom_count', 'unk_count', 'samples_zygosity',
+                          'samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
+                          'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters']
 MODIFIED_IMPORTED_VARIANT_HEADER = ['import_info_id', 'variant_id',
                                     'old_multiallelic', 'old_variant', 'old_variant_formatted']
 
@@ -27,18 +27,18 @@ def get_database_settings():
     return host, database_name, user, password
 
 
-def sql_copy_csv(input_filename, table_name, columns, separator=',', quote=None):
+def sql_copy_csv(input_filename, table_name, columns, delimiter=',', quote=None):
     logging.info("sql_copy_csv %s", input_filename)
     with open(input_filename, 'rb') as f:
-        return sql_copy_csv_file(f, table_name, columns, separator, quote=quote)
+        return sql_copy_csv_file(f, table_name, columns, delimiter, quote=quote)
 
 
-def sql_copy_csv_file(f, table_name, columns, separator=',', quote=None):
+def sql_copy_csv_file(f, table_name, columns, delimiter=',', quote=None):
     cursor = connection.cursor()
     try:
         if quote:
-            if separator != ',':
-                msg = f"Don't know how to do this (sql_copy_csv_file sep='{separator}', quote='{quote}'"
+            if delimiter != ',':
+                msg = f"Don't know how to do this (sql_copy_csv_file sep='{delimiter}', quote='{quote}'"
                 raise ValueError(msg)
 
             columns = ','.join(columns)
@@ -48,7 +48,7 @@ def sql_copy_csv_file(f, table_name, columns, separator=',', quote=None):
         else:
             value = cursor.copy_from(f,
                                      table_name,
-                                     separator,
+                                     delimiter,
                                      null='',
                                      columns=columns)
 
@@ -73,25 +73,26 @@ def variants_sql_copy_csv(input_filename):
 
 
 def cohort_genotype_sql_copy_csv(input_filename, table_name):
-    return sql_copy_csv(input_filename, table_name, COHORT_GENOTYPE_HEADER, quote='"')
+    return sql_copy_csv(input_filename, table_name, COHORT_GENOTYPE_HEADER)
 
 
 def modified_imported_variant_sql_copy_csv(input_filename):
     return sql_copy_csv(input_filename, "upload_modifiedimportedvariant", MODIFIED_IMPORTED_VARIANT_HEADER, quote='"')
 
 
-def write_sql_copy_csv(data, filename, separator=None):
+def write_sql_copy_csv(data, filename, **kwargs):
     if os.path.exists(filename):
         msg = f"We don't want to overwrite '{filename}'"
         raise ValueError(msg)
 
     with open(filename, "w") as f:
-        kwargs = {}
-        if separator is not None:
-            kwargs['delimiter'] = separator
         writer = csv.writer(f, **kwargs)
         for row in data:
-            writer.writerow(row)
+            try:
+                writer.writerow(row)
+            except Exception as e:
+                logging.error("CSV couldn't write '%s'", row)
+                raise e
 #            f.write(','.join([str(x) if x is not None else '' for x in row]) + '\n')
 
     if not os.path.exists(filename):

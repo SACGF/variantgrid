@@ -85,6 +85,8 @@ def create_vcf_filters(vcf, header_types):
                                  filter_id=filter_id,
                                  description=filter_description)
         filter_code_id += 1
+        if chr(filter_code_id) in "',\"":
+            filter_code_id += 1  # Skip these as it causes quoting issues
         if filter_code_id > VCFFilter.ASCII_MAX:
             num_filters = VCFFilter.ASCII_MAX - VCFFilter.ASCII_MIN
             logging.warning("Warning: Run out of characters to store filters! Only storing 1st %d.", num_filters)
@@ -152,7 +154,11 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
         vcf.read_depth_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_READ_DEPTH_FIELD)
         vcf.genotype_quality_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_QUALITY_FIELD)
-        vcf.phred_likelihood_field = get_phred_likelihood_field(vcf_formats, source, VCFConstant.DEFAULT_PHRED_LIKILIHOOD_FIELD)
+        vcf.phred_likelihood_field = get_phred_likelihood_field(vcf_formats, source,
+                                                                VCFConstant.DEFAULT_PHRED_LIKILIHOOD_FIELD)
+        vcf.allele_frequency_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_ALLELE_FREQUENCY_FIELD)
+        vcf.sample_filters_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_SAMPLE_FILTERS_FIELD)
+
     vcf.save()
     uploaded_vcf.vcf = vcf
     uploaded_vcf.save()
@@ -174,10 +180,7 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
         if no_dna_control_sample_pattern and no_dna_control_sample_pattern.findall(sample_name):
             no_dna_control = True
 
-        Sample.objects.create(vcf=vcf,
-                              vcf_sample_name=sample_name,
-                              name=sample_name,
-                              no_dna_control=no_dna_control,
+        Sample.objects.create(vcf=vcf, vcf_sample_name=sample_name, name=sample_name, no_dna_control=no_dna_control,
                               import_status=ImportStatus.IMPORTING)
 
     if backend_vcf:
@@ -206,22 +209,16 @@ def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uplo
     return klass(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info)
 
 
-def import_vcf_file(upload_step):
-    """ This can be run in parallel """
+def import_vcf_file(upload_step, bulk_inserter) -> int:
+    """ This can be run in parallel. Sets max variant """
 
     upload_pipeline = upload_step.upload_pipeline
     uploaded_vcf = upload_pipeline.uploadedvcf
 
-    vcf = uploaded_vcf.vcf
-    cohort_genotype_collection = vcf.cohort.cohort_genotype_collection
-
-    preprocess_vcf_import_info = get_preprocess_vcf_import_info(upload_pipeline)
-    bulk_inserter = genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info)
     uploaded_vcf.vcf_importer = bulk_inserter.get_vcf_importer_version()
     uploaded_vcf.save()
 
     fast_vcf_reader = cyvcf2.VCF(upload_step.input_filename)
-
     record_id = 1
     v: Any = None
     try:
@@ -251,40 +248,6 @@ def get_preprocess_vcf_import_info(upload_pipeline):
         return ModifiedImportedVariants.objects.get(upload_step=preprocess_vcf_sub_step)
     except:
         return None
-
-
-def read_vcf_file_set_max_variant(upload_step, vcf_processor_klass):
-    """ This can be run in parallel """
-
-    upload_pipeline = upload_step.upload_pipeline
-    uploaded_vcf = upload_pipeline.uploadedvcf
-
-    preprocess_vcf_import_info = get_preprocess_vcf_import_info(upload_pipeline)
-    bulk_inserter = vcf_processor_klass(upload_step, preprocess_vcf_import_info)
-    uploaded_vcf.vcf_importer = bulk_inserter.get_vcf_importer_version()
-    uploaded_vcf.save()
-
-    fast_vcf_reader = cyvcf2.VCF(upload_step.input_filename)
-    record_id = 1
-    v: Any = None
-    try:
-        for v in fast_vcf_reader:
-            bulk_inserter.process_entry(v)
-            record_id += 1
-    except PipelineFailedJobTerminateEarlyException:
-        raise
-    except Exception as e:
-        failed_vcf_line = str(v)
-
-        exc_traceback = sys.exc_info()[2]
-        tb = ''.join(traceback.format_tb(exc_traceback))
-        params = (str(e), upload_step.input_filename, record_id, failed_vcf_line, tb)
-        message = "Exception: '%s'\nVCF file '%s' record: %d\nLine: '%s'\nTraceback:\n%s" % params
-        raise ValueError(message)
-
-    bulk_inserter.finish()
-    update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id())
-    return bulk_inserter.rows_processed
 
 
 def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id):
