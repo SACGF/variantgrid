@@ -14,7 +14,7 @@ from ontology.models import OntologyTerm, OntologyService, OntologySnake
 
 class OntologySnakeJson(TypedDict):
     via: str
-    extra: Dict[Any]
+    extra: Optional[Dict[Any, Any]]
     relation: str
     source: str
 
