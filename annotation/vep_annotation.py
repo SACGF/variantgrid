@@ -91,13 +91,15 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--af",
         "--pubmed",
         "--variant_class",
-        # TODO: put this in config
-        "--pick_order", "biotype,rank,mane,canonical,ccds,length",
         # Plugins that don't require data
         "--plugin", "Grantham",
         "--plugin", "SpliceRegion",
         "--plugin", "LoFtool",
     ]
+
+    if settings.ANNOTATION_VEP_PICK_ORDER:
+        # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
+        cmd.extend(["--pick_order", settings.ANNOTATION_VEP_PICK_ORDER])
 
     # Plugins that require data
     PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter

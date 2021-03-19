@@ -159,6 +159,8 @@ ANNOTATION_VEP_ARGS = []  # ["--buffer_size", "1000"] # default = 5000
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
 ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
+# @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
+ANNOTATION_VEP_PICK_ORDER = None
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 BUILD_GRCH37 = "GRCh37"
