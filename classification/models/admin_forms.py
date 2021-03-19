@@ -496,6 +496,7 @@ class ConditionTextAdmin(ModelAdminBasics):
         condition_text: ConditionText
         for condition_text in queryset:
             ConditionTextMatch.attempt_automatch(condition_text=condition_text)
+            condition_text.save()
 
     auto_match.short_description = "Automatch (leaves existing data)"
 

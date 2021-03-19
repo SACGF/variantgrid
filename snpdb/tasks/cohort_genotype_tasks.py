@@ -126,10 +126,10 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
         Zygosity.HOM_REF: "ref_count",
         Zygosity.HET: "het_count",
         Zygosity.HOM_ALT: "hom_count",
+        Zygosity.UNKNOWN_ZYGOSITY: "unk_count",
     }
 
-    for zygosity in Zygosity.VARIANT:
-        c = ZYGOSITY_COUNT_COLUMNS[zygosity]
+    for zygosity, c in ZYGOSITY_COUNT_COLUMNS.items():
         columns[c] = " + ".join(zygosity_count_lists[zygosity])
 
     for c, (is_array, _) in CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE.items():
@@ -147,7 +147,7 @@ SELECT DISTINCT
 FROM snpdb_variant
 {joins}
 WHERE
-({columns['ref_count']} + {columns['het_count']} + {columns['hom_count']}) > 0
+({columns['ref_count']} + {columns['het_count']} + {columns['hom_count']} + {columns['unk_count']}) > 0
 """
     return insert_sql
 

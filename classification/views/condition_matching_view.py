@@ -65,28 +65,6 @@ def next_condition_text(current: ConditionText, user: User) -> Optional[Conditio
 
 def condition_matching_view(request, pk: int):
     ct: ConditionText = get_object_or_404(ConditionText.objects.filter(pk=pk))
-
-    if request.method == 'POST':
-        ct.check_can_write(request.user)
-        condition_match_pattern = re.compile("condition-match-([0-9]+)")
-        key: str
-        for key, value in request.POST.items():
-            if match := condition_match_pattern.match(key):
-                match_id = int(match[1])
-                # do secondary check to make sure we're only editing one ConditionText at at time
-                ctm: ConditionTextMatch
-                if ctm := ConditionTextMatch.objects.filter(condition_text=ct, pk=match_id).first():
-                    ctm.update_with_condition_matching_str(value)
-                    ctm.save()
-                else:
-                    print(f"Couldn't find ConditionMatchText record {match_id}")
-
-        ct.last_edited_by = request.user
-        update_condition_text_match_counts(ct)
-        ct.save()
-
-        return redirect(reverse('condition_matching', kwargs={"pk": pk}))
-
     ct.check_can_view(request.user)
 
     root_match = get_object_or_404(ConditionTextMatch.objects.filter(condition_text=ct, gene_symbol__isnull=True))
@@ -143,8 +121,6 @@ class ConditionTextMatchingAPI(APIView):
                 "count_outstanding": ct.classifications_count_outstanding
             })
         else:
-            # TODO this didn't seem to work, changing parent term didn't look like it re-calcualted gene nodes
-            # will investigate
             suggestions = condition_matching_suggestions(ct)
             return Response({
                 "suggestions": [cms.as_json() for cms in suggestions],

@@ -437,12 +437,40 @@ $(document).ready(function() {
             <p>
                 <label>Format</label>
                 <span>
-                    {% if vcf.ref_depth_field and vcf.alt_depth_field %}
-                        ref_depth: {{ vcf.ref_depth_field }}, alt_depth: {{ vcf.alt_depth_field }},
-                    {% else %}
-                        allele_depth: {{ vcf.allele_depth_field }},
-                    {% endif %}
-                    read_depth = {{ vcf.read_depth_field }}, genotype_quality = {{ vcf.genotype_quality_field }}, phred_likelihood = {{ vcf.phred_likelihood_field }}
+                    <table>
+                        <tr>
+                            <td>
+                            {% if vcf.ref_depth_field and vcf.alt_depth_field %}
+                                Ref Depth: {{ vcf.ref_depth_field }}, Alt Depth: {{ vcf.alt_depth_field }}
+                            {% else %}
+                                Allele Depth: {{ vcf.allele_depth_field }}
+                            {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Read Depth: {{ vcf.read_depth_field }}</td>
+                        </tr>
+                        <tr>
+                            <td>Allele Frequency:
+                                {%  if vcf.allele_frequency_field %}
+                                    {{ vcf.allele_frequency_field }}
+                                {% else %}
+                                    Calculated as <code>100.0 * AD / (sum of all AD for that locus)</code> after VCF normalization
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Genotype Quality: {{ vcf.genotype_quality_field }}</td>
+                        </tr>
+                        <tr>
+                            <td>Phred Likelihood: {{ vcf.phred_likelihood_field }}</td>
+                        </tr>
+                        {% if vcf.sample_filters_field %}
+                            <tr>
+                                <td>Sample Filters: {{ vcf.sample_filters_field }}</td>
+                            </tr>
+                        {% endif %}
+                    </table>
                 </span>
             </p>
             <p>

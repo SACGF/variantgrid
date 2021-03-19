@@ -79,7 +79,7 @@ class ExportFormatterMVL(ExportFormatter):
         def get_value(ekey: EvidenceKey) -> str:
             return ExportFormatterMVL.mvl_safe(ekey.pretty_value(vcm.get(ekey.key))) or 'None'
 
-        def format_key(ekey: EvidenceKey, override_value = None) -> str:
+        def format_key(ekey: EvidenceKey, override_value=None) -> str:
             nonlocal vcm
 
             label = ekey.pretty_label

@@ -161,9 +161,3 @@ class SuperPopulationCode(models.TextChoices):
     EAS = "E", "East Asian"
     EUR = "U", "European"
     SAS = "S", "South Asian"
-
-
-class AlleleFrequencySource(models.TextChoices):
-    """ How AF is calculated for a VCF file """
-    CALCULATED = 'C', 'calculated'
-    FIELD = 'F', 'field'

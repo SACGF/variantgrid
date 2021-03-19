@@ -207,8 +207,11 @@ class ConditionResolvedTermDict(TypedDict):
 
 
 class ConditionResolvedDict(TypedDict):
-    display_text: str
-    sort_text: str
+    """
+    Structure of data used to cached resolved condition text again a classification
+    """
+    display_text: str  # plain text to show to users if not in a position to render links
+    sort_text: str  # lower case representation of description
     resolved_terms: List[ConditionResolvedTermDict]
     resolved_join: str
 
@@ -2119,6 +2122,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             previous_share_level=old_share_level,
             newly_published=self,
             user=user)
+        vc.refresh_from_db()
         return True
 
     @lazy

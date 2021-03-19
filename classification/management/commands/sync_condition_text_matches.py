@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from classification.models import ConditionText, sync_all_condition_resolutions
+from classification.models import ConditionText, sync_all_condition_resolutions_to_classifications
 from classification.models.condition_text_matching import ConditionTextMatch
 
 
@@ -17,7 +17,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["classifications"]:
             print("Updating classifications")
-            sync_all_condition_resolutions()
+            sync_all_condition_resolutions_to_classifications()
             print("Complete")
             return
 

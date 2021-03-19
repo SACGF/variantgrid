@@ -1,12 +1,11 @@
 import functools
-import operator
 import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from django.db.models import PROTECT, CASCADE, QuerySet, Q, F
+from django.db.models import PROTECT, CASCADE, QuerySet, Q
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel, now
