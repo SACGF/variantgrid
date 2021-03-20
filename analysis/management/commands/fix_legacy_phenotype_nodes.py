@@ -21,6 +21,11 @@ class Command(BaseCommand):
         if not hpo.exists():
             raise ValueError("No HPO ontology terms exist. Run 'ontology_import' first")
 
+        # Some OMIM terms became obsolete / moved etc.
+        OMIM_CHANGES = {
+             614087: [227650, 609644]
+        }
+
         migrations_dir = Path(settings.BASE_DIR) / "data/migrations"
         omim_csv = migrations_dir / "omim_legacy.csv"
         if omim_csv.exists():
@@ -28,8 +33,16 @@ class Command(BaseCommand):
             for _, row in df.iterrows():
                 node_id = row["phenotype_node"]
                 omim_id = row["mim_morbid_alias__mim_morbid"]
-                term = f"OMIM:{omim_id}"
-                PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node_id=node_id, ontology_term_id=term)
+                omim_ids = []
+                if modified_omim := OMIM_CHANGES.get(omim_id):
+                    print(f"{omim_id} => {modified_omim}")
+                    omim_ids = modified_omim
+                else:
+                    omim_ids = [omim_id]
+
+                for omim_id in omim_ids:
+                    term = f"OMIM:{omim_id}"
+                    PhenotypeNodeOntologyTerm.objects.get_or_create(phenotype_node_id=node_id, ontology_term_id=term)
         else:
             print(f"{omim_csv} not found")
 
