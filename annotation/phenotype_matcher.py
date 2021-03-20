@@ -411,40 +411,40 @@ class PhenotypeMatcher:
 
         HARDCODED_LOOKUPS = {
             'aHUS': HUS,
-             "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
-             # AML fix until we get new HPO data - see https://github.com/obophenotype/human-phenotype-ontology/issues/4236
-             "AML": (load_hpo_by_name, "Acute myeloid leukemia"),
-             "ADPCKD": (load_omim_by_id, 600273),  # Autosomal dominant polycystic kidney disease
-             "AVSD": (load_hpo_by_name, "Atrioventricular canal defect"),  # aka Atrioventricular septal defect
-             "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
-             "BrCa": (load_omim_by_id, 114480),  # BREAST CANCER
-             "CHD": (load_hpo_by_name, "Abnormal heart morphology"),
-             "CMS": CMS,
-             "DD":  DEVELOPMENTAL_DELAY,
-             "FAOD": FATTY_ACID_DISORDER,  # Fatty Acid Oxidation Disorders
-             "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
-             "FTT": (load_hpo_by_name, "Failure to thrive"),
-             "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
-             "GEFS": GEFS,
-             "GEFS+": GEFS,
-             "GSD": GLYCOGEN_STORAGE_DISEASE,
-             "GTOP": (load_hpo_by_name, "Spontaneous abortion"),  # Genetic Termination of Pregnancy
-             "HCM": (load_hpo_by_name, "Concentric hypertrophic cardiomyopathy"),
-             "HL": (load_hpo_by_name, "Hodgkin lymphoma"),
-             'HUS': HUS,
-             "IBD": (load_omim_by_id, 266600),  # IBD1
-             "ID": (load_hpo_by_name, 'intellectual disability'),
-             "LGA": (load_hpo_by_name, "Large for gestational age"),
-             "LQTS": (load_hpo_by_id, 31547),  # Long QT syndrome
-             "MM": (load_hpo_by_name, 'Multiple myeloma'),
-             "NCS": (load_hpo_by_id, 12668),  # "Neurocardiogenic syncope" aka Vasovagal syncope
-             "PCKD": (load_hpo_by_name, "Polycystic kidney dysplasia"),
-             "PV": (load_omim_by_id, 263300),  # POLYCYTHEMIA VERA; PV
-             "SCID": (load_hpo_by_name, "Severe combined immunodeficiency"),
-             'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
-             "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
-             "SUDEP": (load_hpo_list_by_names, ["Sudden death", "Epilepsy"]),
-             "VSD": (load_hpo_by_name, "Ventricular septal defect"),
+            "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
+            # AML fix until we get new HPO data - see https://github.com/obophenotype/human-phenotype-ontology/issues/4236
+            "AML": (load_hpo_by_name, "Acute myeloid leukemia"),
+            "ADPCKD": (load_omim_by_id, 600273),  # Autosomal dominant polycystic kidney disease
+            "AVSD": (load_hpo_by_name, "Atrioventricular canal defect"),  # aka Atrioventricular septal defect
+            "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
+            "BrCa": (load_omim_by_id, 114480),  # BREAST CANCER
+            "CHD": (load_hpo_by_name, "Abnormal heart morphology"),
+            "CMS": CMS,
+            "DD":  DEVELOPMENTAL_DELAY,
+            "FAOD": FATTY_ACID_DISORDER,  # Fatty Acid Oxidation Disorders
+            "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
+            "FTT": (load_hpo_by_name, "Failure to thrive"),
+            "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
+            "GEFS": GEFS,
+            "GEFS+": GEFS,
+            "GSD": GLYCOGEN_STORAGE_DISEASE,
+            "GTOP": (load_hpo_by_name, "Spontaneous abortion"),  # Genetic Termination of Pregnancy
+            "HCM": (load_hpo_by_name, "Concentric hypertrophic cardiomyopathy"),
+            "HL": (load_hpo_by_name, "Hodgkin lymphoma"),
+            'HUS': HUS,
+            "IBD": (load_omim_by_id, 266600),  # IBD1
+            "ID": (load_hpo_by_name, 'intellectual disability'),
+            "LGA": (load_hpo_by_name, "Large for gestational age"),
+            "LQTS": (load_hpo_by_id, 31547),  # Long QT syndrome
+            "MM": (load_hpo_by_name, 'Multiple myeloma'),
+            "NCS": (load_hpo_by_id, 12668),  # "Neurocardiogenic syncope" aka Vasovagal syncope
+            "PCKD": (load_hpo_by_name, "Polycystic kidney dysplasia"),
+            "PV": (load_omim_by_id, 263300),  # POLYCYTHEMIA VERA; PV
+            "SCID": (load_hpo_by_name, "Severe combined immunodeficiency"),
+            'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
+            "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
+            "SUDEP": (load_hpo_list_by_names, ["Sudden death", "Epilepsy"]),
+            "VSD": (load_hpo_by_name, "Ventricular septal defect"),
         }
 
         CASE_INSENSITIVE_LOOKUPS = {
