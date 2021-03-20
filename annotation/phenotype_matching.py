@@ -326,7 +326,7 @@ def create_phenotype_description(text, phenotype_matcher=None):
             try:
                 process_text_phenotype(sentence.text_phenotype, phenotype_matcher)
             except Exception:
-                logging.error("Problem processing phenotype for %s", sentence.text_phenotype.text)
+                logging.error("Problem processing phenotype for '%s'", sentence.text_phenotype.text)
                 raise
             known_sentences.append(sentence)
 
