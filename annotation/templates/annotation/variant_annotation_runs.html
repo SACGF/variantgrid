@@ -105,6 +105,15 @@ width: 100% !important;
                             {% endfor %}
                         </table>
                     </div>
+                    <form method="post" id='vcf-form'>
+                        {% csrf_token %}
+                        {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' %}
+                            <button name="set-non-finished-to-error-{{ build_name }}" class="btn btn-danger">Set non-finished runs to Error</button>
+                        {% endif %}
+                        {% if genome_build_summary|get_item:build_name|get_item:'Error' %}
+                            <button name="retry-annotation-runs-{{ build_name }}" class="btn btn-danger">Retry all failed runs</button>
+                        {% endif  %}
+                    </form>
                     <a data-toggle="collapse" href="#grid-collapse-{{ build_name }}">grid</a>
                     <div class="collapse" id="grid-collapse-{{ build_name }}">
                         {% jqgrid 'annotation_run_grid' build_name template_name='annotation/grids/annotation_run_grid.html' search=False genome_build_name=build_name %}

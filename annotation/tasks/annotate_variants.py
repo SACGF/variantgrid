@@ -140,6 +140,10 @@ def dump_and_annotate_variants(annotation_run):
 
 
 def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> AnnotationRun:
+    if annotation_run.status != AnnotationStatus.ERROR:
+        msg = f"Cannot re-try {annotation_run} as has non-error status {annotation_run.get_status_display()}"
+        raise ValueError(msg)
+
     if upload_only and annotation_run.vcf_annotated_filename is None:
         msg = "Retry annotation run upload only requires annotation VCF to be written"
         raise ValueError(msg)
