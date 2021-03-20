@@ -29,9 +29,9 @@ class Command(BaseCommand):
         for klass in [VariantAnnotation, VariantTranscriptAnnotation]:
             missing_qs = klass.objects.filter(Q(transcript__isnull=True) | Q(transcript_version__isnull=True),
                                               version=vav, hgvs_c__isnull=False)
-            split_func = Func(F("hgvs_c"), Value(":"), Value(1))
+            split_func = Func(F("hgvs_c"), Value(":"), Value(1), function="split_part")
             records = []
-            for pk, feature in missing_qs.annotate(feature=split_func, function="split_part").values_list("pk", "feature"):
+            for pk, feature in missing_qs.annotate(feature=split_func).values_list("pk", "feature"):
                 t_id, version = TranscriptVersion.get_transcript_id_and_version(feature)
                 transcript_versions = transcript_versions_by_id.get(t_id)
                 if transcript_versions:
