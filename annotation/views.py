@@ -315,6 +315,7 @@ def view_version_diff(request, version_diff_id):
     return render(request, "annotation/view_version_diff.html", context)
 
 
+@require_superuser
 def variant_annotation_runs(request):
     as_display = dict(AnnotationStatus.choices)
 
