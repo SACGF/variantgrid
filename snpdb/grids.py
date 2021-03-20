@@ -19,7 +19,7 @@ from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_
 class VCFListGrid(JqGridUserRowConfig):
     model = VCF
     caption = 'VCFs'
-    fields = ["id", "name", "date", "import_status", "genome_build", "user__username", "source",
+    fields = ["id", "name", "date", "import_status", "genome_build__name", "user__username", "source",
               "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
@@ -62,7 +62,7 @@ class SamplesListGrid(JqGridUserRowConfig):
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
               "patient__first_name", "patient__last_name", "patient__sex", "patient__date_of_birth", "patient__date_of_death",
-              "specimen__reference_id", "specimen__tissue", "specimen__collection_date"]
+              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,
