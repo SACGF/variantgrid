@@ -23,7 +23,7 @@ class Command(BaseCommand):
 
         # Some OMIM terms became obsolete / moved etc.
         OMIM_CHANGES = {
-             614087: [227650, 609644]
+             "614087": [227650, 609644]
         }
 
         migrations_dir = Path(settings.BASE_DIR) / "data/migrations"
