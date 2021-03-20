@@ -7,7 +7,7 @@ import os
 
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models import AnnotationStatus, GenomeBuild
-from annotation.models.models import AnnotationRun
+from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals import annotation_run_complete_signal
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command
@@ -61,6 +61,10 @@ def annotate_variants(annotation_run_id):
     try:
         # Reload to get updated task_id
         annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+        if annotation_run.variant_annotation_version.gene_annotation_release is None:
+            # We need this so that transcript/versions are in DB so FKs link
+            msg = f"{annotation_run.variant_annotation_version} missing GeneAnnotationRelease"
+            raise InvalidAnnotationVersionError(msg)
         annotation_run.task_id = annotate_variants.request.id
         annotation_run.set_task_log("start", timezone.now())
         annotation_run.save()

@@ -1,5 +1,7 @@
 import operator
 from collections import defaultdict
+from typing import Tuple, Optional
+
 from django.conf import settings
 from lazy import lazy
 import logging
@@ -303,39 +305,24 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning(f"Could not find gene_id: '{vep_gene}'")
         return gene_id
 
-    def get_transcript_id(self, vep_transcript_data):
+    def get_transcript_and_version_ids(self, vep_transcript_data) -> Tuple[Optional[str], Optional[str]]:
         transcript_id = None
+        transcript_version_id = None
         vep_feature_type = vep_transcript_data[VEPColumns.FEATURE_TYPE]
         if vep_feature_type == "Transcript":
-            vep_feature = vep_transcript_data[VEPColumns.FEATURE]
-            if vep_feature:
-                feature_no_version, _version = TranscriptVersion.get_transcript_id_and_version(vep_feature)
-                if feature_no_version in self.transcript_versions_by_id:
-                    transcript_id = feature_no_version
+            accession = vep_transcript_data[VEPColumns.FEATURE]
+            if accession:
+                # We pass in --transcript_version so Ensembl IDs will have version
+                t_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
+                transcript_versions = self.transcript_versions_by_id.get(t_id)
+                if transcript_versions:
+                    transcript_id = t_id  # Know it's valid to link
+                    transcript_version_id = transcript_versions.get(version)
+                    if transcript_version_id is None:
+                        logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
                 else:
-                    msg = f"Could not find transcript_id from '{vep_feature}'"
-                    if feature_no_version != vep_feature:
-                        msg += f" (version removed: '{feature_no_version}')"
-                    logging.warning(msg)
-        return transcript_id
-
-    def get_transcript_version_id(self, vep_transcript_data):
-        """ Use c.HGVS as Feature doesn't contain the version """
-        # TODO: VEP added --transcript_version option - could enable that and remove this
-        transcript_version_id = None
-        hgvs_c = vep_transcript_data[VEPColumns.HGVS_C]
-        if hgvs_c:
-            accession = hgvs_c.split(":")[0]
-            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
-            transcript_versions = self.transcript_versions_by_id.get(transcript_id)
-            if transcript_versions is None:
-                logging.warning(f"Could not find transcript: '{transcript_id}'")
-            else:
-                transcript_version_id = transcript_versions.get(version)
-                if transcript_version_id is None:
-                    logging.warning(f"Could not find transcript version: '{accession}'")
-
-        return transcript_version_id
+                    logging.warning(f"Could not find transcript: '{t_id}'")
+        return transcript_id, transcript_version_id
 
     def get_uniprot_id(self, data):
         """ Out of 2M records, only 0.12% contain multiple (ie P0CG04&B9A064) - just take 1st """
@@ -409,8 +396,9 @@ class BulkVEPVCFAnnotationInserter:
                 transcript_data.update(self.constant_data)
                 transcript_data["variant_id"] = variant_id
                 transcript_data["gene_id"] = gene_id
-                transcript_data["transcript_id"] = self.get_transcript_id(vep_transcript_data)
-                transcript_data["transcript_version_id"] = self.get_transcript_version_id(vep_transcript_data)
+                transcript_id, transcript_version_id = self.get_transcript_and_version_ids(vep_transcript_data)
+                transcript_data["transcript_id"] = transcript_id
+                transcript_data["transcript_version_id"] = transcript_version_id
                 if symbol := transcript_data.get("symbol"):
                     overlapping_symbols.add(symbol)
                 if gene_id:

@@ -82,12 +82,13 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--uniprot",
         "--hgvs",
         "--symbol",
-        "--numbers",
+        "--numbers",  # EXON/INTRON numbers
         "--domains",
         # "--regulatory", # don't know how to deal with ENSM00525026610
         "--canonical",
         "--protein",
         "--biotype",
+        "--transcript_version",  # Makes Ensembl Transcript IDs in Feature have version (RefSeq ones already do)
         "--af",
         "--pubmed",
         "--variant_class",
