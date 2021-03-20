@@ -19,6 +19,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_annotation_link_transcript"]),
+        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_annotation_link_transcripts"]),
                         test=_test_has_missing_transcript_versions)
     ]

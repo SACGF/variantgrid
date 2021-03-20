@@ -20,6 +20,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def fix_variant_annotation_version(vav: VariantAnnotationVersion):
+        print(f"Looking for missing transcripts in {vav}")
         t_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=vav.annotation_consortium,
                                                 genome_build=vav.genome_build)
         transcript_versions_by_id = defaultdict(dict)
@@ -30,6 +31,7 @@ class Command(BaseCommand):
             missing_qs = klass.objects.filter(Q(transcript__isnull=True) | Q(transcript_version__isnull=True),
                                               version=vav, hgvs_c__isnull=False)
             split_func = Func(F("hgvs_c"), Value(":"), Value(1), function="split_part")
+            num_fixed = 0
             records = []
             for pk, feature in missing_qs.annotate(feature=split_func).values_list("pk", "feature"):
                 t_id, version = TranscriptVersion.get_transcript_id_and_version(feature)
@@ -41,6 +43,15 @@ class Command(BaseCommand):
                         logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
                     records.append(klass(pk=pk, transcript_id=transcript_id, transcript_version_id=transcript_version_id))
 
-            print(f"Updating {len(records)} {klass} records")
-            if records:
+                    # Need to break up into smaller runs as the big job (even with batch_size) was killed
+                    num_records = len(records)
+                    if num_records >= 2000:
+                        num_fixed += num_records
+                        klass.objects.bulk_update(records, fields=["transcript_id", "transcript_version_id"])
+                        records = []
+
+            if records:  # Any remaining
+                num_fixed += len(records)
                 klass.objects.bulk_update(records, fields=["transcript_id", "transcript_version_id"], batch_size=2000)
+
+            print(f"Fixed {num_fixed} {klass} records")
