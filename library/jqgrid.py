@@ -322,7 +322,7 @@ class JqGrid:
                     for f, formatter in field_formatters.items():
                         try:
                             row[f] = formatter(row, f)
-                        except ValueError:
+                        except (KeyError, ValueError):
                             pass  # field may not be in columns returned...
                     yield row
 

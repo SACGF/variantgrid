@@ -21,9 +21,9 @@ from ontology.grids import AbstractOntologyGenesGrid
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
-from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts
+from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings
+from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings, VCFFilter
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 
@@ -204,7 +204,7 @@ class VariantGrid(JqGridSQL):
 
         cohorts, visibility = node.get_cohorts_and_sample_visibility()
         if cohorts:
-            sample_columns, sample_overrides = VariantGrid._get_grid_genotype_columns_and_overrides(cohorts, visibility)
+            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(cohorts, visibility)
             if sample_columns_position:
                 fields = fields[:sample_columns_position] + sample_columns + fields[sample_columns_position:]
             else:
@@ -213,7 +213,7 @@ class VariantGrid(JqGridSQL):
         return fields, overrides
 
     @staticmethod
-    def _get_packed_data_formatter(packed_data_replace: Dict, column, i):
+    def get_packed_data_formatter(packed_data_replace: Dict, column, i):
         """ A function to capture loop variable """
 
         def packed_data_formatter(row, _field):
@@ -224,7 +224,8 @@ class VariantGrid(JqGridSQL):
         return packed_data_formatter
 
     @staticmethod
-    def _get_grid_genotype_columns_and_overrides(cohorts, visibility):
+    def get_grid_genotype_columns_and_overrides(cohorts, visibility):
+        available_format_columns = get_available_format_columns(cohorts)
         sample_columns = {
             'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55),
             'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25),
@@ -232,6 +233,7 @@ class VariantGrid(JqGridSQL):
             'samples_read_depth': ('DP', '%(label)s %(sample)s', 25),
             'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
+            'samples_filters': ('FT', '%(label)s %(sample)s', 100),
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -254,9 +256,22 @@ class VariantGrid(JqGridSQL):
         column_data = []
         for sample, (cohort, cc_index) in sample_cohort_cat_cohorts_index.items():
             for column, (column_label, label_format, width) in sample_columns.items():
+                if not available_format_columns[column]:
+                    continue
                 column_names.append(f"{sample.pk}_{column}")
                 label = label_format % {"sample": sample.name, "label": column_label}
-                server_side_formatter = VariantGrid._get_packed_data_formatter(packed_data_replace, column, cc_index)
+                server_side_formatter = VariantGrid.get_packed_data_formatter(packed_data_replace, column, cc_index)
+                if column == "samples_filters":
+                    packed_data_formatter = server_side_formatter  # capture for func below
+
+                    def sample_filters_formatter(row, field):
+                        """ Need to unpack then switch filters """
+                        filter_formatter = VCFFilter.get_formatter(sample.vcf)
+                        val = packed_data_formatter(row, field)
+                        row[field] = val
+                        return filter_formatter(row, field)
+
+                    server_side_formatter = sample_filters_formatter
 
                 col_data_dict = {
                     "label": label,

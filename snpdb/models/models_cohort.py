@@ -415,6 +415,7 @@ class CohortGenotype(models.Model):
         "samples_read_depth": (True, -1),
         "samples_genotype_quality": (True, -1),
         "samples_phred_likelihood": (True, -1),
+        "samples_filters": (True, "''"),
     }
 
     collection = models.ForeignKey(CohortGenotypeCollection, on_delete=CASCADE)

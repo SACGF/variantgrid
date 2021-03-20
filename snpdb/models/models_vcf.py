@@ -199,6 +199,22 @@ class VCFFilter(models.Model):
     filter_id = models.TextField()
     description = models.TextField(null=True)
 
+    @staticmethod
+    def get_formatter(vcf: VCF):
+        lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+
+        def filter_string_formatter(row, field):
+            if filter_string := row[field]:
+                formatted_filters = []
+                for f in filter_string:
+                    formatted_filters.append(lookup[f])
+                formatted_filters = ','.join(formatted_filters)
+            else:
+                formatted_filters = "PASS"
+            return formatted_filters
+
+        return filter_string_formatter
+
 
 class VCFTag(models.Model):
     tag = models.ForeignKey(Tag, on_delete=CASCADE)

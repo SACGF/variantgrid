@@ -8,6 +8,7 @@ from django.db.models import Q
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from patients.models_enums import Zygosity
+from snpdb.models import VCFFilter
 
 
 class CohortMixin:
@@ -124,23 +125,6 @@ class CohortMixin:
             q_and.append(GroupOperation.reduce(filters, naff.group_operation))
         return q_and
 
-    def get_vcf_locus_filter_formatter(self):
-        """ This only gets called if has_filters is True """
-        vcf = self._get_vcf()
-        lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
-
-        def filter_string_formatter(row, field):
-            if filter_string := row[field]:
-                formatted_filters = []
-                for f in filter_string:
-                    formatted_filters.append(lookup[f])
-                formatted_filters = ','.join(formatted_filters)
-            else:
-                formatted_filters = "PASS"
-            return formatted_filters
-
-        return filter_string_formatter
-
     def get_vcf_locus_filters_q(self):
         q = self.q_all()
         if self.has_filters:
@@ -207,7 +191,8 @@ class CohortMixin:
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
         if self.has_filters:
-            server_side_formatter = self.get_vcf_locus_filter_formatter()
+            vcf = self._get_vcf()
+            server_side_formatter = VCFFilter.get_formatter(vcf)
             cgc = self.cohort_genotype_collection
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
             extra_colmodel_overrides[filters_column] = {
