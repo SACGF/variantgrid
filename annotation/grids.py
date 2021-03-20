@@ -14,8 +14,8 @@ class AnnotationRunGrid(JqGridUserRowConfig):
     fields = [
         'id', 'status',
         'annotation_range_lock__version__genome_build__name',
-        'annotation_range_lock__version', 'annotation_range_lock__count', 'vep_skipped_count',
-        'annotation_range_lock__min_variant', 'annotation_range_lock__max_variant',
+        'annotation_range_lock__version__id', 'annotation_range_lock__count', 'vep_skipped_count',
+        'annotation_range_lock__min_variant__id', 'annotation_range_lock__max_variant__id',
         'task_id', 'created', 'dump_start', 'dump_end',
         'annotation_start', 'annotation_end', 'upload_start', 'upload_end',
         'error_exception', 'vcf_dump_filename', 'vcf_annotated_filename'
@@ -23,10 +23,10 @@ class AnnotationRunGrid(JqGridUserRowConfig):
     colmodel_overrides = {
         'id': {'width': 20, 'formatter': 'viewAnnotationRunLink'},
         'annotation_range_lock__version__genome_build__name': {'label': 'Build'},
-        'annotation_range_lock__version': {'label': 'Version'},
+        'annotation_range_lock__version__id': {'label': 'Version'},
         'annotation_range_lock__count': {'label': 'Variant Count'},
-        'annotation_range_lock__min_variant': {'label': 'Min Variant'},
-        'annotation_range_lock__max_variant': {'label': 'Max Variant'}
+        'annotation_range_lock__min_variant__id': {'label': 'Min Variant'},
+        'annotation_range_lock__max_variant__id': {'label': 'Max Variant'}
     }
 
     def __init__(self, user, genome_build_name):
@@ -44,7 +44,7 @@ class VariantAnnotationVersionGrid(JqGridUserRowConfig):
     model = VariantAnnotationVersion
     caption = 'VariantAnnotationVersion'
     fields = [
-        'id', "vep", "annotation_consortium", 'created', 'last_checked_date', 'gene_annotation_release',
+        'id', "vep", "annotation_consortium", 'created', 'last_checked_date', 'gene_annotation_release__id',
         "ensembl", "ensembl_funcgen", "ensembl_variation", "ensembl_io",
         "thousand_genomes", "cosmic", "hgmd", "assembly", "dbsnp",
         "gencode", "genebuild", "gnomad", "refseq", "regbuild", "sift", "dbnsfp"
