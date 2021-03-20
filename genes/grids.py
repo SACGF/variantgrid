@@ -241,9 +241,9 @@ class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
 class CanonicalTranscriptGrid(JqGridUserRowConfig):
     model = CanonicalTranscript
     caption = 'CanonicalTranscripts'
-    fields = ["gene_symbol", "transcript", "original_gene_symbol", "original_transcript_id"]
-    colmodel_overrides = {'gene_symbol': {'label': "Matched Symbol"},
-                          'transcript': {'label': "Matched Transcript"}}
+    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript_id"]
+    colmodel_overrides = {'gene_symbol__symbol': {'label': "Matched Symbol"},
+                          'transcript__identifier': {'label': "Matched Transcript"}}
 
     def __init__(self, user, pk):
         super().__init__(user)
@@ -257,11 +257,11 @@ class CanonicalTranscriptGrid(JqGridUserRowConfig):
 class QCGeneCoverageGrid(JqGridUserRowConfig):
     model = GeneCoverageCanonicalTranscript
     caption = 'QC'
-    fields = ["gene_symbol", "transcript", "original_gene_symbol", "original_transcript_id", "min", "mean", "std_dev",
+    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript_id", "min", "mean", "std_dev",
               "percent_0x", "percent_10x", "percent_20x", "sensitivity"]
     number_format = {'formatter': 'number', 'width': 80}
-    colmodel_overrides = {'gene_symbol': {"width": 110},
-                          'transcript': {"width": 110},
+    colmodel_overrides = {'gene_symbol__symbol': {"width": 110},
+                          'transcript__identifier': {"width": 110},
                           "original_gene_symbol": {'label': 'original symbol'},
                           "original_transcript_id": {'label': 'original transcript_id'},
                           'min': {'width': 40},
