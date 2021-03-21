@@ -29,7 +29,8 @@ def get_seqauto_scripts(only_process_file_types):
     for file_type, script_name in SEQAUTO_SCRIPTS:
         if only_process_file_types and file_type not in only_process_file_types:
             continue
-        seqauto_scripts.append((file_type, script_name))
+        if script_name:
+            seqauto_scripts.append((file_type, script_name))
 
     return seqauto_scripts
 

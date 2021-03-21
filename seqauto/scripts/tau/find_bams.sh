@@ -1,4 +1,4 @@
 #!/bin/sh
 
-find /tau/data/clinical/aligned -name "*.bam"
+find /tau/data/clinical_hg38 -name "*.bam"
 

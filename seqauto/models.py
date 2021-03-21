@@ -23,6 +23,7 @@ from library.log_utils import get_traceback, log_traceback
 from library.utils import sorted_nicely
 from patients.models import FakeData
 from seqauto.illumina import illuminate_report, illumina_sequencers
+from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models_enums import DataGeneration, SequencerRead, PairedEnd, \
     DataState, SequencingFileType, JobScriptStatus, SeqAutoRunStatus, EnrichmentKitType
 from seqauto.qc.exec_summary import load_exec_summary
@@ -368,8 +369,17 @@ class SequencingRun(models.Model):
         """ This allows chaining down names etc - in case a level changes it, will cascade down """
         params = {"sequencing_run": self.name,
                   "sequencing_run_dir": self.path}
+
+        # TAU rename the sequencing run dir with enrichment kit at the end - need to clean it
+        original_sequencing_run = self.name
+        if m := re.match(SEQUENCING_RUN_REGEX, self.name):
+            original_sequencing_run = m.group(0)
+        params["original_sequencing_run"] = original_sequencing_run
         if self.enrichment_kit:
             params["enrichment_kit"] = self.enrichment_kit.name
+
+        if self.experiment:
+            params["experiment"] = self.experiment.name
         return params
 
     def get_enrichment_kit_name(self):

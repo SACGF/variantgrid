@@ -1,3 +1,3 @@
 #!/bin/sh
 
-find /tau/data/clinical/qc -name "*.txt"
+find /tau/data/clinical_hg38 -name "*.txt"

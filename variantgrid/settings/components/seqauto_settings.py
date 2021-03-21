@@ -21,7 +21,7 @@ SEQAUTO_FASTQ_SCRIPT = 'find_fastqs.sh'
 SEQAUTO_FASTQC_SCRIPT = 'find_fastqc.sh'
 SEQAUTO_ILLUMINATE_QC = 'find_illuminate_qc.sh'
 SEQAUTO_BAM_SCRIPT = 'find_bams.sh'
-SEQAUTO_FLAGSTATS_SCRIPT = 'find_flagstats.sh'
+SEQAUTO_FLAGSTATS_SCRIPT = None  # Don't do this anymore 'find_flagstats.sh'
 SEQAUTO_VCF_SCRIPT = 'find_vcfs.sh'
 SEQAUTO_QC_SCRIPT = 'find_qc.sh'
 
