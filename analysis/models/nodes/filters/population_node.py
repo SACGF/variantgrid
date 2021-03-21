@@ -74,7 +74,7 @@ class PopulationNode(AnalysisNode):
             vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
 
             if self.internal_percent != self.EVERYTHING:
-                num_samples = Sample.objects.count()
+                num_samples = Sample.objects.filter(vcf__genome_build=self.analysis.genome_build).count()
                 max_samples_from_percent = int(num_samples * (self.internal_percent / 100))
                 # Min of 1 - so don't filter out self if only copy!
                 max_samples_from_percent = max(max_samples_from_percent, 1)
