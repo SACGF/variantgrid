@@ -874,7 +874,7 @@ class BamFile(SeqAutoFile, SequencingSamplePropertiesMixin):
     @staticmethod
     def get_path_from_unaligned_reads(unaligned_reads):
         params = unaligned_reads.get_params()
-        pattern = os.path.join(settings.SEQAUTO_ALIGNED_DIR_PATTERN, settings.SEQAUTO_BAM_PATTERN)
+        pattern = os.path.join(settings.SEQAUTO_BAM_DIR_PATTERN, settings.SEQAUTO_BAM_PATTERN)
         try:
             filename = pattern % params
         except KeyError as ke:
