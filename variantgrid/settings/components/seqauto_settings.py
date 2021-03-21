@@ -33,6 +33,7 @@ SEQAUTO_CONTROL_SAMPLE_REGEX = None
 SEQAUTO_ALIGNED_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "aligned")
 SEQAUTO_QC_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "qc")
 SEQAUTO_SCRATCH_BASE_DIR = "/tmp"
+SEQAUTO_GOLD_BASE_DIR = None
 
 SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s")
 SEQAUTO_VCF_DIR_PATTERN = SEQAUTO_ALIGNED_DIR_PATTERN
