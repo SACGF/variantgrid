@@ -31,13 +31,13 @@ SEQAUTO_SKIP_INDIVIDUAL_FLOWCELL_FILE = ".variantgrid_skip_flowcell"
 
 SEQAUTO_CONTROL_SAMPLE_REGEX = None
 SEQAUTO_ALIGNED_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "aligned")
-SEQAUTO_QC_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "qc")
+_SEQAUTO_QC_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "qc")
 SEQAUTO_SCRATCH_BASE_DIR = "/tmp"
 SEQAUTO_GOLD_BASE_DIR = None
 
 SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s")
 SEQAUTO_VCF_DIR_PATTERN = SEQAUTO_ALIGNED_DIR_PATTERN
-SEQAUTO_QC_DIR_PATTERN = os.path.join(SEQAUTO_QC_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s_QC")
+SEQAUTO_QC_DIR_PATTERN = os.path.join(_SEQAUTO_QC_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s_QC")
 
 SEQAUTO_MISEQ_ALIGNED_PATTERN = "%(sample_name_underscores)s_S%(sample_number)s"
 SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
