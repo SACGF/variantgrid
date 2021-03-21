@@ -30,26 +30,26 @@ SEQAUTO_SKIP_FLOWCELLS_PATTERNS = []
 SEQAUTO_SKIP_INDIVIDUAL_FLOWCELL_FILE = ".variantgrid_skip_flowcell"
 
 SEQAUTO_CONTROL_SAMPLE_REGEX = None
-SEQAUTO_ALIGNED_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "aligned")
-_SEQAUTO_QC_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "qc")
+SEQAUTO_ALIGNED_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "clinical_hg38")
 SEQAUTO_SCRATCH_BASE_DIR = "/tmp"
 SEQAUTO_GOLD_BASE_DIR = None
 
-SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s")
-SEQAUTO_BAM_DIR_PATTERN = SEQAUTO_ALIGNED_DIR_PATTERN
-SEQAUTO_VCF_DIR_PATTERN = SEQAUTO_ALIGNED_DIR_PATTERN
-SEQAUTO_QC_DIR_PATTERN = os.path.join(_SEQAUTO_QC_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s_QC")
+SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(lab_run_id)s_%(original_sequencing_run)s")
+SEQAUTO_BAM_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "1_BAM")
+SEQAUTO_VCF_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "2_variants")
+SEQAUTO_QC_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "4_QC")
 
 SEQAUTO_MISEQ_ALIGNED_PATTERN = "%(sample_name_underscores)s_S%(sample_number)s"
 SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
 
-SEQAUTO_BAM_PATTERN = "%(aligned_pattern)s_recal_reads.bam"
-SEQAUTO_VCF_PATTERN = "%(aligned_pattern)s.vcf"
-SEQAUTO_COMBINED_VCF_PATTERN = "combined.vcf.gz"
-SEQAUTO_QC_EXEC_SUMMARY_PATTERN = "%(aligned_pattern)s_exec_sum.txt"
-SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN = "bulky_files/%(aligned_pattern)s_summary.txt"
-SEQAUTO_QC_GENE_LIST_PATTERN = "%(sequencing_run)s_%(aligned_pattern)s_QC.txt"
-SEQAUTO_QC_GENE_COVERAGE_PATTERN = "bulky_files/%(aligned_pattern)s_genes.txt"
+SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
+SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.hg38.vcf.gz"
+SEQAUTO_COMBINED_VCF_PATTERN = "%(lab_run_id)s_%(original_sequencing_run)s.gatk.hg38.vcf.gz"
+
+SEQAUTO_QC_EXEC_SUMMARY_PATTERN = "exec_stats/%(sample_name)s_qc_summary.txt"
+SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN = "exec_stats/%(sample_name)s_stats.txt"
+SEQAUTO_QC_GENE_LIST_PATTERN = "exec_stats/%(sample_name)s_QC.txt"
+SEQAUTO_QC_GENE_COVERAGE_PATTERN = "bam_stats/samples/%(sample_name)s.per_gene_coverage.tsv.gz"
 
 SEQAUTO_JOB_SCRIPTS_BASE_DIR = os.path.join(MEDIA_ROOT, "job_scripts")
 SEQAUTO_JOB_SCRIPTS_OUT_DIR = os.path.join(SEQAUTO_JOB_SCRIPTS_BASE_DIR, "out")

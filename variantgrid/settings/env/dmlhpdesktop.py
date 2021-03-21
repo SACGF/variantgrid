@@ -16,7 +16,6 @@ if USE_DJANGO_DEBUG_TOOLBAR:
         '127.0.0.1',
     ]
 
-SEQAUTO_ENABLED = True
 #SEQAUTO_LOAD_GENE_COVERAGE=False
 
 SEQAUTO_CONTROL_SAMPLE_REGEX = NO_DNA_CONTROL_REGEX
@@ -102,7 +101,7 @@ if _SHARIANT_MODE:
                                "classification_import_tool": True})
 
 elif _SAPATHOLOGY_MODE:
-
+    SEQAUTO_ENABLED = True
     SAPATH_APP = 'sapath.apps.SapathConfig'
     INSTALLED_APPS += [SAPATH_APP]
 

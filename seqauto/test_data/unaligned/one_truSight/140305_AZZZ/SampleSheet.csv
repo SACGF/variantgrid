@@ -1,5 +1,0 @@
-FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject,ProjectType,Group,Bioinformatician,E-mail,Adapter,Priming,Notes,conc pM,SAPOrderNumber
-14305_AZZZ,3,Sample_33,hg19,GCCAAT,Foo,N,,XX,SampleProject,WES,tau,,foo@bar.com,KAPA,,,16,MEX00180317154907
-14305_AZZZ,3,Sample_42,hg19,CAGATC,Foo,N,,XX,SampleProject,WES,tau,,foo@bar.com,KAPA,,,16,MEX00180317153812
-14305_AZZZ,3,10_NDC,hg19,CGGTAC,Blah,Y,,XX,SampleProject,WES,tau,,foo@bar.com,KAPA,,,16,MEX00180317153327
-#_IEMVERSION_3_TruSeq LT,#_IEMVERSION_3_TruSeq LT,,,,,,,,,,,,,,,,,

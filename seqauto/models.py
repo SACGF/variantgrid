@@ -444,7 +444,11 @@ class SequencingRun(models.Model):
 
     @property
     def is_data_out_of_date_from_current_sample_sheet(self):
-        current_sample_sheet = self.get_current_sample_sheet()
+        try:
+            current_sample_sheet = self.get_current_sample_sheet()
+        except SequencingRunCurrentSampleSheet.DoesNotExist:
+            return False
+
         try:
             combo = current_sample_sheet.samplesheetcombinedvcffile_set.get()
             if combo.needs_to_be_linked():
@@ -1011,8 +1015,8 @@ class SampleSheetCombinedVCFFile(SeqAutoFile, SampleSheetPropertiesMixin):
 
     @property
     def name(self):
-        dir_name = os.path.basename(os.path.dirname(self.path))
-        return f"{dir_name} combined"
+        """ What the VCF gets named """
+        return os.path.basename(self.path)
 
     @property
     def upload_pipeline(self):
