@@ -118,10 +118,9 @@ elif _SAPATHOLOGY_MODE:
     INITIAL_USER_DATA_PREFIX_KWARGS = {"prefix": '/tau',
                                        "replacement": '\\\\frgeneseq01.imvs.sa.gov.au\\tau'}
 
-    #SAPATH_HELIX_USER = "HelixReadOnlyUser"
-    #SAPATH_HELIX_PASSWORD_FILE = os.path.expanduser("~/.helix_password.txt")
     SAPATH_HELIX_USER = get_secret("SAPATH.HELIX.user")
     SAPATH_HELIX_PASSWORD = get_secret("SAPATH.HELIX.password")
+    SAPATH_HELIX_GENERATE_CSV_FROM_SQL = False
 
     PATHOLOGY_TESTS_ENABLED = True
     PATHOLOGY_TEST_REQUESTS_REDIRECT_URL = "sapathology_test_requests"
