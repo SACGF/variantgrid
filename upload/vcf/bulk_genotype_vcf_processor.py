@@ -354,7 +354,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         cg_basename = f"cohort_genotype_step_{self.upload_step.pk}_batch_{self.cohort_genotype_file_id}.csv"
         cohort_genotypes_filename = get_import_processing_filename(self.upload_pipeline.pk, cg_basename)
         write_sql_copy_csv(cohort_genotypes, cohort_genotypes_filename,
-                           quoting=csv.QUOTE_NONE, escapechar='', quotechar='')
+                           quoting=csv.QUOTE_NONE, escapechar='\\', quotechar='')
         table_name = self.cohort_genotype_collection.get_partition_table()
         num_cohort_genotypes = len(cohort_genotypes)
         self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)
