@@ -386,7 +386,7 @@ class SequencingRun(models.Model):
             if self.enrichment_kit:
                 if nice_name := TAU_LAB_IDS.get(self.enrichment_kit.name):
                     experiment_parts = self.experiment.name.split("_")
-                    if len(experiment_parts) == 3:
+                    if len(experiment_parts) >= 3:  # Could be GMPFOCUS_21_011 or GMPFOCUS_21_011_FFPE
                         lab_run_id = f"{nice_name}_{experiment_parts[1]}_{experiment_parts[2]}"
                         params["lab_run_id"] = lab_run_id
         return params
