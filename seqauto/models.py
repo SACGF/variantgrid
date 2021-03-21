@@ -380,6 +380,15 @@ class SequencingRun(models.Model):
 
         if self.experiment:
             params["experiment"] = self.experiment.name
+
+            # TODO: TAU hack - not sure how we're supposed to get this
+            TAU_LAB_IDS = {"idt_exome": "Exome", "idt_gmp_focus": "GMPFocus"}
+            if self.enrichment_kit:
+                if nice_name := TAU_LAB_IDS.get(self.enrichment_kit.name):
+                    experiment_parts = self.experiment.name.split("_")
+                    if len(experiment_parts) == 3:
+                        lab_run_id = f"{nice_name}_{experiment_parts[1]}_{experiment_parts[2]}"
+                        params["lab_run_id"] = lab_run_id
         return params
 
     def get_enrichment_kit_name(self):
