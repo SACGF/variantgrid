@@ -14,6 +14,8 @@ from seqauto.models_enums import QCCompareType
 
 ILLUMINA_FLOWCELL_QC_COLUMNS = ["mean_cluster_density", "mean_pf_cluster_density", "total_clusters", "total_pf_clusters", "percentage_of_clusters_pf", "aligned_to_phix"]
 PAIRED_END_READS = ('R1', 'R2')
+
+
 def get_q30_col_name(read):
     return "%s %% >= Q30" % read
 
@@ -25,6 +27,7 @@ SEQUENCING_RUN_QC_COLUMNS = ILLUMINA_FLOWCELL_QC_COLUMNS + READ_COLUMNS
 QC_EXEC_SUMMARY_QC_COLUMNS = ["mean_coverage_across_genes", "mean_coverage_across_kit", "uniformity_of_coverage",
                               "percent_read_enrichment", "duplicated_alignable_reads", "median_insert",
                               "ts_to_tv_ratio", "number_snps", "snp_dbsnp_percent", "number_indels", "indels_dbsnp_percent"]
+
 
 def get_sequencing_runs_for_compare_type(sequencing_run, qc_compare_type):
     all_runs_qs = SequencingRun.objects.filter(bad=False)
@@ -46,6 +49,7 @@ def get_sequencing_runs_for_compare_type(sequencing_run, qc_compare_type):
 
     return qs
 
+
 def get_sequencing_runs(sequencing_run, qc_compare_type, include_passed_sequencing_run):
     """ Used to get 'other' sequencing runs for QCCompareType - but pass include_passed_sequencing_run to also include this """
     sequencing_runs_qs = get_sequencing_runs_for_compare_type(sequencing_run, qc_compare_type)
@@ -57,6 +61,7 @@ def get_sequencing_runs(sequencing_run, qc_compare_type, include_passed_sequenci
         sequencing_runs_ids.add(sequencing_run.pk)
 
     return sequencing_runs_ids
+
 
 def get_sequencing_run_columns(ss_path, columns):
     return [f"{ss_path}__{c}" for c in columns]
