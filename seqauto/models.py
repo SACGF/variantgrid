@@ -111,7 +111,7 @@ class SequencerModel(models.Model):
 
     @property
     def css_class(self):
-        return self.model.replace(' ', '-').lower()
+        return str(self.model).replace(' ', '-').lower()
 
     def __str__(self):
         return f"{self.manufacturer} {self.model}"
