@@ -35,8 +35,7 @@ class TestPhenotypeMatching(TestCase):
                 self.assertListEqual(results, [], "Empty results")
 
     def test_acronyms(self):
-        HARDCODED_LOOKUPS = {"FTT": (PhenotypeMatchTypes.HPO, "HP:0001508"),
-                             "LQTS": (PhenotypeMatchTypes.HPO, "HP:0001657")}
+        HARDCODED_LOOKUPS = {"FTT": (PhenotypeMatchTypes.HPO, "HP:0001508")}
 
         self.check_expected_results_for_description(HARDCODED_LOOKUPS)
 
