@@ -1,7 +1,6 @@
 from typing import Tuple
 
 from django.conf import settings
-from django.db.models import QuerySet
 from django.http.response import HttpResponse
 import json
 
@@ -34,7 +33,6 @@ from analysis.views.nodes.node_view import NodeView
 from classification.views.classification_datatables import ClassificationDatatableConfig
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
-from ontology.models import OntologyService
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import Sample
 from classification.models.classification import Classification
@@ -256,6 +254,12 @@ class TagNodeView(NodeView):
         context["datatable_config"] = ClassificationDatatableConfig(self.request)
         context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(tag=settings.TAG_REQUIRES_CLASSIFICATION)
         return context
+
+    def _get_form_initial(self):
+        form_initial = super()._get_form_initial()
+        form_initial["tags"] = self.object.tagnodetag_set.all().values_list("tag", flat=True)
+        return form_initial
+
 
 class TissueNodeView(NodeView):
     model = TissueNode

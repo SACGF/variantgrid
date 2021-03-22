@@ -139,3 +139,9 @@ class TrioSample(models.TextChoices):
     MOTHER = 'M', 'Mother'
     FATHER = 'F', 'Father'
     PROBAND = 'P', 'Proband'
+
+
+class TagNodeMode(models.TextChoices):
+    PARENT = 'P', 'Parent'
+    THIS_ANALYSIS = 'T', 'This Analysis'
+    ALL_ANALYSES = 'L', 'All Analyses'

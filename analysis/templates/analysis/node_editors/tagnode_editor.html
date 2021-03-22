@@ -59,13 +59,13 @@ $(document).ready(function() {
         {% endfor %}
         <div>
     		{% if node.visible %}
-    		<b>Analysis wide:</b> {{ form.analysis_wide }}
+    		<b>Tags from:</b> {{ form.mode }}
     		{% else %}
     		<b>All tags for analysis</b> 
     		{% endif %}
         </div>
 		<div>
-    		<b>Tag:</b> {{ form.tag }}
+    		<b>Tag:</b> {{ form.tags }}
 		</div>
         {% if has_write_permission %}
             <button id='tag-node-save' class="btn btn-primary">save</button>

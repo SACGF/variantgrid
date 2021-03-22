@@ -11,7 +11,6 @@ from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.views.analysis_permissions import get_node_subclass_or_404
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -456,16 +455,12 @@ class TaggedVariantGrid(AbstractVariantGrid):
         else:
             analyses_queryset = Analysis.objects.filter(user=user)
 
-        tags_qs = VariantTag.get_for_build(genome_build).filter(analysis__in=analyses_queryset)
+        tag_ids = []
         if extra_filters:
-            tag_id = extra_filters.get("tag")
-            if tag_id is not None:
-                tag = Tag.objects.get(pk=tag_id)
-                tags_qs = tags_qs.filter(tag=tag)
+            if tag_id := extra_filters.get("tag"):
+                tag_ids.append(tag_id)
 
-        qs = get_variant_queryset_for_latest_annotation_version(genome_build)
-        qs = qs.filter(variantallele__genome_build=genome_build,
-                       variantallele__allele__in=tags_qs.values_list("variant__variantallele__allele", flat=True))
+        qs = VariantTag.variants_for_build(genome_build, analyses_queryset, tag_ids)
 
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
