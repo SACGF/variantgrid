@@ -79,13 +79,10 @@ def console_logger():
 
 
 def get_traceback():
-    exec_type, exec_value, exc_traceback = sys.exc_info()
-    tb = ''.join(traceback.format_tb(exc_traceback))
-    tb += f"Type: {exec_type}, Value: {exec_value}"
-    return tb
+    exec_type, exec_value, _ = sys.exc_info()
+    return "".join(traceback.format_exception(exec_value.__class__, exec_value, exec_value.__traceback__))
 
 
 def log_traceback(level=logging.ERROR):
-    exec_type, exec_value, exc_traceback = sys.exc_info()
-    logging.log(level, "%s: %s", exec_type, exec_value)
-    logging.log(level, ''.join(traceback.format_tb(exc_traceback)))
+    tb = get_traceback()
+    logging.log(level, tb)
