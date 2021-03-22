@@ -3,7 +3,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from django.conf import settings
 from django.db.models.query_utils import Q
-from typing import Iterable
+from typing import Iterable, Optional
 import logging
 import os
 import re
@@ -29,6 +29,10 @@ from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, 
 from upload.models import BackendVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
 import pandas as pd
+
+
+class SeqAutoRunError(Exception):
+    pass
 
 
 def stripped_lines_set(lines):
@@ -353,97 +357,100 @@ def process_flowcells(seqauto_run, existing_files, results):
     flowcell_checker = FlowcellChecker()
 
     sequencing_runs = {}
+    # TODO: Only handling existing - need to handle deleted flowcells + set to deleted
     for sequencing_run_dir in existing_sequencing_runs:
         sequencing_run = existing_sequencing_run_records.get(sequencing_run_dir)
-
-        # TODO: Handle skipped for this and spreadsheet missing below together
-        if flowcell_checker.skip(sequencing_run_dir):
-            message = f"Skipping Flowcell path '{sequencing_run_dir}'"
-            logging.info(message)
-            # sequencing_run may have been created pre-skipping
-            if sequencing_run and sequencing_run.data_state != DataState.SKIPPED:
-                sequencing_run.data_state = DataState.SKIPPED
-                sequencing_run.save()
-
-                create_sequencing_run_event(seqauto_run, sequencing_run, message)
-
-            continue
-
-        # TODO: This wil always be true as we're looping over existing_sequencing_runs
-        exists = sequencing_run_dir in existing_sequencing_runs
-        if exists:
-            data_state = DataState.COMPLETE
-        else:
-            data_state = DataState.DELETED
-
-        instrument_name, experiment_name = get_run_parameters(sequencing_run_dir)
-        if experiment_name:
-            experiment, _ = Experiment.objects.get_or_create(name=experiment_name)
-        else:
-            experiment = None
-
-        if sequencing_run is None:
-            try:
-                sequencer = Sequencer.get_or_create_sequencer(instrument_name, sequencers)
-            except Exception as e:
-                msg = f"Could not process sequencer from run parameters in {sequencing_run_dir}"
-                raise ValueError(msg) from e
-
-            name = os.path.basename(sequencing_run_dir)
-            sequencing_run = SequencingRun.objects.create(name=name,
-                                                          sequencer=sequencer,
-                                                          path=sequencing_run_dir,
-                                                          experiment=experiment,
-                                                          data_state=data_state,
-                                                          fake_data=seqauto_run.fake_data)
-
-            sequencing_run_created_signal.send(sender=os.path.basename(__file__),
-                                               sequencing_run=sequencing_run)
-        else:
-            if experiment and sequencing_run.experiment is None:
-                logging.info("Setting Experiment on existing SequencingRun")
-                sequencing_run.experiment = experiment
-
-        sequencing_run.has_basecalls = sequencing_run.check_basecalls_dir()
-        sequencing_run.has_interop = sequencing_run.check_interop_dir()
-
-        # Set to skipped if no sample sheet
-        samplesheet_path = SampleSheet.get_path_from_sequencing_run(sequencing_run)
-        if not os.path.exists(samplesheet_path):
-            message = f"Skipping Flowcell '{sequencing_run_dir}' as missing '{samplesheet_path}'"
-            create_sequencing_run_event(seqauto_run, sequencing_run, message, severity=LogLevel.ERROR)
-            data_state = DataState.SKIPPED
-
-        sequencing_run.data_state = data_state
-        sequencing_run.save()
-
-        if sequencing_run.data_state != DataState.SKIPPED:
-            sample_sheet, created = sequencing_run.samplesheet_set.get_or_create(hash=file_md5sum(samplesheet_path),
-                                                                                 path=samplesheet_path)
-            if created:
-                sample_sheet.date = django_modification_date(samplesheet_path)
-                sample_sheet.save()
-                create_samplesheet_samples(sample_sheet)
-                sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),
-                                                                sample_sheet=sample_sheet)
-            # Make sure SequencingRunCurrentSampleSheet is set to what we found on disk
-            try:
-                # Update existing
-                current_ss = sequencing_run.sequencingruncurrentsamplesheet
-                on_disk_not_current = current_ss.sample_sheet != sample_sheet
-                if on_disk_not_current:
-                    current_sample_sheet_changed(seqauto_run, current_ss, sample_sheet)
-
-            except SequencingRunCurrentSampleSheet.DoesNotExist:
-                # Create new
-                current_ss = SequencingRunCurrentSampleSheet.objects.create(sequencing_run=sequencing_run,
-                                                                            sample_sheet=sample_sheet)
-                logging.info("Created new SequencingRunCurrentSampleSheet: %s", current_ss)
-
-        # Process all files regardless of state
-        sequencing_runs[sequencing_run.pk] = sequencing_run
+        try:
+            sequencing_run = process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing_run_dir, sequencing_run)
+            # Process all files regardless of state
+            sequencing_runs[sequencing_run.pk] = sequencing_run
+        except Exception as e:
+            raise SeqAutoRunError(f"Error processing {sequencing_run_dir}") from e
 
     return sequencing_runs
+
+
+def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing_run_dir, sequencing_run) -> Optional[SequencingRun]:
+    # TODO: Handle skipped for this and spreadsheet missing below together
+    if flowcell_checker.skip(sequencing_run_dir):
+        message = f"Skipping Flowcell path '{sequencing_run_dir}'"
+        logging.info(message)
+        # sequencing_run may have been created pre-skipping
+        if sequencing_run and sequencing_run.data_state != DataState.SKIPPED:
+            sequencing_run.data_state = DataState.SKIPPED
+            sequencing_run.save()
+
+            create_sequencing_run_event(seqauto_run, sequencing_run, message)
+
+        return None
+
+    data_state = DataState.COMPLETE
+
+    instrument_name, experiment_name = get_run_parameters(sequencing_run_dir)
+    if experiment_name:
+        experiment, _ = Experiment.objects.get_or_create(name=experiment_name)
+    else:
+        experiment = None
+
+    if sequencing_run is None:
+        try:
+            sequencer = Sequencer.get_or_create_sequencer(instrument_name, sequencers)
+        except Exception as e:
+            msg = f"Could not process sequencer from run parameters in {sequencing_run_dir}"
+            raise ValueError(msg) from e
+
+        name = os.path.basename(sequencing_run_dir)
+        sequencing_run = SequencingRun.objects.create(name=name,
+                                                      sequencer=sequencer,
+                                                      path=sequencing_run_dir,
+                                                      experiment=experiment,
+                                                      data_state=data_state,
+                                                      fake_data=seqauto_run.fake_data)
+
+        sequencing_run_created_signal.send(sender=os.path.basename(__file__),
+                                           sequencing_run=sequencing_run)
+    else:
+        if experiment and sequencing_run.experiment is None:
+            logging.info("Setting Experiment on existing SequencingRun")
+            sequencing_run.experiment = experiment
+
+    sequencing_run.has_basecalls = sequencing_run.check_basecalls_dir()
+    sequencing_run.has_interop = sequencing_run.check_interop_dir()
+
+    # Set to skipped if no sample sheet
+    samplesheet_path = SampleSheet.get_path_from_sequencing_run(sequencing_run)
+    if not os.path.exists(samplesheet_path):
+        message = f"Skipping Flowcell '{sequencing_run_dir}' as missing '{samplesheet_path}'"
+        create_sequencing_run_event(seqauto_run, sequencing_run, message, severity=LogLevel.ERROR)
+        data_state = DataState.SKIPPED
+
+    sequencing_run.data_state = data_state
+    sequencing_run.save()
+
+    if sequencing_run.data_state != DataState.SKIPPED:
+        sample_sheet, created = sequencing_run.samplesheet_set.get_or_create(hash=file_md5sum(samplesheet_path),
+                                                                             path=samplesheet_path)
+        if created:
+            sample_sheet.date = django_modification_date(samplesheet_path)
+            sample_sheet.save()
+            create_samplesheet_samples(sample_sheet)
+            sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),
+                                                            sample_sheet=sample_sheet)
+        # Make sure SequencingRunCurrentSampleSheet is set to what we found on disk
+        try:
+            # Update existing
+            current_ss = sequencing_run.sequencingruncurrentsamplesheet
+            on_disk_not_current = current_ss.sample_sheet != sample_sheet
+            if on_disk_not_current:
+                current_sample_sheet_changed(seqauto_run, current_ss, sample_sheet)
+
+        except SequencingRunCurrentSampleSheet.DoesNotExist:
+            # Create new
+            current_ss = SequencingRunCurrentSampleSheet.objects.create(sequencing_run=sequencing_run,
+                                                                        sample_sheet=sample_sheet)
+            logging.info("Created new SequencingRunCurrentSampleSheet: %s", current_ss)
+
+    return sequencing_run
 
 
 def get_data_state(input_data_state, file_exists):
@@ -590,7 +597,7 @@ def unaligned_reads_list_from_fastqs(fastq_pairs):
                 unaligned_reads = UnalignedReads.objects.create(sequencing_sample=sequencing_sample,
                                                                 fastq_r1=fastq_r1,
                                                                 fastq_r2=fastq_r2)
-        unaligned_reads_list.append(unaligned_reads)
+            unaligned_reads_list.append(unaligned_reads)
     return unaligned_reads_list
 
 

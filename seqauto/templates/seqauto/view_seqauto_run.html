@@ -14,8 +14,6 @@
     Back to <a href="{% url 'seqauto_runs' %}">info on disk scans</a>
     </p>
 
-    {% include "messages/messages.html" %}
-
     <h3>Messages</h3>
     {% if seqauto_run.seqautorunevent_set.all %}
         <table>

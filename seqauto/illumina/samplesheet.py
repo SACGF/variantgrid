@@ -119,6 +119,8 @@ def convert_sheet_to_df(sheet):
     date = '20{yy}-{mm}-{dd}T00:00:00+0930'.format(yy=yy, mm=mm, dd=dd)
 
     df = pd.read_csv(csv_file, index_col=None, comment='#', skip_blank_lines=True, skipinitialspace=True, dtype=str)
+    # Remove empty rows - sometimes left by people editing SampleSheets.csv by hand
+    df = df.dropna(axis=0, how='all')
     df['sample_id'] = df[sample_id].str.strip()
     df['sample_name'] = None
     if 'Sample_Name' in df.columns:
