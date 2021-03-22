@@ -96,6 +96,13 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
     column_pack_lists = defaultdict(list)
     joins = set()
 
+    ZYGOSITY_COUNT_COLUMNS = {
+        Zygosity.HOM_REF: "ref_count",
+        Zygosity.HET: "het_count",
+        Zygosity.HOM_ALT: "hom_count",
+        Zygosity.UNKNOWN_ZYGOSITY: "unk_count",
+    }
+
     for sample in samples:
         sample_cgc = sample.vcf.cohort.cohort_genotype_collection
         partition_table = sample_cgc.get_partition_table()
@@ -114,19 +121,12 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
             column_pack_lists[column].append(sample_value)
 
             if column == "samples_zygosity":
-                for zygosity in Zygosity.VARIANT:
+                for zygosity in ZYGOSITY_COUNT_COLUMNS:
                     zygosity_count_lists[zygosity].append(_get_sample_zygosity_count_sql(sample_value, zygosity))
 
     columns = {
         "variant_id": '"snpdb_variant"."id"',
         "collection_id": f"{cgc.pk}",
-    }
-
-    ZYGOSITY_COUNT_COLUMNS = {
-        Zygosity.HOM_REF: "ref_count",
-        Zygosity.HET: "het_count",
-        Zygosity.HOM_ALT: "hom_count",
-        Zygosity.UNKNOWN_ZYGOSITY: "unk_count",
     }
 
     for zygosity, c in ZYGOSITY_COUNT_COLUMNS.items():
