@@ -1302,7 +1302,7 @@ class QCGeneCoverage(SeqAutoFile):
 
     @staticmethod
     def get_path_from_qc(qc):
-        pattern = os.path.join(qc.qc_dir_path, settings.SEQAUTO_QC_GENE_COVERAGE_PATTERN)
+        pattern = os.path.join(settings.SEQAUTO_QC_DIR_PATTERN, settings.SEQAUTO_QC_GENE_COVERAGE_PATTERN)
         return pattern % qc.get_params()
 
     def load_from_file(self, seqauto_run, **kwargs):
@@ -1310,7 +1310,8 @@ class QCGeneCoverage(SeqAutoFile):
         if self.qc:  # SeqAuto
             enrichment_kit = self.qc.sequencing_sample.enrichment_kit
 
-        gene_coverage_collection = GeneCoverageCollection.objects.create(path=self.path, genome_build=self.qc.genome_build)
+        gene_coverage_collection = GeneCoverageCollection.objects.create(path=self.path,
+                                                                         genome_build=self.qc.genome_build)
         self.gene_coverage_collection = gene_coverage_collection
         self.data_state = DataState.RUNNING
         self.save()
