@@ -287,7 +287,8 @@ class VariantGrid(JqGridSQL):
 class AnalysesGrid(JqGridUserRowConfig):
     model = Analysis
     caption = 'Analyses'
-    fields = ["id", "name", "modified", "genome_build", "analysis_type", "description", "user__username", "analysislock__locked"]
+    fields = ["id", "name", "modified", "genome_build__name", "analysis_type", "description",
+              "user__username", "analysislock__locked"]
     colmodel_overrides = {
         'id': {"hidden": True},
         'name': {"width": 400,
