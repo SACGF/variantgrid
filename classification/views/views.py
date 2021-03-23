@@ -275,7 +275,7 @@ def view_classification(request, record_id):
     context = {'vc': vc,
                'record': record,
                'genome_build': genome_build,
-               'asterix_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW,
+               'asterisk_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERISK_VIEW,
                'existing_files': existing_files,
                'other_classifications_summary': other_classifications_summary,
                'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
