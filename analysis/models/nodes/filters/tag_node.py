@@ -22,7 +22,12 @@ class TagNode(AnalysisNode):
 
     @lazy
     def tag_ids(self) -> List[str]:
-        return list(Tag.objects.filter(tagnodetag__tag_node=self).order_by("id").values_list("id", flat=True))
+        # This is called when Node is being initialised to set the name
+        if self.pk is None:
+            return []
+
+        qs = Tag.objects.filter(tagnodetag__tag_node=self).order_by("id").values_list("id", flat=True)
+        return list(qs)
 
     def _get_node_q(self) -> Q:
         if self.mode == TagNodeMode.ALL_ANALYSES:

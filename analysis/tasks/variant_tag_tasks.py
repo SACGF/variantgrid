@@ -30,10 +30,10 @@ def _update_analysis_on_variant_tag_change(analysis: Analysis, tag: Tag):
     """ TagNodes relying on VariantTag need to be reloaded """
 
     start = time()
-    tag_filter = Q(tag__isnull=True) | Q(tag=tag)
+    tag_filter = Q(tagnodetag__tag__isnull=True) | Q(tagnodetag__tag=tag)
     # TagNode doesn't have any output, so no need to check children
     need_to_reload = False
-    for node in TagNode.objects.filter(analysis=analysis).filter(tag_filter):
+    for node in TagNode.objects.filter(analysis=analysis).filter(tag_filter).distinct():
         node.queryset_dirty = True
         node.save()
         need_to_reload = True
