@@ -36,16 +36,13 @@ class TagNode(AnalysisNode):
             variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, analyses, self.tag_ids)
             node_q = Q(pk__in=list(variants_qs.values_list("pk", flat=True)))
         else:
-            print("Using variant query")
             # Tags from this analysis - use variant query
             # VariantTags are same build as analysis, so use this not Allele as it avoids a race condition where
             # tagging a variant w/o an Allele takes a few seconds to create one via liftover pipelines
             variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
             if self.tag_ids:
-                print(f"Restricting to {self.tag_ids}")
                 variants_with_tags = variants_with_tags.filter(tag__in=self.tag_ids)
             variants_list = list(variants_with_tags.values_list("variant_id", flat=True))
-            print(f"variants_list={variants_list}")
             node_q = Q(pk__in=variants_list)
 
         return node_q
