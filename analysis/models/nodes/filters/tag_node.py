@@ -32,18 +32,33 @@ class TagNode(AnalysisNode):
     def _get_node_q(self) -> Q:
         if self.mode == TagNodeMode.ALL_ANALYSES:
             analyses = Analysis.filter_for_user(self.analysis.user)
+            # Builds from different analyses (maybe diff builds) - so do query using Allele
+            variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, analyses, self.tag_ids)
+            node_q = Q(pk__in=list(variants_qs.values_list("pk", flat=True)))
         else:
-            analyses = [self.analysis]
+            print("Using variant query")
+            # Tags from this analysis - use variant query
+            # VariantTags are same build as analysis, so use this not Allele as it avoids a race condition where
+            # tagging a variant w/o an Allele takes a few seconds to create one via liftover pipelines
+            variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
+            if self.tag_ids:
+                print(f"Restricting to {self.tag_ids}")
+                variants_with_tags = variants_with_tags.filter(tag__in=self.tag_ids)
+            variants_list = list(variants_with_tags.values_list("variant_id", flat=True))
+            print(f"variants_list={variants_list}")
+            node_q = Q(pk__in=variants_list)
 
-        variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, analyses, self.tag_ids)
-        return Q(pk__in=list(variants_qs.values_list("pk", flat=True)))
+        return node_q
 
     def get_node_name(self):
         if self.visible:
             if self.tag_ids:
                 description = f"Tagged {', '.join(self.tag_ids)}"
             else:
-                description = "All Tags"
+                if self.mode == TagNodeMode.ALL_ANALYSES:
+                    description = "Global Tags"
+                else:
+                    description = "All Tags"
         else:
             description = self.ANALYSIS_TAGS_NAME  # Has to be set to this
 
