@@ -476,9 +476,10 @@ class AnalysisTemplateRun(TimeStampedModel):
         for arg in self.analysistemplaterunargument_set.all():
             params[arg.variable.field] = arg.value
 
-        for field in ["sample", "cohort", "trio", "pedigree"]:
+        # Do trio before sample so it's used first (trio sets proband as sample)
+        for field in ["pedigree", "trio", "cohort", "sample"]:
             if field in params:
-                params["input"] = field
+                params["input"] = params[field]
                 break
 
         try:
