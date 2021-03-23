@@ -1,14 +1,16 @@
-import pathlib
-from collections import Counter, defaultdict
-from datetime import datetime
-from django.conf import settings
-from django.db.models.query_utils import Q
-from typing import Iterable, Optional
 import logging
 import os
+import pathlib
 import re
 import sys
 import traceback
+from collections import Counter, defaultdict
+from datetime import datetime
+from typing import Iterable, Optional
+
+import pandas as pd
+from django.conf import settings
+from django.db.models.query_utils import Q
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
@@ -16,19 +18,16 @@ from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, file_md5sum, file_to_array
 from library.log_utils import get_traceback, log_traceback
 from seqauto.illumina.run_parameters import get_run_parameters
-from seqauto.illumina.samplesheet import convert_sheet_to_df, \
-    samplesheet_is_valid
-from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, \
-    SampleSheet, UnalignedReads, BamFile, DataState, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
+from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
+from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
+    UnalignedReads, BamFile, DataState, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
     DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SeqAutoRunEvent, SequencingRunModification, \
-    SampleFromSequencingSample, VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, \
-    QCGeneCoverage
+    SampleFromSequencingSample, VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage
 from seqauto.models_enums import SequencingFileType
-from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, sequencing_run_sample_sheet_created_signal, \
-    sequencing_run_created_signal
+from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, sequencing_run_created_signal, \
+    sequencing_run_sample_sheet_created_signal
 from upload.models import BackendVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
-import pandas as pd
 
 
 class SeqAutoRunError(Exception):
