@@ -67,3 +67,4 @@ django-crispy-forms==1.10.0
 # separate to django-amazon-ses
 boto3==1.14.51
 django-storages==1.9.1
+django-threadlocals===0.10

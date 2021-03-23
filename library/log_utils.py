@@ -63,6 +63,9 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
 
 
 def report_exc_info(extra_data=None, request=None):
+    if not request:
+        from threadlocals.threadlocals import get_current_request
+        request = get_current_request()
     rollbar.report_exc_info(extra_data=extra_data, request=request)
     exc_info = sys.exc_info()
     if exc_info:

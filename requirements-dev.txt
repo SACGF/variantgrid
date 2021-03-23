@@ -65,3 +65,4 @@ Unidecode
 boto3
 django-storages
 django-crispy-forms
+django-threadlocals

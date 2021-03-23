@@ -497,6 +497,7 @@ MIDDLEWARE = (
     'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
     'htmlmin.middleware.HtmlMinifyMiddleware',
     'htmlmin.middleware.MarkRequestMiddleware',
+    'threadlocals.middleware.ThreadLocalMiddleware'
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
     # 'debug_panel.middleware.DebugPanelMiddleware',
