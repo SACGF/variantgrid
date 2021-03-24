@@ -7,6 +7,7 @@ from typing import Optional
 from celery.task.control import inspect  # @UnresolvedImport
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -53,31 +54,39 @@ def variants(request):
     return render(request, "variantopedia/variants.html", context)
 
 
-def get_dashboard_notices(user) -> dict:
+def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     """ returns {} if nothing to show """
     MAX_PAST_DAYS = 30
 
-    upa, created = UserPageAck.objects.get_or_create(user=user, page_id="server_status")
     start_time = 0
     notice_header = ""
-    if created:
-        if user.last_login:
-            start_time = user.last_login
-            notice_header = f"New since last login ({timesince(start_time)} ago)"
-    else:
-        start_time = upa.modified
-        notice_header = f"Since last visit to this page ({timesince(start_time)} ago)"
-        upa.save()  # Update last modified timestamp
 
-    max_days_ago = timezone.now() - timedelta(days=MAX_PAST_DAYS)
-    if max_days_ago > start_time:
-        start_time = max_days_ago
-        notice_header = f"New in the last {MAX_PAST_DAYS} days"
+    if days_ago:
+        # if days ago was passed in, don't update upa
+        days_ago = min(days_ago, MAX_PAST_DAYS)
+        start_time = timezone.now() - timedelta(days=days_ago)
+        notice_header = f"New in the last {days_ago} day{'s' if days_ago > 1 else ''}"
+    else:
+        upa, created = UserPageAck.objects.get_or_create(user=user, page_id="server_status")
+        if created:
+            if user.last_login:
+                start_time = user.last_login
+                notice_header = f"New since last login ({timesince(start_time)} ago)"
+        else:
+            start_time = upa.modified
+            notice_header = f"Since last visit to this page ({timesince(start_time)} ago)"
+            upa.save()  # Update last modified timestamp
+
+        max_days_ago = timezone.now() - timedelta(days=MAX_PAST_DAYS)
+        if max_days_ago > start_time:
+            start_time = max_days_ago
+            notice_header = f"New in the last {MAX_PAST_DAYS} days"
 
     if user.is_superuser:
         events = Event.objects.filter(date__gte=start_time, severity=LogLevel.ERROR)
     else:
         events = Event.objects.none()
+
     vcfs = VCF.filter_for_user(user, True).filter(date__gte=start_time)
     analyses = Analysis.filter_for_user(user)
     analyses_created = analyses.filter(created__gte=start_time)
@@ -128,35 +137,36 @@ def dashboard(request):
 
 @require_superuser
 def server_status(request):
-    # This relies on the services being started with the "-n worker_name" with a separate one for each service
-    worker_names = settings.CELERY_WORKER_NAMES.copy()
-    if settings.URLS_APP_REGISTER["analysis"]:
-        worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
-    if settings.SEQAUTO_ENABLED:
-        worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
-
-    i = inspect()
-    pong = strip_celery_from_keys(i.ping())
-    active = strip_celery_from_keys(i.active())
-    scheduled = strip_celery_from_keys(i.scheduled())
-
     celery_workers = {}
-    for worker in worker_names:
-        data = pong.get(worker)
-        ok = False
-        if data:
-            if data.get('ok') == 'pong':
-                status = 'ok'
-                ok = True
-            else:
-                status = data
-        else:
-            status = 'ERROR - no workers found'
+    if settings.CELERY_ENABLED:
+        # This relies on the services being started with the "-n worker_name" with a separate one for each service
+        worker_names = settings.CELERY_WORKER_NAMES.copy()
+        if settings.URLS_APP_REGISTER["analysis"]:
+            worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
+        if settings.SEQAUTO_ENABLED:
+            worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
 
-        celery_workers[worker] = {"status": status,
-                                  "ok": ok,
-                                  "active": len(active.get(worker, [])),
-                                  "scheduled": len(scheduled.get(worker, []))}
+        i = inspect()
+        pong = strip_celery_from_keys(i.ping())
+        active = strip_celery_from_keys(i.active())
+        scheduled = strip_celery_from_keys(i.scheduled())
+
+        for worker in worker_names:
+            data = pong.get(worker)
+            ok = False
+            if data:
+                if data.get('ok') == 'pong':
+                    status = 'ok'
+                    ok = True
+                else:
+                    status = data
+            else:
+                status = 'ERROR - no workers found'
+
+            celery_workers[worker] = {"status": status,
+                                      "ok": ok,
+                                      "active": len(active.get(worker, [])),
+                                      "scheduled": len(scheduled.get(worker, []))}
 
     can_access_reference = True
     try:
@@ -208,7 +218,15 @@ def server_status(request):
             disk_free["status"] = "warning"
         disk_free["messages"].append(message)
 
-    dashboard_notices = get_dashboard_notices(request.user)
+    days_ago: Optional[int] = None
+    try:
+        if days_ago_str := request.GET.get('days'):
+            days_ago = int(days_ago_str)
+    except ValueError:
+        pass
+
+    dashboard_notices = get_dashboard_notices(request.user, days_ago)
+
     context = {"celery_workers": celery_workers,
                "can_access_reference": can_access_reference,
                "redis_status": redis_status,

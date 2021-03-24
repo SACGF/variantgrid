@@ -43,7 +43,8 @@
 {% endblock %}
 {% block content %}
 	<div class="container">
-		<h3>Sequencing</h3>
+        <h3>Server Status</h3>
+		<h4>Sequencing</h4>
 
         {% if seqauto_enabled %}
         <div>
@@ -68,7 +69,7 @@
         {% endlabelled %}
 
         {% if celery_workers %}
-            <h3>Celery Workers</h3>
+            <h4>Celery Workers</h4>
             {% for worker, worker_info in celery_workers.items %}
 
                 {% labelled id=worker label=worker %}
@@ -86,58 +87,63 @@
             {% endfor %}
         {% endif %}
 
+        <div class="btn-toolbar mt-4">
+            <label class="d-inline-block mr-2">Show from the last</label>
+            <a class="hover-link" href="{% url 'server_status' %}?days=1">1 Day</a>,
+            <a class="hover-link" href="{% url 'server_status' %}?days=5">5 Days</a>,
+            <a class="hover-link" href="{% url 'server_status' %}?days=14">14 Days</a>,
+            <a class="hover-link" href="{% url 'server_status' %}?days=30">30 Days</a>
+        </div>
+
         {% if dashboard_notices %}
-            <div id="dashboard-notices">
-                {{ dashboard_notices.notice_header }}
-                {% if dashboard_notices.events %}
-                <h3>Errors</h3>
-                <a href="{% url 'eventlog' %}">View Errors</a>
-                <ul class='messages'>
-                    {% for e in dashboard_notices.events %}
-                        <li class='error'>{{ e }}
-                    {% endfor %}
-                </ul>
-                {% endif %}
-                {% if dashboard_notices.vcfs %}
-                <h3>VCFs</h3>
-                <ul>
-                    {% for vcf in dashboard_notices.vcfs %}
-                        <li><a href="{% url 'view_vcf' vcf.pk %}">{{ vcf }}</a>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-                {% if dashboard_notices.analyses_created or dashboard_notices.analyses_modified %}
-                    <h3>Analyses</h3>
-                    {% if dashboard_notices.analyses_created %}
-                        <ul><b>Created:</b>
-                            {% for a in dashboard_notices.analyses_created %}
-                                <li>
-                                {% if url_name_visible.analysis %}
-                                    <a href="{% url 'analysis' a.pk %}">{{ a }}</a>
-                                {% else %}
-                                    {{ a }}
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                    {% if dashboard_notices.analyses_modified %}
-                    <ul><b>Modified:</b>
-                        {% for a in dashboard_notices.analyses_modified %}
-                            <li>
+            {{ dashboard_notices.notice_header }}
+            {% if dashboard_notices.events %}
+            <h4>Errors</h4>
+            <a href="{% url 'eventlog' %}">View EventLog</a>
+            <ul class='list-group'>
+                {% for e in dashboard_notices.events %}
+                    <li class='list-group-item list-group-item-danger'>{{ e }}
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if dashboard_notices.vcfs %}
+            <h4>VCFs</h4>
+            <ul class="list-group">
+                {% for vcf in dashboard_notices.vcfs %}
+                    <a class="list-group-item list-group-item-action" href="{% url 'view_vcf' vcf.pk %}">{{ vcf }}</a>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if dashboard_notices.analyses_created or dashboard_notices.analyses_modified %}
+                <h4>Analyses</h4>
+                {% if dashboard_notices.analyses_created %}
+                    <ul class="list-group">
+                        <li class="list-group-item-heading">Created:</li>
+                        {% for a in dashboard_notices.analyses_created %}
                             {% if url_name_visible.analysis %}
-                                <a href="{% url 'analysis' a.pk %}">{{ a }}</a>
+                                <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
                             {% else %}
-                                {{ a }}
+                                <li class="list-group-item">{{ a }}</li>
                             {% endif %}
-        
                         {% endfor %}
                     </ul>
-                    {% endif %}
                 {% endif %}
-            </div>
+                {% if dashboard_notices.analyses_modified %}
+                <ul class="list-group">
+                    <li class="list-group-item-heading">Modified:</li>
+                    {% for a in dashboard_notices.analyses_modified %}
+                        {% if url_name_visible.analysis %}
+                            <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
+                        {% else %}
+                            <li class="list-group-item">{{ a }}</li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            {% endif %}
         {% endif %}
 
-        <div>
+        <div class="btn-toolbar mt-4">
             {% if url_name_visible.view_upload_stats %}
                 <a href="{% url 'view_upload_stats' %}" class="btn btn-outline-primary">Upload Stats</a>
             {% endif %}

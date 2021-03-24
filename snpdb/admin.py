@@ -122,6 +122,10 @@ class UserSettingsOverrideAdmin(admin.ModelAdmin, AdminExportCsvMixin):
     actions = ["export_as_csv"]
 
 
+class UserPageAck(ModelAdminBasics):
+    list_display = ('user', 'page_id')
+
+
 admin.site.register(models.Allele, AlleleAdmin)
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
@@ -151,3 +155,4 @@ admin.site.register(models.VCF, GuardedModelAdminBasics)
 admin.site.register(models.VCFSourceSettings, ModelAdminBasics)
 admin.site.register(models.VCFTag, ModelAdminBasics)
 admin.site.register(models.VariantGridColumn, ModelAdminBasics)
+admin.site.register(models.UserPageAck, UserPageAck)

@@ -27,6 +27,7 @@ POPEN_SHELL = True
 USER_SETTINGS_SHOW_GROUPS = False
 
 # import all the base settings #
+CELERY_ENABLED = False
 DISCORDANCE_ENABLED = True
 VARIANT_CLASSIFICATION_STATS_USE_SHARED = True
 DISCORDANCE_EMAIL = 'discordance@test.shariant.org.au'

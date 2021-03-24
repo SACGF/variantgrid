@@ -333,6 +333,10 @@ USER_CREATE_ORG_LABS = {
 # after including this file
 SEQAUTO_ENABLED = False
 
+# Occasionally turn off if it helps with testing
+# (Server Status page will freeze up if this is true and celery is not on)
+CELERY_ENABLED = True
+
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = []
 # Fields must be from GoldCoverageSummary and COLUMNS + LABELS must line up!
 GENE_GRID_ENRICHMENT_KIT_COLUMNS = ['mean', 'min_mean', 'depth_20x_5th_percentile']
