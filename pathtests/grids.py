@@ -19,10 +19,13 @@ class PathologyTestOrdersGrid(JqGridUserRowConfig):
 class CasesGrid(JqGridUserRowConfig):
     model = Case
     caption = "Cases"
-    fields = ["id", "external_pk__code", "name", "lead_scientist",
+    fields = ["id", "external_pk__code", "name", "lead_scientist__username",
               "created", "result_required_date", "modified", "patient__external_pk__code",
               "report_date", "details", "status", "workflow_status", "investigation_type"]
-    colmodel_overrides = {'id': {"width": 30, 'formatter': 'viewCaseLink'}}
+    colmodel_overrides = {
+        'id': {"width": 30, 'formatter': 'viewCaseLink'},
+        'lead_scientist__username': {'label': 'Lead Scientist'}
+    }
 
     def __init__(self, user, **kwargs):
         super().__init__(user)
