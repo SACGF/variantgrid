@@ -1,13 +1,15 @@
 import csv
+from typing import List
 
 from django.contrib import admin, messages
 from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse
+from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
 
 from classification.models.clinvar_export_models import ClinVarExport
 from snpdb import models
-from snpdb.models import Allele
+from snpdb.models import Allele, VariantAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models_admin_forms import LabAdmin, OrganizationAdmin
 
@@ -75,7 +77,39 @@ class GuardedModelAdminBasics(GuardedModelAdmin, AdminExportCsvMixin):
         return self._get_fields(request=request, obj=obj)
 
 
+class AlleleClingenFilter(admin.SimpleListFilter):
+    title = 'Clingen Filter'
+    parameter_name = 'clin'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [("present", "present"), ("missing", "missing")]
+
+    def queryset(self, request, queryset):
+        if value := self.value():
+            if value == "present":
+                return queryset.filter(clingen_allele__isnull=False)
+            elif value == "missing":
+                return queryset.filter(clingen_allele__isnull=True)
+        return queryset
+
+
 class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
+
+    list_display = ('pk', 'url', 'clingen_allele', 'variants')
+    list_filter = (AlleleClingenFilter,)
+
+    def url(self, obj: Allele):
+        return format_html("<a href='{url}'>{url}</a>", url=obj.get_absolute_url())
+
+    def variants(self, obj: Allele):
+        genome_builds: List[GenomeBuild] = list()
+        for va in VariantAllele.objects.filter(allele=obj).order_by('genome_build'):
+            genome_builds.append(va.genome_build)
+        if genome_builds:
+            return ", ".join(str(genome_build) for genome_build in genome_builds)
+        else:
+            return "-"
 
     def validate(self, request, queryset):
         allele: Allele
