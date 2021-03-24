@@ -118,7 +118,7 @@
                 <h4>Analyses</h4>
                 {% if dashboard_notices.analyses_created %}
                     <ul class="list-group">
-                        <li class="list-group-item-heading">Created:</li>
+                        <li class="list-group-item list-group-item-heading">Created:</li>
                         {% for a in dashboard_notices.analyses_created %}
                             {% if url_name_visible.analysis %}
                                 <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
@@ -130,7 +130,7 @@
                 {% endif %}
                 {% if dashboard_notices.analyses_modified %}
                 <ul class="list-group">
-                    <li class="list-group-item-heading">Modified:</li>
+                    <li class="list-group-item list-group-item-heading">Modified:</li>
                     {% for a in dashboard_notices.analyses_modified %}
                         {% if url_name_visible.analysis %}
                             <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
