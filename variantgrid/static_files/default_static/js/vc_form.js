@@ -1912,7 +1912,7 @@ VCForm.format_condition = function(condition_json) {
     }
     if (condition_json.resolved_terms.length > 1) {
         let joinText = 'Uncertain';
-        $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occuring' : ' Uncertain'}).appendTo(dom);
+        $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;
 };

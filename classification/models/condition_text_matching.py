@@ -509,7 +509,7 @@ class ConditionMatchingSuggestion:
 
     def is_auto_assignable(self, gene_symbol: Optional[GeneSymbol] = None):
         """ Is this suggestion so certain we can just assign it
-        Has to be a single term (since we don't support uncertain/co-occuring in text yet).
+        Has to be a single term (since we don't support uncertain/co-occurring in text yet).
         Can't be found via an alias.
         Can't be any warnings or errors.
         If we're a gene symbol, the term has to be a leaf term and have a relationship to the gene.
