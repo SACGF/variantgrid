@@ -31,7 +31,7 @@ from seqauto.qc.exec_summary import load_exec_summary
 from seqauto.qc.fastqc_parser import read_fastqc_data
 from seqauto.qc.flag_stats import load_flagstats
 from seqauto.qc.qc_utils import meta_data_file
-from snpdb.models import VCF, Sample, Wiki, GenomeBuild, DataState
+from snpdb.models import VCF, Sample, GenomeBuild, DataState, InheritanceManager
 from snpdb.models.models_enums import ImportStatus, ImportSource
 from variantgrid.celery import app
 
@@ -93,15 +93,43 @@ class SeqAutoRun(TimeStampedModel):
         return f"AnnotationRun: {self.created} ({self.status})"
 
 
-class SeqAutoRunEvent(models.Model):
-    """ These are messages created by SeqAutoRun """
+class SeqAutoRecord(TimeStampedModel):
+    """ Base class for everything below """
+    objects = InheritanceManager()
+    path = models.TextField()
+    # Stores stat st_mtime - time of last modification - only used for classes that can reload
+    file_last_modified = models.FloatField(default=0.0)
+    hash = models.TextField()  # Not used for everything
+    data_state = models.CharField(max_length=1, choices=DataState.choices)
+
+
+class SeqAutoMessage(TimeStampedModel):
+    # TODO: Remember we can bump to latest SeqAutoRun as we go
     seqauto_run = models.ForeignKey(SeqAutoRun, on_delete=CASCADE)
+    record = models.ForeignKey(SeqAutoRecord, on_delete=CASCADE)
     severity = models.CharField(max_length=1, choices=LogLevel.CHOICES)
-    file_type = models.CharField(max_length=1, choices=SequencingFileType.choices, null=True)
     message = models.TextField(null=True)
 
     def __str__(self):
-        return f"{self.seqauto_run} {self.get_severity_display()} {self.file_type}: {self.message}"
+        record = SeqAutoRecord.objects.get_subclass(pk=self.record)
+        return f"{self.seqauto_run} {self.get_severity_display()} {record}: {self.message}"
+
+
+class SequencingRun2(SeqAutoRecord):
+    """ Represents a flowcell (or other technology with multiple sequencing samples) """
+    name = models.TextField(primary_key=True)
+    sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE)
+    gold_standard = models.BooleanField(default=False)
+    bad = models.BooleanField(default=False)
+    hidden = models.BooleanField(default=False)
+    ready = models.BooleanField(default=False)
+    legacy = models.BooleanField(default=False)  # Don't update it with scans (eg to say file missing)
+    experiment = models.ForeignKey(Experiment, null=True, on_delete=SET_NULL)
+    # Sequencing Run can be all one enrichment_kit, or SequencingSample can have own enrichment_kits
+    enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)
+    has_basecalls = models.BooleanField(default=False)
+    has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
+    fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
 
 
 class SequencingRun(models.Model):
@@ -241,18 +269,9 @@ class SequencingRun(models.Model):
         return reverse('view_sequencing_run', kwargs={"sequencing_run_id": self.pk})
 
 
-class SequencingRunWiki(Wiki):
-    sequencing_run = models.OneToOneField(SequencingRun, on_delete=CASCADE)
-
-
-class SequencingRunModification(models.Model):
-    """ To be able to associate a sequencing_run with an event (or just general message) """
-
-    created = models.DateTimeField(auto_now_add=True)
-    sequencing_run = models.ForeignKey(SequencingRun, on_delete=CASCADE)
-    user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
-    message = models.TextField(null=True)  # Filled in by users
-    seqauto_run_event = models.ForeignKey(SeqAutoRunEvent, null=True, on_delete=CASCADE)  # Set if done as an event
+# TODO: Put back for models refactor
+#class SequencingRunWiki(Wiki):
+#    sequencing_run = models.OneToOneField(SequencingRun, on_delete=CASCADE)
 
 
 class SeqAutoFile(models.Model):
@@ -281,6 +300,12 @@ class SequencingSamplePropertiesMixin(SampleSheetPropertiesMixin):
     @property
     def sample_sheet(self):
         return self.sequencing_sample.sample_sheet
+
+
+class SampleSheet2(SeqAutoRecord):
+    SAMPLE_SHEET = "SampleSheet.csv"
+    # We should assume that these will be changed, and so need to know...
+    sequencing_run = models.ForeignKey(SequencingRun2, on_delete=CASCADE)
 
 
 class SampleSheet(models.Model):
@@ -322,6 +347,12 @@ class SampleSheet(models.Model):
         return self.path
 
 
+class SequencingRunCurrentSampleSheet2(models.Model):
+    """ This is a way to "walk" via relations from sequencing run to the latest sample sheet """
+    sequencing_run = models.OneToOneField(SequencingRun2, on_delete=CASCADE)
+    sample_sheet = models.OneToOneField(SampleSheet2, on_delete=CASCADE)
+
+
 class SequencingRunCurrentSampleSheet(models.Model):
     """ This is a way to "walk" via relations from sequencing run to the latest sample sheet """
     sequencing_run = models.OneToOneField(SequencingRun, on_delete=CASCADE)
@@ -329,6 +360,23 @@ class SequencingRunCurrentSampleSheet(models.Model):
 
     def __str__(self):
         return f"{self.sequencing_run}, {self.sample_sheet}"
+
+
+class SequencingSample2(models.Model):
+    """ Represents a row in a SampleSheet.csv """
+    sample_sheet = models.ForeignKey(SampleSheet2, on_delete=CASCADE)
+    sample_id = models.TextField()
+    # sample_name is used to name files. In MiSeq/NextSeq samplesheet you can add names.
+    # For Hiseq and if left empty on MiSeq this will be sample_id
+    sample_name = models.TextField(null=True)
+    sample_project = models.TextField(null=True)
+    sample_number = models.IntegerField()
+    lane = models.IntegerField(null=True)
+    barcode = models.TextField()
+    enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)
+    is_control = models.BooleanField(default=False)
+    failed = models.BooleanField(default=False)
+    automatically_process = models.BooleanField(default=True)
 
 
 class SequencingSample(models.Model):
@@ -397,11 +445,23 @@ class SequencingSample(models.Model):
         return self.sample_id
 
 
+class SequencingSampleData2(models.Model):
+    """ key/values set from settings.SEQAUTO_SAMPLE_SHEET_EXTRA_COLUMNS """
+    sequencing_sample = models.ForeignKey(SequencingSample2, on_delete=CASCADE)
+    column = models.TextField()
+    value = models.TextField(null=True)
+
+
 class SequencingSampleData(models.Model):
     """ key/values set from settings.SEQAUTO_SAMPLE_SHEET_EXTRA_COLUMNS """
     sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
     column = models.TextField()
     value = models.TextField(null=True)
+
+
+class SampleFromSequencingSample2(models.Model):
+    sample = models.OneToOneField(Sample, on_delete=CASCADE)
+    sequencing_sample = models.OneToOneField(SequencingSample2, on_delete=CASCADE)
 
 
 # Store the final relations, so it's easier to move between these 2 models
@@ -414,9 +474,24 @@ class SampleFromSequencingSample(models.Model):
         return self.sequencing_sample.sample_sheet.sequencing_run
 
 
+class VCFFromSequencingRun2(models.Model):
+    vcf = models.OneToOneField(VCF, on_delete=CASCADE)
+    sequencing_run = models.OneToOneField(SequencingRun2, on_delete=CASCADE)
+
+
 class VCFFromSequencingRun(models.Model):
     vcf = models.OneToOneField(VCF, on_delete=CASCADE)
     sequencing_run = models.OneToOneField(SequencingRun, on_delete=CASCADE)
+
+
+class IlluminaFlowcellQC2(SeqAutoRecord, SampleSheetPropertiesMixin):
+    sample_sheet = models.OneToOneField(SampleSheet2, on_delete=CASCADE)
+    mean_cluster_density = models.IntegerField(null=True)
+    mean_pf_cluster_density = models.IntegerField(null=True)
+    total_clusters = models.IntegerField(null=True)
+    total_pf_clusters = models.IntegerField(null=True)
+    percentage_of_clusters_pf = models.FloatField(null=True)
+    aligned_to_phix = models.FloatField(null=True)
 
 
 class IlluminaFlowcellQC(SeqAutoFile, SampleSheetPropertiesMixin):
@@ -449,6 +524,14 @@ class IlluminaFlowcellQC(SeqAutoFile, SampleSheetPropertiesMixin):
         return self.path
 
 
+class ReadQ302(models.Model):
+    illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC2, on_delete=CASCADE)
+    sequencer_read_id = models.IntegerField()  # Eg HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
+    read = models.CharField(max_length=2, choices=SequencerRead.choices)
+    percent = models.FloatField()
+    is_index = models.BooleanField(default=False)
+
+
 class ReadQ30(models.Model):
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, on_delete=CASCADE)
     sequencer_read_id = models.IntegerField()  # Eg HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
@@ -461,12 +544,26 @@ class ReadQ30(models.Model):
         return f"Read: {self.sequencer_read_id}{index}. {self.read} {self.percent:.2f}%"
 
 
+class IlluminaIndexQC2(models.Model):
+    illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC2, on_delete=CASCADE)
+    index = models.TextField()
+    project = models.TextField()
+    name = models.TextField()
+    reads = models.IntegerField()
+
+
 class IlluminaIndexQC(models.Model):
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, on_delete=CASCADE)
     index = models.TextField()
     project = models.TextField()
     name = models.TextField()
     reads = models.IntegerField()
+
+
+class Fastq2(SeqAutoRecord, SequencingSamplePropertiesMixin):
+    sequencing_sample = models.ForeignKey(SequencingSample2, on_delete=CASCADE)
+    name = models.TextField()  # from path
+    read = models.CharField(max_length=2, choices=PairedEnd.choices)
 
 
 class Fastq(SeqAutoFile, SequencingSamplePropertiesMixin):
@@ -538,6 +635,13 @@ class Fastq(SeqAutoFile, SequencingSamplePropertiesMixin):
         return f"FastQ {self.name} ({self.read}) from sample {self.sequencing_sample}"
 
 
+class FastQC2(SeqAutoRecord, SequencingSamplePropertiesMixin):
+    fastq = models.OneToOneField(Fastq2, on_delete=CASCADE)
+    total_sequences = models.IntegerField(null=True)
+    filtered_sequences = models.IntegerField(null=True)
+    gc = models.IntegerField(null=True)
+
+
 class FastQC(SeqAutoFile, SequencingSamplePropertiesMixin):
     fastq = models.OneToOneField(Fastq, on_delete=CASCADE)
     total_sequences = models.IntegerField(null=True)
@@ -570,6 +674,13 @@ class FastQC(SeqAutoFile, SequencingSamplePropertiesMixin):
 
     def __str__(self):
         return f"FastQC ({self.get_data_state_display()}) for {self.fastq}"
+
+
+class UnalignedReads2(models.Model, SequencingSamplePropertiesMixin):
+    """ Not a file just a way of keeping paired end fastqs together """
+    sequencing_sample = models.ForeignKey(SequencingSample2, on_delete=CASCADE)
+    fastq_r1 = models.ForeignKey(Fastq2, related_name='fastq_r1', on_delete=CASCADE)
+    fastq_r2 = models.ForeignKey(Fastq2, null=True, related_name='fastq_r2', on_delete=CASCADE)
 
 
 class UnalignedReads(models.Model, SequencingSamplePropertiesMixin):
@@ -628,6 +739,12 @@ class UnalignedReads(models.Model, SequencingSamplePropertiesMixin):
         return f"UnalignedReads from sample {self.sequencing_sample} ({data_state})"
 
 
+class BamFile2(SeqAutoRecord, SequencingSamplePropertiesMixin):
+    unaligned_reads = models.ForeignKey(UnalignedReads2, null=True, on_delete=CASCADE)
+    name = models.TextField()
+    aligner = models.ForeignKey(Aligner, on_delete=CASCADE)
+
+
 class BamFile(SeqAutoFile, SequencingSamplePropertiesMixin):
     unaligned_reads = models.ForeignKey(UnalignedReads, null=True, on_delete=CASCADE)
     name = models.TextField()
@@ -663,6 +780,17 @@ class BamFile(SeqAutoFile, SequencingSamplePropertiesMixin):
 
     def __str__(self):
         return f"BAM: {self.unaligned_reads.sequencing_sample} ({self.get_data_state_display()})"
+
+
+class Flagstats2(SeqAutoRecord):
+    FLAGSTATS_EXTENSION = ".flagstat.txt"
+
+    bam_file = models.OneToOneField(BamFile2, on_delete=CASCADE)
+    total = models.IntegerField(null=True)
+    read1 = models.IntegerField(null=True)
+    read2 = models.IntegerField(null=True)
+    mapped = models.IntegerField(null=True)
+    properly_paired = models.IntegerField(null=True)
 
 
 class Flagstats(SeqAutoFile):
@@ -723,6 +851,12 @@ class DontAutoLoadException(Exception):
     pass
 
 
+class VCFFile2(SeqAutoRecord, SequencingSamplePropertiesMixin):
+    """ VCFs from the file system """
+    bam_file = models.ForeignKey(BamFile2, on_delete=CASCADE)
+    variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
+
+
 class VCFFile(SeqAutoFile, SequencingSamplePropertiesMixin):
     """ VCFs from the file system """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
@@ -765,6 +899,11 @@ class VCFFile(SeqAutoFile, SequencingSamplePropertiesMixin):
 
     def __str__(self):
         return f"VCF {self.name} ({self.get_data_state_display()})"
+
+
+class SampleSheetCombinedVCFFile2(SeqAutoRecord, SampleSheetPropertiesMixin):
+    sample_sheet = models.ForeignKey(SampleSheet2, on_delete=CASCADE)
+    variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
 
 class SampleSheetCombinedVCFFile(SeqAutoFile, SampleSheetPropertiesMixin):
@@ -841,6 +980,12 @@ class SampleSheetCombinedVCFFile(SeqAutoFile, SampleSheetPropertiesMixin):
         num_samples = self.sample_sheet.sequencingsample_set.all().count()
         return f"ComboVCF ({self.pk}) for {self.sample_sheet.sequencing_run} ({num_samples} samples)"
 
+class QC2(SeqAutoRecord, SequencingSamplePropertiesMixin):
+    """ This holds together all of the other QC objects """
+    bam_file = models.ForeignKey(BamFile2, on_delete=CASCADE)
+    vcf_file = models.ForeignKey(VCFFile2, on_delete=CASCADE)
+
+
 
 class QC(SeqAutoFile, SequencingSamplePropertiesMixin):
     """ This holds together all of the other QC objects """
@@ -881,6 +1026,13 @@ class QC(SeqAutoFile, SequencingSamplePropertiesMixin):
         return f"QC {name_from_filename(self.path)} ({self.get_data_state_display()})"
 
 
+class QCGeneList2(SeqAutoRecord, SequencingSamplePropertiesMixin):
+    """ This represents a text file containing genes which will be used for initial pass and QC filters """
+    qc = models.ForeignKey(QC2, on_delete=CASCADE)
+    custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=SET_NULL)
+    sample_gene_list = models.ForeignKey(SampleGeneList, null=True, on_delete=SET_NULL)
+
+
 class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
     """ This represents a text file containing genes which will be used for initial pass and QC filters """
     qc = models.ForeignKey(QC, on_delete=CASCADE)
@@ -915,10 +1067,11 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
                 message += f"Error: {custom_text_gene_list.gene_list.error_message}"
                 logging.error(message)
                 if seqauto_run:  # won't always - can be kicked off from management commands
-                    SeqAutoRunEvent.objects.create(seqauto_run=seqauto_run,
-                                                   file_type=SequencingFileType.QC,
-                                                   message=message,
-                                                   severity=LogLevel.ERROR)
+                    pass
+                    #SeqAutoRunEvent.objects.create(seqauto_run=seqauto_run,
+                    #                               file_type=SequencingFileType.QC,
+                    #                               message=message,
+                    #                               severity=LogLevel.ERROR)
 
             self.custom_text_gene_list = custom_text_gene_list
 
@@ -934,6 +1087,29 @@ class QCGeneList(SeqAutoFile, SequencingSamplePropertiesMixin):
         self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
                                                                      gene_list=self.custom_text_gene_list.gene_list)[0]
         self.save()
+
+
+class QCExecSummary2(SeqAutoRecord, SequencingSamplePropertiesMixin):
+    qc = models.ForeignKey(QC2, on_delete=CASCADE)
+    gene_list = models.ForeignKey(GeneList, null=True, on_delete=CASCADE)  # GOI - null = all genes
+
+    percent_20x_kit = models.FloatField(null=True)
+    # Coverages below are across GOIs (some of these will be null)
+    percent_500x = models.FloatField(null=True)
+    percent_250x = models.FloatField(null=True)
+    percent_20x = models.FloatField(null=True)
+    percent_10x = models.FloatField(null=True)
+    mean_coverage_across_genes = models.FloatField()
+    mean_coverage_across_kit = models.FloatField()
+    uniformity_of_coverage = models.FloatField()
+    percent_read_enrichment = models.FloatField()
+    duplicated_alignable_reads = models.FloatField()
+    median_insert = models.FloatField()
+    ts_to_tv_ratio = models.FloatField()
+    number_snps = models.IntegerField()
+    snp_dbsnp_percent = models.FloatField()
+    number_indels = models.IntegerField()
+    indels_dbsnp_percent = models.FloatField()
 
 
 class QCExecSummary(SeqAutoFile, SequencingSamplePropertiesMixin):
@@ -1036,6 +1212,28 @@ class QCExecSummary(SeqAutoFile, SequencingSamplePropertiesMixin):
         return f"QCExecSummary ({self.data_state}) for {self.qc}"
 
 
+class ExecSummaryReferenceRange2(models.Model):
+    exec_summary = models.OneToOneField(QCExecSummary2, on_delete=CASCADE)
+
+    percent_20x = DecimalRangeField(null=True)
+    percent_10x = DecimalRangeField(null=True)
+    mean_coverage_across_genes = DecimalRangeField()
+    # We used to have a reference range for mean coverage, now we can have either that or a set limit (one must be set)
+    mean_coverage_across_kit = DecimalRangeField(null=True)
+    min_mean_coverage_across_kit = models.IntegerField(null=True)
+    min_percent_20x_kit = models.IntegerField(null=True)
+    uniformity_of_coverage = DecimalRangeField()
+    percent_read_enrichment = DecimalRangeField()
+    duplicated_alignable_reads = DecimalRangeField()
+    median_insert = DecimalRangeField()
+    ts_to_tv_ratio = DecimalRangeField()
+    number_snps = DecimalRangeField()
+    snp_dbsnp_percent = DecimalRangeField()
+    number_indels = DecimalRangeField()
+    indels_dbsnp_percent = DecimalRangeField()
+
+
+
 class ExecSummaryReferenceRange(models.Model):
     exec_summary = models.OneToOneField(QCExecSummary, on_delete=CASCADE)
 
@@ -1055,6 +1253,11 @@ class ExecSummaryReferenceRange(models.Model):
     snp_dbsnp_percent = DecimalRangeField()
     number_indels = DecimalRangeField()
     indels_dbsnp_percent = DecimalRangeField()
+
+
+class QCGeneCoverage2(SeqAutoRecord):
+    qc = models.OneToOneField(QC2, on_delete=CASCADE)
+    gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=CASCADE)
 
 
 class QCGeneCoverage(SeqAutoFile):
@@ -1081,10 +1284,11 @@ class QCGeneCoverage(SeqAutoFile):
             warnings = gene_coverage_collection.load_from_file(enrichment_kit, **kwargs)
             if seqauto_run:
                 for w in warnings:
-                    SeqAutoRunEvent.objects.create(seqauto_run=seqauto_run,
-                                                   file_type=SequencingFileType.QC,
-                                                   message=w,
-                                                   severity=LogLevel.WARNING)
+                    pass
+#                    SeqAutoRunEvent.objects.create(seqauto_run=seqauto_run,
+#                                                   file_type=SequencingFileType.QC,
+#                                                   message=w,
+#                                                   severity=LogLevel.WARNING)
             self.data_state = DataState.COMPLETE
         except FileNotFoundError:
             self.data_state = DataState.DELETED
@@ -1170,8 +1374,7 @@ class QCColumn(models.Model):
     def __str__(self):
         return self.name
 
-
-class JobScript(models.Model):
+class JobScript(object):# SeqAutoRecord):
     # Attach the samplesheet/bam/vcf/qc to this script so delete will cascade through
     FIELDS = {
         SequencingFileType.SAMPLE_SHEET: 'sample_sheet',  # TODO: Rename to basecalling?
@@ -1186,7 +1389,6 @@ class JobScript(models.Model):
     }
 
     seqauto_run = models.ForeignKey(SeqAutoRun, on_delete=CASCADE)
-    path = models.TextField()  # script
     out_file = models.TextField(null=True)
     file_type = models.CharField(max_length=1, choices=SequencingFileType.choices)
     sample_sheet = models.ForeignKey(SampleSheet, null=True, on_delete=CASCADE)
@@ -1238,7 +1440,6 @@ class JobScript(models.Model):
         record = self.get_record()
         record_pk = record.pk if record else 'N/A'
         return "%s: %r" % (self.file_type, record_pk)
-
 
 
 @receiver(post_delete, sender=JobScript)
