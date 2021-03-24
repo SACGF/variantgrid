@@ -22,7 +22,7 @@ from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_val
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
     UnalignedReads, BamFile, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
     DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SampleFromSequencingSample, \
-    VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage
+    VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage, SeqAutoMessage
 from snpdb.models import DataState
 from seqauto.models.models_enums import SequencingFileType
 from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, sequencing_run_created_signal, \
@@ -170,17 +170,6 @@ class FlowcellChecker:
         return False
 
 
-def create_sequencing_run_event(seqauto_run, sequencing_run, message, severity=LogLevel.INFO):
-    pass
-    #sar_event = SeqAutoRunEvent.objects.create(seqauto_run=seqauto_run,
-    #                                           severity=severity,
-    #                                           file_type=SequencingFileType.SAMPLE_SHEET,
-    #                                           message=message)
-
-    #SequencingRunModification.objects.create(sequencing_run=sequencing_run,
-    #                                         seqauto_run_event=sar_event)
-
-
 def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):
     """ returns True, "string reason" if downstream stuff has to change """
 
@@ -222,9 +211,12 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
     meaningfully_changed, reason = sample_sheet_meaningfully_changed(old_sample_sheet, new_sample_sheet)
     if meaningfully_changed:
         message += f"SampleSheets CHANGED: {reason}"
+        SeqAutoMessage.objects.create(seqauto_run=seqauto_run, record=sequencing_run,
+                                      message=message, severity=LogLevel.WARNING)
     else:
         message += "SampleSheets not meaningfully changed"
-    create_sequencing_run_event(seqauto_run, sequencing_run, message)
+        SeqAutoMessage.objects.create(seqauto_run=seqauto_run, record=sequencing_run,
+                                      message=message, severity=LogLevel.INFO)
 
     if not meaningfully_changed:
         # Can go through and update models etc...
@@ -381,7 +373,8 @@ def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing
             sequencing_run.data_state = DataState.SKIPPED
             sequencing_run.save()
 
-            create_sequencing_run_event(seqauto_run, sequencing_run, message)
+            SeqAutoMessage.objects.create(seqauto_run=seqauto_run, record=sequencing_run,
+                                          message=message, severity=LogLevel.INFO)
 
         return None
 
@@ -422,7 +415,8 @@ def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing
     samplesheet_path = SampleSheet.get_path_from_sequencing_run(sequencing_run)
     if not os.path.exists(samplesheet_path):
         message = f"Skipping Flowcell '{sequencing_run_dir}' as missing '{samplesheet_path}'"
-        create_sequencing_run_event(seqauto_run, sequencing_run, message, severity=LogLevel.ERROR)
+        SeqAutoMessage.objects.create(seqauto_run=seqauto_run, record=sequencing_run,
+                                      message=message, severity=LogLevel.ERROR)
         data_state = DataState.SKIPPED
 
     sequencing_run.data_state = data_state
