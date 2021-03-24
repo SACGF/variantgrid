@@ -8,30 +8,30 @@ from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
-from django_dag.models import node_factory, edge_factory
 from django_extensions.db.models import TimeStampedModel
 import logging
 import os
 import re
 import shutil
 
-from genes.models import CanonicalTranscriptCollection, GeneListCategory, \
-    CustomTextGeneList, GeneList, GeneCoverageCollection, Transcript, GeneSymbol, SampleGeneList
+from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
+    Transcript, GeneSymbol, SampleGeneList
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
 from library.utils import sorted_nicely
 from patients.models import FakeData
-from seqauto.illumina import illuminate_report, illumina_sequencers
+from seqauto.illumina import illuminate_report
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models_enums import DataGeneration, SequencerRead, PairedEnd, \
-    DataState, SequencingFileType, JobScriptStatus, SeqAutoRunStatus, EnrichmentKitType
+from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
+from seqauto.models.models_software import Aligner, VariantCaller, get_fake_variant_caller
+from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd, \
+    SequencingFileType, JobScriptStatus, SeqAutoRunStatus, EnrichmentKitType
 from seqauto.qc.exec_summary import load_exec_summary
 from seqauto.qc.fastqc_parser import read_fastqc_data
 from seqauto.qc.flag_stats import load_flagstats
 from seqauto.qc.qc_utils import meta_data_file
-from snpdb.models import Manufacturer, VCF, Sample, SoftwareVersion, Wiki, LabProject, \
-    GenomicIntervalsCollection, GenomeBuild
+from snpdb.models import VCF, Sample, Wiki, GenomeBuild, DataState
 from snpdb.models.models_enums import ImportStatus, ImportSource
 from variantgrid.celery import app
 
@@ -102,239 +102,6 @@ class SeqAutoRunEvent(models.Model):
 
     def __str__(self):
         return f"{self.seqauto_run} {self.get_severity_display()} {self.file_type}: {self.message}"
-
-
-class SequencerModel(models.Model):
-    model = models.TextField(primary_key=True)
-    manufacturer = models.ForeignKey(Manufacturer, null=True, on_delete=CASCADE)
-    data_naming_convention = models.CharField(max_length=1, choices=DataGeneration.choices)
-
-    @property
-    def css_class(self):
-        return str(self.model).replace(' ', '-').lower()
-
-    def __str__(self):
-        return f"{self.manufacturer} {self.model}"
-
-
-class Sequencer(models.Model):
-    name = models.TextField(primary_key=True)
-    sequencer_model = models.ForeignKey(SequencerModel, on_delete=CASCADE)
-
-    @staticmethod
-    def get_sequencers_dict_by_name():
-        sequencers = {}
-        for sequencer in Sequencer.objects.all():
-            sequencers[sequencer.pk] = sequencer
-        return sequencers
-
-    @staticmethod
-    def get_or_create_sequencer(name, existing_sequencers=None):
-        if existing_sequencers is None:
-            existing_sequencers = Sequencer.get_sequencers_dict_by_name()
-
-        sequencer = existing_sequencers.get(name)
-        if not sequencer:
-            model_name = illumina_sequencers.get_sequencer_model_from_name(name)
-            if model_name:
-                illumina, _ = Manufacturer.objects.get_or_create(name='Illumina')
-                try:
-                    sequencer_model = SequencerModel.objects.get(model=model_name,
-                                                                 manufacturer=illumina)
-                except:
-                    if 'HiSeq' in model_name:
-                        data_naming_convention = DataGeneration.HISEQ
-                    else:
-                        data_naming_convention = DataGeneration.MISEQ
-                    sequencer_model = SequencerModel.objects.create(model=model_name,
-                                                                    data_naming_convention=data_naming_convention,
-                                                                    manufacturer=illumina)
-
-                sequencer = Sequencer.objects.create(name=name,
-                                                     sequencer_model=sequencer_model)
-                existing_sequencers[sequencer.name] = sequencer  # Add in case this is being used elsewhere
-            else:
-                msg = f"Can't recognise Illumina model from name '{name}' and don't know how to handle non-Illumina sequencers yet"
-                raise ValueError(msg)
-
-        return sequencer
-
-    def get_absolute_url(self):
-        return reverse('view_sequencer', kwargs={'pk': self.pk})
-
-    def __str__(self):
-        return f"{self.name} ({self.sequencer_model})"
-
-
-class EnrichmentKit(models.Model):
-    """ A lab method to enrich a sample (eg Capture Panel or Amplicon etc) """
-    name = models.TextField()
-    version = models.IntegerField(default=1)
-    enrichment_kit_type = models.CharField(max_length=1, choices=EnrichmentKitType.choices, null=True)
-    manufacturer = models.ForeignKey(Manufacturer, null=True, on_delete=CASCADE)
-    bed_file = models.TextField(null=True, blank=True)  # Original manifest bed
-    genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
-    gene_list = models.ForeignKey(GeneList, null=True, on_delete=PROTECT)
-    canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, on_delete=SET_NULL)
-    obsolete = models.BooleanField(default=False)
-
-    @staticmethod
-    def get_latest_version(name):
-        return EnrichmentKit.objects.filter(name=name).order_by("version").last()
-
-    @staticmethod
-    def get_enrichment_kits(enrichment_kit_kwargs_list):
-        enrichment_kits = []
-        for enrichment_kit_kwargs in enrichment_kit_kwargs_list:
-            # There can be more than 1 per enrichment_kit name
-            for enrichment_kit in EnrichmentKit.objects.filter(**enrichment_kit_kwargs):
-                enrichment_kits.append(enrichment_kit)
-        return enrichment_kits
-
-    def get_gold_sequencing_runs_qs(self):
-        return self.sequencingrun_set.filter(gold_standard=True)
-
-    def get_absolute_url(self):
-        return reverse('view_enrichment_kit', kwargs={"pk": self.pk})
-
-    def __str__(self):
-        name = self.name
-        if self.version > 1:
-            name += f" (version {self.version})"
-        return name
-
-
-class Library(models.Model):
-    name = models.TextField(primary_key=True)
-    description = models.TextField(null=True, blank=True)
-    manufacturer = models.ForeignKey(Manufacturer, null=True, on_delete=CASCADE)
-
-    def get_absolute_url(self):
-        return reverse('view_library', kwargs={'pk': self.pk})
-
-    def __str__(self):
-        return ' '.join(map(str, filter(lambda x: x, [self.name, self.description, self.manufacturer])))
-
-
-class Assay(models.Model):
-    library = models.ForeignKey(Library, on_delete=CASCADE)
-    sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE)
-    enrichment_kit = models.ForeignKey(EnrichmentKit, on_delete=CASCADE)  # Genes captured
-
-    def get_absolute_url(self):
-        return reverse('view_assay', kwargs={'pk': self.pk})
-
-    def __str__(self):
-        return f"Seq: {self.sequencer}, Lib: {self.library}, EnrichmentKit: {self.enrichment_kit}"
-
-
-class VariantCaller(SoftwareVersion):
-    run_params = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        description = f"{self.name} (v. {self.version})"
-        if self.run_params:
-            description += f": {self.run_params}"
-        return description
-
-    def get_absolute_url(self):
-        return reverse('view_variant_caller', kwargs={'pk': self.pk})
-
-
-class Aligner(SoftwareVersion):
-
-    def __str__(self):
-        return f"{self.name} (v. {self.version})"
-
-    def get_absolute_url(self):
-        return reverse('view_aligner', kwargs={'pk': self.pk})
-
-
-class VariantCallingPipeline(SoftwareVersion):
-    description = models.TextField(null=True, blank=True)
-    aligner = models.ForeignKey(Aligner, on_delete=CASCADE)
-    variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
-    other_details = models.TextField(null=True, blank=True)
-
-    def get_absolute_url(self):
-        return reverse('view_variant_calling_pipeline', kwargs={'pk': self.pk})
-
-    def __str__(self):
-        return f"{self.description} (Algn: {self.aligner}, V. Caller: {self.variant_caller})"
-
-# Software Pipeline Models replace VariantCallingPipeline and use the acyclic
-# graph module from django_dag
-
-
-class SoftwarePipeline(SoftwareVersion):
-    description = models.TextField(null=True, blank=True)
-
-
-class SoftwarePipelineNode(node_factory('SoftwarePipelineEdge')):
-    softwarepipeline = models.ForeignKey(SoftwarePipeline, on_delete=CASCADE)
-    name = models.TextField()
-    version = models.TextField()
-    parameters = models.TextField()
-    description = models.TextField()
-
-
-class SoftwarePipelineEdge(edge_factory(SoftwarePipelineNode, concrete=False)):
-    name = models.CharField(max_length=32, blank=True, null=True)
-
-
-# ExperimentManager manages the Experiment objects
-# to ensure that experiment names are cleaned before creation or updating
-class ExperimentManager(models.Manager):
-
-    @staticmethod
-    def fix_kwargs(kwargs):
-        try:
-            old_name = kwargs["name"]
-            name = Experiment.clean_experiment_name(old_name)
-            kwargs["name"] = name
-        except:
-            pass
-        return kwargs
-
-    def get(self, *args, **kwargs):
-        self.fix_kwargs(kwargs)
-        return super().get(*args, **kwargs)
-
-    def get_or_create(self, default=None, **kwargs):
-        self.fix_kwargs(kwargs)
-        return super().get_or_create(default, **kwargs)
-
-
-class Experiment(models.Model):
-    name = models.TextField(primary_key=True)
-    created = models.DateTimeField(auto_now_add=True)
-    objects = ExperimentManager()
-
-    @staticmethod
-    def clean_experiment_name(experiment_name):
-        experiment_name = experiment_name.upper()
-        experiment_name = experiment_name.replace("-", "_")
-        experiment_name = experiment_name.replace(" ", "_")
-
-        # Remove RPT off the end...
-        experiment_name = re.sub("_RPT$", "", experiment_name)
-        experiment_name = re.sub("RPT$", "", experiment_name)
-        return experiment_name
-
-    def save(self, **kwargs):
-        old_name = self.name
-        self.name = Experiment.clean_experiment_name(old_name)
-        return super().save(**kwargs)
-
-    def can_write(self, user):
-        """ can't delete once you've linked to SequencingRun """
-        return user.is_superuser and not self.sequencingrun_set.exists()
-
-    def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        return reverse('view_experiment', kwargs={"experiment_id": self.pk})
 
 
 class SequencingRun(models.Model):
@@ -935,12 +702,6 @@ class Flagstats(SeqAutoFile):
         return f"Flagstats ({self.get_data_state_display()}) for {self.bam_file}"
 
 
-def get_fake_variant_caller():
-    variant_caller, _ = VariantCaller.objects.get_or_create(name='fake_variant_caller',
-                                                            version='0.666')
-    return variant_caller
-
-
 def get_seqauto_user():
     user, created = User.objects.get_or_create(username=settings.SEQAUTO_USER)
     if created:
@@ -1053,7 +814,7 @@ class SampleSheetCombinedVCFFile(SeqAutoFile, SampleSheetPropertiesMixin):
 
     def needs_to_be_linked(self):
         try:
-            self.backendvcf  # if no exception we can link it
+            _ = self.backendvcf  # if no exception we can link it
             try:
                 self.sample_sheet.sequencing_run.vcffromsequencingrun
             except VCFFromSequencingRun.DoesNotExist:
@@ -1478,17 +1239,6 @@ class JobScript(models.Model):
         record_pk = record.pk if record else 'N/A'
         return "%s: %r" % (self.file_type, record_pk)
 
-
-class SequencingInfo(models.Model):
-    lab_project = models.ForeignKey(LabProject, on_delete=CASCADE)
-    doi = models.TextField(blank=True, null=True)
-    paper_name = models.TextField(blank=True, null=True)
-    year_published = models.IntegerField(null=True)
-    enrichment_kit = models.ForeignKey(EnrichmentKit, on_delete=CASCADE, blank=True, null=True)
-    sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE, blank=True, null=True)
-    seq_details = models.TextField(blank=True, null=True)
-    file_type = models.TextField(blank=True, null=True)
-    file_count = models.IntegerField(blank=True, default=0)
 
 
 @receiver(post_delete, sender=JobScript)

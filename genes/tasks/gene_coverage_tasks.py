@@ -8,7 +8,7 @@ from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTr
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript
 from seqauto.models import EnrichmentKit
-from seqauto.models_enums import DataState
+from snpdb.models import DataState
 
 
 @celery.task

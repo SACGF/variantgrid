@@ -2,7 +2,8 @@ from collections import defaultdict
 import re
 
 from library.utils import FLOAT_REGEX
-from seqauto.models_enums import SequencerRead, PairedEnd, DataState
+from seqauto.models.models_enums import SequencerRead, PairedEnd
+from snpdb.models import DataState
 
 
 # TODO: Return a hash, instead of having knowledge of object (should be done in models)

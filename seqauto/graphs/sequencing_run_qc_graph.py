@@ -6,7 +6,7 @@ import hashlib
 
 from library.graphs.graph_utils import ForceMandKIntFormatter
 from seqauto.models import SequencingRun
-from seqauto.models_enums import QCCompareType
+from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.sequencing_run_utils import ILLUMINA_FLOWCELL_QC_COLUMNS, SEQUENCING_RUN_QC_COLUMNS, PAIRED_END_READS, get_q30_col_name, get_sequencing_run_data
 from snpdb.graphs.graphcache import CacheableGraph
 

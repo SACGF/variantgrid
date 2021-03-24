@@ -36,8 +36,7 @@ from library.django_utils import SortByPKMixin
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.log_utils import log_traceback
 from library.utils import empty_dict
-from seqauto.models_enums import DataState
-from snpdb.models import Wiki, Company, Sample
+from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 

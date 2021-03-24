@@ -161,3 +161,17 @@ class SuperPopulationCode(models.TextChoices):
     EAS = "E", "East Asian"
     EUR = "U", "European"
     SAS = "S", "South Asian"
+
+
+class DataState(models.TextChoices):
+    """ For files being loaded off disks """
+    NON_EXISTENT = 'N', 'Non Existent'
+    DELETED = 'D', 'Deleted'
+    RUNNING = 'R', 'Running'
+    SKIPPED = 'S', 'Skipped'
+    ERROR = 'E', 'Error'
+    COMPLETE = 'C', 'Complete'
+
+    @staticmethod
+    def should_create_new_record(data_state):
+        return data_state not in [DataState.DELETED, DataState.SKIPPED]

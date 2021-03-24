@@ -31,7 +31,7 @@ from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedR
     SeqAutoRun, Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, \
     SequencingRunModification, SoftwarePipelineNode, GoldReference, \
     GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage
-from seqauto.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
+from seqauto.models.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
     QCCompareType, SequencingFileType
 from seqauto.qc.exec_summary import EXEC_STATS_LOOKUP
 from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, \

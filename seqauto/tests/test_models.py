@@ -10,9 +10,9 @@ from genes.models import GeneCoverageCollection
 from seqauto.models import SequencerModel, Sequencer, SequencingRun, SampleSheet, \
     SequencingRunCurrentSampleSheet, SequencingSample, Fastq, UnalignedReads, Aligner, \
     BamFile, VCFFile, QC, VariantCaller, EnrichmentKit, QCGeneCoverage
-from seqauto.models_enums import DataState, DataGeneration
+from seqauto.models.models_enums import DataGeneration
 from seqauto.tasks.gold_summary_tasks import calculate_gold_summary
-from snpdb.models import Manufacturer, GenomeBuild
+from snpdb.models import Manufacturer, GenomeBuild, DataState
 
 
 class TestSeqAutoModels(TestCase):

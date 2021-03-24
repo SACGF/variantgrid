@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand
 import logging
 
 from seqauto.models import IlluminaFlowcellQC
-from seqauto.models_enums import DataState
+from snpdb.models import DataState
 
 
 class Command(BaseCommand):

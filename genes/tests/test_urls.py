@@ -11,8 +11,7 @@ from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, 
     GeneListCategory, Gene, CanonicalTranscript, GeneListGeneSymbol, PanelAppServer
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
-from seqauto.models_enums import DataState
-from snpdb.models import ImportStatus
+from snpdb.models import ImportStatus, DataState
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.test_data import create_fake_trio
 

@@ -1,7 +1,6 @@
 from django.template import Library
 
-from seqauto.models import DataState
-
+from snpdb.models import DataState
 
 register = Library()
 

@@ -9,7 +9,7 @@ Place to put common data gathering utils for SequencingRunQC and QCExecsummary
 from collections import defaultdict
 
 from seqauto.models import SequencingRun, IlluminaFlowcellQC, ReadQ30, QCExecSummary
-from seqauto.models_enums import QCCompareType
+from seqauto.models.models_enums import QCCompareType
 
 
 ILLUMINA_FLOWCELL_QC_COLUMNS = ["mean_cluster_density", "mean_pf_cluster_density", "total_clusters",

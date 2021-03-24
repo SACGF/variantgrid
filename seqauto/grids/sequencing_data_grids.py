@@ -3,9 +3,8 @@ from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 
 from library.jqgrid_user_row_config import JqGridUserRowConfig
-from seqauto.models import SequencingRun, BamFile, UnalignedReads, DataState, \
-    VCFFile, QC, SampleSheet, Experiment, EnrichmentKit
-from snpdb.models import UserGridConfig
+from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, SampleSheet, Experiment, EnrichmentKit
+from snpdb.models import UserGridConfig, DataState
 
 
 class ExperimentsListGrid(JqGridUserRowConfig):

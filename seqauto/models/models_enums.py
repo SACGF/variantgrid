@@ -4,19 +4,6 @@ from django.db import models
 from library.utils import Constant
 
 
-class DataState(models.TextChoices):
-    NON_EXISTENT = 'N', 'Non Existent'
-    DELETED = 'D', 'Deleted'
-    RUNNING = 'R', 'Running'
-    SKIPPED = 'S', 'Skipped'
-    ERROR = 'E', 'Error'
-    COMPLETE = 'C', 'Complete'
-
-    @staticmethod
-    def should_create_new_record(data_state):
-        return data_state not in [DataState.DELETED, DataState.SKIPPED]
-
-
 class QCGraphEnrichmentKitSeparationChoices(models.TextChoices):
     ALL_ENRICHMENT_KITS = 'A', 'All Enrichment Kits'
     SEPARATED_ENRICHMENT_KITS = 'S', 'Separated Enrichment Kit'

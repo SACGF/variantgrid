@@ -2,8 +2,8 @@ import hashlib
 import logging
 
 from snpdb.graphs.graphcache import CacheableGraph
-from seqauto.models import QC, DataState, QCColumn
-
+from seqauto.models import QC, QCColumn
+from snpdb.models import DataState
 
 PADDING = 0.5
 

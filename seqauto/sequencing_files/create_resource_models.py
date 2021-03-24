@@ -20,10 +20,11 @@ from library.log_utils import get_traceback, log_traceback
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
-    UnalignedReads, BamFile, DataState, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
+    UnalignedReads, BamFile, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
     DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SeqAutoRunEvent, SequencingRunModification, \
     SampleFromSequencingSample, VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage
-from seqauto.models_enums import SequencingFileType
+from snpdb.models import DataState
+from seqauto.models.models_enums import SequencingFileType
 from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, sequencing_run_created_signal, \
     sequencing_run_sample_sheet_created_signal
 from upload.models import BackendVCF
@@ -923,10 +924,15 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
     missing = 0
     unchanged = 0
 
+    print(f"{existing_other_qc_records=}")
+    print(f"{existing_qcs=}")
+
     for qc in qc_set:
         other_qc_path = klass.get_path_from_qc(qc)
         exists = other_qc_path in existing_qcs
         data_state = get_data_state(qc.data_state, exists)
+
+        print(f"{other_qc_path=} {exists=}, {data_state=}")
 
         path = pathlib.Path(other_qc_path)
         if exists:
@@ -935,6 +941,7 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             file_last_modified = 0.0
 
         def _create_new_record():
+            print(f"_create_new_record, data_state={data_state=}")
             return klass.objects.create(path=other_qc_path,
                                         qc=qc,
                                         data_state=data_state,
@@ -974,6 +981,7 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             if DataState.should_create_new_record(data_state):
                 created += 1
                 record = _create_new_record()
+                print(f"{record=}")
                 load_from_file_if_complete(seqauto_run,
                                            record,
                                            gene_matcher=gene_matcher,

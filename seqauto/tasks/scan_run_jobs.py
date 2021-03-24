@@ -8,7 +8,7 @@ import subprocess
 from library.file_utils import name_from_filename, mk_path
 from library.log_utils import get_traceback
 from seqauto.models import SeqAutoRun
-from seqauto.models_enums import SequencingFileType
+from seqauto.models.models_enums import SequencingFileType
 from seqauto.pbs.create_jobs import create_jobs_and_launch_script
 from seqauto.sequencing_files.create_resource_models import create_resource_models
 

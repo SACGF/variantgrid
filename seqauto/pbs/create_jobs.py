@@ -6,9 +6,10 @@ import stat
 
 from library.file_utils import add_permissions_to_file, mk_path_for_file
 from seqauto.job_scripts import get_job_data, create_bash_script
-from seqauto.models import VCFFile, DataState, SampleSheet, BamFile, \
+from seqauto.models import VCFFile, SampleSheet, BamFile, \
     SequencingFileType, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, \
     FastQC, Flagstats, JobScript
+from snpdb.models import DataState
 from seqauto.pbs.pbs_scripts import get_dependency_flags, create_pbs_script
 
 
