@@ -2,4 +2,4 @@
     {% if not forloop.first %}<br/>{% endif %}
     <span><a href="{% url 'ontology_term' term.url_safe_id %}" class="hover-link">{{ term.id }}</a> {{ term.name }}</span>
 {% endfor %}
-{% if condition.join_text %}<span class="font-italic">{{ condition.join_text }}</span>{% endif %}
+{% if condition.join_text %}&#32;<span class="font-italic">{{ condition.join_text }}</span>{% endif %}
