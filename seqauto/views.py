@@ -1,16 +1,16 @@
+import json
 from collections import defaultdict
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
-from django.http.response import HttpResponseRedirect, JsonResponse, \
-    HttpResponse
+from django.http.response import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls.base import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import UpdateView
-import json
 
 from eventlog.models import create_event
 from genes.models import CanonicalTranscriptCollection
@@ -27,16 +27,14 @@ from seqauto.graphs.qc_exec_summary_graph import QCExecSummaryGraph
 from seqauto.graphs.sequencing_run_qc_graph import SequencingRunQCGraph
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedReads, QCType, VCFFile, QC, \
-    Experiment, SequencingSample, SampleSheetCombinedVCFFile, QCExecSummary, IlluminaFlowcellQC, \
-    SeqAutoRun, Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, \
-    SequencingRunModification, SoftwarePipelineNode, GoldReference, \
-    GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage
+    Experiment, SequencingSample, SampleSheetCombinedVCFFile, QCExecSummary, IlluminaFlowcellQC, SeqAutoRun, \
+    Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, SoftwarePipelineNode, \
+    GoldReference, GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage
 from seqauto.models.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
     QCCompareType, SequencingFileType
 from seqauto.qc.exec_summary import EXEC_STATS_LOOKUP
-from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, \
-    get_qc_exec_summary_data, get_sequencing_run_columns, \
-    SEQUENCING_RUN_QC_COLUMNS, QC_EXEC_SUMMARY_QC_COLUMNS
+from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec_summary_data, \
+    get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS, QC_EXEC_SUMMARY_QC_COLUMNS
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.create_resource_models import assign_old_sample_sheet_data_to_current_sample_sheet
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
@@ -158,9 +156,9 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
             for f in sequencing_run_form.changed_data:
                 val = sequencing_run_form.cleaned_data.get(f)
                 message = f"{f} set to {val}"
-                SequencingRunModification.objects.create(sequencing_run=sequencing_run,
-                                                         user=request.user,
-                                                         message=message)
+                #SequencingRunModification.objects.create(sequencing_run=sequencing_run,
+                #                                         user=request.user,
+                #                                         message=message)
 
             sequencing_run = sequencing_run_form.save()
 

@@ -21,8 +21,8 @@ from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
     UnalignedReads, BamFile, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
-    DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SeqAutoRunEvent, SequencingRunModification, \
-    SampleFromSequencingSample, VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage
+    DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SampleFromSequencingSample, \
+    VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage
 from snpdb.models import DataState
 from seqauto.models.models_enums import SequencingFileType
 from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, sequencing_run_created_signal, \
@@ -171,13 +171,14 @@ class FlowcellChecker:
 
 
 def create_sequencing_run_event(seqauto_run, sequencing_run, message, severity=LogLevel.INFO):
-    sar_event = SeqAutoRunEvent.objects.create(seqauto_run=seqauto_run,
-                                               severity=severity,
-                                               file_type=SequencingFileType.SAMPLE_SHEET,
-                                               message=message)
+    pass
+    #sar_event = SeqAutoRunEvent.objects.create(seqauto_run=seqauto_run,
+    #                                           severity=severity,
+    #                                           file_type=SequencingFileType.SAMPLE_SHEET,
+    #                                           message=message)
 
-    SequencingRunModification.objects.create(sequencing_run=sequencing_run,
-                                             seqauto_run_event=sar_event)
+    #SequencingRunModification.objects.create(sequencing_run=sequencing_run,
+    #                                         seqauto_run_event=sar_event)
 
 
 def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):
@@ -343,9 +344,9 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
     UnalignedReads.get_for_old_sample_sheets(sequencing_run).delete()
 
     message = f"Assigning old data to current sample sheet {current_sample_sheet.hash} ({current_sample_sheet.date})"
-    SequencingRunModification.objects.create(sequencing_run=sequencing_run,
-                                             user=user,
-                                             message=message)
+    #SequencingRunModification.objects.create(sequencing_run=sequencing_run,
+    #                                         user=user,
+    #                                         message=message)
 
     sequencing_run.save()  # Re-validate "ready"
 
