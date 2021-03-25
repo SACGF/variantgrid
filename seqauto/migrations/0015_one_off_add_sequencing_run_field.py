@@ -29,7 +29,7 @@ def _one_off_add_sequencing_run_field(apps, schema_editor):
         # Tried doing bulk update but it died expecting id (int) while PK=sequencing_run - I think
         # it has something to do with model inheritance
         for record in klass.objects.all():
-            sequencing_run_id = klass.objects.all().values_list(path_to_sequencing_run, flat=True).distinct()[0]
+            sequencing_run_id = klass.objects.filter(pk=record.pk).values_list(path_to_sequencing_run, flat=True).distinct()[0]
             #print(f"Assigning {record} -> {sequencing_run_id=}")
             record.sequencing_run_id = sequencing_run_id
             record.save()
