@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
-from flags.models import Flag, FlagPermissionLevel
+from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS, chgvs_diff_description, CHGVSDiff, HGVSNameExtra
@@ -300,9 +300,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return can_create and (user.is_superuser or settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
 
     @staticmethod
-    def dashboard_report(since) -> QuerySet:
+    def dashboard_report_classifications_of_interest(since) -> QuerySet:
         min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
-        return Classification.objects.filter(created__gte=since, created__lte=min_age).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
+
+        # want to find new tags that are still open
+        flag_collections = Flag.objects.filter(created__gte=since, created__lte=min_age, resolution__status=FlagStatus.OPEN).order_by('collection__id').values_list('collection__id', flat=True).distinct()
+        flag_activity = Classification.objects.filter(flag_collection_id__in=flag_collections)
+        not_lifted = Classification.objects.filter(created__gte=since, created__lte=min_age).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
+
+        return flag_activity.union(not_lifted)
 
 
     @classmethod

@@ -473,7 +473,11 @@ class UserSettingsGenomeBuildMixin:
         genome_builds_qs = GenomeBuild.builds_with_annotation()
         build_field = self.fields['genome_build']
         build_field.queryset = genome_builds_qs
+
+        self.genome_build_hidden = False
+
         if genome_builds_qs.count() < 2:
+            self.genome_build_hidden = True
             build_field.widget = HiddenInput()
 
 

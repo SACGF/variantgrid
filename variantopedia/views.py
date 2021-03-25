@@ -91,15 +91,19 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     analyses = Analysis.filter_for_user(user)
     analyses_created = analyses.filter(created__gte=start_time)
     analyses_modified = analyses.filter(created__lt=start_time, modified__gte=start_time)
-    any_notices = any(qs.exists() for qs in [events, vcfs, analyses_created, analyses_modified])
+    from classification.models import Classification
+    classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
+
+    any_notices = any(qs.exists() for qs in [events, vcfs, analyses_created, analyses_modified, classifications_of_interest])
 
     dashboard_notices = {}
     if any_notices:
         dashboard_notices = {"notice_header": notice_header,
                              "events": events,
+                             "classifications_of_interest": classifications_of_interest,
                              "vcfs": vcfs,
                              "analyses_created": analyses_created,
-                             "analyses_modified": analyses_modified}
+                             "analyses_modified": analyses_modified,}
     return dashboard_notices
 
 

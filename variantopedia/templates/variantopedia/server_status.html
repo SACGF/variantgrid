@@ -114,6 +114,22 @@
                     {% endfor %}
                 </ul>
             {% endif %}
+            {% if dashboard_notices.classifications_of_interest %}
+                <div class="row mt-2">
+                    <div class="col-3">
+                        <a class='toggle-link' data-toggle='collapse' href='#classifications-of-interest'>View {% count dashboard_notices.classifications_of_interest singular='1 Classification' plural='Classifications' %} of Interest</a>
+                    </div>
+                    <div class="col-9">
+                        <a href="{% url 'activity' %}">Goto Classification Activity</a>
+                    </div>
+                </div>
+
+                <ul class='list-group collapse' id="classifications-of-interest">
+                    {% for c in dashboard_notices.classifications_of_interest %}
+                        <a class='list-group-item list-group-item-action' href="{% url 'view_classification' c.pk %}">{{ c }}</a>
+                    {% endfor %}
+                </ul>
+            {% endif %}
             {% if dashboard_notices.vcfs %}
                 <div class="row mt-2">
                     <div class="col-3">
