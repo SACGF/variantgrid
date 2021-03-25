@@ -17,16 +17,19 @@ from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
     VCF_IMPORTER_VERSION = 1  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
-    EMPTY_SINGLE_ELEMENT_ARRAY = postgres_arrays([BulkGenotypeVCFProcessor.MISSING_DATA_VALUE])
-    EMPTY_COHORT_GT_DATA = [0,
-                            0,
-                            0,
-                            Zygosity.UNKNOWN_ZYGOSITY,
-                            EMPTY_SINGLE_ELEMENT_ARRAY,
-                            EMPTY_SINGLE_ELEMENT_ARRAY,
-                            EMPTY_SINGLE_ELEMENT_ARRAY,
-                            EMPTY_SINGLE_ELEMENT_ARRAY,
-                            EMPTY_SINGLE_ELEMENT_ARRAY]
+    EMPTY_COHORT_GT_DATA = [
+        0,  # ref_count
+        0,  # het_count
+        0,  # hom_count
+        0,  # unk_count
+        Zygosity.UNKNOWN_ZYGOSITY,   # samples_zygosity
+        None,  # samples_allele_depth
+        None,  # samples_allele_frequency
+        None,  # samples_read_depth
+        None,  # samples_genotype_quality
+        None,  # samples_phred_likelihood,
+        None,  # samples_filters
+    ]
 
     @staticmethod
     def get_vcf_importer_version():
