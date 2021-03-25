@@ -1927,7 +1927,7 @@ VCTable.c_hgvs = (data, type, row) => {
     const MAX_C_HGVS_LEN = 100;
 
     let labelFn = (chgvsValue) => {
-        if (chgvsValue.type == 'imported') {
+        if (chgvsValue.type === 'imported') {
             return `<i>Imported (${chgvsValue.build})</i>`;
         } else {
             return `<i>Normalised (${chgvsValue.build})</i>`;

@@ -381,8 +381,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         will not look up the hierarchy for a valid term, do that beforehand
         """
         if terms := self.condition_xref_terms:
+
+            def format_term(term: OntologyTerm) -> str:
+                if name := term.name:
+                    return f"{term.id} {term.name}"
+                else:
+                    return term.id
+
             terms = _sort_terms(terms)  # sorts by name
-            text = ", ".join([f"{term.id} {term.name}" for term in terms])
+            text = ", ".join([format_term(term) for term in terms])
             sort_text = ", ".join([term.name for term in terms]).lower()
             if len(terms) > 1:
                 text = f"{text}; {MultiCondition(self.condition_multi_operation).label}"
@@ -831,8 +838,10 @@ def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_
     return _is_descendant_ids({term.id for term in terms}, {term.id for term in ancestors}, set(), check_levels)
 
 
-def _sort_terms(terms: Iterable[OntologyTerm]):
-    return sorted(list(terms), key=attrgetter("name"))
+def _sort_terms(terms: Iterable[OntologyTerm]) -> List[OntologyTerm]:
+    # sort by name (so OMIM, MONDO etc will be sorted together)
+    # if we don't have a name, then fall back to ontology service, and then index, so DOID:00034 will appear before DOID:400
+    return sorted(list(terms), key=attrgetter("name", "ontology_service", "index"))
 
 
 def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> List[ConditionMatchingSuggestion]:
