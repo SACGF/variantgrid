@@ -186,6 +186,7 @@ class CohortListGrid(JqGridUserRowConfig):
                  'formatter_kwargs': {"icon_css_class": "cohort-icon",
                                       "url_name": "view_cohort",
                                       "url_object_column": "id"}},
+        "sample_count": {"label": "Sample Count"},
     }
 
     def __init__(self, user):
@@ -196,12 +197,6 @@ class CohortListGrid(JqGridUserRowConfig):
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': "modified",
                                   'sortorder': "desc"})
-
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
-        extra = {'index': 'sample_count', 'name': 'sample_count', 'label': 'Sample Count', 'sorttype': 'int'}
-        colmodels.append(extra)
-        return colmodels
 
 
 class TriosListGrid(JqGridUserRowConfig):
