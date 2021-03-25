@@ -221,6 +221,16 @@ class ConditionResolved:
     terms: List[OntologyTerm]
     join: Optional[Any]
 
+    @lazy
+    def join_text(self):
+        if join := self.join:
+            try:
+                from classification.models import MultiCondition
+                return MultiCondition(join).label
+            except:
+                pass
+        return None
+
 
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
     """

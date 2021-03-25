@@ -1912,7 +1912,7 @@ VCForm.format_condition = function(condition_json) {
     }
     if (condition_json.resolved_terms.length > 1) {
         let joinText = 'Uncertain';
-        $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occuring' : ' Uncertain'}).appendTo(dom);
+        $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;
 };
@@ -1927,7 +1927,7 @@ VCTable.c_hgvs = (data, type, row) => {
     const MAX_C_HGVS_LEN = 100;
 
     let labelFn = (chgvsValue) => {
-        if (chgvsValue.type == 'imported') {
+        if (chgvsValue.type === 'imported') {
             return `<i>Imported (${chgvsValue.build})</i>`;
         } else {
             return `<i>Normalised (${chgvsValue.build})</i>`;
