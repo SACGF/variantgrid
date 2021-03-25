@@ -48,7 +48,7 @@
 	
 		<h3>Input</h3>
 		<ul>
-		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' qc.bam_file.unaligned_reads.sequencing_run.pk %}">{{ qc.bam_file.unaligned_reads.sequencing_run }}</a></li>  
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' qc.sequencing_run.pk %}">{{ qc.sequencing_run }}</a></li>
 		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' qc.bam_file.unaligned_reads.pk %}">{{ qc.bam_file.unaligned_reads }}</a></li>
 		<li>Bam: <a href="{% url 'view_bam_file' qc.bam_file.pk %}">{{ qc.bam_file }}</a></li>
 		<li>VCF: <a href="{% url 'view_vcf_file' qc.vcf_file.pk %}">{{ qc.vcf_file }}</a></li>

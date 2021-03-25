@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='EnrichmentKit',
@@ -82,7 +82,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='FastQC',
@@ -99,7 +99,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='Flagstats',
@@ -136,7 +136,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SampleSheetPropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='QC',
@@ -150,7 +150,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='QCType',
@@ -295,7 +295,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='VariantCallingPipeline',
@@ -320,7 +320,7 @@ class Migration(migrations.Migration):
                 ('fastq_r2', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='fastq_r2', to='seqauto.fastq')),
                 ('sequencing_sample', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='seqauto.sequencingsample')),
             ],
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='SoftwarePipelineNode',
@@ -429,7 +429,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SampleSheetPropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.AddField(
             model_name='samplesheet',
@@ -468,7 +468,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='QCGeneCoverage',
@@ -513,7 +513,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(models.Model, seqauto.models.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='QCColumn',

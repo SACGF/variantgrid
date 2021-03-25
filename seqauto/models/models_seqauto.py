@@ -1,15 +1,17 @@
-from typing import List
+import pathlib
+from datetime import datetime
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import DecimalRangeField
 from django.db import models
-from django.db.models import Value, When, Case
+from django.db.models import Value, When, Case, IntegerField
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
+from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
 import logging
 import os
@@ -99,13 +101,36 @@ class SeqAutoRecord(TimeStampedModel):
     """ Base class for everything below """
     objects = InheritanceManager()
     path = models.TextField()
+    # Everything is derived from a SequencingRun so just keep this around to simplify traversing models
+    # Need to keep this nullable so we can make a SequencingRun before assigning FK to itself
+    sequencing_run = models.ForeignKey("SequencingRun", null=True, on_delete=CASCADE)
     # Stores stat st_mtime - time of last modification - only used for classes that can reload
     file_last_modified = models.FloatField(default=0.0)
     hash = models.TextField()  # Not used for everything
+    is_valid = models.BooleanField(default=False)  # Set in save
     data_state = models.CharField(max_length=1, choices=DataState.choices)
+
+    def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
+        self.validate()
+        self.is_valid = not SeqAutoMessage.objects.filter(record=self, open=True, severity=LogLevel.ERROR).exists()
+        super().save()
+
+    def validate(self) -> bool:
+        """ Creates SeqAutoMessage of severity=ERROR - or closes any that no longer apply """
+        return True
+
+    @property
+    def last_modified_datetime(self):
+        return make_aware(datetime.fromtimestamp(self.file_last_modified))
 
     def _close_messages_with_code(self, *args):
         SeqAutoMessage.objects.filter(record=self, code__in=args).update(open=False)
+
+    @staticmethod
+    def get_file_last_modified(filename):
+        path = pathlib.Path(filename)
+        return path.stat().st_mtime
 
     def add_messages(self, request):
         qs = SeqAutoMessage.objects.filter(record=self, open=True).annotate(
@@ -114,10 +139,11 @@ class SeqAutoRecord(TimeStampedModel):
                 When(severity=LogLevel.WARNING, then=Value(2)),
                 When(severity=LogLevel.INFO, then=Value(3)),
                 When(severity=LogLevel.DEBUG, then=Value(4)),
+                output_field=IntegerField(),
             )
         ).order_by("priority")
         for sa_message in qs:
-            messages.add_message(request, sa_message.severity, sa_message.message)
+            messages.add_message(request, sa_message.level, sa_message.message)
 
 
 class SeqAutoMessage(TimeStampedModel):
@@ -129,6 +155,11 @@ class SeqAutoMessage(TimeStampedModel):
     code = models.TextField(null=True)  # A code you can use to close messages after resolving
     message = models.TextField()
     open = models.BooleanField(default=True)
+
+    @property
+    def level(self):
+        """ Convert from LogLevel to Django Messages constants """
+        return messages.constants.DEFAULT_LEVELS[self.get_severity_display()]
 
     def __str__(self):
         record = SeqAutoRecord.objects.get_subclass(pk=self.record)
@@ -142,7 +173,6 @@ class SequencingRun(SeqAutoRecord):
     gold_standard = models.BooleanField(default=False)
     bad = models.BooleanField(default=False)
     hidden = models.BooleanField(default=False)
-    ready = models.BooleanField(default=False)
     legacy = models.BooleanField(default=False)  # Don't update it with scans (eg to say file missing)
     experiment = models.ForeignKey(Experiment, null=True, on_delete=SET_NULL)
     # Sequencing Run can be all one enrichment_kit, or SequencingSample can have own enrichment_kits
@@ -150,12 +180,6 @@ class SequencingRun(SeqAutoRecord):
     has_basecalls = models.BooleanField(default=False)
     has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
-
-    def save(self, force_insert=False, force_update=False, using=None,
-             update_fields=None):
-        self._validate()
-        self.ready = not SeqAutoMessage.objects.filter(record=self, open=True, severity=LogLevel.ERROR).exists()
-        super().save()
 
     def _validate(self):
         sample_sheet_changed_code = "sample_sheet_changed"
@@ -296,26 +320,8 @@ class SequencingRunWiki(Wiki):
     sequencing_run = models.OneToOneField(SequencingRun, on_delete=CASCADE)
 
 
-class SampleSheetPropertiesMixin:
-    """ Needs a "sample_sheet" property """
-
-    @property
-    def sequencing_run(self):
-        return self.sample_sheet.sequencing_run
-
-
-class SequencingSamplePropertiesMixin(SampleSheetPropertiesMixin):
-    """ Needs a "sequencing_sample" property """
-
-    @property
-    def sample_sheet(self):
-        return self.sequencing_sample.sample_sheet
-
-
 class SampleSheet(SeqAutoRecord):
     SAMPLE_SHEET = "SampleSheet.csv"
-    # We should assume that these will be changed, and so need to know...
-    sequencing_run = models.ForeignKey(SequencingRun, on_delete=CASCADE)
 
     def get_params(self):
         params = self.sequencing_run.get_params()
@@ -446,7 +452,7 @@ class VCFFromSequencingRun(models.Model):
     sequencing_run = models.OneToOneField(SequencingRun, on_delete=CASCADE)
 
 
-class IlluminaFlowcellQC(SeqAutoRecord, SampleSheetPropertiesMixin):
+class IlluminaFlowcellQC(SeqAutoRecord):
     sample_sheet = models.OneToOneField(SampleSheet, on_delete=CASCADE)
     mean_cluster_density = models.IntegerField(null=True)
     mean_pf_cluster_density = models.IntegerField(null=True)
@@ -496,7 +502,7 @@ class IlluminaIndexQC(models.Model):
     reads = models.IntegerField()
 
 
-class Fastq(SeqAutoRecord, SequencingSamplePropertiesMixin):
+class Fastq(SeqAutoRecord):
     sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
     name = models.TextField()  # from path
     read = models.CharField(max_length=2, choices=PairedEnd.choices)
@@ -565,15 +571,11 @@ class Fastq(SeqAutoRecord, SequencingSamplePropertiesMixin):
         return f"FastQ {self.name} ({self.read}) from sample {self.sequencing_sample}"
 
 
-class FastQC(SeqAutoRecord, SequencingSamplePropertiesMixin):
+class FastQC(SeqAutoRecord):
     fastq = models.OneToOneField(Fastq, on_delete=CASCADE)
     total_sequences = models.IntegerField(null=True)
     filtered_sequences = models.IntegerField(null=True)
     gc = models.IntegerField(null=True)
-
-    @property
-    def sequencing_sample(self):
-        return self.fastq.sequencing_sample
 
     def get_params(self):
         params = self.fastq.get_params()
@@ -599,7 +601,7 @@ class FastQC(SeqAutoRecord, SequencingSamplePropertiesMixin):
         return f"FastQC ({self.get_data_state_display()}) for {self.fastq}"
 
 
-class UnalignedReads(models.Model, SequencingSamplePropertiesMixin):
+class UnalignedReads(models.Model):
     """ Not a file just a way of keeping paired end fastqs together """
     sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
     fastq_r1 = models.ForeignKey(Fastq, related_name='fastq_r1', on_delete=CASCADE)
@@ -607,7 +609,8 @@ class UnalignedReads(models.Model, SequencingSamplePropertiesMixin):
 
     def get_params(self):
         fastq_params = self.fastq_r1.sequencing_sample.get_params()
-        data_naming_convention = self.sequencing_run.sequencer.sequencer_model.data_naming_convention
+        sequencing_run = self.sequencing_sample.sample_sheet.sequencing_run
+        data_naming_convention = sequencing_run.sequencer.sequencer_model.data_naming_convention
         if data_naming_convention == DataGeneration.HISEQ:
             aligned_pattern = settings.SEQAUTO_HISEQ_ALIGNED_PATTERN
         elif data_naming_convention == DataGeneration.MISEQ:
@@ -655,7 +658,7 @@ class UnalignedReads(models.Model, SequencingSamplePropertiesMixin):
         return f"UnalignedReads2 from sample {self.sequencing_sample} ({data_state})"
 
 
-class BamFile(SeqAutoRecord, SequencingSamplePropertiesMixin):
+class BamFile(SeqAutoRecord):
     unaligned_reads = models.ForeignKey(UnalignedReads, null=True, on_delete=CASCADE)
     name = models.TextField()
     aligner = models.ForeignKey(Aligner, on_delete=CASCADE)
@@ -750,7 +753,7 @@ class DontAutoLoadException(Exception):
     pass
 
 
-class VCFFile(SeqAutoRecord, SequencingSamplePropertiesMixin):
+class VCFFile(SeqAutoRecord):
     """ VCFs from the file system """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
@@ -761,10 +764,6 @@ class VCFFile(SeqAutoRecord, SequencingSamplePropertiesMixin):
     @property
     def name(self):
         return name_from_filename(self.path)
-
-    @property
-    def sequencing_sample(self):
-        return self.bam_file.sequencing_sample
 
     @property
     def upload_pipeline(self):
@@ -794,7 +793,7 @@ class VCFFile(SeqAutoRecord, SequencingSamplePropertiesMixin):
         return f"VCF {self.name} ({self.get_data_state_display()})"
 
 
-class SampleSheetCombinedVCFFile(SeqAutoRecord, SampleSheetPropertiesMixin):
+class SampleSheetCombinedVCFFile(SeqAutoRecord):
     sample_sheet = models.ForeignKey(SampleSheet, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
@@ -869,7 +868,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord, SampleSheetPropertiesMixin):
         return f"ComboVCF ({self.pk}) for {self.sample_sheet.sequencing_run} ({num_samples} samples)"
 
 
-class QC(SeqAutoRecord, SequencingSamplePropertiesMixin):
+class QC(SeqAutoRecord):
     """ This holds together all of the other QC objects """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
     vcf_file = models.ForeignKey(VCFFile, on_delete=CASCADE)
@@ -908,7 +907,7 @@ class QC(SeqAutoRecord, SequencingSamplePropertiesMixin):
         return f"QC {name_from_filename(self.path)} ({self.get_data_state_display()})"
 
 
-class QCGeneList(SeqAutoRecord, SequencingSamplePropertiesMixin):
+class QCGeneList(SeqAutoRecord):
     """ This represents a text file containing genes which will be used for initial pass and QC filters """
     qc = models.ForeignKey(QC, on_delete=CASCADE)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=SET_NULL)
@@ -960,7 +959,7 @@ class QCGeneList(SeqAutoRecord, SequencingSamplePropertiesMixin):
         self.save()
 
 
-class QCExecSummary(SeqAutoRecord, SequencingSamplePropertiesMixin):
+class QCExecSummary(SeqAutoRecord):
     qc = models.ForeignKey(QC, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, null=True, on_delete=CASCADE)  # GOI - null = all genes
 

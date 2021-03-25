@@ -15,12 +15,23 @@
     </p>
 
     <h3>Messages</h3>
-    {% if seqauto_run.seqautorunevent_set.all %}
+    {% if seqauto_run.seqautomessage_set.all %}
         <table>
-        {% for sar_event in seqauto_run.seqautorunevent_set.all %}
-            <tr><td>{{ sar_event.get_file_type_display }}
-                <td>{{ sar_event.message }}
-                <td>{{ sar_event.get_severity_display }}
+            <thead>
+                <tr>
+                    <th>SequencingRun</th>
+                    <th>Record</th>
+                    <th>Message</th>
+                    <th>Level</th>
+                </tr>
+            </thead>
+        {% for sam in seqauto_run.seqautomessage_set.all %}
+            <tr>
+                <td>{{ sam.record.sequencing_run }}</td>
+                <td>{{ sam.record }}</td>
+                <td>{{ sam.message }}</td>
+                <td>{{ sam.get_severity_display }}</td>
+            </tr>
         {% endfor %} 
         </table>
     {% else %}

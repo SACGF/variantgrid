@@ -20,7 +20,7 @@
 	<div>
 		<h3>Input</h3>
 		<ul>
-		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' combo_vcf_file.sample_sheet.sequencing_run.pk %}">{{ combo_vcf_file.sample_sheet.sequencing_run }}</a></li>  
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' combo_vcf_file.sequencing_run.pk %}">{{ combo_vcf_file.sequencing_run }}</a></li>
 		</ul>
 
 		{% if combo_vcf_file.upload_pipeline %}

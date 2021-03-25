@@ -1,11 +1,9 @@
 import logging
 import os
-import pathlib
 import re
 import sys
 import traceback
 from collections import Counter, defaultdict
-from datetime import datetime
 from typing import Iterable, Optional
 
 import pandas as pd
@@ -22,7 +20,7 @@ from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_val
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
     UnalignedReads, BamFile, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
     DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SampleFromSequencingSample, \
-    VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage, SeqAutoMessage
+    VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage, SeqAutoMessage, SeqAutoRecord
 from snpdb.models import DataState
 from seqauto.models.models_enums import SequencingFileType
 from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, sequencing_run_created_signal, \
@@ -111,11 +109,6 @@ def create_samplesheet_samples(sample_sheet):
                                                     value=value)
 
     return sequencing_samples
-
-
-def django_modification_date(path):
-    ts = os.path.getmtime(path)
-    return datetime.fromtimestamp(ts)
 
 
 def load_from_file_if_complete(seqauto_run, record, **kwargs):
@@ -335,10 +328,11 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
     # Delete anything left...
     UnalignedReads.get_for_old_sample_sheets(sequencing_run).delete()
 
-    message = f"Assigning old data to current sample sheet {current_sample_sheet.hash} ({current_sample_sheet.date})"
-    #SequencingRunModification.objects.create(sequencing_run=sequencing_run,
-    #                                         user=user,
-    #                                         message=message)
+    message = f"Assigning old data to current sample sheet {current_sample_sheet.hash} ({current_sample_sheet.last_modified_datetime})"
+    SeqAutoMessage.objects.create(record=sequencing_run,
+                                  severity=LogLevel.INFO,
+                                  code="assign_old_date_to_current_sample_sheet",
+                                  message=message)
 
     sequencing_run.save()  # Re-validate "ready"
 
@@ -400,6 +394,8 @@ def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing
                                                       experiment=experiment,
                                                       data_state=data_state,
                                                       fake_data=seqauto_run.fake_data)
+        sequencing_run.sequencing_run = sequencing_run  # Wat
+        sequencing_run.save()
 
         sequencing_run_created_signal.send(sender=os.path.basename(__file__),
                                            sequencing_run=sequencing_run)
@@ -423,10 +419,11 @@ def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing
     sequencing_run.save()
 
     if sequencing_run.data_state != DataState.SKIPPED:
-        sample_sheet, created = sequencing_run.samplesheet_set.get_or_create(hash=file_md5sum(samplesheet_path),
-                                                                             path=samplesheet_path)
+        sample_sheet, created = SampleSheet.objects.get_or_create(sequencing_run=sequencing_run,
+                                                                  hash=file_md5sum(samplesheet_path),
+                                                                  path=samplesheet_path)
         if created:
-            sample_sheet.date = django_modification_date(samplesheet_path)
+            sample_sheet.file_last_modified = SeqAutoRecord.get_file_last_modified(samplesheet_path)
             sample_sheet.save()
             create_samplesheet_samples(sample_sheet)
             sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),
@@ -496,7 +493,8 @@ def process_illuminate_qc(seqauto_run, existing_files, results):
             if DataState.should_create_new_record(data_state):
                 logging.info("IlluminaQC: creating for %s", illuminate_path)
                 sample_sheet = sequencing_run.get_current_sample_sheet()
-                illumina_qc = IlluminaFlowcellQC.objects.create(sample_sheet=sample_sheet,
+                illumina_qc = IlluminaFlowcellQC.objects.create(sequencing_run=sequencing_run,
+                                                                sample_sheet=sample_sheet,
                                                                 path=illuminate_path,
                                                                 data_state=data_state)
                 load_from_file_if_complete(seqauto_run, illumina_qc)
@@ -522,7 +520,7 @@ def create_fastqs_for_sample_sheet(sample_sheet, existing_fastq_files, existing_
         if data_state == DataState.NON_EXISTENT and not sample_sheet.sequencing_run.can_basecall():
             data_state = DataState.DELETED  # Can't do anything...
 
-        #logging.info("paths=%s, data_state=%s", paths, data_state)
+        # logging.info("paths=%s, data_state=%s", paths, data_state)
 
         if data_state == DataState.NON_EXISTENT:
             paths = pair_paths[0]  # 1st is what current pipeline will make
@@ -531,7 +529,7 @@ def create_fastqs_for_sample_sheet(sample_sheet, existing_fastq_files, existing_
         for fastq_path in paths:
             # We want to be able to skip these sometimes
             if not sequencing_sample.automatically_process:
-                #logging.info("Skipping sequencing sample %s", sequencing_sample)
+                # logging.info("Skipping sequencing sample %s", sequencing_sample)
                 data_state = DataState.SKIPPED
 
             fastq = existing_fastq_records.get(fastq_path)
@@ -563,10 +561,11 @@ def create_fastqs_for_sample_sheet(sample_sheet, existing_fastq_files, existing_
             else:
                 if DataState.should_create_new_record(data_state):
                     name = name_from_filename(fastq_path)
-                    fastq = Fastq.objects.create(sequencing_sample=sequencing_sample,
+                    fastq = Fastq.objects.create(sequencing_run=sequencing_sample.sample_sheet.sequencing_run,
+                                                 sequencing_sample=sequencing_sample,
                                                  path=fastq_path,
                                                  name=name,
-                                                 data_state=data_state,)
+                                                 data_state=data_state)
 
             if fastq and fastq.data_state != DataState.SKIPPED:
                 fastqs.append(fastq)
@@ -673,7 +672,8 @@ def process_fastqc(seqauto_run, existing_files, results):
                     fastqc.save()
             else:
                 if DataState.should_create_new_record(data_state):
-                    fastqc = FastQC.objects.create(fastq=fastq,
+                    fastqc = FastQC.objects.create(sequencing_run=fastq.sequencing_run,
+                                                   fastq=fastq,
                                                    path=fastqc_path,
                                                    data_state=data_state)
                     load_from_file_if_complete(seqauto_run, fastqc)
@@ -718,7 +718,9 @@ def process_bam_files_and_records(seqauto_run, existing_bam_files, existing_bam_
             if DataState.should_create_new_record(data_state):
                 name = name_from_filename(bam_path)
                 aligner = BamFile.get_aligner_from_bam_file(bam)
-                bam = BamFile.objects.create(unaligned_reads=unaligned_reads,
+                sequencing_run = unaligned_reads.fastq_r1.sequencing_run
+                bam = BamFile.objects.create(sequencing_run=sequencing_run,
+                                             unaligned_reads=unaligned_reads,
                                              path=bam_path,
                                              name=name,
                                              data_state=data_state,
@@ -749,7 +751,8 @@ def process_flagstats(seqauto_run, existing_files, results):
                 flagstats.save()
         else:
             if DataState.should_create_new_record(data_state):
-                flagstats = Flagstats.objects.create(bam_file=bam_file,
+                flagstats = Flagstats.objects.create(sequencing_run=bam_file.sequencing_run,
+                                                     bam_file=bam_file,
                                                      path=flagstats_path,
                                                      data_state=data_state)
                 load_from_file_if_complete(seqauto_run, flagstats)
@@ -790,7 +793,8 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
         else:
             if DataState.should_create_new_record(data_state):
                 variant_caller = VCFFile.get_variant_caller_from_vcf_file(vcf_path)
-                vcf_file = VCFFile.objects.create(bam_file=bam_file,
+                vcf_file = VCFFile.objects.create(sequencing_run=bam_file.sequencing_run,
+                                                  bam_file=bam_file,
                                                   path=vcf_path,
                                                   data_state=data_state,
                                                   variant_caller=variant_caller)
@@ -827,7 +831,8 @@ def process_combo_vcfs(seqauto_run, existing_files, results):
                 require_save = True
 
             if combined_vcf_file.data_state != data_state:
-                logging.info("combined_vcf_file %s data state changed from %s->%s", combined_vcf_file, combined_vcf_file.data_state, data_state)
+                logging.info("combined_vcf_file %s data state changed from %s->%s", combined_vcf_file,
+                             combined_vcf_file.data_state, data_state)
                 combined_vcf_file.data_state = data_state
                 require_save = True
 
@@ -836,7 +841,8 @@ def process_combo_vcfs(seqauto_run, existing_files, results):
         else:
             if DataState.should_create_new_record(data_state):
                 variant_caller = SampleSheetCombinedVCFFile.get_variant_caller_from_vcf_file(vcf_path)
-                combined_vcf_file = SampleSheetCombinedVCFFile.objects.create(sample_sheet=sample_sheet,
+                combined_vcf_file = SampleSheetCombinedVCFFile.objects.create(sequencing_run=sequencing_run,
+                                                                              sample_sheet=sample_sheet,
                                                                               path=vcf_path,
                                                                               data_state=data_state,
                                                                               variant_caller=variant_caller)
@@ -888,9 +894,10 @@ def process_qc(seqauto_run, existing_files, results):
         else:
             if DataState.should_create_new_record(data_state):
                 qc = QC.objects.create(path=qc_path,
+                                       sequencing_run=vcf_file.sequencing_run,
                                        bam_file=vcf_file.bam_file,
                                        vcf_file=vcf_file,
-                                       data_state=data_state,)
+                                       data_state=data_state)
                 load_from_file_if_complete(seqauto_run, qc)
 
         if qc:
@@ -929,15 +936,15 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
 
         print(f"{other_qc_path=} {exists=}, {data_state=}")
 
-        path = pathlib.Path(other_qc_path)
         if exists:
-            file_last_modified = path.stat().st_mtime
+            file_last_modified = SeqAutoRecord.get_file_last_modified(other_qc_path)
         else:
             file_last_modified = 0.0
 
         def _create_new_record():
             print(f"_create_new_record, data_state={data_state=}")
             return klass.objects.create(path=other_qc_path,
+                                        sequencing_run=qc.sequencing_run,
                                         qc=qc,
                                         data_state=data_state,
                                         file_last_modified=file_last_modified)
@@ -960,7 +967,7 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
                                            gene_matcher=gene_matcher,
                                            canonical_transcript_manager=canonical_transcript_manager)
             else:
-                #logging.info("%s - previous last modified: %f - now %f",
+                # logging.info("%s - previous last modified: %f - now %f",
                 #             record.path, record.file_last_modified, file_last_modified)
                 if exists and file_last_modified > record.file_last_modified:
                     logging.info("**** RECORD last modified has changed! ***")
