@@ -299,6 +299,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         can_create = settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE
         return can_create and (user.is_superuser or settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
 
+    @staticmethod
+    def dashboard_report(since) -> QuerySet:
+        min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
+        return Classification.objects.filter(created__gte=since, created__lte=min_age).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
+
+
     @classmethod
     def order_by_evidence(cls, key_id: str):
         return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))

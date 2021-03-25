@@ -4,6 +4,7 @@
 {% load ui_menu_bars %}
 {% load ui_utils %}
 {% load ui_help %}
+{% load english_tags %}
 {% load jqgrid_tags %}
 {% load seqauto_graph_tags %}
 {% load static %}
@@ -98,39 +99,65 @@
         {% if dashboard_notices %}
             {{ dashboard_notices.notice_header }}
             {% if dashboard_notices.events %}
-            <h4>Errors</h4>
-            <a href="{% url 'eventlog' %}">View EventLog</a>
-            <ul class='list-group'>
-                {% for e in dashboard_notices.events %}
-                    <li class='list-group-item list-group-item-danger'>{{ e }}
-                {% endfor %}
-            </ul>
+                <div class="row mt-2">
+                    <div class="col-3">
+                        <a class='toggle-link' data-toggle='collapse' href='#event-errors'>View {% count dashboard_notices.events singular='1 Error' plural='Errors' %}</a>
+                    </div>
+                    <div class="col-9">
+                        <a href="{% url 'eventlog' %}">Goto EventLog</a>
+                    </div>
+                </div>
+
+                <ul class='list-group collapse' id="event-errors">
+                    {% for e in dashboard_notices.events %}
+                        <li class='list-group-item list-group-item-danger'>{{ e }}
+                    {% endfor %}
+                </ul>
             {% endif %}
             {% if dashboard_notices.vcfs %}
-            <h4>VCFs</h4>
-            <ul class="list-group">
-                {% for vcf in dashboard_notices.vcfs %}
-                    <a class="list-group-item list-group-item-action" href="{% url 'view_vcf' vcf.pk %}">{{ vcf }}</a>
-                {% endfor %}
-            </ul>
+                <div class="row mt-2">
+                    <div class="col-3">
+                        <a class='toggle-link' data-toggle='collapse' href='#vcfs'>View {% count dashboard_notices.vcfs singular='1 New VCF' plural='New VCFs' %}</a>
+                    </div>
+                    <div class="col-9">
+                        <a href="{% url 'vcfs' %}">Goto VCFs</a>
+                    </div>
+                </div>
+                <ul class="list-group collapse" id="vcfs">
+                    {% for vcf in dashboard_notices.vcfs %}
+                        <a class="list-group-item list-group-item-action" href="{% url 'view_vcf' vcf.pk %}">{{ vcf }}</a>
+                    {% endfor %}
+                </ul>
             {% endif %}
-            {% if dashboard_notices.analyses_created or dashboard_notices.analyses_modified %}
-                <h4>Analyses</h4>
-                {% if dashboard_notices.analyses_created %}
-                    <ul class="list-group">
-                        <li class="list-group-item list-group-item-heading">Created:</li>
-                        {% for a in dashboard_notices.analyses_created %}
-                            {% if url_name_visible.analysis %}
-                                <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
-                            {% else %}
-                                <li class="list-group-item">{{ a }}</li>
-                            {% endif %}
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-                {% if dashboard_notices.analyses_modified %}
-                <ul class="list-group">
-                    <li class="list-group-item list-group-item-heading">Modified:</li>
+            {% if dashboard_notices.analyses_created %}
+                <div class="row mt-2">
+                    <div class="col-3">
+                        <a class='toggle-link' data-toggle='collapse' href='#analyses_new'>View {% count dashboard_notices.analyses_created singular='1 New Analysis' plural='New Analyses' %}</a>
+                    </div>
+                    <div class="col-9">
+                        <a href="{% url 'analyses' %}">Goto Analyses</a>
+                    </div>
+                </div>
+                <ul class="list-group collapse" id="analyses_new">
+                    {% for a in dashboard_notices.analyses_created %}
+                        {% if url_name_visible.analysis %}
+                            <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
+                        {% else %}
+                            <li class="list-group-item">{{ a }}</li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            {% if dashboard_notices.analyses_modified %}
+                <div class="row mt-2">
+                    <div class="col-3">
+                        <a class='toggle-link' data-toggle='collapse' href='#analyses_modified'>View {% count dashboard_notices.analyses_modified singular='1 Modified Analysis' plural='Modified Analyses' %}</a>
+                    </div>
+                    <div class="col-9">
+                        <a href="{% url 'analyses' %}">Goto Analyses</a>
+                    </div>
+                </div>
+                <ul class="list-group collapse" id="analyses_modified">
                     {% for a in dashboard_notices.analyses_modified %}
                         {% if url_name_visible.analysis %}
                             <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
@@ -139,7 +166,6 @@
                         {% endif %}
                     {% endfor %}
                 </ul>
-                {% endif %}
             {% endif %}
         {% endif %}
 

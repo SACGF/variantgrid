@@ -65,13 +65,13 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
         # if days ago was passed in, don't update upa
         days_ago = min(days_ago, MAX_PAST_DAYS)
         start_time = timezone.now() - timedelta(days=days_ago)
-        notice_header = f"New in the last {days_ago} day{'s' if days_ago > 1 else ''}"
+        notice_header = f"Since the last {days_ago} day{'s' if days_ago > 1 else ''}"
     else:
         upa, created = UserPageAck.objects.get_or_create(user=user, page_id="server_status")
         if created:
             if user.last_login:
                 start_time = user.last_login
-                notice_header = f"New since last login ({timesince(start_time)} ago)"
+                notice_header = f"Since last login ({timesince(start_time)} ago)"
         else:
             start_time = upa.modified
             notice_header = f"Since last visit to this page ({timesince(start_time)} ago)"
@@ -80,7 +80,7 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
         max_days_ago = timezone.now() - timedelta(days=MAX_PAST_DAYS)
         if max_days_ago > start_time:
             start_time = max_days_ago
-            notice_header = f"New in the last {MAX_PAST_DAYS} days"
+            notice_header = f"Since the last {MAX_PAST_DAYS} days"
 
     if user.is_superuser:
         events = Event.objects.filter(date__gte=start_time, severity=LogLevel.ERROR)
@@ -184,7 +184,7 @@ def server_status(request):
             redis_status = "warning"
             redis_message = "Inserts running - unable to check"
     except ValueError as ve:
-        redis_status = "error"
+        redis_status = "danger"
         redis_message = str(ve)
 
     # Variant Annotation - incredibly quick check
@@ -204,10 +204,10 @@ def server_status(request):
                 highest_variant_annotated["status"] = "warning"
                 highest_variant_annotated["message"] = f"AnnotationRun: {ar}"
             except AnnotationRun.DoesNotExist:
-                highest_variant_annotated["status"] = "error"
+                highest_variant_annotated["status"] = "danger"
                 highest_variant_annotated["message"] = "Not annotated, no AnnotationRun!"
     except Exception as e:
-        highest_variant_annotated["status"] = "error"
+        highest_variant_annotated["status"] = "danger"
         highest_variant_annotated["message"] = str(e)
 
     sample_enrichment_kits_df = get_sample_enrichment_kits_df()
