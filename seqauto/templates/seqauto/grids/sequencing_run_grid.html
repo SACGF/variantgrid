@@ -36,10 +36,10 @@
 			const URL = Urls.view_sequencing_run(sequencingRunId);
 	    	return "<a class='sequencing-run-link' href='" + URL + "'>" + sequencingRunId + "</a>";
 		},
-        formatSequencingRunReady: function(ready) {
-            let value = ready;
-            if (!ready) {
-                value = `<span class="error">${ready}</span>`;
+        formatSequencingRunValid: function(is_valid) {
+            let value = is_valid;
+            if (!is_valid) {
+                value = `<span class="error">${is_valid}</span>`;
             }
             return value;
         },

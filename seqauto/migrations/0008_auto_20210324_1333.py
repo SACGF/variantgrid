@@ -132,7 +132,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('sequencing_sample', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='seqauto.sequencingsample2')),
             ],
-            bases=(models.Model, seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=(models.Model, ),
         ),
         migrations.CreateModel(
             name='VCFFromSequencingRun2',
@@ -176,7 +176,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=('seqauto.seqautorecord',),
         ),
         migrations.CreateModel(
             name='Fastq2',
@@ -189,7 +189,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=('seqauto.seqautorecord',),
         ),
         migrations.CreateModel(
             name='FastQC2',
@@ -204,7 +204,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=('seqauto.seqautorecord',),
         ),
         migrations.CreateModel(
             name='Flagstats2',
@@ -238,7 +238,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SampleSheetPropertiesMixin),
+            bases=('seqauto.seqautorecord',),
         ),
         migrations.CreateModel(
             name='QC2',
@@ -250,7 +250,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=('seqauto.seqautorecord',),
         ),
         migrations.CreateModel(
             name='QCExecSummary2',
@@ -279,7 +279,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=('seqauto.seqautorecord',),
         ),
         migrations.CreateModel(
             name='QCGeneCoverage2',
@@ -306,7 +306,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=('seqauto.seqautorecord',),
         ),
         migrations.CreateModel(
             name='SampleSheet2',
@@ -330,7 +330,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SampleSheetPropertiesMixin),
+            bases=('seqauto.seqautorecord', ),
         ),
         migrations.CreateModel(
             name='SequencingRun2',
@@ -366,7 +366,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=('seqauto.seqautorecord', seqauto.models.models_seqauto.SequencingSamplePropertiesMixin),
+            bases=('seqauto.seqautorecord', ),
         ),
         migrations.DeleteModel(
             name='JobScript',

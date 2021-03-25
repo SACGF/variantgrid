@@ -42,7 +42,7 @@
 	<div>
 		<h3>Input</h3>
 		<ul>
-		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' bam_file.unaligned_reads.sequencing_run.pk %}">{{ bam_file.unaligned_reads.sequencing_run }}</a></li>  
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' bam_file.sequencing_run.pk %}">{{ bam_file.sequencing_run }}</a></li>
 		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' bam_file.unaligned_reads.pk %}">{{ bam_file.unaligned_reads }}</a></li>
 		</ul>
 

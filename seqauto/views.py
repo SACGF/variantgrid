@@ -171,17 +171,13 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
     except:
         pass
 
-    has_errors = False
-    for error_message in sequencing_run.get_errors():
-        has_errors = True
-        messages.add_message(request, messages.ERROR, error_message)
+    if not sequencing_run.is_valid:  # Had errors
+        sequencing_run.save()  # Try again now
+        if sequencing_run.is_valid:
+            message = "SequencingRun had errors but they appear to have been resolved. Setting is_valid=True"
+            messages.add_message(request, messages.WARNING, message)
 
-    if sequencing_run.ready is False and has_errors is False:
-        sequencing_run.save()  # clear
-        messages.add_message(request, messages.WARNING, "SequencingRun has no errors, setting ready=True")
-
-    for warning_message in sequencing_run.get_warnings():
-        messages.add_message(request, messages.WARNING, warning_message)
+    sequencing_run.add_messages(request)
 
     context = {"sequencing_run": sequencing_run,
                "sequencing_run_form": sequencing_run_form,

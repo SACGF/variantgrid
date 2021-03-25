@@ -61,7 +61,6 @@ class Command(BaseCommand):
             else:
                 logging.warning(f"Couldn't open gold runs filename: {gold_runs_filename}")
 
-
     @staticmethod
     def _get_gold_runs(enrichment_kit, gold_runs_filename):
         """ Need to deal with how this was stored on /tau over time """

@@ -3,7 +3,7 @@ from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 
 from library.jqgrid_user_row_config import JqGridUserRowConfig
-from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, SampleSheet, Experiment, EnrichmentKit
+from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
 from snpdb.models import UserGridConfig, DataState
 
 
@@ -39,29 +39,27 @@ class ExperimentsListGrid(JqGridUserRowConfig):
 class SequencingRunListGrid(JqGridUserRowConfig):
     model = SequencingRun
     caption = 'SequencingRuns'
-    fields = ["name", "ready", "sequencer__sequencer_model__model", "sequencer__name",
+    fields = ["name", "is_valid", "sequencer__sequencer_model__model", "sequencer__name",
               "experiment__name",
-              "enrichment_kit",
               "enrichment_kit__name",
               "enrichment_kit__version",
               "gold_standard",
               "hidden",
               "bad",
-              "vcffromsequencingrun__vcf",
+              "vcffromsequencingrun__vcf__id",
               "vcffromsequencingrun__vcf__import_status",
               "path"]
     colmodel_overrides = {'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
-                          "ready": {'formatter': 'formatSequencingRunReady'},
+                          "is_valid": {'formatter': 'formatSequencingRunValid'},
                           'sequencer__name': {'width': 60, 'label': 'Sequencer'},
                           'sequencer__sequencer_model__model': {'width': 70, 'label': 'Model'},
                           'experiment__name': {'label': 'Experiment', 'width': 120},
-                          "enrichment_kit": {"hidden": True},
                           "enrichment_kit__name": {"label": "EnrichmentKit"},
                           "enrichment_kit__version": {"label": "Kit version", 'width': 20},
                           "gold_standard": {'label': 'Gold', 'width': 20, 'formatter': 'showGoldStandardIcon'},
                           "hidden": {'label': 'Hidden', 'width': 20, 'formatter': 'showHiddenIcon'},
                           "bad": {'label': 'Bad', 'width': 20, 'formatter': 'showBadIcon'},
-                          "vcffromsequencingrun__vcf": {'label': 'VCF',
+                          "vcffromsequencingrun__vcf__id": {'label': 'VCF',
                                                         'formatter': 'viewVCFLink',
                                                         'width': 20},
                           "vcffromsequencingrun__vcf__import_status": {'hidden': True}}
