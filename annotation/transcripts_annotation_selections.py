@@ -154,7 +154,7 @@ class VariantTranscriptSelections:
                             self.gene_annotations[vsta.gene_id] = model_to_dict(gene_annotation)
         except VariantAnnotation.DoesNotExist:
             # Probably due to variant being annotated - in that case show a warning message
-            ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=variant.genome_build,
+            ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=annotation_version.genome_build,
                                               annotation_range_lock__min_variant__gte=variant.pk,
                                               annotation_range_lock__max_variant__lte=variant.pk).first()
             if ar:

@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
         vc: Classification
         for vc in Classification.objects.filter(variant__isnull=False):
-            orig_allele = vc.variant.variantallele
+            orig_allele = vc.variant.variantallele_set.filter(genome_build=vc.get_genome_build())
             allele = orig_allele.allele
             transcript = vc.transcript
             if transcript:

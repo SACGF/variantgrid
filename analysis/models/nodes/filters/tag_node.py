@@ -127,6 +127,18 @@ class VariantTag(TimeStampedModel):
     def can_write(self, user):
         return self.analysis.can_write(user)
 
+    @property
+    def canonical_c_hgvs(self):
+        return self.variant.get_canonical_c_hgvs(self.analysis.genome_build)
+
+    @property
+    def gene_symbol(self):
+        gs = None
+        if cta := self.variant.get_canonical_transcript_annotation(self.analysis.genome_build):
+            if tv := cta.transcript_version:
+                gs = tv.gene_version.gene_symbol
+        return gs
+
     @staticmethod
     def get_for_build(genome_build: GenomeBuild, variant_qs=None):
         """ Returns tags visible within a build

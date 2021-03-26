@@ -111,7 +111,8 @@ rest_urlpatterns = [
     path('api-auth/', include('rest_framework.urls')),
     perm_path('api/sample_variant_zygosity/<int:sample_id>/<int:variant_id>', views_rest.VariantZygosityForSampleView.as_view(), name='variant_zygosity_for_sample'),
     perm_path('api/trio/<pk>', views_rest.TrioView.as_view(), name='api_view_trio'),
-    perm_path('api/variant_allele_for_variant/<int:variant_id>', views_rest.VariantAlleleForVariantView.as_view(), name='variant_allele_for_variant'),
+    perm_path('api/variant_allele_for_variant/<int:variant_id>/<genome_build_name>',
+              views_rest.VariantAlleleForVariantView.as_view(), name='variant_allele_for_variant'),
     perm_path('api/project/create', views_rest.ProjectViewSet.as_view({"post": "create"}), name='api_project_create'),
     perm_path('docs/', include_docs_urls(title='VariantGrid API', public=True, authentication_classes=[], permission_classes=[]), name='docs'),
 ]

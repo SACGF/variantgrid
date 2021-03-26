@@ -7,6 +7,8 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
+{% load genome_build_tags %}
+
 {% block head %}
     <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
     <script>
@@ -21,6 +23,10 @@
 {% block submenu %}{% menu_bar_data %}{% endblock submenu %}
 
 {% block content %}
+    {% if in_multiple_genome_builds %}
+        {% genome_build_url_arg genome_build 'view_variant_genome_build' variant_id=variant.pk %}
+    {% endif %}
+
 	{% include "variantopedia/variant_details.html" %}
     <div id="error-dialog" class="no-close" title="Error">
     </div>

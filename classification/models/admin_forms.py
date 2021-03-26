@@ -149,7 +149,7 @@ class ClassificationAdmin(admin.ModelAdmin):
             if not vc.variant:
                 self.message_user(request, "(%i) No variant for classification" % vc.id)
             else:
-                genome_build = vc.variant.genome_build
+                genome_build = vc.get_genome_build()
                 annotation_version = AnnotationVersion.latest(genome_build)
                 data = get_evidence_fields_for_variant(genome_build, vc.variant, refseq_transcript_id, ensembl_transcript_id,
                                                        evidence_keys_list=[], annotation_version=annotation_version)

@@ -1,6 +1,6 @@
 from django.template import Library
 
-from annotation.models import AnnotationVersion
+from annotation.models import AnnotationVersion, GenomeBuild
 from snpdb.models import Variant
 from variantopedia.interesting_nearby import get_nearby_summaries, variant_interesting_summary
 
@@ -13,6 +13,7 @@ def nearby_variants(context, variant: Variant, annotation_version: AnnotationVer
     user = context["user"]
     context.update({
         'variant': variant,
+        "annotation_version": annotation_version,
         "distance": distance,
     })
     context.update(get_nearby_summaries(user, variant, annotation_version,
@@ -21,10 +22,10 @@ def nearby_variants(context, variant: Variant, annotation_version: AnnotationVer
 
 
 @register.simple_tag(takes_context=True)
-def nearby_summary(context, obj):
+def nearby_summary(context, obj, genome_build: GenomeBuild):
     """ Only does anything for Variants """
     user = context["user"]
     summary = ""
     if isinstance(obj, Variant):
-        summary = variant_interesting_summary(user, obj)
+        summary = variant_interesting_summary(user, obj, genome_build)
     return summary

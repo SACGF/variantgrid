@@ -191,7 +191,7 @@
     <form action="{{ form_post_url }}" class="classification-form" method="POST">
         {% csrf_token %}
         <input type='hidden' class='auto-pop-field' id='variant_id' name="variant_id" value="{{ variant.pk }}" />
-        <input type='hidden' class='auto-pop-field' id='genome_build_name' name="genome_build_name" value="{{ variant.genome_build.pk }}" />
+        <input type='hidden' class='auto-pop-field' id='genome_build_name' name="genome_build_name" value="{{ genome_build.pk }}" />
         <input type='hidden' class='auto-pop-field' id='refseq_transcript_accession' name="refseq_transcript_accession" />
         <input type='hidden' class='auto-pop-field' id='ensembl_transcript_accession' name="ensembl_transcript_accession" />
         <input type='hidden' class='auto-pop-field' id='sample_id' name="sample_id" />

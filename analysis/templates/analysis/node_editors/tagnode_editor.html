@@ -94,8 +94,8 @@ $(document).ready(function() {
                         <i class="fas fa-plus-circle"></i> New Classification
                     </a>
                 </td>
-                <td>{{ vt.variant.canonical_c_hgvs }}</td>
-                <td>{{ vt.variant.canonical_transcript_annotation.transcript_version.gene_version.gene_symbol }}</td>
+                <td>{{ vt.canonical_c_hgvs }}</td>
+                <td>{{ vt.gene_symbol }}</td>
                 <td>{{ vt.user }}</td>
                 <td>{{ vt.created | localtime }}</td>
             </tr>

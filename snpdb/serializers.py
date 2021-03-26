@@ -92,7 +92,7 @@ class VariantAlleleSerializer(serializers.ModelSerializer):
     @staticmethod
     def data_with_link_data(variant_allele: 'VariantAllele') -> Dict[str, Any]:
         variant_data = VariantAlleleSerializer(variant_allele).data
-        link_data = variant_link_info(variant_allele.variant)
+        link_data = variant_link_info(variant_allele.variant, variant_allele.genome_build)
         data = dict(variant_data)
         data['link_data'] = link_data
         return data

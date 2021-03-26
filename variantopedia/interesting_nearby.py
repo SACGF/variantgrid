@@ -27,7 +27,7 @@ def get_nearby_qs(variant, annotation_version, distance=50):
 
 def get_nearby_summaries(user, variant, annotation_version, distance=50, clinical_significance=False):
     nearby_qs = get_nearby_qs(variant, annotation_version, distance=distance)
-    kwargs = {"user": user, "genome_build": variant.genome_build, "clinical_significance": clinical_significance}
+    kwargs = {"user": user, "genome_build": annotation_version.genome_build, "clinical_significance": clinical_significance}
     return {f"{region}_summary": interesting_summary(qs, **kwargs) for region, qs in nearby_qs.items()}
 
 
@@ -158,9 +158,9 @@ def filter_variant_domain(qs, variant: Variant):
     return qs
 
 
-def variant_interesting_summary(user: User, variant: Variant, clinical_significance=False) -> str:
+def variant_interesting_summary(user: User, variant: Variant, genome_build, clinical_significance=False) -> str:
     """ Could use this for search summary? """
-    qs = get_variant_queryset_for_latest_annotation_version(variant.genome_build)
+    qs = get_variant_queryset_for_latest_annotation_version(genome_build)
     qs = qs.filter(pk=variant.pk)
 
-    return interesting_summary(qs, user, variant.genome_build, total=False, clinical_significance=clinical_significance)
+    return interesting_summary(qs, user, genome_build, total=False, clinical_significance=clinical_significance)

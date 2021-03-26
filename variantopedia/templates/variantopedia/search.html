@@ -64,7 +64,7 @@
                                         <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
                                         {% comment %}Check it's a Variant object{% endcomment %}
                                         {% if variant_summary and search_result.record.locus %}
-                                            {% nearby_summary search_result.record %}
+                                            {% nearby_summary search_result.record search_result.genome_build %}
                                         {% endif %}
                                     </td>
                                 </tr>

@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
@@ -12,7 +14,7 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
-from typing import Optional, Pattern, Tuple, Iterable
+from typing import Optional, Pattern, Tuple, Iterable, Set
 import collections
 import django.dispatch
 import re
@@ -25,7 +27,7 @@ from library.utils import md5sum_str
 from snpdb.models import Wiki
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_genome import Contig, GenomeBuild
+from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 
 LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$")
@@ -98,6 +100,14 @@ class Allele(FlagsMixin, models.Model):
 
         from snpdb.models.models_dbsnp import DbSNP
         from genes.hgvs import get_hgvs_variant_tuple
+
+        # Check if the other build shares existing contig
+        genome_build_contigs = set(c.pk for c in genome_build.chrom_contig_mappings.values())
+        for variant_allele in self.variantallele_set.all():
+            if variant_allele.variant.locus.contig_id in genome_build_contigs:
+                conversion_tool = AlleleConversionTool.SAME_CONTIG
+                variant_tuple = variant_allele.variant.as_tuple()
+                return conversion_tool, variant_tuple
 
         conversion_tool = None
         g_hgvs = None
@@ -330,8 +340,8 @@ class Variant(models.Model):
         variant_tuple = None
         if m := regex_pattern.match(variant_string):
             chrom, position, ref, alt = m.groups()
-            chrom, position, ref, alt = Variant.clean_fields(chrom, position, ref, alt,
-                                                             want_chr=genome_build.reference_fasta_has_chr)
+            chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
+                                                                     want_chr=genome_build.reference_fasta_has_chr)
             contig = genome_build.chrom_contig_mappings[chrom]
             variant_tuple = VariantCoordinate(contig.name, int(position), ref, alt)
         return variant_tuple
@@ -352,17 +362,10 @@ class Variant(models.Model):
                                    **dict(zip(params, variant_tuple)))
 
     @lazy
-    def genome_build(self) -> Optional['GenomeBuild']:
-        try:  # Short cut
-            return self.variantallele.genome_build
-        except VariantAllele.DoesNotExist:
-            pass
-
-        q = Q(genome_build__name__in=settings.ANNOTATION)
-        build_contig = self.locus.contig.genomebuildcontig_set.filter(q).first()
-        if build_contig:
-            return build_contig.genome_build
-        return None
+    def genome_builds(self) -> Set['GenomeBuild']:
+        gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
+                                                  contig__locus__variant=self)
+        return {gbc.genome_build for gbc in gbc_qs}
 
     @lazy
     def coordinate(self) -> VariantCoordinate:
@@ -420,21 +423,14 @@ class Variant(models.Model):
             return [self]
         return Variant.objects.filter(variantallele__allele=allele)
 
-    @lazy
-    def variant_annotation(self) -> Optional['VariantAnnotation']:
-        vav = self.genome_build.latest_variant_annotation_version
-        return self.variantannotation_set.filter(version=vav).first()
-
-    @lazy
-    def canonical_transcript_annotation(self) -> Optional['VariantTranscriptAnnotation']:
-        vav = self.genome_build.latest_variant_annotation_version
+    def get_canonical_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
+        vav = genome_build.latest_variant_annotation_version
         return self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first()
 
-    @lazy
-    def canonical_c_hgvs(self):
+    def get_canonical_c_hgvs(self, genome_build):
         c_hgvs = None
-        if self.canonical_transcript_annotation:
-            c_hgvs = self.canonical_transcript_annotation.hgvs_c
+        if cta := self.get_canonical_transcript_annotation(genome_build):
+            c_hgvs = cta.hgvs_c
         return c_hgvs
 
     @property
@@ -446,7 +442,7 @@ class Variant(models.Model):
         return self.locus.position + max(self.locus.ref.length, self.alt.length)
 
     @staticmethod
-    def clean_fields(chrom, position, ref, alt, want_chr):
+    def clean_variant_fields(chrom, position, ref, alt, want_chr):
         ref = ref.upper()
         alt = alt.upper()
         if ref == alt:
@@ -469,12 +465,21 @@ class VariantAllele(TimeStampedModel):
         We only expect to store Alleles for a small fraction of Variants
         So don't want them on the Variant object - instead do 1-to-1 """
 
-    variant = models.OneToOneField(Variant, on_delete=CASCADE)
+    # Some builds share contigs (eg GRCh37/38 share MT and some unplaced scaffolds) - in those cases
+    # we'll have the same variant linked through different VariantAlleles (so it can't be 1-to-1)
+    variant = models.ForeignKey(Variant, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
     origin = models.CharField(max_length=1, choices=AlleleOrigin.choices)
     conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     error = models.JSONField(null=True)  # Only set on error
+
+    class Meta:
+        unique_together = ("variant", "genome_build", "allele")
+
+    @property
+    def canonical_c_hgvs(self):
+        return self.variant.get_canonical_c_hgvs(self.genome_build)
 
     def needs_clinvar_call(self):
         return settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None and self.error is None

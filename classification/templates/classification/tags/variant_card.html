@@ -6,7 +6,7 @@
         <div class="card-header">{{ variant_allele.genome_build }}</div>
         <div class="card-body">
             {% if variant_show_canonical_hgvs %}
-                {% labelled label='Canonical c.HGVS' value_css="variant-c-hgvs" hint="tiny" %}{{ variant_allele.variant.canonical_c_hgvs }}{% endlabelled %}
+                {% labelled label='Canonical c.HGVS' value_css="variant-c-hgvs" hint="tiny" %}{{ variant_allele.canonical_c_hgvs }}{% endlabelled %}
             {% endif %}
             {% labelled label='Variant Coordinate' value_css="variant-coordinate" hint="tiny" %}
                 <a href="{% url 'view_variant' variant_allele.variant.pk %}">{{ variant_allele.variant }}</a>
@@ -22,12 +22,12 @@
             {% endif %}
             {% labelled label='Origin' hint="tiny" %}{{ variant_allele.get_origin_display }}{% endlabelled%}
             {% labelled label='Conversion Tool' hint="tiny" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
-            {% labelled id_prefix="quick-links" hint="tiny" id=variant_allele.variant_id value_css="quick-links" label="Quick Links" %}Loading ...{% endlabelled %}
+            {% labelled id_prefix="quick-links" hint="tiny" id=variant_allele.pk value_css="quick-links" label="Quick Links" %}Loading ...{% endlabelled %}
         </div>
         {% if can_create_classification %}
             <div class="card-footer">
 
-                <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant_allele.variant.pk %}">
+                <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant_allele.variant.pk variant_allele.genome_build.pk %}">
                     <i class="fas fa-plus-circle"></i> New Classification
                 </a>
 

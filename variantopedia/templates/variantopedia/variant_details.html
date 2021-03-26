@@ -193,7 +193,7 @@ function populateVariantAllele(data) {
 }
 
 $(document).ready(function() {
-	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id %}');
+	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id genome_build.pk %}');
 
     let variantAllele = {{ variant_allele | jsonify }};
     if (variantAllele) {
@@ -201,7 +201,7 @@ $(document).ready(function() {
     } else {
     {% if variant.can_have_annotation %}
         // Use Ajax to create + retrieve ClinGenAllele
-        let variantAlleleForVariantUrl = "{% url 'variant_allele_for_variant' variant.pk %}";
+        let variantAlleleForVariantUrl = "{% url 'variant_allele_for_variant' variant.pk genome_build.pk %}";
         $.ajax(variantAlleleForVariantUrl, {
             suppressErrors: true,
             success: populateVariantAllele
@@ -256,7 +256,7 @@ $(document).ready(function() {
             <div class="card-body">
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{{ g_hgvs }}{% endlabelled %}
                 {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
-                {% labelled label="Genome Build" %}{{ variant.genome_build }}{% endlabelled %}
+                {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
                 {% if variant.can_have_annotation and variant_show_canonical_hgvs %}
                     {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
                 {% endif %}
@@ -266,7 +266,7 @@ $(document).ready(function() {
 
             {% if variant.can_have_annotation and can_create_classification %}
                 <div class="card-footer">
-                    <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant.pk %}">
+                    <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant.pk genome_build.pk %}">
                         <i class="fas fa-plus-circle"></i> New Classification
                     </a>
                 </div>
@@ -299,7 +299,7 @@ $(document).ready(function() {
         <!-- Needs to be full width to show data table -->
         <div id='classifications' class='container-table mt-4'>
             <h3>Classifications</h3>
-                {% classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
+                {% classification_table classifications genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
         </div>
     {% else %}
         <!-- Nicer table that lines up with others -->

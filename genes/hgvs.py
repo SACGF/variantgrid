@@ -311,7 +311,7 @@ class HGVSMatcher:
         chrom, offset, ref, alt = variant.as_tuple()
         if transcript_name:
             transcript = self.get_pyhgvs_transcript(transcript_name)
-            contig_mappings = variant.genome_build.chrom_contig_mappings
+            contig_mappings = self.genome_build.chrom_contig_mappings
             transcript_contig = contig_mappings.get(transcript.tx_position.chrom)
             if variant.locus.contig != transcript_contig:
                 accession = TranscriptVersion.get_accession(transcript.name, transcript.version)
@@ -330,12 +330,6 @@ class HGVSMatcher:
     def variant_to_hgvs(self, variant: Variant, transcript_name=None, max_allele_length=10) -> Optional[str]:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
         return self.variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name).format(max_allele_length=max_allele_length)
-
-    @staticmethod
-    def static_variant_to_g_hgvs(variant: Variant):
-        """ """
-        matcher = HGVSMatcher(variant.genome_build)
-        return matcher.variant_to_g_hgvs(variant)
 
     def variant_to_g_hgvs(self, variant: Variant):
         g_hgvs = self.variant_to_hgvs(variant)

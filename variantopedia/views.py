@@ -192,7 +192,8 @@ def server_status(request):
     highest_variant_annotated = {}
     try:
         highest_variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").last()
-        vav = VariantAnnotationVersion.latest(highest_variant.genome_build)
+        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
+        vav = VariantAnnotationVersion.latest(genome_build)
         annotated = highest_variant.variantannotation_set.filter(version=vav).exists()
         if annotated:
             highest_variant_annotated["status"] = "info"
@@ -261,15 +262,34 @@ def tagged(request):
     return render(request, "variantopedia/tagged.html", context)
 
 
-def view_variant(request, variant_id):
+def view_variant(request, variant_id, genome_build_name=None):
     """ This is to open it with the normal menu around it (ie via search etc) """
     template = 'variantopedia/view_variant.html'
 
     variant = get_object_or_404(Variant, pk=variant_id)
-    igv_data = get_igv_data(request.user, genome_build=variant.genome_build)
+    in_multiple_genome_builds = len(variant.genome_builds) > 1
+    genome_build = None
+    if genome_build_name:
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        if genome_build not in variant.genome_builds:
+            raise ValueError(f"Variant {variant} not in '{genome_build}'")
+    else:
+        if in_multiple_genome_builds:
+            user_settings = UserSettings.get_for_user(request.user)
+            if user_settings.default_genome_build in variant.genome_builds:
+                genome_build = user_settings.default_genome_build
+
+    if genome_build is None:
+        genome_build = next(iter(variant.genome_builds))
+
+    igv_data = get_igv_data(request.user, genome_build=genome_build)
     extra_context = {"igv_data": igv_data,
+                     "in_multiple_genome_builds": in_multiple_genome_builds,
                      "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'}
-    return variant_details(request, variant_id, template=template, extra_context=extra_context)
+
+    annotation_version = AnnotationVersion.latest(genome_build)
+    return variant_details_annotation_version(request, variant_id, annotation_version.pk,
+                                              template=template, extra_context=extra_context)
 
 
 def view_variant_annotation_history(request, variant_id):
@@ -384,12 +404,6 @@ def create_variant_for_allele(request, allele_id, genome_build_name):
     return redirect(allele)
 
 
-def variant_details(request, variant_id, template='variant_details.html', extra_context: dict = None):
-    """ This views variant details, with an optional template around it
-        So it can be embedded in analysis or as full screen with menu around it.  """
-    return variant_details_annotation_version(request, variant_id, template=template, extra_context=extra_context)
-
-
 def get_genes_canonical_transcripts(variant, annotation_version):
     """ returns dict of list of (enrichment kit description, original_transcript_id) """
 
@@ -409,14 +423,15 @@ def get_genes_canonical_transcripts(variant, annotation_version):
     return dict(genes_canonical_transcripts)
 
 
-def variant_details_annotation_version(request, variant_id, annotation_version_id=None,
+def variant_details_annotation_version(request, variant_id, annotation_version_id,
                                        template='variantopedia/variant_details.html',
                                        extra_context: dict = None):
     """ Main Variant Details page """
     variant = get_object_or_404(Variant, pk=variant_id)
-    g_hgvs = HGVSMatcher.static_variant_to_g_hgvs(variant)
-    annotation_version = None
-    latest_annotation_version = None
+    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    genome_build = annotation_version.genome_build
+    g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+    latest_annotation_version = AnnotationVersion.latest(genome_build)
     variant_annotation = None
     vts = None
     clinvar = None
@@ -433,14 +448,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
     if variant.can_have_annotation:
         try:
-            latest_annotation_version = AnnotationVersion.latest(variant.genome_build)
-
-            if annotation_version_id:
-                annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
-            else:
-                annotation_version = latest_annotation_version
-
-            vts = VariantTranscriptSelections(variant, variant.genome_build, annotation_version)
+            vts = VariantTranscriptSelections(variant, genome_build, annotation_version)
             variant_annotation = vts.variant_annotation
             for w_msg in vts.warning_messages:
                 messages.add_message(request, messages.WARNING, w_msg)
@@ -471,18 +479,18 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
 
     try:
-        va = variant.variantallele
+        variant_allele = variant.variantallele_set.get(genome_build=genome_build)
         # If we require a ClinGen call (eg have Allele but no ClinGen, and settings say we can get it then don't
         # provide the data so we will do an async call)
-        if not va.needs_clinvar_call():
+        if not variant_allele.needs_clinvar_call():
             logging.info("Skipping as we need clinvar call")
-            variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant.variantallele)
+            variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
         else:
             variant_allele_data = None
     except VariantAllele.DoesNotExist:
         variant_allele_data = None
 
-    variant_tags = VariantTag.get_for_build(variant.genome_build, variant_qs=variant.equivalent_variants)
+    variant_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
 
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
@@ -491,6 +499,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "classifications": latest_classifications,
         "clinvar": clinvar,
         "genes_canonical_transcripts": genes_canonical_transcripts,
+        "genome_build": genome_build,
         "g_hgvs": g_hgvs,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
@@ -510,9 +519,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     return render(request, template, context)
 
 
-def variant_sample_information(request, variant_id):
+def variant_sample_information(request, variant_id, genome_build_name):
     variant = get_object_or_404(Variant, pk=variant_id)
-    vsi = VariantSampleInformation(request.user, variant)
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    vsi = VariantSampleInformation(request.user, variant, genome_build)
 
     context = {"variant": variant,
                "vsi": vsi,
@@ -535,17 +545,14 @@ def gene_coverage(request, gene_symbol_id):
     return render(request, "variantopedia/gene_coverage.html", context)
 
 
-def nearby_variants(request, variant_id, annotation_version_id=None):
+def nearby_variants(request, variant_id, annotation_version_id):
     variant = get_object_or_404(Variant, pk=variant_id)
-    latest_annotation_version = AnnotationVersion.latest(variant.genome_build)
+    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
 
-    if annotation_version_id:
-        annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
-    else:
-        annotation_version = latest_annotation_version
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
-    context = {"variant": variant,
+    context = {"genome_build": annotation_version.genome_build,
+               "variant": variant,
                "variant_annotation": variant_annotation}
     context.update(get_nearby_qs(variant, annotation_version))
     return render(request, "variantopedia/nearby_variants.html", context)

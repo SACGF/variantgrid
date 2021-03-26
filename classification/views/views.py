@@ -264,7 +264,8 @@ def view_classification(request, record_id):
     genome_build = None
     variant = ref.record.variant
     if variant:
-        genome_build = variant.genome_build
+        if len(variant.genome_builds) == 1:
+            genome_build = next(iter(variant.genome_builds))
 
     if genome_build is None:
         user_settings = UserSettings.get_for_user(request.user)
@@ -272,15 +273,16 @@ def view_classification(request, record_id):
 
     vc: Classification = ref.record
 
-    context = {'vc': vc,
-               'record': record,
-               'genome_build': genome_build,
-               'asterisk_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERISK_VIEW,
-               'existing_files': existing_files,
-               'other_classifications_summary': other_classifications_summary,
-               'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
-               'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
-               }
+    context = {
+        'vc': vc,
+        'record': record,
+        'genome_build': genome_build,
+        'asterisk_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERISK_VIEW,
+        'existing_files': existing_files,
+        'other_classifications_summary': other_classifications_summary,
+        'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
+        'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
+    }
     return render(request, 'classification/classification.html', context)
 
 
@@ -485,8 +487,11 @@ def view_classification_file_attachment_thumbnail(request, pk):
 class CreateClassificationForVariantView(TemplateView):
     template_name = 'classification/create_classification_for_variant.html'
 
-    def _get_variant(self):
+    def _get_variant(self) -> Variant:
         return Variant.objects.get(pk=self.kwargs["variant_id"])
+
+    def _get_genome_build(self) -> GenomeBuild:
+        return GenomeBuild.get_name_or_alias(self.kwargs["genome_build_name"])
 
     def _get_form_post_url(self):
         return reverse("create_classification")
@@ -505,13 +510,14 @@ class CreateClassificationForVariantView(TemplateView):
             msg = "We only classify variants - not reference alleles"
             raise ValueError(msg)
 
-        vts = VariantTranscriptSelections(variant,
-                                          variant.genome_build,
+        genome_build = self._get_genome_build()
+        vts = VariantTranscriptSelections(variant, genome_build,
                                           add_other_annotation_consortium_transcripts=True)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensus = ClassificationConsensus(variant, self.request.user)
         return {'variant': variant,
+                "genome_build": genome_build,
                 "form_post_url": self._get_form_post_url(),
                 'variant_sample_autocomplete_form': self._get_sample_form(),
                 "vts": vts,

@@ -8,19 +8,19 @@ from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_O
 from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection
+from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild
 import pandas as pd
 
 
 class VariantSampleInformation:
 
-    def __init__(self, user, variant):
+    def __init__(self, user, variant, genome_build: GenomeBuild):
         locus_qs = Locus.objects.filter(pk=variant.locus.pk)
         values_qs = self._get_sample_values_for_variant_via_cohort_genotype(locus_qs)
         values_qs = self._cohort_genotype_to_sample_genotypes(values_qs)
 
         self.variant = variant
-        self.genome_build = variant.genome_build
+        self.genome_build = genome_build
         self.num_samples = Sample.objects.filter(vcf__genome_build=self.genome_build).count()
         visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build=self.genome_build)
         self.user_sample_ids = set(visible_samples_qs.values_list("pk", flat=True))

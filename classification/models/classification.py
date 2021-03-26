@@ -1711,8 +1711,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         variant = self.get_variant_for_build(genome_build)
         if variant:
             try:
-                hgvs_matcher = HGVSMatcher(genome_build=genome_build)
-                g_hgvs = hgvs_matcher.variant_to_g_hgvs(variant)
+                g_hgvs = HGVSMatcher(genome_build=genome_build).variant_to_g_hgvs(variant)
                 c_hgvs = self.get_c_hgvs(genome_build)
                 return {
                     SpecialEKeys.GENOME_BUILD: genome_build.name,

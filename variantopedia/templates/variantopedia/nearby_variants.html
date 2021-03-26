@@ -38,7 +38,7 @@
                     {% labelled label="Canonical c.HGVS" %} {{ variant_annotation.hgvs_c }} {% endlabelled %}
                 {% endif %}
                 {% labelled label="Coordinate" %} <a href="{% url 'view_variant' variant.pk %}">{{ variant }}</a> {% endlabelled %}
-                {% labelled label="Genome Build" %}{% endlabelled %}
+                {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
                 {% labelled label="Exon" %}{{ variant_annotation.exon }}{% endlabelled %}
                 {% labelled label="Domain" %}{{ variant_annotation.interpro_domain | default_if_none:"-" }}{% endlabelled %}
             </div>

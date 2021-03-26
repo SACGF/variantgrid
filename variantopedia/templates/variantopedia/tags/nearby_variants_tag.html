@@ -19,7 +19,7 @@
     {% if codon_summary or exon_summary or domain_summary or range_summary %}
         <label class="col-12 col-md-6 text-md-right" for="nearby_details">Details</label>
         <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_details">
-            <a href="{% url 'nearby_variants' variant.pk %}">See nearby variants...</a>
+            <a href="{% url 'nearby_variants_annotation_version' variant.pk annotation_version.pk %}">See nearby variants...</a>
         </div>
     {% endif %}
 

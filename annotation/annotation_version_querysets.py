@@ -32,6 +32,8 @@ def get_variant_queryset_for_annotation_version(annotation_version):
     qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
     # Ensure Variant QS is constrained to genome build
     qs = qs.filter(Variant.get_contigs_q(annotation_version.genome_build))
+    # VariantAllele is no longer a 1-to-1, don't want multiple results - make sure we restrict join to this build
+    qs = qs.filter(Q(variantallele__isnull=True) | Q(variantallele__genome_build=annotation_version.genome_build))
     return qs
 
 

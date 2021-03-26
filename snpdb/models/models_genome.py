@@ -103,7 +103,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         values_qs = GenomeBuild.builds_with_annotation().values_list("name", "alias")
         return ", ".join(itertools.chain.from_iterable(values_qs))
 
-    @property
+    @lazy
     def contigs(self):
         qs = Contig.objects.filter(genomebuildcontig__genome_build=self)
         return qs.order_by("genomebuildcontig__order")
