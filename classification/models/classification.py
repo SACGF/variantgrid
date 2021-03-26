@@ -232,6 +232,27 @@ class ConditionResolved:
         return None
 
 
+class ClassificationOutstandingIssues:
+
+    def __init__(self, classification: 'Classification'):
+        self.classification = classification
+        self.flags = list()
+        self.issues = list()
+
+    @property
+    def pk(self):
+        return self.classification.pk
+
+    def add_flag(self, flag: str):
+        self.flags.append(flag)
+
+    def add_issue(self, issue: str):
+        self.issues.append(issue)
+
+    def __str__(self):
+        return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
+
+
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
     """
     A Variant Classification, belongs to a lab and user. Keeps a full history using ClassificationModification
@@ -300,15 +321,36 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return can_create and (user.is_superuser or settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
 
     @staticmethod
-    def dashboard_report_classifications_of_interest(since) -> QuerySet:
+    def dashboard_report_new_classifications(since) -> int:
+        return Classification.objects.filter(created__gte=since).count()
+
+    @staticmethod
+    def dashboard_report_classifications_of_interest(since) -> Iterable[ClassificationOutstandingIssues]:
         min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
 
-        # want to find new tags that are still open
-        flag_collections = Flag.objects.filter(created__gte=since, created__lte=min_age, resolution__status=FlagStatus.OPEN).order_by('collection__id').values_list('collection__id', flat=True).distinct()
-        flag_activity = Classification.objects.filter(flag_collection_id__in=flag_collections)
-        not_lifted = Classification.objects.filter(created__gte=since, created__lte=min_age).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
+        time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
 
-        return flag_activity.union(not_lifted)
+        # want to find new tags that are still open
+        flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN).order_by('collection__id').values_list('collection__id', flat=True).distinct()
+        coi_qs = Classification.objects.filter(Q(flag_collection_id__in=flag_collections) | (time_range_q & (Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))))
+        coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
+
+        summaries: List[ClassificationOutstandingIssues] = list()
+        c: Classification
+        for c in coi_qs:
+            coi = ClassificationOutstandingIssues(c)
+            this_flags = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN, collection=c.flag_collection).values_list('flag_type', flat=True).order_by('flag_type')
+            variant_matching = False
+            for flag_type in this_flags:
+                if flag_type == 'classification_matching_variant':
+                    variant_matching = True
+                coi.add_flag(flag_type)
+            if not variant_matching and (not c.chgvs_grch37 or not c.chgvs_grch38):
+                coi.add_issue("Not lifted over")
+
+            summaries.append(coi)
+
+        return summaries
 
 
     @classmethod
