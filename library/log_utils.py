@@ -14,6 +14,7 @@ from rest_framework.request import Request
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
+from threadlocals.threadlocals import get_current_request
 
 
 def report_event(name: str, request: Request = None, extra_data: Dict = None):
@@ -57,7 +58,6 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     """
     print(message)
     if not request:
-        from threadlocals.threadlocals import get_current_request
         request = get_current_request()
     rollbar.report_message(message=message,
                            level=level,
@@ -67,7 +67,6 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
 
 def report_exc_info(extra_data=None, request=None):
     if not request:
-        from threadlocals.threadlocals import get_current_request
         request = get_current_request()
     rollbar.report_exc_info(extra_data=extra_data, request=request)
     exc_info = sys.exc_info()
