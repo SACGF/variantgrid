@@ -51,6 +51,11 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
                 if date_field not in data and hasattr(new_klass, date_field):
                     data[date_field] = timezone.now()
 
+            # Model inheritance uses ID to refer to base class - while PK is for
+            if pk := data.get("id"):
+                data["pk"] = pk
+                del data["id"]
+
             new_klass.objects.create(**data)
             num_records += 1
 
