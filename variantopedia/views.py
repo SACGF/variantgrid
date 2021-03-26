@@ -95,18 +95,13 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
     new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
 
-    any_notices = any(qs.exists() for qs in [events, vcfs, analyses_created, analyses_modified]) or bool(classifications_of_interest) or bool(new_classification_count)
-
-    dashboard_notices = {}
-    if any_notices:
-        dashboard_notices = {"notice_header": notice_header,
-                             "events": events,
-                             "classifications_of_interest": classifications_of_interest,
-                             "new_classification_count": new_classification_count,
-                             "vcfs": vcfs,
-                             "analyses_created": analyses_created,
-                             "analyses_modified": analyses_modified,}
-    return dashboard_notices
+    return {"notice_header": notice_header,
+             "events": events,
+             "classifications_of_interest": classifications_of_interest,
+             "new_classification_count": new_classification_count,
+             "vcfs": vcfs,
+             "analyses_created": analyses_created,
+             "analyses_modified": analyses_modified,}
 
 
 def strip_celery_from_keys(celery_state):
