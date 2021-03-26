@@ -66,6 +66,7 @@
                 {% for message in disk_free.messages %}
                     <div>{{ message }}</div>
                 {% endfor %}
+                {% if not disk_free.messages %}Unknown{% endif %}
             </div>
         {% endlabelled %}
 
@@ -88,15 +89,14 @@
             {% endfor %}
         {% endif %}
 
-        <div class="btn-toolbar mt-4">
+        <h4>{{ dashboard_notices.notice_header }}</h4>
+        <div class="btn-toolbar">
             <label class="d-inline-block mr-2">Show from the last</label>
             <a class="hover-link" href="{% url 'server_status' %}?days=1">1 Day</a>,
             <a class="hover-link" href="{% url 'server_status' %}?days=5">5 Days</a>,
             <a class="hover-link" href="{% url 'server_status' %}?days=14">14 Days</a>,
             <a class="hover-link" href="{% url 'server_status' %}?days=30">30 Days</a>
         </div>
-
-        {{ dashboard_notices.notice_header }}
         {% if dashboard_notices.events %}
             <div class="row mt-4">
                 <div class="col-3">
@@ -127,16 +127,16 @@
                 {% for c in dashboard_notices.classifications_of_interest %}
                     <a class='list-group-item list-group-item-action' href="{% url 'view_classification' c.pk %}">
                         <div class="row">
-                            <div class="col-8">
-                                {{ c.classification.friendly_label }}
-                                {% for issue in c.issues %}
-                                   <div class="d-inline-block mx-2">{{ 'warning' | severity_icon }} {{ issue }}</div>
-                                {% endfor %}
-                            </div>
                             <div class="col-4">
-                                New Flags:
+                                {{ c.classification.friendly_label }}
+                            </div>
+                            <div class="col-8">
+                                New Issues:
                                 {% for flag in c.flags %}
                                     <div class="flag flag-{{ flag }} mx-2" title="{{ flag }}" data-toggle="tooltip"></div>
+                                {% endfor %}
+                                {% for issue in c.issues %}
+                                   <div class="d-inline-block mx-2">{{ 'warning' | severity_icon }} {{ issue }}</div>
                                 {% endfor %}
                             </div>
                         </div>
@@ -147,15 +147,15 @@
         {% if dashboard_notices.new_classification_count %}
             <div class="row mt-4">
                 <div class="col-3">
-                    {% count dashboard_notices.new_classification_count singular='1 New Classification' plural='New Classifications' %}
+                    <label>{% count dashboard_notices.new_classification_count singular='1 New Classification' plural='New Classifications' %}</label>
                 </div>
-                <div class="col-9">
+                <div class="col-6">
                     <a href="{% url 'classifications' %}">Goto Classifications</a>
                 </div>
             </div>
         {% endif %}
         {% if dashboard_notices.vcfs %}
-            <div class="row mt-2">
+            <div class="row mt-4">
                 <div class="col-3">
                     <a class='toggle-link' data-toggle='collapse' href='#vcfs'>View {% count dashboard_notices.vcfs singular='1 New VCF' plural='New VCFs' %}</a>
                 </div>
