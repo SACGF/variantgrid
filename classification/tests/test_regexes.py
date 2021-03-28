@@ -25,10 +25,11 @@ class RegexTests(TestCase):
     def test_multiple(self):
         text = 'PMID is great and all, but my id is ClinGen CA123 and OMIM: 555, #444 and this is a number 23432'
         results = db_ref_regexes.search(text, default_regex=DbRegexes.SNP)
-        self.assertEqual(len(results), 3)
+        self.assertEqual(len(results), 1)
         self.assertEqual(str(results[0]), 'ClinGen:123')
-        self.assertEqual(str(results[1]), 'OMIM:000444')
-        self.assertEqual(str(results[2]), 'OMIM:000555')
+        # we no longer match OMIM if length is too short
+        # self.assertEqual(str(results[1]), 'OMIM:000444')
+        # self.assertEqual(str(results[2]), 'OMIM:000555')
 
     def test_clingen(self):
         text = 'Without the word cl-in-gen lets see if CA123456 is caught'
@@ -37,12 +38,12 @@ class RegexTests(TestCase):
         self.assertEqual(str(results[0]), 'ClinGen:123456')
 
     def test_comma_diff(self):
-        text = 'MedGen:C3150878,OMIM:613616,Orphanet:ORPHA93600'
+        text = 'MedGen:C3150878,OMIM:613616,Orphanet:93600'
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 3)
         self.assertEqual(str(results[0]), 'MedGen:C3150878')
         self.assertEqual(str(results[1]), 'OMIM:613616')
-        self.assertEqual(str(results[2]), 'Orphanet:ORPHA93600')
+        self.assertEqual(str(results[2]), 'Orphanet:93600')
 
     def test_comma_diff_no_rs(self):
         text = 'rs749899964, 6/249'
@@ -64,11 +65,11 @@ class RegexTests(TestCase):
         self.assertEqual(str(results[0]), 'NCBIBookShelf:NBK1426')
 
     def test_dividers(self):
-        text = 'OMIM# 12345 PMID#23456 HPO:123456'
+        text = 'OMIM# 123456 PMID#23456 HPO:123456'
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 3)
         self.assertEqual(str(results[0]), 'HP:0123456')
-        self.assertEqual(str(results[1]), 'OMIM:012345')
+        self.assertEqual(str(results[1]), 'OMIM:123456')
         self.assertEqual(str(results[2]), 'PubMed:23456')
 
     def test_urls(self):
