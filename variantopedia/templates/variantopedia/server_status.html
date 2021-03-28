@@ -93,7 +93,7 @@
         <div class="btn-toolbar">
             <label class="d-inline-block mr-2">Show from the last</label>
             <a class="hover-link" href="{% url 'server_status' %}?days=1">1 Day</a>,
-            <a class="hover-link" href="{% url 'server_status' %}?days=5">5 Days</a>,
+            <a class="hover-link" href="{% url 'server_status' %}?days=7">7 Days</a>,
             <a class="hover-link" href="{% url 'server_status' %}?days=14">14 Days</a>,
             <a class="hover-link" href="{% url 'server_status' %}?days=30">30 Days</a>
         </div>
@@ -131,7 +131,7 @@
                                 {{ c.classification.friendly_label }}
                             </div>
                             <div class="col-8">
-                                New Issues:
+                                <span class="text-secondary">New Issues</span>
                                 {% for flag in c.flags %}
                                     <div class="flag flag-{{ flag }} mx-2" title="{{ flag }}" data-toggle="tooltip"></div>
                                 {% endfor %}
