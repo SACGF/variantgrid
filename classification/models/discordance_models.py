@@ -56,9 +56,10 @@ class DiscordanceReport(TimeStampedModel):
         return ''
 
     @transaction.atomic
-    def close(self, expected_resolution: Optional[str] = None, cause_text: Optional[str] = None):
+    def close(self, expected_resolution: Optional[str] = None, cause_text: str = ''):
         """
         @param expected_resolution this will be calculated, but if provided a ValueError will be raised if it doesn't match
+        @param cause_text reason this discordance is being closed
         """
         if self.clinical_context.is_discordant():
             self.resolution = DiscordanceReportResolution.CONTINUED_DISCORDANCE
@@ -76,7 +77,7 @@ class DiscordanceReport(TimeStampedModel):
             drc.close()
 
     @transaction.atomic
-    def update(self, cause_text: Optional[str] = None):
+    def update(self, cause_text: str = ''):
         if not self.is_active:
             raise ValueError('Cannot update non active Discordance Report')
 
@@ -104,7 +105,7 @@ class DiscordanceReport(TimeStampedModel):
             self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
 
     @transaction.atomic
-    def create_new_report(self, only_if_necessary: bool = True, cause: str = None):
+    def create_new_report(self, only_if_necessary: bool = True, cause: str = ''):
         if not self.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
             raise ValueError(f'Should only call create_new_report from the latest report, only if resolution = {DiscordanceReportResolution.CONTINUED_DISCORDANCE}')
 
@@ -124,8 +125,8 @@ class DiscordanceReport(TimeStampedModel):
                     classification_original=ClassificationModification.objects.get(pk=last_id)
                 ).save()
 
-            # the report might even auto close itself if the change brought it into concordance
-            report.update()
+            # the report might even auto-close itself if the change brought it into concordance
+            report.update(cause_text=cause)
         return report
 
     def has_significance_changed(self):
