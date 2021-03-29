@@ -80,7 +80,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
             for fk in fk_name_list:
                 old_new_pk[fk][old_pk] = r.id
 
-            print(f"Created {num_records} {new_class_name} records.")
+        print(f"Created {num_records} {new_class_name} records.")
 
     # Verify that nothing went wrong
     SampleSheet2 = apps.get_model("seqauto", "SampleSheet2")
