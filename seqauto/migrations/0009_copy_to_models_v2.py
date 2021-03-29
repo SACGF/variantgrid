@@ -43,9 +43,8 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
         old_klass = apps.get_model("seqauto", old_class_name)
         new_klass = apps.get_model("seqauto", new_class_name)
 
+        num_records = 0
         first_record = True
-        old_pks = []
-        new_records = []
         for data in old_klass.objects.all().values():
             if first_record:
                 print(f"Old: {old_klass}")
@@ -62,28 +61,25 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
                     data[date_field] = timezone.now()
 
             # Model inheritance uses ID to refer to base class - while PK is for
-            if old_pk := data.get("id"):
-                old_pks.append(old_pk)
+            if old_class_name == "SequencingRun":
+                old_pk = data["name"]
+            else:
+                old_pk = data["id"]
                 del data["id"]
 
             for fk in old_new_pk:
-                if old_pk := data[fk]:
-                    data[fk] = old_new_pk[fk][old_pk]
+                if old_fk := data[fk]:
+                    data[fk] = old_new_pk[fk][old_fk]
 
-            new_records.append(new_klass(**data))
-            print(f"New: {new_klass}")
-            print(data)
-            first_record = False
+            if first_record:
+                print(f"New: {new_klass}")
+                print(data)
+                first_record = False
+            r = new_klass.objects.create(**data)
+            for fk in fk_name_list:
+                old_new_pk[fk][old_pk] = r.id
 
-        if new_records:
-            created_records = new_klass.objects.bulk_create(new_records, batch_size=2000)
-            if fk_name_list:
-                new_pks = [r.id for r in created_records]
-                for old_pk, new_pk in zip(old_pks, new_pks):
-                    for fk in fk_name_list:
-                        old_new_pk[fk][old_pk] = new_pk
-
-            print(f"Created {len(new_records)} {new_class_name} records.")
+            print(f"Created {num_records} {new_class_name} records.")
 
     # Verify that nothing went wrong
     SampleSheet2 = apps.get_model("seqauto", "SampleSheet2")
