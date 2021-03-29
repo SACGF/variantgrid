@@ -11,7 +11,7 @@ from library.file_utils import mk_path
 
 def _one_off_copy_to_models_v2(apps, schema_editor):
     OLD_CLASSES_AND_FKS = {
-        "SequencingRun": ["sequencing_run_id"],
+        "SequencingRun": [],  # Will use existing name(PK) which works for new table too
         "SampleSheet": ["sample_sheet_id"],
         "SequencingRunCurrentSampleSheet": [],  # No FK to this
         "SequencingSample": ["sequencing_sample_id"],
@@ -86,9 +86,9 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
         print("-" * 40 + "\n")
 
     # Verify that nothing went wrong
-    SampleSheet2 = apps.get_model("seqauto", "SampleSheet2")
-    if SampleSheet2.objects.filter(path='').exists():
-        raise ValueError("SampleSheet2 contains path=''")
+    #SampleSheet2 = apps.get_model("seqauto", "SampleSheet2")
+    #if SampleSheet2.objects.filter(path='').exists():
+    #    raise ValueError("SampleSheet2 contains path=''")
 
     # upload.BackEndVCF refers to VCFFile and SampleSheetCombinedVCFFile.
     # Write out what the new FKs should be, then set to NULL (they will be changed to v2 in a bit)
