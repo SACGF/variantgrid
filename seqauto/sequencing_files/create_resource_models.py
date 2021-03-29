@@ -351,8 +351,9 @@ def process_flowcells(seqauto_run, existing_files, results):
             continue
         try:
             sequencing_run = process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing_run_dir, sequencing_run)
-            # Process all files regardless of state
-            sequencing_runs[sequencing_run.pk] = sequencing_run
+            if sequencing_run:
+                # Process all files regardless of state
+                sequencing_runs[sequencing_run.pk] = sequencing_run
         except Exception as e:
             raise SeqAutoRunError(f"Error processing {sequencing_run_dir}") from e
 
