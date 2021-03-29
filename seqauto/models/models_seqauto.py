@@ -242,7 +242,9 @@ class SequencingRun(SeqAutoRecord):
             params["experiment"] = self.experiment.name
 
             # TODO: TAU hack - not sure how we're supposed to get this
-            TAU_LAB_IDS = {"idt_exome": "Exome", "idt_gmp_focus": "GMPFocus"}
+            TAU_LAB_IDS = {"idt_exome": "Exome",
+                           "idt_gmp_focus": "GMPFocus",
+                           "idt_haem": "Haem"}
             if self.enrichment_kit:
                 if nice_name := TAU_LAB_IDS.get(self.enrichment_kit.name):
                     experiment_parts = self.experiment.name.split("_")
