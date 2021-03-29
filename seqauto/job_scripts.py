@@ -72,6 +72,7 @@ def get_job_data(seqauto_run, file_type, qs):
     if pattern is not None:
         for record in qs:
             params = settings.SEQAUTO_SCRIPT_PARAMS.copy()
+            params["base_dir"] = settings.BASE_DIR
             params.update(record.get_params())
 
             if isinstance(pattern, str):
