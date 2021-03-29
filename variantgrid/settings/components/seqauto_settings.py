@@ -14,7 +14,8 @@ SEQAUTO_VIRTUALENV_RUNNER = None
 SEQAUTO_SCRIPT_PARAMS = {"virtualenv_runner": SEQAUTO_VIRTUALENV_RUNNER or '',
                          "tau_pipeline_dir": os.path.join(TAU_DIR, "scripts"),
                          "tau_scripts_dir": os.path.join(TAU_DIR, "archive"),
-                         "pythonpath": TAU_DIR}
+                         "pythonpath": TAU_DIR,
+                         "base_dir": BASE_DIR}
 
 SEQAUTO_FLOWCELL_SCRIPT = 'find_flowcells.sh'
 SEQAUTO_FASTQ_SCRIPT = 'find_fastqs.sh'
@@ -70,7 +71,7 @@ manage_command_str = " ".join(MANAGE_COMMAND)
 SEQAUTO_JOB_SUBMITTED = f"{manage_command_str} job_script_submitted"
 SEQAUTO_JOB_COMPLETE = f"{manage_command_str} job_script_complete"
 SEQAUTO_SAMPLE_SHEET_COMMAND = "%(tau_scripts_dir)s/basecall_sample_sheet.sh %(sequencing_run_dir)s %(sample_sheet)s"
-SEQAUTO_ILLUMINA_FLOWCELL_QC_COMMAND = "%(virtualenv_runner)s %(tau_scripts_dir)s/illuminate_qc.sh %(sequencing_run_dir)s"
+SEQAUTO_ILLUMINA_FLOWCELL_QC_COMMAND = "%(virtualenv_runner)s %(base_dir)s/seqauto/scripts/illuminate_qc.sh %(sequencing_run_dir)s"
 SEQAUTO_FASTQC_COMMAND = "%(tau_scripts_dir)s/fastqc.sh %(fastq)s"
 SEQAUTO_BAM_COMMAND = TAU_PYTHON_COMMAND + ' %(tau_pipeline_dir)s/BWA_2_hap.py -r "%(sequencing_run)s" -p "%(enrichment_kit)s" -s "%(full_sample_name)s"'
 SEQAUTO_FLAGSTATS_COMMAND = "%(tau_scripts_dir)s/bam_index_flagstats.sh %(bam)s"
