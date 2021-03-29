@@ -347,6 +347,8 @@ def process_flowcells(seqauto_run, existing_files, results):
     # TODO: Only handling existing - need to handle deleted flowcells + set to deleted
     for sequencing_run_dir in existing_sequencing_runs:
         sequencing_run = existing_sequencing_run_records.get(sequencing_run_dir)
+        if sequencing_run and sequencing_run.legacy:
+            continue
         try:
             sequencing_run = process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing_run_dir, sequencing_run)
             # Process all files regardless of state
