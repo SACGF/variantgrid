@@ -936,15 +936,10 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
     missing = 0
     unchanged = 0
 
-    print(f"{existing_other_qc_records=}")
-    print(f"{existing_qcs=}")
-
     for qc in qc_set:
         other_qc_path = klass.get_path_from_qc(qc)
         exists = other_qc_path in existing_qcs
         data_state = get_data_state(qc.data_state, exists)
-
-        print(f"{other_qc_path=} {exists=}, {data_state=}")
 
         if exists:
             file_last_modified = SeqAutoRecord.get_file_last_modified(other_qc_path)
@@ -952,7 +947,6 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             file_last_modified = 0.0
 
         def _create_new_record():
-            print(f"_create_new_record, data_state={data_state=}")
             return klass.objects.create(path=other_qc_path,
                                         sequencing_run=qc.sequencing_run,
                                         qc=qc,
@@ -993,7 +987,6 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             if DataState.should_create_new_record(data_state):
                 created += 1
                 record = _create_new_record()
-                print(f"{record=}")
                 load_from_file_if_complete(seqauto_run,
                                            record,
                                            gene_matcher=gene_matcher,
