@@ -345,10 +345,12 @@ class ExportFormatter(BaseExportFormatter):
         if self.since:
             cm: ClassificationModification
             for cm in ag.data:
-                if cm.modified > self.since:
+                if cm.modified > self.since or cm.classification.modified > self.since:
                     return True
 
             # no modifications passed the check, but maybe a flag has changed on the allele of classifications
+            # and the flag could be attached to a withdrawn classification even
+            # (it could be that the classification is now withdrawn).
             flag_collection_ids = list()
             if allele_flag_id := Allele.objects.filter(pk=ag.allele_id).values_list("flag_collection_id", flat=True).first():
                 flag_collection_ids.append(allele_flag_id)
@@ -448,13 +450,16 @@ class ExportFormatter(BaseExportFormatter):
     def iter_group_by_allele(self):
         for allele_group in self.allele_groups:
             # actually populate the allele group data now
-            all_allele_group_data = [vcm for vcm in self.qs.filter(classification__variant__in=allele_group.variant_ids) if self.passes_flag_check(vcm)]
+            all_allele_group_data = self.qs.filter(classification__variant__in=allele_group.variant_ids)
             vcm: ClassificationModification
             for vcm in all_allele_group_data:
                 if vcm.classification.withdrawn:
+                    # if something is withdrawn, don't check it for other flags
                     allele_group.withdrawn.append(vcm)
                 else:
-                    allele_group.data.append(vcm)
+                    # if not withdrawn, make sure it passes other flag checks
+                    if self.passes_flag_check(vcm):
+                        allele_group.data.append(vcm)
 
             self.filter_mismatched_transcripts(allele_group)
 
