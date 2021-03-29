@@ -51,9 +51,9 @@ class Command(BaseCommand):
                 hpa_version.delete_related_objects()
                 hpa_version.create_partition()
             else:
-                logging.error("HumanProteinAtlasAnnotationVersion with hd5_hash='%s' already exists as pk=%d.", md5_hash, hpa_version.pk)
-                logging.error("If you really want to import this again, use the --replace option")
-                exit(1)
+                message = f"HumanProteinAtlasAnnotationVersion with hd5_hash='{md5_hash}' already exists as " \
+                          f"pk={hpa_version.pk}. If you really want to import this again, use the --replace option"
+                raise ValueError(message)
 
         version_id = hpa_version.pk
         logging.info("Reading hpa_version file...")
@@ -76,7 +76,8 @@ class Command(BaseCommand):
 
         delimiter = '\t'  # Was having trouble with quoting CSVs
         logging.info("Creating TSV to insert into database...")
-        csv_filename = get_import_processing_filename(version_id, "human_protein_annotation.csv", prefix='human_protein_atlas')
+        csv_filename = get_import_processing_filename(version_id, "human_protein_annotation.csv",
+                                                      prefix='human_protein_atlas')
         if os.path.exists(csv_filename):
             os.remove(csv_filename)
         write_sql_copy_csv(records, csv_filename, delimiter=delimiter)

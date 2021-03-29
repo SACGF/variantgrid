@@ -106,15 +106,11 @@ def convert_sheet_to_df(sheet):
         sample_id = 'SampleID'
 
     if len(date_on_file) != 6:
-        logging.error('The date indicated in the file name (%s) not in format YY-MM-DD: ', date_on_file)
-        logging.error('\t%s', sheet)
-        exit(1)
+        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YY-MM-DD")
 
     yy, mm, dd = date_on_file[:2], date_on_file[2:4], date_on_file[4:]
     if int(mm) > 12 or int(dd) > 31:
-        logging.error('The date indicated in the file name not in format YY-MM-DD: ')
-        logging.error('\t%s', sheet)
-        exit(1)
+        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YY-MM-DD")
 
     date = '20{yy}-{mm}-{dd}T00:00:00+0930'.format(yy=yy, mm=mm, dd=dd)
 
