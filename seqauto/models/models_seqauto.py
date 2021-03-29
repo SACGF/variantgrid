@@ -599,6 +599,10 @@ class UnalignedReads(models.Model):
     fastq_r1 = models.ForeignKey(Fastq, related_name='fastq_r1', on_delete=CASCADE)
     fastq_r2 = models.ForeignKey(Fastq, null=True, related_name='fastq_r2', on_delete=CASCADE)
 
+    @property
+    def sequencing_run(self):
+        return self.sequencing_sample.sample_sheet.sequencing_run
+
     def get_params(self):
         fastq_params = self.fastq_r1.sequencing_sample.get_params()
         sequencing_run = self.sequencing_sample.sample_sheet.sequencing_run
