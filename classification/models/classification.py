@@ -345,8 +345,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if flag_type == 'classification_matching_variant':
                     variant_matching = True
                 coi.add_flag(flag_type)
-            if not variant_matching and (not c.chgvs_grch37 or not c.chgvs_grch38):
-                coi.add_issue("Not lifted over")
+            if not variant_matching:
+                if not c.chgvs_grch37:
+                    coi.add_issue("No cached 37 representation")
+                if not c.chgvs_grch38:
+                    coi.add_issue("No cached 38 representation")
 
             summaries.append(coi)
 
