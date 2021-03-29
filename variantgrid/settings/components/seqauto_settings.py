@@ -1,11 +1,11 @@
 import os
-from variantgrid.settings.components.default_settings import BASE_DIR, MEDIA_ROOT, MANAGE_COMMAND
+from variantgrid.settings.components.default_settings import BASE_DIR, MANAGE_COMMAND, PRIVATE_DATA_ROOT
 
 SEQAUTO_ENABLED = False
 SEQAUTO_ALLOW_NON_STAFF_MANUAL_RUN = True
 SEQAUTO_DIR = os.path.join(BASE_DIR, "seqauto")
 SEQAUTO_SCRIPTS_DIR = os.path.join(SEQAUTO_DIR, "scripts", "test")
-SEQAUTO_SCAN_RESOURCES_DIR = os.path.join(MEDIA_ROOT, 'scan_resources')
+SEQAUTO_SCAN_RESOURCES_DIR = os.path.join(PRIVATE_DATA_ROOT, 'scan_resources')
 SEQAUTO_USER = 'seqauto'
 SEQAUTO_GROUP = None
 
@@ -51,7 +51,7 @@ SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN = "exec_stats/%(sample_name)s_stats.txt"
 SEQAUTO_QC_GENE_LIST_PATTERN = "exec_stats/%(sample_name)s_QC.txt"
 SEQAUTO_QC_GENE_COVERAGE_PATTERN = "bam_stats/samples/%(sample_name)s.per_gene_coverage.tsv.gz"
 
-SEQAUTO_JOB_SCRIPTS_BASE_DIR = os.path.join(MEDIA_ROOT, "job_scripts")
+SEQAUTO_JOB_SCRIPTS_BASE_DIR = os.path.join(PRIVATE_DATA_ROOT, "job_scripts")
 SEQAUTO_JOB_SCRIPTS_OUT_DIR = os.path.join(SEQAUTO_JOB_SCRIPTS_BASE_DIR, "out")
 SEQAUTO_JOB_SCRIPTS_DIR = os.path.join(SEQAUTO_JOB_SCRIPTS_BASE_DIR, "scripts")
 
