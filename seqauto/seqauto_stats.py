@@ -2,36 +2,35 @@ import operator
 from functools import reduce
 
 from library.date_utils import get_month_and_year, get_months_since, month_range
-from seqauto.models import SequencingSample
+from seqauto.models import SequencingSample, SequencingRun
 import pandas as pd
 import numpy as np
 
 
 def get_sample_enrichment_kits_df():
-    SEQUENCING_RUN_COL = "sample_sheet__sequencing_run"
-    values_qs = SequencingSample.get_current().values(SEQUENCING_RUN_COL, "enrichment_kit__name")
+    values_qs = SequencingSample.get_current().values("sequencing_run", "enrichment_kit__name")
     df = pd.DataFrame.from_records(values_qs)
-    if SEQUENCING_RUN_COL in df.columns:
-        sr = df[SEQUENCING_RUN_COL]
+    sr = df["sequencing_run"]
 
-        year_month_series = pd.Series(index=df.index, dtype='i')
-        year_series = pd.Series(index=df.index, dtype='i')
+    year_month_series = pd.Series(index=df.index, dtype='i')
+    year_series = pd.Series(index=df.index, dtype='i')
 
-        for i, val in sr.items():
-            run_date = val.split("_")[0]
-            year_series[i] = run_date[:2]
-            year_month_series[i] = run_date[:4]
+    for i, val in sr.items():
+        sr_name = SequencingRun.get_original_illumina_sequencing_run(val)
+        run_date = sr_name.split("_")[0]
+        year_series[i] = run_date[:2]
+        year_month_series[i] = run_date[:4]
 
-        start_month, start_year = get_month_and_year(year_month_series.min())
+    start_month, start_year = get_month_and_year(year_month_series.min())
 
-        month_offset = pd.Series(index=df.index)
-        for i, year_month in year_month_series.items():
-            month, year = get_month_and_year(year_month)
-            month_offset[i] = get_months_since(start_month, start_year, month, year)
+    month_offset = pd.Series(index=df.index)
+    for i, year_month in year_month_series.items():
+        month, year = get_month_and_year(year_month)
+        month_offset[i] = get_months_since(start_month, start_year, month, year)
 
-        df.loc[:, "year"] = year_series
-        df.loc[:, "year_month"] = year_month_series
-        df.loc[:, "month_offset"] = month_offset
+    df.loc[:, "year"] = year_series
+    df.loc[:, "year_month"] = year_month_series
+    df.loc[:, "month_offset"] = month_offset
     return df
 
 

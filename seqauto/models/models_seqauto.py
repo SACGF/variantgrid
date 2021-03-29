@@ -225,16 +225,21 @@ class SequencingRun(SeqAutoRecord):
             logging.info("Can't find current sample sheet for %s", self.path)
             raise
 
+    @staticmethod
+    def get_original_illumina_sequencing_run(modified_sequencing_run):
+        # TAU rename the sequencing run dir with enrichment kit at the end - need to clean it
+        original_sequencing_run = modified_sequencing_run
+        if m := re.search(SEQUENCING_RUN_REGEX, modified_sequencing_run):
+            original_sequencing_run = m.group(0)
+        return original_sequencing_run
+
     def get_params(self):
         """ This allows chaining down names etc - in case a level changes it, will cascade down """
-        params = {"sequencing_run": self.name,
-                  "sequencing_run_dir": self.path}
-
-        # TAU rename the sequencing run dir with enrichment kit at the end - need to clean it
-        original_sequencing_run = self.name
-        if m := re.search(SEQUENCING_RUN_REGEX, self.name):
-            original_sequencing_run = m.group(0)
-        params["original_sequencing_run"] = original_sequencing_run
+        params = {
+            "sequencing_run": self.name,
+            "sequencing_run_dir": self.path,
+            "original_sequencing_run": self.get_original_illumina_sequencing_run(self.name),
+        }
         if self.enrichment_kit:
             params["enrichment_kit"] = self.enrichment_kit.name
 
