@@ -71,11 +71,12 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
                 if old_fk := data.get(fk):
                     data[fk] = old_new_pk[fk][old_fk]
 
-            if first_record:
-                print(f"New: {new_klass}")
-                print(data)
-                first_record = False
             r = new_klass.objects.create(**data)
+            if first_record:
+                print(f"New: {new_klass} - inserted with ID={r.id}")
+                print(data)
+                print("-" * 40 + "\n")
+                first_record = False
             num_records += 1
             for fk in fk_name_list:
                 old_new_pk[fk][old_pk] = r.id
