@@ -38,7 +38,7 @@ SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichme
 SEQAUTO_BAM_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "1_BAM")
 SEQAUTO_VCF_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "2_variants")
 SEQAUTO_QC_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "4_QC")
-SEQAUTO_RUN_PARAMETERS_DIR_PATTERN = os.path.join(SEQAUTO_QC_DIR_PATTERN, "sequencing_stats")
+SEQAUTO_RUN_PARAMETERS_SUB_DIR = "4_QC/sequencing_stats"  # Subdir of SequencingRun
 
 SEQAUTO_MISEQ_ALIGNED_PATTERN = "%(sample_name_underscores)s_S%(sample_number)s"
 SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"

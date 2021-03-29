@@ -1,4 +1,5 @@
 import json
+import os
 from collections import defaultdict
 
 from django.conf import settings
@@ -249,8 +250,9 @@ def reload_experiment_name(request, sequencing_run_id):
     old_experiment = sequencing_run.experiment
 
     # TODO: Event log message??
-    run_parameters_dir = settings.SEQAUTO_RUN_PARAMETERS_DIR_PATTERN % sequencing_run.get_params()
+    run_parameters_dir = os.path.join(sequencing_run.path, settings.SEQAUTO_RUN_PARAMETERS_SUB_DIR)
     _, experiment_name = get_run_parameters(run_parameters_dir)
+    experiment = None
     if experiment_name:
         experiment, _ = Experiment.objects.get_or_create(name=experiment_name)
 
