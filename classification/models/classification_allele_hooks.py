@@ -1,6 +1,7 @@
 from django.dispatch.dispatcher import receiver
 
 from genes.hgvs import HGVSMatcher
+from snpdb.models import GenomeBuild
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_variant import Allele, allele_validate_signal
 from classification.models.classification import Classification
@@ -12,8 +13,8 @@ def compare_chgvs(sender, allele: Allele, **kwargs):
     v37 = allele.grch37
     v38 = allele.grch38
     if v37 and v38:
-        matcher37 = HGVSMatcher(genome_build=v37.genome_build)
-        matcher38 = HGVSMatcher(genome_build=v38.genome_build)
+        matcher37 = HGVSMatcher(genome_build=GenomeBuild.grch37())
+        matcher38 = HGVSMatcher(genome_build=GenomeBuild.grch38())
         transcripts = set()
         existing_flags = allele.flags_of_type(allele_flag_types.allele_37_not_38).values_list('data__transcript',
                                                                                               flat=True)
