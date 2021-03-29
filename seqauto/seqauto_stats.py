@@ -8,9 +8,9 @@ import numpy as np
 
 
 def get_sample_enrichment_kits_df():
-    values_qs = SequencingSample.get_current().values("sequencing_run", "enrichment_kit__name")
+    values_qs = SequencingSample.get_current().values("sample_sheet__sequencing_run", "enrichment_kit__name")
     df = pd.DataFrame.from_records(values_qs)
-    sr = df["sequencing_run"]
+    sr = df["sample_sheet__sequencing_run"]
 
     year_month_series = pd.Series(index=df.index, dtype='i')
     year_series = pd.Series(index=df.index, dtype='i')
