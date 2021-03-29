@@ -6,6 +6,8 @@ from django.db import migrations
 from django.db.models import Q
 from django.utils import timezone
 
+from library.file_utils import mk_path
+
 
 def _one_off_copy_to_models_v2(apps, schema_editor):
     OLD_CLASSES_AND_FKS = {
@@ -101,6 +103,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
         csv_records.append(record)
 
     df = pd.DataFrame.from_records(csv_records)
+    mk_path("data/migrations")
     backend_vcf_filename = "data/migrations/backend_vcf_new_pks.csv"
     df.to_csv(backend_vcf_filename)
 
