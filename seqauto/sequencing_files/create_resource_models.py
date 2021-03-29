@@ -377,7 +377,8 @@ def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing
 
     data_state = DataState.COMPLETE
 
-    instrument_name, experiment_name = get_run_parameters(sequencing_run_dir)
+    run_parameters_dir = settings.SEQAUTO_RUN_PARAMETERS_DIR_PATTERN % sequencing_run.get_params()
+    instrument_name, experiment_name = get_run_parameters(run_parameters_dir)
     if experiment_name:
         experiment, _ = Experiment.objects.get_or_create(name=experiment_name)
     else:

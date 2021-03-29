@@ -249,7 +249,8 @@ def reload_experiment_name(request, sequencing_run_id):
     old_experiment = sequencing_run.experiment
 
     # TODO: Event log message??
-    _, experiment_name = get_run_parameters(sequencing_run.path)
+    run_parameters_dir = settings.SEQAUTO_RUN_PARAMETERS_DIR_PATTERN % sequencing_run.get_params()
+    _, experiment_name = get_run_parameters(run_parameters_dir)
     if experiment_name:
         experiment, _ = Experiment.objects.get_or_create(name=experiment_name)
 
