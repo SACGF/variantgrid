@@ -232,7 +232,7 @@ class SequencingRun(SeqAutoRecord):
 
         # TAU rename the sequencing run dir with enrichment kit at the end - need to clean it
         original_sequencing_run = self.name
-        if m := re.match(SEQUENCING_RUN_REGEX, self.name):
+        if m := re.search(SEQUENCING_RUN_REGEX, self.name):
             original_sequencing_run = m.group(0)
         params["original_sequencing_run"] = original_sequencing_run
         if self.enrichment_kit:

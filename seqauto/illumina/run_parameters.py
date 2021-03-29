@@ -40,6 +40,6 @@ def get_run_parameters(run_parameters_dir):
     try:
         instrument = get_single_element(run_info_file, root, "InstrumentID")
     except:
-        instrument = get_instrument_from_run_info(flowcell_dir)
+        instrument = get_instrument_from_run_info(run_parameters_dir)
 
     return instrument.text, experiment.text
