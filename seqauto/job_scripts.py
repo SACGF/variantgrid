@@ -100,5 +100,12 @@ def get_job_data(seqauto_run, file_type, qs):
                   "cores": cores,
                   "mem": mem}
             job_data[record.pk] = jd
+    else:
+        logging.info("Skipped scripts for %s", SequencingFileType(file_type).label)
+
+    logging.info("Generated scripts for %d records", len(job_data))
+    if job_data:
+        data = next(iter(job_data.values()))
+        print(f"A job was written to {data['path']}")
 
     return job_data
