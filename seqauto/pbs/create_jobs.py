@@ -61,8 +61,7 @@ class ScriptWriter:
         logging.info(f"Creating job {file_type} - {job_data['path']}")
         copy_fields = ["seqauto_run", "path", "file_type", "out_file"]
         kwargs = {f: job_data[f] for f in copy_fields}
-        field = JobScript.FIELDS[file_type]
-        kwargs[field] = job_data["record"]
+        kwargs["record"] = job_data["record"]
         job_script = JobScript.objects.create(**kwargs)
 
         name = job_data["name"]
