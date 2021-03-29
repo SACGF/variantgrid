@@ -40,7 +40,7 @@ class Command(BaseCommand):
             gold_runs_filename = gold_runs_file_template % {"enrichment_kit": enrichment_kit.name}
             if os.path.exists(gold_runs_filename):
                 gold_runs = self._get_gold_runs(enrichment_kit, gold_runs_filename)
-                runs_for_enrichment_kit_qs = SequencingRun.objects.filter(samplesheet__sequencingsample__enrichment_kit=enrichment_kit).distinct()
+                runs_for_enrichment_kit_qs = SequencingRun.objects.filter(seqautorun__samplesheet__sequencingsample__enrichment_kit=enrichment_kit).distinct()
                 old_gold_for_enrichment_kit = get_enrichment_kit_gold_sequencing_runs(runs_for_enrichment_kit_qs)
                 gold_runs_qs = SequencingRun.objects.all().filter(name__in=gold_runs)  # Get all in case was set to wrong kit
                 logging.info("Setting enrichment_kit '%s' runs '%s' to this kit and gold", enrichment_kit, ','.join(gold_runs))

@@ -40,7 +40,7 @@ def get_sequencing_runs_for_compare_type(sequencing_run, qc_compare_type):
         qs = all_runs_qs.filter(sequencer=sequencing_run.sequencer)
     elif qc_compare_type in QCCompareType.ENRICHMENT_KIT_TYPES:
         enrichment_kit = sequencing_run.enrichment_kit
-        qs = all_runs_qs.filter(samplesheet__sequencingsample__enrichment_kit=enrichment_kit).distinct()
+        qs = all_runs_qs.filter(seqautorecord__samplesheet__sequencingsample__enrichment_kit=enrichment_kit).distinct()
         if qc_compare_type == QCCompareType.GOLD_ENRICHMENT_KIT_RUNS:
             qs = qs.filter(gold_standard=True)
     elif qc_compare_type == QCCompareType.SEQUENCING_RUN:

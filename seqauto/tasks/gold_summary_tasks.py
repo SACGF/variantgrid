@@ -37,7 +37,7 @@ def calculate_gold_summary(enrichment_kit_id):
                                                   import_status=ImportStatus.IMPORTING)
 
     try:
-        seq_runs_qs = SequencingRun.objects.filter(samplesheet__sequencingsample__enrichment_kit=enrichment_kit,
+        seq_runs_qs = SequencingRun.objects.filter(seqautorun__samplesheet__sequencingsample__enrichment_kit=enrichment_kit,
                                                    gold_standard=True).distinct()
         # Check that we have sufficient data from all of them...
         problems = []
