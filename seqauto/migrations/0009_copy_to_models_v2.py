@@ -12,7 +12,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
         "SequencingRun": ["sequencing_run_id"],
         "SampleSheet": ["sample_sheet_id"],
         "SequencingRunCurrentSampleSheet": [],  # No FK to this
-        "SequencingSample": "sequencing_sample_id",
+        "SequencingSample": ["sequencing_sample_id"],
         "SequencingSampleData": [],  # No FK to this
         "SampleFromSequencingSample": [], # No FK to this
         "VCFFromSequencingRun": [],  # No FK to this
@@ -27,7 +27,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
         "VCFFile": ["vcf_file_id"],
         "SampleSheetCombinedVCFFile": ["combo_vcf_id"],  # For BackEndVCF
         "QC": ["qc_id"],
-        "QCGeneList": [], # No FK to this
+        "QCGeneList": [],  # No FK to this
         "QCExecSummary": ["exec_summary_id"],
         "ExecSummaryReferenceRange": [],  # No FK to this
     }
@@ -75,13 +75,13 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
             if first_record:
                 print(f"New: {new_klass} - inserted with ID={r.id}")
                 print(data)
-                print("-" * 40 + "\n")
                 first_record = False
             num_records += 1
             for fk in fk_name_list:
                 old_new_pk[fk][old_pk] = r.id
 
         print(f"Created {num_records} {new_class_name} records.")
+        print("-" * 40 + "\n")
 
     # Verify that nothing went wrong
     SampleSheet2 = apps.get_model("seqauto", "SampleSheet2")
