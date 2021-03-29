@@ -110,6 +110,15 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
     # Set to Null - we'll reload them from CSV above
     BackEndVCF.objects.all().update(vcf_file=None, combo_vcf=None)
 
+    # Write the whole old/new keys so we can debug what happened
+    csv_records = []
+    for fk, onp in old_new_pk.items():
+        for o, n in onp.items():
+            csv_records.append({"fk": fk, "old_pk": o, "new_pk": n})
+    df = pd.DataFrame.from_records(csv_records)
+    fk_conversions_filename = "data/migrations/fk_conversions.csv"
+    df.to_csv(fk_conversions_filename)
+
 
 class Migration(migrations.Migration):
 
