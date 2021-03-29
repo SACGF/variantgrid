@@ -260,7 +260,7 @@ class SequencingRun(SeqAutoRecord):
         return has_basecall_data
 
     def check_interop_dir(self):
-        interop_dir = os.path.join(self.path, "InterOp")
+        interop_dir = os.path.join(self.path, settings.SEQAUTO_SEQUENCING_RUN_INTEROP_SUB_DIR)
         has_quality = os.path.exists(os.path.join(interop_dir, "QMetricsOut.bin"))
         has_index = os.path.exists(os.path.join(interop_dir, "IndexMetricsOut.bin"))
         has_tile = os.path.exists(os.path.join(interop_dir, "TileMetricsOut.bin"))
