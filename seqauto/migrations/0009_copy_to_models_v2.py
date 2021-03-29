@@ -36,7 +36,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
     # file_last_modified = models.FloatField(default=0.0)
     # data_state = models.CharField(max_length=1, choices=DataState.choices)
 
-    old_new_pk = defaultdict(lambda: defaultdict)
+    old_new_pk = defaultdict(dict)
 
     for old_class_name, fk_name_list in OLD_CLASSES_AND_FKS.items():
         new_class_name = old_class_name + "2"
