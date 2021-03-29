@@ -68,7 +68,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
                 del data["id"]
 
             for fk in old_new_pk:
-                if old_fk := data[fk]:
+                if old_fk := data.get(fk):
                     data[fk] = old_new_pk[fk][old_fk]
 
             if first_record:
@@ -76,6 +76,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
                 print(data)
                 first_record = False
             r = new_klass.objects.create(**data)
+            num_records += 1
             for fk in fk_name_list:
                 old_new_pk[fk][old_pk] = r.id
 
