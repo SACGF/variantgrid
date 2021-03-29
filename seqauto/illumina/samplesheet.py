@@ -48,12 +48,14 @@ def csv_file_from_new_samplesheet(sheet):
     return mem_file
 
 
-def is_standard_valid_flowcell_dir(sequencing_run_path):
+def is_standard_valid_flowcell_dir(sequencing_run_path, date_on_file: str = None):
     filename_parts = sequencing_run_path.split('_')
-    date_on_file = filename_parts[0]
+    if date_on_file is None:
+        date_on_file = filename_parts[0]
 
     if len(date_on_file) != 6:
-        logging.warning('SequencingRun: %s - date from file name section "%s" not in format YY-MM-DD: ', sequencing_run_path, date_on_file)
+        logging.warning('SequencingRun: %s - date from file name section "%s" not in format YY-MM-DD: ',
+                        sequencing_run_path, date_on_file)
         return False
 
     # There are 2 types of naming conventions:
@@ -84,7 +86,7 @@ def convert_sheet_to_df(sheet, date_on_file: str = None):
     flow_cell_id = None  # default None = use column from sample sheet
 
     sequencing_run_path = os.path.basename(os.path.dirname(sheet))
-    is_standard_valid_flowcell_dir(sequencing_run_path)
+    is_standard_valid_flowcell_dir(sequencing_run_path, date_on_file=date_on_file)
 
     filename_parts = sequencing_run_path.split('_')
     if date_on_file is None:
