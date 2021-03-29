@@ -41,7 +41,8 @@ def create_jobs_and_launch_script(seqauto_run, launch_file_types):
             s = get_job_data(seqauto_run, file_type, qs)
             job_data_by_file_type[file_type].update(s)
 
-    launch_script_filename = get_launch_script_with_dependencies(seqauto_run, job_data_by_file_type, launch_file_types, allow_dependencies=True)
+    launch_script_filename = get_launch_script_with_dependencies(seqauto_run, job_data_by_file_type, launch_file_types,
+                                                                 allow_dependencies=True)
     return launch_script_filename
 
 
