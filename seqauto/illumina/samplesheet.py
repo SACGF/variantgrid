@@ -75,7 +75,7 @@ def is_standard_valid_flowcell_dir(sequencing_run_path):
     return True
 
 
-def convert_sheet_to_df(sheet):
+def convert_sheet_to_df(sheet, date_on_file: str = None):
     """
     columns in returned df:
         sample_id, sample_name, sample_project, flowcell_id, lane, barcode, date, platform
@@ -87,7 +87,8 @@ def convert_sheet_to_df(sheet):
     is_standard_valid_flowcell_dir(sequencing_run_path)
 
     filename_parts = sequencing_run_path.split('_')
-    date_on_file = filename_parts[0]
+    if date_on_file is None:
+        date_on_file = filename_parts[0]
 
     if is_new_sheet(sheet):
         # 150828_NB501009_0004_AHFCC3BGXX

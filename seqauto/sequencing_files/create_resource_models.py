@@ -56,7 +56,13 @@ def returning_existing_records_by_path(klass, filter_kwargs=None):
 
 def create_samplesheet_samples(sample_sheet):
     try:
-        df = convert_sheet_to_df(sample_sheet.path)
+        date_on_file = None
+        # Handle having prefixes added to SequencingRun dir - get off original path
+        if original_sequencing_run := sample_sheet.sequencing_run.get_params().get("original_sequencing_run"):
+            filename_parts = original_sequencing_run.split('_')
+            date_on_file = filename_parts[0]
+
+        df = convert_sheet_to_df(sample_sheet.path, date_on_file=date_on_file)
         sample_sheet_process_default, msg = samplesheet_is_valid(df)
     except Exception as e:
         logging.error("samplesheet_is_valid() died for %s", sample_sheet.path)
