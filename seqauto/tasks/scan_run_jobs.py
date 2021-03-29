@@ -75,7 +75,7 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run
         create_resource_models(seqauto_run, process_seqauto_scripts)
 
         # Jobs
-        all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | set([SequencingFileType.COMBINED_VCF])
+        all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | {SequencingFileType.COMBINED_VCF}
         launch_file_types = only_launch_file_types or all_sequencing_file_types
         seqauto_run.scripts_and_jobs_start = timezone.now()
 
