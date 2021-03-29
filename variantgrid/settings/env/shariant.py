@@ -98,7 +98,7 @@ ANNOTATION[BUILD_GRCH37]["annotation_consortium"] = "RefSeq"
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
 
-LIFTOVER_NCBI_REMAP_ENABLED = False
+LIFTOVER_NCBI_REMAP_ENABLED = True
 LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
 LOGIN_REDIRECT_URL = '/classification/dashboard'
@@ -208,8 +208,5 @@ SEARCH_VARIANT_SHOW_SUMMARY = False  # If you want to use this for Shariant we n
 
 UNSHARED_FLAG_ENABLED = True
 VIEW_GENE_SHOW_HOTSPOT_GRAPH = False
-
-LIFTOVER_NCBI_REMAP_ENABLED = True
-LIFTOVER_NCBI_REMAP_USE_PERLBREW = True
 
 PANEL_APP_CHECK_ENABLED = True
