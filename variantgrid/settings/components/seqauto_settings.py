@@ -34,7 +34,7 @@ SEQAUTO_ALIGNED_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "clinical_hg38
 SEQAUTO_SCRATCH_BASE_DIR = "/tmp"
 SEQAUTO_GOLD_BASE_DIR = None
 
-SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(lab_run_id)s_%(original_sequencing_run)s")
+SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s")
 SEQAUTO_BAM_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "1_BAM")
 SEQAUTO_VCF_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "2_variants")
 SEQAUTO_QC_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "4_QC")
@@ -44,7 +44,7 @@ SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
 
 SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
 SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.hg38.vcf.gz"
-SEQAUTO_COMBINED_VCF_PATTERN = "%(lab_run_id)s_%(original_sequencing_run)s.gatk.hg38.vcf.gz"
+SEQAUTO_COMBINED_VCF_PATTERN = "%(sequencing_run)s.gatk.hg38.vcf.gz"
 
 SEQAUTO_QC_EXEC_SUMMARY_PATTERN = "exec_stats/%(sample_name)s_qc_summary.txt"
 SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN = "exec_stats/%(sample_name)s_stats.txt"
