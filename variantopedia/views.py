@@ -101,7 +101,7 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     return {"notice_header": notice_header,
              "events": events,
              "classifications_of_interest": classifications_of_interest,
-             "classifications_new_count": new_classification_count,
+             "classifications_created": new_classification_count,
              "vcfs": vcfs,
              "analyses_created": analyses_created,
              "analyses_modified": analyses_modified,}
@@ -139,29 +139,66 @@ def dashboard(request):
     return render(request, "variantopedia/dashboard.html", context)
 
 
+def notify_server_status():
+    dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
+    url = get_url_from_view_path(reverse('server_status')) + '?days=1'
+
+    blocks = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"Health Check from <{url}|{url}>\nIn the last _24 hours_:"
+            }
+        },
+        {
+            "type": "divider"
+        }
+    ]
+    for _, message in get_disk_messages(info_messages=True):
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f":floppy_disk: {message}"
+            }
+        })
+
+    keys = set(dashboard_notices.keys())
+    keys.discard('events')
+    keys.discard('notice_header')
+    visible_urls = get_visible_url_names()
+    if not visible_urls.get('analyses'):
+        for exclude_key in ['vcfs', 'analyses_created', 'analyses_modified']:
+            keys.discard(exclude_key)
+    sorted_keys = sorted(list(keys))
+
+    for key in sorted_keys:
+        emoji = ":blue_book:"
+        if 'analyses' in key:
+            emoji = ":orange_book:"
+        elif 'vcf' in key:
+            emoji = ":green_book:"
+        count_display = count(dashboard_notices.get(key))
+        if count_display:
+            count_display = f"*{count}*"
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"{emoji} {count_display} : {pretty_label(key)}"
+            }
+        })
+    message = f"Health Check from <{url}|{url}>"
+
+    emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
+    send_notification(message=message, blocks=blocks, username="Health Check", emoji=emoji)
+
+
 @require_superuser
 def server_status(request):
     if request.method == "POST":
-        dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
-        message_parts = list()
-        keys = set(dashboard_notices.keys())
-        keys.discard('events')
-        keys.discard('notice_header')
-        visible_urls = get_visible_url_names()
-        if not visible_urls.get('analyses'):
-            for exclude_key in ['vcfs', 'analyses_created', 'analyses_modified']:
-                keys.discard(exclude_key)
-        sorted_keys = sorted(list(keys))
-
-        for key in sorted_keys:
-            message_parts.append(f"{pretty_label(key)}: {count(dashboard_notices.get(key))}")
-
-        url = get_url_from_view_path(reverse('server_status'))
-        message_body = "\n".join(message_parts)
-        message = f"Health Check from <{url}|{url}>\nIn the last 24 hours\n\n{message_body}"
-
-        emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
-        send_notification(message=message, username="Health Check", emoji=emoji)
+        notify_server_status()
 
     celery_workers = {}
     if settings.CELERY_ENABLED:

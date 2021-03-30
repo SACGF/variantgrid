@@ -76,7 +76,7 @@ def report_exc_info(extra_data=None, request=None):
         print(exc_info)
 
 
-def send_notification(message: str, username: Optional[str] = None, emoji: str = ":dna:"):
+def send_notification(message: str, blocks: Optional[Dict] = None, username: Optional[str] = None, emoji: str = ":dna:"):
     sent = False
     if slack := settings.SLACK:
         if slack.get('enabled'):
@@ -86,6 +86,8 @@ def send_notification(message: str, username: Optional[str] = None, emoji: str =
                     "text": message,
                     "icon_emoji": emoji
                 }
+                if blocks:
+                    data["blocks"] = blocks
                 data_str = json.dumps(data)
                 print(data_str)
                 r = requests.request(
