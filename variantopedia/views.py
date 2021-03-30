@@ -181,7 +181,7 @@ def notify_server_status():
             emoji = ":green_book:"
         count_display = count(dashboard_notices.get(key))
         if count_display:
-            count_display = f"*{count}*"
+            count_display = f"*{count_display}*"
         blocks.append({
             "type": "section",
             "text": {
