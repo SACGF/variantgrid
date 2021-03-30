@@ -976,8 +976,10 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             else:
                 # logging.info("%s - previous last modified: %f - now %f",
                 #             record.path, record.file_last_modified, file_last_modified)
-                if exists and file_last_modified > record.file_last_modified:
-                    logging.info("**** RECORD last modified has changed! ***")
+                # Compare last modified at second level - otherwise we get float equality issues
+                if exists and int(file_last_modified) > int(record.file_last_modified):
+                    logging.info("**** RECORD last modified has changed: old: %s, new: %s ***",
+                                 record.file_last_modified, file_last_modified)
                     record = _create_new_record()
                     load_from_file_if_complete(seqauto_run,
                                                record,

@@ -922,7 +922,7 @@ class QCGeneList(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_qc(qc):
-        pattern = os.path.join(qc.qc_dir_path, settings.SEQAUTO_QC_GENE_LIST_PATTERN)
+        pattern = os.path.join(settings.SEQAUTO_GOI_DIR_PATTERN, settings.SEQAUTO_GOI_LIST_PATTERN)
         return pattern % qc.get_params()
 
     def load_from_file(self, seqauto_run, **kwargs):

@@ -37,6 +37,7 @@ SEQAUTO_GOLD_BASE_DIR = None
 
 SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s")
 SEQAUTO_FASTQ_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "0_fastq")
+SEQAUTO_GOI_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "0_goi")
 SEQAUTO_BAM_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "1_BAM")
 SEQAUTO_VCF_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "2_variants")
 SEQAUTO_QC_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "4_QC")
@@ -51,11 +52,12 @@ SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
 SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
 SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.hg38.vcf.gz"
 SEQAUTO_COMBINED_VCF_PATTERN = "%(sequencing_run)s.gatk.hg38.vcf.gz"
+SEQAUTO_GOI_LIST_PATTERN = "%(sequencing_run)s_%(sample_name)s.txt"
 
 SEQAUTO_QC_EXEC_SUMMARY_PATTERN = "exec_stats/%(sample_name)s_qc_summary.txt"
 SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN = "exec_stats/%(sample_name)s_stats.txt"
-SEQAUTO_QC_GENE_LIST_PATTERN = "exec_stats/%(sample_name)s_QC.txt"
 SEQAUTO_QC_GENE_COVERAGE_PATTERN = "bam_stats/samples/%(sample_name)s.per_gene_coverage.tsv.gz"
+
 
 SEQAUTO_JOB_SCRIPTS_BASE_DIR = os.path.join(PRIVATE_DATA_ROOT, "job_scripts")
 SEQAUTO_JOB_SCRIPTS_OUT_DIR = os.path.join(SEQAUTO_JOB_SCRIPTS_BASE_DIR, "out")
