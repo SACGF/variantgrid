@@ -293,8 +293,6 @@ $(document).ready(function() {
         </div>
     {% endif %}
 
-{% if variant.can_have_annotation %}
-
     {% if classifications %}
         <!-- Needs to be full width to show data table -->
         <div id='classifications' class='container-table mt-4'>
@@ -312,7 +310,6 @@ $(document).ready(function() {
             </div>
         </div>
     {% endif %}
-{% endif %}
 
 {% if show_annotation and variant_annotation %}
     <div class="container">
