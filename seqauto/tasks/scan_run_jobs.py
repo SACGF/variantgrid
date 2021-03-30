@@ -106,7 +106,7 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run
 
     if seqauto_run.error_exception:
         logging.error(seqauto_run.error_exception)
-    else:
+    elif not settings.DEBUG:
         seqauto_run.remove_scan_resources_dir()
 
     seqauto_run.save()

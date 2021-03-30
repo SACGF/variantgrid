@@ -523,7 +523,8 @@ class Fastq(SeqAutoRecord):
 
     @staticmethod
     def get_pair_paths_from_sequencing_sample(sequencing_sample):
-        """ The 1st value returned must be what will be generated given current pipelines (ie old naming conventions come after) """
+        """ The 1st value returned must be what will be generated given current pipelines
+            (ie old naming conventions come after) """
         sequencer_model = sequencing_sample.sample_sheet.sequencing_run.sequencer.sequencer_model
         patterns = ["%(full_sample_name)s_L%(lane)03d_R%(read)d_001.fastq.gz"]
 
@@ -545,10 +546,11 @@ class Fastq(SeqAutoRecord):
 
         unaligned_dir_patterns = []
         if sequencing_sample.sample_project:
-            vcf_subdirs = ["%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s",
-                           "%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s/%(sample_id)s"]
-            unaligned_dir_patterns.extend(vcf_subdirs)
+            fastq_subdirs = ["%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s",
+                             "%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s/%(sample_id)s"]
+            unaligned_dir_patterns.extend(fastq_subdirs)
         unaligned_dir_patterns.append("%(sequencing_run_dir)s/Data/Intensities/BaseCalls")
+        unaligned_dir_patterns.append(settings.SEQAUTO_FASTQ_DIR_PATTERN % sequencing_sample.get_params())
 
         pair_paths = []
         for unaligned_dir_pattern in unaligned_dir_patterns:
