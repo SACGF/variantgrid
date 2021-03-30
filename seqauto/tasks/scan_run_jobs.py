@@ -46,7 +46,9 @@ def scan_resources(seqauto_run, seqauto_scripts):
 
 
 @celery.task(track_started=True)
-def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run_launch_script=False, fake_data=None):
+def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run_launch_script=None, fake_data=None):
+    if run_launch_script is None:
+        run_launch_script = settings.SEQAUTO_SCAN_RUN_SCRIPTS
     if only_launch_file_types is None:
         only_launch_file_types = [SequencingFileType.ILLUMINA_FLOWCELL_QC]
 

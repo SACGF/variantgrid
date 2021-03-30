@@ -16,6 +16,7 @@ SEQAUTO_SCRIPT_PARAMS = {"virtualenv_runner": SEQAUTO_VIRTUALENV_RUNNER or '',
                          "tau_scripts_dir": os.path.join(TAU_DIR, "archive"),
                          "pythonpath": TAU_DIR}
 
+SEQAUTO_SCAN_RUN_SCRIPTS = False
 SEQAUTO_FLOWCELL_SCRIPT = 'find_flowcells.sh'
 SEQAUTO_FASTQ_SCRIPT = 'find_fastqs.sh'
 SEQAUTO_FASTQC_SCRIPT = 'find_fastqc.sh'

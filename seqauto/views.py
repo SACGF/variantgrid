@@ -61,8 +61,7 @@ def seqauto_runs(request):
         only_launch_file_types = [SequencingFileType.ILLUMINA_FLOWCELL_QC]
 
         task = scan_run_jobs.si(only_process_file_types=only_process_file_types,  # @UndefinedVariable
-                                only_launch_file_types=only_launch_file_types,
-                                run_launch_script=True)
+                                only_launch_file_types=only_launch_file_types)
         task.apply_async()
 
         msg = 'Scanning disk for sequencing data...'
