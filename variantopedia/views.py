@@ -148,7 +148,7 @@ def notify_server_status():
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Health Check from <{url}|{url}>\nIn the last _24 hours_:"
+                "text": f"Health Check from <{url}|{url}>\n*Disk Usage*"
             }
         },
         {
@@ -163,6 +163,15 @@ def notify_server_status():
                 "text": f":floppy_disk: {message}"
             }
         })
+
+    blocks.append({
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "\n*In the last 24 hours*"
+        }
+    })
+    blocks.append({"type": "mrkdwn"})
 
     keys = set(dashboard_notices.keys())
     keys.discard('events')
