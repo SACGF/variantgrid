@@ -171,7 +171,7 @@ def notify_server_status():
             "text": "\n*In the last 24 hours*"
         }
     })
-    blocks.append({"type": "mrkdwn"})
+    blocks.append({"type": "divider"})
 
     keys = set(dashboard_notices.keys())
     keys.discard('events')
