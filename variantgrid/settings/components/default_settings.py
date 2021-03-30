@@ -431,6 +431,11 @@ ROLLBAR = {
     'code_version': Git(BASE_DIR).hash,
 }
 
+SLACK = {
+    'enabled': get_secret('SLACK.enabled'),
+    'admin_callback_url': get_secret('SLACK.admin_callback_url')
+}
+
 SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 

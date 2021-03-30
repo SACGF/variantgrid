@@ -1,12 +1,14 @@
 import json
 from logging import StreamHandler
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
+import requests
 import rollbar
 import sys
 import traceback
 
+from django.conf import settings
 from django.utils import timezone
 
 from django.contrib.auth.models import User
@@ -72,6 +74,31 @@ def report_exc_info(extra_data=None, request=None):
     exc_info = sys.exc_info()
     if exc_info:
         print(exc_info)
+
+
+def send_notification(message: str, username: Optional[str] = None, emoji: str = ":dna:"):
+    sent = False
+    if slack := settings.SLACK:
+        if slack.get('enabled'):
+            if admin_callback_url := slack.get('admin_callback_url'):
+                data = {
+                    "username": settings.SITE_NAME + (f" {username}" if username else ""),
+                    "text": message,
+                    "icon_emoji": emoji
+                }
+                data_str = json.dumps(data)
+                print(data_str)
+                r = requests.request(
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                    url=admin_callback_url,
+                    json=data
+                )
+                r.raise_for_status()
+                sent = True
+    if not sent:
+        print("Slack not enabled, did not send message")
+        print(message)
 
 
 def console_logger():

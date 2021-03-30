@@ -219,6 +219,20 @@ def empty_to_none(value: T) -> Optional[T]:
     return value
 
 
+def pretty_label(label: str):
+    label = label.replace('_', ' ')
+    tidied = ''
+    last_space = True
+    for char in label:
+        if last_space:
+            char = char.upper()
+            last_space = False
+        if char == ' ':
+            last_space = True
+        tidied = tidied + char
+    return tidied
+
+
 def query_to_array(value):
     try:
         return json.loads(value)
@@ -446,6 +460,17 @@ def get_subclasses(cls):
     for subclass in subclasses:
         subclasses.extend(get_subclasses(subclass))
     return subclasses
+
+
+def count(object: Any) -> int:
+    if object is None:
+        return 0
+    elif isinstance(object, int):
+        return object
+    elif isinstance(object, QuerySet):
+        return object.count()
+    else:
+        return len(object)
 
 
 def delimited_row(data: list, delimiter: str = ',') -> str:

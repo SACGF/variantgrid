@@ -2,6 +2,7 @@ import logging
 import re
 from collections import defaultdict
 from datetime import timedelta
+from random import randint
 from typing import Optional
 
 from celery.task.control import inspect  # @UnresolvedImport
@@ -24,11 +25,12 @@ from annotation.transcripts_annotation_selections import VariantTranscriptSelect
 from eventlog.models import Event, create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import require_superuser, highest_pk
+from library.django_utils import require_superuser, highest_pk, get_url_from_view_path
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback
+from library.log_utils import report_exc_info, log_traceback, send_notification
+from library.utils import count, pretty_label
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -43,6 +45,7 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
+from variantgrid.perm_path import get_visible_url_names
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs
@@ -98,7 +101,7 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     return {"notice_header": notice_header,
              "events": events,
              "classifications_of_interest": classifications_of_interest,
-             "new_classification_count": new_classification_count,
+             "classification_new_count": new_classification_count,
              "vcfs": vcfs,
              "analyses_created": analyses_created,
              "analyses_modified": analyses_modified,}
@@ -138,6 +141,27 @@ def dashboard(request):
 
 @require_superuser
 def server_status(request):
+    if request.method == "POST":
+        dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
+        message_parts = list()
+        keys = set(dashboard_notices.keys())
+        keys.discard('events')
+        visible_urls = get_visible_url_names()
+        if not visible_urls.get('analyses'):
+            for exclude_key in ['vcfs', 'analyses_created', 'analyses_modified']:
+                keys.discard(exclude_key)
+        sorted_keys = sorted(list(keys))
+
+        for key in sorted_keys:
+            message_parts.append(f"{pretty_label(key)}: {count(dashboard_notices.get(key))}")
+
+        url = get_url_from_view_path('server_status')
+        message_body = "\n".join(message_parts)
+        message = f"Health Check from <{url}|{url}>\nIn the last 24 hours\n{message_body}"
+
+        emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
+        send_notification(message=message, username="Health Check", emoji=emoji)
+
     celery_workers = {}
     if settings.CELERY_ENABLED:
         # This relies on the services being started with the "-n worker_name" with a separate one for each service

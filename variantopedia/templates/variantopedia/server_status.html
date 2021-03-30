@@ -103,7 +103,7 @@
                     <a class='toggle-link' data-toggle='collapse' href='#event-errors'>View {% count dashboard_notices.events singular='1 Error' plural='Errors' %}</a>
                 </div>
                 <div class="col-9">
-                    <a href="{% url 'eventlog' %}">Goto EventLog</a>
+                    <a href="{% url 'eventlog' %}">Goto EventLog</a> (Note <a href="https://rollbar.com/jimmy.andrews/all/items/" class="external-link" target="_blank">Rollbar</a> is much more accurate in recording errors)
                 </div>
             </div>
 
@@ -144,10 +144,10 @@
                 {% endfor %}
             </ul>
         {% endif %}
-        {% if dashboard_notices.new_classification_count %}
+        {% if dashboard_notices.classification_new_count %}
             <div class="row mt-4">
                 <div class="col-3">
-                    <label>{% count dashboard_notices.new_classification_count singular='1 New Classification' plural='New Classifications' %}</label>
+                    <label>{% count dashboard_notices.classification_new_count singular='1 New Classification' plural='New Classifications' %}</label>
                 </div>
                 <div class="col-6">
                     <a href="{% url 'classifications' %}">Goto Classifications</a>
@@ -208,12 +208,16 @@
             </ul>
         {% endif %}
 
-        <div class="btn-toolbar mt-4">
-            {% if url_name_visible.view_upload_stats %}
-                <a href="{% url 'view_upload_stats' %}" class="btn btn-outline-primary">Upload Stats</a>
-            {% endif %}
-            <a href="{% url 'database_statistics' %}" class="btn btn-outline-primary">Database statistics</a>
-        </div>
+        <form method="POST">
+            {% csrf_token %}
+            <div class="btn-toolbar mt-4">
+                {% if url_name_visible.view_upload_stats %}
+                    <a href="{% url 'view_upload_stats' %}" class="btn btn-outline-primary">Upload Stats</a>
+                {% endif %}
+                <a href="{% url 'database_statistics' %}" class="btn btn-outline-primary">Database statistics</a>
+                <input type="submit" value="Test Slack" class="btn btn-outline-secondary" />
+            </div>
+        </form>
 
 	</div>
 
