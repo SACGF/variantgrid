@@ -77,6 +77,14 @@ def report_exc_info(extra_data=None, request=None):
 
 
 def send_notification(message: str, blocks: Optional[Dict] = None, username: Optional[str] = None, emoji: str = ":dna:"):
+    """
+    Sends a message to your notification service, currently Slack centric.
+    If Slack is not configured, this will do nothing.
+    @param message The message to send, (if also sending blocks just have message as a summary, wont be displayed)
+    @param blocks See https://api.slack.com/messaging/webhooks#advanced_message_formatting
+    @param username The username that will appear in Slack
+    @param emoji The emoji that will
+    """
     sent = False
     if slack := settings.SLACK:
         if slack.get('enabled'):
@@ -96,8 +104,11 @@ def send_notification(message: str, blocks: Optional[Dict] = None, username: Opt
                     url=admin_callback_url,
                     json=data
                 )
-                r.raise_for_status()
-                sent = True
+                try:
+                    r.raise_for_status()
+                    sent = True
+                except:
+                    report_exc_info()
     if not sent:
         print("Slack not enabled, did not send message")
         print(message)

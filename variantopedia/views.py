@@ -148,7 +148,7 @@ def notify_server_status():
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Health Check from <{url}|{url}>\n*Disk Usage*"
+                "text": f"Health Check from <{url}|{url}>\n\n*Disk Usage*"
             }
         },
         {
