@@ -101,7 +101,7 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     return {"notice_header": notice_header,
              "events": events,
              "classifications_of_interest": classifications_of_interest,
-             "classification_new_count": new_classification_count,
+             "classifications_new_count": new_classification_count,
              "vcfs": vcfs,
              "analyses_created": analyses_created,
              "analyses_modified": analyses_modified,}
@@ -146,6 +146,7 @@ def server_status(request):
         message_parts = list()
         keys = set(dashboard_notices.keys())
         keys.discard('events')
+        keys.discard('notice_header')
         visible_urls = get_visible_url_names()
         if not visible_urls.get('analyses'):
             for exclude_key in ['vcfs', 'analyses_created', 'analyses_modified']:
@@ -155,9 +156,9 @@ def server_status(request):
         for key in sorted_keys:
             message_parts.append(f"{pretty_label(key)}: {count(dashboard_notices.get(key))}")
 
-        url = get_url_from_view_path('server_status')
+        url = get_url_from_view_path(reverse('server_status'))
         message_body = "\n".join(message_parts)
-        message = f"Health Check from <{url}|{url}>\nIn the last 24 hours\n{message_body}"
+        message = f"Health Check from <{url}|{url}>\nIn the last 24 hours\n\n{message_body}"
 
         emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
         send_notification(message=message, username="Health Check", emoji=emoji)
@@ -236,7 +237,9 @@ def server_status(request):
         highest_variant_annotated["status"] = "danger"
         highest_variant_annotated["message"] = str(e)
 
-    sample_enrichment_kits_df = get_sample_enrichment_kits_df()
+    sample_enrichment_kits_df = None
+    if settings.SEQAUTO_ENABLED:
+        sample_enrichment_kits_df = get_sample_enrichment_kits_df()
     disk_messages = get_disk_messages(info_messages=True)
     disk_free = {"status": "info", "messages": []}
     for status, message in disk_messages:

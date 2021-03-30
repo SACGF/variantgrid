@@ -144,10 +144,10 @@
                 {% endfor %}
             </ul>
         {% endif %}
-        {% if dashboard_notices.classification_new_count %}
+        {% if dashboard_notices.classifications_new_count %}
             <div class="row mt-4">
                 <div class="col-3">
-                    <label>{% count dashboard_notices.classification_new_count singular='1 New Classification' plural='New Classifications' %}</label>
+                    <label>{% count dashboard_notices.classifications_new_count singular='1 New Classification' plural='New Classifications' %}</label>
                 </div>
                 <div class="col-6">
                     <a href="{% url 'classifications' %}">Goto Classifications</a>

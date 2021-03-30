@@ -177,6 +177,8 @@ if _SHARIANT_MODE:
     TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
     SITE_NAME = MIMIC
 
+SITE_NAME = "James Dev"
+
 #INSTALLED_APPS.append('debug_toolbar')
 
 #SAPATH_APP = 'sapath.apps.SapathConfig'
