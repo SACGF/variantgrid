@@ -499,12 +499,7 @@ class BulkVEPVCFAnnotationInserter:
     @lazy
     def transcript_versions_by_id(self):
         vav = self.annotation_run.variant_annotation_version
-        t_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=vav.annotation_consortium,
-                                                genome_build=vav.genome_build)
-        tv_by_id = defaultdict(dict)
-        for pk, transcript_id, version in t_qs.values_list("pk", "transcript_id", "version"):
-            tv_by_id[transcript_id][version] = pk
-        return tv_by_id
+        return TranscriptVersion.transcript_versions_by_id(vav.genome_build, vav.annotation_consortium)
 
     @lazy
     def uniprot_identifiers(self):

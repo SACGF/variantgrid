@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import total_ordering
@@ -596,6 +596,22 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         else:
             identifier, version = transcript_name, None
         return identifier, version
+
+    @staticmethod
+    def transcript_versions_by_id(genome_build: GenomeBuild = None, annotation_consortium=None) -> Dict[str, Dict[str, 'TranscriptVersion']]:
+        filter_kwargs = {}
+        if genome_build:
+            filter_kwargs["genome_build"] = genome_build
+        if annotation_consortium:
+            filter_kwargs["transcript__annotation_consortium"] = annotation_consortium
+
+        qs = TranscriptVersion.objects.all()
+        if filter_kwargs:
+            qs = qs.filter(**filter_kwargs)
+        tv_by_id = defaultdict(dict)
+        for pk, transcript_id, version in qs.values_list("pk", "transcript_id", "version"):
+            tv_by_id[transcript_id][version] = pk
+        return tv_by_id
 
     @staticmethod
     def filter_by_accession(accession, genome_build=None):
@@ -1339,6 +1355,7 @@ class GeneCoverageCollection(models.Model):
         try:
             gene_matcher = kwargs["gene_matcher"]
             canonical_transcript_manager = kwargs.get("canonical_transcript_manager")
+            transcript_versions_by_id = kwargs.get("transcript_versions_by_id")
         except KeyError as ke:
             missing_key = ke.args[0]
             logging.error("You need to pass '%s' to kwargs", missing_key)
@@ -1356,39 +1373,32 @@ class GeneCoverageCollection(models.Model):
         gene_coverage_canonical_list = []
         warnings = []
 
-        known_transcript_ids = Transcript.known_transcript_ids(canonical_transcript_collection.genome_build,
-                                                               canonical_transcript_collection.annotation_consortium)
         for _, row in gene_coverage_df.iterrows():
-            original_gene_symbol = row["gene"]
-            original_transcript_id = row["transcript"]
+            original_gene_symbol = row["original_gene_symbol"]
+            original_transcript = row["original_transcript"]
 
             gene_symbol_id = gene_matcher.get_gene_symbol_id(original_gene_symbol)
-            if original_transcript_id in known_transcript_ids:
-                transcript_id = original_transcript_id
+            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(original_transcript)
+            if transcript_versions := transcript_versions_by_id.get(transcript_id):
+                transcript_version_id = transcript_versions.get(version)
             else:
                 transcript_id = None
+                transcript_version_id = None
 
-                kwargs = {"gene_coverage_collection": self,
-                          "transcript_id": transcript_id,
-                          "gene_symbol_id": gene_symbol_id,
-                          "original_gene_symbol": original_gene_symbol,
-                          "original_transcript_id": original_transcript_id,
-                          "min": row["min"],
-                          "mean": row["mean"],
-                          "std_dev": row["std_dev"],
-                          "percent_0x": row["percent_0x"],
-                          "percent_10x": row.get("percent_10x"),
-                          "percent_20x": row["percent_20x"],
-                          "percent_100x": row.get("percent_100x"),
-                          "sensitivity": row["sensitivity"]}
+            kwargs = {
+                "gene_coverage_collection": self,
+                "transcript_id": transcript_id,
+                "transcript_version_id": transcript_version_id,
+                "gene_symbol_id": gene_symbol_id,
+            }
+            kwargs.update(row.to_dict())
+            gene_coverage = GeneCoverage(**kwargs)
+            gene_coverage_list.append(gene_coverage)
 
-                gene_coverage = GeneCoverage(**kwargs)
-                gene_coverage_list.append(gene_coverage)
-
-                if original_transcript_id in original_canonical_transcript_ids:
-                    kwargs["canonical_transcript_collection"] = canonical_transcript_collection
-                    gene_coverage_canonical = GeneCoverageCanonicalTranscript(**kwargs)
-                    gene_coverage_canonical_list.append(gene_coverage_canonical)
+            if transcript_id in original_canonical_transcript_ids:
+                kwargs["canonical_transcript_collection"] = canonical_transcript_collection
+                gene_coverage_canonical = GeneCoverageCanonicalTranscript(**kwargs)
+                gene_coverage_canonical_list.append(gene_coverage_canonical)
 
         if gene_coverage_list:
             GeneCoverage.objects.bulk_create(gene_coverage_list)
@@ -1412,18 +1422,32 @@ class AbstractGeneCoverage(models.Model):
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=CASCADE)  # rename to "coverage"?
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=CASCADE)
     original_gene_symbol = models.TextField()  # raw input string
-    original_transcript_id = models.TextField()  # raw input string
+    original_transcript = models.TextField()  # raw input string
+    size = models.IntegerField(null=True)
     min = models.IntegerField()
+    max = models.IntegerField(null=True)
     mean = models.FloatField()
     std_dev = models.FloatField()
     # As per QCExecSummary - different enrichment kits store different coverages
     # So some will be None
-    percent_0x = models.FloatField()
+    percent_1x = models.FloatField(null=True)
+    percent_2x = models.FloatField(null=True)
+    percent_5x = models.FloatField(null=True)
     percent_10x = models.FloatField(null=True)
-    percent_20x = models.FloatField()
+    percent_15x = models.FloatField(null=True)
+    percent_20x = models.FloatField(null=True)
+    percent_25x = models.FloatField(null=True)
+    percent_30x = models.FloatField(null=True)
+    percent_40x = models.FloatField(null=True)
+    percent_50x = models.FloatField(null=True)
+    percent_60x = models.FloatField(null=True)
+    percent_80x = models.FloatField(null=True)
     percent_100x = models.FloatField(null=True)
-    sensitivity = models.FloatField()  # Estimated Sensitivity of Detection
+    percent_150x = models.FloatField(null=True)
+    percent_200x = models.FloatField(null=True)
+    percent_250x = models.FloatField(null=True)
 
     class Meta:
         abstract = True

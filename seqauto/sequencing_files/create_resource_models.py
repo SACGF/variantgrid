@@ -12,6 +12,7 @@ from django.db.models.query_utils import Q
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
+from genes.models import TranscriptVersion
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, file_md5sum, file_to_array
 from library.log_utils import get_traceback, log_traceback
@@ -920,13 +921,14 @@ def process_qc(seqauto_run, existing_files, results):
 def process_other_qc(seqauto_run, existing_qcs, qc_set):
     gene_matcher = GeneSymbolMatcher()
     canonical_transcript_manager = CanonicalTranscriptManager()
+    transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id()  # Don't know build - just get all
 
-    process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, existing_qcs, qc_set, QCGeneList)
+    process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id, existing_qcs, qc_set, QCGeneList)
     if settings.SEQAUTO_LOAD_GENE_COVERAGE:
-        process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, existing_qcs, qc_set, QCGeneCoverage)
+        process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id, existing_qcs, qc_set, QCGeneCoverage)
 
 
-def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, existing_qcs, qc_set, klass):
+def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id, existing_qcs, qc_set, klass):
     logging.info("process_other_qc_class: %s", klass)
 
     existing_other_qc_records = returning_existing_records_by_path(klass)
@@ -969,7 +971,8 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
                 load_from_file_if_complete(seqauto_run,
                                            record,
                                            gene_matcher=gene_matcher,
-                                           canonical_transcript_manager=canonical_transcript_manager)
+                                           canonical_transcript_manager=canonical_transcript_manager,
+                                           transcript_versions_by_id=transcript_versions_by_id)
             else:
                 # logging.info("%s - previous last modified: %f - now %f",
                 #             record.path, record.file_last_modified, file_last_modified)
@@ -979,7 +982,8 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
                     load_from_file_if_complete(seqauto_run,
                                                record,
                                                gene_matcher=gene_matcher,
-                                               canonical_transcript_manager=canonical_transcript_manager)
+                                               canonical_transcript_manager=canonical_transcript_manager,
+                                               transcript_versions_by_id=transcript_versions_by_id)
                     reloaded += 1
                 else:
                     unchanged += 1
@@ -990,7 +994,8 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
                 load_from_file_if_complete(seqauto_run,
                                            record,
                                            gene_matcher=gene_matcher,
-                                           canonical_transcript_manager=canonical_transcript_manager)
+                                           canonical_transcript_manager=canonical_transcript_manager,
+                                           transcript_versions_by_id=transcript_versions_by_id)
             else:
                 missing += 1
 

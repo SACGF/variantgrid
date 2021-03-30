@@ -6,7 +6,7 @@ import time
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript
+from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript, TranscriptVersion
 from seqauto.models import EnrichmentKit
 from snpdb.models import DataState
 
@@ -23,15 +23,19 @@ def reload_gene_coverage_collection(gene_coverage_collection_id):
     gene_coverage_collection.data_state = DataState.RUNNING
     gene_coverage_collection.save()
 
+    genome_build = gene_coverage_collection.genome_build
     gene_matcher = GeneSymbolMatcher()
     canonical_transcript_manager = CanonicalTranscriptManager()
-
+    transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(genome_build,
+                                                                            genome_build.annotation_consortium)
     try:
         enrichment_kit = gene_coverage_collection.qcgenecoverage.qc.sequencing_sample.enrichment_kit
     except ObjectDoesNotExist:
         enrichment_kit = None
 
-    gene_coverage_collection.load_from_file(enrichment_kit, gene_matcher=gene_matcher, canonical_transcript_manager=canonical_transcript_manager)
+    gene_coverage_collection.load_from_file(enrichment_kit, gene_matcher=gene_matcher,
+                                            canonical_transcript_manager=canonical_transcript_manager,
+                                            transcript_versions_by_id=transcript_versions_by_id)
     gene_coverage_collection.data_state = DataState.COMPLETE
     gene_coverage_collection.save()
 

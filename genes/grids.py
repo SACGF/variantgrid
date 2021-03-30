@@ -257,20 +257,19 @@ class CanonicalTranscriptGrid(JqGridUserRowConfig):
 class QCGeneCoverageGrid(JqGridUserRowConfig):
     model = GeneCoverageCanonicalTranscript
     caption = 'QC'
-    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript_id", "min", "mean", "std_dev",
-              "percent_0x", "percent_10x", "percent_20x", "sensitivity"]
+    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript", "min",
+              "mean", "std_dev", "percent_1x", "percent_10x", "percent_20x"]
     number_format = {'formatter': 'number', 'width': 80}
     colmodel_overrides = {'gene_symbol__symbol': {"width": 110},
                           'transcript__identifier': {"width": 110},
                           "original_gene_symbol": {'label': 'original symbol'},
-                          "original_transcript_id": {'label': 'original transcript_id'},
+                          "original_transcript": {'label': 'original transcript'},
                           'min': {'width': 40},
                           'mean': number_format,
                           'std_dev': number_format,
-                          'percent_0x': number_format,
+                          'percent_1x': number_format,
                           'percent_10x': number_format,
-                          'percent_20x': number_format,
-                          'sensitivity': number_format}
+                          'percent_20x': number_format}
 
     def __init__(self, user, gene_coverage_collection_id, gene_list_id_list=None):
         super().__init__(user)

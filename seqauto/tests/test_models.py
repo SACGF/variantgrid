@@ -6,7 +6,7 @@ import os
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.canonical_transcripts.create_canonical_transcripts import create_canonical_transcript_collection
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneCoverageCollection
+from genes.models import GeneCoverageCollection, TranscriptVersion
 from seqauto.models import SequencerModel, Sequencer, SequencingRun, SampleSheet, \
     SequencingRunCurrentSampleSheet, SequencingSample, Fastq, UnalignedReads, Aligner, \
     BamFile, VCFFile, QC, VariantCaller, EnrichmentKit, QCGeneCoverage
@@ -20,9 +20,8 @@ class TestSeqAutoModels(TestCase):
     GENES_TEST_DATA = os.path.join(settings.BASE_DIR, "genes", "tests", "test_data")
     QC_DIR = os.path.join(TEST_DATA, "qc")
 
-    SEQUENCING_RUN_CAPTURE = "190322FakeRun"
+    SEQUENCING_RUN_CAPTURE = "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG"
     CANONICAL_TRANSCRIPTS = os.path.join(GENES_TEST_DATA, "canonical_transcripts.tsv")
-    SEQUENCING_RUN_AMPLICON = "151113_M02027_0214_000000000"
 
     @staticmethod
     def _create_sequencing_run(sequencing_run_name, enrichment_kit=None):
@@ -56,7 +55,7 @@ class TestSeqAutoModels(TestCase):
         vcf_file, _ = VCFFile.objects.get_or_create(bam_file=bam_file,
                                                     variant_caller=variant_caller)
         path = os.path.join(TestSeqAutoModels.QC_DIR,
-                            "medical_exomes/190322FakeRun/bulky_files/sample_1_summary.txt")
+                            "idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/4_QC/exec_stats/hiseq_sample_1_stats.txt")
         qc, _ = QC.objects.get_or_create(bam_file=bam_file, vcf_file=vcf_file,
                                          defaults={"path": path})
         return qc
@@ -89,13 +88,14 @@ class TestSeqAutoModels(TestCase):
         self.genome_build = GenomeBuild.grch37()
         self.gene_matcher = GeneSymbolMatcher()
         self.canonical_transcript_manager = CanonicalTranscriptManager(use_system_default=False)
+        self.transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(self.genome_build, self.genome_build.annotation_consortium)
 
     def test_load_qc_exec_summary(self):
-        enrichment_kit = self._create_enrichment_kit("medical_exomes")
+        enrichment_kit = self._create_enrichment_kit("idt_exome")
         sequencing_run = TestSeqAutoModels._create_sequencing_run(self.SEQUENCING_RUN_CAPTURE,
                                                                   enrichment_kit=enrichment_kit)
         qc = TestSeqAutoModels._create_sequencing_qc(sequencing_run,
-                                                     "sample_1",
+                                                     "hiseq_sample1",
                                                      enrichment_kit=enrichment_kit)
         qc.load_from_file(None)
         qc_exec_summary = qc.qcexecsummary_set.order_by("pk").last()
@@ -104,37 +104,18 @@ class TestSeqAutoModels(TestCase):
     def test_gene_coverage_capture(self):
         """ Capture uses headers: ["% bases >20x", "% bases <10x"] """
 
-        CAPTURE_GENES = os.path.join(self.QC_DIR, "medical_exomes/190322FakeRun_QC/bulky_files/sample_1_genes.txt")
+        CAPTURE_GENES = os.path.join(self.QC_DIR, f"idt_exome/{self.SEQUENCING_RUN_CAPTURE}/4_QC/bam_stats/samples/hiseq_sample1.per_gene_coverage.tsv.gz")
         enrichment_kit = self._create_enrichment_kit()
         sequencing_run = TestSeqAutoModels._create_sequencing_run(self.SEQUENCING_RUN_CAPTURE,
                                                                   enrichment_kit=enrichment_kit)
         qc = TestSeqAutoModels._create_sequencing_qc(sequencing_run,
-                                                     "sample_1",
+                                                     "hiseq_sample1",
                                                      enrichment_kit=enrichment_kit)
         qcgc = self._create_qc_gene_coverage(qc, CAPTURE_GENES, self.genome_build)
         qcgc.load_from_file(None,
                             gene_matcher=self.gene_matcher,
-                            canonical_transcript_manager=self.canonical_transcript_manager)
-        gcc = qcgc.gene_coverage_collection
-        num_genes_covered = gcc.genecoverage_set.count()
-        num_canonical_genes = gcc.genecoveragecanonicaltranscript_set.count()
-        logging.info("genes: %d, canonical: %d", num_genes_covered, num_canonical_genes)
-
-    def test_gene_coverage_amplicon(self):
-        """ Test fix: Amplicons have different headers than capture:
-            ["% bases >100x", "% bases <20x"] """
-
-        AMPLICON_GENES = os.path.join(self.QC_DIR, "myeloid_truSight/151113_M02027_0214_000000000-AHWJW_QC/bulky_files/blah_blah_genes.txt")
-        enrichment_kit = self._create_enrichment_kit()
-        sequencing_run = TestSeqAutoModels._create_sequencing_run(self.SEQUENCING_RUN_AMPLICON,
-                                                                  enrichment_kit=enrichment_kit)
-        qc = TestSeqAutoModels._create_sequencing_qc(sequencing_run,
-                                                     "blah_blah",
-                                                     enrichment_kit=enrichment_kit)
-        qcgc = self._create_qc_gene_coverage(qc, AMPLICON_GENES, self.genome_build)
-        qcgc.load_from_file(None,
-                            gene_matcher=self.gene_matcher,
-                            canonical_transcript_manager=self.canonical_transcript_manager)
+                            canonical_transcript_manager=self.canonical_transcript_manager,
+                            transcript_versions_by_id=self.transcript_versions_by_id)
         gcc = qcgc.gene_coverage_collection
         num_genes_covered = gcc.genecoverage_set.count()
         num_canonical_genes = gcc.genecoveragecanonicaltranscript_set.count()
@@ -144,7 +125,7 @@ class TestSeqAutoModels(TestCase):
         """ #1619 - Ensure missing file sets data_state=DELETED and doesn't throw error. """
         MISSING_GENES_FILE = os.path.join(self.QC_DIR, "no_such_file.txt")
         enrichment_kit = self._create_enrichment_kit()
-        sequencing_run = TestSeqAutoModels._create_sequencing_run(self.SEQUENCING_RUN_AMPLICON,
+        sequencing_run = TestSeqAutoModels._create_sequencing_run(self.SEQUENCING_RUN_CAPTURE,
                                                                   enrichment_kit=enrichment_kit)
         qc = TestSeqAutoModels._create_sequencing_qc(sequencing_run,
                                                      "blah_blah",
@@ -152,15 +133,17 @@ class TestSeqAutoModels(TestCase):
         qcgc = self._create_qc_gene_coverage(qc, MISSING_GENES_FILE, self.genome_build)
         qcgc.load_from_file(None,
                             gene_matcher=self.gene_matcher,
-                            canonical_transcript_manager=self.canonical_transcript_manager)
+                            canonical_transcript_manager=self.canonical_transcript_manager,
+                            transcript_versions_by_id=self.transcript_versions_by_id)
         msg = "Missing file should set data_state to DELETED was %s" % qcgc.get_data_state_display()
         self.assertEqual(qcgc.data_state, DataState.DELETED, msg)
 
     def test_gold_coverage(self):
         """ This test doesn't work very well as there's no genes/Transcripts/UCSC aliases etc """
 
-        SEQUENCING_RUN_NAME = "190322FakeRun"
-        GENE_FILES_PATTERN = os.path.join(self.QC_DIR, "medical_exomes", SEQUENCING_RUN_NAME + "_QC", "bulky_files", "%s_genes.txt")
+        SEQUENCING_RUN_NAME = "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG"
+        GENE_FILES_PATTERN = os.path.join(self.QC_DIR, "idt_exome", SEQUENCING_RUN_NAME, "4_QC", "bam_stats",
+                                          "samples", "%s.per_gene_coverage.tsv.gz")
 
         enrichment_kit = self._create_enrichment_kit()
         sequencing_run = TestSeqAutoModels._create_sequencing_run(SEQUENCING_RUN_NAME,
@@ -179,7 +162,8 @@ class TestSeqAutoModels(TestCase):
             qcgc = self._create_qc_gene_coverage(qc, gene_filename, self.genome_build)
             qcgc.load_from_file(None,
                                 gene_matcher=self.gene_matcher,
-                                canonical_transcript_manager=self.canonical_transcript_manager)
+                                canonical_transcript_manager=self.canonical_transcript_manager,
+                                transcript_versions_by_id=self.transcript_versions_by_id)
 
 #            logging.info("%s Coverage:" % sample_name)
 #            logging.info(gcc.genecoverage_set.filter(gene_symbol__contains="MIR1302").values())

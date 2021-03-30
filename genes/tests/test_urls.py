@@ -52,27 +52,25 @@ class Test(URLTestCase):
         if created:
             GeneCoverage.objects.create(gene_coverage_collection=gcg,
                                         original_gene_symbol="orig_symbol",
-                                        original_transcript_id="orig_refseq",
+                                        original_transcript="orig_refseq",
                                         min=41,
                                         mean=50,
                                         std_dev=1.11,
-                                        percent_0x=0.0,
+                                        percent_1x=100.0,
                                         percent_10x=100.0,
                                         percent_20x=100.0,
-                                        percent_100x=88.2,
-                                        sensitivity=41)
+                                        percent_100x=88.2)
 
             GeneCoverage.objects.create(gene_coverage_collection=gcg,
                                         original_gene_symbol="orig_symbol",
-                                        original_transcript_id="orig_refseq",
+                                        original_transcript="orig_refseq",
                                         min=1,
                                         mean=22,
                                         std_dev=1.11,
-                                        percent_0x=0.0,
+                                        percent_1x=100,
                                         percent_10x=99.0,
                                         percent_20x=89.9,
-                                        percent_100x=50.2,
-                                        sensitivity=41)
+                                        percent_100x=50.2)
 
         cls.canonical_transcript_collection = ctc
         cls.gene_coverage_collection = gcg

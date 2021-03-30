@@ -1035,8 +1035,7 @@ class QCExecSummary(SeqAutoRecord):
             raise ValueError(msg)
 
         exec_data = exec_summary_data["exec_data"]
-        exec_data["qc"] = qc
-        exec_summary = QCExecSummary(**exec_data)
+        exec_summary = QCExecSummary(qc=qc, sequencing_run=qc.sequencing_run, **exec_data)
         exec_summary.data_state = DataState.COMPLETE
         exec_summary.save()
 
