@@ -260,9 +260,8 @@ class VariantGrid(JqGridSQL):
                 column_names.append(f"{sample.pk}_{column}")
                 label = label_format % {"sample": sample.name, "label": column_label}
                 server_side_formatter = VariantGrid.get_packed_data_formatter(packed_data_replace, column, cc_index)
+                packed_data_formatter = server_side_formatter  # capture for funcs below
                 if column == "samples_filters":
-                    packed_data_formatter = server_side_formatter  # capture for func below
-
                     def sample_filters_formatter(row, field):
                         """ Need to unpack then switch filters """
                         filter_formatter = VCFFilter.get_formatter(sample.vcf)
@@ -271,6 +270,17 @@ class VariantGrid(JqGridSQL):
                         return filter_formatter(row, field)
 
                     server_side_formatter = sample_filters_formatter
+                elif column == "samples_allele_frequency":
+                    if sample.vcf.allele_frequency_percent:
+                        def samples_allele_frequency_percent_formatter(row, field):
+                            """ Convert from legacy percent to AF (0-1) """
+                            val = packed_data_formatter(row, field)
+                            print(f"raw={row['packed_samples_allele_frequency']}, {field=} {cc_index=} => AF was: {val}")
+                            if val != '.':  # missing value
+                                val /= 100.0
+                            return val
+
+                        server_side_formatter = samples_allele_frequency_percent_formatter
 
                 col_data_dict = {
                     "label": label,

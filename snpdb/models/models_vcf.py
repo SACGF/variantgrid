@@ -65,6 +65,7 @@ class VCF(models.Model):
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
     sample_filters_field = models.TextField(null=True)
+    allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
 

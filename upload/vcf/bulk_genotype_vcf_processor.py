@@ -227,7 +227,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         else:
             # Calculate ourselves across locus
             for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):
-                vaf = 100.0 * ad / self.locus_ad_sum
+                vaf = ad / self.locus_ad_sum
                 vaf[np.isnan(vaf)] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
                 cgt[self.cohort_gt_vaf_index] = postgres_arrays(vaf)
                 self.cohort_genotypes.append(cgt)

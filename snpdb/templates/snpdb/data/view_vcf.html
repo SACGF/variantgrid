@@ -455,7 +455,7 @@ $(document).ready(function() {
                                 {%  if vcf.allele_frequency_field %}
                                     {{ vcf.allele_frequency_field }}
                                 {% else %}
-                                    Calculated as <code>100.0 * AD / (sum of all AD for that locus)</code> after VCF normalization
+                                    Calculated as <code>AD / (sum of all AD for that locus)</code> after VCF normalization
                                 {% endif %}
                             </td>
                         </tr>
