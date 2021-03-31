@@ -166,7 +166,7 @@ class TrioNode(AbstractCohortBasedNode):
         errors = []
         if trio:
             if inheritance == TrioInheritance.DOMINANT:
-                if not trio.mother_affected or trio.father_affected:
+                if not (trio.mother_affected or trio.father_affected):
                     errors.append("Dominant inheritance requires an affected parent")
             elif inheritance == TrioInheritance.XLINKED_RECESSIVE:
                 proband_sample = trio.proband.sample
