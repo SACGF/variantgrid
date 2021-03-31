@@ -2,9 +2,7 @@ from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import ClinicalSignificanceComparison
-from classification.enums.classification_enums import ShareLevel, \
-    SpecialEKeys
+from classification.enums.classification_enums import ShareLevel, SpecialEKeys, ClinicalSignificance
 from classification.models.evidence_key import EvidenceKey
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification import \
@@ -41,7 +39,7 @@ def published(sender, classification, previously_published, newly_published, use
         old_classification = previously_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         new_classification = newly_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-        significant_change = ClinicalSignificanceComparison.is_significant_change(
+        significant_change = ClinicalSignificance.is_significant_change(
             old_classification=old_classification,
             new_classification=new_classification
         )

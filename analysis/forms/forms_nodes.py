@@ -202,7 +202,7 @@ class ClassificationsNodeForm(BaseNodeForm):
 
     class Meta:
         model = ClassificationsNode
-        fields = ("clinical_significance", "comparison")
+        fields = ('other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic')
 
 
 class CohortNodeForm(VCFSourceNodeForm):

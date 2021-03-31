@@ -337,34 +337,6 @@ class ClinicalSignificance:
     ]
     SHORT_LABELS = dict(SHORT_CHOICES + [(None, "U")])
 
-
-class ClinicalSignificanceComparison:
-    LESS_OR_EQUAL = "l"
-    EQUAL = 'e'
-    GREATER_OR_EQUAL = 'g'
-
-    CHOICES = (
-        (LESS_OR_EQUAL, "Less or equal than"),
-        (EQUAL, "Exactly"),
-        (GREATER_OR_EQUAL, "Greater or equal than")
-    )
-
-    @staticmethod
-    def get_clinical_significance_list(clinical_significance, comparison) -> Optional[List]:
-        """ Returns all if clinical_significance=None """
-        clinical_significance_list = None
-        if clinical_significance:
-            if comparison == ClinicalSignificanceComparison.EQUAL:
-                clinical_significance_list = [clinical_significance]
-            else:
-                clinical_significance_list = [c[0] for c in ClinicalSignificance.CHOICES]
-                i = clinical_significance_list.index(clinical_significance)
-                if comparison == ClinicalSignificanceComparison.LESS_OR_EQUAL:
-                    clinical_significance_list = clinical_significance_list[:i + 1]
-                elif comparison == ClinicalSignificanceComparison.GREATER_OR_EQUAL:
-                    clinical_significance_list = clinical_significance_list[i:]
-        return clinical_significance_list
-
     @staticmethod
     def is_significant_change(old_classification: str, new_classification: str) -> bool:
         was_vus_change = old_classification and new_classification and old_classification == 'VUS' and new_classification.startswith('VUS')

@@ -5,14 +5,17 @@
 {% endblock docreadyjs %}
 
 {% block content %}
+<style>
+#classifications-node-form input {
+    margin: 0px 5px 0px 5px;
+}
+</style>
 <div>
 	<form id="classifications-node-form" method="post" action="{{ request.path }}">
         {% csrf_token %}
-        
-        
 		<div>
             <div>
-                {{ form.comparison }} {{ form.clinical_significance }}        
+                {{ form }}
             </div>
             <div>
     		  <b>Last Saved:</b> {{ node.modified }}

@@ -12,9 +12,8 @@ from typing import Set, Optional, List
 
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
-from classification.enums import ClinicalSignificanceComparison
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
-from classification.enums.classification_enums import SpecialEKeys
+from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification import ClassificationModification, Classification
@@ -343,7 +342,7 @@ class DiscordanceReportClassification(TimeStampedModel):
 
         # note if we had a significant change we treat it as if the record was reviewed
         # e.g. there's no
-        had_significant_change = ClinicalSignificanceComparison.is_significant_change(
+        had_significant_change = ClinicalSignificance.is_significant_change(
             old_classification=self.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
             new_classification=self.classfication_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         )
