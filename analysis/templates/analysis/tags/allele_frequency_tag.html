@@ -46,7 +46,7 @@
     }
 
     function afSetSliderMinMaxLabels(slider, minVal, maxVal) {
-        var container = $(slider).parent();
+        const container = $(slider).parent();
         $(".slider-min", container).text(minVal);
         $(".slider-max", container).text(maxVal);
     }
@@ -54,15 +54,16 @@
     function createSlider(value1, value2) {
         value1 = getValue(value1, 0);
         value2 = getValue(value2, 100);
-    
-        var sliderTemplate = $('script[data-template="slider"]').html();
-        var sliderContainer = $(sliderTemplate);
-        var slider = $(".af-slider", sliderContainer);
+
+        const sliderTemplate = $('script[data-template="slider"]').html();
+        const sliderContainer = $(sliderTemplate);
+        const slider = $(".af-slider", sliderContainer);
 
         slider.slider({
             range: true,
             min: 0,
-            max: 100,
+            max: 1,
+            step: 0.01,
             values: [ value1, value2 ],
             slide: function(event, ui) {
                 afSetSliderMinMaxLabels(this, ui.values[0], ui.values[1]);
@@ -80,17 +81,17 @@
 
 
     function addSlider(value1, value2) {
-        var sliderContainer = createSlider(value1, value2);
+        const sliderContainer = createSlider(value1, value2);
         $("#allele-frequency-filter").append(sliderContainer);
         return $(".af-slider", sliderContainer);
     }
 
 
     function getAlleleFrequencyValues() {
-        var sliderList = [];
+        const sliderList = [];
         $(".af-slider").each(function() {
-            var sMin = $(this).slider('values', 0);
-            var sMax = $(this).slider('values', 1);
+            const sMin = $(this).slider('values', 0);
+            const sMax = $(this).slider('values', 1);
             sliderList.push([sMin, sMax]);
         });
         
@@ -106,7 +107,7 @@
         });
         
         {% if allele_frequency %}
-        var initialAlleleFrequency = {{ allele_frequency|safe }};
+        let initialAlleleFrequency = {{ allele_frequency|safe }};
         setInitialAlleleFrequencyFilter(initialAlleleFrequency);
         {% endif %}
     });

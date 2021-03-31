@@ -22,7 +22,7 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
     get_variantgrid_extra_alias_and_select_columns
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings, VCFFilter
+from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings, VCFFilter, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 
@@ -212,7 +212,7 @@ class VariantGrid(JqGridSQL):
         return fields, overrides
 
     @staticmethod
-    def get_packed_data_formatter(packed_data_replace: Dict, column, i):
+    def _get_sample_columns_server_side_formatter(sample: Sample, packed_data_replace: Dict, column, i: int):
         """ A function to capture loop variable """
 
         def packed_data_formatter(row, _field):
@@ -220,7 +220,27 @@ class VariantGrid(JqGridSQL):
             val = packed_data[i]
             return packed_data_replace.get(val, val)
 
-        return packed_data_formatter
+        server_side_formatter = packed_data_formatter
+        if column == "samples_filters":
+            def sample_filters_formatter(row, field):
+                """ Need to unpack then switch filters """
+                filter_formatter = VCFFilter.get_formatter(sample.vcf)
+                val = packed_data_formatter(row, field)
+                row[field] = val
+                return filter_formatter(row, field)
+
+            server_side_formatter = sample_filters_formatter
+        elif column == "samples_allele_frequency":
+            if sample.vcf.allele_frequency_percent:
+                def samples_allele_frequency_percent_formatter(row, field):
+                    """ Convert from legacy percent to AF (0-1) """
+                    val = packed_data_formatter(row, field)
+                    if val != '.':  # missing value
+                        val /= 100.0
+                    return val
+                server_side_formatter = samples_allele_frequency_percent_formatter
+
+        return server_side_formatter
 
     @staticmethod
     def get_grid_genotype_columns_and_overrides(cohorts, visibility):
@@ -259,29 +279,9 @@ class VariantGrid(JqGridSQL):
                     continue
                 column_names.append(f"{sample.pk}_{column}")
                 label = label_format % {"sample": sample.name, "label": column_label}
-                server_side_formatter = VariantGrid.get_packed_data_formatter(packed_data_replace, column, cc_index)
-                packed_data_formatter = server_side_formatter  # capture for funcs below
-                if column == "samples_filters":
-                    def sample_filters_formatter(row, field):
-                        """ Need to unpack then switch filters """
-                        filter_formatter = VCFFilter.get_formatter(sample.vcf)
-                        val = packed_data_formatter(row, field)
-                        row[field] = val
-                        return filter_formatter(row, field)
-
-                    server_side_formatter = sample_filters_formatter
-                elif column == "samples_allele_frequency":
-                    if sample.vcf.allele_frequency_percent:
-                        def samples_allele_frequency_percent_formatter(row, field):
-                            """ Convert from legacy percent to AF (0-1) """
-                            val = packed_data_formatter(row, field)
-                            print(f"raw={row['packed_samples_allele_frequency']}, {field=} {cc_index=} => AF was: {val}")
-                            if val != '.':  # missing value
-                                val /= 100.0
-                            return val
-
-                        server_side_formatter = samples_allele_frequency_percent_formatter
-
+                server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(sample,
+                                                                                              packed_data_replace,
+                                                                                              column, cc_index)
                 col_data_dict = {
                     "label": label,
                     "width": width,

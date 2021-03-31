@@ -110,12 +110,12 @@ class CohortMixin:
         cohort = self._get_cohort()
         cgc = self.cohort_genotype_collection
 
-        for sample_id in cohort.get_sample_ids():
+        for sample in cohort.get_samples():
             # Indexes are handled by cohortgenotype (sub cohorts etc)
-            array_index = cgc.get_array_index_for_sample_id(sample_id)
+            array_index = cgc.get_array_index_for_sample_id(sample.pk)
             # https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
             allele_frequency_column = f"{cgc.cohortgenotype_alias}__samples_allele_frequency__{array_index}"
-            q = naff.get_q(allele_frequency_column)
+            q = naff.get_q(allele_frequency_column, sample.vcf.allele_frequency_percent)
             if q:
                 # logging.info("%s => %s => %s", sample_id, allele_frequency_column, q)
                 filters.append(q)

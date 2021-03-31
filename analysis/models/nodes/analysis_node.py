@@ -995,7 +995,7 @@ class NodeAlleleFrequencyFilter(models.Model):
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
 
-    def get_q(self, allele_frequency_path):
+    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool):
         af_q = None
         try:
             filters = []
@@ -1004,9 +1004,15 @@ class NodeAlleleFrequencyFilter(models.Model):
                 # Missing value (historical data) == -1 so those will come through
                 and_filters = []
                 if af_range.min > 0:
-                    and_filters.append(Q(**{allele_frequency_path + "__gte": af_range.min}))
-                if af_range.max < 100:
-                    and_filters.append(Q(**{allele_frequency_path + "__lte": af_range.max}))
+                    min_value = af_range.min
+                    if allele_frequency_percent:
+                        min_value *= 100.0
+                    and_filters.append(Q(**{allele_frequency_path + "__gte": min_value}))
+                if af_range.max < 1:
+                    max_value = af_range.max
+                    if allele_frequency_percent:
+                        max_value *= 100.0
+                    and_filters.append(Q(**{allele_frequency_path + "__lte": max_value}))
 
                 if and_filters:
                     and_q = reduce(operator.and_, and_filters)
@@ -1024,7 +1030,9 @@ class NodeAlleleFrequencyFilter(models.Model):
         af_q = None
         if sample:
             try:
-                af_q = node.nodeallelefrequencyfilter.get_q(sample.get_cohort_genotype_field("allele_frequency"))
+                allele_frequency_path = sample.get_cohort_genotype_field("allele_frequency")
+                allele_frequency_percent = sample.vcf.allele_frequency_percent
+                af_q = node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent)
             except NodeAlleleFrequencyFilter.DoesNotExist:
                 pass
         return af_q
@@ -1040,13 +1048,16 @@ class NodeAlleleFrequencyFilter(models.Model):
 
 
 class NodeAlleleFrequencyRange(models.Model):
+    MIN_VALUE = 0
+    MAX_VALUE = 1
+
     filter = models.ForeignKey(NodeAlleleFrequencyFilter, on_delete=CASCADE)
-    min = models.IntegerField(null=False)
-    max = models.IntegerField(null=False)
+    min = models.FloatField(null=False)
+    max = models.FloatField(null=False)
 
     def __str__(self):
-        has_min = self.min is not None and self.min > 0
-        has_max = self.max is not None and self.max < 100
+        has_min = self.min is not None and self.min > self.MIN_VALUE
+        has_max = self.max is not None and self.max < self.MAX_VALUE
 
         if has_min and has_max:
             return f"{self.min} - {self.max}%"
