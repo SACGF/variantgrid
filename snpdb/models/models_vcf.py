@@ -81,7 +81,9 @@ class VCF(models.Model):
 
     @staticmethod
     def convert_from_percent_to_unit(percent):
-        if percent != '.':
+        from snpdb.models import CohortGenotype  # Circular import
+
+        if percent != CohortGenotype.MISSING_NUMBER_VALUE:
             percent /= 100.0
         return percent
 

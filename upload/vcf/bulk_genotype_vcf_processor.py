@@ -15,6 +15,7 @@ import numpy as np
 from library.utils import double_quote
 from library.vcf_utils import VCFConstant
 from patients.models_enums import Zygosity
+from snpdb.models import CohortGenotype
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
     VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage
@@ -43,7 +44,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
     # genotype for each possible genotype generated from the reference and alternate alleles given the sample ploidy
     GENOTYPE_LIKELIHOOD = 'GL'
-    MISSING_DATA_VALUE = -1
     # gt_types is array of 0,1,2,3==HOM_REF, HET, UNKNOWN, HOM_ALT
     ALT_CYVCF_GT_ZYGOSITIES = [Zygosity.HOM_REF, Zygosity.HET, Zygosity.UNKNOWN_ZYGOSITY, Zygosity.HOM_ALT]
     DOESNT_MATTER = 0  # For unknown, anything should work
@@ -146,7 +146,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 if len(clcad2) == 2:
                     alt = clcad2[1]
                 else:
-                    alt = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                    alt = CohortGenotype.MISSING_NUMBER_VALUE
                 return np.array([ref]), np.array([alt])
             return _get_clcad2_ref_alt_depths
         if vcf.ref_depth_field and vcf.alt_depth_field:  # explicitly set
@@ -157,9 +157,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
                 # As VCF is decomposed these arrays will always be length of 1, so return in same shape as default above
                 ref_depth = variant.format(vcf.ref_depth_field).flatten()
-                ref_depth[ref_depth == _NUMPY_INT_NAN_VALUE] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                ref_depth[ref_depth == _NUMPY_INT_NAN_VALUE] = CohortGenotype.MISSING_NUMBER_VALUE
                 alt_depth = variant.format(vcf.alt_depth_field).flatten()
-                alt_depth[alt_depth == _NUMPY_INT_NAN_VALUE] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                alt_depth[alt_depth == _NUMPY_INT_NAN_VALUE] = CohortGenotype.MISSING_NUMBER_VALUE
                 return ref_depth, alt_depth
             return get_ref_alt_depths
         raise ValueError(f"Don't know how to get ref and alt allele depth for {vcf}")
@@ -170,7 +170,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         if field:
             format_array = variant.format(field)
             if format_array is not None:
-                format_array[np.isnan(format_array) | (format_array < 0)] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                format_array[np.isnan(format_array) | (format_array < 0)] = CohortGenotype.MISSING_NUMBER_VALUE
                 if as_type:
                     format_array = format_array.astype(as_type)
                 format_array_str = postgres_arrays(format_array.flat)
@@ -190,7 +190,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 if missing.all():
                     return self.EMPTY_PL_ARRAY
 
-                pl[missing] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE  # Handle individual PL array entry missing
+                pl[missing] = CohortGenotype.MISSING_NUMBER_VALUE  # Handle individual PL array entry missing
                 pl_index_lookup = BulkGenotypeVCFProcessor.CYVCF_PL_INDEX_FOR_PLOIDY[variant.ploidy]
                 for i, gt in enumerate(variant.gt_types):
                     pl_index = pl_index_lookup[gt]
@@ -233,7 +233,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             # Calculate ourselves across locus
             for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):
                 vaf = ad / self.locus_ad_sum
-                vaf[np.isnan(vaf)] = BulkGenotypeVCFProcessor.MISSING_DATA_VALUE
+                vaf[np.isnan(vaf)] = CohortGenotype.MISSING_NUMBER_VALUE
                 cgt[self.cohort_gt_vaf_index] = postgres_arrays(vaf)
                 self.cohort_genotypes.append(cgt)
 

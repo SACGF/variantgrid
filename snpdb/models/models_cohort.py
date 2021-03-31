@@ -410,14 +410,15 @@ class SampleGenotype:
 
 class CohortGenotype(models.Model):
     """ Genotype information for multiple samples in a single database row. """
+    MISSING_NUMBER_VALUE = -1
 
     COLUMN_IS_ARRAY_EMPTY_VALUE = {
         "samples_zygosity": (False, "."),
-        "samples_allele_depth": (True, -1),
-        "samples_allele_frequency": (True, -1),
-        "samples_read_depth": (True, -1),
-        "samples_genotype_quality": (True, -1),
-        "samples_phred_likelihood": (True, -1),
+        "samples_allele_depth": (True, MISSING_NUMBER_VALUE),
+        "samples_allele_frequency": (True, MISSING_NUMBER_VALUE),
+        "samples_read_depth": (True, MISSING_NUMBER_VALUE),
+        "samples_genotype_quality": (True, MISSING_NUMBER_VALUE),
+        "samples_phred_likelihood": (True, MISSING_NUMBER_VALUE),
         "samples_filters": (True, "NULL"),
     }
 
@@ -444,7 +445,7 @@ class CohortGenotype(models.Model):
 
     def get_sample_genotypes(self) -> List[SampleGenotype]:
         sample_genotypes = []
-        for i, sample in enumerate(self.cohort.get_samples()):
+        for i, sample in enumerate(self.collection.cohort.get_samples()):
             sample_genotypes.append(SampleGenotype(self, sample, i))
         return sample_genotypes
 
