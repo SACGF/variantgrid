@@ -418,7 +418,7 @@ class CohortGenotype(models.Model):
         "samples_read_depth": (True, -1),
         "samples_genotype_quality": (True, -1),
         "samples_phred_likelihood": (True, -1),
-        "samples_filters": (True, "''"),
+        "samples_filters": (True, "NULL"),
     }
 
     collection = models.ForeignKey(CohortGenotypeCollection, on_delete=CASCADE)
@@ -435,7 +435,8 @@ class CohortGenotype(models.Model):
     samples_read_depth = ArrayField(models.IntegerField(), null=True)
     samples_genotype_quality = ArrayField(models.IntegerField(), null=True)
     samples_phred_likelihood = ArrayField(models.IntegerField(), null=True)
-    samples_filters = ArrayField(models.TextField(), null=True)  # Same codes as filters, at sample level
+    # Same codes as filters, at sample level. None for no entry, PASS = ""
+    samples_filters = ArrayField(models.TextField(), null=True)
 
     def get_sample_genotype(self, sample: Sample) -> SampleGenotype:
         sample_index = self.collection.get_array_index_for_sample_id(sample.pk)

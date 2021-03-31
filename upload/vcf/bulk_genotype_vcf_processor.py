@@ -123,7 +123,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     def convert_filters(self, vcf_filter) -> Optional[str]:
         filters = None
-        if vcf_filter:
+        if vcf_filter and vcf_filter != '.':  # FORMAT filters can be '.'
             filters_iter = (self.vcf_filter_map[f] for f in vcf_filter.split(";"))
             filters = ''.join(sorted(filters_iter))
         return filters
@@ -208,9 +208,14 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             if s_filters is not None:
                 for sf in s_filters:
                     sample_filters.append(self.convert_filters(sf))
-                if any(sample_filters):  # Skip if all were PASS
+                if any([s is not None for s in sample_filters]):  # Skip if all were PASS
                     # https://www.postgresql.org/docs/9.1/arrays.html - Postgres arrays use double quotes
-                    samples_filters_str = postgres_arrays([double_quote(sf) for sf in sample_filters])
+                    cleaned_sample_filters = []
+                    for sf in sample_filters:
+                        if sf is not None:
+                            sf = double_quote(sf)
+                        cleaned_sample_filters.append(sf)
+                    samples_filters_str = postgres_arrays(cleaned_sample_filters)
         return samples_filters_str
 
     def finished_locus(self):

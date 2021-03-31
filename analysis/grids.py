@@ -232,10 +232,14 @@ class VariantGrid(JqGridSQL):
         if column == "samples_filters":
             def sample_filters_formatter(row, field):
                 """ Need to unpack then switch filters """
-                filter_formatter = VCFFilter.get_formatter(sample.vcf)
+                # Sample Filters can be "."
                 val = packed_data_formatter(row, field)
-                row[field] = val
-                return filter_formatter(row, field)
+                if val is None:
+                    return '.'
+                else:  # empty string ('') is PASS
+                    filter_formatter = VCFFilter.get_formatter(sample.vcf)
+                    row[field] = val
+                    return filter_formatter(row, field)
 
             server_side_formatter = sample_filters_formatter
         elif column == "samples_allele_frequency":

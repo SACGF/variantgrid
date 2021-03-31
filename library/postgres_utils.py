@@ -36,7 +36,7 @@ def prepare_binary(f, dat):
 
 
 def postgres_arrays(array):
-    return "{%s}" % ','.join([str(s) for s in array])
+    return "{%s}" % ','.join([str(s) if s is not None else "NULL" for s in array])
 
 
 def split_postgres_arrays(pg_array_str, missing_fill_value=None):
