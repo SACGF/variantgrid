@@ -22,7 +22,7 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
     get_variantgrid_extra_alias_and_select_columns
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings, VCFFilter, Sample
+from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings, VCFFilter, Sample, VCF
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 
@@ -235,9 +235,7 @@ class VariantGrid(JqGridSQL):
                 def samples_allele_frequency_percent_formatter(row, field):
                     """ Convert from legacy percent to AF (0-1) """
                     val = packed_data_formatter(row, field)
-                    if val != '.':  # missing value
-                        val /= 100.0
-                    return val
+                    return VCF.convert_from_percent_to_unit(val)
                 server_side_formatter = samples_allele_frequency_percent_formatter
 
         return server_side_formatter

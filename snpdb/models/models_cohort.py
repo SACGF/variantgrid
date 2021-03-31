@@ -377,7 +377,10 @@ class SampleGenotype:
         self.sample = sample
         self.zygosity = self._get_sample_value("samples_zygosity", sample_index)
         self.allele_depth = self._get_sample_value("samples_allele_depth", sample_index)
-        self.allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
+        allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
+        if sample.vcf.allele_frequency_percent:
+            allele_frequency = VCF.convert_from_percent_to_unit(allele_frequency)
+        self.allele_frequency = allele_frequency
         self.read_depth = self._get_sample_value("samples_read_depth", sample_index)
         self.genotype_quality = self._get_sample_value("samples_genotype_quality", sample_index)
         self.phred_likelihood = self._get_sample_value("samples_phred_likelihood", sample_index)

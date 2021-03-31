@@ -80,6 +80,12 @@ class VCF(models.Model):
         return filter_dict
 
     @staticmethod
+    def convert_from_percent_to_unit(percent):
+        if percent != '.':
+            percent /= 100.0
+        return percent
+
+    @staticmethod
     def filter_for_user(user, group_data=True, has_write_permission=False):
         if has_write_permission:
             perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)

@@ -67,11 +67,12 @@
            <div id="genotype-grid-pager"></div> 
 	   </div>
        <script>
-        var visible_rows = {{ visible_rows | jsonify }};
-        var ZYGOSITY_DICT = { 'O' : 'HOM_ALT',
-                              'E' : 'HET',
-                              'R' : 'HOM_REF',
-                              'U' : 'Unknown Zygosity',
+        let visible_rows = {{ visible_rows | jsonify }};
+        const ZYGOSITY_DICT = {
+            'O': 'HOM_ALT',
+            'E': 'HET',
+            'R': 'HOM_REF',
+            'U': 'Unknown Zygosity',
         };
 
         function sampleFormatFieldFormatter(formatField) {
@@ -85,11 +86,11 @@
         }
 
         function getTermLinks(term_type, term_list) {
-            var links = '';
+            let links = '';
             if (term_list) {
-                var terms = term_list.split('|');
-                for (var i=0 ; i<terms.length ; ++i) {
-                    var term = terms[i];
+                const terms = term_list.split('|');
+                for (let i=0 ; i<terms.length ; ++i) {
+                    const term = terms[i];
                     links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'>" + term + "</span>";
                 }
             }
@@ -128,7 +129,7 @@
             xaxis.showgrid = false;
             layout.xaxis = xaxis;
             let yaxis = layout.yaxis || {};
-            yaxis.range = [0, 105];
+            yaxis.range = [0, 1.05];
             yaxis.showgrid = false;
             yaxis.zeroline = false;
             layout.yaxis = yaxis;
@@ -138,8 +139,8 @@
             let clamped_af = [];
             for (let i=0; i<af.length; ++i) {
                 let val = af[i];
-                if (val >= 100) {
-                    val = 99;
+                if (val >= 1) {
+                    val = .99;
                 }
                 clamped_af.push(val)
             }
@@ -149,12 +150,12 @@
                 x: clamped_af,
                 autobinx: false,
                 histnorm: "count",
-                xbins: {start: 0, size: 10, end: 110}
+                xbins: {start: 0, size: .05, end: 1}
             };
             layout = defaultLayout("{{ variant }} Allele Frequency Histogram");
             layout.xaxis = {
                 autotick: true,
-                range: [0, 100]
+                range: [0, 1]
             };
             layout.yaxis = {showline: false, zeroline: false, showticklabels: false};
             Plotly.newPlot('sample-allele-frequency-histogram', [histo_data], layout);
@@ -165,7 +166,7 @@
         $(document).ready(function() {
             jQuery.extend($.fn.fmatter , {
                 viewSampleLink : function(sampleName, options, rowObject) {
-                    var url = Urls.view_sample(rowObject["sample"]);
+                    const url = Urls.view_sample(rowObject["sample"]);
                     return "<a href='" + url + "'>" + sampleName + "</a>";
                 },
                 viewZygosity : function(zygosity, options, rowObject) {
