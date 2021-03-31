@@ -38,8 +38,9 @@ class AbstractTrioInheritance(ABC):
     @staticmethod
     def _zygosity_options(zyg: Set, allow_unknown=False):
         if allow_unknown:
-            zyg.add(Zygosity.UNKNOWN_ZYGOSITY)
-        zyg.discard(Zygosity.MISSING)  # Implementation detail - don't show to user
+            # Make a new set so as to not alter passed in value
+            zyg = zyg | {Zygosity.UNKNOWN_ZYGOSITY}
+        zyg = zyg - {Zygosity.MISSING}  # Implementation detail - don't show to user
         return ", ".join(sorted([Zygosity.display(z) for z in zyg]))
 
     def get_zygosities_method(self, mum_z: Set, dad_z: Set, proband_z: Set):
