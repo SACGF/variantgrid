@@ -83,6 +83,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self.ancestor_input_samples_changed = False
         self.parents_changed = False
         self.queryset_dirty = False
+        self.update_children = True
 
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
@@ -766,14 +767,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             self.bump_version()
 
             super_save(**kwargs)
-            for kid in self.children.select_subclasses():
+            if self.update_children:
                 # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
                 # So we could go from having multiple proband samples to only one later (thus can set descendants)
-                kid.ancestor_input_samples_changed = self.is_source() or self.ancestor_input_samples_changed or \
-                                                     self.get_samples_from_node_only_not_ancestors()
-                kid.appearance_dirty = False
-                kid.queryset_dirty = True
-                kid.save()  # Will bump versions
+                for kid in self.children.select_subclasses():
+                    kid.ancestor_input_samples_changed = self.is_source() or self.ancestor_input_samples_changed or \
+                                                         self.get_samples_from_node_only_not_ancestors()
+                    kid.appearance_dirty = False
+                    kid.queryset_dirty = True
+                    kid.save()  # Will bump versions
         else:
             super_save(**kwargs)
 

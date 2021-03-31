@@ -68,9 +68,11 @@ def update_nodes(analysis_id, run_async=True):
 
 
 def reload_analysis_nodes(analysis_id, run_async=True):
-    AnalysisNode.objects.filter(analysis_id=analysis_id).update(status=NodeStatus.DIRTY,
-                                                                count=None,
-                                                                version=F("version") + 1)
+    for node in AnalysisNode.objects.filter(analysis_id=analysis_id).select_subclasses():
+        node.update_children = False  # Will get them all in loop
+        node.appearance_dirty = True
+        node.queryset_dirty = True
+        node.save()
     return update_nodes(analysis_id, run_async=run_async)
 
 
