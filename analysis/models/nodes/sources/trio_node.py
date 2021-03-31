@@ -195,7 +195,7 @@ class TrioNode(AbstractCohortBasedNode):
     def modifies_parents(self):
         return self.trio is not None
 
-    def _inhertiance_factory(self):
+    def _inheritance_factory(self):
         inhertiance_classes = {
             TrioInheritance.COMPOUND_HET: CompHet,
             TrioInheritance.RECESSIVE: Recessive,
@@ -210,14 +210,14 @@ class TrioNode(AbstractCohortBasedNode):
     def _get_node_q(self) -> Optional[Q]:
         cohort, q = self.get_cohort_and_q()
         if cohort:
-            inheritance = self._inhertiance_factory()
+            inheritance = self._inheritance_factory()
             q &= inheritance.get_q()
             q &= self.get_vcf_locus_filters_q()
         return q
 
     def _get_method_summary(self):
         if self._get_cohort():
-            inheritance = self._inhertiance_factory()
+            inheritance = self._inheritance_factory()
             method = inheritance.get_method()
         else:
             method = "No cohort selected"
