@@ -22,9 +22,15 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
     get_variantgrid_extra_alias_and_select_columns
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings, VCFFilter, Sample, VCF
+from snpdb.models import Tag, VariantGridColumn, UserGridConfig, UserSettings, VCFFilter, Sample, VCF, ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
+
+
+def server_side_format_clingen_allele(row, field):
+    if ca_id := row[field]:
+        ca_id = ClinGenAllele.format_clingen_allele(ca_id)
+    return ca_id
 
 
 class VariantGrid(JqGridSQL):
@@ -36,7 +42,9 @@ class VariantGrid(JqGridSQL):
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
         'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
         'clinvar__clinvar_variation_id': {'width': 60, 'formatter': 'clinvarLink'},
-        'variantallele__allele__clingen_allele': {'width': 90, 'formatter': 'formatClinGenAlleleId'},
+        'variantallele__allele__clingen_allele': {'width': 90,
+                                                  "server_side_formatter": server_side_format_clingen_allele,
+                                                  'formatter': 'formatClinGenAlleleId'},
         'variantannotation__cosmic_id': {'width': 90, 'formatter': 'cosmicLink'},
         'variantannotation__cosmic_legacy_id': {'width': 90, 'formatter': 'cosmicLink'},
         'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},

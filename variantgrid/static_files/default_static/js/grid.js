@@ -497,7 +497,7 @@ function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
 function formatClinGenAlleleId(cellValue) {
     // warning: doesn't use settings.CLINGEN_ALLELE_REGISTRY_DOMAIN as static JS
     if (cellValue) {
-        let ca_id = "CA" + cellValue;
+        let ca_id = cellValue;
         let url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${ca_id}`;
         cellValue = `<a href="${url}" target="_blank">${ca_id}</a>`;
     } else {
