@@ -84,7 +84,10 @@ class VCF(models.Model):
         from snpdb.models import CohortGenotype  # Circular import
 
         if percent != CohortGenotype.MISSING_NUMBER_VALUE:
-            percent /= 100.0
+            try:
+                percent /= 100.0
+            except Exception as e:
+                raise ValueError(f"percent was '{percent}'") from e
         return percent
 
     @staticmethod
