@@ -29,7 +29,7 @@ from library.django_utils import require_superuser, highest_pk, get_url_from_vie
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback, send_notification
+from library.log_utils import report_exc_info, log_traceback, send_notification, NotificationBuilder
 from library.utils import count, pretty_label
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
@@ -143,35 +143,15 @@ def notify_server_status():
     dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
     url = get_url_from_view_path(reverse('server_status')) + '?days=1'
 
-    blocks = [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"Health Check from <{url}|{url}>\n\n*Disk Usage*"
-            }
-        },
-        {
-            "type": "divider"
-        }
-    ]
+    emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
+    nb = NotificationBuilder(message="Health Check", username="Health Check", emoji=emoji)
+    nb.add_markdown(f"*Health Check from* <{url}|{url}>\n\n")
+    nb.add_markdown("*Disk Usage*")
+    disk_usage = list()
     for _, message in get_disk_messages(info_messages=True):
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f":floppy_disk: {message}"
-            }
-        })
-
-    blocks.append({
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "\n*In the last 24 hours*"
-        }
-    })
-    blocks.append({"type": "divider"})
+        disk_usage.append(f":floppy_disk: {message}")
+    nb.add_markdown("\n".join(disk_usage), indented=True)
+    nb.add_markdown("*In the last 24 hours*")
 
     keys = set(dashboard_notices.keys())
     keys.discard('events')
@@ -182,6 +162,7 @@ def notify_server_status():
             keys.discard(exclude_key)
     sorted_keys = sorted(list(keys))
 
+    lines = list()
     for key in sorted_keys:
         emoji = ":blue_book:"
         if 'analyses' in key:
@@ -191,17 +172,10 @@ def notify_server_status():
         count_display = count(dashboard_notices.get(key))
         if count_display:
             count_display = f"*{count_display}*"
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"{emoji} {count_display} : {pretty_label(key)}"
-            }
-        })
-    message = f"Health Check from <{url}|{url}>"
 
-    emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
-    send_notification(message=message, blocks=blocks, username="Health Check", emoji=emoji)
+        lines.append(f"{emoji} {count_display} : {pretty_label(key)}")
+    nb.add_markdown("\n".join(lines), indented=True)
+    nb.send()
 
 
 @require_superuser

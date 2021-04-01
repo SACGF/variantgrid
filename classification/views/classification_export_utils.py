@@ -511,21 +511,20 @@ class ExportFormatter(BaseExportFormatter):
 
     def report_stats(self, row_count: int):
         url = None
-        nb = NotificationBuilder(message="Classification Download", username="Download Notifier", emoji=":arrow_down:").\
-            add_markdown(
+        nb = NotificationBuilder(message="Classification Download", username="Download Notifier", emoji=":arrow_down:")\
+            .add_markdown("*Classification Download Completed*")\
+            .add_markdown(
 f"""
-*Classification Download Completed*
-:simple_smile: {self.user.username}
+>>> :simple_smile: {self.user.username}
 Filename : *{self.filename()}*
 Rows Downloaded : *{row_count}*
 """
         )
         if request := get_current_request():
-            nb.add_divider()
             parts = [f"URL : `{request.path_info}`"]
             for key, value in request.GET.items():
                 parts.append(f"{key} : *{value}*")
-            nb.add_markdown("\n".join(parts))
+            nb.add_markdown(">>> " + "\n".join(parts))
         nb.send()
 
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:

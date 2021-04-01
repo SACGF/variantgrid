@@ -89,7 +89,9 @@ class NotificationBuilder:
         self.blocks.append({"type": "divider"})
         return self
 
-    def add_markdown(self, text):
+    def add_markdown(self, text, indented=False):
+        if indented:
+            text = ">>> " + (text or "_No Data_")
         self.blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
         return self
 
