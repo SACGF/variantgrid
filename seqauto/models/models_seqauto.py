@@ -1,5 +1,6 @@
 import pathlib
 from datetime import datetime
+from typing import List
 
 from django.conf import settings
 from django.contrib import messages
@@ -858,17 +859,25 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         return False
 
     @staticmethod
-    def get_path_from_sample_sheet(sample_sheet):
-        try:
-            pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, settings.SEQAUTO_COMBINED_VCF_PATTERN)
-            params = sample_sheet.get_params()
-            combined_vcf_path = pattern % params
-            return os.path.abspath(combined_vcf_path)
-        except Exception as e:
-            raise ValueError(f"sample_sheet: {sample_sheet}") from e
+    def get_paths_from_sample_sheet(sample_sheet) -> List[str]:
+        enrichment_kit = sample_sheet.sequencing_run.enrichment_kit
+        pattern_list = None
+        if enrichment_kit:
+            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT[enrichment_kit.name]
+
+        if pattern_list is None:
+            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT["default"]
+
+        paths = []
+        for pattern in pattern_list:
+            combo_path = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, pattern) % sample_sheet.get_params()
+            paths.append(os.path.abspath(combo_path))
+        return paths
 
     @staticmethod
     def get_variant_caller_from_vcf_file(vcf_path):
+        # The GATK file has multiple entries for "source" and it only calls it
+
         return get_fake_variant_caller()
 
     def __str__(self):

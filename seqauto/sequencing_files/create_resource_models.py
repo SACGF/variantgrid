@@ -828,41 +828,41 @@ def process_combo_vcfs(seqauto_run, existing_files, results):
             sample_sheet = sequencing_run.get_current_sample_sheet()
         except:
             continue
-        vcf_path = SampleSheetCombinedVCFFile.get_path_from_sample_sheet(sample_sheet)
 
-        exists = vcf_path in existing_combo_vcf_files
-        data_state = get_data_state(sequencing_run.data_state, exists)
-        combined_vcf_file = existing_combo_vcf_records.get(vcf_path)
+        for vcf_path in SampleSheetCombinedVCFFile.get_paths_from_sample_sheet(sample_sheet):
+            exists = vcf_path in existing_combo_vcf_files
+            data_state = get_data_state(sequencing_run.data_state, exists)
+            combined_vcf_file = existing_combo_vcf_records.get(vcf_path)
 
-        if combined_vcf_file:
-            require_save = False
-            if sample_sheet != combined_vcf_file.sample_sheet:
-                logging.info("Combo VCF %s on disk set for old sample_sheet, setting to latest", combined_vcf_file)
-                combined_vcf_file.sample_sheet = sample_sheet
-                require_save = True
+            if combined_vcf_file:
+                require_save = False
+                if sample_sheet != combined_vcf_file.sample_sheet:
+                    logging.info("Combo VCF %s on disk set for old sample_sheet, setting to latest", combined_vcf_file)
+                    combined_vcf_file.sample_sheet = sample_sheet
+                    require_save = True
 
-            if combined_vcf_file.data_state != data_state:
-                logging.info("combined_vcf_file %s data state changed from %s->%s", combined_vcf_file,
-                             combined_vcf_file.data_state, data_state)
-                combined_vcf_file.data_state = data_state
-                require_save = True
+                if combined_vcf_file.data_state != data_state:
+                    logging.info("combined_vcf_file %s data state changed from %s->%s", combined_vcf_file,
+                                 combined_vcf_file.data_state, data_state)
+                    combined_vcf_file.data_state = data_state
+                    require_save = True
 
-            if require_save:
-                combined_vcf_file.save()
-        else:
-            if DataState.should_create_new_record(data_state):
-                variant_caller = SampleSheetCombinedVCFFile.get_variant_caller_from_vcf_file(vcf_path)
-                combined_vcf_file = SampleSheetCombinedVCFFile.objects.create(sequencing_run=sequencing_run,
-                                                                              sample_sheet=sample_sheet,
-                                                                              path=vcf_path,
-                                                                              data_state=data_state,
-                                                                              variant_caller=variant_caller)
-        if combined_vcf_file:
-            combined_vcf_files.add(combined_vcf_file)
-            try:
-                combined_vcf_file.backendvcf  # If there, VCF is already loaded
-            except:
-                load_from_file_if_complete(seqauto_run, combined_vcf_file)
+                if require_save:
+                    combined_vcf_file.save()
+            else:
+                if DataState.should_create_new_record(data_state):
+                    variant_caller = SampleSheetCombinedVCFFile.get_variant_caller_from_vcf_file(vcf_path)
+                    combined_vcf_file = SampleSheetCombinedVCFFile.objects.create(sequencing_run=sequencing_run,
+                                                                                  sample_sheet=sample_sheet,
+                                                                                  path=vcf_path,
+                                                                                  data_state=data_state,
+                                                                                  variant_caller=variant_caller)
+            if combined_vcf_file:
+                combined_vcf_files.add(combined_vcf_file)
+                try:
+                    combined_vcf_file.backendvcf  # If there, VCF is already loaded
+                except:
+                    load_from_file_if_complete(seqauto_run, combined_vcf_file)
     return combined_vcf_files
 
 
