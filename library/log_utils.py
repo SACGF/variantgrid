@@ -1,7 +1,7 @@
 import json
 from logging import StreamHandler
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import requests
 import rollbar
@@ -75,6 +75,31 @@ def report_exc_info(extra_data=None, request=None):
     if exc_info:
         print(exc_info)
 
+
+class NotificationBuilder:
+
+    def __init__(self, message: str, username: Optional[str], emoji: str = ":dna:"):
+        self.message = message
+        self.username = username
+        self.emoji = emoji
+        self.blocks = list()
+        self.sent = False
+
+    def add_divider(self) -> 'NotificationBuilder':
+        self.blocks.append({"type": "divider"})
+        return self
+
+    def add_markdown(self, text):
+        self.blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
+        return self
+
+    def send(self):
+        self.sent = True
+        send_notification(message=self.message, blocks=self.blocks, username=self.username, emoji=self.emoji)
+
+    def __del__(self):
+        if not self.sent:
+            report_message(f"Created a NotificationBuilder but did not call send {self.message}")
 
 def send_notification(message: str, blocks: Optional[Dict] = None, username: Optional[str] = None, emoji: str = ":dna:"):
     """

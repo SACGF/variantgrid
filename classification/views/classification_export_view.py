@@ -255,16 +255,6 @@ class ClassificationApiExportView(APIView):
             "user": request.user,
             "since": since
         }
-        report_event(
-            name='variant classification download',
-            request=request,
-            extra_data={
-                'format': file_format,
-                'approx_count': qs.count(),
-                'refer': 'download page',
-                'since': str(since) if since else ''
-            }
-        )
 
         if file_format == 'mvl':
             if request.query_params.get('mvl_detail', 'standard') == 'shell':
@@ -311,16 +301,6 @@ def redcap_data_dictionary(request) -> HttpResponseBase:
 
 
 def record_csv(request, record_id) -> HttpResponseBase:
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'csv',
-            'record_id': record_id,
-            'refer': 'classification form',
-            'approx_count': 1
-        }
-    )
     vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, record_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 

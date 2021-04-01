@@ -41,8 +41,6 @@ class EventColumns(DatatableConfig):
                 qs = qs.filter(severity__in=[LogLevel.ERROR, LogLevel.WARNING])
             elif filter_param == 'events':
                 qs = qs.filter(severity=LogLevel.INFO)
-            elif filter_param == 'vc_downloads':
-                qs = qs.filter(name='variant classification download')
             elif filter_param == 'searches':
                 qs = qs.filter(name='search')
             else:

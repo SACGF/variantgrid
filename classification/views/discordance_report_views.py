@@ -78,15 +78,6 @@ def export_discordance_report(request: HttpRequest, report_id: int) -> HttpRespo
     vcs_qs = ClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
 
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'csv',
-            'refer': f'discordance report ({report_id})',
-            'approx_count': vcs_qs.count()
-        }
-    )
     filename_override = f'discordance_report_{report_id}.csv'
     return ExportFormatterCSV(user=request.user,
                               genome_build=genome_build,

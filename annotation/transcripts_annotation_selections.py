@@ -161,7 +161,6 @@ class VariantTranscriptSelections:
                 if ar.status in (AnnotationStatus.ERROR, AnnotationStatus.FINISHED):
                     msg = f"Annotation for variant {variant} failed (Annotation run: {ar.get_status_display()})"
                     self.error_messages.append(msg)
-                    report_event(name='variant classification download')
                 else:
                     msg = f"This variant has not yet been annotated. Last status: {ar.get_status_display()} ({timesince(ar.modified)} ago)"
                     self.warning_messages.append(msg)

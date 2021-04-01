@@ -11,12 +11,13 @@ from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
 from django.utils.timezone import now
 from lazy import lazy
 from pytz import timezone
+from threadlocals.threadlocals import get_current_request
 
 from flags.models import FlagComment
 from flags.models.enums import FlagStatus
 from flags.models.models import Flag
 from genes.hgvs import CHGVS
-from library.log_utils import log_traceback, report_exc_info, report_message
+from library.log_utils import log_traceback, report_exc_info, report_message, NotificationBuilder
 from library.utils import delimited_row
 from snpdb.models import Contig
 from snpdb.models.flag_types import allele_flag_types
@@ -188,6 +189,7 @@ class AlleleGroup:
         self.variant_ids = list()
         self.data: List[ClassificationModification] = list()
         self.withdrawn: List[ClassificationModification] = list()
+        self.failed: List[ClassificationModification] = list()
         self.source = source
 
     def filter_out_transcripts(self, transcripts: Set[str]) -> List[ClassificationModification]:
@@ -266,11 +268,11 @@ class ExportFormatter(BaseExportFormatter):
         self.user = user
         self.allele_groups: List[AlleleGroup] = list()
         self.since = since
-
         self.error_message_ids = dict()
         self.raw_qs = qs
         self.started = datetime.utcnow()
         self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
+        self.row_count = 0
 
         super().__init__()
 
@@ -354,10 +356,11 @@ class ExportFormatter(BaseExportFormatter):
             flag_collection_ids = list()
             if allele_flag_id := Allele.objects.filter(pk=ag.allele_id).values_list("flag_collection_id", flat=True).first():
                 flag_collection_ids.append(allele_flag_id)
-            for cm in ag.data:
-                flag_collection_ids.append(cm.classification.flag_collection_id)
-            for cm in ag.withdrawn:
-                flag_collection_ids.append(cm.classification.flag_collection_id)
+
+            # check withdrawn and failed for new flags (just in case something newly fails a flag check or is newly withdrawn)
+            for data_set in [ag.data, ag.withdrawn, ag.failed]:
+                for cm in data_set:
+                    flag_collection_ids.append(cm.classification.flag_collection_id)
 
             if FlagComment.objects.filter(flag__collection_id__in=flag_collection_ids, created__gt=self.since).exists():
                 return True
@@ -460,6 +463,8 @@ class ExportFormatter(BaseExportFormatter):
                     # if not withdrawn, make sure it passes other flag checks
                     if self.passes_flag_check(vcm):
                         allele_group.data.append(vcm)
+                    else:
+                        allele_group.failed.append(vcm)
 
             self.filter_mismatched_transcripts(allele_group)
 
@@ -504,6 +509,25 @@ class ExportFormatter(BaseExportFormatter):
             ).exists()
         return False
 
+    def report_stats(self, row_count: int):
+        url = None
+        nb = NotificationBuilder(message="Classification Download", username="Download Notifier", emoji=":arrow_down:").\
+            add_markdown(
+f"""
+*Classification Download Completed*
+:simple_smile: {self.user.username}
+Filename : *{self.filename()}*
+Rows Downloaded : *{row_count}*
+"""
+        )
+        if request := get_current_request():
+            nb.add_divider()
+            parts = [f"URL : `{request.path_info}`"]
+            for key, value in request.GET.items():
+                parts.append(f"{key} : *{value}*")
+            nb.add_markdown("\n".join(parts))
+        nb.send()
+
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
 
         def iter_allele_to_row():
@@ -516,6 +540,7 @@ class ExportFormatter(BaseExportFormatter):
                 try:
                     row = self.row(vdata)
                     if row:
+                        self.row_count += 1
                         yield row
                 except GeneratorExit:
                     # user has cancelled the download, just stop now
@@ -528,6 +553,8 @@ class ExportFormatter(BaseExportFormatter):
             footer = self.footer()
             if footer:
                 yield footer
+
+            self.report_stats(row_count=self.row_count)
 
         response = StreamingHttpResponse(iter_allele_to_row(), content_type=self.content_type())
         modified_str = self.started.strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'

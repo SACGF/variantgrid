@@ -388,30 +388,12 @@ def export_classifications_grid(request):
     """
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'csv',
-            'refer': 'classification listing',
-            'approx_count': qs.count()
-        }
-    )
     return ExportFormatterCSV(user=request.user, genome_build=genome_build, qs=qs).export()
 
 
 def export_classifications_grid_redcap(request):
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'redcap',
-            'refer': 'classification listing',
-            'approx_count': qs.count()
-        }
-    )
     return ExportFormatterRedcap(user=request.user, genome_build=genome_build, qs=qs).export()
 
 

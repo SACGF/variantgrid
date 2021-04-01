@@ -92,6 +92,7 @@ class ExportFormatterCSV(ExportFormatter):
         writer = csv.writer(out, delimiter=',')
         for vcm, message in self.record_and_error():
             writer.writerow(self.to_row(None, vcm, message))
+            self.row_count += 1
 
         return out.getvalue()
 
