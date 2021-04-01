@@ -144,9 +144,10 @@ def notify_server_status():
     url = get_url_from_view_path(reverse('server_status')) + '?days=1'
 
     emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
-    nb = NotificationBuilder(message="Health Check", username="Health Check", emoji=emoji)
-    nb.add_markdown(f"*Health Check from* <{url}|{url}>\n\n")
-    nb.add_markdown("*Disk Usage*")
+    nb = NotificationBuilder(message="Health Check", emoji=emoji)
+    nb.add_header(f"Health Check")
+    nb.add_markdown(f"URL : <{url}|{url}>")
+    nb.add_markdown("*Disk usage*")
     disk_usage = list()
     for _, message in get_disk_messages(info_messages=True):
         disk_usage.append(f":floppy_disk: {message}")

@@ -1,7 +1,8 @@
 import json
 from logging import StreamHandler
 import logging
-from typing import Dict, Optional, List
+import socket
+from typing import Dict, Optional, List, Tuple, Any
 
 import requests
 import rollbar
@@ -78,26 +79,83 @@ def report_exc_info(extra_data=None, request=None):
 
 class NotificationBuilder:
 
-    def __init__(self, message: str, username: Optional[str], emoji: str = ":dna:"):
+    def __init__(self, message: str, emoji: str = ":dna:"):
         self.message = message
-        self.username = username
         self.emoji = emoji
         self.blocks = list()
         self.sent = False
+        self.fields: List[Tuple[str, Any]] = list()
+
+    def add_header(self, text) -> 'NotificationBuilder':
+        self._check()
+        self.blocks.append({
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": text,
+                "emoji": True
+            }
+        })
+        return self
+
+    def _check(self):
+        self._field_check()
+
+    def _field_check(self):
+        def as_field(field: Tuple[str, Any]):
+            return {
+                "type": "mrkdwn",
+                "text": f"*{field[0]}:*\n{field[1]}"
+            }
+
+        def add_field_list(fields: List[Tuple[str, Any]]):
+            if fields:
+                self.blocks.append({
+                    "type": "section",
+                    "fields": [as_field(field) for field in fields]
+                })
+
+        if fields := self.fields:
+            field_list = list()
+            for field in fields:
+                field_list.append(field)
+                if len(field_list) == 2:
+                    add_field_list(field_list)
+                    field_list = list()
+            add_field_list(field_list)
+            self.fields = list()
+
+    def add_field(self, label: str, value: str, single=False):
+        self.fields.append((label, value))
 
     def add_divider(self) -> 'NotificationBuilder':
+        self._check()
         self.blocks.append({"type": "divider"})
         return self
 
     def add_markdown(self, text, indented=False):
+        self._check()
         if indented:
             text = ">>> " + (text or "_No Data_")
         self.blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
         return self
 
     def send(self):
+        self._check()
         self.sent = True
-        send_notification(message=self.message, blocks=self.blocks, username=self.username, emoji=self.emoji)
+        if blocks := self.blocks:
+            env_name = socket.gethostname().lower().split('.')[0].replace('-', '')
+            blocks.append({
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": env_name,
+                        "emoji": False
+                    }
+                ]
+            })
+            send_notification(message=self.message, blocks=blocks, emoji=self.emoji)
 
     def __del__(self):
         if not self.sent:
@@ -117,7 +175,7 @@ def send_notification(message: str, blocks: Optional[Dict] = None, username: Opt
         if slack.get('enabled'):
             if admin_callback_url := slack.get('admin_callback_url'):
                 data = {
-                    "username": settings.SITE_NAME + (f" {username}" if username else ""),
+                    "username": (settings.SITE_NAME + (f" {username}" if username else "")).strip(),
                     "text": message,
                     "icon_emoji": emoji
                 }
