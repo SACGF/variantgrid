@@ -1,7 +1,10 @@
 from django.contrib.postgres.aggregates.general import StringAgg
+from django.db.models import TextField
 from django.db.models.aggregates import Count
+from django.db.models.functions import Cast
 from django.db.models.query_utils import Q
 
+from library.database_utils import queryset_to_sql
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
 from snpdb.models import UserGridConfig, DataState
@@ -40,31 +43,21 @@ class SequencingRunListGrid(JqGridUserRowConfig):
     model = SequencingRun
     caption = 'SequencingRuns'
     fields = ["name", "is_valid", "sequencer__sequencer_model__model", "sequencer__name",
-              "experiment__name",
-              "enrichment_kit__name",
-              "enrichment_kit__version",
-              "gold_standard",
-              "legacy",
-              "hidden",
-              "bad",
-              "vcffromsequencingrun__vcf__id",
-              "vcffromsequencingrun__vcf__import_status",
-              "path"]
-    colmodel_overrides = {'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
-                          "is_valid": {'formatter': 'formatSequencingRunValid'},
-                          'sequencer__name': {'width': 60, 'label': 'Sequencer'},
-                          'sequencer__sequencer_model__model': {'width': 70, 'label': 'Model'},
-                          'experiment__name': {'label': 'Experiment', 'width': 120},
-                          "enrichment_kit__name": {"label": "EnrichmentKit"},
-                          "enrichment_kit__version": {"label": "Kit version", 'width': 20},
-                          "gold_standard": {'label': 'Gold', 'width': 20, 'formatter': 'showGoldStandardIcon'},
-                          "legacy": {'label': 'Legacy', 'width': 20},
-                          "hidden": {'label': 'Hidden', 'width': 20, 'formatter': 'showHiddenIcon'},
-                          "bad": {'label': 'Bad', 'width': 20, 'formatter': 'showBadIcon'},
-                          "vcffromsequencingrun__vcf__id": {'label': 'VCF',
-                                                        'formatter': 'viewVCFLink',
-                                                        'width': 20},
-                          "vcffromsequencingrun__vcf__import_status": {'hidden': True}}
+              "experiment__name", "enrichment_kit__name", "enrichment_kit__version",
+              "gold_standard", "legacy", "hidden", "bad", "path"]
+    colmodel_overrides = {
+        'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
+        "is_valid": {'formatter': 'formatSequencingRunValid'},
+        'sequencer__name': {'width': 60, 'label': 'Sequencer'},
+        'sequencer__sequencer_model__model': {'width': 70, 'label': 'Model'},
+        'experiment__name': {'label': 'Experiment', 'width': 120},
+        "enrichment_kit__name": {"label": "EnrichmentKit"},
+        "enrichment_kit__version": {"label": "Kit version", 'width': 20},
+        "gold_standard": {'label': 'Gold', 'width': 20, 'formatter': 'showGoldStandardIcon'},
+        "legacy": {'label': 'Legacy', 'width': 20},
+        "hidden": {'label': 'Hidden', 'width': 20, 'formatter': 'showHiddenIcon'},
+        "bad": {'label': 'Bad', 'width': 20, 'formatter': 'showBadIcon'}
+    }
 
     def __init__(self, user, **kwargs):
         extra_filters = kwargs.get("extra_filters")
@@ -80,11 +73,17 @@ class SequencingRunListGrid(JqGridUserRowConfig):
         if not user_grid_config.show_hidden_data:
             queryset = queryset.filter(hidden=False)
 
-        # Add sample_count to queryset
-        queryset = queryset.annotate(sample_count=Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample"))
-        field_names = self.get_field_names() + ["sample_count"]
-        self.queryset = queryset.values(*field_names)
+        annotate = {
+            "sample_count": Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample"),
+            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), ',', ordering="vcffromsequencingrun"),
+            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", ',', ordering="vcffromsequencingrun"),
+            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", ',', ordering="vcffromsequencingrun"),
+        }
 
+        # Add sample_count to queryset
+        queryset = queryset.annotate(**annotate)
+        field_names = self.get_field_names() + list(annotate.keys())
+        self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'name',
                                   'sortorder': 'desc'})
 
@@ -92,6 +91,14 @@ class SequencingRunListGrid(JqGridUserRowConfig):
         colmodels = super().get_colmodels(*args, **kwargs)
         extra = {'index': 'sample_count', 'name': 'sample_count', 'label': 'Sample Count', 'sorttype': 'int', 'width': 20}
         colmodels = colmodels[:1] + [extra] + colmodels[1:]
+        vcf_extra = [
+            {'index': 'vcf_ids', 'name': 'vcf_ids', 'label': 'VCF', 'formatter': 'formatSequencingRunVCF',
+             'sorttype': 'int', 'width': 80},
+            {'index': 'vcf_variant_caller', 'hidden': True},
+            {'index': 'vcf_import_status', 'hidden': True},
+        ]
+        # Insert second to last
+        colmodels = colmodels[:-1] + vcf_extra + colmodels[-1:]
         return colmodels
 
 

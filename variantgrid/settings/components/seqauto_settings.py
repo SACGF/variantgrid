@@ -51,7 +51,15 @@ SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
 
 SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
 SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.hg38.vcf.gz"
-SEQAUTO_COMBINED_VCF_PATTERN = "%(sequencing_run)s.gatk.hg38.vcf.gz"
+SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {
+    "default": ["%(sequencing_run)s.gatk.hg38.vcf.gz"],
+    "idt_haem": [
+        "%(sequencing_run)s.gatk.hg38.vcf.gz",
+        "%(sequencing_run)s.freebayes.hg38.vcf.gz",
+        "%(sequencing_run)s.vardict.hg38.vcf.gz"
+    ],
+}
+
 SEQAUTO_GOI_LIST_PATTERN = "%(sequencing_run)s_%(sample_name)s.txt"
 
 SEQAUTO_QC_EXEC_SUMMARY_PATTERN = "exec_stats/%(sample_name)s_qc_summary.txt"

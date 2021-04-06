@@ -1,5 +1,10 @@
 import operator
+import os
+import re
 from collections import defaultdict
+from typing import Tuple
+
+import vcf
 
 
 class VCFConstant:
@@ -58,3 +63,27 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
         for vcf_record in vcf_tuples:
             line = "\t".join([str(s) for s in vcf_record]) + empty_columns
             f.write(line + "\n")
+
+
+def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
+    variant_caller = None
+    version = None
+
+    if os.path.exists(filename):
+        reader = vcf.Reader(filename=filename)
+
+        if source_list := reader.metadata.get("source"):
+            for source in source_list:
+                # Match source = "freeBayes v1.3.5" or "VarDict_v1.8.2"
+                if m := re.match(r"(.*?)[ _]v([\d\\.]+)", source):
+                    variant_caller, version = m.groups()
+                    break
+
+        if gatk_commandline := reader.metadata.get("GATKCommandLine"):
+            variant_caller = "GATK"
+            for commandline in gatk_commandline:
+                if version := commandline.get("Version"):
+                    version = version.replace('"', "")  # Strip quotes
+                break
+
+    return variant_caller, version

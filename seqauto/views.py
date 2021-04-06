@@ -162,15 +162,6 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
 
             sequencing_run = sequencing_run_form.save()
 
-    vcf = None
-    can_view_vcf = False
-    try:
-        vcf = sequencing_run.vcffromsequencingrun.vcf
-        read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
-        can_view_vcf = request.user.has_perm(read_perm, vcf)
-    except:
-        pass
-
     if not sequencing_run.is_valid:  # Had errors
         sequencing_run.save()  # Try again now
         if sequencing_run.is_valid:
@@ -179,11 +170,18 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
 
     sequencing_run.add_messages(request)
 
-    context = {"sequencing_run": sequencing_run,
-               "sequencing_run_form": sequencing_run_form,
-               'tab_id': tab_id,
-               'vcf': vcf,
-               'can_view_vcf': can_view_vcf}
+    run_vcfs = []
+    try:
+        for vcf_for_run in sequencing_run.vcffromsequencingrun_set.all():
+            run_vcfs.append((vcf_for_run.variant_caller, vcf_for_run.vcf, vcf_for_run.vcf.can_view(request.user)))
+    except:
+        log_traceback()
+    context = {
+        "sequencing_run": sequencing_run,
+        "sequencing_run_form": sequencing_run_form,
+        'tab_id': tab_id,
+        'run_vcfs': run_vcfs
+    }
 
     try:  # May not have sample sheet and die
         sample_sheet = sequencing_run.get_current_sample_sheet()

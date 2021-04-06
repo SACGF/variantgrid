@@ -15,8 +15,8 @@ import traceback
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant,\
     cyvcf2_get_contig_lengths_dict
-from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, \
-    VCFFromSequencingRun, SampleFromSequencingSample, QCGeneList
+from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
+    SampleFromSequencingSample, QCGeneList
 from seqauto.signals import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
     Cohort, CohortSample, UserSettings, VCFSourceSettings
@@ -309,15 +309,17 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
         vcf.save()
 
         try:
-            pfsr = VCFFromSequencingRun.objects.get(sequencing_run=sequencing_run)
-            if replace_existing or pfsr.vcf.import_status in ImportStatus.DELETION_STATES:
-                pfsr.vcf = vcf  # OK to replace
-                pfsr.save()
+            vfsr = VCFFromSequencingRun.objects.get(vcf=vcf)
+            if replace_existing or vfsr.vcf.import_status in ImportStatus.DELETION_STATES:
+                vfsr.vcf = vcf  # OK to replace
+                vfsr.save()
             else:
-                logging.warning("SR %s already linked to non-deleting vcf: %s (%s/%s)", sequencing_run, pfsr.vcf, pfsr.vcf.pk, pfsr.vcf.import_status)
+                logging.warning("SR %s already linked to non-deleting vcf: %s (%s/%s)", sequencing_run,
+                                vfsr.vcf, vfsr.vcf.pk, vfsr.vcf.import_status)
         except VCFFromSequencingRun.DoesNotExist:
             VCFFromSequencingRun.objects.create(vcf=vcf,
-                                                sequencing_run=sequencing_run)
+                                                sequencing_run=sequencing_run,
+                                                variant_caller=backend_vcf.variant_caller)
 
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
 
