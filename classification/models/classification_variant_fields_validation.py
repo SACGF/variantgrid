@@ -67,6 +67,11 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:
             for evidence_key, variant_value in variant_values.items():
                 try:
                     if evidence_key in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:
+                        # see if we even have a chance with the transcript type before submitting
+                        if not Classification.is_supported_transcript(evidence_key):
+                            vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message='Transcript type not yet supported')
+                            continue
+
                         variant_tuple = hgvs_matcher.get_variant_tuple(variant_value)
                     elif evidence_key == SpecialEKeys.VARIANT_COORDINATE:
                         variant_tuple = Variant.get_tuple_from_string(variant_value, genome_build)

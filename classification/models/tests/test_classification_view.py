@@ -1,3 +1,5 @@
+import json
+
 from django.test import TestCase, RequestFactory, override_settings
 
 from classification.enums import EvidenceKeyValueType, SubmissionSource
@@ -52,13 +54,9 @@ class ClassificationTestCaseViews(TestCase):
         }).data
         # pop all the values which are database id/time based
         # all remaining values should be the same everytime
-        response.pop("id")
-        response.pop("flag_collection")
-        response.pop("lab_record_id")
-        response.pop("last_edited")
-        response.pop("published_version")
-        response.pop("title")
-        response.pop("version")
+        pop_me = ["id", "flag_collection", "lab_record_id", "last_edited", "published_version", "title", "version", "resolved_condition"]
+        for pop_key in pop_me:
+            response.pop(pop_key)
 
         expected = {
             "can_write": True,
@@ -174,6 +172,9 @@ class ClassificationTestCaseViews(TestCase):
             },
             "publish": "lab"
         })
+        # now in test mode we always return all data (for the sake of useful information when testing)
+        response_json = response.data
+        response_json.pop('data')
         expected = {
             'id': None,
             'lab_record_id': 'test_123456',
@@ -183,6 +184,7 @@ class ClassificationTestCaseViews(TestCase):
             'title': 'instx/labby/test_123456',
             'publish_level': 'lab',
             'published_version': None,
+            'resolved_condition': None,
             'version_is_published': None,
             'version_publish_level': 'lab',
             'can_write': False,
@@ -197,7 +199,7 @@ class ClassificationTestCaseViews(TestCase):
             'patch_messages': [{'code': 'test_mode', 'message': 'Test mode on, no changes have been saved'}]}
 
         self.maxDiff = None
-        self.assertEqual(response.data, expected)
+        self.assertEqual(response_json, expected)
 
     @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
     def test_bulk(self):

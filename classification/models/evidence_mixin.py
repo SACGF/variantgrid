@@ -20,11 +20,20 @@ class VCDbRefDict(TypedDict, total=False):
     internal_id: int
 
 
+class VCValidation(TypedDict, total=True):
+    severity: str
+    code: str
+    message: str
+    options: Optional[Any]
+
+
 class VCBlobDict(TypedDict, total=False):
     value: Any
     note: str
     explain: str
+    immutable: str
     db_refs: List[VCDbRefDict]
+    validation: List[VCValidation]
 
 
 VCStoreValue = VCBlobDict

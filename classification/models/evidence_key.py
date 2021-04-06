@@ -7,6 +7,7 @@ from lazy import lazy
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set
 import re
 
+from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
 from library.utils import empty_to_none
 from snpdb.models import VariantGridColumn, Lab
@@ -80,20 +81,20 @@ class EvidenceKey(TimeStampedModel):
 
         return lower_key + suffix_str
 
-    def matched_options(self, normalValueObj) -> List[Dict[str, str]]:
+    def matched_options(self, normal_value_obj) -> List[Dict[str, str]]:
         """
         Given a value (or possibly list of values) generate or find the options that match.
         e.g. for the value ["maternal","xsdfdwerew"] for variant inheritance we'd get
         [{"key":"maternal", "value":"Maternal"}, {"key":"xsdfdwerew", "label":"xsdfdwerew"}]
         With he fist one being the result of a match, and the second on being the result of not being matched
-        :param normalValueObj: A value or dict with a key value
+        :param normal_value_obj: A value or dict with a key value
         :return: A list of options that matched
         """
         value = None
-        if isinstance(normalValueObj, Mapping):
-            value = normalValueObj.get('value')
+        if isinstance(normal_value_obj, Mapping):
+            value = normal_value_obj.get('value')
         else:
-            value = normalValueObj
+            value = normal_value_obj
 
         options = self.virtual_options
         if options is not None and len(options) > 0:
@@ -214,7 +215,7 @@ class EvidenceKey(TimeStampedModel):
         for option in self.virtual_options:
             if option_key in option and option[option_key] == val:
                 return option.get('key')
-        #couldnt match
+        # couldnt match
         return val
 
     def pretty_value(self, normalValueObj: Any, dash_for_none: bool = False) -> Optional[str]:
@@ -350,7 +351,7 @@ class EvidenceKeyMap:
         for evidence_key in self.all_keys:
             self.key_dict[evidence_key.key] = evidence_key
 
-        #update keys to have overridden values
+        # update keys to have overridden values
         if lab:
             merged = EvidenceKey.merge_config(lab.classification_config, lab.organization.classification_config)
             if 'namespaces' in merged:
@@ -423,7 +424,7 @@ class VCDataCell:
     here will automatically be applied back to the data
     """
 
-    def __init__(self, data: Dict[str, Any], e_key: EvidenceKey):
+    def __init__(self, data: VCPatch, e_key: EvidenceKey):
         self.data = data
         self.e_key = e_key
 
@@ -431,10 +432,10 @@ class VCDataCell:
         return f'"{self.e_key.key}": {str(self.raw)}'
 
     @property
-    def _my_data(self) -> Dict[str, Any]:
+    def _my_data(self) -> VCBlobDict:
         return self.data.get(self.e_key.key) or {}
 
-    def _ensure_my_data(self) -> Dict[str, Any]:
+    def _ensure_my_data(self) -> VCBlobDict:
         existing = self.data.get(self.e_key.key)
         if existing is None:
             existing = {}
@@ -442,15 +443,15 @@ class VCDataCell:
         return existing
 
     @property
-    def raw(self) -> Optional[Dict[str, Any]]:
+    def raw(self) -> VCPatchValue:
         """
         What is being stored in the dictionary for this key,
-        note both missing from the dictionary or being None in the dictioanry will both return None
+        note both missing from the dictionary or being None in the dictionary will both return None
         """
         return self.data.get(self.e_key.key)
 
     @raw.setter
-    def raw(self, value):
+    def raw(self, value: VCPatchValue):
         self.data[self.e_key.key] = value
 
     @property
@@ -505,6 +506,9 @@ class VCDataCell:
         elif mode == WipeMode.ATTRIBUTES_TO_NONE:
             self.raw = dict({'value': None, 'explain': None, 'note': None})
 
+    def clear_validation(self):
+        self.raw.pop('validation', None)
+
     @property
     def value(self) -> Any:
         return self._my_data.get('value')
@@ -530,11 +534,11 @@ class VCDataCell:
         self._ensure_my_data()['note'] = value
 
     @property
-    def db_refs(self) -> Optional[List]:
+    def db_refs(self) -> Optional[List[VCDbRefDict]]:
         return self._my_data.get('db_refs')
 
     @db_refs.setter
-    def db_refs(self, db_refs: Optional[List]):
+    def db_refs(self, db_refs: Optional[List[VCDbRefDict]]):
         self._ensure_my_data()['db_refs'] = db_refs
 
     def strip_non_client_submission(self):
@@ -617,7 +621,7 @@ class VCDataCell:
         """
         VCDataDict.add_validation(self._ensure_my_data(), code=code, severity=severity, message=message, options=options)
 
-    def has_validiation_code(self, code: str) -> bool:
+    def has_validation_code(self, code: str) -> bool:
         """
         Returns true if there's a validation message with the given code
         """

@@ -15,14 +15,22 @@ class ClassificationTestUtils:
             group_name='instx'
         )
         org.save()
-        lab = Lab(
+        lab = Lab.objects.create(
             name='Labby',
             organization=org,
             city='CityA',
             country='CountryA',
             group_name='instx/labby'
         )
-        lab.save()
+
+        ext_lab = Lab.objects.create(
+            external=True,
+            name='External',
+            organization=org,
+            city='CityB',
+            country='CountryB',
+            group_name='instx/ext'
+        )
 
         user = User(
             username='joejoe',
@@ -38,14 +46,20 @@ class ClassificationTestUtils:
         )
         user.save()
         user.groups.add(lab.group)
+        user.groups.add(ext_lab.group)
         user.save()
 
     @staticmethod
     def tearDown():
         Lab.objects.filter(group_name='instx/labby').delete()
+        Lab.objects.filter(group_name='instx/ext').delete()
         User.objects.filter(username__in=['joejoe', 'joejoe2']).delete()
         Classification.objects.all().delete()
 
     @staticmethod
     def lab_and_user() -> Tuple[Lab, User]:
         return Lab.objects.filter(group_name='instx/labby').get(), User.objects.filter(username='joejoe').get()
+
+    @staticmethod
+    def external_lab_and_user() -> Tuple[Lab, User]:
+        return Lab.objects.filter(group_name='instx/ext').get(), User.objects.filter(username='joejoe').get()

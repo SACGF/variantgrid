@@ -19,7 +19,7 @@ from snpdb.models import Lab, GenomeBuild
 from snpdb.models.models_enums import ImportSource
 from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
 from classification.models import ClassificationRef, ClassificationImport, \
-    ClassificationJsonParams, PatchMeta
+    ClassificationJsonParams, PatchMeta, Classification
 from classification.models.evidence_mixin import EvidenceMixin, VCStore
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification import ClassificationProcessError, \
@@ -42,16 +42,12 @@ class BulkInserter:
 
         self.force_publish = force_publish
 
-    SUPPORTED_TRANSCRIPTS = {"NM", "ENST"}
-
     def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
+        """
+        Returns the ClassificationImport record taht a classification should attach to to have its variant processed
+        """
         if transcript:
-            supported_transcript = False
-            for transcript_type in BulkInserter.SUPPORTED_TRANSCRIPTS:
-                if transcript.startswith(transcript_type):
-                    supported_transcript = True
-                    break
-            if not supported_transcript:
+            if not Classification.is_supported_transcript(transcript):
                 report_message(message="Unsupported transcript type imported - will not attempt variant match", extra_data={"transcript": transcript})
                 return None
 
