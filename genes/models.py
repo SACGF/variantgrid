@@ -598,7 +598,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return identifier, version
 
     @staticmethod
-    def transcript_versions_by_id(genome_build: GenomeBuild = None, annotation_consortium=None) -> Dict[str, Dict[str, 'TranscriptVersion']]:
+    def transcript_versions_by_id(genome_build: GenomeBuild = None, annotation_consortium=None) -> \
+            Dict[str, Dict[str, int]]:
+        """ {transcript_id: {1: PK of TranscriptVersion.1, 2: PK of TranscriptVersion.2} """
         filter_kwargs = {}
         if genome_build:
             filter_kwargs["genome_build"] = genome_build
