@@ -224,7 +224,7 @@ div.json {
         {% labelled label="Lab" %}
             <select id="lab" class="form-control">
                 {% for lab in labs %}
-                <option value="{{lab.group_name}}">{{lab.name}}</option>
+                <option value="{{lab.group_name}}" {% if lab == selected_lab %}selected="selected"{% endif %}>{{lab.name}}</option>
                 {% endfor %}
             </select>
         {% endlabelled %}

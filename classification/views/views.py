@@ -376,8 +376,20 @@ def classification_qs(request):
 
 def classification_import_tool(request: HttpRequest) -> Response:
     EKeyFormSet = formset_factory(EvidenceKeyForm, extra=3)
+    all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
+    selected_lab = None
+    if len(all_labs) == 1:
+        selected_lab = all_labs[0]
+    else:
+        # choose the first test lab for import to process on
+        for lab in all_labs:
+            if 'test' in lab.name.lower():
+                selected_lab = lab
+                break
+
     context = {
-        "labs": Lab.valid_labs_qs(request.user)
+        "labs": all_labs,
+        "selected_lab": selected_lab
     }
     return render(request, 'classification/classification_import_tool.html', context)
 
