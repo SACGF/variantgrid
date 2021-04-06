@@ -79,10 +79,6 @@
         .grid-link-icon {
             display: inline-block;
         }
-
-</style>
-
-		
 	</style>
 	
 {% endblock %}
@@ -158,30 +154,40 @@
 
 	<table id='sequencing-run-details'>
     <tr><th>Path:
-    <td>
-        {% if sequencing_run.data_state == 'D' %}
-            <span id='deleted-path'>{{ sequencing_run.path }}</span> (This directory has been deleted)
-        {% else %}
-            {{ sequencing_run.path }}
-        {% endif %}
-    </td>
-    <tr><th>BaseCall Data:</th> <td>{{ sequencing_run.has_basecalls|yesno:"Exists,Deleted" }}</td>
+        <td>
+            {% if sequencing_run.data_state == 'D' %}
+                <span id='deleted-path'>{{ sequencing_run.path }}</span> (This directory has been deleted)
+            {% else %}
+                {{ sequencing_run.path }}
+            {% endif %}
+        </td>
+    </tr>
+    <tr>
+        <th>BaseCall Data:</th>
+        <td>{{ sequencing_run.has_basecalls|yesno:"Exists,Deleted" }}</td>
+    </tr>
     {% if sequencing_run.enrichment_kit %}
-    <tr><th>Enrichment Kit:</th>
-    <td><a href="{% url 'view_enrichment_kit' sequencing_run.enrichment_kit.pk %}">{{ sequencing_run.enrichment_kit }}</a>
-        {% if sequencing_run.gold_standard %}
-            - (<div class="grid-link-icon gold-standard-icon"></div> <span class='gold-standard'>Gold Standard Run</span>)
-        {% endif %}
-    </td>
+    <tr>
+        <th>Enrichment Kit:</th>
+        <td><a href="{% url 'view_enrichment_kit' sequencing_run.enrichment_kit.pk %}">{{ sequencing_run.enrichment_kit }}</a>
+            {% if sequencing_run.gold_standard %}
+                - (<div class="grid-link-icon gold-standard-icon"></div> <span class='gold-standard'>Gold Standard Run</span>)
+            {% endif %}
+        </td>
+    </tr>
     {% endif %}
-    {% if vcf %}
-        <tr><th>VCF:<td>
-        {% if can_view_vcf %} 
-        <a href="{% url 'view_vcf' vcf.pk %}"><div class='vcf-icon'></div>{{ vcf }}</a>
-        {% else %}
-        <div title="You don't have permission to view this VCF" class='vcf-icon'></div>{{ vcf }}
-        {% endif %}
-    {% endif %}
+    {% for variant_caller, vcf, can_view in run_vcfs %}
+        <tr>
+            <th>{{ variant_caller.name }} VCF:</th>
+            <td>
+                {% if can_view %}
+                    <a href="{% url 'view_vcf' vcf.pk %}"><div class='vcf-icon'></div>{{ vcf }}</a>
+                {% else %}
+                    <div title="You don't have permission to view this VCF" class='vcf-icon'></div>{{ vcf }}
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
 	</table>
 
 	<div id="sequencing-run-tabs">
@@ -306,7 +312,7 @@
             {% if sample_sheet.samplesheetcombinedvcffile_set.exists %}
                 <ul><b>Combined VCF files</b> 
                 {% for combo_vcf in sample_sheet.samplesheetcombinedvcffile_set.all %}
-                    <li><a href="{% url 'view_combo_vcf_file' combo_vcf.pk %}">{{ combo_vcf }}</a>
+                    <li class='seqauto-record vcf-file data-state-{{ combo_vcf.data_state }}'><a href="{% url 'view_combo_vcf_file' combo_vcf.pk %}">{{ combo_vcf }}</a>
                 {% endfor %}
                 </ul>        
             {% endif %}
