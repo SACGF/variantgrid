@@ -31,7 +31,7 @@ from library.file_utils import file_md5sum, mk_path, name_from_filename
 from library.log_utils import get_traceback, report_message
 from patients.models import PatientRecords
 from pedigree.models import PedFile
-from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample
+from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, GenomicIntervalsCollection, \
     Variant, SoftwareVersion, Sample, GenomeBuild
@@ -485,6 +485,11 @@ class BackendVCF(models.Model):
     @property
     def vcf(self):
         return self.uploaded_vcf.vcf
+
+    @property
+    def variant_caller(self) -> VariantCaller:
+        record = self.vcf_file or self.combo_vcf
+        return record.variant_caller
 
     def get_samples_by_sequencing_sample(self):
         return get_samples_by_sequencing_sample(self.filesystem_vcf.sample_sheet, self.vcf)

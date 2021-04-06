@@ -1,14 +1,15 @@
 from django.template import Library
 
+from seqauto.models import VCFFromSequencingRun
+
 register = Library()
 
 
 @register.inclusion_tag("snpdb/tags/vcf_history_trail.html", takes_context=True)
 def vcf_history_trail(context, vcf):
-    sequencing_run = None
     try:
         sequencing_run = vcf.vcffromsequencingrun.sequencing_run
-    except:
+    except VCFFromSequencingRun.DoesNotExist:
         sequencing_run = None
 
     user = context["user"]

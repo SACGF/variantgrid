@@ -1,6 +1,6 @@
 import pathlib
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from django.conf import settings
 from django.contrib import messages
@@ -19,17 +19,20 @@ import os
 import re
 import shutil
 
+from lazy import lazy
+
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
     Transcript, GeneSymbol, SampleGeneList
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
 from library.utils import sorted_nicely
+from library.vcf_utils import get_variant_caller_and_version_from_vcf
 from patients.models import FakeData
 from seqauto.illumina import illuminate_report
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
-from seqauto.models.models_software import Aligner, VariantCaller, get_fake_variant_caller
+from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd, \
     SequencingFileType, JobScriptStatus, SeqAutoRunStatus, EnrichmentKitType
 from seqauto.qc.exec_summary import load_exec_summary
@@ -446,8 +449,13 @@ class SampleFromSequencingSample(models.Model):
 
 
 class VCFFromSequencingRun(models.Model):
+    """ This object exists so it's easy to build VCF links on the sequencing list grid """
     vcf = models.OneToOneField(VCF, on_delete=CASCADE)
-    sequencing_run = models.OneToOneField(SequencingRun, on_delete=CASCADE)
+    sequencing_run = models.ForeignKey(SequencingRun, on_delete=CASCADE)
+    variant_caller = models.ForeignKey(VariantCaller, null=True, on_delete=SET_NULL)
+
+    class Meta:
+        unique_together = ("sequencing_run", "variant_caller")
 
 
 class IlluminaFlowcellQC(SeqAutoRecord):
@@ -794,10 +802,6 @@ class VCFFile(SeqAutoRecord):
         vcf_path = pattern % bam.get_params()
         return os.path.abspath(vcf_path)
 
-    @staticmethod
-    def get_variant_caller_from_vcf_file(vcf_path):
-        return get_fake_variant_caller()
-
     def __str__(self):
         return f"VCF {self.name} ({self.get_data_state_display()})"
 
@@ -822,28 +826,32 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
             up = None
         return up
 
+    @lazy
+    def vcf(self) -> Optional[VCF]:
+        try:
+            VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)
+        except VCF.DoesNotExist:
+            return None
+
     def load_from_file(self, seqauto_run, **kwargs):
         if not settings.SEQAUTO_IMPORT_COMBO_VCF:
             raise DontAutoLoadException()
 
-        try:
-            vcf = VCF.objects.filter(uploadedvcf__uploaded_file__path=self.path)
-            if vcf.exists():
-                try:
-                    from upload.models import UploadedVCF
-                    from upload.vcf.vcf_import import create_backend_vcf_links
+        if self.vcf:
+            # Already exists! Make sure it's linked but don't reload
+            try:
+                from upload.models import UploadedVCF
+                from upload.vcf.vcf_import import create_backend_vcf_links
 
-                    uploaded_vcf = UploadedVCF.objects.filter(uploaded_file__path=self.path).get()
-                    create_backend_vcf_links(uploaded_vcf)
-                except:
-                    log_traceback()
+                uploaded_vcf = UploadedVCF.objects.filter(uploaded_file__path=self.path).get()
+                create_backend_vcf_links(uploaded_vcf)
+            except:
+                log_traceback()
 
-                # Re-linking SequencingRun / backend VCF will be done manually in view_sequencing_run
-                # "Assign data to most recent sample sheet" button
-                logging.info("Skipping loading of %s as vcf named already exists!", self.path)
-                raise DontAutoLoadException()
-        except VCF.DoesNotExist:
-            pass
+            # Re-linking SequencingRun / backend VCF will be done manually in view_sequencing_run
+            # "Assign data to most recent sample sheet" button
+            logging.info("Skipping loading of %s as vcf named already exists!", self.path)
+            raise DontAutoLoadException()
 
         import_filesystem_vcf(self.path, self.name, ImportSource.SEQAUTO)
 
@@ -851,7 +859,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         try:
             _ = self.backendvcf  # if no exception we can link it
             try:
-                self.sample_sheet.sequencing_run.vcffromsequencingrun
+                _ = self.backendvcf.vcf.vcffromsequencingrun
             except VCFFromSequencingRun.DoesNotExist:
                 return True
         except:
@@ -863,7 +871,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         enrichment_kit = sample_sheet.sequencing_run.enrichment_kit
         pattern_list = None
         if enrichment_kit:
-            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT[enrichment_kit.name]
+            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(enrichment_kit.name)
 
         if pattern_list is None:
             pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT["default"]
@@ -874,15 +882,9 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
             paths.append(os.path.abspath(combo_path))
         return paths
 
-    @staticmethod
-    def get_variant_caller_from_vcf_file(vcf_path):
-        # The GATK file has multiple entries for "source" and it only calls it
-
-        return get_fake_variant_caller()
-
     def __str__(self):
         num_samples = self.sample_sheet.sequencingsample_set.all().count()
-        return f"ComboVCF ({self.pk}) for {self.sample_sheet.sequencing_run} ({num_samples} samples)"
+        return f"{self.variant_caller} ComboVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
 
 
 class QC(SeqAutoRecord):
@@ -1285,3 +1287,12 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
     unique_gene_coverage_qs = gene_symbol.genecoveragecanonicaltranscript_set.filter(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
     unique_gene_coverage_qs = unique_gene_coverage_qs.distinct("gene_coverage_collection")
     return unique_gene_coverage_qs.filter(percent_20x__gte=min_coverage).count()
+
+
+def get_variant_caller_from_vcf_file(vcf_path):
+    variant_caller, version = get_variant_caller_and_version_from_vcf(vcf_path)
+    if variant_caller is None:
+        variant_caller = "Unknown Variant Caller"
+        version = -1
+
+    return VariantCaller.objects.get_or_create(name=variant_caller, version=version)[0]

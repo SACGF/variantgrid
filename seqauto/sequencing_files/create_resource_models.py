@@ -20,8 +20,8 @@ from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
     UnalignedReads, BamFile, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
-    DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SampleFromSequencingSample, \
-    VCFFromSequencingRun, get_samples_by_sequencing_sample, QCGeneList, QCGeneCoverage, SeqAutoMessage, SeqAutoRecord
+    DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SampleFromSequencingSample, QCGeneList, \
+    get_samples_by_sequencing_sample, QCGeneCoverage, SeqAutoMessage, SeqAutoRecord, get_variant_caller_from_vcf_file
 from snpdb.models import DataState
 from seqauto.models.models_enums import SequencingFileType
 from seqauto.signals import sequencing_run_current_sample_sheet_changed_signal, sequencing_run_created_signal, \
@@ -220,37 +220,34 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
 
     if not meaningfully_changed:
         # Can go through and update models etc...
-        try:
-            # Update samples from sequencing sample
-            vcf = sequencing_run.vcffromsequencingrun.vcf
-            # TODO: Raise some kind of manual task here to fix things???
+        # Update samples from sequencing sample
+        for combo_vcf in sequencing_run.samplesheetcombinedvcffile_set.all():
+            if vcf := combo_vcf.vcf:
+                # TODO: Raise some kind of manual task here to fix things???
 
-            def _get_samples_by_sequencing_sample_id(sample_sheet):
-                return {ss.sample_id: s for ss, s in get_samples_by_sequencing_sample(sample_sheet, vcf).items()}
+                def _get_samples_by_sequencing_sample_id(sample_sheet):
+                    return {ss.sample_id: s for ss, s in get_samples_by_sequencing_sample(sample_sheet, vcf).items()}
 
-            old_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(old_sample_sheet)
-            new_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(new_sample_sheet)
+                old_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(old_sample_sheet)
+                new_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(new_sample_sheet)
 
-            for sequencing_sample_id, sample in old_samples_by_sequencing_sample_id.items():
-                new_sample = new_samples_by_sequencing_sample_id[sequencing_sample_id]
-                try:
-                    new_ss = new_sample.samplefromsequencingsample.sequencing_sample
-                except SampleFromSequencingSample.DoesNotExist:
-                    # Does this matter? maybe vcf wasn't imported etc...
-                    logging.info("There was no SampleFromSequencingSample for sample %s", new_sample)
-                    continue
+                for sequencing_sample_id, sample in old_samples_by_sequencing_sample_id.items():
+                    new_sample = new_samples_by_sequencing_sample_id[sequencing_sample_id]
+                    try:
+                        new_ss = new_sample.samplefromsequencingsample.sequencing_sample
+                    except SampleFromSequencingSample.DoesNotExist:
+                        # Does this matter? maybe vcf wasn't imported etc...
+                        logging.info("There was no SampleFromSequencingSample for sample %s", new_sample)
+                        continue
 
-                try:
-                    sfss = sample.samplefromsequencingsample
-                    sfss.sequencing_sample = new_ss
-                    sfss.save()
-                    logging.info("Updated SampleFromSequencingSample with %s", new_ss)
-                except SampleFromSequencingSample.DoesNotExist:
-                    # Does this matter? maybe vcf wasn't imported etc...
-                    logging.info("There was no SampleFromSequencingSample for sample %s", sample)
-
-        except VCFFromSequencingRun.DoesNotExist:
-            pass
+                    try:
+                        sfss = sample.samplefromsequencingsample
+                        sfss.sequencing_sample = new_ss
+                        sfss.save()
+                        logging.info("Updated SampleFromSequencingSample with %s", new_ss)
+                    except SampleFromSequencingSample.DoesNotExist:
+                        # Does this matter? maybe vcf wasn't imported etc...
+                        logging.info("There was no SampleFromSequencingSample for sample %s", sample)
 
         # Update downstream models
         old_samples_by_name = old_sample_sheet.get_sequencing_samples_by_name()
@@ -803,7 +800,7 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
                 vcf_file.save()
         else:
             if DataState.should_create_new_record(data_state):
-                variant_caller = VCFFile.get_variant_caller_from_vcf_file(vcf_path)
+                variant_caller = get_variant_caller_from_vcf_file(vcf_path)
                 vcf_file = VCFFile.objects.create(sequencing_run=bam_file.sequencing_run,
                                                   bam_file=bam_file,
                                                   path=vcf_path,
@@ -851,7 +848,7 @@ def process_combo_vcfs(seqauto_run, existing_files, results):
                     combined_vcf_file.save()
             else:
                 if DataState.should_create_new_record(data_state):
-                    variant_caller = SampleSheetCombinedVCFFile.get_variant_caller_from_vcf_file(vcf_path)
+                    variant_caller = get_variant_caller_from_vcf_file(vcf_path)
                     combined_vcf_file = SampleSheetCombinedVCFFile.objects.create(sequencing_run=sequencing_run,
                                                                                   sample_sheet=sample_sheet,
                                                                                   path=vcf_path,
