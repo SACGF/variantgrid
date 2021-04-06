@@ -453,7 +453,7 @@ def create_variant_for_allele(request, allele_id, genome_build_name):
 
 
 def get_genes_canonical_transcripts(variant, annotation_version):
-    """ returns dict of list of (enrichment kit description, original_transcript_id) """
+    """ returns dict of list of (enrichment kit description, original_transcript) """
 
     vav = annotation_version.variant_annotation_version
     vst_anno = variant.varianttranscriptannotation_set.filter(version=vav)
@@ -466,7 +466,7 @@ def get_genes_canonical_transcripts(variant, annotation_version):
                 description = str(enrichment_kit)
                 if ct.collection == default_canonical_transcript_collection:
                     description += " (default)"
-                genes_canonical_transcripts[gene_symbol].append((description, ct.original_transcript_id))
+                genes_canonical_transcripts[gene_symbol].append((description, ct.original_transcript))
 
     return dict(genes_canonical_transcripts)
 

@@ -241,7 +241,7 @@ class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
 class CanonicalTranscriptGrid(JqGridUserRowConfig):
     model = CanonicalTranscript
     caption = 'CanonicalTranscripts'
-    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript_id"]
+    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript"]
     colmodel_overrides = {'gene_symbol__symbol': {'label': "Matched Symbol"},
                           'transcript__identifier': {'label': "Matched Transcript"}}
 

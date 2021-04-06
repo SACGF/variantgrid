@@ -1319,8 +1319,9 @@ class CanonicalTranscript(models.Model):
     collection = models.ForeignKey(CanonicalTranscriptCollection, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=CASCADE)
     original_gene_symbol = models.TextField()
-    original_transcript_id = models.TextField()
+    original_transcript = models.TextField()
 
 
 class GeneCoverageCollection(models.Model):
@@ -1392,21 +1393,24 @@ class GeneCoverageCollection(models.Model):
                 "gene_symbol_id": gene_symbol_id,
             }
             kwargs.update(row.to_dict())
-            gene_coverage = GeneCoverage(**kwargs)
-            gene_coverage_list.append(gene_coverage)
+            if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_ALL:
+                gene_coverage = GeneCoverage(**kwargs)
+                gene_coverage_list.append(gene_coverage)
 
-            if transcript_id in original_canonical_transcript_ids:
-                kwargs["canonical_transcript_collection"] = canonical_transcript_collection
-                gene_coverage_canonical = GeneCoverageCanonicalTranscript(**kwargs)
-                gene_coverage_canonical_list.append(gene_coverage_canonical)
+            if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
+                if transcript_id in original_canonical_transcript_ids:
+                    kwargs["canonical_transcript_collection"] = canonical_transcript_collection
+                    gene_coverage_canonical = GeneCoverageCanonicalTranscript(**kwargs)
+                    gene_coverage_canonical_list.append(gene_coverage_canonical)
 
         if gene_coverage_list:
             GeneCoverage.objects.bulk_create(gene_coverage_list)
 
-        if gene_coverage_canonical_list:
-            GeneCoverageCanonicalTranscript.objects.bulk_create(gene_coverage_canonical_list)
-        else:
-            logging.warning("GeneCoverage had no canonical transcripts")
+        if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
+            if gene_coverage_canonical_list:
+                GeneCoverageCanonicalTranscript.objects.bulk_create(gene_coverage_canonical_list)
+            else:
+                logging.warning("GeneCoverage had no canonical transcripts")
 
         logging.info("%d missing genes, %d missing transcripts", missing_genes, missing_transcripts)
         return warnings

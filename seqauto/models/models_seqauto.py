@@ -22,7 +22,7 @@ import shutil
 from lazy import lazy
 
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
-    Transcript, GeneSymbol, SampleGeneList
+    Transcript, GeneSymbol, SampleGeneList, TranscriptVersion
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
@@ -1176,8 +1176,9 @@ class GoldCoverageSummary(models.Model):
     gold_reference = models.ForeignKey(GoldReference, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=CASCADE)
     original_gene_symbol = models.TextField()
-    original_transcript_id = models.TextField()
+    original_transcript = models.TextField()
     mean = models.FloatField()
     standard_error = models.FloatField()
     min_mean = models.FloatField()

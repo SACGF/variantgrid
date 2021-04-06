@@ -66,6 +66,8 @@ SEQAUTO_QC_EXEC_SUMMARY_PATTERN = "exec_stats/%(sample_name)s_qc_summary.txt"
 SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN = "exec_stats/%(sample_name)s_stats.txt"
 SEQAUTO_QC_GENE_COVERAGE_PATTERN = "bam_stats/samples/%(sample_name)s.per_gene_coverage.tsv.gz"
 
+SEQAUTO_QC_GENE_COVERAGE_STORE_ALL = False
+SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL = True
 
 SEQAUTO_JOB_SCRIPTS_BASE_DIR = os.path.join(PRIVATE_DATA_ROOT, "job_scripts")
 SEQAUTO_JOB_SCRIPTS_OUT_DIR = os.path.join(SEQAUTO_JOB_SCRIPTS_BASE_DIR, "out")

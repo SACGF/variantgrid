@@ -69,9 +69,9 @@ def create_canonical_gene_coverage_for_enrichment_kit(enrichment_kit_id):
     #    logging.info("Skipping %d already calculated", num_already_calculated)
 
     for cc in coverage_collection_qs.exclude(already_calculated_q):
-        transcript_ids, original_transcript_ids = canonical_transcripts
+        transcript_ids, original_transcript = canonical_transcripts
         qt = Q(transcript_id__in=transcript_ids)
-        qrefseq = Q(original_transcript_id__in=original_transcript_ids)
+        qrefseq = Q(original_transcript__in=original_transcript)
         qs = cc.genecoverage_set.filter(qt | qrefseq)
         if qs.exists():
             #logging.info("Getting GeneCoverage records for %s", cc)

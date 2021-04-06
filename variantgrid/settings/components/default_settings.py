@@ -340,7 +340,7 @@ CELERY_ENABLED = True
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = []
 # Fields must be from GoldCoverageSummary and COLUMNS + LABELS must line up!
 GENE_GRID_ENRICHMENT_KIT_COLUMNS = ['mean', 'min_mean', 'depth_20x_5th_percentile']
-GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript_id"] * len(GENE_GRID_ENRICHMENT_KIT_COLUMNS)
+GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript"] * len(GENE_GRID_ENRICHMENT_KIT_COLUMNS)
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS = ["Mean", "Min Mean", "Depth 20x (5th percentile)"]
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS = [None, None, None]
 

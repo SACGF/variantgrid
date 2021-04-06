@@ -49,7 +49,7 @@ SEQAUTO_COVERAGE_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 # Fields must be from GoldCoverageSummary and COLUMNS + LABELS must line up!
 GENE_GRID_ENRICHMENT_KIT_COLUMNS = ['depth_20x_5th_percentile']
-GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript_id"]
+GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript"]
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS = ["% at 20x*"]
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS = ["% at 20x for 5th percentile of gold runs (ie expected worst case)"]
 
