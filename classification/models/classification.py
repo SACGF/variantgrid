@@ -272,7 +272,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     SUPPORTED_TRANSCRIPTS = {"NM", "ENST"}
 
-
     @staticmethod
     def is_supported_transcript(transcript_or_chgvs: str):
         for transcript_type in Classification.SUPPORTED_TRANSCRIPTS:

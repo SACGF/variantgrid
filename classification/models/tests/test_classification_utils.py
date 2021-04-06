@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from classification.models import ValidationMerger, EvidenceMixin
+from classification.models import ValidationMerger, EvidenceMixin, Classification
 
 
 class ClassificationTestCaseUtils(TestCase):
@@ -84,3 +84,7 @@ class ClassificationTestCaseUtils(TestCase):
         tidy_twice = EvidenceMixin.to_patch(tidy_once)
         self.assertEqual(tidy_once, expected)
         self.assertEqual(tidy_once, tidy_twice)
+
+    def test_is_valid_transcript(self):
+        self.assertTrue(Classification.is_supported_transcript("NM_002739.5(PRKCG):c.1397T>C"))
+        self.assertFalse(Classification.is_supported_transcript("NR_023343.1(RNU4ATAC):n.50G>A"))
