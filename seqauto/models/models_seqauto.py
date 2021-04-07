@@ -672,7 +672,7 @@ class UnalignedReads(models.Model):
             data_state = self.fastq_r1.get_data_state_display()
         else:
             data_state = f"R1: {self.fastq_r1.get_data_state_display()}, R2: {self.fastq_r2.get_data_state_display()}"
-        return f"UnalignedReads2 from sample {self.sequencing_sample} ({data_state})"
+        return f"UnalignedReads from sample {self.sequencing_sample} ({data_state})"
 
 
 class BamFile(SeqAutoRecord):
