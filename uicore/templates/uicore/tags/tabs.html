@@ -1,10 +1,11 @@
+{% load ui_utils %}
 {% if tab_builder.tabs_required %}
     {% if mode == 'accordion' %}
         <div class="accordion round-indicator indicator-plus-before" id="{{ id }}">
             {% for tab in tab_builder.tabs %}
                 <div class="card">
                     <div class="card-header hover-link" data-toggle="collapse" data-target="#{{ tab.tab_id }}" aria-expanded="true">
-                        {{ tab.label }}
+                        {{ tab.label }}{{ tab.badge | danger_badge }}
                     </div>
                     <div id="{{ tab.tab_id }}" class="collapse {% if tab.active %}show{% endif %}" data-parent="#{{ id }}">
                   <div class="card-body">
@@ -22,11 +23,14 @@
                         <a class="nav-link {% if tab.active %}show active{% endif %}"
                            id="{{ tab.tab_id }}-tab"
                            href="#{{ tab.tab_id }}-content"
+                           data-toggle="tab" role="tab"
                            {% if tab.resolved_url %}
-                            data-toggle="tab" role="tab" data-href="{{ tab.resolved_url }}">{{ tab.label }}</a>
-                            {% else %}
-                            data-toggle="tab" role="tab" {% if tab.url %}data-href="{% if tab.param %}{% url tab.url tab.param %}{% else %}{% url tab.url %}{% endif %}"{% endif %}>{{ tab.label }}</a>
-                            {% endif %}
+                                data-href="{{ tab.resolved_url }}">{{ tab.label }}{{ tab.badge | danger_badge }}
+                           {% else %}
+                                {% if tab.url %}data-href="{% if tab.param %}{% url tab.url tab.param %}{% else %}{% url tab.url %}{% endif %}"{% endif %}>
+                               {{ tab.label }}{{ tab.badge | danger_badge }}
+                           {% endif %}
+                        </a>
                     </li>
                 {% endfor %}
             </ul>
@@ -40,7 +44,7 @@
     {% endif %}
 {% else %}{% comment %}Could be 0 or 1 tabs{% endcomment %}
     {% for tab in tab_builder.tabs %}
-        <h4>{{ tab.label }}</h4>
+        <h4>{{ tab.label }}{{ tab.badge | danger_badge }}</h4>
         {{ tab.content }}
     {% endfor %}
 {% endif %}

@@ -2,58 +2,104 @@
 {% load classification_tags %}
 {% load ui_menu_bars %}
 {% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load datatable_tags %}
 {% block title %}HGVS issues{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+<style>
+    .allele-table .dt-id {
+        width: 100px !important;
+    }
+    .allele-table .dt-clingen_allele__id {
+        width: 200px !important;
+    }
+</style>
 <script>
+    function alleleIdRender(data, type, row) {
+        return $('<a>', {text:data, href:Urls.view_allele(data)}).prop('outerHTML');
+    }
+    function clingenIdRenderer(data, type, row) {
+        if (data) {
+            return `CA${_.padStart('0', 6, String(data))}`;
+        } else {
+            return $('<span>', {class:'text-danger font-weight-bold', text:'MISSING'}).prop('outerHTML');
+        }
+    }
+
+    function alleleMissingRepFilter(data) {
+        data.flag = 'missing_rep';
+    }
+    function alleleMissingClinGenFilter(data) {
+        data.flag = 'missing_clingen';
+    }
+    function alleleChgvs37not38(data) {
+        data.flag = 'chgvs_37_not_38'
+    }
+
+    function classificationMatchingVariant(data) {
+        data.flags = JSON.stringify(['classification_matching_variant']);
+    }
+    function classificationMatchingVariantWarning(data) {
+        data.flags = JSON.stringify(['classification_matching_variant_warning']);
+    }
+    function classificationMatchingVariantTranscript(data) {
+        data.flags = JSON.stringify(['classification_transcript_version_change']);
+    }
+
     $(document).ready(() => {
-        Flags.instance.init({userId: '{{user.id}}'});
+        EKeys.load().then(() => {
+            $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
+                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+            });
+            {% datatable_definition table_config=allele_columns data='alleleMissingRepFilter' table_id='allele-missing-rep' url='allele_datatable' %}
+            {% datatable_definition table_config=allele_columns data='alleleMissingClinGenFilter' table_id='allele-missing-clingen' url='allele_datatable' %}
+            {% datatable_definition table_config=allele_columns data='alleleChgvs37not38' table_id='allele-chgvs-37not38' url='allele_datatable' %}
+
+            {% datatable_definition table_config=classification_columns data='classificationMatchingVariant' table_id='classification-matching-variant' url='classification_datatables' %}
+            {% datatable_definition table_config=classification_columns data='classificationMatchingVariantWarning' table_id='classification-matching-variant-warning' url='classification_datatables' %}
+            {% datatable_definition table_config=classification_columns data='classificationMatchingVariantTranscript' table_id='classification-matching-variant-transcript' url='classification_datatables' %}
+
+            // TODO will have to run this on all datatables
+            $('.dataTable').on('draw.dt', () => {
+                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+            });
+        });
     });
 </script>
 {% endblock %}
 {% block content %}
-    <div class="container">
-        <h3>HGVS Issues</h3>
-
-        <a class="btn btn-outline-primary" href="{% url 'hgvs_issues_download' %}"><i class="fas fa-file-csv"></i> Download HGVS Issues</a>
-
-        <!-- flags filter needs to be restyled -->
-        <div class="card mt-4">
-            <div class="card-header">All Allele/HGVS Issues Filter</div>
-            <div class="card-body card-body-list">
-                <ul id="flags-filter" data-filter="{{ filter_flags }}" class="list-group"></ul>
-            </div>
-        </div>
-
-        <h3>Allele Issues</h3>
-        <table class="table">
-            <thead>
-                <tr>
-                <th>ID</th>
-                <th>ClinGen Allele ID</th>
-                <th>GRCh37</th>
-                <th>GRCh38</th>
-                <th>Classification Count</th>
-                <th>Flags</th>
-            </thead>
-            <tbody>
-            {% for allele in alleles %}
-                <tr>
-                    <td><a class="hover-link" href="{% url 'view_allele' allele.id %}">{{ allele.id }}</a></td>
-                    <td>{% if allele.clingen_allele %}{{ allele.clingen_allele }}{% else %}<span class="error-value">MISSING</span>{% endif %}</td>
-                    <td class="variant-coordinate">{{ allele.grch37 | default_if_none:"-" }}</td>
-                    <td class="variant-coordinate">{{ allele.grch38 | default_if_none:"-" }}</td>
-                    <td>{{ allele | classification_count }}
-                    <td data-flags="{{allele.flag_collection.id}}">...</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-
-        <h3>Classification HGVS Issues</h3>
-        Classifications with variant matching in progress, failed or variant matching warnings appear here
-    </div>
     <div class="container-table">
-        {% classification_table classifications show_variant_link=True show_clinical_context=False %}
+        <h3>HGVS Issues</h3>
+        <p>Note that only Alleles with 1 or more classifications attached will be considered.</p>
+        <a class="btn btn-outline-primary" href="{% url 'hgvs_issues_download' %}"><i class="fas fa-file-csv"></i> Download HGVS Allele Issues</a>
+        <div class="mt-4">
+        {% ui_register_tab_embedded tab_set="hgvs_issues" label="Missing 37/38" badge=counts.allele.missing_rep %}
+            {% datatable table_config=allele_columns table_id='allele-missing-rep' class_name='sticky-header allele-table' %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="hgvs_issues" label="Missing Clingen" badge=counts.allele.missing_clingen %}
+            {% datatable table_config=allele_columns table_id='allele-missing-clingen' class_name='sticky-header allele-table' %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="hgvs_issues" label="37 != 38" badge=counts.allele.chgvs_37_not_38 %}
+            {% datatable table_config=allele_columns table_id='allele-chgvs-37not38' class_name='sticky-header allele-table' %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="hgvs_issues" label="Matching Variant" badge=counts.classifications.matching_variant %}
+            {% datatable table_config=classification_columns table_id='classification-matching-variant' class_name='sticky-header classification-table' %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="hgvs_issues" label="Variant Warning" badge=counts.classifications.matching_variant_warning %}
+            {% datatable table_config=classification_columns table_id='classification-matching-variant-warning' class_name='sticky-header classification-table' %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="hgvs_issues" label="Transcript Version" badge=counts.classifications.matching_variant_transcript %}
+            {% datatable table_config=classification_columns table_id='classification-matching-variant-transcript' class_name='sticky-header classification-table' %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_render_tabs tab_set="hgvs_issues" %}
+        </div>
     </div>
 {% endblock %}

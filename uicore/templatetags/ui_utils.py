@@ -249,6 +249,21 @@ def severity_icon(severity: str) -> str:
 
 
 @register.filter()
+def danger_badge(count: Optional[int]) -> str:
+    """
+    If count is None, does nothing
+    If count is 0, shows a success badge with 0 in it
+    If count is anything else, shown in a danger badge
+    """
+    if count is None:
+        return ""
+    if count == 0:
+        return SafeString(' <span class="d-inline-block ml-1 badge badge-success">0</span>')
+    else:
+        return SafeString(f' <span class="d-inline-block ml-1 badge badge-danger">{count}</span>')
+
+
+@register.filter()
 def checked(test: bool) -> str:
     if test:
         return SafeString('checked="checked"')
@@ -271,6 +286,16 @@ class TagUtils:
         val = TagUtils.value(context, value, default)
         if val is not None:
             return str(val)
+        return None
+
+    @staticmethod
+    def value_int(context, value: Any, default: Any = None) -> Optional[str]:
+        val = TagUtils.value(context, value, default)
+        if val is not None and val != '':
+            try:
+                return int(val)
+            except ValueError:
+                pass
         return None
 
     @staticmethod
