@@ -15,6 +15,17 @@ COHORT_GENOTYPE_HEADER = ['collection_id', 'variant_id', "filters",
 MODIFIED_IMPORTED_VARIANT_HEADER = ['import_info_id', 'variant_id',
                                     'old_multiallelic', 'old_variant', 'old_variant_formatted']
 
+GENE_COVERAGE_HEADER = [
+    "gene_coverage_collection_id", "gene_symbol_id", "transcript_id", "transcript_version_id",
+    "original_gene_symbol", "original_transcript", "size", "min", "max", "mean", "std_dev",
+    "percent_1x", "percent_2x", "percent_5x", "percent_10x", "percent_15x", "percent_20x", "percent_25x",
+    "percent_30x", "percent_40x", "percent_50x", "percent_60x", "percent_80x", "percent_100x",
+    "percent_150x", "percent_200x", "percent_250x",
+]
+
+GENE_COVERAGE_CANONICAL_TRANSCRIPT_HEADER = ["canonical_transcript_collection_id"] + GENE_COVERAGE_HEADER
+
+
 
 def get_database_settings():
     """ returns host, database_name, user, password """
@@ -78,6 +89,14 @@ def cohort_genotype_sql_copy_csv(input_filename, table_name):
 
 def modified_imported_variant_sql_copy_csv(input_filename):
     return sql_copy_csv(input_filename, "upload_modifiedimportedvariant", MODIFIED_IMPORTED_VARIANT_HEADER, quote='"')
+
+
+def gene_coverage_sql_copy_csv(input_filename, table_name):
+    return sql_copy_csv(input_filename, table_name, GENE_COVERAGE_HEADER, quote='"')
+
+
+def gene_coverage_canonical_transcript_sql_copy_csv(input_filename, table_name):
+    return sql_copy_csv(input_filename, table_name, GENE_COVERAGE_CANONICAL_TRANSCRIPT_HEADER, quote='"')
 
 
 def write_sql_copy_csv(data, filename, **kwargs):

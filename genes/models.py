@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
@@ -18,7 +19,7 @@ from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
 from django.db.models.query_utils import Q
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -33,12 +34,16 @@ from genes.annotation_consortium_api import transcript_exists
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource
 from library.django_utils import SortByPKMixin
+from library.django_utils.django_partition import RelatedModelsPartitionModel
+from library.file_utils import mk_path
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.log_utils import log_traceback
 from library.utils import empty_dict
 from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
+from upload.vcf.sql_copy_files import write_sql_copy_csv, gene_coverage_canonical_transcript_sql_copy_csv, \
+    gene_coverage_sql_copy_csv, GENE_COVERAGE_HEADER
 
 
 class HGNCImport(TimeStampedModel):
@@ -1326,7 +1331,12 @@ class CanonicalTranscript(models.Model):
     original_transcript = models.TextField()
 
 
-class GeneCoverageCollection(models.Model):
+class GeneCoverageCollection(RelatedModelsPartitionModel):
+    """ Note both GeneCoverage and GeneCoverageCanonicalTranscript point off same collection object """
+    RECORDS_BASE_TABLE_NAMES = ["genes_genecoverage", "genes_genecoveragecanonicaltranscript"]
+    RECORDS_FK_FIELD_TO_THIS_MODEL = "gene_coverage_collection_id"
+    PARTITION_LABEL_TEXT = "collection"
+
     path = models.TextField()
     data_state = models.CharField(max_length=1, choices=DataState.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
@@ -1368,12 +1378,12 @@ class GeneCoverageCollection(models.Model):
         missing_transcripts = 0
 
         canonical_transcript_collection = canonical_transcript_manager.get_canonical_collection_for_enrichment_kit(enrichment_kit)
-        _, original_canonical_transcript_ids = canonical_transcript_manager.get_canonical_transcripts(canonical_transcript_collection)
+        _, original_canonical_transcript_accessions = canonical_transcript_manager.get_canonical_transcripts(canonical_transcript_collection)
 
         gene_coverage_df = load_gene_coverage_df(self.path)
 
-        gene_coverage_list = []
-        gene_coverage_canonical_list = []
+        gene_coverage_tuples = []
+        gene_coverage_canonical_transcript_tuples = []
         warnings = []
 
         for _, row in gene_coverage_df.iterrows():
@@ -1388,31 +1398,42 @@ class GeneCoverageCollection(models.Model):
                 transcript_id = None
                 transcript_version_id = None
 
-            kwargs = {
-                "gene_coverage_collection": self,
+            gc_dict = {
+                "gene_coverage_collection_id": self.pk,
                 "transcript_id": transcript_id,
                 "transcript_version_id": transcript_version_id,
                 "gene_symbol_id": gene_symbol_id,
             }
-            kwargs.update(row.to_dict())
+            gc_dict.update(row.to_dict())
+            gc_tup = tuple([gc_dict[f] for f in GENE_COVERAGE_HEADER])
+
             if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_ALL:
-                gene_coverage = GeneCoverage(**kwargs)
-                gene_coverage_list.append(gene_coverage)
+                gene_coverage_tuples.append(gc_tup)
 
             if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
-                if transcript_id in original_canonical_transcript_ids:
-                    kwargs["canonical_transcript_collection"] = canonical_transcript_collection
-                    gene_coverage_canonical = GeneCoverageCanonicalTranscript(**kwargs)
-                    gene_coverage_canonical_list.append(gene_coverage_canonical)
+                if original_transcript in original_canonical_transcript_accessions:
+                    gene_coverage_canonical_transcript_tuples.append((canonical_transcript_collection.pk,) + gc_tup)
 
-        if gene_coverage_list:
-            GeneCoverage.objects.bulk_create(gene_coverage_list)
+        processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, "gene_coverage",
+                                      f"gene_coverage_collection_{self.pk}")
+        mk_path(processing_dir)
+        if gene_coverage_tuples:
+            csv_filename = os.path.join(processing_dir, f"gene_coverage_{self.pk}.csv")
+            write_sql_copy_csv(gene_coverage_tuples, csv_filename)
+            partition_table = self.get_partition_table(base_table_name="genes_genecoverage")
+            gene_coverage_sql_copy_csv(csv_filename, partition_table)
 
         if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
-            if gene_coverage_canonical_list:
-                GeneCoverageCanonicalTranscript.objects.bulk_create(gene_coverage_canonical_list)
+            if gene_coverage_canonical_transcript_tuples:
+                csv_filename = os.path.join(processing_dir, f"gene_coverage_canonical_transcript_{self.pk}.csv")
+                write_sql_copy_csv(gene_coverage_canonical_transcript_tuples, csv_filename)
+                partition_table = self.get_partition_table(base_table_name="genes_genecoveragecanonicaltranscript")
+                gene_coverage_canonical_transcript_sql_copy_csv(csv_filename, partition_table)
             else:
                 logging.warning("GeneCoverage had no canonical transcripts")
+
+        if not settings.DEBUG:
+            shutil.rmtree(processing_dir)
 
         logging.info("%d missing genes, %d missing transcripts", missing_genes, missing_transcripts)
         return warnings
@@ -1422,6 +1443,14 @@ class GeneCoverageCollection(models.Model):
 
     def __str__(self):
         return "GeneCoverageCollection " + os.path.basename(self.path)
+
+
+@receiver(pre_delete, sender=GeneCoverageCollection)
+def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):
+    try:
+        instance.delete_related_objects()
+    except:
+        pass
 
 
 class AbstractGeneCoverage(models.Model):

@@ -9,7 +9,7 @@ from django.contrib.postgres.fields import DecimalRangeField
 from django.db import models
 from django.db.models import Value, When, Case, IntegerField
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils.timezone import make_aware
@@ -1129,6 +1129,18 @@ class QCGeneCoverage(SeqAutoRecord):
             self.data_state = DataState.DELETED
 
         self.save()
+
+
+@receiver(pre_delete, sender=QCGeneCoverage)
+def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):
+    try:
+        if gcc := instance.gene_coverage_collection:
+            instance.gene_coverage_collection = None  # To stop recursive deleting
+            instance.save()
+            gcc.delete()
+    except:
+        # Might fail due to GoldGeneCoverageCollection protecting it
+        pass
 
 
 class GoldReference(models.Model):
