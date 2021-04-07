@@ -31,8 +31,6 @@
 		graph_selector.html("Genomic Intervals have not finished importing.");
 	{% endif %}
 
-    $("button#save-genomic-intervals-collection").button();
-
 {% endblock %}
 
 {% block submenu_page_content %}
@@ -54,7 +52,7 @@
 
                     {{  form.as_p }}
                     {% if has_write_permission %}
-                        <button id='save-genomic-intervals-collection'>save</button>
+                        <button id='save-genomic-intervals-collection' class="btn btn-primary">save</button>
                     {% else %}
                         You can view but not modify this data.
                     {% endif %}

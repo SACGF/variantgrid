@@ -438,7 +438,7 @@ function populateGeneColumn(geneListId, data, className, saveGeneListFunc, close
     }
     if (can_write) {
         if (saveGeneListFunc) { 
-            let saveButton = $("<button>save</button>").button().addClass("save-genelist");
+            let saveButton = $("<button>save</button>").addClass("save-genelist btn btn-secondary");
             saveButton.hide();
             iconContainerDiv.append(saveButton);
             
