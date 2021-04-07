@@ -23,8 +23,6 @@
         <td>{{ enrichment_kit.version }}
     <tr><th>Manufacturer
         <td>{{ enrichment_kit.manufacturer }}
-    <tr><th>Bed File
-        <td>{{ enrichment_kit.bed_file }}
     <tr><th>Genomic Intervals
         <td>{% if enrichment_kit.genomic_intervals %}
             <a href="{% url 'view_genomic_intervals' enrichment_kit.genomic_intervals.pk %}">{{ enrichment_kit.genomic_intervals }}</a>

@@ -78,7 +78,6 @@ class EnrichmentKit(models.Model):
     version = models.IntegerField(default=1)
     enrichment_kit_type = models.CharField(max_length=1, choices=EnrichmentKitType.choices, null=True)
     manufacturer = models.ForeignKey(Manufacturer, null=True, blank=True, on_delete=CASCADE)
-    bed_file = models.TextField(null=True, blank=True)  # Original manifest bed
     genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
     gene_list = models.ForeignKey(GeneList, null=True, blank=True, on_delete=PROTECT)
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, blank=True, on_delete=SET_NULL)
