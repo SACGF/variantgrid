@@ -15,7 +15,7 @@ def _one_off_fix_cohort_sample_order(apps, schema_editor):
             my_samples = Sample.objects.filter(cohortsample__cohort=cohort).order_by("pk")
             parent_samples = Sample.objects.filter(cohortsample__cohort=cohort.parent_cohort).order_by("pk")
             if my_samples.exclude(pk__in=parent_samples).exists():
-                print(f"Cohort {cohort} ({cohort.pk}) set to not a sub cohort")
+                print(f"Cohort {cohort.name} ({cohort.pk}) set to not a sub cohort")
                 cohort.parent_cohort = None  # No longer a sub cohort
                 cohort.save()
 
