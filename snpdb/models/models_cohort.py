@@ -61,6 +61,13 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         return user.has_perm(write_perm, self)
 
     def increment_version(self):
+        # Check if any samples not in parent cohort (can no longer be a sub cohort)
+        if self.parent_cohort:
+            my_samples = self.get_samples()
+            parent_samples = self.parent_cohort.get_samples()
+            if my_samples.exclude(pk__in=parent_samples).exists():
+                self.parent_cohort = None  # No longer a sub cohort
+
         self.version += 1
         self.sample_count = self.cohortsample_set.all().count()
         self.save()
