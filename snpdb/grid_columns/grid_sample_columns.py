@@ -14,6 +14,7 @@ from snpdb.models import CohortGenotype, VCF
 def get_left_outer_join_on_variant(partition_table):
     return f'LEFT OUTER JOIN "{partition_table}" ON ("snpdb_variant"."id" = "{partition_table}"."variant_id")'
 
+
 def get_available_format_columns(cohorts):
     available_format_columns = {
         # We want to always show some fields
