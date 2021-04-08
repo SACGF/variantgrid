@@ -68,7 +68,7 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:
                 try:
                     if evidence_key in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:
                         # see if we even have a chance with the transcript type before submitting
-                        if not Classification.is_supported_transcript(variant_value):
+                        if evidence_key == SpecialEKeys.C_HGVS and not Classification.is_supported_transcript(variant_value):
                             vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message='Transcript type not yet supported')
                             continue
 
