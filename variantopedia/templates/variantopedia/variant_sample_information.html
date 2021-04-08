@@ -67,14 +67,6 @@
            <div id="genotype-grid-pager"></div> 
 	   </div>
        <script>
-        let visible_rows = {{ visible_rows | jsonify }};
-        const ZYGOSITY_DICT = {
-            'O': 'HOM_ALT',
-            'E': 'HET',
-            'R': 'HOM_REF',
-            'U': 'Unknown Zygosity',
-        };
-
         function sampleFormatFieldFormatter(formatField) {
             let formatFieldString = formatField;
             // Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -164,6 +156,14 @@
 
 
         $(document).ready(function() {
+            const visible_rows = {{ visible_rows | jsonify }};
+            const ZYGOSITY_DICT = {
+                'O': 'HOM_ALT',
+                'E': 'HET',
+                'R': 'HOM_REF',
+                'U': 'Unknown Zygosity',
+            };
+
             jQuery.extend($.fn.fmatter , {
                 viewSampleLink : function(sampleName, options, rowObject) {
                     const url = Urls.view_sample(rowObject["sample"]);
