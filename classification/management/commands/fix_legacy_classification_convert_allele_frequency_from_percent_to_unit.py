@@ -22,8 +22,7 @@ class Command(BaseCommand):
                 if not isinstance(value_obj, Mapping):
                     value_obj = {}
                 # Someone had entered "0..2"
-                old_value = old_value.replace("..", ".")
-                to_value = str(float(old_value) / 100)
+                to_value = str(float(old_value.replace("..", ".")) / 100)
                 value_obj["value"] = to_value
                 notes = []
                 existing_note = value_obj.get("note")
