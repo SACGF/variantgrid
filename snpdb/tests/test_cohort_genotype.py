@@ -6,7 +6,7 @@ from snpdb.tasks.cohort_genotype_tasks import cohort_genotype_task, create_cohor
 from snpdb.tests.test_data import create_fake_trio
 
 
-class AlleleTestCase(TestCase):
+class CohortGenotypeTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
