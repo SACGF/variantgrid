@@ -20,7 +20,7 @@ def create_cohort_genotype_and_launch_task(cohort, run_async=True):
     cohort.delete_old_counts()
 
     q_not_sub_cohort = Q(parent_cohort__isnull=True)
-    q_is_vcf = Q(vcf__isnull=False)
+    q_is_vcf = Q(vcf__isnull=False)  # Don't build off a cohort that could get deleted
     q_exclude_this_cohort = ~Q(pk=cohort.pk)
     q = q_not_sub_cohort & q_is_vcf & q_exclude_this_cohort
 

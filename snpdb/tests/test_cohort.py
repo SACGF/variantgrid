@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from snpdb.models import GenomeBuild, CohortGenotypeCollection, Cohort
+from snpdb.models import GenomeBuild, CohortGenotypeCollection, Cohort, CohortSample
 from snpdb.tasks.cohort_genotype_tasks import cohort_genotype_task, create_cohort_genotype_collection, \
     create_cohort_genotype_and_launch_task
 from snpdb.tests.test_data import create_fake_trio
@@ -38,3 +38,19 @@ class CohortGenotypeTestCase(TestCase):
         cohort.add_sample(samples2[0].pk)  # Add a sample that is NOT in parent cohort, now can't be sub cohort
         self.assertFalse(cohort.is_sub_cohort())  # Shouldn't be a sub cohort
 
+    def test_cohort_genotype_packed_field_index(self):
+        """ Add/Remove CohortSamples - ensure cohort_genotype_packed_field_index stays in range """
+        # Add samples from multiple parent cohorts - to ensure it's not a sub cohort
+        cohort = Cohort.objects.create(name="not_a_sub_cohort", genome_build=self.grch37)
+        samples = list(self.trio1.get_samples())
+        samples2 = list(self.trio2.get_samples())
+        cohort.add_sample(samples[0].pk)
+        cohort.add_sample(samples[1].pk)
+        cohort.add_sample(samples2[0].pk)
+
+        # Delete existing cohort sample
+        CohortSample.objects.get(cohort=cohort, sample=samples[1]).delete()
+
+        create_cohort_genotype_and_launch_task(cohort, run_async=False)
+        cs = cohort.cohortsample_set.order_by("-cohort_genotype_packed_field_index").first()
+        self.assertLess(cs.cohort_genotype_packed_field_index, cohort.cohort_genotype_collection.num_samples)

@@ -274,7 +274,7 @@ class VariantGrid(JqGridSQL):
         sample_cohort_cat_cohorts_index = {}
         cohorts_offset = 0
         for cohort in cohorts:
-            for cohort_sample in cohort.get_cohort_samples():
+            for cohort_sample in cohort.get_cohort_samples():  # orders by sort_order
                 sample = cohort_sample.sample
                 if visibility.get(sample) and sample not in sample_cohort_cat_cohorts_index:
                     cc_index = cohorts_offset + cohort_sample.cohort_genotype_packed_field_index

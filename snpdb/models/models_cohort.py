@@ -6,7 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, DO_NOTHING
-from django.db.models.expressions import F
+from django.db.models.expressions import F, Value
 from django.db.models.query_utils import Q, FilteredRelation
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -72,6 +72,22 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         self.sample_count = self.cohortsample_set.all().count()
         self.save()
 
+        if self.vcf is None:
+            # For custom built Cohorts - need to ensure cohort_genotype_packed_field_index entries are correct
+            if highest_packed_index := self._get_cohort_sample_field_max("cohort_genotype_packed_field_index"):
+                # packed fields are unique per cohort so need to move them sufficiently high to be able to rearrange
+                out_of_range = F("cohort_genotype_packed_field_index") + Value(highest_packed_index + 1)
+                self.cohortsample_set.all().update(cohort_genotype_packed_field_index=out_of_range)
+
+                # Cohort genotype packed fields are in sample order
+                cohort_samples = []
+                for i, cs in enumerate(self.cohortsample_set.order_by("sample")):
+                    cs.cohort_genotype_packed_field_index = i
+                    cohort_samples.append(cs)
+                if cohort_samples:
+                    # Do a bulk update so it doesn't trigger a save then call this func again
+                    CohortSample.objects.bulk_update(cohort_samples, ["cohort_genotype_packed_field_index"])
+
         self.delete_old_counts()
 
     def delete_old_counts(self):
@@ -81,10 +97,13 @@ class Cohort(SortByPKMixin, TimeStampedModel):
             task = delete_old_cohort_genotypes_task.si()
             task.apply_async()
 
-    def get_next_sort_order(self):
+    def _get_cohort_sample_field_max(self, field):
         qs = self.cohortsample_set.all()
-        data = qs.aggregate(Max("sort_order"))
-        existing_max = data["sort_order__max"]
+        data = qs.aggregate(highest_value=Max(field))
+        return data["highest_value"]
+
+    def _get_next_sort_order(self):
+        existing_max = self._get_cohort_sample_field_max("sort_order")
         if existing_max is not None:
             return existing_max + 1
         return 0
@@ -94,7 +113,7 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         try:
             ss = self.cohortsample_set.get(cohort=self, sample_id=sample_id)
         except CohortSample.DoesNotExist:
-            i = self.get_next_sort_order()
+            i = self._get_next_sort_order()
             ss = CohortSample.objects.create(cohort=self,
                                              sample_id=sample_id,
                                              cohort_genotype_packed_field_index=i,
