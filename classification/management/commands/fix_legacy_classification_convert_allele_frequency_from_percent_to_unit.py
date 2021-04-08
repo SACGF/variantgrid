@@ -26,8 +26,12 @@ class Command(BaseCommand):
                     if "Converted from" in existing_note:
                         continue  # Already run
 
-                # Someone had entered "0..2"
-                to_value = str(float(old_value.replace("..", ".")) / 100)
+                try:
+                    to_value = float(old_value) / 100
+                except ValueError:
+                    # Someone had entered "0..2"
+                    to_value = float(old_value.replace("..", ".")) / 100
+
                 value_obj["value"] = to_value
                 notes = []
                 existing_note = value_obj.get("note")
