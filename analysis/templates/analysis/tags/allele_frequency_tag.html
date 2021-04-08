@@ -26,14 +26,15 @@
         $("#view-allele-frequency-filter-link").hide();
         $("#allele-frequency-filter").show();
         
-        var groupOperation = allele_frequency["group_operation"];
+        const groupOperation = allele_frequency["group_operation"];
+        const sliderList = allele_frequency["nodeallelefrequencyrange_set"];
+
         if (groupOperation) {
             $("#slider-group-operation").val(groupOperation);
         }
-        var sliderList = allele_frequency["nodeallelefrequencyrange_set"];
-        
-        for (var i=0 ; i<sliderList.length ; ++i) {
-            var sliderData = sliderList[i];
+
+        for (let i=0 ; i<sliderList.length ; ++i) {
+            let sliderData = sliderList[i];
             addSlider(sliderData.min, sliderData.max);
         }
     }
