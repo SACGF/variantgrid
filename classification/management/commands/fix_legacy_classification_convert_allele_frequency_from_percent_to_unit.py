@@ -21,15 +21,17 @@ class Command(BaseCommand):
                 value_obj = classification.evidence.get("allele_frequency")
                 if not isinstance(value_obj, Mapping):
                     value_obj = {}
+                existing_note = value_obj.get("note")
+                if existing_note:
+                    if "Converted from" in existing_note:
+                        continue  # Already run
+
                 # Someone had entered "0..2"
                 to_value = str(float(old_value.replace("..", ".")) / 100)
                 value_obj["value"] = to_value
                 notes = []
                 existing_note = value_obj.get("note")
                 if existing_note:
-                    if "Converted from" in existing_note:
-                        raise ValueError(f"Classification {classification} contains allele_frequency note with "
-                                         f"'converted from' - Legacy upgrade appears to have been run twice!!")
                     notes.append(existing_note)
                 notes.append(f"Converted from '{old_value}'%")
                 value_obj["note"] = ". ".join(notes)
