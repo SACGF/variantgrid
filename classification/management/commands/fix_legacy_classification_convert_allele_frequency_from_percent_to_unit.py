@@ -21,6 +21,8 @@ class Command(BaseCommand):
                 value_obj = classification.evidence.get("allele_frequency")
                 if not isinstance(value_obj, Mapping):
                     value_obj = {}
+                # Someone had entered "0..2"
+                old_value = old_value.replace("..", ".")
                 to_value = str(float(old_value) / 100)
                 value_obj["value"] = to_value
                 notes = []
