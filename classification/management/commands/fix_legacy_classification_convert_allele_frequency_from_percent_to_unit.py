@@ -47,11 +47,9 @@ class Command(BaseCommand):
 
                 lab_changes[classification.lab.name] += 1
                 count += 1
-                print(f"Debugged one record {classification.id}")
-                return
 
                 if count % 100 == 0:
                     print(f"Processed {count} records")
 
         print("Classifications changed per lab:")
-        print(str(dict(lab_changes)))
+        print(lab_changes)
