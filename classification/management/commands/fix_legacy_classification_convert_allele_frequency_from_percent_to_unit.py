@@ -19,9 +19,7 @@ class Command(BaseCommand):
             old_value = classification.get("allele_frequency")
             if old_value is not None:
                 # Get out dict - so we can look at and store notes
-                value_obj = classification.evidence.get("allele_frequency")
-                if not isinstance(value_obj, Mapping):
-                    value_obj = {}
+                value_obj = dict(classification.evidence.get("allele_frequency"))
                 existing_note = value_obj.get("note")
                 if existing_note:
                     if "Converted from" in existing_note:
