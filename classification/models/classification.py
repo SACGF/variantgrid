@@ -1074,7 +1074,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             submitted = last_edit.pk == last_publish.pk
         return not submitted
 
-    def revalidate(self, user: User):
+    def revalidate(self, user: User, migration_patch: Optional[VCPatch] = None):
         """
         Re-normalises all values and re-performs validation on mutable fields.
         Re-publishes if the latest version was published (don't want to make every record
@@ -1099,6 +1099,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     "explain": value.get('explain'),
                     "immutable": value.get('immutable')
                 }
+        if migration_patch:
+            for key, value in migration_patch.items():
+                raw_patch[key] = value
 
         self.patch_value(
             patch=raw_patch,
@@ -1107,15 +1110,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             save=True,
             revalidate_all=True
         )
-        self.fix_migration_stuff(user)
+        # migration fixes are so established at this point, no need to re-run them
+        # self.fix_migration_stuff(user)
 
         classification_revalidate_signal.send(sender=Classification, classification=self)
 
         if submitted:
             # have to re-retrieve last_edited_version as it's now the latest
             self.last_edited_version.publish(share_level=self.share_level_enum, user=user, vc=self)
-
-        self.fix_permissions()
 
     def fix_migration_stuff(self, user: User) -> None:
         """

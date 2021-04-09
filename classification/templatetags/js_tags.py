@@ -73,6 +73,9 @@ def format_value(val):
         return mark_safe(f'<span class="json">{escape(json.dumps(val))}</span>')
     if isinstance(val, float):
         val = format(Decimal(str(val)).normalize(), 'f')
+        return mark_safe(f'<span class="number">{val}</span>')
+    elif isinstance(val, int):
+        return mark_safe(f'<span class="number">{val}</span>')
     else:
         val = str(val)
     return mark_safe(f'<span>{escape(val)}</span>')

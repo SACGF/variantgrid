@@ -13,6 +13,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         user = admin_bot()
 
+        count = 0
         lab_changes = Counter()
         for classification in Classification.objects.filter(evidence__allele_frequency__isnull=False):
             old_value = classification.get("allele_frequency")
@@ -38,16 +39,19 @@ class Command(BaseCommand):
                 if existing_note:
                     notes.append(existing_note)
                 notes.append(f"Converted from '{old_value}'%")
-                value_obj["note"] = ". ".join(notes)
+                value_obj["note"] = "\n".join(notes)
                 patch = {
                     SpecialEKeys.ALLELE_FREQUENCY: value_obj,
                 }
-                classification.patch_value(patch=patch,
-                                           source=SubmissionSource.VARIANT_GRID,
-                                           save=True,
-                                           user=user)
-                classification.revalidate(user)
+                classification.revalidate(user, migration_patch=patch)
+
                 lab_changes[classification.lab.name] += 1
+                count += 1
+                print(f"Debugged one record {classification.id}")
+                return
+
+                if count % 100 == 0:
+                    print(f"Processed {count} records")
 
         print("Classifications changed per lab:")
-        print(lab_changes)
+        print(str(dict(lab_changes)))
