@@ -247,7 +247,9 @@ class VariantGrid(JqGridSQL):
                 def samples_allele_frequency_percent_formatter(row, field):
                     """ Convert from legacy percent to AF (0-1) """
                     val = packed_data_formatter(row, field)
-                    return VCF.convert_from_percent_to_unit(val)
+                    if val != '.':
+                        val = VCF.convert_from_percent_to_unit(val)
+                    return val
                 server_side_formatter = samples_allele_frequency_percent_formatter
 
         return server_side_formatter
