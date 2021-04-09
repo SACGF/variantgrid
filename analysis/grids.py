@@ -2,7 +2,7 @@ import pandas as pd
 from typing import Dict, List, Tuple
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import Max, F, Q
+from django.db.models import Max, F, Q, Value, TextField
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
@@ -442,16 +442,18 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
         queryset = queryset.filter(variant__variantallele__allele__variantallele__genome_build=genome_build)
         queryset = Variant.annotate_variant_string(queryset,
                                                    path_to_variant="variant__variantallele__allele__variantallele__variant__")
-        field_names = self.get_field_names() + ["variant_string"]
+        queryset = queryset.annotate(view_genome_build=Value(genome_build_name, output_field=TextField()))
+        field_names = self.get_field_names() + ["variant_string", "view_genome_build"]
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'variant_string',
                                   'sortorder': 'asc'})
 
     def get_colmodels(self, remove_server_side_only=False):
-        before_colmodels = [{'index': 'variant_string',
-                             'name': 'variant_string',
-                             'label': 'Variant',
-                             'formatter': 'formatVariantTagFirstColumn'}]
+        before_colmodels = [
+            {'index': 'variant_string', 'name': 'variant_string',
+             'label': 'Variant', 'formatter': 'formatVariantTagFirstColumn'},
+            {'index': 'view_genome_build', 'name': 'view_genome_build', 'label': 'Genome Build'},
+        ]
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         return before_colmodels + colmodels
 

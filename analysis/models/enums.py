@@ -145,3 +145,10 @@ class TagNodeMode(models.TextChoices):
     PARENT = 'P', 'Parent'
     THIS_ANALYSIS = 'T', 'This Analysis'
     ALL_ANALYSES = 'L', 'All Analyses'
+
+
+class TagLocation(models.TextChoices):
+    ANALYSIS = 'A', 'Analysis'
+    EXTERNAL = 'E', 'External Import'
+    GENE_PAGE = 'G', 'Gene Page'
+    VARIANT_DETAILS = 'V', 'Variant Details'

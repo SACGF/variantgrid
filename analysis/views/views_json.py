@@ -182,6 +182,7 @@ def set_variant_tag(request, analysis_id):
     tag = get_object_or_404(Tag, pk=tag_id)
     if op == 'add':
         variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
+                                                                genome_build=analysis.genome_build,
                                                                 analysis=analysis, user=request.user)
         variant_tag.node_id = node_id
         variant_tag.save()

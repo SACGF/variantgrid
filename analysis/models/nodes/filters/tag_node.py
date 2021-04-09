@@ -7,9 +7,10 @@ from django.db.models.query_utils import Q
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
-from analysis.models.enums import TagNodeMode
+from analysis.models.enums import TagNodeMode, TagLocation
 from analysis.models.nodes.analysis_node import Analysis, AnalysisNode
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from snpdb.models import Tag, Variant, GenomeBuild, VariantAllele
 
 
@@ -114,27 +115,38 @@ class TagNodeTag(models.Model):
         unique_together = ("tag_node", "tag")
 
 
-class VariantTag(TimeStampedModel):
+class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     """ A tag in an analysis. Has create create/delete signal handlers:
         @see analysis.signals.signal_handlers._update_analysis_on_variant_tag_change """
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
-    analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
+    analysis = models.ForeignKey(Analysis, null=True, on_delete=SET_NULL)
+    location = models.CharField(max_length=1, choices=TagLocation.choices, default=TagLocation.ANALYSIS)
     # Most recent node where it was added
     node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)  # Keep even if node deleted
     user = models.ForeignKey(User, on_delete=CASCADE)
 
+    def can_view(self, user):
+        """ Delegate to Analysis if set """
+        if self.analysis:
+            return self.analysis.can_view(user)
+        return super().can_view(user)
+
     def can_write(self, user):
-        return self.analysis.can_write(user)
+        """ Delegate to Analysis if set """
+        if self.analysis:
+            return self.analysis.can_write(user)
+        return super().can_write(user)
 
     @property
     def canonical_c_hgvs(self):
-        return self.variant.get_canonical_c_hgvs(self.analysis.genome_build)
+        return self.variant.get_canonical_c_hgvs(self.genome_build)
 
     @property
     def gene_symbol(self):
         gs = None
-        if cta := self.variant.get_canonical_transcript_annotation(self.analysis.genome_build):
+        if cta := self.variant.get_canonical_transcript_annotation(self.genome_build):
             if tv := cta.transcript_version:
                 gs = tv.gene_version.gene_symbol
         return gs
