@@ -10,8 +10,7 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.file_utils import name_from_filename
 import pandas as pd
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
-    UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput
-from upload.models_enums import VCFPipelineStage
+    UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage
 from upload.tasks.vcf.unknown_variants_task import SeparateUnknownVariantsTask
 
 

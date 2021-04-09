@@ -24,8 +24,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ImportSource
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
-    BackendVCF, UploadStep, ModifiedImportedVariants
-from upload.models_enums import UploadStepTaskType, VCFPipelineStage
+    BackendVCF, UploadStep, ModifiedImportedVariants, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor

@@ -30,7 +30,6 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta
 from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGenAlleleExternalRecordType
-from upload.models import ModifiedImportedVariant
 
 
 class ClinGenAlleleAPIException(Exception):
@@ -89,6 +88,7 @@ def clingen_hgvs_put(hgvs_iter):
 def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants):
     """ Ensures that we have ClinGenAllele for variants
         You don't need to, but more efficient to make variants distinct """
+    from upload.models import ModifiedImportedVariant  # Circular import
 
     qs = VariantAllele.objects.filter(variant__in=variants).values_list("variant_id", flat=True)
     variant_ids_with_allele = set(qs)

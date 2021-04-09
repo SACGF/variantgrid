@@ -1,4 +1,7 @@
+import logging
+import os
 import re
+import shutil
 from collections import namedtuple
 from typing import Dict, List, Optional
 
@@ -10,39 +13,25 @@ from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.fields import BigIntegerField
 from django.db.models.query import QuerySet
-from django.db.models.signals import pre_delete, post_delete
+from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
-import logging
 from model_utils.managers import InheritanceManager
-import os
-import shutil
 
-from annotation.models.models import ClinVarCitationsCollection, \
-    ManualVariantEntryCollection, ClinVarVersion
 from eventlog.models import create_event
-from expression.models import CuffDiffFile
-from genes.models import GeneList, GeneCoverageCollection
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.enums.log_level import LogLevel
-from library.file_utils import file_md5sum, mk_path, name_from_filename
+from library.file_utils import file_md5sum, mk_path
 from library.log_utils import get_traceback, report_message
-from patients.models import PatientRecords
-from pedigree.models import PedFile
 from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status
-from snpdb.models import VCF, GenomicIntervalsCollection, \
-    Variant, SoftwareVersion, Sample, GenomeBuild
-from snpdb.models.models_variant import Liftover
-from snpdb.models.models_enums import ImportSource, ProcessingStatus, AnnotationLevel, ImportStatus
+from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild
+from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
-from upload.bed_file_processing import process_bed_file
-from upload.models_enums import UploadedFileTypes, VCFPipelineStage, \
-    UploadStepTaskType, ExpressionType, TimeFilterMethod, VCFImportInfoSeverity, \
-    UploadStepOrigin
-from classification.models import ClassificationImport
+from upload.models.models_enums import UploadedFileTypes, VCFPipelineStage, \
+    UploadStepTaskType, TimeFilterMethod, VCFImportInfoSeverity, UploadStepOrigin
 from variantgrid.celery import app
 
 
@@ -620,122 +609,6 @@ class VCFSkippedGVCFNonVarBlocks(VCFImportInfo):
     @property
     def message(self):
         return f"{self.num_skipped} gVCF non-variant blocks skipped (we only store reference variants and genotype calls at variant sites)"
-
-
-class UploadedGeneList(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    gene_list = models.OneToOneField(GeneList, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.gene_list
-
-
-class UploadedExpressionFile(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    format = models.CharField(max_length=1, choices=ExpressionType.choices)
-    annotation_level = models.CharField(max_length=1, choices=AnnotationLevel.choices)
-    cuff_diff_file = models.OneToOneField(CuffDiffFile, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.cuff_diff_file
-
-
-class UploadedBed(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    genomic_intervals_collection = models.OneToOneField(GenomicIntervalsCollection, null=True, on_delete=CASCADE)
-
-    def process_bed_file(self):
-        bed_file = self.uploaded_file.get_filename()
-        has_chr = self.genomic_intervals_collection.genome_build.reference_fasta_has_chr
-        if has_chr:
-            chrom_description = "has_chr"
-        else:
-            chrom_description = "no_chr"
-        name = name_from_filename(bed_file)
-        processed_base_name = f"{self.genomic_intervals_collection.pk}.{name}.{chrom_description}.processed.bed"
-        processed_file = os.path.join(settings.PROCESSED_BED_FILES_DIR, processed_base_name)
-        if not os.path.exists(processed_file):
-            num_records = process_bed_file(bed_file, processed_file, has_chr)
-            self.genomic_intervals_collection.processed_records = num_records
-
-        self.genomic_intervals_collection.processed_file = processed_file
-        self.genomic_intervals_collection.import_status = ImportStatus.SUCCESS
-        self.genomic_intervals_collection.save()
-
-    def get_data(self):
-        return self.genomic_intervals_collection
-
-
-class UploadedPedFile(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    ped_file = models.OneToOneField(PedFile, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.ped_file
-
-
-class UploadedPatientRecords(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    patient_records = models.OneToOneField(PatientRecords, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.patient_records
-
-
-class UploadedGeneCoverage(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=CASCADE)
-    sample = models.OneToOneField(Sample, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.gene_coverage_collection
-
-
-class UploadedManualVariantEntryCollection(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    collection = models.OneToOneField(ManualVariantEntryCollection, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.collection
-
-
-class UploadedClassificationImport(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    classification_import = models.OneToOneField(ClassificationImport, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.classification_import
-
-
-class UploadedLiftover(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    liftover = models.OneToOneField(Liftover, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.liftover
-
-
-@receiver(post_delete, sender=UploadedGeneCoverage)
-def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):
-    if instance.gene_coverage_collection:
-        instance.gene_coverage_collection.delete()
-
-
-class UploadedClinVarVersion(models.Model):
-    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    clinvar_version = models.OneToOneField(ClinVarVersion, null=True, on_delete=CASCADE)
-
-
-class UploadedClinVarCitations(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    md5_hash = models.CharField(max_length=32)
-    clinvar_citations_collection = models.ForeignKey(ClinVarCitationsCollection, null=True, on_delete=CASCADE)
-
-
-@receiver(post_delete, sender=UploadedClinVarCitations)
-def uploaded_clinvar_citations_post_delete_handler(sender, instance, **kwargs):
-    if instance.clinvar_citations_collection:
-        instance.clinvar_citations_collection.delete()
 
 
 class UploadSettings(models.Model):

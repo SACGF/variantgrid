@@ -7,13 +7,13 @@ import json
 import logging
 import random
 
-from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, AnalysisTemplateVersion
+from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, \
+    AnalysisTemplateVersion, VariantTag
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion, AnalysisNodeAlleleSource
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
-from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes, \

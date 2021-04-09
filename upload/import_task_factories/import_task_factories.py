@@ -6,14 +6,14 @@ from upload.import_task_factories.abstract_vcf_import_task_factory import Abstra
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import UploadedFileTypes, UploadedBed, UploadedExpressionFile, \
     UploadedGeneList, UploadedPatientRecords, UploadedPedFile, UploadedVCF, \
-    UploadedGeneCoverage, UploadStep
-from upload.models_enums import UploadStepTaskType
+    UploadedGeneCoverage, UploadStep, UploadedVariantTags, UploadStepTaskType
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_expression_task import ImportExpressionTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
+from upload.tasks.import_variant_tags_task import ImportVariantTagsTask
 from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, \
     ProcessGenotypeVCFDataTask, ImportGenotypeVCFSuccessTask, \
     UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
@@ -226,3 +226,26 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
     def get_finish_task_classes(self):
         task_classes = super().get_finish_task_classes()
         return [LiftoverCompleteTask] + task_classes
+
+
+class VariantTagsImportTaskFactory(ImportTaskFactory):
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.VARIANT_TAGS
+
+    def get_possible_extensions(self):
+        return ['csv']
+
+    def get_data_classes(self):
+        return [UploadedVariantTags]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        df = pd.read_csv(filename, nrows=1)  # Just need header
+        REQUIRED_COLUMNS = ["variant_string", "view_genome_build", "tag__id"]
+        for c in REQUIRED_COLUMNS:
+            if c not in df.columns:
+                return 0
+        return 1000
+
+    def create_import_task(self, upload_pipeline):
+        return ImportVariantTagsTask.si(upload_pipeline.pk)

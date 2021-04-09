@@ -7,8 +7,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from snpdb.models import ImportSource, Sequence, md5sum_str
-from upload.models import UploadedFile, UploadPipeline, UploadedVCF, UploadStep
-from upload.models_enums import UploadedFileTypes
+from upload.models import UploadedFile, UploadPipeline, UploadedVCF, UploadStep, UploadedFileTypes
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER

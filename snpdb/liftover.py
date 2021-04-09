@@ -18,8 +18,7 @@ from library.vcf_utils import write_vcf_from_tuples
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_variant import AlleleSource, Liftover, Allele, Variant
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool
-from upload.models import UploadedFile, UploadedLiftover, UploadPipeline
-from upload.models_enums import UploadedFileTypes
+from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
 

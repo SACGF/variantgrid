@@ -6,10 +6,9 @@ from django.db.models import Max, F, Q, Value, TextField
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
-from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate
+from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, VariantTag
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
-from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL, get_overrides
@@ -395,11 +394,12 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
     model = VariantTag
     caption = 'Variant Tags'
     fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
-              "variant__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
+              "variant__id", "node__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
 
     colmodel_overrides = {
         'id': {'hidden': True},
         "variant__id": {"hidden": True},
+        "node__id": {"hidden": True},
         "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
         "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
         "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},

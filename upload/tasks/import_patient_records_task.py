@@ -17,4 +17,5 @@ class ImportPatientRecords(ImportTask):
 
         return import_patient_records(patient_records)
 
+
 ImportPatientRecords = app.register_task(ImportPatientRecords())  # @UndefinedVariable

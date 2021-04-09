@@ -8,8 +8,7 @@ from patients.models import Clinician, ExternalPK, ExternalModelManager, Patient
     Specimen
 from snpdb.models import Sex, assign_permission_to_user_and_groups, ImportSource
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import UploadedFile, UploadedPatientRecords
-from upload.models_enums import UploadedFileTypes
+from upload.models import UploadedFile, UploadedPatientRecords, UploadedFileTypes
 
 
 class Test(URLTestCase):

@@ -9,7 +9,7 @@ from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadedFile, UploadPipeline, UploadStep, \
     UploadedClassificationImport
-from upload.models_enums import UploadedFileTypes, UploadStepOrigin, \
+from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, \
     UploadStepTaskType, VCFPipelineStage
 from upload.upload_processing import process_upload_pipeline
 from classification.models.classification import ClassificationImport

@@ -5,9 +5,7 @@ from typing import Tuple
 from eventlog.models import create_event
 from library.file_utils import name_from_filename
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadPipeline, ProcessingStatus, \
-    UploadedFileTypes, UploadedFile
-from upload.models_enums import UploadStepOrigin
+from upload.models import UploadPipeline, ProcessingStatus, UploadedFileTypes, UploadedFile, UploadStepOrigin
 
 
 def get_upload_processing_task(file_type, upload_pipeline):

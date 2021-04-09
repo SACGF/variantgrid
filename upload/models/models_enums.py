@@ -11,9 +11,10 @@ class UploadedFileTypes(models.TextChoices):
     LIFTOVER = 'I', 'Liftover'
     PED = 'P', 'Pedigree'
     PATIENT_RECORDS = 'R', 'Patient Records'
+    VARIANT_CLASSIFICATIONS = 'S', 'Variant Classifications'
+    VARIANT_TAGS = "A", "Variant Tags"
     VCF = 'V', 'VCF'
     VCF_INSERT_VARIANTS_ONLY = 'Y', 'VCF - Insert variants only (no samples etc)'
-    VARIANT_CLASSIFICATIONS = 'S', 'Variant Classifications'
 
 
 class UploadStepTaskType(models.TextChoices):
