@@ -283,11 +283,13 @@ const VCForm = (function() {
                         if (this.record.has_changes) {
                             message = "This record has unsubmitted changes.";
                             provideButton = true;
-                        } else if (this.record.publish_level === 'lab' || this.record.publish_level === 'institution') {
-                            message = "This record is not fully shared yet.";
+                        } else if (this.record.publish_level === 'lab') {
+                            message = `This record is only visible by the lab.`;
+                        } else if (this.record.publish_level === 'institution') {
+                            message = `This record is only visible by the organisation.`;
                             provideButton = true;
                         } else {
-                            console.log(this.record.share_level);
+                            $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-success', style:'font-size:14px', html: '<i class="fas fa-check-circle"></i> This record is shared.'}).appendTo(quickSubmitWrapper);
                         }
                     }
                     if (message) {
