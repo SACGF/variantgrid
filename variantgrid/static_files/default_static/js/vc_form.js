@@ -135,11 +135,11 @@ const VCForm = (function() {
             
             this.messages = recordMessages;
             this.data = data;
-            this.updatePublishHistory();
             this.updateLinks();
             this.updateErrors();
             this.updateCitations();
             this.updateTitle();
+            this.updatePublishHistory();
             
             if (!this.isEditMode() || this.alwaysAsterix) {
                 this.searchAsterix();
@@ -266,19 +266,42 @@ const VCForm = (function() {
             wrapper.append($('<h5>', {text: 'Actions'}));
             let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
 
+            // The submit button appears next to the quick summary now so it's always at hand
             {
-                let butt = $('<button>', {class: 'btn btn-primary btn-lg', html: '<i class="fas fa-upload"></i> Submit', title: 'Submit/Share', click: this.share.bind(this)});
-                if (this.record.withdrawn) {
-                    butt.attr('title', 'Classification Withdrawn, un-withdraw before sharing');
-                    butt = disableButton(butt);
-                } else if (this.hasSendingStatus) {
-                    butt.attr('title', 'Saving... Please wait');
-                    butt = disableButton(butt);
-                } else if (this.hasErrors()) {
-                    butt.attr('title', 'Share: Please fix errors before sharing');
-                    butt = disableButton(butt);
+                let quickSubmitWrapper = $('#vc-quick-submit');
+                if (quickSubmitWrapper.length) {
+                    let message = null;
+                    let provideButton = false;
+                    if (this.record.withdrawn) {
+                        message = "You must unwithdraw to perform any changes.";
+                    } else if (this.hasSendingStatus) {
+                        message = "Changes uploading.";
+                        // shouldn't happen as when we have a sending status it just says Sending
+                    } else if (this.hasErrors()) {
+                        message = "You must fix any errors before submitting.";
+                    } else {
+                        if (this.record.has_changes) {
+                            message = "This record has unsubmitted changes.";
+                            provideButton = true;
+                        } else if (this.record.publish_level === 'lab' || this.record.publish_level === 'institution') {
+                            message = "This record is not fully shared yet.";
+                            provideButton = true;
+                        } else {
+                            console.log(this.record.share_level);
+                        }
+                    }
+                    if (message) {
+                        $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:16px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + message}).appendTo(quickSubmitWrapper);
+                    }
+                    if (provideButton) {
+                        $('<button>', {
+                            class: 'mt-2 btn btn-primary w-100',
+                            html: '<i class="fas fa-upload"></i> Submit',
+                            title: 'Submit/Share',
+                            click: this.share.bind(this)
+                        }).appendTo(quickSubmitWrapper);
+                    }
                 }
-                butt.appendTo(buttons);
             }
             {
                 let butt = $('<button>', {class: 'btn btn-danger btn-lg', html: '<i class="fas fa-trash-alt"></i> Delete', title: 'Delete', click: this.trash.bind(this)});
@@ -751,6 +774,8 @@ const VCForm = (function() {
 
             if (this.record.can_write && !this.isEditMode()) {
                 $('<button>', {class:"mt-2 btn btn-primary w-100", html:`<i class=\"fas fa-unlock-alt\"></i> EDIT`, click:this.editMode}).appendTo(jSyncStatus);
+            } else if (this.record.can_write && this.isEditMode()) {
+                $('<div>', {id:'vc-quick-submit'}).appendTo(jSyncStatus);
             }
         },
 

@@ -309,6 +309,7 @@ table.diff tbody tr .explain-icon {
 }
 #vc-extras #vcform-summary .card-body {
   background-color: #fdf;
+  min-height: 100px;
 }
 #vc-extras #vcform-errors .card-header {
   background-color: #dcc;
