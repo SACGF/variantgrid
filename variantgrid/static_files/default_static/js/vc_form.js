@@ -249,7 +249,7 @@ const VCForm = (function() {
                     });
                 }
             }
-            $('<p>', {text: 'Note that once shared at a certain level, this classifcation can only be shared at the same or higher level'}).appendTo(dialogBody);
+            $('<p>', {text: 'Note that once shared at a certain level, this classification can only be shared at the same or higher level'}).appendTo(dialogBody);
 
             dialogFooter.html([
                 $('<button>', {type:"button", class:"btn btn-secondary", 'data-dismiss':"modal", text:'Cancel'}),
@@ -308,7 +308,7 @@ const VCForm = (function() {
                         }).appendTo(quickSubmitWrapper);
                     } else {
                         $('<button>', {
-                            class: 'mt-1 btn btn-success w-100',
+                            class: 'mt-1 btn btn-primary w-100',
                             html: '<i class="fas fa-upload"></i> Submit',
                             title: 'Submit/Share',
                             click: this.share.bind(this)
