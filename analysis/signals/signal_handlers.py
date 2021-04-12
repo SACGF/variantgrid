@@ -14,12 +14,14 @@ def _analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag):
 
 def variant_tag_create(sender, instance, created=False, **kwargs):
     if created:
-        _analysis_tag_nodes_set_dirty(instance.analysis, instance.tag)
-        # want to be as quick as we can so do analysis reload + liftover async
-        analysis_tag_created_task.si(instance.pk).apply_async()
+        if instance.analysis:
+            _analysis_tag_nodes_set_dirty(instance.analysis, instance.tag)
+            # want to be as quick as we can so do analysis reload + liftover async
+            analysis_tag_created_task.si(instance.pk).apply_async()
 
 
 def variant_tag_delete(sender, instance, **kwargs):
-    _analysis_tag_nodes_set_dirty(instance.analysis, instance.tag)
-    # want to be as quick as we can so do analysis reload + liftover async
-    analysis_tag_deleted_task.si(instance.analysis_id, instance.tag_id).apply_async()
+    if instance.analysis:
+        _analysis_tag_nodes_set_dirty(instance.analysis, instance.tag)
+        # want to be as quick as we can so do analysis reload + liftover async
+        analysis_tag_deleted_task.si(instance.analysis_id, instance.tag_id).apply_async()

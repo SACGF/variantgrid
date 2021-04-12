@@ -11,9 +11,13 @@ from snpdb.models import ImportSource, VariantAlleleSource, VariantAllele
 @celery.task
 def analysis_tag_created_task(variant_tag_id):
     """ Do this async to save a few miliseconds when adding/removing tags """
-    variant_tag = VariantTag.objects.get(pk=variant_tag_id)
+    try:
+        variant_tag = VariantTag.objects.get(pk=variant_tag_id)
+    except VariantTag.DoesNotExist:
+        return  # Deleted before this got run, doesn't matter...
     update_nodes(variant_tag.analysis.pk)
     _liftover_variant_tag(variant_tag)
+
 
 
 @celery.task
