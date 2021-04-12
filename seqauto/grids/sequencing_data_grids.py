@@ -47,7 +47,7 @@ class SequencingRunListGrid(JqGridUserRowConfig):
               "gold_standard", "legacy", "hidden", "bad", "path"]
     colmodel_overrides = {
         'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
-        "is_valid": {'formatter': 'formatSequencingRunValid'},
+        "is_valid": {'label': 'Validated', 'formatter': 'formatSequencingRunValid'},
         'sequencer__name': {'width': 60, 'label': 'Sequencer'},
         'sequencer__sequencer_model__model': {'width': 70, 'label': 'Model'},
         'experiment__name': {'label': 'Experiment', 'width': 120},

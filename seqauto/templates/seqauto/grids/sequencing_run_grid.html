@@ -37,9 +37,9 @@
 	    	return "<a class='sequencing-run-link' href='" + URL + "'>" + sequencingRunId + "</a>";
 		},
         formatSequencingRunValid: function(is_valid) {
-            let value = is_valid;
+            let value = "Pass";
             if (!is_valid) {
-                value = `<span class="error">${is_valid}</span>`;
+                value = `<span class="error">Fail</span>`;
             }
             return value;
         },
