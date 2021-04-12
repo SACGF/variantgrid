@@ -32,8 +32,6 @@
     <div class="container">
         <h3>Nearby Variants</h3>
 
-        {% page_help user 'variantopedia/nearby_variants_help' 'Nearby variants & transcript choice' %}
-
         <div class="card" id="clingen-allele">
             <div class="card-header">Variant</div>
             <div class="card-body">
@@ -46,6 +44,8 @@
                 {% labelled label="Domain" %}{{ variant_annotation.interpro_domain | default_if_none:"-" }}{% endlabelled %}
             </div>
         </div>
+
+        {% page_help user 'variantopedia/nearby_variants_help' 'Nearby variants & transcript choice' %}
 
         <h4>Codon</h4>
         <div><b>Method:</b> {{ method_summaries.codon }}</div>
