@@ -260,44 +260,55 @@ const VCForm = (function() {
             ]);
             dialogContent.modal();
         },
-        
-        generateActionButtons() {
-            let wrapper = $('<div>', {class:'mt-4'});
-            wrapper.append($('<h5>', {text: 'Actions'}));
-            let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
 
+        updateSubmitButton() {
             // The submit button appears next to the quick summary now so it's always at hand
-            {
-                let quickSubmitWrapper = $('#vc-quick-submit');
-                if (quickSubmitWrapper.length) {
-                    let message = null;
-                    let provideButton = false;
-                    if (this.record.withdrawn) {
-                        message = "You must unwithdraw to perform any changes.";
-                    } else if (this.hasSendingStatus) {
-                        message = "Changes uploading.";
-                        // shouldn't happen as when we have a sending status it just says Sending
-                    } else if (this.hasErrors()) {
-                        message = "You must fix any errors before submitting.";
+            let quickSubmitWrapper = $('#vc-quick-submit');
+            quickSubmitWrapper.empty();
+            if (quickSubmitWrapper.length) {
+                let message = null;
+                let provideSubmitButton = false;
+
+                if (this.record.withdrawn) {
+                    message = "You must unwithdraw to perform any changes.";
+                //} else if (this.hasSendingStatus()) {
+                    // message = "Changes uploading.";
+                    // shouldn't happen as when we have a sending status it just says Sending
+                } else if (this.hasErrors()) {
+                    message = "Errors must be fixed before submitting.";
+                } else {
+                    if (this.record.has_changes) {
+                        message = "This record has unsubmitted changes.";
+                        provideSubmitButton = true;
+                    } else if (this.record.publish_level === 'lab') {
+                        message = `This record is only visible by the lab.`;
+                    } else if (this.record.publish_level === 'institution') {
+                        message = `This record is only visible by the organisation.`;
+                        provideSubmitButton = true;
                     } else {
-                        if (this.record.has_changes) {
-                            message = "This record has unsubmitted changes.";
-                            provideButton = true;
-                        } else if (this.record.publish_level === 'lab') {
-                            message = `This record is only visible by the lab.`;
-                        } else if (this.record.publish_level === 'institution') {
-                            message = `This record is only visible by the organisation.`;
-                            provideButton = true;
-                        } else {
-                            $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-success', style:'font-size:14px', html: '<i class="fas fa-check-circle"></i> This record is shared.'}).appendTo(quickSubmitWrapper);
-                        }
+                        $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: '<i class="fas fa-check-circle text-success"></i> This record is shared.'}).appendTo(quickSubmitWrapper);
                     }
-                    if (message) {
-                        $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:16px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + message}).appendTo(quickSubmitWrapper);
-                    }
-                    if (provideButton) {
+                }
+                if (message) {
+                    $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:14px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + message}).appendTo(quickSubmitWrapper);
+                }
+                if (this.record.can_write && !this.isEditMode()) {
+                    $('<button>', {class:"mt-1 btn btn-warning w-100", html:`<i class=\"fas fa-unlock-alt\"></i> EDIT`, click:this.editMode}).appendTo(quickSubmitWrapper);
+                } else {
+                    if (this.sendStatus.error) {
+                        $('<div>', {class: 'mt-1 btn btn-danger w-100',
+                            disabled: true,
+                            html: '<i class="fas fa-bomb"></i> Error. Please Reload Page.'
+                        }).appendTo(quickSubmitWrapper);
+
+                    } else if (this.hasSendingStatus()) {
+                        $('<div>', {class: 'mt-1 btn btn-secondary w-100',
+                            disabled: true,
+                            html: '<i class="fas fa-clock"></i> Uploading Changes'
+                        }).appendTo(quickSubmitWrapper);
+                    } else {
                         $('<button>', {
-                            class: 'mt-2 btn btn-primary w-100',
+                            class: 'mt-1 btn btn-success w-100',
                             html: '<i class="fas fa-upload"></i> Submit',
                             title: 'Submit/Share',
                             click: this.share.bind(this)
@@ -305,28 +316,34 @@ const VCForm = (function() {
                     }
                 }
             }
-            {
-                let butt = $('<button>', {class: 'btn btn-danger btn-lg', html: '<i class="fas fa-trash-alt"></i> Delete', title: 'Delete', click: this.trash.bind(this)});
-            
-                if (this.record.withdrawn) {
-                    butt.attr('title', 'Un-withdraw Classification');
-                    butt.html('<i class="fas fa-trash-restore-alt"></i> Unwithdraw');
-                    butt.removeClass('btn-danger');
-                    butt.addClass('btn-secondary');
-                } else if (this.record.publish_level === 'logged_in_users' ||
-                    this.record.publish_level === 'public') {
-                    //butt.attr('title', 'Cannot delete classification after it has been shared with logged in users or 3rd parties');
-                    //butt = disableButton(butt);
-                    butt.attr('title', 'Withdraw Classification');
-                    butt.html('<i class="fas fa-trash-alt"></i> Withdraw');
-                }
-                if (this.hasSendingStatus) {
-                    butt.attr('title', 'Saving... Please wait');
-                    butt = disableButton(butt);
-                }
-                
-                butt.appendTo(buttons);
+        },
+
+        generateActionButtons() {
+            this.updateSubmitButton();
+
+            let wrapper = $('<div>', {class:'mt-4'});
+            wrapper.append($('<h5>', {text: 'Actions'}));
+            let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
+
+            let butt = $('<button>', {class: 'btn btn-danger btn-lg', html: '<i class="fas fa-trash-alt"></i> Delete', title: 'Delete', click: this.trash.bind(this)});
+            if (this.record.withdrawn) {
+                butt.attr('title', 'Un-withdraw Classification');
+                butt.html('<i class="fas fa-trash-restore-alt"></i> Unwithdraw');
+                butt.removeClass('btn-danger');
+                butt.addClass('btn-secondary');
+            } else if (this.record.publish_level === 'logged_in_users' ||
+                this.record.publish_level === 'public') {
+                //butt.attr('title', 'Cannot delete classification after it has been shared with logged in users or 3rd parties');
+                //butt = disableButton(butt);
+                butt.attr('title', 'Withdraw Classification');
+                butt.html('<i class="fas fa-trash-alt"></i> Withdraw');
             }
+            if (this.hasSendingStatus()) {
+                butt.attr('title', 'Saving... Please wait');
+                butt = disableButton(butt);
+            }
+
+            butt.appendTo(buttons);
 
             return wrapper;
         },
@@ -443,6 +460,8 @@ const VCForm = (function() {
                 jShareButtons.empty();
                 
                 this.generateActionButtons().appendTo(jShareButtons);
+            } else {
+                this.updateSubmitButton();
             }
             this.generateExportButtons().appendTo(jShareButtons);
         },
@@ -535,8 +554,10 @@ const VCForm = (function() {
             sending: false,
             error: null
         },
-        
-        hasSendingStatus: false,
+
+        hasSendingStatus() {
+            return this.sendStatus.modifications || this.sendStatus.sending || this.sendStatus.error;
+        },
         
         setupUnloadWarning() {
             window.addEventListener("beforeunload", (e) => {
@@ -561,45 +582,8 @@ const VCForm = (function() {
             //console.log(`Update sending status delta =`);
             //console.log(delta);
             Object.assign(this.sendStatus, delta);
-            
-            let hasStatus = Object.keys(this.sendStatus).find(k => !!this.sendStatus[k]);
-            if (!hasStatus && this.hasSendingStatus) {
-                // jSyncStatus.fadeTo(500, 0);
-                this.hasSendingStatus = false;
-                this.updateTitle();
-                return;
-            } else if (hasStatus && !this.hasSendingStatus) {
-                jSyncStatus.fadeTo(500, 1);
-                this.hasSendingStatus = true;
-            }
-            
-            jSyncStatus.empty();
-            
-            let networkStatus = $('<div>', {class: 'network-status'});
-            let title = '';
-            let important = false;
-            
-            if (this.sendStatus.modifications) {
-                networkStatus.addClass('modifications');
-                title = '<i class="far fa-clock"></i> Pending changes';
-            }
-            if (this.sendStatus.error) {
-                networkStatus.addClass('error');
-                title = `<i class="fas fa-bomb text-danger"></i> Error uploading to server.<br/>Please reload this page.`;
-                important = true;
-            }
-            if (this.sendStatus.sending) {
-                networkStatus.addClass('sending');
-                title = '<i class="fas fa-upload"></i> Uploading changes';
-            }
-            let span = $('<span>', {html: title});
-            if (important) {
-                span.css('font-weight', 'bold');
-                span.css('font-size', 'larger');
-            }
-            jSyncStatus.html(span);
-            jSyncStatus.append(networkStatus);
-            
+            this.updateTitle();
+            this.updateSubmitButton();
             this.updatePublishHistory();
         },
 
@@ -774,11 +758,7 @@ const VCForm = (function() {
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Clin Sig');
 
-            if (this.record.can_write && !this.isEditMode()) {
-                $('<button>', {class:"mt-2 btn btn-primary w-100", html:`<i class=\"fas fa-unlock-alt\"></i> EDIT`, click:this.editMode}).appendTo(jSyncStatus);
-            } else if (this.record.can_write && this.isEditMode()) {
-                $('<div>', {id:'vc-quick-submit'}).appendTo(jSyncStatus);
-            }
+            $('<div>', {id:'vc-quick-submit'}).appendTo(jSyncStatus);
         },
 
         alleleVariantData() {
