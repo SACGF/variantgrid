@@ -7,7 +7,7 @@ from lazy import lazy
 
 from analysis.models.enums import TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
-from analysis.models.nodes.analysis_node import Analysis, AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode
 from snpdb.models import Tag
 
 
@@ -28,10 +28,10 @@ class TagNode(AnalysisNode):
         return list(qs)
 
     def _get_node_q(self) -> Q:
-        if self.mode == TagNodeMode.ALL_ANALYSES:
-            analyses = Analysis.filter_for_user(self.analysis.user)
+        if self.mode == TagNodeMode.ALL_TAGS:
+            tags_qs = VariantTag.filter_for_user(self.analysis.user)
             # Builds from different analyses (maybe diff builds) - so do query using Allele
-            variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, analyses, self.tag_ids)
+            variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, tags_qs, self.tag_ids)
             node_q = Q(pk__in=list(variants_qs.values_list("pk", flat=True)))
         else:
             # Tags from this analysis - use variant query
@@ -50,10 +50,10 @@ class TagNode(AnalysisNode):
             if self.tag_ids:
                 description = f"Tagged {', '.join(self.tag_ids)}"
             else:
-                if self.mode == TagNodeMode.ALL_ANALYSES:
+                if self.mode == TagNodeMode.ALL_TAGS:
                     description = "Global Tags"
                 else:
-                    description = "All Tags"
+                    description = "Analysis Tags"
         else:
             description = self.ANALYSIS_TAGS_NAME  # Has to be set to this
 

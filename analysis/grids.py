@@ -413,16 +413,12 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         queryset = VariantTag.get_for_build(genome_build)
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            analyses_queryset = Analysis.filter_for_user(user)
-        else:
-            analyses_queryset = Analysis.objects.filter(user=user)
 
         if extra_filters:
             analysis_ids = extra_filters.get("analysis_ids")
             if analysis_ids is not None:
-                analyses_queryset = analyses_queryset.filter(pk__in=analysis_ids)
+                analyses_queryset = Analysis.filter_for_user(user).filter(pk__in=analysis_ids)
+                queryset = queryset.filter(analysis__in=analyses_queryset)
 
             gene_id = extra_filters.get("gene")
             if gene_id:
@@ -433,8 +429,9 @@ class AnalysesVariantTagsGrid(JqGridUserRowConfig):
                 tag = Tag.objects.get(pk=tag_id)
                 queryset = queryset.filter(tag=tag)
 
+        user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
-            queryset = queryset.filter(analysis__in=analyses_queryset)
+            queryset = VariantTag.filter_for_user(user, queryset=queryset)
         else:
             queryset = queryset.filter(user=user)
 
@@ -476,17 +473,16 @@ class TaggedVariantGrid(AbstractVariantGrid):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         user_grid_config = UserGridConfig.get(user, self.caption)
         if user_grid_config.show_group_data:
-            analyses_queryset = Analysis.filter_for_user(user)
+            tags_qs = VariantTag.filter_for_user(user)
         else:
-            analyses_queryset = Analysis.objects.filter(user=user)
+            tags_qs = tags_qs.filter(user=user)
 
         tag_ids = []
         if extra_filters:
             if tag_id := extra_filters.get("tag"):
                 tag_ids.append(tag_id)
 
-        qs = VariantTag.variants_for_build(genome_build, analyses_queryset, tag_ids)
-
+        qs = VariantTag.variants_for_build(genome_build, tags_qs, tag_ids)
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
         fields.remove("tags")

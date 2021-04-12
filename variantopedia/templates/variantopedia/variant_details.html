@@ -192,7 +192,108 @@ function populateVariantAllele(data) {
     });
 }
 
+function variantDetailsTagClickHandler() {
+    const variantTag = $(this);
+    const innerSpan = $(".user-tag-colored", variantTag);
+
+    function removeClickHandler() {
+        const variantTagId = variantTag.attr('variant_tag_id');
+        const tagId = variantTag.attr("tag_id");
+
+        const removeTagCallback = function () {
+            $(`#variant-tag-${variantTagId}`).parents("tr").remove();
+        };
+        let data = 'variant_id={{ variant.pk }}';
+        data += "&genome_build_name={{ genome_build.pk }}";
+        data += '&tag_id=' + tagId;
+        data += '&variant_tag_id=' + variantTagId;
+        data += '&op=' + 'del';
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: Urls.set_variant_tag('V'),
+            success : removeTagCallback,
+        });
+    }
+    deleteItemClickHandler(variantTag, innerSpan, removeClickHandler);
+}
+
+
+function addVariantTag(variantTagData) {
+    const tag = variantTagData.tag;
+    // console.log("addVariantTag:");
+    // console.log(variantTagData);
+    const tagsTable = $("table#tags-table");
+    let tagRow = $("<tr/>"); // tag, analysis, user, timestamp
+    let variantTagClasses = `grid-tag tagged-${tag}`;
+    let variantTag = `<span class='${variantTagClasses}' title='Tagged as ${tag}' id="variant-tag-${variantTagData.id}" variant_tag_id='${variantTagData.id}' tag_id='${tag}'><span class='user-tag-colored'>${tag}</span></span>`;
+    let tagTd = $("<td/>").append(variantTag);
+    let analysisTd = "<td></td>";
+    if (variantTagData.analysis) {
+        const analysisUrl = Urls.analysis(variantTagData.analysis.id);
+        analysisTd = `<td><a class='hover-link' href="${analysisUrl}">${variantTagData.analysis.name}</a></td>`;
+    }
+    let userTd = `<td><span title="${variantTagData.user.first_name} ${variantTagData.user.last_name}">${variantTagData.user.username}</span></td>`;
+    let createdTd = $("<td/>").append(createTimestampDom(variantTagData.seconds_since_epoch, false));
+    let timeAgoTd = $("<td/>").append(createTimestampDom(variantTagData.seconds_since_epoch, true));
+    tagRow.append(tagTd);
+    tagRow.append(analysisTd);
+    tagRow.append(userTd);
+    tagRow.append(createdTd);
+    tagRow.append(timeAgoTd);
+    tagsTable.append(tagRow);
+
+    if (variantTagData.can_write) {
+        $(`#variant-tag-${variantTagData.id}`).click(variantDetailsTagClickHandler);
+    }
+}
+
+function showTagAutocomplete() {
+    const showTagButton = $("#show-tag-autocomplete");
+    const tagForm = $("#variant-tag-form");
+    const variantTagUrl = Urls.set_variant_tag('V');
+    const tagSelect = $("select#id_tag", tagForm);
+
+    showTagButton.hide();
+    tagForm.show();
+
+    tagSelect.change(function() {
+        const tag = $(this).val();
+        if (tag) {
+            clearAutocompleteChoice(tagSelect);
+            const successFunc = function (data) {
+                // We can return success but with empty data if it's a dupe (so don't add)
+                if (!$.isEmptyObject(data)) {
+                    addVariantTag(data);
+                }
+                showTagButton.show();
+                tagForm.hide();
+            };
+            let data = 'variant_id={{ variant.pk }}';
+            data += "&genome_build_name={{ genome_build.pk }}";
+            data += '&tag_id=' + tag;
+            data += '&op=' + 'add';
+            $.ajax({
+                type: "POST",
+                data: data,
+                url: variantTagUrl,
+                success : successFunc,
+            });
+        }
+    });
+    tagSelect.select2('open');
+}
+
+
 $(document).ready(function() {
+    {% if variant_tags %}
+        const variantTags = {{ variant_tags|safe }};
+        for (let i=0 ; i<variantTags.length ; ++i) {
+            addVariantTag(variantTags[i]);
+        }
+        $("table#tags-table").show();
+    {% endif %}
+
 	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id genome_build.pk %}');
 
     let variantAllele = {{ variant_allele | jsonify }};
@@ -274,24 +375,24 @@ $(document).ready(function() {
         </div>
     </div>
 
-    {% if variant_tags %}
-        <div class="container mt-4">
-            <h4>Tags</h4>
-            <table id='tags-table' class="table">
-                <thead>
-                    <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th>
-                </thead>
-                {% for vt in variant_tags %}
-                    <tr>
-                        <td><span class='grid-tag tagged-{{ vt.tag }}' title='Tagged as {{ vt.tag }}' tag_id='{{ vt.tag }}'><span class='user-tag-colored'>{{ vt.tag }}</span></span></td>
-                        <td><a class='hover-link' href="{% url 'analysis' vt.analysis.pk %}">{{ vt.analysis }}</a></td>
-                        <td>{{ vt.user }}</td>
-                        <td>{% timestamp vt.created %}</td>
-                    </tr>
-                {% endfor %}
-            </table>
+    <div class="container mt-4">
+        <h4>Tags</h4>
+        <table id='tags-table' class="table hidden">
+            <thead>
+                <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th><th>Time Ago</th>
+            </thead>
+        </table>
+        <div class="d-flex">
+            <div>
+                <a href="javascript:showTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button"></div></a>
+            </div>
+            <form id="variant-tag-form" class="hidden flex-row flex-grow">
+                {% csrf_token %}
+                {{  tag_form.tag }}
+                {{  tag_form.media }}
+            </form>
         </div>
-    {% endif %}
+    </div>
 
     {% if classifications %}
         <!-- Needs to be full width to show data table -->

@@ -13,10 +13,12 @@
                 <tr>
                     <td><span class='grid-tag tagged-{{ variant_tag.tag }}' title='Tagged as {{ variant_tag.tag }}' tag_id='{{ variant_tag.tag }}'><span class='user-tag-colored'>{{ variant_tag.tag }}</span></span></td>
                     <td>
-                        {% if variant_tag.node %}
-                            <a class='hover-link' target="_blank" href="{% url 'analysis_node' variant_tag.analysis.pk variant_tag.node.pk %}">{{ variant_tag.analysis }}</a>
-                        {% else %}
-                            <a class='hover-link' target="_blank" href="{% url 'analysis' variant_tag.analysis.pk %}">{{ variant_tag.analysis }}</a>
+                        {% if variant_tag.analysis %}
+                            {% if variant_tag.node %}
+                                <a class='hover-link' target="_blank" href="{% url 'analysis_node' variant_tag.analysis.pk variant_tag.node.pk %}">{{ variant_tag.analysis }}</a>
+                            {% else %}
+                                <a class='hover-link' target="_blank" href="{% url 'analysis' variant_tag.analysis.pk %}">{{ variant_tag.analysis }}</a>
+                            {% endif %}
                         {% endif %}
                     </td>
                     <td>{{ variant_tag.user }}</td>

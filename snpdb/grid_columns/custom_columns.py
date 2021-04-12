@@ -94,7 +94,7 @@ def get_variantgrid_extra_alias_and_select_columns(user: User, exclude_analysis=
     # TODO: Need to add user level security to classifications and tags
     tags_global_sql = SELECT_TAGGED_SQL
     if exclude_analysis:
-        tags_global_sql += " AND analysis_varianttag.analysis_id <> %d" % exclude_analysis.pk
+        tags_global_sql += " AND (analysis_varianttag.analysis_id IS NULL OR analysis_varianttag.analysis_id <> %d)" % exclude_analysis.pk
 
     alias_and_select = {
         "internally_classified": SELECT_INTERNALLY_CLASSIFIED_SQL,

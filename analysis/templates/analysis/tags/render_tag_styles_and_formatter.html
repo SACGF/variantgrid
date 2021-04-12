@@ -15,8 +15,12 @@
             },
         {% if url_name_visible.analysis %}
             formatAnalysis : function(analysisName, options, rowObject) {
-                const URL = Urls.analysis(rowObject["analysis__id"]);
-                return "<a href='" + URL + "' target='_blank'>" + analysisName + "</a>";
+                let analysis = "";
+                if (analysisName) {
+                    const URL = Urls.analysis(rowObject["analysis__id"]);
+                    analysis = "<a href='" + URL + "' target='_blank'>" + analysisName + "</a>";
+                }
+                return analysis;
             },
         {% endif %}
         {% if url_name_visible.view_variant %}

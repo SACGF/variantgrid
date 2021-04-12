@@ -4,7 +4,6 @@ from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.db.models.query_utils import Q
 
-from library.database_utils import queryset_to_sql
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
 from snpdb.models import UserGridConfig, DataState
@@ -105,7 +104,8 @@ class SequencingRunListGrid(JqGridUserRowConfig):
 class UnalignedReadsListGrid(JqGridUserRowConfig):
     model = UnalignedReads
     caption = 'UnalignedReads'
-    fields = ["id", "sequencing_sample__sample_sheet__sequencing_run__name", "sequencing_sample__sample_id", "fastq_r1__data_state", "fastq_r2__data_state"]
+    fields = ["id", "sequencing_sample__sample_sheet__sequencing_run__name", "sequencing_sample__sample_id",
+              "fastq_r1__data_state", "fastq_r2__data_state"]
     colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewUnalignedReadsLink'},
                           'sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
                           "fastq_r1__data_state": {'label': 'R1 state'},
@@ -126,11 +126,15 @@ class UnalignedReadsListGrid(JqGridUserRowConfig):
 class BamFileListGrid(JqGridUserRowConfig):
     model = BamFile
     caption = 'BamFiles'
-    fields = ["id", "data_state", "unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name", "unaligned_reads__sequencing_sample__sample_id", "path", "aligner__name"]
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewBamFileLink'},
-                          'data_state': {'width': 40},
-                          'unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
-                          'aligner__name': {'label': 'Aligner'}}
+    fields = [
+        "id", "data_state", "unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
+        "unaligned_reads__sequencing_sample__sample_id", "path", "aligner__name"]
+    colmodel_overrides = {
+        'id': {'width': 20, 'formatter': 'viewBamFileLink'},
+        'data_state': {'width': 40},
+        'unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
+        'aligner__name': {'label': 'Aligner', "hidden": True}  # Hide as always "Fake Aligner" currently
+    }
 
     def __init__(self, user, **kwargs):
         super().__init__(user)
@@ -146,9 +150,12 @@ class BamFileListGrid(JqGridUserRowConfig):
 class VCFFileListGrid(JqGridUserRowConfig):
     model = VCFFile
     caption = 'VCFFiles'
-    fields = ["id", "data_state", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name", "bam_file__unaligned_reads__sequencing_sample__sample_id", "path", "variant_caller"]
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewVCFFileLink'},
-                          'bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}}
+    fields = ["id", "data_state", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
+              "bam_file__unaligned_reads__sequencing_sample__sample_id", "path", "variant_caller"]
+    colmodel_overrides = {
+        'id': {'width': 20, 'formatter': 'viewVCFFileLink'},
+        'bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
+    }
 
     def __init__(self, user, **kwargs):
         super().__init__(user)
@@ -164,9 +171,12 @@ class VCFFileListGrid(JqGridUserRowConfig):
 class QCFileListGrid(JqGridUserRowConfig):
     model = QC
     caption = 'QC'
-    fields = ["id", "data_state", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name", "bam_file__unaligned_reads__sequencing_sample__sample_id", "path"]
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewQCLink'},
-                          'bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}}
+    fields = ["id", "data_state", "bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name",
+              "bam_file__unaligned_reads__sequencing_sample__sample_id", "path"]
+    colmodel_overrides = {
+        'id': {'width': 20, 'formatter': 'viewQCLink'},
+        'bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
+    }
 
     def __init__(self, user, **kwargs):
         super().__init__(user)

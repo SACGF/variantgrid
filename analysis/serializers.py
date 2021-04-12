@@ -9,10 +9,12 @@ from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, Phenot
     PhenotypeNodeOntologyTerm
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
     NodeWiki
+from analysis.models.models_variant_tag import VariantTag
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
 from ontology.serializers import OntologyTermSerializer
+from snpdb.serializers import UserSerializer
 
 
 class NodeAlleleFrequencyRangeSerializer(serializers.ModelSerializer):
@@ -291,3 +293,21 @@ class ZygosityNodeSerializer(AnalysisNodeSerializer):
     class Meta(AnalysisNodeSerializer.Meta):
         model = ZygosityNode
         fields = _analysis_node_fields(model)
+
+
+class VariantTagSerializer(serializers.ModelSerializer):
+    analysis = AnalysisSerializer()
+    user = UserSerializer()
+    seconds_since_epoch = serializers.SerializerMethodField()
+    can_write = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VariantTag
+        fields = "__all__"
+
+    def get_seconds_since_epoch(self, obj):
+        return obj.created.timestamp()
+
+    def get_can_write(self, obj):
+        user = self.context['request'].user
+        return obj.can_write(user)

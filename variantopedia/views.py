@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from collections import defaultdict
@@ -19,6 +20,7 @@ from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import Analysis
+from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
@@ -29,13 +31,14 @@ from library.django_utils import require_superuser, highest_pk, get_url_from_vie
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback, send_notification, NotificationBuilder
+from library.log_utils import report_exc_info, log_traceback, NotificationBuilder
 from library.utils import count, pretty_label
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
+from snpdb.forms import TagForm
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
     AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
@@ -538,7 +541,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     except VariantAllele.DoesNotExist:
         variant_allele_data = None
 
-    variant_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+    variant_tags = []
+    for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):
+        variant_tags.append(VariantTagSerializer(vt, context={"request": request}).data)
 
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
@@ -556,10 +561,11 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "clinvar_citations": clinvar_citations,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
         "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
+        "tag_form": TagForm(),
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "variant_tags": variant_tags,
+        "variant_tags": json.dumps(variant_tags),
         "vts": vts,
     }
     if extra_context:

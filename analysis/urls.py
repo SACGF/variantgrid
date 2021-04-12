@@ -63,7 +63,7 @@ urlpatterns = [
 
     perm_path('node_graph/<int:node_id>/<int:graph_type_id>/<slug:cmap>/', views.node_graph, name='node_graph'),
     perm_path('column_summary_boxplot/<int:node_id>/<label>/<slug:variant_column>/', views.column_summary_boxplot, name='column_summary_boxplot'),
-    perm_path('analysis/<int:analysis_id>/set_variant_tag/', views_json.set_variant_tag, name='set_variant_tag'),
+    perm_path('analysis/set_variant_tag/<slug:location>/', views_json.set_variant_tag, name='set_variant_tag'),
     perm_path('set_variant_selected/<int:node_id>/', views_json.set_variant_selected, name='set_variant_selected'),
 
     perm_path('classification/create_for_variant_tag/<int:variant_tag_id>', views.CreateClassificationForVariantTagView.as_view(),

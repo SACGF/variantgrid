@@ -71,12 +71,16 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return gs
 
     @staticmethod
-    def get_for_build(genome_build: GenomeBuild, variant_qs=None):
+    def get_for_build(genome_build: GenomeBuild, tags_qs=None, variant_qs=None):
         """ Returns tags visible within a build
+            tags_qs - set to filter - default (None) = all tags
             variant_qs - set to filter - default (None) = all variants """
+        if tags_qs is None:
+            tags_qs = VariantTag.objects.all()
+
         va_kwargs = {
             "genome_build": genome_build,
-            "allele__in": VariantTag.objects.all().values_list("variant__variantallele__allele")
+            "allele__in": tags_qs.values_list("variant__variantallele__allele")
         }
         if variant_qs is not None:
             va_kwargs["variant__in"] = variant_qs
@@ -85,8 +89,8 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True))
 
     @staticmethod
-    def variants_for_build(genome_build, analyses, tag_ids: List[str]):
-        tags_qs = VariantTag.get_for_build(genome_build).filter(analysis__in=analyses)
+    def variants_for_build(genome_build, tags_qs, tag_ids: List[str]):
+        tags_qs = VariantTag.get_for_build(genome_build, tags_qs=tags_qs)
         if tag_ids:
             tags_qs = tags_qs.filter(tag__in=tag_ids)
 

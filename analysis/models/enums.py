@@ -144,7 +144,7 @@ class TrioSample(models.TextChoices):
 class TagNodeMode(models.TextChoices):
     PARENT = 'P', 'Parent'
     THIS_ANALYSIS = 'T', 'This Analysis'
-    ALL_ANALYSES = 'L', 'All Analyses'
+    ALL_TAGS = 'L', 'All Tags'
 
 
 class TagLocation(models.TextChoices):
