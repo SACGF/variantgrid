@@ -281,12 +281,13 @@ const VCForm = (function() {
                         message = "This record has unsubmitted changes.";
                         provideSubmitButton = true;
                     } else if (this.record.publish_level === 'lab') {
-                        message = `This record is only visible by the lab.`;
+                        message = `This record is only visible to users in your lab group.`;
                     } else if (this.record.publish_level === 'institution') {
-                        message = `This record is only visible by the organisation.`;
+                        message = `This record is only visible to users in your organisation.`;
                         provideSubmitButton = true;
                     } else {
-                        $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: '<i class="fas fa-check-circle text-success"></i> This record is shared.'}).appendTo(quickSubmitWrapper);
+                        let message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
+                        $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`}).appendTo(quickSubmitWrapper);
                     }
                 }
                 if (message) {
