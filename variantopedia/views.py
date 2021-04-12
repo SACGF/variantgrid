@@ -51,7 +51,7 @@ from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.perm_path import get_visible_url_names
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.interesting_nearby import get_nearby_qs
+from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries
 from variantopedia.search import search_data, SearchResults
 
 
@@ -605,8 +605,11 @@ def nearby_variants(request, variant_id, annotation_version_id):
 
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
-    context = {"genome_build": annotation_version.genome_build,
-               "variant": variant,
-               "variant_annotation": variant_annotation}
+    context = {
+        "method_summaries": get_method_summaries(variant, distance=settings.VARIANT_DETAILS_NEARBY_RANGE),
+        "genome_build": annotation_version.genome_build,
+        "variant": variant,
+        "variant_annotation": variant_annotation
+    }
     context.update(get_nearby_qs(variant, annotation_version))
     return render(request, "variantopedia/nearby_variants.html", context)
