@@ -1062,11 +1062,11 @@ class NodeAlleleFrequencyRange(models.Model):
         has_max = self.max is not None and self.max < self.MAX_VALUE
 
         if has_min and has_max:
-            return f"{self.min} - {self.max}%"
+            return f"{self.min} - {self.max}"
         if has_min:
-            return f">={self.min}%"
+            return f">={self.min}"
         if has_max:
-            return f"<={self.max}%"
+            return f"<={self.max}"
         return ""
 
 
