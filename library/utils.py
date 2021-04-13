@@ -473,6 +473,30 @@ def count(object: Any) -> int:
         return len(object)
 
 
+trailing_zeros_strip = re.compile("(.*?[.]?[0-9]+?)([.]0+|0+)$")
+
+
+def format_significant_digits(num_str: str, significant_digits=3) -> str:
+    if not isinstance(num_str, str):
+        num_str = str(num_str)
+
+    significant_digit_count = None
+    to_sig_places = ''
+    for char in num_str:
+        to_sig_places += char
+        if significant_digit_count is None and char in {'1', '2', '3', '4', '5', '6', '7', '8', '9'}:
+            significant_digit_count = 1
+        elif significant_digit_count and char != '.':
+            significant_digit_count += 1
+        if significant_digit_count == significant_digits:
+            break
+
+    # strip trailing 0s
+    if match := trailing_zeros_strip.match(to_sig_places):
+        to_sig_places = match.group(1)
+    return to_sig_places
+
+
 def delimited_row(data: list, delimiter: str = ',') -> str:
     out = io.StringIO()
     writer = csv.writer(out, delimiter=delimiter)
