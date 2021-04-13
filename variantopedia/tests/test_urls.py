@@ -44,7 +44,6 @@ class Test(URLTestCase):
             ("variants", {}, 200),
             ("dashboard", {}, 200),
             ("database_statistics", {}, 200),
-            ("variantopedia_tagged", {}, 200),
             ("search", {}, 200),
             ("variantopedia_wiki", {}, 200),
             ("view_variant", {"variant_id": self.variant.pk}, 200),

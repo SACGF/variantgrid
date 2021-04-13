@@ -1,14 +1,19 @@
 from library.django_utils.jqgrid_view import JQGridView
 from variantgrid.perm_path import perm_path
 from variantopedia import views
-from variantopedia.grids import VariantWikiGrid, AllVariantsGrid, NearbyVariantsGrid
+from variantopedia.grids import VariantWikiGrid, AllVariantsGrid, NearbyVariantsGrid, TaggedVariantGrid, VariantTagsGrid
+
 
 urlpatterns = [
     perm_path('variants', views.variants, name='variants'),
     perm_path('dashboard', views.dashboard, name='dashboard'),
     perm_path('server_status', views.server_status, name='server_status'),
     perm_path('database_statistics', views.database_statistics, name='database_statistics'),
-    perm_path('tagged', views.tagged, name='variantopedia_tagged'),
+    # Tagging
+    perm_path('variant_tags/', views.variant_tags, name='variant_tags'),
+    perm_path('variant_tags/<genome_build_name>', views.variant_tags, name='genome_build_variant_tags'),
+
+    #
     perm_path('search', views.search, name='search'),
     perm_path('view_variant/<int:variant_id>', views.view_variant, name='view_variant'),
     perm_path('view_variant/<int:variant_id>/<genome_build_name>', views.view_variant,
@@ -37,4 +42,8 @@ urlpatterns = [
               name='nearby_variants_grid'),
     perm_path('all_variants/grid/<slug:op>/', JQGridView.as_view(grid=AllVariantsGrid, csv_download=True),
               name='all_variants_grid'),
+    perm_path('tags/grid/<genome_build_name>/<slug:op>/',
+              JQGridView.as_view(grid=VariantTagsGrid, delete_row=True), name='variant_tags_grid'),
+    perm_path('tagged_variants/grid/<genome_build_name>/<slug:op>/',
+              JQGridView.as_view(grid=TaggedVariantGrid, delete_row=True), name='tagged_variant_grid'),
 ]

@@ -752,15 +752,6 @@ def node_method_description(request, node_id, node_version):
     return render(request, 'analysis/node_method_description.html', context)
 
 
-def analyses_variant_tags(request, genome_build_name=None):
-    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    variant_tags_qs = VariantTag.objects.filter(analysis__genome_build=genome_build)
-    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
-    context = {"genome_build": genome_build,
-               "tag_counts": tag_counts}
-    return render(request, 'analysis/analyses_variant_tags.html', context)
-
-
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
     all_nodes = AnalysisNode.objects.all()

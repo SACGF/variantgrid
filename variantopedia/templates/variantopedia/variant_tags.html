@@ -1,11 +1,11 @@
-{% extends menu_analysis_base %}
+{% extends menu_variants_base %}
 {% load settings_tags %}
 {% load static %}
 {% load genome_build_tags %}
 {% load jqgrid_tags %}
 {% load user_tag_color_tags %}
 
-{% block title %}Analyses Variant Tags{% endblock title %}
+{% block title %}Variant Tags{% endblock title %}
 
 {% block head %}
 {{ block.super }}
@@ -76,9 +76,11 @@ $(document).ready(function() {
 {% endblock head %}
 
 {% block submenu_page_content %}
-    {% genome_build_url_arg genome_build 'genome_build_analyses_variant_tags' %}
+    {% genome_build_url_arg genome_build 'genome_build_variant_tags' %}
 
-    <h3>Analyses Variant Tags</h3>
+    <h3>Variant Tags</h3>
+
+    <a href="{% url 'tag_settings' %}">Tag Settings</a>
 
     {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' %}
 
@@ -86,13 +88,13 @@ $(document).ready(function() {
 
     (One variant per row, with all associated tags)
 
-    {% jqgrid 'analysis_tagged_variant_grid' 'analysis_tagged_variant' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
+    {% jqgrid 'tagged_variant_grid' 'tagged_variant' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
 
     <h3>Tags</h3>
 
     (One tag per row, showing full information)
 
-    {% user_data_grid_filter 'analyses_variant_tags' 'Analyses Variant Tags' filter_name_choices=filter_name_choices %}
-    {% jqgrid 'analyses_variant_tags_grid' 'analyses_variant_tags' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
+    {% user_data_grid_filter 'variant_tags' 'Variant Tags' filter_name_choices=filter_name_choices %}
+    {% jqgrid 'variant_tags_grid' 'variant_tags' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False download_grid_json_as_csv=True init_func='variantTagsGridInitFunc' %}
 
 {% endblock submenu_page_content %}

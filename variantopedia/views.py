@@ -27,7 +27,7 @@ from annotation.transcripts_annotation_selections import VariantTranscriptSelect
 from eventlog.models import Event, create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import require_superuser, highest_pk, get_url_from_view_path
+from library.django_utils import require_superuser, highest_pk, get_url_from_view_path, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
@@ -309,11 +309,6 @@ def database_statistics(request):
     return render(request, "variantopedia/database_statistics.html", context)
 
 
-def tagged(request):
-    context = {}
-    return render(request, "variantopedia/tagged.html", context)
-
-
 def view_variant(request, variant_id, genome_build_name=None):
     """ This is to open it with the normal menu around it (ie via search etc) """
     template = 'variantopedia/view_variant.html'
@@ -359,6 +354,15 @@ def view_variant_annotation_history(request, variant_id):
                "annotation_versions": annotation_versions,
                "annotation_by_version": variant_annotation_by_version}
     return render(request, "variantopedia/view_variant_annotation_history.html", context)
+
+
+def variant_tags(request, genome_build_name=None):
+    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
+    variant_tags_qs = VariantTag.objects.filter(analysis__genome_build=genome_build)
+    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
+    context = {"genome_build": genome_build,
+               "tag_counts": tag_counts}
+    return render(request, 'variantopedia/variant_tags.html', context)
 
 
 def search(request):
