@@ -2,6 +2,7 @@
 {% load static %}
 {% load jqgrid_tags %}
 {% load help_tags %}
+{% load seqauto_record_tags %}
 
 {% block title %}{{ qc }}{% endblock %}
 {% block head %}
@@ -41,7 +42,7 @@
 	<div>
 {% else %}
 
-	{% load record_data_state_tags %}
+    {% seqauto_messages qc.seqautomessage_set.all %}
 	{% record_data_state_helper qc %}
 	
 {% endif %}	

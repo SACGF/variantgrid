@@ -982,20 +982,28 @@ class QCExecSummary(SeqAutoRecord):
     qc = models.ForeignKey(QC, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, null=True, on_delete=CASCADE)  # GOI - null = all genes
 
-    # Coverages below are across GOIs (some of these will be null)
-    duplicated_alignable_reads = models.FloatField()
+    deduplicated_reads = models.IntegerField(null=True)
     indels_dbsnp_percent = models.FloatField()
     mean_coverage_across_genes = models.FloatField()
     mean_coverage_across_kit = models.FloatField()
     median_insert = models.FloatField()
     number_indels = models.IntegerField()
     number_snps = models.IntegerField()
-    percent_10x = models.FloatField(null=True)
-    percent_20x = models.FloatField(null=True)
+    percent_10x_goi = models.FloatField(null=True)
+    percent_20x_goi = models.FloatField(null=True)
     percent_20x_kit = models.FloatField(null=True)
-    percent_250x = models.FloatField(null=True)
-    percent_500x = models.FloatField(null=True)
+    percent_20x_kit = models.FloatField(null=True)
+    percent_250x_goi = models.FloatField(null=True)
+    percent_500x_goi = models.FloatField(null=True)
+    percent_error_rate = models.FloatField(null=True)
+    percent_map_to_diff_chr = models.FloatField(null=True)
     percent_read_enrichment = models.FloatField()
+    percent_reads = models.FloatField(null=True)
+    percent_softclip = models.FloatField(null=True)
+    percent_duplication = models.FloatField()
+    reads = models.IntegerField(null=True)
+    sample_id_lod = models.FloatField(null=True)
+    sex_match = models.TextField(null=True)
     snp_dbsnp_percent = models.FloatField()
     ts_to_tv_ratio = models.FloatField()
     uniformity_of_coverage = models.FloatField()
@@ -1037,7 +1045,7 @@ class QCExecSummary(SeqAutoRecord):
     @staticmethod
     def load_for_qc(_seqauto_run, qc, **kwargs):
         exec_summary_filename = QC.get_tsv_path_from_vcf(qc.vcf_file)
-        exec_summary_data = load_exec_summary(exec_summary_filename)
+        exec_summary_data = load_exec_summary(QCExecSummary, exec_summary_filename)
 
         # Sanity check sample names match
         # TODO: Better name or way of storing this info than "aligned_pattern"?
@@ -1049,15 +1057,13 @@ class QCExecSummary(SeqAutoRecord):
             raise ValueError(msg)
 
         exec_data = exec_summary_data["exec_data"]
-        exec_summary = QCExecSummary(qc=qc, sequencing_run=qc.sequencing_run, **exec_data)
-        exec_summary.data_state = DataState.COMPLETE
-        exec_summary.save()
+        exec_summary = QCExecSummary.objects.create(qc=qc, sequencing_run=qc.sequencing_run,
+                                                    data_state=DataState.COMPLETE, **exec_data)
 
         reference_range = exec_summary_data["reference_range"]
         if reference_range:
             reference_range["exec_summary"] = exec_summary
-            esrr = ExecSummaryReferenceRange(**reference_range)
-            esrr.save()
+            ExecSummaryReferenceRange.objects.create(**reference_range)
 
     @property
     def sequencing_sample(self):
