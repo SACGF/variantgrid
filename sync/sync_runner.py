@@ -1,3 +1,4 @@
+from library.log_utils import report_exc_info
 from sync.models.models import SyncDestination, SyncRun
 from sync.shariant.shariant_download import sync_shariant_download
 from sync.shariant.shariant_upload import sync_shariant_upload
@@ -32,14 +33,17 @@ def run_sync(sync_destination: SyncDestination, full_sync: bool = False) -> Sync
         }
     }
     """
-
-    config = sync_destination.config
-    sync_type = config.get('type')
-    if sync_type in ('shariant', 'variantgrid'):
-        direction = config.get('direction')
-        if direction == 'upload':
-            return sync_shariant_upload(sync_destination=sync_destination, full_sync=full_sync)
-        if direction == 'download':
-            return sync_shariant_download(sync_destination=sync_destination, full_sync=full_sync)
-        raise ValueError('config.direction must be upload or download')
-    raise ValueError(f'unknown sync_type: {sync_type}')
+    try:
+        config = sync_destination.config
+        sync_type = config.get('type')
+        if sync_type in ('shariant', 'variantgrid'):
+            direction = config.get('direction')
+            if direction == 'upload':
+                return sync_shariant_upload(sync_destination=sync_destination, full_sync=full_sync)
+            if direction == 'download':
+                return sync_shariant_download(sync_destination=sync_destination, full_sync=full_sync)
+            raise ValueError('config.direction must be upload or download')
+        raise ValueError(f'unknown sync_type: {sync_type}')
+    except:
+        report_exc_info(extra_data={"sync_name": sync_destination.name})
+        raise

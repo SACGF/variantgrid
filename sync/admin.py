@@ -22,12 +22,14 @@ class SyncDestinationAdmin(admin.ModelAdmin):
     list_display = ('name', 'config', 'enabled')
 
     def run_sync(self, request, queryset):
+        sync_destination: SyncDestination
         for sync_destination in queryset:
             sync_destination.run(full_sync=False)
             self.message_user(request, message=f"Completed {str(sync_destination)}")
     run_sync.short_description = "Run now (delta sync)"
 
     def run_sync_full(self, request, queryset):
+        sync_destination: SyncDestination
         for sync_destination in queryset:
             sync_destination.run(full_sync=True)
             self.message_user(request, message=f"Completed {str(sync_destination)}")
