@@ -130,7 +130,9 @@ def load_from_file_if_complete(seqauto_run, record, **kwargs):
             logging.error("Problem loading %s: '%s'", record, record.path)
             logging.error(error_exception)
             record.data_state = DataState.ERROR
-            record.error_exception = error_exception
+            SeqAutoMessage.objects.update_or_create(seqauto_run=seqauto_run, record=record,
+                                                    severity=LogLevel.ERROR, code="load_error",
+                                                    defaults={"open": True, "message": error_exception})
 
         record.save()
 

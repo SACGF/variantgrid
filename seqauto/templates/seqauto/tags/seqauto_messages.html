@@ -1,0 +1,23 @@
+<h3>Messages</h3>
+{% if messages %}
+    <table>
+        <thead>
+            <tr>
+                <th>SequencingRun</th>
+                <th>Record</th>
+                <th>Message</th>
+                <th>Level</th>
+            </tr>
+        </thead>
+    {% for sam in messages %}
+        <tr>
+            <td>{{ sam.record.sequencing_run }}</td>
+            <td>{{ sam.record }}</td>
+            <td>{{ sam.message }}</td>
+            <td>{{ sam.get_severity_display }}</td>
+        </tr>
+    {% endfor %}
+    </table>
+{% else %}
+    No messages
+{% endif %}
