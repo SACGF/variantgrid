@@ -45,28 +45,26 @@ EXEC_STATS_LOOKUP = [("% of bases with >20x coverage across kit", "percent_20x_k
 
 def load_exec_summary(exec_summary_file):
     QCEXEC_FIELDS = {
-        '%bp20x_GOI': 'percent_20x',
+        '%Duplication': 'duplicated_alignable_reads',
+        '%Indels_dbSNP': 'indels_dbsnp_percent'
+        '%ReadEnrich': 'percent_read_enrichment',
+        '%SNPs_dbSNP': 'snp_dbsnp_percent',
+        '%UniformCov': 'uniformity_of_coverage',
         '%bp10x_GOI': 'percent_10x',
+        '%bp20x_GOI': 'percent_20x',
+        'Indels': 'number_indels',
         'MeanDepth_GOI': 'mean_coverage_across_genes',
         'MeanDepth_Kit': 'mean_coverage_across_kit',
-        '%UniformCov': 'uniformity_of_coverage',
-        '%ReadEnrich': 'percent_read_enrichment',
-        '%Duplication': 'duplicated_alignable_reads',
         'MedianInsert': 'median_insert',
-        'Ts/Tv': 'ts_to_tv_ratio',
         'SNPs': 'number_snps',
-        '%SNPs_dbSNP': 'snp_dbsnp_percent',
-        'Indels': 'number_indels',
-        '%Indels_dbSNP': 'indels_dbsnp_percent'
+        'Ts/Tv': 'ts_to_tv_ratio',
     }
 
-    df = pd.read_csv(exec_summary_file, sep='\t', index_col='Sample')
-    assert len(df.columns) == 2, f"QCExec summary not a 2 column TSV, columns: {df.columns}"
-    (sample_name, gold) = df.columns
-    assert gold == "Gold", f"QCExec summary missing gold column in columns: {df.columns}"
+    df = pd.read_csv(exec_summary_file, sep='\t', index_col='Name')
+    values = df["Value"]
 
     exec_data = {}
-    for k, v in df[sample_name].items():
+    for k, v in values.items():
         f = QCEXEC_FIELDS.get(k)
         if f:
             exec_data[f] = float(v)
