@@ -185,30 +185,31 @@ def bulk_group_permissions(request, class_name):
     return render(request, 'snpdb/data/bulk_group_permissions.html', context)
 
 
-def get_vcf_sample_stats(vcf, klass):
+def _get_vcf_sample_stats(vcf, klass):
+    """ Count is het + hom """
     ss_fields = ("sample_id", "sample__name", "variant_count", "ref_count", "het_count", "hom_count", "unk_count")
     ss_values_qs = klass.objects.filter(sample__vcf=vcf).order_by("sample").values(*ss_fields)
 
-    sample_stats_count = {}
+    sample_stats_het_hom_count = {}
     sample_names = []
     sample_zygosities = defaultdict(list)
     for value_dict in ss_values_qs:
         sample_id = value_dict.pop("sample_id")
         sample_names.append(value_dict.pop("sample__name"))
-        variant_count = value_dict.pop("variant_count")
-        sample_stats_count[sample_id] = variant_count
+        value_dict.pop("variant_count")
+        sample_stats_het_hom_count[sample_id] = value_dict["het_count"] + value_dict["hom_count"]
         for k, v in value_dict.items():
             sample_zygosities[k].append(v)
 
-    return sample_stats_count, sample_names, tuple(sample_zygosities.items())
+    return sample_stats_het_hom_count, sample_names, tuple(sample_zygosities.items())
 
 
 def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
 
-    sample_stats_count, sample_names, sample_zygosities = get_vcf_sample_stats(vcf, SampleStats)
-    sample_stats_pass_count, _, sample_zygosities_pass = get_vcf_sample_stats(vcf, SampleStatsPassingFilter)
+    sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, SampleStats)
+    sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, SampleStatsPassingFilter)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
                                              fields=["vcf_sample_name", "name", "patient", "specimen", "bam_file_path"],
@@ -248,16 +249,18 @@ def view_vcf(request, vcf_id):
     for warning, _ in vcf.get_warnings():
         messages.add_message(request, messages.WARNING, warning, extra_tags='import-message')
 
-    context = {'vcf': vcf,
-               'sample_stats_count': sample_stats_count,
-               'sample_stats_pass_count': sample_stats_pass_count,
-               'sample_names': sample_names,
-               'sample_zygosities': sample_zygosities,
-               'vcf_form': vcf_form,
-               'samples_form': samples_form,
-               'patient_form': PatientForm(user=request.user),  # blank
-               'has_write_permission': vcf.can_write(request.user),
-               'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser}
+    context = {
+        'vcf': vcf,
+        'sample_stats_het_hom_count': sample_stats_het_hom_count,
+        'sample_stats_pass_het_hom_count': sample_stats_pass_het_hom_count,
+        'sample_names': sample_names,
+        'sample_zygosities': sample_zygosities,
+        'vcf_form': vcf_form,
+        'samples_form': samples_form,
+        'patient_form': PatientForm(user=request.user),  # blank
+        'has_write_permission': vcf.can_write(request.user),
+        'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser
+    }
     return render(request, 'snpdb/data/view_vcf.html', context)
 
 

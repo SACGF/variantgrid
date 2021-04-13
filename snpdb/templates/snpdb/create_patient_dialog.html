@@ -4,25 +4,25 @@
 <script>
 
 function setupCreatePatientDialog() {
-    var dWidth = $(window).width() * 0.8;
-    var dHeight = $(window).height() * 0.8;
-    
-    var dialog = $("#new-patient-dialog").dialog({
+    const dWidth = $(window).width() * 0.8;
+    const dHeight = $(window).height() * 0.8;
+
+    const dialog = $("#new-patient-dialog").dialog({
         autoOpen: false,
         height: dHeight,
         width: dWidth,
         modal: true,
         buttons: {
-            Cancel: function() {
+            Cancel: function () {
                 dialog.dialog("close");
             }
         },
-        close: function() {
+        close: function () {
             // form reset
         }
     });
 
-    var form = dialog.find("form");
+    const form = dialog.find("form");
     form.ajaxForm({
         success: function(data) {
             setAutocompleteValue(window.activePatientSelect, data.patient_id, data.__str__);
@@ -39,17 +39,17 @@ function setupCreatePatientDialog() {
 }
 
 function addCreatePatientButton(dialog, patientSelect, sampleName) {
-    var form = dialog.find("form");
-    var createPatientButton = $("<div/>")
-        .addClass("click-to-add-button left")
+    const form = dialog.find("form");
+    const createPatientButton = $("<div/>")
+        .addClass("click-to-add-button flex-row")
         .attr("title", "Create new patient...");
- 
+
     createPatientButton.click(function() {
         form.resetForm();
         $("#set-to-sample-name-link", form).remove();
 
-        var lastName = $("#id_last_name", form);
-        var setToSampleNameLink = $("<a>")
+        const lastName = $("#id_last_name", form);
+        const setToSampleNameLink = $("<a>")
             .attr("id", "set-to-sample-name-link")
             .attr("href", "#")
             .text("Set from sample ('" + sampleName + "')");
@@ -63,12 +63,10 @@ function addCreatePatientButton(dialog, patientSelect, sampleName) {
         window.activePatientSelect = patientSelect;
         dialog.dialog("open");
     });
-    
-    var parent = patientSelect.parent();
-    parent.children().addClass("left")
+
+    const parent = patientSelect.parents(".sample-patient");
     parent.append(createPatientButton);
-    parent.append($("<div/>").addClass("clear"));
-    
+
 }
 </script>
 <div id="new-patient-dialog" title="New Patient">
