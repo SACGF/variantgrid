@@ -1050,7 +1050,7 @@ class QCExecSummary(SeqAutoRecord):
         # Sanity check sample names match
         # TODO: Better name or way of storing this info than "aligned_pattern"?
         params = qc.get_params()
-        expected_sample_name = params['aligned_pattern']
+        expected_sample_name = params['sample_name']
         sample = exec_summary_data["sample"]
         if sample != expected_sample_name:
             msg = f"Exec summary file '{qc.path}' had sample name of '{sample}' while we expected '{expected_sample_name}'"
