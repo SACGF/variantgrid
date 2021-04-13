@@ -159,10 +159,12 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names):  # , get
             ad = obj[f"{sample_id}_samples_allele_depth"]
             zygosity = obj[f"{sample_id}_samples_zygosity"]
             gt = Zygosity.get_genotype_from_expanded_zygosity(zygosity)
-            pl = obj[f"{sample_id}_samples_phred_likelihood"]
             dp = obj[f"{sample_id}_samples_read_depth"]
-            gq = obj[f"{sample_id}_samples_genotype_quality"]
             af = obj[f"{sample_id}_samples_allele_frequency"]
+            # GQ/PL/FT are optional now
+            # TODO: Ideally, we'd not write them out
+            pl = obj.get(f"{sample_id}_samples_phred_likelihood", ".")
+            gq = obj.get(f"{sample_id}_samples_genotype_quality", ".")
             # TODO: Need to grab information for reference base to be able to properly fill in this data.
             data_args = {'AD': ['.', ad],
                          'GT': gt,

@@ -149,7 +149,7 @@ class ClassificationAdmin(admin.ModelAdmin):
             if not vc.variant:
                 self.message_user(request, "(%i) No variant for classification" % vc.id)
             else:
-                genome_build = vc.variant.genome_build
+                genome_build = vc.get_genome_build()
                 annotation_version = AnnotationVersion.latest(genome_build)
                 data = get_evidence_fields_for_variant(genome_build, vc.variant, refseq_transcript_id, ensembl_transcript_id,
                                                        evidence_keys_list=[], annotation_version=annotation_version)
@@ -496,8 +496,9 @@ class ConditionTextAdmin(ModelAdminBasics):
         condition_text: ConditionText
         for condition_text in queryset:
             ConditionTextMatch.attempt_automatch(condition_text=condition_text)
+            condition_text.save()
 
-    auto_match.short_description = "Automatch (overwrite existing data)"
+    auto_match.short_description = "Automatch (leaves existing data)"
 
     def clear(self, request, queryset):
         condition_text: ConditionText
@@ -524,17 +525,27 @@ class ConditionTextMatchUserFilter(admin.SimpleListFilter):
     default_value = None
 
     def lookups(self, request, model_admin):
-        return [(user.id, user.username) for user in User.objects.all()]
+        return [
+            ("any", "Any User"),
+            ("non_admin", "Non Admin"),
+            ("bot", "Auto-Assigned")
+        ]
 
     def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(last_edited_by=self.value())
+        if user := self.value():
+            if user == "any":
+                queryset = queryset.filter(last_edited_by__isnull=False).exclude(last_edited_by=admin_bot())
+            elif user == "non_admin":
+                queryset = queryset.filter(last_edited_by__is_superuser=False).exclude(last_edited_by=admin_bot())
+            elif user == "bot":
+                queryset = queryset.filter(last_edited_by=admin_bot())
         return queryset
 
 
 class ConditionTextMatchAdmin(ModelAdminBasics):
     list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "last_edited_by", "created", "modified"]
     list_filter = [ConditionTextMatchUserFilter]
+    search_fields = ('id', 'condition_text__normalized_text', 'gene_symbol__symbol', 'classification__id', 'condition_xrefs')
 
 
 class ClinVarExportAdmin(ModelAdminBasics):

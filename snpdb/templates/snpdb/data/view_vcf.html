@@ -12,17 +12,19 @@
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 
 <style type="text/css">
-input#bam_pattern {
-    width: 300px;
-}
-
-table#sample-formset input[type="text"] {
-    width: 150px;
-}
-
 #bulk-set-form-container {
     display: none;
 }
+
+table#sample-formset input {
+    width: 100%;
+}
+
+table#sample-formset input[type=checkbox] {
+    width: auto;
+    margin-right: 5px;
+}
+
 
 #bulk-set-form-container {
     border: 1px solid black;
@@ -32,12 +34,6 @@ table#sample-formset input[type="text"] {
 .vcf-history-trail-link-text {
     display: none;
 }
-
-.vcf-button {
-    float: left;
-    height: 44px;
-}
-
 
 .sub-cohort-button-component {
     float: left;
@@ -52,6 +48,10 @@ table#sample-formset input[type="text"] {
     vertical-align: middle;
 }
 
+#vcf-populate-clingen-alleles {
+    margin-left: 10px;
+}
+
 </style>
 <script>
 function showBulkSet() {
@@ -60,13 +60,13 @@ function showBulkSet() {
 }
 
 function setBamPath() {
-    var bamPattern = $("input#bam_pattern").val();
+    const bamPattern = $("input#bam_pattern").val();
     $("tr.sample-row").each(function() {
-        var nameTD = $("td.sample-name", this);
-        var name = $("input", nameTD).val();
-        var data = {"name" : name};
-        var bfp = format(bamPattern, data);
-        var bamTD = $("td.bam_file_path", this);
+        const nameTD = $("td.sample-name", this);
+        const name = $("input", nameTD).val();
+        const data = {"name": name};
+        const bfp = format(bamPattern, data);
+        const bamTD = $("td.bam_file_path", this);
         $("input", bamTD).val(bfp);
     });
 
@@ -74,19 +74,19 @@ function setBamPath() {
 
 {% if vcf.import_status == 'S' and vcf.cohort %}
     function subCohortClick() {
-       var sampleIdList = [];
+        let sampleIdList = [];
         $("input:checked", "#sample-formset").each(function() {
-            var sampleId = $(this).attr("sample_id");
+            const sampleId = $(this).attr("sample_id");
             sampleIdList.push(sampleId);
         });
 
-        var data = 'sample_id_list=' + encodeURIComponent(JSON.stringify(sampleIdList));
+        const data = 'sample_id_list=' + encodeURIComponent(JSON.stringify(sampleIdList));
         $.ajax({
             type: "POST",
             data: data,
             url: "{% url 'create_sub_cohort' vcf.cohort.pk %}",
             success: function(data) {
-                var cohortId = data["cohort_id"];
+                const cohortId = data["cohort_id"];
                 window.location = Urls.view_cohort(cohortId);
             },
         });
@@ -94,7 +94,7 @@ function setBamPath() {
 {% endif %}
 
 function initSubCohort() {
-    var subCohortButton = $("#sub-cohort-button");
+    const subCohortButton = $("#sub-cohort-button");
     subCohortButton.button({disabled: true});
     {% if vcf.import_status == 'S' and vcf.cohort %}
     subCohortButton.click(subCohortClick);
@@ -104,25 +104,25 @@ function initSubCohort() {
 }
 
 function setupSubCohortButton() {
-    var numSelectedSamples = $("input:checked", "#sample-formset").length;
-    var buttonEnabled = numSelectedSamples > 1;
+    const numSelectedSamples = $("input:checked", "#sample-formset").length;
+    const buttonEnabled = numSelectedSamples > 1;
     $("#sub-cohort-button").button( "option", "disabled", !buttonEnabled );
 }
 
 
 function addCreateProjectButtonAndForm() {
-    var createProjectButton = $("<div/>")
+    const createProjectButton = $("<div/>")
         .addClass("click-to-add-button left")
         .attr("title", "Create new project...");
 
-    var dialog, form;
-    var allFields = $("input", "#new-project-dialog");
+    let dialog, form;
+    const allFields = $("input", "#new-project-dialog");
 
     function createNewProject() {
         allFields.removeClass("ui-state-error");
-        var valid = true;
-        var name = $("#name", form);
-        var nameVal = name.val().trim();
+        let valid = true;
+        const name = $("#name", form);
+        const nameVal = name.val().trim();
         if (!nameVal) {
             name.addClass("ui-state-error");
             valid = false;
@@ -131,7 +131,7 @@ function addCreateProjectButtonAndForm() {
         name.addClass("ui-state-error");
 
         if (valid) {
-            var postData = {
+            const postData = {
                 name: nameVal,
                 description: $("#description", form).val().trim()
             };
@@ -145,16 +145,16 @@ function addCreateProjectButtonAndForm() {
                       'Content-Type': 'application/json'
                 },
                 success: function(data) {
-                    var name = data.name;
+                    let name = data.name;
                     if (data.description) {
                         name += " (" + data.description + ")";
                     }
-                    var option = $('<option>', {value: data.name, text: name, selected: 'selected'});
+                    const option = $('<option>', {value: data.name, text: name, selected: 'selected'});
                     $("select#id_project").append(option);
                     dialog.dialog("close");
                 },
                 error: function(data) {
-                    var errorMessage = data.responseJSON.name[0];
+                    const errorMessage = data.responseJSON.name[0];
                     $(".error-messages", dialog).html(errorMessage);
                     console.log(data);
                 }
@@ -224,12 +224,11 @@ $(document).ready(function() {
 
     addCreateProjectButtonAndForm();
 
-    var dialog = setupCreatePatientDialog();
-
-    $(".sample-patient > select", "form#vcf-form").each(function () {
-        var parentRow = $(this).parents("tr");
-        var sampleNameCell = $(".sample-name", parentRow);
-        var sampleName = $("input", sampleNameCell).val();
+    const dialog = setupCreatePatientDialog();
+    $(".sample-patient select", "form#vcf-form").each(function () {
+        const parentRow = $(this).parents("tr");
+        const sampleNameCell = $(".sample-name", parentRow);
+        const sampleName = $("input", sampleNameCell).val();
         addCreatePatientButton(dialog, $(this), sampleName);
     });
 
@@ -304,9 +303,9 @@ $(document).ready(function() {
         {% endif %}
         </table>
 
-        <div id="samples">
-            <h3>Samples</h3>
+        <h3>Samples</h3>
 
+        <div id="samples">
             <div id='sample-list-top-links'>
                 <div class="left">                
                     <a href="{% url 'get_patient_upload_csv_for_vcf' vcf.pk %}"><img width=24px height=24px src="{% static 'icons/report_icon.jpg' %}" /> Patient record upload CSV template.</a>
@@ -323,53 +322,63 @@ $(document).ready(function() {
                     <tr>
                     <th>BAM path</th>
                     <td><input id='bam_pattern' type='text' value='/data/{name}.bam'></input>
-                    <td><button id='set-bam-path-button' type='button'>Set Bam Path</button>
+                    <td><button id='set-bam-path-button' class="btn btn-secondary" type='button'>Set Bam Path</button>
                     </table>
                 </form>
             </div>
 
             {{ samples_form.management_form }}
-            <table id='sample-formset'>
-            <tr>
-                <th>Sample
-                {% if vcf.import_status == 'S' %}
-                    <th>Variants
-                    {% if vcf.vcffiltercollection %}
-                    (passed)
+            <table id='sample-formset' class="table">
+            <thead>
+                <tr>
+                    <th>Sample
+                    {% if vcf.import_status == 'S' %}
+                        <th>Het/Hom Variants
+                        {% if vcf.vcffiltercollection %}
+                        (passed)
+                        {% endif %}
                     {% endif %}
-                {% endif %}
-                <th>VCF Sample Name
-                <th>Name
-                <th>Patient
-                <th>Specimen
-                <th>BAM path
-            </tr>
+                    <th>VCF Sample Name
+                    <th>Name
+                    <th>Patient
+                    <th>Specimen
+                    <th>BAM path
+                </tr>
+            </thead>
             {% for form in samples_form %}
                 <tr class="sample-row"> 
-                {{ form.id }}
-                <td>
-                    <input class='sample-select' sample_id='{{ form.id.value }}' type='checkbox' />
-                    <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
-                    {% if vcf.import_status == 'S' %}
-                        <td>
-                        {% with ss=sample_stats_count|get_item:form.instance.pk %}
-                            {% if ss %}
-                                {{ ss }}
-                                {% with sspf=sample_stats_pass_count|get_item:form.instance.pk %}
-                                    {% if sspf %}
-                                        ({{ sspf }})
-                                    {% endif %}
-                                {% endwith %}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        {% endwith %}
-                    {% endif %}
-                <td class="vcf-sample-name">{{ form.vcf_sample_name }}{{ form.vcf_sample_name.errors }}
-                <td class="sample-name">{{ form.name }}{{ form.name.errors }}
-                <td class="sample-patient">{{ form.patient }}{{ form.patient.errors }}
-                <td>{{ form.specimen }}{{ form.specimen.errors }}
-                <td class="bam_file_path">{{ form.bam_file_path }}{{ form.bam_file_path.errors }}
+                    {{ form.id }}
+                    <td>
+                        <input class='sample-select' sample_id='{{ form.id.value }}' type='checkbox' />
+                        <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
+                    </td>
+                {% if vcf.import_status == 'S' %}
+                    <td>
+                    {% with ss=sample_stats_het_hom_count|get_item:form.instance.pk %}
+                        {% if ss %}
+                            {{ ss }}
+                            {% with sspf=sample_stats_pass_het_hom_count|get_item:form.instance.pk %}
+                                {% if sspf %}
+                                    ({{ sspf }})
+                                {% endif %}
+                            {% endwith %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    {% endwith %}
+                    </td>
+                {% endif %}
+                    <td class="vcf-sample-name">{{ form.vcf_sample_name }}{{ form.vcf_sample_name.errors }}</td>
+                    <td class="sample-name">{{ form.name }}{{ form.name.errors }}</td>
+                    <td>
+                        <div class="sample-patient display-flex">
+                            <div class="flex-grow">
+                            {{ form.patient }}{{ form.patient.errors }}
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ form.specimen }}{{ form.specimen.errors }}</td>
+                    <td class="bam_file_path">{{ form.bam_file_path }}{{ form.bam_file_path.errors }}</td>
                 </tr>
                 
             {% endfor %}
@@ -381,7 +390,7 @@ $(document).ready(function() {
         {% if has_write_permission %}
             <button id="vcf-submit-button" class="btn btn-primary">Update VCF</button>
             {% if user.is_superuser %}
-                <button id="vcf-populate-clingen-alleles" class="btn btn-primary"
+                <button id="vcf-populate-clingen-alleles" class="btn btn-secondary"
                         title="Retrieves max {% settings_value 'CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS' %} ClinGen Alleles">
                     Populate ClinGen Alleles
                 </button>
@@ -437,12 +446,40 @@ $(document).ready(function() {
             <p>
                 <label>Format</label>
                 <span>
-                    {% if vcf.ref_depth_field and vcf.alt_depth_field %}
-                        ref_depth: {{ vcf.ref_depth_field }}, alt_depth: {{ vcf.alt_depth_field }},
-                    {% else %}
-                        allele_depth: {{ vcf.allele_depth_field }},
-                    {% endif %}
-                    read_depth = {{ vcf.read_depth_field }}, genotype_quality = {{ vcf.genotype_quality_field }}, phred_likelihood = {{ vcf.phred_likelihood_field }}
+                    <table>
+                        <tr>
+                            <td>
+                            {% if vcf.ref_depth_field and vcf.alt_depth_field %}
+                                Ref Depth: {{ vcf.ref_depth_field }}, Alt Depth: {{ vcf.alt_depth_field }}
+                            {% else %}
+                                Allele Depth: {{ vcf.allele_depth_field }}
+                            {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Read Depth: {{ vcf.read_depth_field }}</td>
+                        </tr>
+                        <tr>
+                            <td>Allele Frequency:
+                                {%  if vcf.allele_frequency_field %}
+                                    {{ vcf.allele_frequency_field }}
+                                {% else %}
+                                    Calculated as <code>AD / (sum of all AD for that locus)</code> after VCF normalization
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Genotype Quality: {{ vcf.genotype_quality_field }}</td>
+                        </tr>
+                        <tr>
+                            <td>Phred Likelihood: {{ vcf.phred_likelihood_field }}</td>
+                        </tr>
+                        {% if vcf.sample_filters_field %}
+                            <tr>
+                                <td>Sample Filters: {{ vcf.sample_filters_field }}</td>
+                            </tr>
+                        {% endif %}
+                    </table>
                 </span>
             </p>
             <p>

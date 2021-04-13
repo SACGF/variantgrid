@@ -51,9 +51,9 @@ class Command(BaseCommand):
                 hpa_version.delete_related_objects()
                 hpa_version.create_partition()
             else:
-                logging.error("HumanProteinAtlasAnnotationVersion with hd5_hash='%s' already exists as pk=%d.", md5_hash, hpa_version.pk)
-                logging.error("If you really want to import this again, use the --replace option")
-                exit(1)
+                message = f"HumanProteinAtlasAnnotationVersion with hd5_hash='{md5_hash}' already exists as " \
+                          f"pk={hpa_version.pk}. If you really want to import this again, use the --replace option"
+                raise ValueError(message)
 
         version_id = hpa_version.pk
         logging.info("Reading hpa_version file...")
@@ -74,12 +74,13 @@ class Command(BaseCommand):
             data = (version_id, ensembl_gene_id, tissue_sample, abundance)
             records.append(data)
 
-        separator = '\t'  # Was having trouble with quoting CSVs
+        delimiter = '\t'  # Was having trouble with quoting CSVs
         logging.info("Creating TSV to insert into database...")
-        csv_filename = get_import_processing_filename(version_id, "human_protein_annotation.csv", prefix='human_protein_atlas')
+        csv_filename = get_import_processing_filename(version_id, "human_protein_annotation.csv",
+                                                      prefix='human_protein_atlas')
         if os.path.exists(csv_filename):
             os.remove(csv_filename)
-        write_sql_copy_csv(records, csv_filename, separator=separator)
+        write_sql_copy_csv(records, csv_filename, delimiter=delimiter)
         partition_table = hpa_version.get_partition_table()
         logging.info("Inserting file '%s' into partition %s", csv_filename, partition_table)
 
@@ -87,5 +88,5 @@ class Command(BaseCommand):
                       'gene_id',
                       'tissue_sample_id',
                       'abundance']
-        sql_copy_csv(csv_filename, partition_table, HPA_HEADER, separator=separator)
+        sql_copy_csv(csv_filename, partition_table, HPA_HEADER, delimiter=delimiter)
         logging.info("Done!")

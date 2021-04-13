@@ -87,7 +87,7 @@ class SequencingSamplesHistoricalGrid(DataFrameJqGrid):
 class GoldCoverageSummaryGrid(JqGridUserRowConfig):
     model = GoldCoverageSummary
     caption = 'GoldCoverageSummaries'
-    fields = ["original_gene_symbol", "original_transcript_id", "gene_symbol", "transcript",
+    fields = ["original_gene_symbol", "original_transcript", "gene_symbol", "transcript",
               "mean", "standard_error", "min_mean",
               "depth_20x_5th_percentile", "depth_10x_5th_percentile",
               "depth_mean_5th_percentile", "depth_mean_95th_percentile"]
@@ -112,7 +112,7 @@ class EnrichmentKitGeneCoverageGrid(JqGridUserRowConfig):
     model = GeneCoverageCanonicalTranscript
     caption = 'Enrichment Kit Gene Coverage'
     fields = [SEQUENCING_RUN_PATH, GOLD_PATH, SAMPLE_NAME_PATH,
-              "min", "mean", "std_dev", "percent_0x", "percent_10x", "percent_20x", "sensitivity"]
+              "min", "mean", "std_dev", "percent_1x", "percent_10x", "percent_20x", "sensitivity"]
     number_format = {'formatter': 'number', 'width': 80}
     colmodel_overrides = {SEQUENCING_RUN_PATH: {"label": "Sequencing Run", "formatter": "viewSequencingRunLink"},
                           GOLD_PATH: {"label": "Gold"},
@@ -120,7 +120,7 @@ class EnrichmentKitGeneCoverageGrid(JqGridUserRowConfig):
                           'min': {'width': 40},
                           'mean': number_format,
                           'std_dev': number_format,
-                          'percent_0x': number_format,
+                          'percent_1x': number_format,
                           'percent_10x': number_format,
                           'percent_20x': number_format,
                           'sensitivity': number_format}

@@ -83,6 +83,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self.ancestor_input_samples_changed = False
         self.parents_changed = False
         self.queryset_dirty = False
+        self.update_children = True
 
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
@@ -331,20 +332,25 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             @see https://docs.djangoproject.com/en/2/topics/db/queries/#spanning-multi-valued-relationships
         """
+        # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
+        # for some nodes (Comp HET / pheno) so cache it
+        cache_key = f"{self.pk}_{self.version}_get_q_cache_{disable_cache}"
+        q = cache.get(cache_key)
+        if q is None:
+            if disable_cache is False:
+                if cache_q := self._get_node_cache_q():
+                    return cache_q
 
-        if disable_cache is False:
-            if cache_q := self._get_node_cache_q():
-                return cache_q
-
-        if self.has_input():
-            q = self.get_parent_q()
-            if self.modifies_parents():
+            if self.has_input():
+                q = self.get_parent_q()
+                if self.modifies_parents():
+                    if node_q := self._get_node_q():
+                        q &= node_q
+            else:
+                q = self.q_all()
                 if node_q := self._get_node_q():
-                    q &= node_q
-        else:
-            q = self.q_all()
-            if node_q := self._get_node_q():
-                q = node_q
+                    q = node_q
+            cache.set(cache_key, q)
         return q
 
     def get_parent_q(self):
@@ -761,14 +767,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             self.bump_version()
 
             super_save(**kwargs)
-            for kid in self.children.select_subclasses():
+            if self.update_children:
                 # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
                 # So we could go from having multiple proband samples to only one later (thus can set descendants)
-                kid.ancestor_input_samples_changed = self.is_source() or self.ancestor_input_samples_changed or \
-                                                     self.get_samples_from_node_only_not_ancestors()
-                kid.appearance_dirty = False
-                kid.queryset_dirty = True
-                kid.save()  # Will bump versions
+                for kid in self.children.select_subclasses():
+                    kid.ancestor_input_samples_changed = self.is_source() or self.ancestor_input_samples_changed or \
+                                                         self.get_samples_from_node_only_not_ancestors()
+                    kid.appearance_dirty = False
+                    kid.queryset_dirty = True
+                    kid.save()  # Will bump versions
         else:
             super_save(**kwargs)
 
@@ -905,7 +912,7 @@ class NodeCache(models.Model):
 
 
 @receiver(post_delete, sender=NodeCache)
-def post_delete_intersection_cache(sender, instance, *args, **kwargs):
+def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.variant_collection:
         instance.variant_collection.delete_related_objects()
         instance.variant_collection.delete()
@@ -990,7 +997,7 @@ class NodeAlleleFrequencyFilter(models.Model):
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
 
-    def get_q(self, allele_frequency_path):
+    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool):
         af_q = None
         try:
             filters = []
@@ -999,9 +1006,15 @@ class NodeAlleleFrequencyFilter(models.Model):
                 # Missing value (historical data) == -1 so those will come through
                 and_filters = []
                 if af_range.min > 0:
-                    and_filters.append(Q(**{allele_frequency_path + "__gte": af_range.min}))
-                if af_range.max < 100:
-                    and_filters.append(Q(**{allele_frequency_path + "__lte": af_range.max}))
+                    min_value = af_range.min
+                    if allele_frequency_percent:
+                        min_value *= 100.0
+                    and_filters.append(Q(**{allele_frequency_path + "__gte": min_value}))
+                if af_range.max < 1:
+                    max_value = af_range.max
+                    if allele_frequency_percent:
+                        max_value *= 100.0
+                    and_filters.append(Q(**{allele_frequency_path + "__lte": max_value}))
 
                 if and_filters:
                     and_q = reduce(operator.and_, and_filters)
@@ -1019,7 +1032,9 @@ class NodeAlleleFrequencyFilter(models.Model):
         af_q = None
         if sample:
             try:
-                af_q = node.nodeallelefrequencyfilter.get_q(sample.get_cohort_genotype_field("allele_frequency"))
+                allele_frequency_path = sample.get_cohort_genotype_field("allele_frequency")
+                allele_frequency_percent = sample.vcf.allele_frequency_percent
+                af_q = node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent)
             except NodeAlleleFrequencyFilter.DoesNotExist:
                 pass
         return af_q
@@ -1035,20 +1050,23 @@ class NodeAlleleFrequencyFilter(models.Model):
 
 
 class NodeAlleleFrequencyRange(models.Model):
+    MIN_VALUE = 0
+    MAX_VALUE = 1
+
     filter = models.ForeignKey(NodeAlleleFrequencyFilter, on_delete=CASCADE)
-    min = models.IntegerField(null=False)
-    max = models.IntegerField(null=False)
+    min = models.FloatField(null=False)
+    max = models.FloatField(null=False)
 
     def __str__(self):
-        has_min = self.min is not None and self.min > 0
-        has_max = self.max is not None and self.max < 100
+        has_min = self.min is not None and self.min > self.MIN_VALUE
+        has_max = self.max is not None and self.max < self.MAX_VALUE
 
         if has_min and has_max:
-            return f"{self.min} - {self.max}%"
+            return f"{self.min} - {self.max}"
         if has_min:
-            return f">={self.min}%"
+            return f">={self.min}"
         if has_max:
-            return f"<={self.max}%"
+            return f"<={self.max}"
         return ""
 
 

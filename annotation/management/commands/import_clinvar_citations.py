@@ -3,16 +3,14 @@
 from django.core.management.base import BaseCommand
 import logging
 
-from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection, \
-    Citation
+from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection, Citation
 from annotation.models.models_enums import CitationSource
 from library.file_utils import file_md5sum
 from library.guardian_utils import admin_bot
 from library.utils import invert_dict
 import pandas as pd
 from snpdb.models.models_enums import ImportSource
-from upload.models import UploadedFile, UploadedFileTypes, \
-    UploadedClinVarCitations
+from upload.models import UploadedFile, UploadedFileTypes, UploadedClinVarCitations
 
 ALLELE_ID = '#AlleleID'
 VARIATION_ID = 'VariationID'
@@ -47,7 +45,8 @@ class Command(BaseCommand):
                                                     file_type=UploadedFileTypes.CLINVAR_CITATIONS)
 
         clinvar_citations_collection = ClinVarCitationsCollection.objects.create()
-        UploadedClinVarCitations.objects.create(md5_hash=md5_hash, uploaded_file=uploaded_file, clinvar_citations_collection=clinvar_citations_collection)
+        UploadedClinVarCitations.objects.create(md5_hash=md5_hash, uploaded_file=uploaded_file,
+                                                clinvar_citations_collection=clinvar_citations_collection)
 
         existing_citations = {}
         citation = None
@@ -75,7 +74,7 @@ class Command(BaseCommand):
 
         # Insert the new citations
         logging.info("Inserting %d citations", len(new_citations_by_key))
-        Citation.objects.bulk_create(new_citations_by_key.values())
+        Citation.objects.bulk_create(new_citations_by_key.values(), batch_size=2000)
 
         # Update hash
         for citation in Citation.objects.filter(pk__gt=max_previously_existing_citation_id):
@@ -98,4 +97,4 @@ class Command(BaseCommand):
             rows.append(cvc)
 
         logging.info("Read %d records, inserting into DB", len(rows))
-        ClinVarCitation.objects.bulk_create(rows)
+        ClinVarCitation.objects.bulk_create(rows, batch_size=2000)

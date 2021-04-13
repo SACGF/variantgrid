@@ -79,7 +79,7 @@ class ClinVarVersion(SubVersionPartition):
 
 
 @receiver(pre_delete, sender=ClinVarVersion)
-def clinvar_version_pre_delete_handler(sender, instance, **kwargs):
+def clinvar_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     instance.delete_related_objects()
 
 
@@ -229,7 +229,7 @@ class GeneAnnotationVersion(SubVersionPartition):
 
 
 @receiver(pre_delete, sender=GeneAnnotationVersion)
-def gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):
+def gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     instance.delete_related_objects()
 
 
@@ -258,7 +258,7 @@ class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
 
 
 @receiver(pre_delete, sender=HumanProteinAtlasAnnotationVersion)
-def human_protein_annotation_version_pre_delete_handler(sender, instance, **kwargs):
+def human_protein_annotation_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     instance.delete_related_objects()
 
 
@@ -356,7 +356,7 @@ class VariantAnnotationVersion(SubVersionPartition):
 
 
 @receiver(pre_delete, sender=VariantAnnotationVersion)
-def variant_annotation_version_pre_delete_handler(sender, instance, **kwargs):
+def variant_annotation_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     instance.delete_related_objects()
 
 
@@ -977,7 +977,7 @@ class CachedWebResource(TimeStampedModel):
 
     @staticmethod
     def named_handler_factory(name, celery_task_class):
-        def handler(sender, instance, **kwargs):
+        def handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
             created = kwargs.get("created")
 
             if created and instance.name == name:

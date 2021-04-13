@@ -1,0 +1,1 @@
+seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG

@@ -1,5 +1,6 @@
 from collections import Counter, namedtuple
 import copy
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 
@@ -20,11 +21,11 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
 import logging
 import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
-from flags.models import Flag, FlagPermissionLevel
+from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS, chgvs_diff_description, CHGVSDiff, HGVSNameExtra
@@ -33,6 +34,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text
+from ontology.models import OntologyTerm
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
@@ -51,7 +53,8 @@ ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 
 classification_validation_signal = django.dispatch.Signal(providing_args=["classification", "patch_meta", "key_map"])
 classification_current_state_signal = django.dispatch.Signal(providing_args=["user"])
-classification_post_publish_signal = django.dispatch.Signal(providing_args=["classification", "previously_published", "previous_share_level", "newly_published", "user"])
+classification_post_publish_signal = django.dispatch.Signal(
+    providing_args=["classification", "previously_published", "previous_share_level", "newly_published", "user"])
 classification_withdraw_signal = django.dispatch.Signal(providing_args=["classification", "user"])
 classification_variant_set_signal = django.dispatch.Signal(providing_args=["classification", "variant"])
 classification_revalidate_signal = django.dispatch.Signal(providing_args=["classification"])
@@ -112,7 +115,8 @@ class ClassificationImportAlleleSource(AlleleSource):
         allele: Allele
         for allele in self.get_allele_qs():
             allele.validate()
-        report_event('Completed import liftover', extra_data={'liftover_id': self.pk, 'allele_count': self.get_allele_qs().count()})
+        report_event('Completed import liftover',
+                     extra_data={'liftover_id': self.pk, 'allele_count': self.get_allele_qs().count()})
 
 
 class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
@@ -139,7 +143,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
-def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:
+def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pylint: disable=unused-argument
     """
     Allows us to provide extra info for FlagCollections attached to Classification
     e.g. linking to the appropriate allele page, discordance report etc
@@ -152,20 +156,12 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:
     from classification.enums.discordance_enums import DiscordanceReportResolution
 
     vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
-    drcs = DiscordanceReportClassification.objects.filter(classification_original__classification__in=vcs, report__resolution=DiscordanceReportResolution.ONGOING)\
+    drcs = DiscordanceReportClassification.objects.filter(classification_original__classification__in=vcs,
+                                                          report__resolution=DiscordanceReportResolution.ONGOING) \
         .values_list('classification_original__classification', 'report')
     drcs_dict = {}
     for drc in drcs:
         drcs_dict[drc[0]] = drc[1]
-
-    def find_unsubmitted(flags: List[Flag]) -> Optional[Flag]:
-        # return outstanding edits if we have it, otherwise fall back to unshared flag
-        for flag in flags:
-            if flag.flag_type == classification_flag_types.classification_outstanding_edits:
-                return flag
-        for flag in flags:
-            if flag.flag_type == classification_flag_types.unshared_flag:
-                return flag
 
     for vc in vcs:
         """
@@ -199,6 +195,58 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:
         flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
 
 
+class ConditionResolvedTermDict(TypedDict):
+    term_id: str
+    name: str
+
+
+class ConditionResolvedDict(TypedDict):
+    """
+    Structure of data used to cached resolved condition text again a classification
+    """
+    display_text: str  # plain text to show to users if not in a position to render links
+    sort_text: str  # lower case representation of description
+    resolved_terms: List[ConditionResolvedTermDict]
+    resolved_join: str
+
+
+@dataclass
+class ConditionResolved:
+    terms: List[OntologyTerm]
+    join: Optional[Any]
+
+    @lazy
+    def join_text(self):
+        if join := self.join:
+            try:
+                from classification.models import MultiCondition
+                return MultiCondition(join).label
+            except:
+                pass
+        return None
+
+
+class ClassificationOutstandingIssues:
+
+    def __init__(self, classification: 'Classification'):
+        self.classification = classification
+        self.flags = list()
+        self.issues = list()
+
+    @property
+    def pk(self):
+        return self.classification.pk
+
+    def add_flag(self, flag: str):
+        self.flags.append(flag)
+
+    def add_issue(self, issue: str):
+        self.issues.append(issue)
+
+    def __str__(self):
+        return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
+
+
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
     """
     A Variant Classification, belongs to a lab and user. Keeps a full history using ClassificationModification
@@ -222,6 +270,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     :cvar withdrawn: Soft delete, if withdrawn classification should not appear in most places
     """
 
+    SUPPORTED_TRANSCRIPTS = {"NM", "ENST"}
+
+    @staticmethod
+    def is_supported_transcript(transcript_or_chgvs: str):
+        for transcript_type in Classification.SUPPORTED_TRANSCRIPTS:
+            if transcript_or_chgvs.startswith(transcript_type):
+                return True
+        return False
+
     # Variant is created/linked from initial GenomeBuild - discordance is against Allele
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
     chgvs_grch37 = models.TextField(blank=True, null=True)
@@ -235,13 +292,29 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     user = models.ForeignKey(User, on_delete=PROTECT)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=False, default=ShareLevel.LAB.key)
-    annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True, on_delete=SET_NULL)  # Null means OUTSIDE of VariantGrid
+    annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True,
+                                           on_delete=SET_NULL)  # Null means OUTSIDE of VariantGrid
     clinical_context = models.ForeignKey('ClinicalContext', null=True, blank=True, on_delete=SET_NULL)
     lab_record_id = models.TextField(blank=True, null=True)
     evidence = models.JSONField(null=False, blank=True, default=empty_dict)
     withdrawn = models.BooleanField(default=False)
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
+    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
+
+    @property
+    def condition_resolution_dict(self) -> Optional[ConditionResolvedDict]:
+        return self.condition_resolution
+
+    @lazy
+    def condition_resolution_obj(self) -> Optional[ConditionResolved]:
+        if cr_dict := self.condition_resolution_dict:
+            terms = [OntologyTerm.get_or_stub(term.get("term_id")) for term in cr_dict.get("resolved_terms")]
+            join = None
+            if len(terms) > 1:
+                from classification.models import MultiCondition
+                join = MultiCondition(cr_dict.get("resolved_join"))
+            return ConditionResolved(terms=terms, join=join)
 
     class Meta:
         unique_together = ('lab', 'lab_record_id')
@@ -250,6 +323,46 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def can_create_via_web_form(user: User):
         can_create = settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE
         return can_create and (user.is_superuser or settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
+
+    @staticmethod
+    def dashboard_report_new_classifications(since) -> int:
+        return Classification.objects.filter(created__gte=since).count()
+
+    @staticmethod
+    def dashboard_report_classifications_of_interest(since) -> Iterable[ClassificationOutstandingIssues]:
+        min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
+            minutes=2)  # give records 2 minutes to matching properly before reporting
+
+        time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
+
+        # want to find new tags that are still open
+        flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN).order_by(
+            'collection__id').values_list('collection__id', flat=True).distinct()
+        coi_qs = Classification.objects.filter(Q(flag_collection_id__in=flag_collections) | (
+                    time_range_q & (Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))))
+        coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
+
+        summaries: List[ClassificationOutstandingIssues] = list()
+        c: Classification
+        for c in coi_qs:
+            coi = ClassificationOutstandingIssues(c)
+            this_flags = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN,
+                                             collection=c.flag_collection).values_list('flag_type', flat=True).order_by(
+                'flag_type')
+            variant_matching = False
+            for flag_type in this_flags:
+                if flag_type == 'classification_matching_variant':
+                    variant_matching = True
+                coi.add_flag(flag_type)
+            if not variant_matching:
+                if not c.chgvs_grch37:
+                    coi.add_issue("No cached 37 representation")
+                if not c.chgvs_grch38:
+                    coi.add_issue("No cached 38 representation")
+
+            summaries.append(coi)
+
+        return summaries
 
     @classmethod
     def order_by_evidence(cls, key_id: str):
@@ -372,12 +485,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 c_hgvs_name = self._generate_c_hgvs_extra(genome_build=GenomeBuild.grch37())
                 max_length = max(c_hgvs_name.ref_lengths(), max_length)
                 self.chgvs_grch37 = c_hgvs_name.format()
-                self.chgvs_grch37_full = c_hgvs_name.format(max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
+                self.chgvs_grch37_full = c_hgvs_name.format(
+                    max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
             if GenomeBuild.grch38().is_annotated:
                 c_hgvs_name = self._generate_c_hgvs_extra(genome_build=GenomeBuild.grch38())
                 max_length = max(c_hgvs_name.ref_lengths(), max_length)
                 self.chgvs_grch38 = c_hgvs_name.format()
-                self.chgvs_grch38_full = c_hgvs_name.format(max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
+                self.chgvs_grch38_full = c_hgvs_name.format(
+                    max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
         else:
             self.chgvs_grch37 = None
             self.chgvs_grch37_full = None
@@ -394,62 +509,66 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             flag_collection = self.flag_collection_safe
 
             self.save()
+            if not self.lab.external:
+                # don't re-raise flags on external classifications,
+                # they would have already been raised in the external system and resolved there
 
-            # see if the match looks suspect
-            c_hgvs = self.get(SpecialEKeys.C_HGVS)
-            lifted_chgvs: Optional[CHGVS] = None
-            transcript_comment: Optional[str] = None
-            matching_warning_comment: Optional[str] = None
-            compare_to: Optional[str] = None
-            diff: Optional[CHGVSDiff] = None
-            if self.get(SpecialEKeys.GENOME_BUILD):
-                current_build = self.get_genome_build()
-                if current_build == GenomeBuild.grch37():
-                    compare_to = self.chgvs_grch37
-                elif current_build == GenomeBuild.grch38():
-                    compare_to = self.chgvs_grch38
+                # see if the match looks suspect
+                c_hgvs = self.get(SpecialEKeys.C_HGVS)
+                lifted_chgvs: Optional[CHGVS] = None
+                transcript_comment: Optional[str] = None
+                matching_warning_comment: Optional[str] = None
+                compare_to: Optional[str] = None
+                diff: Optional[CHGVSDiff] = None
+                if self.get(SpecialEKeys.GENOME_BUILD):
+                    current_build = self.get_genome_build()
+                    if current_build == GenomeBuild.grch37():
+                        compare_to = self.chgvs_grch37
+                    elif current_build == GenomeBuild.grch38():
+                        compare_to = self.chgvs_grch38
 
-                if c_hgvs and compare_to:
-                    original_chgvs = CHGVS(c_hgvs)
-                    lifted_chgvs = CHGVS(compare_to)
+                    if c_hgvs and compare_to:
+                        original_chgvs = CHGVS(c_hgvs)
+                        lifted_chgvs = CHGVS(compare_to)
 
-                    diff = original_chgvs.diff(lifted_chgvs)
+                        diff = original_chgvs.diff(lifted_chgvs)
 
-                    if diff:
-                        # DIFF_RAW_CGVS_EXPANDED is minor and expected process
-                        diff = diff & ~CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
+                        if diff:
+                            # DIFF_RAW_CGVS_EXPANDED is minor and expected process
+                            diff = diff & ~CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
 
-                        if diff == CHGVSDiff.DIFF_TRANSCRIPT_VER:
-                            transcript_comment = \
-                                (f'For c.hgvs {c_hgvs} the transcripts are:\n\n'
-                                 f'{original_chgvs.transcript} (imported)\n{lifted_chgvs.transcript} (resolved)')
-                        elif diff:
-                            important_diffs = chgvs_diff_description(diff)
-                            diff_desc = ' - ' + '\n - '.join(important_diffs)
-                            matching_warning_comment = (f'Imported c.hgvs and matched c.hgvs differ in the following ways:\n\n{diff_desc}\n\n'
-                                                        f'{original_chgvs.full_c_hgvs} (imported)\n{lifted_chgvs.full_c_hgvs} (resolved)')
+                            if diff == CHGVSDiff.DIFF_TRANSCRIPT_VER:
+                                transcript_comment = \
+                                    (f'For c.hgvs {c_hgvs} the transcripts are:\n\n'
+                                     f'{original_chgvs.transcript} (imported)\n{lifted_chgvs.transcript} (resolved)')
+                            elif diff:
+                                important_diffs = chgvs_diff_description(diff)
+                                diff_desc = ' - ' + '\n - '.join(important_diffs)
+                                matching_warning_comment = (
+                                    f'Imported c.hgvs and matched c.hgvs differ in the following ways:\n\n{diff_desc}\n\n'
+                                    f'{original_chgvs.full_c_hgvs} (imported)\n{lifted_chgvs.full_c_hgvs} (resolved)')
 
-            if transcript_comment:
-                flag_collection.get_or_create_open_flag_of_type(
-                    flag_type=classification_flag_types.transcript_version_change_flag,
-                    comment=transcript_comment,
-                    only_if_new=True,
-                    data={'resolved': lifted_chgvs.transcript},
-                    close_other_data=True
-                )
-            else:
-                flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag)
+                if transcript_comment:
+                    flag_collection.get_or_create_open_flag_of_type(
+                        flag_type=classification_flag_types.transcript_version_change_flag,
+                        comment=transcript_comment,
+                        only_if_new=True,
+                        data={'resolved': lifted_chgvs.transcript},
+                        close_other_data=True
+                    )
+                else:
+                    flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag)
 
-            if matching_warning_comment:
-                flag_collection.get_or_create_open_flag_of_type(
-                    flag_type=classification_flag_types.matching_variant_warning_flag,
-                    comment=matching_warning_comment,
-                    only_if_new=True,
-                    data={'resolved': lifted_chgvs.full_c_hgvs},
-                    close_other_data=True
-                )
-            else:
-                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
+                if matching_warning_comment:
+                    flag_collection.get_or_create_open_flag_of_type(
+                        flag_type=classification_flag_types.matching_variant_warning_flag,
+                        comment=matching_warning_comment,
+                        only_if_new=True,
+                        data={'resolved': lifted_chgvs.full_c_hgvs},
+                        close_other_data=True
+                    )
+                else:
+                    flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
 
         if variant and variant.allele:
             allele: Allele = variant.allele
@@ -677,7 +796,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 aliases.append(option.get('label'))
             # Originally had index as a value you could submit, but this starts to get dangerous for fields
             # that allow custom values, can't distinguish between index 3 and custom value 3
-            #if option.get('index') is not None:
+            # if option.get('index') is not None:
             #    aliases.append(str(option.get('index')))
             elif option_value:
                 aliases.append(EvidenceKey.pretty_label_from_string(option_value))
@@ -748,6 +867,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Normalises the value and adds any validation
         """
+        if self.lab.external:
+            # leave external data exactly how it was provided
+            return
+
         value = cell.value
         e_key = cell.e_key
 
@@ -755,7 +878,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # we often get escaped > sent to us as part of
             value = value.replace('&gt;', '>').replace('&lt;', '<')
 
-        if value is None and e_key.mandatory and not e_key.exclude_namespace and not self.lab.external:
+        if value is None and e_key.mandatory and not e_key.exclude_namespace:
             # only provide mandatory validation for internal labs
             # don't want to dirty up imported read only classifications with errors
             cell.add_validation(code=ValidationCode.MANDATORY, severity='error', message='Missing mandatory value')
@@ -775,18 +898,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if e_key.key == 'existing_variant_id':
                 try:
                     self.set_variant(Variant.objects.get(pk=int(value)))
-                    #self.requires_auto_population = True
+                    # self.requires_auto_population = True
                     return None  # clear out the value
                 except:
-                    cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error', message="Couldn't resolve Variant " + str(value) + ")")
+                    cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
+                                        message="Couldn't resolve Variant " + str(value) + ")")
 
             elif e_key.key == 'existing_sample_id':
                 try:
                     self.sample = Sample.objects.get(pk=int(value))
-                    #self.requires_auto_population = True
+                    # self.requires_auto_population = True
                     return None  # clear out the value
                 except:
-                    cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error', message="Couldn't resolve Sample " + str(value) + ")")
+                    cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
+                                        message="Couldn't resolve Sample " + str(value) + ")")
 
             if e_key.value_type == EvidenceKeyValueType.USER:
                 value = str(value)
@@ -813,7 +938,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         elif value in ('FALSE', 'N', 'NO', 'F', '0'):
                             value = False
                         else:
-                            cell.add_validation(code=ValidationCode.INVALID_VALUE, severity='error', message="Invalid value for yes/no field (" + str(value) + ")")
+                            cell.add_validation(code=ValidationCode.INVALID_VALUE, severity='error',
+                                                message="Invalid value for yes/no field (" + str(value) + ")")
                 cell.value = value
 
             elif e_key.value_type in (EvidenceKeyValueType.MULTISELECT,
@@ -837,7 +963,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     if e_key.value_type != EvidenceKeyValueType.MULTISELECT:
                         value_len = len(value)
                         if value_len > 1:
-                            cell.add_validation(code=ValidationCode.TOO_MANY_VALUES, severity='error', message="Can only have a single value for a select field")
+                            cell.add_validation(code=ValidationCode.TOO_MANY_VALUES, severity='error',
+                                                message="Can only have a single value for a select field")
                         elif value_len == 1:
                             value = value[0]
                             cell.value = value
@@ -848,7 +975,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    if not value.startswith("http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
+                    if not value.startswith(
+                            "http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
                         value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
@@ -864,7 +992,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 except:
                     pass
                 if not valid:
-                    cell.add_validation(code=ValidationCode.INVALID_PERCENT, severity='warning', message='Value should be a number between 0 and 100')
+                    cell.add_validation(code=ValidationCode.INVALID_PERCENT, severity='warning',
+                                        message='Value should be a number between 0 and 100')
 
             elif e_key.value_type == EvidenceKeyValueType.UNIT:
                 valid = False
@@ -875,7 +1004,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 except:
                     pass
                 if not valid:
-                    cell.add_validation(code=ValidationCode.INVALID_UNIT, severity='warning', message='Value should be a number between 0 and 1')
+                    cell.add_validation(code=ValidationCode.INVALID_UNIT, severity='warning',
+                                        message='Value should be a number between 0 and 1')
 
             elif e_key.value_type == EvidenceKeyValueType.FLOAT:
                 valid = False
@@ -886,7 +1016,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 except:
                     pass
                 if not valid:
-                    cell.add_validation(code=ValidationCode.INVALID_FLOAT, severity='warning', message='Value should be a number')
+                    cell.add_validation(code=ValidationCode.INVALID_FLOAT, severity='warning',
+                                        message='Value should be a number')
 
             elif e_key.value_type == EvidenceKeyValueType.INTEGER:
                 valid = False
@@ -922,7 +1053,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if e_key.key == SpecialEKeys.REFSEQ_TRANSCRIPT_ID and isinstance(value, str):
             version_regex = re.compile('.*?[.][0-9]+')
             if not version_regex.match(value):
-                cell.add_validation(code=ValidationCode.UNKNOWN_TRANSCRIPT, severity='warning', message='Transcript should include version e.g. NM_001256799.1')
+                cell.add_validation(code=ValidationCode.UNKNOWN_TRANSCRIPT, severity='warning',
+                                    message='Transcript should include version e.g. NM_001256799.1')
 
         # ensure we have one non None value before returning the structure
         if not cell.has_data:
@@ -930,7 +1062,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def modification_at_timestamp(self, version_timestamp) -> 'ClassificationModification':
         dt = datetime.utcfromtimestamp(version_timestamp).replace(tzinfo=timezone.utc)
-        vcm = ClassificationModification.objects.filter(classification=self, created__lte=dt).order_by('-created').first()
+        vcm = ClassificationModification.objects.filter(classification=self, created__lte=dt).order_by(
+            '-created').first()
         return vcm
 
     def has_outstanding_changes(self) -> bool:
@@ -941,7 +1074,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             submitted = last_edit.pk == last_publish.pk
         return not submitted
 
-    def revalidate(self, user: User):
+    def revalidate(self, user: User, migration_patch: Optional[VCPatch] = None):
         """
         Re-normalises all values and re-performs validation on mutable fields.
         Re-publishes if the latest version was published (don't want to make every record
@@ -966,6 +1099,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     "explain": value.get('explain'),
                     "immutable": value.get('immutable')
                 }
+        if migration_patch:
+            for key, value in migration_patch.items():
+                raw_patch[key] = value
 
         self.patch_value(
             patch=raw_patch,
@@ -974,15 +1110,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             save=True,
             revalidate_all=True
         )
-        self.fix_migration_stuff(user)
+        # migration fixes are so established at this point, no need to re-run them
+        # self.fix_migration_stuff(user)
 
         classification_revalidate_signal.send(sender=Classification, classification=self)
 
         if submitted:
             # have to re-retrieve last_edited_version as it's now the latest
             self.last_edited_version.publish(share_level=self.share_level_enum, user=user, vc=self)
-
-        self.fix_permissions()
 
     def fix_migration_stuff(self, user: User) -> None:
         """
@@ -1071,8 +1206,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
         key_dict: EvidenceKeyMap = self.evidence_keys
 
-        use_evidence = VCDataDict(copy.deepcopy(self.evidence), evidence_keys=self.evidence_keys)  # make a deep copy so we don't accidentally mutate the data
-        patch = VCDataDict(data=EvidenceMixin.to_patch(patch), evidence_keys=self.evidence_keys)  # the patch we're going to apply ontop of the evidence
+        use_evidence = VCDataDict(copy.deepcopy(self.evidence),
+                                  evidence_keys=self.evidence_keys)  # make a deep copy so we don't accidentally mutate the data
+        patch = VCDataDict(data=EvidenceMixin.to_patch(patch),
+                           evidence_keys=self.evidence_keys)  # the patch we're going to apply ontop of the evidence
 
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
@@ -1154,7 +1291,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 elif make_patch_fields_immutable and not cell.immutability and source != SubmissionSource.FORM:
                     cell.immutability = source
 
-                # Don't set immutability to form as that's the loweest immutability level
+                # Don't set immutability to form as that's the lowest immutability level
                 if cell.immutability == SubmissionSource.FORM:
                     cell.pop_immutability()
 
@@ -1178,7 +1315,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
 
-        validations_received = classification_validation_signal.send(sender=Classification, classification=self, patch_meta=patch_meta, key_map=key_dict)
+        validations_received = classification_validation_signal.send(sender=Classification, classification=self,
+                                                                     patch_meta=patch_meta, key_map=key_dict)
         multi_errors = ValidationMerger.union_send_responses(validations_received)
         multi_errors.apply(patch.data, use_evidence.data)
 
@@ -1204,15 +1342,18 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 patched.raw = cell.diff(None)
             elif cell.raw is None:
                 if not source.can_edit(existing_immutability):
-                    warnings.append({'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key + \
-                                     ' from ' + str(existing.value) + ' to blank'})
+                    warnings.append(
+                        {'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key +
+                                                                     ' from ' + str(existing.value) + ' to blank'})
                 else:
                     patched.wipe(WipeMode.SET_NONE)
             else:
-                patched.raw = cell.diff(dest=existing, ignore_if_omitted=set(['immutable']))
+                patched.raw = cell.diff(dest=existing, ignore_if_omitted={'immutable'})
                 if patched.value is not None and not source.can_edit(existing_immutability):
-                    warnings.append({'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key + \
-                                     ' from ' + str(existing.value) + ' to ' + str(patched.value)})
+                    warnings.append(
+                        {'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key +
+                                                                     ' from ' + str(existing.value) + ' to ' + str(
+                            patched.value)})
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
 
@@ -1232,7 +1373,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # if this is the first submission, create a version regardless of if there's data or not
             apply_patch = self.id is None
 
-        pending_modification = None
+        pending_modification: Optional[ClassificationModification] = None
 
         # only make a modification if there's data to actually patch
         if apply_patch:
@@ -1273,7 +1414,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
 
-            warnings.append({'code': 'patched', 'message': 'Patched changed values for ' + ', '.join(diffs_only_patch.keys())})
+            warnings.append(
+                {'code': 'patched', 'message': 'Patched changed values for ' + ', '.join(diffs_only_patch.keys())})
 
             if save:
                 self.save()
@@ -1284,14 +1426,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     pending_modification.save()
                     assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
 
-        #end apply patch diff
+        # end apply patch diff
         else:
             warnings.append({'code': 'no_patch', 'message': 'No changes detected to patch'})
             # don't save if we haven't changed any values
 
         if self.requires_auto_population:
             self.requires_auto_population = False
-            from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import classification_auto_populate_fields
+            from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
+                classification_auto_populate_fields
             genome_build = self.get_genome_build()
             classification_auto_populate_fields(self, genome_build, save=save)
 
@@ -1313,7 +1456,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return ClassificationModification.objects.filter(classification=self, is_last_edited=True).first()
 
     def latest_modification_for_user(self, user: User, exclude_withdrawn: bool = True) -> 'ClassificationModification':
-        return ClassificationModification.latest_for_user(user, classification=self, exclude_withdrawn=exclude_withdrawn).first()
+        return ClassificationModification.latest_for_user(user, classification=self,
+                                                          exclude_withdrawn=exclude_withdrawn).first()
 
     @property
     def last_published_version(self) -> 'ClassificationModification':
@@ -1390,7 +1534,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def fix_permissions(self):
         clear_permissions(self, [self.get_write_perm()])
-        #labs can edit classifications
+        # labs can edit classifications
         assign_perm(self.get_write_perm(), self.lab.group, self)
 
     @property
@@ -1461,6 +1605,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             'can_write_latest': can_write,
             'clinical_context': clinical_context,
             'data': self.get_visible_evidence(self.evidence, lowest_share_level),
+            'resolved_condition': self.condition_resolution_dict,
             'withdrawn': self.withdrawn
         }
         if latest_modification:
@@ -1480,7 +1625,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             content['last_edited'] = latest_modification.created.timestamp()
 
         if version is None or version.is_last_edited:
-            #show the editable version
+            # show the editable version
             pass
         else:
             version_timestamp = version.created.timestamp()
@@ -1493,10 +1638,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             content['can_write'] = False
 
         if include_lab_config:
-            content['config'] = EvidenceKey.merge_config(self.lab.classification_config, self.lab.organization.classification_config)
+            content['config'] = EvidenceKey.merge_config(self.lab.classification_config,
+                                                         self.lab.organization.classification_config)
 
         if include_messages:
-            content['messages'] = (content['messages'] or []) + self.current_state_validation(user=current_user).flat_messages
+            content['messages'] = (content['messages'] or []) + self.current_state_validation(
+                user=current_user).flat_messages
 
         # Summary
         data = content['data']
@@ -1608,8 +1755,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         variant = self.get_variant_for_build(genome_build)
         if variant:
             try:
-                hgvs_matcher = HGVSMatcher(genome_build=genome_build)
-                g_hgvs = hgvs_matcher.variant_to_g_hgvs(variant)
+                g_hgvs = HGVSMatcher(genome_build=genome_build).variant_to_g_hgvs(variant)
                 c_hgvs = self.get_c_hgvs(genome_build)
                 return {
                     SpecialEKeys.GENOME_BUILD: genome_build.name,
@@ -1642,7 +1788,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     SpecialEKeys.VARIANT_COORDINATE: str(variant),
                     SpecialEKeys.G_HGVS: g_hgvs,
                     SpecialEKeys.C_HGVS: c_hgvs,
-                    #"origin" : variant_allele.get_origin_display(),
+                    # "origin" : variant_allele.get_origin_display(),
                     "variant_id": variant.pk,
                 }
                 # origin / conversion tool etc a little bit too detailed for end users downloading this
@@ -1687,7 +1833,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         variant_coordinate = self.get(SpecialEKeys.VARIANT_COORDINATE)
         if variant_coordinate:
             if SpecialEKeys.VARIANT_COORDINATE in key_errors:
-                vcfe.record(variant_coordinate, error=key_errors[SpecialEKeys.VARIANT_COORDINATE].get('message', 'Validation Error'))
+                vcfe.record(variant_coordinate,
+                            error=key_errors[SpecialEKeys.VARIANT_COORDINATE].get('message', 'Validation Error'))
             else:
                 try:
                     vcord = Variant.get_tuple_from_string(variant_coordinate, genome_build)
@@ -1739,10 +1886,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def get_other_classifications_summary_for_variant(self, user: User) -> str:
         other_classifications_summary = None
         if self.variant and self.variant.allele:
-            latest_others_for_variant = ClassificationModification.latest_for_user(user=user, allele=self.variant.allele, published=True)
+            latest_others_for_variant = ClassificationModification.latest_for_user(user=user,
+                                                                                   allele=self.variant.allele,
+                                                                                   published=True)
             latest_others_for_variant = latest_others_for_variant.exclude(classification__id=self.id)
 
-            counts = Counter([vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, "Unclassified") for vcm in latest_others_for_variant])
+            counts = Counter(
+                [vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, "Unclassified") for vcm in latest_others_for_variant])
             classifications = []
             for counted in counts.most_common():
                 count = counted[1]
@@ -1879,6 +2029,13 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     # it's useful if we have to rework permissions though
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
 
+    @property
+    def condition_text(self):
+        if crd := self.classification.condition_resolution_dict:
+            return crd.get('display_text')
+        else:
+            return self.get(SpecialEKeys.CONDITION)
+
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, use_full: bool = False):
         if genome_build.is_equivalent(GenomeBuild.grch37()):
@@ -1954,7 +2111,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         return self.classification.as_json(params)
 
     def get_absolute_url(self):
-        return reverse('view_classification', kwargs={'record_id': str(self.classification.id) + '.' + str(self.created.timestamp())})
+        return reverse('view_classification',
+                       kwargs={'record_id': str(self.classification.id) + '.' + str(self.created.timestamp())})
 
     def __init__(self, *args, **kwargs):
         super(ClassificationModification, self).__init__(*args, **kwargs)
@@ -2006,7 +2164,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             qs = qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
 
         if published:
-            qs = qs.select_related('classification', 'classification__lab', 'classification__variant', 'classification__user')
+            qs = qs.select_related('classification', 'classification__lab', 'classification__variant',
+                                   'classification__user')
             qs = qs.filter(is_last_published=True)
             return qs
         qs = qs.values_list('id', 'classification')
@@ -2076,15 +2235,18 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             previous_share_level=old_share_level,
             newly_published=self,
             user=user)
+        vc.refresh_from_db()
         return True
 
     @lazy
     def previous(self) -> Optional['ClassificationModification']:
-        return ClassificationModification.objects.filter(classification=self.classification, created__lt=self.created).order_by('-created').first()
+        return ClassificationModification.objects.filter(classification=self.classification,
+                                                         created__lt=self.created).order_by('-created').first()
 
     @property
     def index(self):
-        return ClassificationModification.objects.filter(classification=self.classification, created__lt=self.created).count()
+        return ClassificationModification.objects.filter(classification=self.classification,
+                                                         created__lt=self.created).count()
 
     @property
     def evidence(self) -> Dict[str, Dict]:
@@ -2095,8 +2257,9 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                 data = {}
                 patches_since_evidence = []
 
-                for vcm in ClassificationModification.objects.filter(classification=self.classification, created__lte=self.created)\
-                    .order_by('-created').values('delta', 'published_evidence'):
+                for vcm in ClassificationModification.objects.filter(classification=self.classification,
+                                                                     created__lte=self.created) \
+                        .order_by('-created').values('delta', 'published_evidence'):
                     published_evidence = vcm['published_evidence']
                     if published_evidence is not None:
                         data = published_evidence
@@ -2146,7 +2309,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                 else:
                     a = [a]
             if not isinstance(b, list):
-                if isinstance(b, list):
+                if isinstance(b, str):
                     b = [s.strip() for s in b.split(',')]
                 else:
                     b = [b]

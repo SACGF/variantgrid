@@ -4,7 +4,7 @@ from matplotlib.patches import Rectangle
 
 from library.graphs.graph_utils import ForceMandKIntFormatter
 from seqauto.models import QCExecSummary
-from seqauto.models_enums import QCCompareType
+from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.sequencing_run_utils import get_qc_exec_summary_data
 from snpdb.graphs.graphcache import CacheableGraph
 
@@ -108,7 +108,7 @@ class QCExecSummaryGraph(CacheableGraph):
             "mean_coverage_across_genes": "mean coverage\nacross genes",
             "mean_coverage_across_kit": "mean coverage\nacross kit",
             "percent_read_enrichment": "percentage\nread enrichment",
-            "duplicated_alignable_reads": "duplicated\nalignable reads",
+            "percent_duplication": "percent\nduplication",
         }
 
         bplot = ax.boxplot([column_values], vert=False, patch_artist=True, flierprops={"markersize": 1})

@@ -634,3 +634,45 @@ table.as_table {
     padding: 2px;
     background-color: #eee;
 }
+
+ul.compact {
+  margin: 0;
+  padding-left: 10px;
+  line-height: 1.2;
+  li {
+    display: block;
+    position: relative;
+    &:before {
+      color: #777;
+      position: relative;
+      padding-right: 6px;
+      bottom: 2px;
+      display: inline-block;
+      font-style: normal;
+      font-variant: normal;
+      text-rendering: auto;
+      font-size: 0.4rem;
+      font-weight: 900;
+      font-family: 'Font Awesome 5 Free';
+      content: "\f111";
+    }
+  }
+}
+
+.threshold {
+  display: inline-block;
+  padding: 2px 6px 2px 6px;
+  border-radius: 4px;
+}
+.threshold-low {
+  background-color: green;
+}
+.threshold-med {
+  background-color: orange;
+}
+.threshold-high {
+  background-color: red;
+}
+.text-monospace {
+  color: #444;
+}

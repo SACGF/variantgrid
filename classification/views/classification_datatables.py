@@ -5,14 +5,16 @@ from typing import Dict, Any, List, Optional, Iterable
 from django.conf import settings
 from django.db.models import Q, Subquery, When, Case, TextField, Value
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
+from django.db.models.functions import Lower, Cast
 from lazy import lazy
 
 from flags.models import FlagCollection, FlagStatus
 from genes.models import Gene, Transcript, TranscriptVersion, GeneSymbol
+from ontology.models import OntologyTerm
 from snpdb.models import UserSettings, GenomeBuild, Allele, Variant
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, BaseDatatableView, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from classification.enums import SpecialEKeys, EvidenceCategory
-from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
+from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap, ConditionResolvedDict
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
 ALLELE_SOMATIC_VALUES = ['somatic', 'likely_somatic']
@@ -48,6 +50,13 @@ class ClassificationDatatableConfig(DatatableConfig):
 
         return response
 
+    def render_condition(self, row:Dict[str, Any]):
+        if cr := row['classification__condition_resolution']:
+            return cr
+        else:
+            return {"display_text": row['published_evidence__condition__value']}
+        return resolved_condition
+
     def classification_id(self, row: Dict[str, Any]):
         matches: Optional[Dict[str, str]] = None
         if id_filter := self.get_query_param("id_filter"):
@@ -75,6 +84,7 @@ class ClassificationDatatableConfig(DatatableConfig):
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
     def __init__(self, request):
+        self.term_cache: Dict[str, OntologyTerm] = dict()
         super().__init__(request)
 
         user_settings = UserSettings.get_for_user(self.user)
@@ -125,8 +135,11 @@ class ClassificationDatatableConfig(DatatableConfig):
                 key='published_evidence__condition__value',
                 name='condition',
                 label='Condition',
-                client_renderer=f'VCTable.evidence_key.bind(null, "{ SpecialEKeys.CONDITION }")',
-                orderable=True
+                sort_keys=['condition_sort'],
+                renderer=self.render_condition,
+                client_renderer='VCTable.condition',
+                orderable=True,
+                extra_columns=["classification__condition_resolution"]
             ),
             RichColumn(
                 key='classification__user__username',
@@ -198,6 +211,16 @@ class ClassificationDatatableConfig(DatatableConfig):
         case = Case(*whens, default=KeyTextTransform('value', KeyTransform('clinical_significance', 'published_evidence')),
                     output_field=TextField())
         initial_qs = initial_qs.annotate(clin_sig_sort=case)
+
+        case = Case(
+            When(
+                classification__condition_resolution__sort_text__isnull=False,
+                then=Cast(KeyTextTransform('sort_text', 'classification__condition_resolution'), TextField())
+            ),
+            default=Lower(Cast(KeyTextTransform('value', KeyTransform('condition', 'published_evidence')), TextField())),
+            output_field=TextField()
+        )
+        initial_qs = initial_qs.annotate(condition_sort=case)
 
         return initial_qs
 

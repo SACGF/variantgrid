@@ -1,50 +1,29 @@
-import logging
-from time import time
-
 import celery
-from django.db.models import Q
 
-from analysis.models import VariantTag, Analysis, TagNode
+from analysis.models import VariantTag, Analysis
 from analysis.models.nodes.node_utils import update_nodes
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import ImportSource, Tag, VariantAlleleSource, VariantAllele
+from snpdb.models import ImportSource, VariantAlleleSource, VariantAllele
 
 
 @celery.task
 def analysis_tag_created_task(variant_tag_id):
-    variant_tag = VariantTag.objects.get(pk=variant_tag_id)
-    _update_analysis_on_variant_tag_change(variant_tag.analysis, variant_tag.tag)
+    """ Do this async to save a few miliseconds when adding/removing tags """
+    try:
+        variant_tag = VariantTag.objects.get(pk=variant_tag_id)
+    except VariantTag.DoesNotExist:
+        return  # Deleted before this got run, doesn't matter...
+    update_nodes(variant_tag.analysis.pk)
     _liftover_variant_tag(variant_tag)
 
 
 @celery.task
-def analysis_tag_deleted_task(analysis_id, tag_id):
+def analysis_tag_deleted_task(analysis_id, _tag_id):
+    """ Do this async to save a few miliseconds when adding/removing tags """
     analysis = Analysis.objects.get(pk=analysis_id)
-    tag = Tag.objects.get(pk=tag_id)
-    _update_analysis_on_variant_tag_change(analysis, tag)
-
-
-def _update_analysis_on_variant_tag_change(analysis: Analysis, tag: Tag):
-    """ TagNodes relying on VariantTag need to be reloaded """
-
-    start = time()
-    tag_filter = Q(tag__isnull=True) | Q(tag=tag)
-    # TagNode doesn't have any output, so no need to check children
-    need_to_reload = False
-    for node in TagNode.objects.filter(analysis=analysis).filter(tag_filter):
-        node.queryset_dirty = True
-        node.save()
-        need_to_reload = True
-
-    if need_to_reload:
-        logging.info("Reloading %s (%d) as tag %s changed", analysis, analysis.pk, tag)
-        update_nodes(analysis.pk)
-
-    end = time()
-    time_taken = end - start
-    logging.info("Time taken %.3f", time_taken)
+    update_nodes(analysis.pk)
 
 
 def _liftover_variant_tag(variant_tag: VariantTag):

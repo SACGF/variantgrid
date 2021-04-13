@@ -91,7 +91,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 25  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 28  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "redis_cache.RedisCache",
@@ -159,6 +159,8 @@ ANNOTATION_VEP_ARGS = []  # ["--buffer_size", "1000"] # default = 5000
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
 ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
+# @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
+ANNOTATION_VEP_PICK_ORDER = None
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 BUILD_GRCH37 = "GRCh37"
@@ -331,10 +333,14 @@ USER_CREATE_ORG_LABS = {
 # after including this file
 SEQAUTO_ENABLED = False
 
+# Occasionally turn off if it helps with testing
+# (Server Status page will freeze up if this is true and celery is not on)
+CELERY_ENABLED = True
+
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = []
 # Fields must be from GoldCoverageSummary and COLUMNS + LABELS must line up!
 GENE_GRID_ENRICHMENT_KIT_COLUMNS = ['mean', 'min_mean', 'depth_20x_5th_percentile']
-GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript_id"] * len(GENE_GRID_ENRICHMENT_KIT_COLUMNS)
+GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript"] * len(GENE_GRID_ENRICHMENT_KIT_COLUMNS)
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS = ["Mean", "Min Mean", "Depth 20x (5th percentile)"]
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS = [None, None, None]
 
@@ -355,7 +361,7 @@ VARIANT_SHOW_CANONICAL_HGVS = True
 VARIANT_CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing
 VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True
 VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = False
-VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW = False  # if true, when view classification form (even if you can edit it, will default to only showing fields with value)
+VARIANT_CLASSIFICAITON_DEFAULT_ASTERISK_VIEW = False  # if true, when view classification form (even if you can edit it, will default to only showing fields with value)
 
 VARIANT_CLASSIFICATION_DASHBOARD_SIZE = 50
 VARIANT_CLASSIFICATION_RECLASSIFICATION_EMAIL = True
@@ -423,6 +429,11 @@ ROLLBAR = {
     'root': BASE_DIR,
     'capture_username': True,
     'code_version': Git(BASE_DIR).hash,
+}
+
+SLACK = {
+    'enabled': get_secret('SLACK.enabled'),
+    'admin_callback_url': get_secret('SLACK.admin_callback_url')
 }
 
 SERVER_MIN_DISK_WARNING_GIGS = 1
@@ -495,6 +506,7 @@ MIDDLEWARE = (
     'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
     'htmlmin.middleware.HtmlMinifyMiddleware',
     'htmlmin.middleware.MarkRequestMiddleware',
+    'threadlocals.middleware.ThreadLocalMiddleware'
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
     # 'debug_panel.middleware.DebugPanelMiddleware',
@@ -765,6 +777,7 @@ URLS_NAME_REGISTER.update({"classification_dashboard": False,
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
 VARIANT_DETAILS_SHOW_SAMPLES = True
+VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True

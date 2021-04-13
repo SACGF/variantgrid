@@ -2,7 +2,7 @@ import operator
 from functools import reduce
 
 from library.date_utils import get_month_and_year, get_months_since, month_range
-from seqauto.models import SequencingSample
+from seqauto.models import SequencingSample, SequencingRun
 import pandas as pd
 import numpy as np
 
@@ -11,6 +11,7 @@ def get_sample_enrichment_kits_df():
     SEQUENCING_RUN_COL = "sample_sheet__sequencing_run"
     values_qs = SequencingSample.get_current().values(SEQUENCING_RUN_COL, "enrichment_kit__name")
     df = pd.DataFrame.from_records(values_qs)
+    # May be no sequencing runs - in which case skip
     if SEQUENCING_RUN_COL in df.columns:
         sr = df[SEQUENCING_RUN_COL]
 
@@ -18,7 +19,8 @@ def get_sample_enrichment_kits_df():
         year_series = pd.Series(index=df.index, dtype='i')
 
         for i, val in sr.items():
-            run_date = val.split("_")[0]
+            sr_name = SequencingRun.get_original_illumina_sequencing_run(val)
+            run_date = sr_name.split("_")[0]
             year_series[i] = run_date[:2]
             year_month_series[i] = run_date[:4]
 

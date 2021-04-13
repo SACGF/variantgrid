@@ -4,6 +4,7 @@ from typing import Optional, Dict
 
 import ijson
 import requests
+import time
 
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
@@ -92,12 +93,11 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                 external=True,
             )
 
-        record = {
+        return {
             "id": record.get('id'),
             "publish": record.get('publish'),
             "data": data,
         }
-        return record
 
     run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
     run.save()
@@ -123,9 +123,16 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                 else:
                     skipped = skipped + 1
 
-        for batch in batch_iterator(records(), batch_size=10):
+        first_batch = True
+        for batch in batch_iterator(records(), batch_size=50):
             inserter = BulkInserter(user=admin_bot(), force_publish=True)
             try:
+                # give the process 10 seconds to breath between batches of 50 classifications
+                # in case we're downloading giant chunks of data
+                if not first_batch:
+                    time.sleep(10)
+                first_batch = False
+
                 for record in batch:
                     inserter.insert(record)
                     count = count + 1

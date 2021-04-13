@@ -20,7 +20,7 @@ def create_cohort_genotype_and_launch_task(cohort, run_async=True):
     cohort.delete_old_counts()
 
     q_not_sub_cohort = Q(parent_cohort__isnull=True)
-    q_is_vcf = Q(vcf__isnull=False)
+    q_is_vcf = Q(vcf__isnull=False)  # Don't build off a cohort that could get deleted
     q_exclude_this_cohort = ~Q(pk=cohort.pk)
     q = q_not_sub_cohort & q_is_vcf & q_exclude_this_cohort
 
@@ -96,6 +96,13 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
     column_pack_lists = defaultdict(list)
     joins = set()
 
+    ZYGOSITY_COUNT_COLUMNS = {
+        Zygosity.HOM_REF: "ref_count",
+        Zygosity.HET: "het_count",
+        Zygosity.HOM_ALT: "hom_count",
+        Zygosity.UNKNOWN_ZYGOSITY: "unk_count",
+    }
+
     for sample in samples:
         sample_cgc = sample.vcf.cohort.cohort_genotype_collection
         partition_table = sample_cgc.get_partition_table()
@@ -114,7 +121,7 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
             column_pack_lists[column].append(sample_value)
 
             if column == "samples_zygosity":
-                for zygosity in Zygosity.VARIANT:
+                for zygosity in ZYGOSITY_COUNT_COLUMNS:
                     zygosity_count_lists[zygosity].append(_get_sample_zygosity_count_sql(sample_value, zygosity))
 
     columns = {
@@ -122,14 +129,7 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
         "collection_id": f"{cgc.pk}",
     }
 
-    ZYGOSITY_COUNT_COLUMNS = {
-        Zygosity.HOM_REF: "ref_count",
-        Zygosity.HET: "het_count",
-        Zygosity.HOM_ALT: "hom_count",
-    }
-
-    for zygosity in Zygosity.VARIANT:
-        c = ZYGOSITY_COUNT_COLUMNS[zygosity]
+    for zygosity, c in ZYGOSITY_COUNT_COLUMNS.items():
         columns[c] = " + ".join(zygosity_count_lists[zygosity])
 
     for c, (is_array, _) in CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE.items():
@@ -147,7 +147,7 @@ SELECT DISTINCT
 FROM snpdb_variant
 {joins}
 WHERE
-({columns['ref_count']} + {columns['het_count']} + {columns['hom_count']}) > 0
+({columns['ref_count']} + {columns['het_count']} + {columns['hom_count']} + {columns['unk_count']}) > 0
 """
     return insert_sql
 

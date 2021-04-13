@@ -124,6 +124,7 @@ class SearchResult:
                  message: Optional[Union[str, List[str]]] = None,
                  is_debug_data: bool = False):
         self.record = record
+        self.genome_build = None  # Set as we display search results for each build
         self.genome_builds = genome_builds
         self.annotation_consortia = annotation_consortia
         search_message = getattr(record, "search_message", None)
@@ -373,6 +374,7 @@ class Searcher:
                                 # don't count as filtered out result, as it's not a "real" result
                                 continue
 
+                            sr.genome_build = genome_build
                             if not sr.search_type:
                                 sr.search_type = search_type
                             if not sr.genome_builds:
@@ -481,6 +483,9 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         search_messages = []
         hgvs_string = search_string
         try:
+            if fixed_hgvs := HGVSMatcher.fix_swapped_gene_transcript(hgvs_string):
+                hgvs_string = fixed_hgvs
+                search_messages.append(f"Warning: swapped gene/transcript, ie '{search_string}' => '{hgvs_string}'")
             variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
         except Contig.ContigNotInBuildError:
             return None  # g.HGVS from another genome build
@@ -571,8 +576,8 @@ def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **k
 def search_variant_match(m: Match, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
     if m:
         chrom, position, ref, alt = m.groups()
-        chrom, position, ref, alt = Variant.clean_fields(chrom, position, ref, alt,
-                                                         want_chr=genome_build.reference_fasta_has_chr)
+        chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
+                                                                 want_chr=genome_build.reference_fasta_has_chr)
         results = get_results_from_variant_tuples(variant_qs, (chrom, position, ref, alt))
         if results.exists():
             return results

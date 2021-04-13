@@ -19,11 +19,11 @@
 
 {% block jshead %}
     function get_icon_class(importStatus) {
-        if (importStatus == 'success') {
+        if (importStatus == 'S') {
             return "vcf-success";
-        } else if (importStatus == 'error') {
+        } else if (importStatus == 'E') {
             return "vcf-error";
-        } else if (importStatus == 'created' || importStatus == 'importing' || importStatus == 'Annotating Variants') {
+        } else if (importStatus == 'C' || importStatus == 'I') {
             return "vcf-loading";
         }
         return null;
@@ -36,30 +36,45 @@
 			const URL = Urls.view_sequencing_run(sequencingRunId);
 	    	return "<a class='sequencing-run-link' href='" + URL + "'>" + sequencingRunId + "</a>";
 		},
-        formatSequencingRunReady: function(ready) {
-            let value = ready;
-            if (!ready) {
-                value = `<span class="error">${ready}</span>`;
+        formatSequencingRunValid: function(is_valid) {
+            let value = "Pass";
+            if (!is_valid) {
+                value = `<span class="error">Fail</span>`;
             }
             return value;
         },
-        viewVCFLink : function(vcfId, options, rowObject) {
-            var vcfLink = '';
-            if (vcfId) {
-                const URL = Urls.view_vcf(vcfId);
-                var importStatus = rowObject.vcffromsequencingrun__vcf__import_status;
-                
-                var iconClass = get_icon_class(importStatus);
-                var linkInner;
-                if (iconClass) {
-                    linkInner = "<div title='View VCF' class='grid-link-icon vcf-icon " + iconClass + "'></div>";
-                } else {
-                    linkInner = 'VCF ' + vcfId;
-                    linkInner += "(" + importStatus + ")";
-                }
-                vcfLink = "<a href='" + URL + "'>" + linkInner + "</a>";
+        formatSequencingRunVCF : function(vcfIds, options, rowObject) {
+            if (!vcfIds) {
+                return "";
             }
-            return vcfLink;
+            let vcfSet = new Set();
+            let vcfIdList = vcfIds.split(",");
+            let variantCallerList = rowObject.vcf_variant_caller.split(",");
+            let importStatusList = rowObject.vcf_import_status.split(",");
+
+            let vcfLinks = [];
+            // This contains duplicates
+            for (let i=0 ; i<vcfIdList.length ; ++i) {
+                let vcfId = vcfIdList[i];
+
+                if (!vcfSet.has(vcfId)) {
+                    vcfSet.add(vcfId);
+                    let variantCaller = variantCallerList[i];
+                    let importStatus = importStatusList[i];
+                    let URL = Urls.view_vcf(vcfId);
+                    let iconClass = get_icon_class(importStatus);
+                    let linkInner;
+                    if (iconClass) {
+                        linkInner = `<div title='${variantCaller}' class='left grid-link-icon vcf-icon ${iconClass}'></div>`;
+                        console.log(linkInner);
+                    } else {
+                        linkInner = 'VCF ' + vcfId;
+                        linkInner += "(" + importStatus + ")";
+                    }
+                    vcfLinks.push("<a href='" + URL + "'>" + linkInner + "</a>");
+                }
+            }
+            return vcfLinks.join(" ");
         },
         showGoldStandardIcon : function(val) {
             var cell_value = '';

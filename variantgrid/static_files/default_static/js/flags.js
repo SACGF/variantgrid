@@ -1240,11 +1240,17 @@ let Flags = (function () {
             if (props.userId) {
                 this.userId = props.userId;
             }
+            let flagDoms = null;
+            if (props.filter) {
+                flagDoms = $(`${props.filter} *[data-flags]`);
+            } else {
+                flagDoms = $('[data-flags]');
+            }
             
             this.onClose = props.onClose || false;
             this.summaryFilter = $('#flags-filter');
             if (this.summaryFilter) {
-                summaryFilterInclusions = this.summaryFilter.attr('data-filter') || null;
+                let summaryFilterInclusions = this.summaryFilter.attr('data-filter') || null;
                 if (summaryFilterInclusions) {
                     this.summaryFilterInclusions = {};
                     for (let inclusion of summaryFilterInclusions.split(' ')) {
@@ -1259,7 +1265,7 @@ let Flags = (function () {
                 existingCollections[collection.id] = collection;
             }
             let flag_collection_doms = {};
-            $('[data-flags]').toArray().forEach(e => {
+            flagDoms.toArray().forEach(e => {
                 let dom = $(e);
                 dom.addClass('flags');
                 let id = parseInt(dom.attr('data-flags'));
@@ -1286,7 +1292,7 @@ let Flags = (function () {
             for (let collection of Object.values(existingCollections)) {
                 collection.remove();
             }
-            if (changes) {
+            if (changes || props.forceRender) {
                 this.refresh();
             } else {
                 this.render();
@@ -1326,11 +1332,11 @@ let Flags = (function () {
 
                 rerender = true;
                 let collections = this.collections.all();
-                if (collections.length == 0) {
+                if (collections.length === 0) {
                     resolve();
                     return;
                 }
-                collection = params.collection;
+                let collection = params.collection;
                 if (collection) {
                     params['history'] = collection.id;
                 } else if (this.dialogState && this.dialogState.collection) {

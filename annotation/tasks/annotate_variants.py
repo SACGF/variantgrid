@@ -7,24 +7,28 @@ import os
 
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models import AnnotationStatus, GenomeBuild
-from annotation.models.models import AnnotationRun
+from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals import annotation_run_complete_signal
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, mk_path_for_file
-from library.log_utils import get_traceback, report_message
+from library.log_utils import get_traceback, report_message, log_traceback
 from library.utils import execute_cmd
 from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT
 
 
 @celery.task
 def delete_annotation_run(annotation_run_id):
-    annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
-    annotation_run.status = AnnotationStatus.DELETING
-    annotation_run.save()
-    annotation_run.delete()
+    try:
+        annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+        annotation_run.status = AnnotationStatus.DELETING
+        annotation_run.save()
+        annotation_run.delete()
+    except:
+        log_traceback()
+        raise
 
 
 @celery.task
@@ -57,6 +61,10 @@ def annotate_variants(annotation_run_id):
     try:
         # Reload to get updated task_id
         annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+        if annotation_run.variant_annotation_version.gene_annotation_release is None:
+            # We need this so that transcript/versions are in DB so FKs link
+            msg = f"{annotation_run.variant_annotation_version} missing GeneAnnotationRelease"
+            raise InvalidAnnotationVersionError(msg)
         annotation_run.task_id = annotate_variants.request.id
         annotation_run.set_task_log("start", timezone.now())
         annotation_run.save()
@@ -132,6 +140,10 @@ def dump_and_annotate_variants(annotation_run):
 
 
 def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> AnnotationRun:
+    if annotation_run.status != AnnotationStatus.ERROR:
+        msg = f"Cannot re-try {annotation_run} as has non-error status {annotation_run.get_status_display()}"
+        raise ValueError(msg)
+
     if upload_only and annotation_run.vcf_annotated_filename is None:
         msg = "Retry annotation run upload only requires annotation VCF to be written"
         raise ValueError(msg)

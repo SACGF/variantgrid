@@ -4,7 +4,7 @@ from django import forms
 from library.forms import ROFormMixin
 from seqauto import models
 from seqauto.models import QCType, QCColumn, EnrichmentKit
-from seqauto.models_enums import QCCompareType, QCGraphTypes2, \
+from seqauto.models.models_enums import QCCompareType, QCGraphTypes2, \
     QCGraphEnrichmentKitSeparationChoices, QCGraphType
 from snpdb.forms import BaseDeclareForm
 

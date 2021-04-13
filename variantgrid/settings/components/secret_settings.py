@@ -39,6 +39,10 @@ _settings_json = _load_settings()
 # CELERY.broker_url: guest:guest default account see: https://www.rabbitmq.com/access-control.html
 # TODO: migrate CLINGEN_ALLELE_REGISTRY to each environment's settings_config.json
 _default_settings = {
+    "SLACK": {
+        "enabled": False,
+        "admin_callback_url": None
+    },
     "DB": {
         "host": "localhost",
         "name": "snpdb",

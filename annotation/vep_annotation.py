@@ -23,9 +23,9 @@ class VEPConfig:
         self.vep_data = genome_build.settings["vep_config"]
 
     def __getitem__(self, key):
-        if value := self.vep_data.get(key):
-            return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
-        return None
+        """ Throws KeyError if missing """
+        value = self.vep_data[key]  # All callers need to catch KeyError
+        return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
 
 
 def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
@@ -82,12 +82,13 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--uniprot",
         "--hgvs",
         "--symbol",
-        "--numbers",
+        "--numbers",  # EXON/INTRON numbers
         "--domains",
         # "--regulatory", # don't know how to deal with ENSM00525026610
         "--canonical",
         "--protein",
         "--biotype",
+        "--transcript_version",  # Makes Ensembl Transcript IDs in Feature have version (RefSeq ones already do)
         "--af",
         "--pubmed",
         "--variant_class",
@@ -96,6 +97,10 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--plugin", "SpliceRegion",
         "--plugin", "LoFtool",
     ]
+
+    if settings.ANNOTATION_VEP_PICK_ORDER:
+        # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
+        cmd.extend(["--pick_order", settings.ANNOTATION_VEP_PICK_ORDER])
 
     # Plugins that require data
     PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter

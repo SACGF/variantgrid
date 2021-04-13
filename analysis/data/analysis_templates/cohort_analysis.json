@@ -38,14 +38,8 @@
         "cadd_score_min": null,
         "revel_score_min": null,
         "allow_null": false,
-        "remove_low_complexity_regions": false,
         "accordion_panel": 0,
         "min_damage_predictions": null,
-        "sift_prediction": null,
-        "polyphen2_prediction": null,
-        "mutation_assessor_prediction": null,
-        "mutation_taster_prediction": null,
-        "fathmm_prediction": null,
         "analysisvariable_set": [],
         "nodeallelefrequencyfilter": null,
         "nodewiki": null
@@ -138,8 +132,7 @@
         "analysisvariable_set": [],
         "nodeallelefrequencyfilter": null,
         "nodewiki": null,
-        "phenotypenodehpo_set": [],
-        "phenotypenodeomim_set": []
+        "phenotypenodeontologyterm_set": []
       }
     },
     {

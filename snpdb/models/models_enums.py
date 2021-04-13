@@ -114,9 +114,9 @@ class AlleleOrigin(models.TextChoices):
     LIFTOVER_NORMALIZED = 'M', 'Liftover (normalized)'  # This probably shouldn't happen!
 
     @staticmethod
-    def variant_origin(variant):
+    def variant_origin(variant, genome_build):
         try:
-            origin = variant.variantallele.origin
+            origin = variant.variantallele_set.get(genome_build=genome_build).origin
         except ObjectDoesNotExist:
             # Variant w/o allele must have been imported directly
             if variant.modifiedimportedvariant_set.exists():
@@ -127,15 +127,19 @@ class AlleleOrigin(models.TextChoices):
 
 
 class AlleleConversionTool(models.TextChoices):
+    SAME_CONTIG = "SC", "Identical Contig/Version"
     CLINGEN_ALLELE_REGISTRY = 'CA', "ClinGen Allele Registry"
     DBSNP = 'DB', "dbSNP API"
     NCBI_REMAP = 'NR', "NCBI Remap"
 
     @classmethod
     def vcf_tuples_in_destination_build(cls, conversion_tool):
-        IN_DEST_BUILD = {cls.CLINGEN_ALLELE_REGISTRY: True,
-                         cls.DBSNP: True,
-                         cls.NCBI_REMAP: False}
+        IN_DEST_BUILD = {
+            cls.SAME_CONTIG: True,
+            cls.CLINGEN_ALLELE_REGISTRY: True,
+            cls.DBSNP: True,
+            cls.NCBI_REMAP: False
+        }
         return IN_DEST_BUILD[conversion_tool]
 
 
@@ -163,7 +167,15 @@ class SuperPopulationCode(models.TextChoices):
     SAS = "S", "South Asian"
 
 
-class AlleleFrequencySource(models.TextChoices):
-    """ How AF is calculated for a VCF file """
-    CALCULATED = 'C', 'calculated'
-    FIELD = 'F', 'field'
+class DataState(models.TextChoices):
+    """ For files being loaded off disks """
+    NON_EXISTENT = 'N', 'Non Existent'
+    DELETED = 'D', 'Deleted'
+    RUNNING = 'R', 'Running'
+    SKIPPED = 'S', 'Skipped'
+    ERROR = 'E', 'Error'
+    COMPLETE = 'C', 'Complete'
+
+    @staticmethod
+    def should_create_new_record(data_state):
+        return data_state not in [DataState.DELETED, DataState.SKIPPED]

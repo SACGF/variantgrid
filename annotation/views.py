@@ -1,3 +1,4 @@
+import logging
 import subprocess
 from subprocess import check_output
 from typing import List, Optional
@@ -5,7 +6,6 @@ from typing import List, Optional
 from collections import defaultdict, Counter
 from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
 from django.http.response import HttpResponse, HttpResponseRedirect, Http404, \
     JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -36,6 +36,7 @@ from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
 from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyTermRelation
 from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
+from variantgrid.celery import app
 
 
 def get_build_contigs():
@@ -315,11 +316,37 @@ def view_version_diff(request, version_diff_id):
     return render(request, "annotation/view_version_diff.html", context)
 
 
+@require_superuser
 def variant_annotation_runs(request):
     as_display = dict(AnnotationStatus.choices)
 
     genome_build_field_counts = {}
     genome_build_summary = {}
+
+    if request.method == "POST":
+        for genome_build in GenomeBuild.builds_with_annotation():
+            annotation_runs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build)
+            message = None
+            if f"set-non-finished-to-error-{genome_build.name}" in request.POST:
+                num_errored = 0
+                non_finished_statuses = [AnnotationStatus.FINISHED, AnnotationStatus.ERROR]
+                for annotation_run in annotation_runs.exclude(status__in=non_finished_statuses):
+                    if celery_task := annotation_run.task_id:
+                        logging.info("Terminating celery job '%s'", celery_task)
+                        app.control.revoke(celery_task, terminate=True)  # @UndefinedVariable
+                    annotation_run.error_exception = "Manually failed"
+                    annotation_run.save()
+                    num_errored += 1
+                message = f"{genome_build} - set {num_errored} annotation runs to Error"
+            elif f"retry-annotation-runs-{genome_build.name}" in request.POST:
+                num_retrying = 0
+                for annotation_run in annotation_runs.filter(status=AnnotationStatus.ERROR):
+                    annotation_run_retry(annotation_run)
+                    num_retrying += 1
+                message = f"{genome_build} - retrying {num_retrying} annotation runs."
+
+            if message:
+                messages.add_message(request, messages.INFO, message)
 
     for genome_build in GenomeBuild.builds_with_annotation():
         qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build)
@@ -358,10 +385,6 @@ def view_annotation_run(request, annotation_run_id):
 def retry_annotation_run(request, annotation_run_id, upload_only=False):
     """ Deletes - then re-tries using annotation lock """
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
-    if annotation_run.status != AnnotationStatus.ERROR:
-        msg = f"Cannot re-try {annotation_run} as has non-error status {annotation_run.get_status_display()}"
-        raise PermissionDenied(msg)
-
     annotation_run = annotation_run_retry(annotation_run, upload_only=upload_only)
 
     msg = 'Re-trying annotation'

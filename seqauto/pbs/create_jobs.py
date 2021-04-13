@@ -6,9 +6,10 @@ import stat
 
 from library.file_utils import add_permissions_to_file, mk_path_for_file
 from seqauto.job_scripts import get_job_data, create_bash_script
-from seqauto.models import VCFFile, DataState, SampleSheet, BamFile, \
+from seqauto.models import VCFFile, SampleSheet, BamFile, \
     SequencingFileType, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, \
     FastQC, Flagstats, JobScript
+from snpdb.models import DataState
 from seqauto.pbs.pbs_scripts import get_dependency_flags, create_pbs_script
 
 
@@ -36,10 +37,12 @@ def create_jobs_and_launch_script(seqauto_run, launch_file_types):
 
     job_data_by_file_type = defaultdict(dict)
     for file_type, qs in data.items():
-        s = get_job_data(seqauto_run, file_type, qs)
-        job_data_by_file_type[file_type].update(s)
+        if file_type in launch_file_types:
+            s = get_job_data(seqauto_run, file_type, qs)
+            job_data_by_file_type[file_type].update(s)
 
-    launch_script_filename = get_launch_script_with_dependencies(seqauto_run, job_data_by_file_type, launch_file_types, allow_dependencies=True)
+    launch_script_filename = get_launch_script_with_dependencies(seqauto_run, job_data_by_file_type, launch_file_types,
+                                                                 allow_dependencies=True)
     return launch_script_filename
 
 
@@ -58,8 +61,7 @@ class ScriptWriter:
         logging.info(f"Creating job {file_type} - {job_data['path']}")
         copy_fields = ["seqauto_run", "path", "file_type", "out_file"]
         kwargs = {f: job_data[f] for f in copy_fields}
-        field = JobScript.FIELDS[file_type]
-        kwargs[field] = job_data["record"]
+        kwargs["record"] = job_data["record"]
         job_script = JobScript.objects.create(**kwargs)
 
         name = job_data["name"]

@@ -14,7 +14,6 @@ from django.db.models.aggregates import Max
 from library.django_utils import get_redis
 from library.utils import md5sum_str
 from snpdb.models import Variant, Locus, Sequence, GenomeBuild, ProcessingStatus, VariantCoordinate
-from upload.models import UploadStep
 from upload.vcf import sql_copy_files
 
 
@@ -43,6 +42,7 @@ class VariantPKLookup:
     def redis_sanity_check(self) -> bool:
         """ Check that the first and last Variant is stored in Redis, throws exception on error
             Returns whether it was able to perform a check or not """
+        from upload.models import UploadStep  # Circular import
 
         running_insert_jobs = UploadStep.objects.filter(name=UploadStep.CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME,
                                                         status=ProcessingStatus.PROCESSING)

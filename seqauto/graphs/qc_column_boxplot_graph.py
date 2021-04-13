@@ -2,8 +2,9 @@ from collections import defaultdict
 import hashlib
 import logging
 
-from seqauto.models import QC, DataState, QCColumn, EnrichmentKit
-from seqauto.models_enums import QCGraphEnrichmentKitSeparationChoices
+from seqauto.models import QC, QCColumn, EnrichmentKit
+from snpdb.models import DataState
+from seqauto.models.models_enums import QCGraphEnrichmentKitSeparationChoices
 from snpdb.graphs.graphcache import CacheableGraph
 
 SEQUENCING_SAMPLE_PATH = 'bam_file__unaligned_reads__sequencing_sample'

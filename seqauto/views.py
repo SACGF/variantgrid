@@ -1,21 +1,21 @@
+import json
+import os
 from collections import defaultdict
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
-from django.http.response import HttpResponseRedirect, JsonResponse, \
-    HttpResponse
+from django.http.response import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls.base import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import UpdateView
-import json
 
 from eventlog.models import create_event
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields, staff_only
-from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from library.utils import full_class_name
 from seqauto import forms
@@ -27,21 +27,18 @@ from seqauto.graphs.qc_exec_summary_graph import QCExecSummaryGraph
 from seqauto.graphs.sequencing_run_qc_graph import SequencingRunQCGraph
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedReads, QCType, VCFFile, QC, \
-    Experiment, SequencingSample, SampleSheetCombinedVCFFile, QCExecSummary, IlluminaFlowcellQC, \
-    SeqAutoRun, Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, \
-    SequencingRunModification, SoftwarePipelineNode, GoldReference, \
-    GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage
-from seqauto.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
+    Experiment, SequencingSample, SampleSheetCombinedVCFFile, QCExecSummary, IlluminaFlowcellQC, SeqAutoRun, \
+    Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, SoftwarePipelineNode, \
+    GoldReference, GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage
+from seqauto.models.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
     QCCompareType, SequencingFileType
-from seqauto.qc.exec_summary import EXEC_STATS_LOOKUP
-from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, \
-    get_qc_exec_summary_data, get_sequencing_run_columns, \
-    SEQUENCING_RUN_QC_COLUMNS, QC_EXEC_SUMMARY_QC_COLUMNS
+from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec_summary_data, \
+    get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS, QC_EXEC_SUMMARY_QC_COLUMNS
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.create_resource_models import assign_old_sample_sheet_data_to_current_sample_sheet
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
 from snpdb.graphs import graphcache
-from snpdb.models import VCF, Sample, UserSettings
+from snpdb.models import Sample, UserSettings
 
 
 def sequencing_data(request):
@@ -62,8 +59,7 @@ def seqauto_runs(request):
         only_launch_file_types = [SequencingFileType.ILLUMINA_FLOWCELL_QC]
 
         task = scan_run_jobs.si(only_process_file_types=only_process_file_types,  # @UndefinedVariable
-                                only_launch_file_types=only_launch_file_types,
-                                run_launch_script=True)
+                                only_launch_file_types=only_launch_file_types)
         task.apply_async()
 
         msg = 'Scanning disk for sequencing data...'
@@ -158,38 +154,32 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
             for f in sequencing_run_form.changed_data:
                 val = sequencing_run_form.cleaned_data.get(f)
                 message = f"{f} set to {val}"
-                SequencingRunModification.objects.create(sequencing_run=sequencing_run,
-                                                         user=request.user,
-                                                         message=message)
+                #SequencingRunModification.objects.create(sequencing_run=sequencing_run,
+                #                                         user=request.user,
+                #                                         message=message)
 
             sequencing_run = sequencing_run_form.save()
 
-    vcf = None
-    can_view_vcf = False
+    if not sequencing_run.is_valid:  # Had errors
+        sequencing_run.save()  # Try again now
+        if sequencing_run.is_valid:
+            message = "SequencingRun had errors but they appear to have been resolved. Setting is_valid=True"
+            messages.add_message(request, messages.WARNING, message)
+
+    sequencing_run.add_messages(request)
+
+    run_vcfs = []
     try:
-        vcf = sequencing_run.vcffromsequencingrun.vcf
-        read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
-        can_view_vcf = request.user.has_perm(read_perm, vcf)
+        for vcf_for_run in sequencing_run.vcffromsequencingrun_set.all():
+            run_vcfs.append((vcf_for_run.variant_caller, vcf_for_run.vcf, vcf_for_run.vcf.can_view(request.user)))
     except:
-        pass
-
-    has_errors = False
-    for error_message in sequencing_run.get_errors():
-        has_errors = True
-        messages.add_message(request, messages.ERROR, error_message)
-
-    if sequencing_run.ready is False and has_errors is False:
-        sequencing_run.save()  # clear
-        messages.add_message(request, messages.WARNING, "SequencingRun has no errors, setting ready=True")
-
-    for warning_message in sequencing_run.get_warnings():
-        messages.add_message(request, messages.WARNING, warning_message)
-
-    context = {"sequencing_run": sequencing_run,
-               "sequencing_run_form": sequencing_run_form,
-               'tab_id': tab_id,
-               'vcf': vcf,
-               'can_view_vcf': can_view_vcf}
+        log_traceback()
+    context = {
+        "sequencing_run": sequencing_run,
+        "sequencing_run_form": sequencing_run_form,
+        'tab_id': tab_id,
+        'run_vcfs': run_vcfs
+    }
 
     try:  # May not have sample sheet and die
         sample_sheet = sequencing_run.get_current_sample_sheet()
@@ -255,7 +245,9 @@ def reload_experiment_name(request, sequencing_run_id):
     old_experiment = sequencing_run.experiment
 
     # TODO: Event log message??
-    _, experiment_name = get_run_parameters(sequencing_run.path)
+    run_parameters_dir = os.path.join(sequencing_run.path, settings.SEQAUTO_RUN_PARAMETERS_SUB_DIR)
+    _, experiment_name = get_run_parameters(run_parameters_dir)
+    experiment = None
     if experiment_name:
         experiment, _ = Experiment.objects.get_or_create(name=experiment_name)
 
@@ -348,46 +340,16 @@ def view_qc_exec_summary_tab(request, qc_id):
     qc = get_object_or_404(QC, pk=qc_id)
     graph_form = None
     exec_summary = None
-    exec_summary_list = None
     historical_exec_summaries = list(qc.qcexecsummary_set.all())
     if historical_exec_summaries:
         exec_summary = historical_exec_summaries.pop()
-        exec_summary_list = []
-
-        try:
-            ref_range = exec_summary.execsummaryreferencerange
-        except:
-            ref_range = None
-
-        for description, field in EXEC_STATS_LOOKUP:
-            exec_data = getattr(exec_summary, field)
-            if field.startswith("percent_") and exec_data is None:
-                continue
-
-            reference_min = ''
-            reference_max = ''
-            if ref_range:
-                r = getattr(ref_range, field, None)
-                if r is not None:
-                    reference_min = r.lower
-                    reference_max = r.upper
-                else:
-                    min_field = "min_" + field
-                    r = getattr(ref_range, min_field, None)
-                    if r is not None:
-                        reference_max = f"Fails if <{r}"
-
-            data = (description, exec_data, reference_min, reference_max)
-            exec_summary_list.append(data)
-
         coverage_columns = list(exec_summary.get_coverage_columns())
         graph_form = forms.QCCompareTypeForm(initial={"compare_against": QCCompareType.SEQUENCING_RUN},
                                              columns=QC_EXEC_SUMMARY_QC_COLUMNS + coverage_columns)
 
     context = {"qc": qc,
                'graph_form': graph_form,
-               "exec_summary": exec_summary,
-               "exec_summary_list": exec_summary_list}
+               "exec_summary": exec_summary}
     return render(request, 'seqauto/tabs/view_qc_exec_summary_tab.html', context)
 
 

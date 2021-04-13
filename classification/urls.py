@@ -11,7 +11,7 @@ from classification.views.clinvar_export_view import clinvar_exports_view, \
     clinvar_export_review_view, ClinVarExportColumns
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
 from classification.views.evidence_keys_view import EvidenceKeysView
-from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues
+from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns
 from classification.views.classification_dashboard_view import problem_download
 from classification.views.classification_datatables import ClassificationDatatableConfig
 from classification.views.classification_email_view import summary_email_preview_html, \
@@ -31,7 +31,8 @@ urlpatterns = [
     perm_path('activity', views.activity, name='activity'),
     perm_path('activity/<str:latest_timestamp>', views.activity, name='activity_dated'),
     perm_path('classifications', views.classifications, name='classifications'),
-    perm_path('create_for_variant/<int:variant_id>', views.CreateClassificationForVariantView.as_view(), name='create_classification_for_variant'),
+    perm_path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
+              name='create_classification_for_variant'),
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),
@@ -89,6 +90,7 @@ urlpatterns = [
     perm_path('overlaps', view_overlaps, name='overlaps'),
     perm_path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
     perm_path('hgvs_issues', view_hgvs_issues, name='hgvs_issues'),
+    perm_path('hgvs_issues/allele/datatable', DatabasetableView.as_view(column_class=AlleleColumns), name='allele_datatable'),
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),

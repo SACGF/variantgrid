@@ -51,3 +51,24 @@ class ClassificationTestValidation(TestCase):
                             'severity': 'warning'
                             }]
         })
+
+    @override_settings(VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=True)
+    def test_external(self):
+        lab, user = ClassificationTestUtils.external_lab_and_user()
+        vc = Classification.create(
+            user=user,
+            lab=lab,
+            lab_record_id=None,
+            data={
+                'bp2': 'BA',
+                'clinical_significance': 'WEIRD_VALUE'
+            },
+            save=True,
+            source=SubmissionSource.API,
+            make_fields_immutable=False
+        )
+        bp2 = vc.evidence.get('bp2')
+        clinical_significance = vc.evidence.get('clinical_significance')
+        # there should be no validation on external lab data
+        self.assertEqual(bp2, {'value': 'BA'})
+        self.assertEqual(clinical_significance, {'value': 'WEIRD_VALUE'})

@@ -45,10 +45,10 @@ class CanonicalTranscriptManager:
     @staticmethod
     def _create_canonical_transcripts(canonical_collection) -> Tuple[Set, Set]:
         transcript_ids = set()
-        original_transcript_ids = set()
+        original_transcripts = set()
 
         qs = canonical_collection.canonicaltranscript_set.all()
-        for transcript_id, original_transcript_id in qs.values_list("transcript_id", "original_transcript_id"):
+        for transcript_id, original_transcript in qs.values_list("transcript_id", "original_transcript"):
             transcript_ids.add(transcript_id)
-            original_transcript_ids.add(original_transcript_id)
-        return transcript_ids, original_transcript_ids
+            original_transcripts.add(original_transcript)
+        return transcript_ids, original_transcripts

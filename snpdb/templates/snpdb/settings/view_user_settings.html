@@ -25,8 +25,7 @@
 {% endblock %}
 {% block content %}
 <div class="container">
-    {% ui_register_tab_embedded label="Lab Activity" tab_set="user_tabs" %}
-        <h4>User Details</h4>
+    {% ui_register_tab_embedded label="User Details" tab_set="user_tabs" %}
         {% if use_oidc %}
             <form method="post" action="{{ form_url }}">
                 {% csrf_token %}

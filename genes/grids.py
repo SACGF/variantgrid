@@ -77,7 +77,7 @@ class GeneListGenesGrid(JqGridUserRowConfig):
     colmodel_overrides = {
         'gene_symbol_alias__source': {"label": "Alias"},
     }
-    fields = ["original_name", "gene_symbol", "gene_symbol_alias__source"]
+    fields = ["original_name", "gene_symbol__symbol", "gene_symbol_alias__source"]
 
     def __init__(self, user, gene_list_id):
         super().__init__(user)
@@ -241,9 +241,9 @@ class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
 class CanonicalTranscriptGrid(JqGridUserRowConfig):
     model = CanonicalTranscript
     caption = 'CanonicalTranscripts'
-    fields = ["gene_symbol", "transcript", "original_gene_symbol", "original_transcript_id"]
-    colmodel_overrides = {'gene_symbol': {'label': "Matched Symbol"},
-                          'transcript': {'label': "Matched Transcript"}}
+    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript"]
+    colmodel_overrides = {'gene_symbol__symbol': {'label': "Matched Symbol"},
+                          'transcript__identifier': {'label': "Matched Transcript"}}
 
     def __init__(self, user, pk):
         super().__init__(user)
@@ -257,20 +257,19 @@ class CanonicalTranscriptGrid(JqGridUserRowConfig):
 class QCGeneCoverageGrid(JqGridUserRowConfig):
     model = GeneCoverageCanonicalTranscript
     caption = 'QC'
-    fields = ["gene_symbol", "transcript", "original_gene_symbol", "original_transcript_id", "min", "mean", "std_dev",
-              "percent_0x", "percent_10x", "percent_20x", "sensitivity"]
+    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript", "min",
+              "mean", "std_dev", "percent_1x", "percent_10x", "percent_20x"]
     number_format = {'formatter': 'number', 'width': 80}
-    colmodel_overrides = {'gene_symbol': {"width": 110},
-                          'transcript': {"width": 110},
+    colmodel_overrides = {'gene_symbol__symbol': {"width": 110},
+                          'transcript__identifier': {"width": 110},
                           "original_gene_symbol": {'label': 'original symbol'},
-                          "original_transcript_id": {'label': 'original transcript_id'},
+                          "original_transcript": {'label': 'original transcript'},
                           'min': {'width': 40},
                           'mean': number_format,
                           'std_dev': number_format,
-                          'percent_0x': number_format,
+                          'percent_1x': number_format,
                           'percent_10x': number_format,
-                          'percent_20x': number_format,
-                          'sensitivity': number_format}
+                          'percent_20x': number_format}
 
     def __init__(self, user, gene_coverage_collection_id, gene_list_id_list=None):
         super().__init__(user)

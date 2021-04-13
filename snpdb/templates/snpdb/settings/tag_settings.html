@@ -1,4 +1,4 @@
-{% extends "uicore/page/base.html" %}
+{% extends menu_variants_base %}
 {% load static %}
 {% load avatar_tags %}
 {% load crispy_forms_tags %}
@@ -7,7 +7,6 @@
 {% load ui_help %}
 {% load ui_menu_bars %}
 {% block title %}Settings{% endblock %}
-{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block head %}
     <link href="{% static 'css/colorPicker.css' %}" rel="stylesheet"></link>
     <script type="text/javascript" src="{% static 'js/lib/jquery.xcolor.min.js' %}"></script>
@@ -74,7 +73,6 @@
 
 {% block content %}
     <div class="container">
-
         {% page_help page_id='settings/tags_help' title='Tags' %}
         <div class="card">
             <div class="card-header">Create Tag</div>

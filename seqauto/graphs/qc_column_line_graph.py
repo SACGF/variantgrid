@@ -2,13 +2,12 @@ import hashlib
 import logging
 
 from snpdb.graphs.graphcache import CacheableGraph
-from seqauto.models import QC, DataState, QCColumn
+from seqauto.models import QC, QCColumn
+from snpdb.models import DataState
 
-
-PADDING = 0.5
 
 class QCColumnLineGraph(CacheableGraph):
-    def __init__(self, qc_column_id, enrichment_kit_separation, enrichment_kit_name, percent):
+    def __init__(self, qc_column_id, _enrichment_kit_separation, _enrichment_kit_name, percent):
         super().__init__()
         self.qc_column = QCColumn.objects.get(pk=qc_column_id)
         self.percent = bool(percent)
@@ -26,30 +25,23 @@ class QCColumnLineGraph(CacheableGraph):
         return sha1.hexdigest()
 
     def get_values_list(self):
-        #values_list = [(datetime.datetime(2016, 2, 18), 41.2), (datetime.datetime(2016, 3, 18), 109.0)]
-
-        SEQUENCING_DATE = 'bam_file__unaligned_reads__sequencing_sample__sample_sheet__date'
-
         path = self.qc_column.qc_type.qc_object_path + "__" + self.qc_column.field
         data_state = self.qc_column.qc_type.qc_object_path + "__data_state"
         qs = QC.objects.filter(**{data_state: DataState.COMPLETE})
-        args = [SEQUENCING_DATE, path]
+        args = ["sequencing_run", path]
         if self.percent:
             total_field = self.qc_column.qc_type.qc_object_path + "__" + self.qc_column.qc_type.total_field
             args.append(total_field)
 
-        values_list = qs.order_by(SEQUENCING_DATE).values_list(*args)
-
         # Format date
         data = []
-        for values in values_list:
-            l = list(values)
-            date = l[0]
-            l[0] = date.strftime("%Y-%m-%d")
-            data.append(tuple(l))
+        for sequencing_run_id, path in qs.order_by("sequencing_run").values_list(*args):
+            sr_date = sequencing_run_id.split("_")[0]
+            data.append((sr_date, path))
         return data
 
     def plot(self, ax):
+        PADDING = 0.5
         x = []
         y = []
         x_labels = []

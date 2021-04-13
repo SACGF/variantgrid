@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
 from django.contrib import admin
 
-from snpdb.admin import ModelAdminBasics
-from classification.models import EvidenceKey, ClassificationReportTemplate, \
-    ClassificationReportTemplateAdmin, DiscordanceReportAdmin
-from classification.models import ClinVarExport, ClinVarExportAdmin, ConditionTextAdmin, ConditionText, \
-    ConditionTextMatchAdmin, ConditionTextMatch
-from classification.models.admin_forms import EvidenceKeyAdmin, ClassificationAdmin, \
-    ClinicalContextAdmin
-from classification.models.clinical_context_models import ClinicalContext
-from classification.models.discordance_models import DiscordanceReportClassification,\
-    DiscordanceReport
+from classification.models import ClinVarExport, ConditionText, ConditionTextMatch
+from classification.models import EvidenceKey, ClassificationReportTemplate
+from classification.models.admin_forms import ClinicalContextAdmin, DiscordanceReportAdmin, ConditionTextMatchAdmin, \
+    EvidenceKeyAdmin, ConditionTextAdmin, ClassificationReportTemplateAdmin, ClinVarExportAdmin, ClassificationAdmin
 from classification.models.classification import Classification
-
+from classification.models.clinical_context_models import ClinicalContext
+from classification.models.discordance_models import DiscordanceReportClassification, DiscordanceReport
+from snpdb.admin import ModelAdminBasics
 
 # Register your models here.
 

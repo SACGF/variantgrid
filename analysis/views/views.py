@@ -752,15 +752,6 @@ def node_method_description(request, node_id, node_version):
     return render(request, 'analysis/node_method_description.html', context)
 
 
-def analyses_variant_tags(request, genome_build_name=None):
-    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    variant_tags_qs = VariantTag.objects.filter(analysis__genome_build=genome_build)
-    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
-    context = {"genome_build": genome_build,
-               "tag_counts": tag_counts}
-    return render(request, 'analysis/analyses_variant_tags.html', context)
-
-
 @user_passes_test(is_superuser)
 def view_analysis_issues(request):
     all_nodes = AnalysisNode.objects.all()
@@ -819,18 +810,26 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
     def _get_variant(self):
         return self.variant_tag.variant
 
+    def _get_genome_build(self) -> GenomeBuild:
+        return self.variant_tag.genome_build
+
     def _get_form_post_url(self) -> str:
-        return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis.pk})
+        if self.variant_tag.analysis:
+            return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis.pk})
+        else:
+            # Just for variant
+            return super()._get_form_post_url()
 
     def _get_sample_form(self):
         # If we have a node with input samples, use that. Then fall back on all samples in analysis.
         # Otherwise fall back on default (all samples in DB visible to user)
         samples = None
-        if self.variant_tag.node:
-            samples = self.variant_tag.node.get_subclass().get_samples()
+        if self.variant_tag.analysis:
+            if self.variant_tag.node:
+                samples = self.variant_tag.node.get_subclass().get_samples()
 
-        if not samples:
-            samples = self.variant_tag.analysis.get_samples()
+            if not samples:
+                samples = self.variant_tag.analysis.get_samples()
 
         if samples:
             form = InputSamplesForm(samples=samples)
@@ -842,8 +841,7 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
     @lazy
     def variant_tag(self):
         variant_tag_id = self.kwargs["variant_tag_id"]
-        variant_tag = VariantTag.objects.get(pk=variant_tag_id)
-        variant_tag.analysis.check_can_view(self.request.user)
+        variant_tag = VariantTag.get_for_user(self.request.user, pk=variant_tag_id)
         return variant_tag
 
     def get_context_data(self, *args, **kwargs):
@@ -851,10 +849,14 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
             context = super().get_context_data(*args, **kwargs)
             context["variant_tag"] = self.variant_tag
 
-            if not self.variant_tag.analysis.can_write(self.request.user):
-                read_only_message = "You have read-only access to this analysis. You can create a classification but " \
-                                    "it will not be linked to the analysis and the " \
-                                    "{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
+            if not self.variant_tag.can_write(self.request.user):
+                if self.variant_tag.analysis:
+                    read_only_message = "You have read-only access to this analysis. You can create a " \
+                                        "classification but it will not be linked to the analysis and the " \
+                                        f"{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
+                else:
+                    read_only_message = "You have read-only access to this tag. You can create a classification " \
+                                        f"but the {settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
                 messages.add_message(self.request, messages.WARNING, read_only_message)
         except VariantTag.DoesNotExist:
             variant_tag_id = self.kwargs["variant_tag_id"]

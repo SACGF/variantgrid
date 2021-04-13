@@ -43,7 +43,7 @@ class DbRefRegex:
         self.prefixes = prefixes
         self.link = link
         self.match_type = match_type
-        self.min_length = min_length
+        self.min_length = min_length or 1
         self.expected_length = expected_length
         self._all_db_ref_regexes.append(self)
 
@@ -61,6 +61,7 @@ class DbRegexes:
     CLINGEN = DbRefRegex(db="ClinGen", prefixes="CA", link="http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=CA${1}", match_type=MatchType.SIMPLE_NUMBERS)
     CLINVAR = DbRefRegex(db="Clinvar", prefixes="VariationID", link="https://www.ncbi.nlm.nih.gov/clinvar/variation/${1}")
     COSMIC = DbRefRegex(db="COSMIC", prefixes="COSM", link="https://cancer.sanger.ac.uk/cosmic/mutation/overview?id=${1}")
+    DOID = DbRefRegex(db="DOID", prefixes="DOID", link=OntologyService.URLS[OntologyService.DOID], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.DOID], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.DOID])
     GTR = DbRefRegex(db="GTR", prefixes="GTR", link="https://www.ncbi.nlm.nih.gov/gtr/tests/${1}/overview/")
     HP = DbRefRegex(db="HP", prefixes=["HPO", "HP"], link=OntologyService.URLS[OntologyService.HPO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HPO])
     HGNC = DbRefRegex(db="HGNC", prefixes="HGNC", link=OntologyService.URLS[OntologyService.HGNC], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HGNC])
@@ -70,6 +71,7 @@ class DbRegexes:
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
     # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
     OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
+    ORPHA = DbRefRegex(db="Orphanet", prefixes=["ORPHANET", "ORPHA"], link=OntologyService.URLS[OntologyService.ORPHANET], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.ORPHANET])
     PMC = DbRefRegex(db="PMC", prefixes="PMCID", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}")
     PUBMED = DbRefRegex(db="PubMed", prefixes=["PubMed", "PMID", "PubMedCentral"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
@@ -90,7 +92,7 @@ class DbRefRegexResult:
         self.summary = None
 
         # this is where we check our database to see if we know what this reference is about
-        if self.db in OntologyService.VALID_ONTOLOGY_PREFIXES:
+        if self.db in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
             term_id = f"{self.db}:{self.idx}"
             if term := OntologyTerm.objects.filter(id=term_id).first():
                 self.summary = term.name

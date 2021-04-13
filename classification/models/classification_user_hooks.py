@@ -10,7 +10,7 @@ from classification.models.classification_utils import ValidationMerger
 
 
 @receiver(classification_validation_signal, sender=Classification)
-def validate_variant_fields(sender, **kwargs) -> ValidationMerger:
+def validate_variant_fields(sender, **kwargs) -> ValidationMerger:  # pylint: disable=unused-argument
     """ Checks the owner is valid """
     patch_meta: PatchMeta = kwargs.get('patch_meta')
     record: Classification = kwargs.get('classification')

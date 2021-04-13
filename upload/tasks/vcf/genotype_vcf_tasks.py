@@ -20,8 +20,8 @@ from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, Uplo
     UploadPipeline, SimpleVCFImportInfo, SkipUploadStepException
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
-from upload.vcf.vcf_import import create_vcf_from_vcf, import_vcf_file, \
-    create_import_success_message, create_cohort_genotype_collection_from_vcf
+from upload.vcf.vcf_import import create_vcf_from_vcf, create_import_success_message, import_vcf_file, \
+    create_cohort_genotype_collection_from_vcf,  get_preprocess_vcf_import_info, genotype_vcf_processor_factory
 from variantgrid.celery import app
 
 
@@ -100,7 +100,14 @@ class ProcessGenotypeVCFDataTask(ImportVCFStepTask):
         (ie via ImportGenotypeVCFTask) - this can run in parallel """
 
     def process_items(self, upload_step):
-        return import_vcf_file(upload_step)
+        upload_pipeline = upload_step.upload_pipeline
+        uploaded_vcf = upload_pipeline.uploadedvcf
+
+        vcf = uploaded_vcf.vcf
+        preprocess_vcf_import_info = get_preprocess_vcf_import_info(upload_pipeline)
+        bulk_inserter = genotype_vcf_processor_factory(upload_step, vcf.cohort.cohort_genotype_collection,
+                                                       uploaded_vcf, preprocess_vcf_import_info)
+        return import_vcf_file(upload_step, bulk_inserter)
 
 
 class CalculateVCFStatsTask(ImportVCFStepTask):
@@ -130,9 +137,9 @@ class UpdateVariantZygosityCountsTask(ImportVCFStepTask):
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
         vcf = uploaded_vcf.vcf
+        create_variant_zygosity_counts()  # In case they created any new variants - set them zero
         if vcf.variant_zygosity_count is False:
             raise SkipUploadStepException()
-        create_variant_zygosity_counts()
         update_all_variant_zygosity_counts_for_vcf(vcf, '+')
 
 

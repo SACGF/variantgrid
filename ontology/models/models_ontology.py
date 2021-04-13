@@ -1,12 +1,11 @@
 import functools
-import operator
 import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from django.db.models import PROTECT, CASCADE, QuerySet, Q, F
+from django.db.models import PROTECT, CASCADE, QuerySet, Q
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel, now
@@ -33,17 +32,24 @@ class OntologyService(models.TextChoices):
     HPO = "HP", "HP"
     HGNC = "HGNC", "HGNC"
 
+    DOID = "DOID", "DOID"
+    ORPHANET = "Orphanet", "Orphanet"
+
     EXPECTED_LENGTHS: Dict[str, int] = Constant({
         MONDO[0]: 7,
         OMIM[0]: 6,
         HPO[0]: 7,
-        HGNC[0]: 1  # HGNC ids aren't typically 0 padded, because they're not monsters
+        HGNC[0]: 1,  # HGNC ids aren't typically 0 padded, because they're not monsters
+        DOID[0]: None,  # variable length with padded 0s
+        ORPHANET[0]: 1  # ORPHANET ids aren't typically 0 padded
     })
 
     IMPORTANCE: Dict[str, int] = Constant({
         MONDO[0]: 2,
         OMIM[0]: 3,
         HPO[0]: 4,  # put HPO relationships last as they occasionally spam OMIM
+        DOID[0]: 5,
+        ORPHANET[0]: 6,
         HGNC[0]: 1  # show gene relationships first
     })
 
@@ -51,20 +57,31 @@ class OntologyService(models.TextChoices):
         MONDO[0]: "https://vm-monitor.monarchinitiative.org/disease/MONDO:${1}",
         OMIM[0]: "http://www.omim.org/entry/${1}",
         HPO[0]: "https://hpo.jax.org/app/browse/term/HP:${1}",
-        HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}"
+        HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}",
+        DOID[0]: "https://www.ebi.ac.uk/ols/ontologies/doid/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FDOID_${1}",
+        ORPHANET[0]: "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=EN&Expert=${1}"
     })
 
-    VALID_ONTOLOGY_PREFIXES: Set[str] = Constant({
+    LOCAL_ONTOLOGY_PREFIXES: Set[str] = Constant({
         MONDO[0],
         OMIM[0],
         HPO[0],
         HGNC[0]
     })
 
+    CONDITION_ONTOLOGIES: Set[str] = Constant({
+        MONDO[0],
+        OMIM[0],
+        HPO[0],
+        DOID[0],
+        ORPHANET[0]
+    })
+
     @staticmethod
     def index_to_id(ontology_service: 'OntologyService', index: int):
-        expected_length = OntologyService.EXPECTED_LENGTHS.get(ontology_service, 0)
-        num_part = str(index).rjust(expected_length, '0')
+        num_part = str(index)
+        if expected_length := OntologyService.EXPECTED_LENGTHS.get(ontology_service):
+            num_part = str(index).rjust(expected_length, '0')
         return f"{ontology_service}:{num_part}"
 
 
@@ -136,7 +153,7 @@ class OntologyTerm(TimeStampedModel):
     MONDO:0000043, OMIM:0000343
     """
     id = models.TextField(primary_key=True)
-    ontology_service = models.CharField(max_length=5, choices=OntologyService.choices)
+    ontology_service = models.CharField(max_length=10, choices=OntologyService.choices)
     index = models.IntegerField()
     name = models.TextField(null=True, blank=True)  # should only be null if we're using it as a placeholder reference
     definition = models.TextField(null=True, blank=True)
@@ -244,11 +261,19 @@ class OntologyTerm(TimeStampedModel):
         if len(parts) != 2:
             raise ValueError(f"Can not convert {id_str} to a proper id")
 
-        prefix = OntologyService(parts[0].strip().upper())
+        prefix = parts[0].strip().upper()
+        if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
+            prefix = "Orphanet"
+        prefix = OntologyService(prefix)
         postfix = parts[1].strip()
         try:
             num_part = int(postfix)
-            clean_id = OntologyService.index_to_id(prefix, num_part)
+            clean_id: str
+            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
+                clean_id = OntologyService.index_to_id(prefix, num_part)
+            else:
+                # variable length IDs like DOID
+                clean_id = f"{prefix}:{postfix}"
 
             if existing := OntologyTerm.objects.filter(id=clean_id).first():
                 return existing
@@ -257,7 +282,7 @@ class OntologyTerm(TimeStampedModel):
                 id=clean_id,
                 ontology_service=prefix,
                 index=num_part,
-                name="Not stored locally"
+                name=""
             )
         except ValueError:
             if existing := OntologyTerm.objects.filter(ontology_service=prefix, name=postfix).first():
@@ -266,8 +291,8 @@ class OntologyTerm(TimeStampedModel):
 
     @property
     def padded_index(self) -> str:
-        expected_length = OntologyService.EXPECTED_LENGTHS[self.ontology_service]
-        return str(self.index).rjust(expected_length, '0')
+        # ID should already be padded to right number of indexes
+        return self.id.split(":")[1]
 
     @property
     def url(self):
@@ -480,8 +505,7 @@ class OntologySnake:
             terms = terms.union(set(via_omim_mondos))
         if terms:
             return set(OntologyTerm.objects.filter(pk__in=terms))
-        else:
-            return set()
+        return set()
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
@@ -492,13 +516,15 @@ class OntologySnake:
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology, max_depth=max_depth)
 
     @staticmethod
-    def gene_symbols_for_term(term: Union[OntologyTerm, str]) -> QuerySet:
-        if isinstance(term, str):
-            term = OntologyTerm.get_or_stub(term)
-            if term.is_stub:
-                return GeneSymbol.objects.none()
-        gene_symbol_snakes = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
-        gene_symbol_names = [snake.leaf_term.name for snake in gene_symbol_snakes]
+    def gene_symbols_for_terms(terms: OntologyList) -> QuerySet:
+        gene_symbol_names = set()
+        for term in terms:
+            if isinstance(term, str):
+                term = OntologyTerm.get_or_stub(term)
+                if term.is_stub:
+                    return GeneSymbol.objects.none()
+            gene_symbol_snakes = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
+            gene_symbol_names.update([snake.leaf_term.name for snake in gene_symbol_snakes])
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
     @staticmethod
@@ -530,43 +556,6 @@ class OntologySnake:
         except ValueError:
             report_exc_info()
             return False
-
-    @staticmethod
-    def special_case_gene_symbols_for_terms(ontology_term_ids: Iterable[str]) -> QuerySet:
-        """ Fast path for looking up gene symbols - doesn't work w/everything, use gene_symbols_for_term """
-        hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_term_ids)
-        return OntologySnake.special_case_gene_symbols_for_hpo_and_omim(hpo_terms=hpo, omim_terms=omim)
-
-    @staticmethod
-    def special_case_gene_symbols_for_hpo_and_omim(*, hpo_terms: OntologyList = None, omim_terms: OntologyList = None) -> QuerySet:
-        """ Fast path for looking up gene symbols - doesn't work w/everything, use gene_symbols_for_term """
-        if hpo_terms is None:
-            hpo_terms = []
-        if omim_terms is None:
-            omim_terms = []
-        if not (hpo_terms or omim_terms):
-            return GeneSymbol.objects.none()
-
-        all_hpo_term_list = set()
-        for hpo_term in hpo_terms:
-            assert hpo_term.ontology_service == OntologyService.HPO, "'hpo_terms' must only contain HPO terms"
-            all_hpo_term_list.add(hpo_term.pk)
-            all_hpo_term_list.update(hpo_term.ontologytermrelation_set.filter(relation='is_a').values_list("source_term_id", flat=True))
-
-        for omim_term in omim_terms:
-            assert omim_term.ontology_service == OntologyService.OMIM, "'omim_terms' must only contain OMIM terms"
-
-        qs = OntologyTermRelation.objects.annotate(st=F("source_term_id"), dt=F("dest_term_id"))
-        omim_q_list = []
-        if hpo_terms:
-            omim = OntologyTermRelation.objects.filter(source_term__in=all_hpo_term_list, relation='frequency').values_list("dest_term_id", flat=True)
-            omim_q_list.append(Q(source_term__in=omim))
-        if omim_terms:
-            omim_q_list.append(Q(source_term__in=omim_terms))
-        q_omim = functools.reduce(operator.or_, omim_q_list)
-        genes_qs = qs.filter(q_omim, dt__startswith="HGNC").values_list("dest_term__name", flat=True)
-        gene_symbols = GeneSymbol.objects.filter(pk__in=genes_qs)
-        return gene_symbols
 
 
 class OntologySnakes:

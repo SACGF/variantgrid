@@ -58,7 +58,8 @@ class Zygosity:
     def get_regex_match(zygosities_set: set, require_zygosity=True):
         if zygosities_set:
             if not require_zygosity:
-                zygosities_set.update({Zygosity.UNKNOWN_ZYGOSITY})
+                # Make new set so as to not alter passed in values
+                zygosities_set = zygosities_set | {Zygosity.UNKNOWN_ZYGOSITY}
 
             if zygosities_set == Zygosity.ALL_ZYGOSITIES_SET:
                 return "."

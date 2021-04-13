@@ -27,7 +27,7 @@ from snpdb.models.models import Tag, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus, AlleleFrequencySource
+from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
 
 
 class Project(models.Model):
@@ -56,13 +56,16 @@ class VCF(models.Model):
     source = models.TextField(blank=True)
     # Most callers put allele depths in AD eg AD=[10,12] but some can split into separate ref/alt fields
     allele_depth_field = models.TextField(null=True)
+    # If AF is provided, we use it, otherwise if it is null we calculate it ourselves (post normalization w/VT)
+    # which can sometimes cause issues with splitting multi-alts
     allele_frequency_field = models.TextField(null=True)
     ref_depth_field = models.TextField(null=True)
     alt_depth_field = models.TextField(null=True)
     read_depth_field = models.TextField(null=True)
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
-    allele_frequency_source = models.CharField(max_length=1, choices=AlleleFrequencySource.choices, default=AlleleFrequencySource.CALCULATED)
+    sample_filters_field = models.TextField(null=True)
+    allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
 
@@ -71,7 +74,18 @@ class VCF(models.Model):
         return self.vcffilter_set.exists()
 
     def get_filter_dict(self):
-        return dict(self.vcffilter_set.all().values_list("filter_id", "filter_code"))
+        filter_dict = dict(self.vcffilter_set.all().values_list("filter_id", "filter_code"))
+        # Don't need this for CyVCF as it returns PASS as None but need for sample filters
+        filter_dict["PASS"] = ""
+        return filter_dict
+
+    @staticmethod
+    def convert_from_percent_to_unit(percent):
+        from snpdb.models import CohortGenotype  # Circular import
+
+        if percent != CohortGenotype.MISSING_NUMBER_VALUE:
+            percent /= 100.0
+        return percent
 
     @staticmethod
     def filter_for_user(user, group_data=True, has_write_permission=False):
@@ -171,7 +185,7 @@ class VCF(models.Model):
 
 
 @receiver(pre_delete, sender=VCF)
-def vcf_pre_delete_handler(sender, instance, **kwargs):
+def vcf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     vcf = instance
     # logging.info("vcf_pre_delete_handler: %s", vcf.pk)
     try:
@@ -193,6 +207,22 @@ class VCFFilter(models.Model):
     filter_code = models.CharField(max_length=1)  # ASCII printable characters
     filter_id = models.TextField()
     description = models.TextField(null=True)
+
+    @staticmethod
+    def get_formatter(vcf: VCF):
+        lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
+
+        def filter_string_formatter(row, field):
+            if filter_string := row[field]:
+                formatted_filters = []
+                for f in filter_string:
+                    formatted_filters.append(lookup[f])
+                formatted_filters = ','.join(formatted_filters)
+            else:
+                formatted_filters = "PASS"
+            return formatted_filters
+
+        return filter_string_formatter
 
 
 class VCFTag(models.Model):

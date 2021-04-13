@@ -518,7 +518,7 @@ class PatientRecord(models.Model):
 
 
 @receiver(models.signals.post_save, sender=PatientAttachment)
-def patient_attachment_post_save(sender, instance, created, *args, **kwargs):
+def patient_attachment_post_save(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
     if created:
         instance.file_type = AttachmentFileType.get_type_for_file(instance.file.name)
 

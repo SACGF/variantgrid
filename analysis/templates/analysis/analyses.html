@@ -84,7 +84,12 @@
                     {% labelled label="New "|add:analysis_type_description|add:" Name" %}
                         {% crispy_field create_analysis_form.name %}
                     {% endlabelled %}
-                    <div><span title="Analysis GenomeBuild defaults and options come from your user settings">{{ create_analysis_form.genome_build }}</span> {{ create_analysis_form.genome_build.errors }}</div>
+                    {% if not create_analysis_form.genome_build_hidden %}
+                        {% labelled label="Genome Build" %}
+                            <span title="Analysis GenomeBuild defaults and options come from your user settings">{% crispy_field create_analysis_form.genome_build %}</span>
+                            {{ create_analysis_form.genome_build.errors }}
+                        {% endlabelled %}
+                    {% endif %}
                     <button class="btn btn-primary" id='create-analysis'><i class="fas fa-plus-circle"></i> Create New {{ analysis_type_description }}</button>
                 </div>
             </div>

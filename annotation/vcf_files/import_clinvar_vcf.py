@@ -93,17 +93,17 @@ class BulkClinVarInserter:
                     values_list.append(getattr(cv, f))
                 return tuple(values_list)
 
-            SEPARATOR = '\t'
+            DELIMITER = '\t'
             PREFIX = "clinvar"
             processing_dir = self.upload_step.upload_pipeline.get_pipeline_processing_subdir(PREFIX)
             basename = f"{PREFIX}_step_{self.upload_step.pk}_batch_{self.batch_id}.tsv"
             csv_filename = os.path.join(processing_dir, basename)
             logging.info("Writing ClinVar copy CSV")
             clinvar_tuples = map(create_clinvar_tuple, clinvar_list)
-            write_sql_copy_csv(clinvar_tuples, csv_filename, separator=SEPARATOR)
+            write_sql_copy_csv(clinvar_tuples, csv_filename, delimiter=DELIMITER)
             partition_table = self.clinvar_version.get_partition_table()
             logging.info("Inserting file '%s' into partition %s", csv_filename, partition_table)
-            sql_copy_csv(csv_filename, partition_table, BulkClinVarInserter.CLINVAR_CSV_FIELDS, separator=SEPARATOR)
+            sql_copy_csv(csv_filename, partition_table, BulkClinVarInserter.CLINVAR_CSV_FIELDS, delimiter=DELIMITER)
 
             self.batch_id += 1
             self.items_processed += len(clinvar_list)

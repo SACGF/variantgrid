@@ -270,6 +270,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
     let data = 'variant_id=' + variantId;
     data += '&tag_id=' + tagId;
     data += '&op=' + op;
+    data += '&analysis_id=' + ANALYSIS_ID;
     if (nodeId) {
         data += '&node_id=' + nodeId;
     }
@@ -300,7 +301,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
     $.ajax({
         type: "POST",
         data: data,
-        url: Urls.set_variant_tag(ANALYSIS_ID),
+        url: Urls.set_variant_tag('A'),
         success : success,
     });
 }

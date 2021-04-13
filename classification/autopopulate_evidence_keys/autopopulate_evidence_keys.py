@@ -42,9 +42,9 @@ def create_classification_for_sample_and_variant_objects(
 
     classification = Classification.create(**kwargs)
     classification_auto_populate_fields(classification, genome_build,
-                                                refseq_transcript_accession=refseq_transcript_accession,
-                                                ensembl_transcript_accession=ensembl_transcript_accession,
-                                                annotation_version=annotation_version)
+                                        refseq_transcript_accession=refseq_transcript_accession,
+                                        ensembl_transcript_accession=ensembl_transcript_accession,
+                                        annotation_version=annotation_version)
     classification.set_variant(variant)  # have to re-do this because we didn't have the transcript the first time around
     liftover_classification_import(vc_import, ImportSource.WEB)
     return classification
@@ -106,10 +106,10 @@ def classification_auto_populate_fields(
     )
     classification.annotation_version = auto_data.annotation_version
     classification.patch_value(auto_data.data,
-                                       user=classification.user,
-                                       source=SubmissionSource.VARIANT_GRID,
-                                       leave_existing_values=leave_existing_values,
-                                       save=save)
+                               user=classification.user,
+                               source=SubmissionSource.VARIANT_GRID,
+                               leave_existing_values=leave_existing_values,
+                               save=save)
 
 
 def get_curation_system():

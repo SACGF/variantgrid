@@ -2,39 +2,37 @@ import pandas as pd
 
 
 def load_gene_coverage_df(gene_coverage_file):
-    GENE_EXON_COLUMN = "Gene/Exon"
-    UNDER_10X_COLUMN = "% bases <10x"
-    UNDER_20X_COLUMN = "% bases <20x"
-    OVER_100X_COLUMN = "% bases >100x"
-    RENAME_COLUMS = {"Min Coverage": "min",
-                     "Mean Coverage": "mean",
-                     "Standard Deviation Coverage": "std_dev",
-                     "% bases >20x": "percent_20x",
-                     "% bases @ 0x": "percent_0x",
-                     "Estimated Sensitivity of Detection": "sensitivity"}
+    GENE_TRANSCRIPT_VERSION_COLUMN = "Name"
+    RENAME_COLUMNS = {
+        'Size': "size",
+        'Mean': "mean",
+        'StdDev': "std_dev",
+        'Max': "max",
+        'Min': "min",
+        '% >=1X': "percent_1x",
+        '% >=2X': "percent_2x",
+        '% >=5X': "percent_5x",
+        '% >=10X': "percent_10x",
+        '% >=15X': "percent_15x",
+        '% >=20X': "percent_20x",
+        '% >=25X': "percent_25x",
+        '% >=30X': "percent_30x",
+        '% >=40X': "percent_40x",
+        '% >=50X': "percent_50x",
+        '% >=60X': "percent_60x",
+        '% >=80X': "percent_80x",
+        '% >=100X': "percent_100x",
+        '% >=150X': "percent_150x",
+        '% >=200X': "percent_200x",
+        '% >=250X': "percent_250x",
+    }
 
     df = pd.read_csv(gene_coverage_file, sep='\t')
     # Split up into separate columns
-    gene_exon_series = df[GENE_EXON_COLUMN].str.split(":")
-    df["gene"] = gene_exon_series.str[0]
-    df["transcript"] = gene_exon_series.str[1]
+    gene_transcript_version_series = df[GENE_TRANSCRIPT_VERSION_COLUMN].str.split(";")
+    df["original_gene_symbol"] = gene_transcript_version_series.str[0]
+    df["original_transcript"] = gene_transcript_version_series.str[1]
 
-    if OVER_100X_COLUMN in df.columns:
-        RENAME_COLUMS[OVER_100X_COLUMN] = "percent_100x"
-
-    df = df.rename(columns=RENAME_COLUMS)
-
-    # Coverage files currently generated inconsistency, sometimes using OVER
-    # and sometimes under. Change them all to be over
-    if UNDER_10X_COLUMN in df.columns:
-        under_10x = df[UNDER_10X_COLUMN]
-        df["percent_10x"] = 100.0 - under_10x
-        del df[UNDER_10X_COLUMN]
-
-    if UNDER_20X_COLUMN in df.columns:
-        under_20x = df[UNDER_20X_COLUMN]
-        df["percent_20x"] = 100.0 - under_20x
-        del df[UNDER_20X_COLUMN]
-
-    del df[GENE_EXON_COLUMN]
+    del df[GENE_TRANSCRIPT_VERSION_COLUMN]
+    df = df.rename(columns=RENAME_COLUMNS)
     return df

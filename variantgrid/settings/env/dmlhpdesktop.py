@@ -16,7 +16,6 @@ if USE_DJANGO_DEBUG_TOOLBAR:
         '127.0.0.1',
     ]
 
-SEQAUTO_ENABLED = True
 #SEQAUTO_LOAD_GENE_COVERAGE=False
 
 SEQAUTO_CONTROL_SAMPLE_REGEX = NO_DNA_CONTROL_REGEX
@@ -50,7 +49,7 @@ SEQAUTO_COVERAGE_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 # Fields must be from GoldCoverageSummary and COLUMNS + LABELS must line up!
 GENE_GRID_ENRICHMENT_KIT_COLUMNS = ['depth_20x_5th_percentile']
-GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript_id"]
+GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS = ["original_transcript"]
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS = ["% at 20x*"]
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS = ["% at 20x for 5th percentile of gold runs (ie expected worst case)"]
 
@@ -102,7 +101,7 @@ if _SHARIANT_MODE:
                                "classification_import_tool": True})
 
 elif _SAPATHOLOGY_MODE:
-
+    SEQAUTO_ENABLED = True
     SAPATH_APP = 'sapath.apps.SapathConfig'
     INSTALLED_APPS += [SAPATH_APP]
 
@@ -118,10 +117,9 @@ elif _SAPATHOLOGY_MODE:
     INITIAL_USER_DATA_PREFIX_KWARGS = {"prefix": '/tau',
                                        "replacement": '\\\\frgeneseq01.imvs.sa.gov.au\\tau'}
 
-    #SAPATH_HELIX_USER = "HelixReadOnlyUser"
-    #SAPATH_HELIX_PASSWORD_FILE = os.path.expanduser("~/.helix_password.txt")
     SAPATH_HELIX_USER = get_secret("SAPATH.HELIX.user")
     SAPATH_HELIX_PASSWORD = get_secret("SAPATH.HELIX.password")
+    SAPATH_HELIX_GENERATE_CSV_FROM_SQL = False
 
     PATHOLOGY_TESTS_ENABLED = True
     PATHOLOGY_TEST_REQUESTS_REDIRECT_URL = "sapathology_test_requests"

@@ -10,6 +10,7 @@ def get_single_element(run_info_file, root, element_name):
         raise ValueError(msg)
     return values[0]
 
+
 def get_instrument_from_run_info(flowcell_dir):
     run_info_file = os.path.join(flowcell_dir, "RunInfo.xml")
     tree = ET.parse(run_info_file)
@@ -17,20 +18,20 @@ def get_instrument_from_run_info(flowcell_dir):
     return get_single_element(run_info_file, root, "Instrument")
 
 
-def get_run_parameters(flowcell_dir):
+def get_run_parameters(run_parameters_dir):
     """ returns instrument, experiment_name """
 
     # Damn you Illumina! MiSeq has lower-case 'r'
     RUN_PARAMETERS_FILES = ["RunParameters.xml", "runParameters.xml"]
     run_info_file = None
     for f in RUN_PARAMETERS_FILES:
-        potential_run_info_file = os.path.join(flowcell_dir, f)
+        potential_run_info_file = os.path.join(run_parameters_dir, f)
         if os.path.exists(potential_run_info_file):
             run_info_file = potential_run_info_file
             break
 
     if run_info_file is None:
-        msg = f"Couldn't find {' or '.join(RUN_PARAMETERS_FILES)} in {flowcell_dir}"
+        msg = f"Couldn't find {' or '.join(RUN_PARAMETERS_FILES)} in {run_parameters_dir}"
         raise ValueError(msg)
 
     tree = ET.parse(run_info_file)
@@ -39,6 +40,6 @@ def get_run_parameters(flowcell_dir):
     try:
         instrument = get_single_element(run_info_file, root, "InstrumentID")
     except:
-        instrument = get_instrument_from_run_info(flowcell_dir)
+        instrument = get_instrument_from_run_info(run_parameters_dir)
 
     return instrument.text, experiment.text

@@ -42,7 +42,35 @@ function gnomadGeneConstraintRetrieval(content) {
     return retrievalSummary;
 }
 
+let SIG_CHARS = {"1": true, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true, "8": true, "9": true}
+let STRIP_ZEROS = /(.*?[.]?[0-9]+?)([.]0+|0+)$/
+let CODE_THRESHOLDS = {"revel_score": [0.4, 0.7]}
 
+function formatNumberSigDigits(value) {
+    let numString = value.toFixed(6);
+    if (numString.indexOf('.') == -1) {
+        return numString;
+    }
+    let sigDigits = null;
+    let preciseString = '';
+    for (let char of numString) {
+        preciseString += char;
+        if (sigDigits == null && SIG_CHARS[char]) {
+            sigDigits = 1;
+        } else if (sigDigits && char != '.') {
+            sigDigits += 1;
+        }
+        if (sigDigits == 3) {
+            break;
+        }
+    }
+    let match = preciseString.match(STRIP_ZEROS);
+    if (match) {
+        return match[1];
+    } else {
+        return preciseString;
+    }
+}
 
 function transcriptFunc(transcriptId, data) {
     let transcriptInfoTable = $('#transcript-info');
@@ -50,6 +78,20 @@ function transcriptFunc(transcriptId, data) {
     $.each(data, (name, value) => {
         if (value === null) {
             value = $('<span>', {class: 'no-value', text:'-'});
+        } else if (_.isNumber(value)) {
+            let threshold = CODE_THRESHOLDS[name];
+            let cssClasses = ["text-monospace"];
+            if (threshold) {
+                cssClasses.push("threshold");
+                if (value < threshold[0]) {
+                    cssClasses.push("threshold-low");
+                } else if (value <= threshold[1]) {
+                    cssClasses.push("threshold-med");
+                } else {
+                    cssClasses.push("threshold-high");
+                }
+            }
+            value = $('<span>', {"class": cssClasses.join(" "), text: formatNumberSigDigits(value)});
         }
         $("#" + name, transcriptInfoTable).html(value);
     });
@@ -192,8 +234,109 @@ function populateVariantAllele(data) {
     });
 }
 
+function variantDetailsTagClickHandler() {
+    const variantTag = $(this);
+    const innerSpan = $(".user-tag-colored", variantTag);
+
+    function removeClickHandler() {
+        const variantTagId = variantTag.attr('variant_tag_id');
+        const tagId = variantTag.attr("tag_id");
+
+        const removeTagCallback = function () {
+            $(`#variant-tag-${variantTagId}`).parents("tr").remove();
+        };
+        let data = 'variant_id={{ variant.pk }}';
+        data += "&genome_build_name={{ genome_build.pk }}";
+        data += '&tag_id=' + tagId;
+        data += '&variant_tag_id=' + variantTagId;
+        data += '&op=' + 'del';
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: Urls.set_variant_tag('V'),
+            success : removeTagCallback,
+        });
+    }
+    deleteItemClickHandler(variantTag, innerSpan, removeClickHandler);
+}
+
+
+function addVariantTag(variantTagData) {
+    const tag = variantTagData.tag;
+    // console.log("addVariantTag:");
+    // console.log(variantTagData);
+    const tagsTable = $("table#tags-table");
+    let tagRow = $("<tr/>"); // tag, analysis, user, timestamp
+    let variantTagClasses = `grid-tag tagged-${tag}`;
+    let variantTag = `<span class='${variantTagClasses}' title='Tagged as ${tag}' id="variant-tag-${variantTagData.id}" variant_tag_id='${variantTagData.id}' tag_id='${tag}'><span class='user-tag-colored'>${tag}</span></span>`;
+    let tagTd = $("<td/>").append(variantTag);
+    let analysisTd = "<td></td>";
+    if (variantTagData.analysis) {
+        const analysisUrl = Urls.analysis(variantTagData.analysis.id);
+        analysisTd = `<td><a class='hover-link' href="${analysisUrl}">${variantTagData.analysis.name}</a></td>`;
+    }
+    let userTd = `<td><span title="${variantTagData.user.first_name} ${variantTagData.user.last_name}">${variantTagData.user.username}</span></td>`;
+    let createdTd = $("<td/>").append(createTimestampDom(variantTagData.seconds_since_epoch, false));
+    let timeAgoTd = $("<td/>").append(createTimestampDom(variantTagData.seconds_since_epoch, true));
+    tagRow.append(tagTd);
+    tagRow.append(analysisTd);
+    tagRow.append(userTd);
+    tagRow.append(createdTd);
+    tagRow.append(timeAgoTd);
+    tagsTable.append(tagRow);
+
+    if (variantTagData.can_write) {
+        $(`#variant-tag-${variantTagData.id}`).click(variantDetailsTagClickHandler);
+    }
+}
+
+function showTagAutocomplete() {
+    const showTagButton = $("#show-tag-autocomplete");
+    const tagForm = $("#variant-tag-form");
+    const variantTagUrl = Urls.set_variant_tag('V');
+    const tagSelect = $("select#id_tag", tagForm);
+
+    showTagButton.hide();
+    tagForm.show();
+
+    tagSelect.change(function() {
+        const tag = $(this).val();
+        if (tag) {
+            clearAutocompleteChoice(tagSelect);
+            const successFunc = function (data) {
+                // We can return success but with empty data if it's a dupe (so don't add)
+                if (!$.isEmptyObject(data)) {
+                    addVariantTag(data);
+                }
+                showTagButton.show();
+                tagForm.hide();
+            };
+            let data = 'variant_id={{ variant.pk }}';
+            data += "&genome_build_name={{ genome_build.pk }}";
+            data += '&tag_id=' + tag;
+            data += '&op=' + 'add';
+            $.ajax({
+                type: "POST",
+                data: data,
+                url: variantTagUrl,
+                success : successFunc,
+            });
+        }
+    });
+    tagSelect.select2('open');
+}
+
+
 $(document).ready(function() {
-	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id %}');
+    {% if variant_tags %}
+        const variantTags = {{ variant_tags|safe }};
+        for (let i=0 ; i<variantTags.length ; ++i) {
+            addVariantTag(variantTags[i]);
+        }
+        $("table#tags-table").show();
+    {% endif %}
+
+	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id genome_build.pk %}');
 
     let variantAllele = {{ variant_allele | jsonify }};
     if (variantAllele) {
@@ -201,7 +344,7 @@ $(document).ready(function() {
     } else {
     {% if variant.can_have_annotation %}
         // Use Ajax to create + retrieve ClinGenAllele
-        let variantAlleleForVariantUrl = "{% url 'variant_allele_for_variant' variant.pk %}";
+        let variantAlleleForVariantUrl = "{% url 'variant_allele_for_variant' variant.pk genome_build.pk %}";
         $.ajax(variantAlleleForVariantUrl, {
             suppressErrors: true,
             success: populateVariantAllele
@@ -256,7 +399,7 @@ $(document).ready(function() {
             <div class="card-body">
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{{ g_hgvs }}{% endlabelled %}
                 {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
-                {% labelled label="Genome Build" %}{{ variant.genome_build }}{% endlabelled %}
+                {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
                 {% if variant.can_have_annotation and variant_show_canonical_hgvs %}
                     {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
                 {% endif %}
@@ -266,7 +409,7 @@ $(document).ready(function() {
 
             {% if variant.can_have_annotation and can_create_classification %}
                 <div class="card-footer">
-                    <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant.pk %}">
+                    <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant.pk genome_build.pk %}">
                         <i class="fas fa-plus-circle"></i> New Classification
                     </a>
                 </div>
@@ -274,36 +417,34 @@ $(document).ready(function() {
         </div>
     </div>
 
-    {% if variant_tags %}
-        <div class="container mt-4">
-            <h4>Tags</h4>
-            <table id='tags-table' class="table">
-                <thead>
-                    <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th>
-                </thead>
-                {% for vt in variant_tags %}
-                    <tr>
-                        <td><span class='grid-tag tagged-{{ vt.tag }}' title='Tagged as {{ vt.tag }}' tag_id='{{ vt.tag }}'><span class='user-tag-colored'>{{ vt.tag }}</span></span></td>
-                        <td><a class='hover-link' href="{% url 'analysis' vt.analysis.pk %}">{{ vt.analysis }}</a></td>
-                        <td>{{ vt.user }}</td>
-                        <td>{% timestamp vt.created %}</td>
-                    </tr>
-                {% endfor %}
-            </table>
+    <div class="container mt-4">
+        <h4>Tags</h4>
+        <table id='tags-table' class="table hidden">
+            <thead>
+                <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th><th>Time Ago</th>
+            </thead>
+        </table>
+        <div class="d-flex">
+            <div>
+                <a href="javascript:showTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button"></div></a>
+            </div>
+            <form id="variant-tag-form" class="hidden flex-row flex-grow">
+                {% csrf_token %}
+                {{  tag_form.tag }}
+                {{  tag_form.media }}
+            </form>
         </div>
-    {% endif %}
-
-{% if variant.can_have_annotation %}
+    </div>
 
     {% if classifications %}
         <!-- Needs to be full width to show data table -->
         <div id='classifications' class='container-table mt-4'>
             <h3>Classifications</h3>
-                {% classification_table classifications variant.genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
+                {% classification_table classifications genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
         </div>
     {% else %}
         <!-- Nicer table that lines up with others -->
-        <div class="container">
+        <div class="container mt-4">
             <div class="card">
                 <div class="card-header">Classifications</div>
                 <div class="card-body">
@@ -312,11 +453,10 @@ $(document).ready(function() {
             </div>
         </div>
     {% endif %}
-{% endif %}
 
 {% if show_annotation and variant_annotation %}
     <div class="container">
-        <div class="card">
+        <div class="card mt-4">
             <div class="card-header">ClinVar</div>
             <div class="card-body">
             {% if clinvar %}
@@ -358,11 +498,11 @@ $(document).ready(function() {
     </div>
 
     <div class="container">
-        <div class="card">
+        <div class="card mt-4">
             <div class="card-header">Nearby variants</div>
             <div class="card-body">
                 {% load nearby_variants_tags %}
-                {% nearby_variants variant annotation_version distance=50 %}
+                {% nearby_variants variant annotation_version %}
             </div>
         </div>
     </div>
@@ -466,9 +606,9 @@ $(document).ready(function() {
                     <div class="card">
                         <div class="card-header">Population Frequency</div>
                         <div class="card-body">
-                            {% labelled id='af_1kg' label='1000 genomes' hint="tiny" %}{{ variant_annotation.af_1kg|floatformat:6 }}{% endlabelled %}
-                            {% labelled id='af_uk10k' label='UK10K' hint="tiny" %}{{ variant_annotation.af_uk10k|floatformat:6 }}{% endlabelled %}
-                            {% labelled id='topmed_af' label='TopMed' hint="tiny"  %}{{ variant_annotation.topmed_af|floatformat:6 }}{% endlabelled %}
+                            {% labelled id='af_1kg' label='1000 genomes' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_1kg|format_unit_as_percent }}{% endlabelled %}
+                            {% labelled id='af_uk10k' label='UK10K' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_uk10k|format_unit_as_percent }}{% endlabelled %}
+                            {% labelled id='topmed_af' label='TopMed' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
                             {% if variant_annotation.gnomad_url %}
                                 {% labelled label="View in gnomAD" hint="tiny" %}
                                     <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
@@ -478,29 +618,29 @@ $(document).ready(function() {
                                 {% else %}
                                     {% labelled label="Is Flagged" label_css="gnomad-flagged-label" hint="tiny" %}{% endlabelled %}
                                 {% endif %}
-                                {% labelled id='gnomad_af' label='Allele Frequency' hint="tiny" %}{{ variant_annotation.gnomad_af|floatformat:6 }}{% endlabelled %}
+                                {% labelled id='gnomad_af' label='Allele Frequency' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
                                 {% if variant_annotation.has_extended_gnomad_fields %}
-                                {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' hint="tiny" %}{{ variant_annotation.gnomad2_liftover_af|floatformat:6 }}{% endlabelled %}
+                                {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
                                 {% endif %}
 
-                                {% labelled id='gnomad_total_homozygotes' label='Total Homozygotes' hint="tiny" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
+                                {% labelled id='gnomad_total_homozygotes' label='Total Homozygotes' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
                                 {% if variant_annotation.has_extended_gnomad_fields %}
-                                    {% labelled id='gnomad_ac' label='Alt Allele Count' hint="tiny" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
-                                    {% labelled id='gnomad_an' label='Total number of alleles' hint="tiny" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
+                                    {% labelled id='gnomad_ac' label='Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
+                                    {% labelled id='gnomad_an' label='Total number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
                                 {% endif %}
-                                {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" %}{{ variant_annotation.gnomad_popmax_af|floatformat:6 }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
+                                {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
                                 {% if variant_annotation.has_extended_gnomad_fields %}
-                                    {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
-                                    {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
+                                    {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
+                                    {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
                                 {% endif %}
 
-                                {% labelled id='gnomad_afr_af' label='African' hint="tiny" %}{{ variant_annotation.gnomad_afr_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" %}{{ variant_annotation.gnomad_asj_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_eas_af' label='East Asian' hint="tiny" %}{{ variant_annotation.gnomad_eas_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_fin_af' label='European (Finnish)' hint="tiny" %}{{ variant_annotation.gnomad_fin_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' hint="tiny" %}{{ variant_annotation.gnomad_nfe_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_amr_af' label='Latino' hint="tiny" %}{{ variant_annotation.gnomad_amr_af|floatformat:6 }}{% endlabelled %}
-                                {% labelled id='gnomad_sas_af' label='South Asian' hint="tiny" %}{{ variant_annotation.gnomad_sas_af|floatformat:6 }}{% endlabelled %}
+                                {% labelled id='gnomad_afr_af' label='African' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_eas_af' label='East Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_fin_af' label='European (Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_amr_af' label='Latino' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
+                                {% labelled id='gnomad_sas_af' label='South Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
                             {% else %}
                                 {% labelled id='gnomad_none' label='gnomAD' hint="tiny" %}No gnomAD entry{% endlabelled %}
                             {% endif %}

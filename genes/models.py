@@ -2,7 +2,8 @@ import json
 import logging
 import os
 import re
-from collections import namedtuple
+import shutil
+from collections import namedtuple, defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import total_ordering
@@ -18,7 +19,7 @@ from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
 from django.db.models.query_utils import Q
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -33,13 +34,16 @@ from genes.annotation_consortium_api import transcript_exists
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource
 from library.django_utils import SortByPKMixin
+from library.django_utils.django_partition import RelatedModelsPartitionModel
+from library.file_utils import mk_path
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.log_utils import log_traceback
 from library.utils import empty_dict
-from seqauto.models_enums import DataState
-from snpdb.models import Wiki, Company, Sample
+from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
+from upload.vcf.sql_copy_files import write_sql_copy_csv, gene_coverage_canonical_transcript_sql_copy_csv, \
+    gene_coverage_sql_copy_csv, GENE_COVERAGE_HEADER
 
 
 class HGNCImport(TimeStampedModel):
@@ -597,6 +601,24 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         else:
             identifier, version = transcript_name, None
         return identifier, version
+
+    @staticmethod
+    def transcript_versions_by_id(genome_build: GenomeBuild = None, annotation_consortium=None) -> \
+            Dict[str, Dict[str, int]]:
+        """ {transcript_id: {1: PK of TranscriptVersion.1, 2: PK of TranscriptVersion.2} """
+        filter_kwargs = {}
+        if genome_build:
+            filter_kwargs["genome_build"] = genome_build
+        if annotation_consortium:
+            filter_kwargs["transcript__annotation_consortium"] = annotation_consortium
+
+        qs = TranscriptVersion.objects.all()
+        if filter_kwargs:
+            qs = qs.filter(**filter_kwargs)
+        tv_by_id = defaultdict(dict)
+        for pk, transcript_id, version in qs.values_list("pk", "transcript_id", "version"):
+            tv_by_id[transcript_id][version] = pk
+        return tv_by_id
 
     @staticmethod
     def filter_by_accession(accession, genome_build=None):
@@ -1163,7 +1185,7 @@ class SampleGeneList(TimeStampedModel):
 
 
 @receiver(post_save, sender=SampleGeneList)
-def sample_gene_list_created(sender, instance, created, **kwargs):
+def sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
     if created:
         sample = instance.sample
         if SampleGeneList.objects.filter(sample=sample).count() > 1:
@@ -1304,11 +1326,17 @@ class CanonicalTranscript(models.Model):
     collection = models.ForeignKey(CanonicalTranscriptCollection, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=CASCADE)
     original_gene_symbol = models.TextField()
-    original_transcript_id = models.TextField()
+    original_transcript = models.TextField()
 
 
-class GeneCoverageCollection(models.Model):
+class GeneCoverageCollection(RelatedModelsPartitionModel):
+    """ Note both GeneCoverage and GeneCoverageCanonicalTranscript point off same collection object """
+    RECORDS_BASE_TABLE_NAMES = ["genes_genecoverage", "genes_genecoveragecanonicaltranscript"]
+    RECORDS_FK_FIELD_TO_THIS_MODEL = "gene_coverage_collection_id"
+    PARTITION_LABEL_TEXT = "collection"
+
     path = models.TextField()
     data_state = models.CharField(max_length=1, choices=DataState.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
@@ -1340,6 +1368,7 @@ class GeneCoverageCollection(models.Model):
         try:
             gene_matcher = kwargs["gene_matcher"]
             canonical_transcript_manager = kwargs.get("canonical_transcript_manager")
+            transcript_versions_by_id = kwargs.get("transcript_versions_by_id")
         except KeyError as ke:
             missing_key = ke.args[0]
             logging.error("You need to pass '%s' to kwargs", missing_key)
@@ -1349,55 +1378,62 @@ class GeneCoverageCollection(models.Model):
         missing_transcripts = 0
 
         canonical_transcript_collection = canonical_transcript_manager.get_canonical_collection_for_enrichment_kit(enrichment_kit)
-        _, original_canonical_transcript_ids = canonical_transcript_manager.get_canonical_transcripts(canonical_transcript_collection)
+        _, original_canonical_transcript_accessions = canonical_transcript_manager.get_canonical_transcripts(canonical_transcript_collection)
 
         gene_coverage_df = load_gene_coverage_df(self.path)
 
-        gene_coverage_list = []
-        gene_coverage_canonical_list = []
+        gene_coverage_tuples = []
+        gene_coverage_canonical_transcript_tuples = []
         warnings = []
 
-        known_transcript_ids = Transcript.known_transcript_ids(canonical_transcript_collection.genome_build,
-                                                               canonical_transcript_collection.annotation_consortium)
         for _, row in gene_coverage_df.iterrows():
-            original_gene_symbol = row["gene"]
-            original_transcript_id = row["transcript"]
+            original_gene_symbol = row["original_gene_symbol"]
+            original_transcript = row["original_transcript"]
 
             gene_symbol_id = gene_matcher.get_gene_symbol_id(original_gene_symbol)
-            if original_transcript_id in known_transcript_ids:
-                transcript_id = original_transcript_id
+            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(original_transcript)
+            if transcript_versions := transcript_versions_by_id.get(transcript_id):
+                transcript_version_id = transcript_versions.get(version)
             else:
                 transcript_id = None
+                transcript_version_id = None
 
-                kwargs = {"gene_coverage_collection": self,
-                          "transcript_id": transcript_id,
-                          "gene_symbol_id": gene_symbol_id,
-                          "original_gene_symbol": original_gene_symbol,
-                          "original_transcript_id": original_transcript_id,
-                          "min": row["min"],
-                          "mean": row["mean"],
-                          "std_dev": row["std_dev"],
-                          "percent_0x": row["percent_0x"],
-                          "percent_10x": row.get("percent_10x"),
-                          "percent_20x": row["percent_20x"],
-                          "percent_100x": row.get("percent_100x"),
-                          "sensitivity": row["sensitivity"]}
+            gc_dict = {
+                "gene_coverage_collection_id": self.pk,
+                "transcript_id": transcript_id,
+                "transcript_version_id": transcript_version_id,
+                "gene_symbol_id": gene_symbol_id,
+            }
+            gc_dict.update(row.to_dict())
+            gc_tup = tuple([gc_dict[f] for f in GENE_COVERAGE_HEADER])
 
-                gene_coverage = GeneCoverage(**kwargs)
-                gene_coverage_list.append(gene_coverage)
+            if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_ALL:
+                gene_coverage_tuples.append(gc_tup)
 
-                if original_transcript_id in original_canonical_transcript_ids:
-                    kwargs["canonical_transcript_collection"] = canonical_transcript_collection
-                    gene_coverage_canonical = GeneCoverageCanonicalTranscript(**kwargs)
-                    gene_coverage_canonical_list.append(gene_coverage_canonical)
+            if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
+                if original_transcript in original_canonical_transcript_accessions:
+                    gene_coverage_canonical_transcript_tuples.append((canonical_transcript_collection.pk,) + gc_tup)
 
-        if gene_coverage_list:
-            GeneCoverage.objects.bulk_create(gene_coverage_list)
+        processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, "gene_coverage",
+                                      f"gene_coverage_collection_{self.pk}")
+        mk_path(processing_dir)
+        if gene_coverage_tuples:
+            csv_filename = os.path.join(processing_dir, f"gene_coverage_{self.pk}.csv")
+            write_sql_copy_csv(gene_coverage_tuples, csv_filename)
+            partition_table = self.get_partition_table(base_table_name="genes_genecoverage")
+            gene_coverage_sql_copy_csv(csv_filename, partition_table)
 
-        if gene_coverage_canonical_list:
-            GeneCoverageCanonicalTranscript.objects.bulk_create(gene_coverage_canonical_list)
-        else:
-            logging.warning("GeneCoverage had no canonical transcripts")
+        if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
+            if gene_coverage_canonical_transcript_tuples:
+                csv_filename = os.path.join(processing_dir, f"gene_coverage_canonical_transcript_{self.pk}.csv")
+                write_sql_copy_csv(gene_coverage_canonical_transcript_tuples, csv_filename)
+                partition_table = self.get_partition_table(base_table_name="genes_genecoveragecanonicaltranscript")
+                gene_coverage_canonical_transcript_sql_copy_csv(csv_filename, partition_table)
+            else:
+                logging.warning("GeneCoverage had no canonical transcripts")
+
+        if not settings.DEBUG:
+            shutil.rmtree(processing_dir)
 
         logging.info("%d missing genes, %d missing transcripts", missing_genes, missing_transcripts)
         return warnings
@@ -1409,22 +1445,44 @@ class GeneCoverageCollection(models.Model):
         return "GeneCoverageCollection " + os.path.basename(self.path)
 
 
+@receiver(pre_delete, sender=GeneCoverageCollection)
+def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    try:
+        instance.delete_related_objects()
+    except:
+        pass
+
+
 class AbstractGeneCoverage(models.Model):
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=CASCADE)  # rename to "coverage"?
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=CASCADE)
     original_gene_symbol = models.TextField()  # raw input string
-    original_transcript_id = models.TextField()  # raw input string
+    original_transcript = models.TextField()  # raw input string
+    size = models.IntegerField(null=True)
     min = models.IntegerField()
+    max = models.IntegerField(null=True)
     mean = models.FloatField()
     std_dev = models.FloatField()
     # As per QCExecSummary - different enrichment kits store different coverages
     # So some will be None
-    percent_0x = models.FloatField()
+    percent_1x = models.FloatField(null=True)
+    percent_2x = models.FloatField(null=True)
+    percent_5x = models.FloatField(null=True)
     percent_10x = models.FloatField(null=True)
-    percent_20x = models.FloatField()
+    percent_15x = models.FloatField(null=True)
+    percent_20x = models.FloatField(null=True)
+    percent_25x = models.FloatField(null=True)
+    percent_30x = models.FloatField(null=True)
+    percent_40x = models.FloatField(null=True)
+    percent_50x = models.FloatField(null=True)
+    percent_60x = models.FloatField(null=True)
+    percent_80x = models.FloatField(null=True)
     percent_100x = models.FloatField(null=True)
-    sensitivity = models.FloatField()  # Estimated Sensitivity of Detection
+    percent_150x = models.FloatField(null=True)
+    percent_200x = models.FloatField(null=True)
+    percent_250x = models.FloatField(null=True)
 
     class Meta:
         abstract = True

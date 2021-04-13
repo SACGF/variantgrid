@@ -22,7 +22,7 @@ from library.log_utils import get_traceback, log_traceback
 from library.utils import get_single_element
 import numpy as np
 from seqauto.models import SequencingRun, GoldReference, GoldCoverageSummary, GoldGeneCoverageCollection, EnrichmentKit
-from seqauto.models_enums import DataState
+from snpdb.models import DataState
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -37,8 +37,7 @@ def calculate_gold_summary(enrichment_kit_id):
                                                   import_status=ImportStatus.IMPORTING)
 
     try:
-        seq_runs_qs = SequencingRun.objects.filter(samplesheet__sequencingsample__enrichment_kit=enrichment_kit,
-                                                   gold_standard=True).distinct()
+        seq_runs_qs = SequencingRun.objects.filter(enrichment_kit=enrichment_kit, gold_standard=True)
         # Check that we have sufficient data from all of them...
         problems = []
         for sequencing_run in seq_runs_qs:
@@ -89,10 +88,11 @@ def calculate_gold_summary(enrichment_kit_id):
 
 
 def get_gold_coverage_summaries(gold_reference, seq_run_ids):
-    seq_run_path = "gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads"
-    seq_run_path += "__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__sequencing_run"
-    kwargs = {seq_run_path + "__in": seq_run_ids}
-    qs = GeneCoverageCanonicalTranscript.objects.filter(**kwargs)
+    qs = GeneCoverageCanonicalTranscript.objects.all()
+    qs = qs.filter(gene_coverage_collection__qcgenecoverage__sequencing_run__in=seq_run_ids).distinct()
+
+    if not qs.exists():
+        raise ValueError(f"No GeneCoverageCanonicalTranscript entries from sequencing runs: {seq_run_ids}")
 
     # If there was a transcript ID match, there will be exactly 1 gene
     # Otherwise, there may be multiple genes with no transcript_id
@@ -100,8 +100,8 @@ def get_gold_coverage_summaries(gold_reference, seq_run_ids):
 
     for data in qs.values():
         original_gene_symbol = data["original_gene_symbol"]
-        original_transcript_id = data["original_transcript_id"]
-        arrays = gene_symbol_transcript_arrays[original_gene_symbol][original_transcript_id]
+        original_transcript = data["original_transcript"]
+        arrays = gene_symbol_transcript_arrays[original_gene_symbol][original_transcript]
 
         for k, v in data.items():
             arrays[k].append(v)
@@ -112,7 +112,7 @@ def get_gold_coverage_summaries(gold_reference, seq_run_ids):
 def calculate_gold_summary_stats(gold_reference, gene_symbol_transcript_gene_arrays):
     gold_coverage_summaries = []
     for original_gene_symbol, transcript_arrays in gene_symbol_transcript_gene_arrays.items():
-        for original_transcript_id, arrays_dict in transcript_arrays.items():
+        for original_transcript, arrays_dict in transcript_arrays.items():
             min_array = np.array(arrays_dict["min"])
             mean_array = np.array(arrays_dict["mean"])
             percent_10x_array = np.array(arrays_dict["percent_10x"])
@@ -136,25 +136,27 @@ def calculate_gold_summary_stats(gold_reference, gene_symbol_transcript_gene_arr
 
             try:
                 # These should have all matched consistently...
-                gene_symbol = get_single_element(set(arrays_dict["gene_symbol"]))
+                gene_symbol_id = get_single_element(set(arrays_dict["gene_symbol_id"]))
                 transcript_id = get_single_element(set(arrays_dict["transcript_id"]))
+                transcript_version_id = get_single_element(set(arrays_dict["transcript_version_id"]))
+
+                gcs = GoldCoverageSummary(gold_reference=gold_reference,
+                                          gene_symbol_id=gene_symbol_id,
+                                          transcript_id=transcript_id,
+                                          transcript_version_id=transcript_version_id,
+                                          original_gene_symbol=original_gene_symbol,
+                                          original_transcript=original_transcript,
+                                          mean=mean,
+                                          standard_error=standard_error,
+                                          min_mean=min_mean,
+                                          depth_20x_5th_percentile=depth_20x_5th_percentile,
+                                          depth_10x_5th_percentile=depth_10x_5th_percentile,
+                                          depth_mean_5th_percentile=depth_mean_5th_percentile,
+                                          depth_mean_95th_percentile=depth_mean_95th_percentile)
+                gold_coverage_summaries.append(gcs)
             except:
                 log_traceback()
                 logging.error(arrays_dict)
                 raise
-
-            gcs = GoldCoverageSummary(gold_reference=gold_reference,
-                                      gene_symbol=gene_symbol,
-                                      transcript_id=transcript_id,
-                                      original_gene_symbol=original_gene_symbol,
-                                      original_transcript_id=original_transcript_id,
-                                      mean=mean,
-                                      standard_error=standard_error,
-                                      min_mean=min_mean,
-                                      depth_20x_5th_percentile=depth_20x_5th_percentile,
-                                      depth_10x_5th_percentile=depth_10x_5th_percentile,
-                                      depth_mean_5th_percentile=depth_mean_5th_percentile,
-                                      depth_mean_95th_percentile=depth_mean_95th_percentile)
-            gold_coverage_summaries.append(gcs)
 
     return gold_coverage_summaries

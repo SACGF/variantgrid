@@ -50,6 +50,27 @@ def assign_patient_to_sample(patient_import, user, sample, patient, description,
                                        patient_import=patient_import)
 
 
+def assign_specimen_to_sample(patient_import, user, sample, specimen, description, origin):
+    """ Creates patient modification record """
+
+    if sample.specimen == specimen:
+        return
+
+    old_specimen = sample.specimen
+
+    sample.specimen = specimen
+    sample.save()
+
+    if old_specimen:
+        description += f" (previously specimen was: {old_specimen})"
+
+    PatientModification.objects.create(patient=specimen.patient,
+                                       user=user,
+                                       description=description,
+                                       origin=origin,
+                                       patient_import=patient_import)
+
+
 def parse_date(row, column, validation_messages):
     date_string = row[column]
     d = None

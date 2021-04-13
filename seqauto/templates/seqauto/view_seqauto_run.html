@@ -1,4 +1,5 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load seqauto_record_tags %}
 {% block title %}Seqauto Run {{ seqauto_run.pk }}{% endblock %}
 {% block head %}
 <style>
@@ -14,21 +15,7 @@
     Back to <a href="{% url 'seqauto_runs' %}">info on disk scans</a>
     </p>
 
-    {% include "messages/messages.html" %}
-
-    <h3>Messages</h3>
-    {% if seqauto_run.seqautorunevent_set.all %}
-        <table>
-        {% for sar_event in seqauto_run.seqautorunevent_set.all %}
-            <tr><td>{{ sar_event.get_file_type_display }}
-                <td>{{ sar_event.message }}
-                <td>{{ sar_event.get_severity_display }}
-        {% endfor %} 
-        </table>
-    {% else %}
-        No messages
-    {% endif %}
-    
+    {% seqauto_messages seqauto_run.seqautomessage_set.all %}
 
     <h3>PBS Jobs</h3>
 

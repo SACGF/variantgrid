@@ -6,7 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, DO_NOTHING
-from django.db.models.expressions import F
+from django.db.models.expressions import F, Value
 from django.db.models.query_utils import Q, FilteredRelation
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -61,9 +61,32 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         return user.has_perm(write_perm, self)
 
     def increment_version(self):
+        # Check if any samples not in parent cohort (can no longer be a sub cohort)
+        if self.parent_cohort:
+            my_samples = self.get_samples()
+            parent_samples = self.parent_cohort.get_samples()
+            if my_samples.exclude(pk__in=parent_samples).exists():
+                self.parent_cohort = None  # No longer a sub cohort
+
         self.version += 1
         self.sample_count = self.cohortsample_set.all().count()
         self.save()
+
+        if self.vcf is None:
+            # For custom built Cohorts - need to ensure cohort_genotype_packed_field_index entries are correct
+            if highest_packed_index := self._get_cohort_sample_field_max("cohort_genotype_packed_field_index"):
+                # packed fields are unique per cohort so need to move them sufficiently high to be able to rearrange
+                out_of_range = F("cohort_genotype_packed_field_index") + Value(highest_packed_index + 1)
+                self.cohortsample_set.all().update(cohort_genotype_packed_field_index=out_of_range)
+
+                # Cohort genotype packed fields are in sample order
+                cohort_samples = []
+                for i, cs in enumerate(self.cohortsample_set.order_by("sample")):
+                    cs.cohort_genotype_packed_field_index = i
+                    cohort_samples.append(cs)
+                if cohort_samples:
+                    # Do a bulk update so it doesn't trigger a save then call this func again
+                    CohortSample.objects.bulk_update(cohort_samples, ["cohort_genotype_packed_field_index"])
 
         self.delete_old_counts()
 
@@ -74,10 +97,13 @@ class Cohort(SortByPKMixin, TimeStampedModel):
             task = delete_old_cohort_genotypes_task.si()
             task.apply_async()
 
-    def get_next_sort_order(self):
+    def _get_cohort_sample_field_max(self, field):
         qs = self.cohortsample_set.all()
-        data = qs.aggregate(Max("sort_order"))
-        existing_max = data["sort_order__max"]
+        data = qs.aggregate(highest_value=Max(field))
+        return data["highest_value"]
+
+    def _get_next_sort_order(self):
+        existing_max = self._get_cohort_sample_field_max("sort_order")
         if existing_max is not None:
             return existing_max + 1
         return 0
@@ -87,7 +113,7 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         try:
             ss = self.cohortsample_set.get(cohort=self, sample_id=sample_id)
         except CohortSample.DoesNotExist:
-            i = self.get_next_sort_order()
+            i = self._get_next_sort_order()
             ss = CohortSample.objects.create(cohort=self,
                                              sample_id=sample_id,
                                              cohort_genotype_packed_field_index=i,
@@ -212,7 +238,7 @@ class Cohort(SortByPKMixin, TimeStampedModel):
 
 
 @receiver(pre_delete, sender=Cohort)
-def pre_delete_cohort(sender, instance, *args, **kwargs):
+def pre_delete_cohort(sender, instance, **kwargs):  # pylint: disable=unused-argument
     # Make sub cohorts not depend on this one (they'll have to be regenerated)
     for sub_cohort in instance.sub_cohort_set.all():
         # logging.info("Updating sub cohorts: %s", sub_cohort)
@@ -362,7 +388,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
 
 
 @receiver(pre_delete, sender=CohortGenotypeCollection)
-def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):
+def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         instance.delete_related_objects()
     except:
@@ -377,7 +403,10 @@ class SampleGenotype:
         self.sample = sample
         self.zygosity = self._get_sample_value("samples_zygosity", sample_index)
         self.allele_depth = self._get_sample_value("samples_allele_depth", sample_index)
-        self.allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
+        allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
+        if sample.vcf.allele_frequency_percent:
+            allele_frequency = VCF.convert_from_percent_to_unit(allele_frequency)
+        self.allele_frequency = allele_frequency
         self.read_depth = self._get_sample_value("samples_read_depth", sample_index)
         self.genotype_quality = self._get_sample_value("samples_genotype_quality", sample_index)
         self.phred_likelihood = self._get_sample_value("samples_phred_likelihood", sample_index)
@@ -407,14 +436,16 @@ class SampleGenotype:
 
 class CohortGenotype(models.Model):
     """ Genotype information for multiple samples in a single database row. """
+    MISSING_NUMBER_VALUE = -1
 
     COLUMN_IS_ARRAY_EMPTY_VALUE = {
         "samples_zygosity": (False, "."),
-        "samples_allele_depth": (True, -1),
-        "samples_allele_frequency": (True, -1),
-        "samples_read_depth": (True, -1),
-        "samples_genotype_quality": (True, -1),
-        "samples_phred_likelihood": (True, -1),
+        "samples_allele_depth": (True, MISSING_NUMBER_VALUE),
+        "samples_allele_frequency": (True, MISSING_NUMBER_VALUE),
+        "samples_read_depth": (True, MISSING_NUMBER_VALUE),
+        "samples_genotype_quality": (True, MISSING_NUMBER_VALUE),
+        "samples_phred_likelihood": (True, MISSING_NUMBER_VALUE),
+        "samples_filters": (True, "NULL"),
     }
 
     collection = models.ForeignKey(CohortGenotypeCollection, on_delete=CASCADE)
@@ -422,14 +453,17 @@ class CohortGenotype(models.Model):
     ref_count = models.IntegerField(default=0)
     het_count = models.IntegerField(default=0)
     hom_count = models.IntegerField(default=0)  # hom_alt
+    unk_count = models.IntegerField(default=0)  # Unknown (ie ./.)
     filters = models.TextField(null=True)
     # samples_ fields below packed in sorted order of CohortSample.cohort_genotype_packed_field_index
-    samples_zygosity = models.TextField()
+    samples_zygosity = models.TextField()  # 1 character per sample of Zygosity
     samples_allele_depth = ArrayField(models.IntegerField(), null=True)
     samples_allele_frequency = ArrayField(PostgresRealField(), null=True)
     samples_read_depth = ArrayField(models.IntegerField(), null=True)
     samples_genotype_quality = ArrayField(models.IntegerField(), null=True)
     samples_phred_likelihood = ArrayField(models.IntegerField(), null=True)
+    # Same codes as filters, at sample level. None for no entry, PASS = ""
+    samples_filters = ArrayField(models.TextField(), null=True)
 
     def get_sample_genotype(self, sample: Sample) -> SampleGenotype:
         sample_index = self.collection.get_array_index_for_sample_id(sample.pk)
@@ -437,7 +471,7 @@ class CohortGenotype(models.Model):
 
     def get_sample_genotypes(self) -> List[SampleGenotype]:
         sample_genotypes = []
-        for i, sample in enumerate(self.cohort.get_samples()):
+        for i, sample in enumerate(self.collection.cohort.get_samples()):
             sample_genotypes.append(SampleGenotype(self, sample, i))
         return sample_genotypes
 

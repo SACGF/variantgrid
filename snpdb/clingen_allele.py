@@ -30,7 +30,6 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta
 from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGenAlleleExternalRecordType
-from upload.models import ModifiedImportedVariant
 
 
 class ClinGenAlleleAPIException(Exception):
@@ -89,6 +88,7 @@ def clingen_hgvs_put(hgvs_iter):
 def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants):
     """ Ensures that we have ClinGenAllele for variants
         You don't need to, but more efficient to make variants distinct """
+    from upload.models import ModifiedImportedVariant  # Circular import
 
     qs = VariantAllele.objects.filter(variant__in=variants).values_list("variant_id", flat=True)
     variant_ids_with_allele = set(qs)
@@ -202,7 +202,7 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant) 
         raise ClinGenAlleleAPIException(msg)
 
     try:
-        va = VariantAllele.objects.get(variant=variant)
+        va = VariantAllele.objects.get(variant=variant, genome_build=genome_build)
         if va.needs_clinvar_call():
             va = variant_allele_clingen(genome_build, variant, existing_variant_allele=va)
 
@@ -215,7 +215,7 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant) 
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant))
+                                              origin=AlleleOrigin.variant_origin(variant, genome_build))
     return va
 
 
@@ -240,7 +240,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None) 
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant),
+                                              origin=AlleleOrigin.variant_origin(variant, genome_build),
                                               error=api_response)
 
     else:
@@ -264,7 +264,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None) 
         else:
             allele, _ = Allele.objects.get_or_create(clingen_allele=clingen_allele)
 
-        known_variants = {variant.genome_build: variant}  # Ensure this gets linked to Allele, no matter API response
+        known_variants = {genome_build: variant}  # Ensure this gets linked to Allele, no matter API response
         variant_allele_by_build = link_allele_to_existing_variants(allele,
                                                                    AlleleConversionTool.CLINGEN_ALLELE_REGISTRY,
                                                                    known_variants=known_variants)
@@ -352,11 +352,11 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
                     raise
 
             if variant:
-                defaults = {"genome_build": genome_build,
-                            "allele": allele,
-                            "origin": AlleleOrigin.variant_origin(variant),
+                defaults = {"origin": AlleleOrigin.variant_origin(variant, genome_build),
                             "conversion_tool": conversion_tool}
                 va, _ = VariantAllele.objects.get_or_create(variant=variant,
+                                                            genome_build=genome_build,
+                                                            allele=allele,
                                                             defaults=defaults)
                 variant_allele_by_build[genome_build] = va
         except Variant.DoesNotExist:

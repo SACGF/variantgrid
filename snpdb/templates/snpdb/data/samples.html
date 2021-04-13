@@ -70,5 +70,5 @@ $(document).ready(function() {
 <div id="delete-samples-container">
 	<a href="javascript:deleteSelectedRows()">Delete Selected Samples</a>
 </div>
-{% jqgrid 'samples_grid' 'samples' search=False delete=True template_name='snpdb/grids/samples_grid.html' grid_complete='samples_grid_complete' %}
+{% jqgrid 'samples_grid' 'samples' search=False delete=True download_grid_json_as_csv=True template_name='snpdb/grids/samples_grid.html' grid_complete='samples_grid_complete' %}
 </div>

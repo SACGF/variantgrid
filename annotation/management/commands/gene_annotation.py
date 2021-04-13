@@ -39,6 +39,7 @@ class Command(BaseCommand):
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
             if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
                 raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")
+            self._create_gene_annotation_version(gene_annotation_release, gene_symbols)
         else:
             for genome_build in GenomeBuild.builds_with_annotation():
                 av = AnnotationVersion.latest(genome_build, validate=False)
@@ -125,14 +126,14 @@ class Command(BaseCommand):
     def _write_records(self, gene_annotation_version: GeneAnnotationVersion, gene_annotation_records):
         print(f"Creating {len(gene_annotation_records)} gene annotation records")
 
-        separator = '\t'  # Was having trouble with quoting CSVs
+        delimiter = '\t'  # Was having trouble with quoting CSVs
         self.stdout.write("Creating CSV to insert into database...\n")
         csv_filename = get_import_processing_filename(gene_annotation_version.pk, "gene_annotation.csv",
                                                       prefix='gene_annotation')
         if os.path.exists(csv_filename):
             os.remove(csv_filename)
-        write_sql_copy_csv(gene_annotation_records, csv_filename, separator=separator)
+        write_sql_copy_csv(gene_annotation_records, csv_filename, delimiter=delimiter)
         partition_table = gene_annotation_version.get_partition_table()
         self.stdout.write(f"Inserting file '{csv_filename}' into partition {partition_table}\n")
-        sql_copy_csv(csv_filename, partition_table, self.GENE_ANNOTATION_HEADER, separator=separator)
+        sql_copy_csv(csv_filename, partition_table, self.GENE_ANNOTATION_HEADER, delimiter=delimiter)
         self.stdout.write("Done!\n")

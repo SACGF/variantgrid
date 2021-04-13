@@ -2,7 +2,7 @@
 from collections import defaultdict
 from typing import Tuple, List
 
-from pyhgvs import HGVSName
+from pyhgvs import HGVSName, InvalidHGVSName
 
 
 def _get_gene_and_terms(vta, c_hgvs=True, dbsnp=True) -> Tuple[str, List]:
@@ -17,7 +17,7 @@ def _get_gene_and_terms(vta, c_hgvs=True, dbsnp=True) -> Tuple[str, List]:
     hgvs_name = None
     try:
         hgvs_name = HGVSName(vta.hgvs_c)
-    except NotImplementedError:
+    except (NotImplementedError, InvalidHGVSName):
         pass
 
     if c_hgvs and hgvs_name:

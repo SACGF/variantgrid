@@ -265,8 +265,8 @@ class UserTrioWizardForm(forms.Form):
             a_v = cleaned_data.get(a)
             b_v = cleaned_data.get(b)
             if a_v == b_v:
-                val = dict(TrioSample.CHOICES)[a_v]
-                msg = f"Samples {a}/{b} are both assigned to: {val}"
+                trio_sample = TrioSample(a_v)
+                msg = f"Samples {a}/{b} are both assigned to: {trio_sample.label}"
                 raise forms.ValidationError(msg)
 
         return cleaned_data

@@ -323,7 +323,11 @@ def create_phenotype_description(text, phenotype_matcher=None):
 
     if unknown_sentences:
         for sentence in unknown_sentences:
-            process_text_phenotype(sentence.text_phenotype, phenotype_matcher)
+            try:
+                process_text_phenotype(sentence.text_phenotype, phenotype_matcher)
+            except Exception:
+                logging.error("Problem processing phenotype for '%s'", sentence.text_phenotype.text)
+                raise
             known_sentences.append(sentence)
 
     return phenotype_description

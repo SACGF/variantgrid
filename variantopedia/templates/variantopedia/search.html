@@ -64,7 +64,7 @@
                                         <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
                                         {% comment %}Check it's a Variant object{% endcomment %}
                                         {% if variant_summary and search_result.record.locus %}
-                                            {% nearby_summary search_result.record %}
+                                            {% nearby_summary search_result.record search_result.genome_build %}
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -114,11 +114,10 @@
                             {% labelled label="Transcript ID" %}
                                 <span class="example">NM_001080463</span> or with version <span class="example">NM_001080463.2</span>
                             {% endlabelled %}
-                            {% labelled label="Ontology" %}
-                                <span class="example">OMIM:616299</span> or <span class="example">HP:0001332</span> or <span class="example">MONDO:0002974</span>
-                            {% endlabelled %}
-
                         {% endif %}
+                        {% labelled label="Ontology" %}
+                            <span class="example">OMIM:616299</span> or <span class="example">HP:0001332</span> or <span class="example">MONDO:0002974</span>
+                        {% endlabelled %}
                         {% if url_name_visible.patients %}
                             {% labelled label="Sample" %}
                                 case insensitive search match in name

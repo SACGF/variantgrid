@@ -1,6 +1,6 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
-{% load record_data_state_tags %}
+{% load seqauto_record_tags %}
 {% block title %}{{ vcf_file }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
@@ -24,7 +24,7 @@
 	<div>
 		<h3>Input</h3>
 		<ul>
-		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' vcf_file.bam_file.unaligned_reads.sequencing_run.pk %}">{{ vcf_file.bam_file.unaligned_reads.sequencing_run }}</a></li>  
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' vcf_file.sequencing_run.pk %}">{{ vcf_file.sequencing_run }}</a></li>
 		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' vcf_file.bam_file.unaligned_reads.pk %}">{{ vcf_file.bam_file.unaligned_reads }}</a></li>
 		<li>Bam: <a href="{% url 'view_bam_file' vcf_file.bam_file.pk %}">{{ vcf_file.bam_file }}</a></li>
 		</ul>

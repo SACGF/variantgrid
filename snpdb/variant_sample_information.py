@@ -8,19 +8,19 @@ from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_O
 from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection
+from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, VCF
 import pandas as pd
 
 
 class VariantSampleInformation:
 
-    def __init__(self, user, variant):
+    def __init__(self, user, variant, genome_build: GenomeBuild):
         locus_qs = Locus.objects.filter(pk=variant.locus.pk)
         values_qs = self._get_sample_values_for_variant_via_cohort_genotype(locus_qs)
         values_qs = self._cohort_genotype_to_sample_genotypes(values_qs)
 
         self.variant = variant
-        self.genome_build = variant.genome_build
+        self.genome_build = genome_build
         self.num_samples = Sample.objects.filter(vcf__genome_build=self.genome_build).count()
         visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build=self.genome_build)
         self.user_sample_ids = set(visible_samples_qs.values_list("pk", flat=True))
@@ -118,19 +118,22 @@ class VariantSampleInformation:
             samples_qs = samples_qs.annotate(**annotation_kwargs)
 
             COPY_SAMPLE_FIELDS = ["id", "name", "patient", SAMPLE_ENRICHMENT_KIT_PATH]
-            sample_values = samples_qs.values(*COPY_SAMPLE_FIELDS, *list(annotation_kwargs.keys()))
+            sample_values = samples_qs.values("no_dna_control", "vcf__allele_frequency_percent",
+                                              *COPY_SAMPLE_FIELDS, *list(annotation_kwargs.keys()))
 
             for s_values in sample_values:
                 sample_id = s_values["id"]
                 i = cgc.get_array_index_for_sample_id(sample_id)
                 zygosity = samples_zygosity[i]
+                if zygosity == Zygosity.MISSING or s_values["no_dna_control"]:
+                    continue
+
                 allele_frequency = samples_allele_frequency[i]
+                if s_values["vcf__allele_frequency_percent"]:
+                    allele_frequency = VCF.convert_from_percent_to_unit(allele_frequency)
                 allele_depth = samples_allele_depth[i]
                 read_depth = samples_read_depth[i]
                 phred_likelihood = samples_phred_likelihood[i]
-
-                if zygosity == Zygosity.MISSING:
-                    continue
 
                 sample_genotype_values = {
                     "variant": variant,

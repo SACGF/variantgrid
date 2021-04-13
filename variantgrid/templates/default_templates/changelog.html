@@ -10,9 +10,18 @@
         <h3>Changelog</h3>
 
         {% if not sapath_enabled %}
+            <div class="card">
+                <div class="card-header">April 12, 2021</div>
+                <div class="card-body">
+                    <ul>
+                        <li>Allele Frequency - now in range 0-1 (not percent) - and uses values in VCF if provided.</li>
+                        <li>Variant Tags can be added/removed from variant details page</li>
+                    </ul>
+                </div>
+            </div>
 
             <div class="card">
-                <div class="card-header">Mar 10, 2021</div>
+                <div class="card-header">March 10, 2021</div>
                 <div class="card-body">
                     <ul>
                         <li>Ontology (OMIM/HPO) updates</li>
@@ -25,8 +34,7 @@
                 </div>
             </div>
 
-
-            <div class="card">
+            <div class="card mt-4">
                 <div class="card-header">Jan 11, 2021</div>
                 <div class="card-body">
                     <ul>
@@ -38,7 +46,7 @@
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card mt-4">
                 <div class="card-header">November 24, 2020</div>
                 <div class="card-body">
                     <ul>
@@ -55,7 +63,7 @@
 
             <!-- For SA Path, show all as one big VG3 upgrade -->
 
-            <div class="card">
+            <div class="card mt-4">
                 <div class="card-header">VariantGrid 3.0</div>
                 <div class="card-body">
                     <h4>General</h4>
@@ -117,6 +125,7 @@
                     <ul>
                         <li>Sample GeneList</li>
                         <li><a class="hover-link" target="_blank" href="https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-020-00761-2">Somalier</a> - tool to check sample relatedness</li>
+                        <li>Allele Frequency - now in range 0-1 (not percent) - and uses values in VCF if provided.</li>
                     </ul>
 
                     <h4>Search</h4>
@@ -127,6 +136,7 @@
                     <h4>Tagging</h4>
                     <ul>
                         <li>Tags grouped together by variant</li>
+                        <li>Variant Tags can be added/removed from variant details page</li>
                     </ul>
 
                     <h4>Variant Details</h4>

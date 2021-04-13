@@ -1,0 +1,26 @@
+TILE METRICS
+------------
+  Mean Cluster Density: 386637
+  Mean PF Cluster Density: 237235
+  Total Clusters: 1013529210
+  Total PF Clusters: 615414381
+  Percentage of Clusters PF: 60.719945
+  Aligned to PhiX: 0.081716
+  Read - PHASING / PRE-PHASING:
+    1 - 0.002196 / 0.001824
+    2 - 0.000000 / 0.000000
+    3 - 0.002258 / 0.001964
+
+QUALITY METRICS
+---------------
+[InteropQualityMetrics] Info: Q-score binning was used with 7 bins and these remapped scores: [2, 14, 21, 27, 32, 36, 40]
+Read 1: 87.901112 
+Read 2: 87.864762 (Index)
+Read 3: 86.679805 
+
+INDEXING METRICS
+----------------
+index_str  project_str   name_str       
+AAGAGGCA+ATAGAGAG  default      hiseq_sample1        33522694
+AGGCAGAA+GCGATCTA  default      hiseq_sample2           19999024
+Name: clusters, dtype: int64

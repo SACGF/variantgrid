@@ -41,6 +41,7 @@ const Diff = (function() {
                 dict.eKeys.push(k);
             }
         });
+
         let groups = Object.keys(groupMap).map(g => {
             let combined = Object.assign({}, groupMap[g]);
             combined.eKeys = criteriaMap[g].eKeys.concat(combined.eKeys);
@@ -307,10 +308,26 @@ const Diff = (function() {
                     height: '16px',
                     display: 'inline-block'
                 }).appendTo(flagRow);
+                let clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+                let clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
+                let clinSigRow = $('<div>', {class:'text-center my-1', text:clin_sig.val});
+                /*
+                let conditionRow = $('<div>', {class:'my-1'});
+                if (v.resolved_condition) {
+                    VCForm.format_condition(v.resolved_condition).appendTo(conditionRow);
+                } else {
+                    conditionRow.text((v.condition || {}).value);
+                }
+                */
                 $('<div>', {'class': 'ml-2 text-center', 'data-flags': v.flag_collection, text: ''}).appendTo(flagRow);
                 $('<div>', {class:'flex-grow'}).appendTo(flagRow);
 
-                let th = $('<th>', {html: [titleDom, flagRow]}).appendTo(headerRow);
+                let th = $('<th>', {html: [
+                        titleDom,
+                        clinSigRow,
+                        flagRow,
+                        // conditionRow
+                    ]}).appendTo(headerRow);
             });
             let all_db_refs = {};
 
@@ -343,8 +360,12 @@ const Diff = (function() {
                         }
                     });
 
-                    for (let show of ['value', 'note']) {
-                        let label = $('<span>', {text: eKey.label + (show === 'note' ? ' note' : '')});
+                    for (let show of ['value', 'resolved', 'note']) {
+                        let labelText = eKey.label;
+                        if (show !== 'value') {
+                            labelText += ` ${show}`;
+                        }
+                        let label = $('<span>', {text: labelText});
 
                         let row = $('<tr>', {class: `${show}`}).appendTo(table);
 
@@ -365,7 +386,7 @@ const Diff = (function() {
                         includedVersions.forEach((v, index) => {
 
                             let blob = v[key] || {};
-                            let {note, explain, value, hidden, db_refs} = blob;
+                            let {note, explain, resolved, value, hidden, db_refs} = blob;
 
                             let cell = $('<td>').appendTo(row);
                             let val = null;
@@ -386,6 +407,13 @@ const Diff = (function() {
                             } else if (show === 'note') {
                                 val = Diff.emptyToNull(note);
                                 cell.text(val);
+                            } else if (show === 'resolved') {
+                                if (resolved) {
+                                    val = resolved.display_text;
+                                    cell.html(VCTable.condition(resolved));
+                                } else {
+                                    val = null;
+                                }
                             }
 
                             let valueKey = Diff.hash(val);

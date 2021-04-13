@@ -10,6 +10,7 @@ django_admin_json_editor==0.2.3
 django_autocomplete_light==3.5.1
 django-avatar==5.0.0
 django-compressor==2.4
+django-dag==1.4.3
 django_debug_toolbar==3.1.1
 django_downloadview==2.1.1
 django_extensions==3.0.4
@@ -22,12 +23,11 @@ django-leaflet==0.27.1
 django_model_utils==4.0.0
 django-redis-cache==2.1.1
 django-registration-redux==2.8
-djangorestframework==3.11.1
+djangorestframework==3.12.4
 django_starfield==1.0.post1
 django_termsandconditions==2.0.6
 easy_thumbnails==2.7
 git+https://github.com/azavea/django-amazon-ses@a9dd749575cfaa6e1fc7c289b535cba9798b8018#egg=django-amazon-ses
-git+https://github.com/davmlaw/django-dag#egg=django-dag
 git+https://github.com/davmlaw/django-datetime-utc#egg=django-datetime-utc
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
@@ -36,6 +36,7 @@ HTSeq==0.12.4
 ijson==3.1.3
 kombu==4.6.11
 lazy==1.4
+lxml==4.6.3
 Markdown==3.2.2
 matplotlib==3.3.0
 mozilla_django_oidc==1.2.3
@@ -45,7 +46,7 @@ nltk==3.5
 numpy==1.17.4
 oauthlib==3.1.0
 pandas==1.1.0
-pronto==2.2
+pronto==2.4.1
 psycopg2==2.8.5
 PyPDF2==1.26.0
 pysam==0.16.0.1
@@ -57,7 +58,7 @@ redis==3.5.3
 reportlab==3.5.34
 requests==2.22.0
 requests_oauthlib==1.3.0
-rollbar==0.15.0
+rollbar==0.15.2
 scipy==1.5.2
 sqlparse==0.2.4
 toposort==1.5
@@ -67,3 +68,4 @@ django-crispy-forms==1.10.0
 # separate to django-amazon-ses
 boto3==1.14.51
 django-storages==1.9.1
+django-threadlocals===0.10

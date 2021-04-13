@@ -11,8 +11,7 @@ from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, 
     GeneListCategory, Gene, CanonicalTranscript, GeneListGeneSymbol, PanelAppServer
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
-from seqauto.models_enums import DataState
-from snpdb.models import ImportStatus
+from snpdb.models import ImportStatus, DataState
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.test_data import create_fake_trio
 
@@ -53,27 +52,25 @@ class Test(URLTestCase):
         if created:
             GeneCoverage.objects.create(gene_coverage_collection=gcg,
                                         original_gene_symbol="orig_symbol",
-                                        original_transcript_id="orig_refseq",
+                                        original_transcript="orig_refseq",
                                         min=41,
                                         mean=50,
                                         std_dev=1.11,
-                                        percent_0x=0.0,
+                                        percent_1x=100.0,
                                         percent_10x=100.0,
                                         percent_20x=100.0,
-                                        percent_100x=88.2,
-                                        sensitivity=41)
+                                        percent_100x=88.2)
 
             GeneCoverage.objects.create(gene_coverage_collection=gcg,
                                         original_gene_symbol="orig_symbol",
-                                        original_transcript_id="orig_refseq",
+                                        original_transcript="orig_refseq",
                                         min=1,
                                         mean=22,
                                         std_dev=1.11,
-                                        percent_0x=0.0,
+                                        percent_1x=100,
                                         percent_10x=99.0,
                                         percent_20x=89.9,
-                                        percent_100x=50.2,
-                                        sensitivity=41)
+                                        percent_100x=50.2)
 
         cls.canonical_transcript_collection = ctc
         cls.gene_coverage_collection = gcg
@@ -112,9 +109,9 @@ class Test(URLTestCase):
             ("gene_lists_grid", {"gene_list_category_id": cls.gene_list_category.pk}, cls.gene_list_w_category),
             ("uncategorised_gene_lists_grid", {}, cls.gene_list),
             ("gene_lists_for_gene_symbol_grid", {"gene_symbol": cls.gene_symbol.pk}, cls.gene_list),
-            ("gene_list_genes_grid", {"gene_list_id": cls.gene_list.pk}, ("gene_symbol", cls.gene_symbol)),
+            ("gene_list_genes_grid", {"gene_list_id": cls.gene_list.pk}, ("gene_symbol__symbol", cls.gene_symbol)),
             ("canonical_transcript_collections_grid", {}, cls.canonical_transcript_collection),
-            ("canonical_transcript_collection_grid", {"pk": cls.canonical_transcript_collection.pk}, ("transcript", canonical_transcript.transcript)),
+            ("canonical_transcript_collection_grid", {"pk": cls.canonical_transcript_collection.pk}, ("transcript__identifier", canonical_transcript.transcript)),
 
             #("gene_coverage_collection_gene_list_grid", coverage_kwargs, cls.gene),
             #("uncovered_genes_grid", coverage_kwargs, cls.uncovered_gene),

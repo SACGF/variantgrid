@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 import unittest
 
+from django.db import IntegrityError
+
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_variant_annotation
 from annotation.models import HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
@@ -17,6 +19,10 @@ class Test(URLTestCase):
         super().setUpClass()
 
         cls.user = User.objects.get_or_create(username='testuser')[0]
+        try:
+            cls.admin_user = User.objects.create_superuser('admin_user')
+        except IntegrityError:
+            cls.admin_user = User.objects.get(username='admin_user')
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
 
@@ -51,7 +57,7 @@ class Test(URLTestCase):
             # Don't run annotation versions as it kicks off new versions after loading VEP
             # ("annotation_versions", {}, 200),
             # ("version_diffs", {}, 200),
-            ("variant_annotation_runs", {}, 200),
+            ("variant_annotation_runs", {}, 403),
             ("view_annotation_descriptions", {}, 200),
             ("about_new_vep_columns", {}, 200),
             ("view_annotation_version_details", {"annotation_version_id": self.annotation_version_grch37.pk}, 200),
@@ -64,6 +70,12 @@ class Test(URLTestCase):
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
+
+    def testAdminUrls(self):
+        URL_NAMES_AND_KWARGS = [
+            ("variant_annotation_runs", {}, 200),
+        ]
+        self._test_urls(URL_NAMES_AND_KWARGS, self.admin_user)
 
     def testGridUrls(self):
         build_kwargs = {"genome_build_name": self.grch37.name, "op": "config"}

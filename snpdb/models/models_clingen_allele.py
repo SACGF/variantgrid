@@ -120,5 +120,10 @@ class ClinGenAllele(TimeStampedModel):
         params = (settings.CLINGEN_ALLELE_REGISTRY_DOMAIN, self)
         return "%s/redmine/projects/registry/genboree_registry/by_caid?caid=%s" % params
 
+    @staticmethod
+    def format_clingen_allele(pk):
+        return f"CA{pk:06}"
+
     def __str__(self):
-        return f"CA{self.pk}"
+        """ ClinGen has minimum length of 6 (0 padded) but can go longer """
+        return self.format_clingen_allele(self.pk)

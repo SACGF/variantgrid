@@ -71,7 +71,7 @@ class PhenotypeNode(AnalysisNode):
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
             gene_symbols_qs = self.patient.get_gene_symbols()
         else:
-            gene_symbols_qs = OntologySnake.special_case_gene_symbols_for_terms(self.get_ontology_term_ids())
+            gene_symbols_qs = OntologySnake.gene_symbols_for_terms(self.get_ontology_term_ids())
         return gene_symbols_qs
 
     def get_ontology_term_ids(self):

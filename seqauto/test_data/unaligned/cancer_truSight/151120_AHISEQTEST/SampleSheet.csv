@@ -1,5 +1,0 @@
-FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject,ProjectType,Group,Bioinformatician,E-mail,Adapter,Priming,Notes,conc pM
-test_hiseq_flowcell,3,hiseq_sample1,hg19,GCCAAT,Foo,N,,XX,SampleProject,WES,tau,,foo@bar.com,KAPA,,,16
-test_hiseq_flowcell,3,hiseq_sample2,hg19,CAGATC,Foo,N,,XX,SampleProject,WES,tau,,foo@bar.com,KAPA,,,16
-test_hiseq_flowcell,3,hiseq_sample3,hg19,CACCTA,Foo,N,,XX,SampleProject,WES,tau,,foo@bar.com,KAPA,,,16
-#_IEMVERSION_3_TruSeq LT,#_IEMVERSION_3_TruSeq LT,,,,,,,,,,,,,,,,

@@ -7,22 +7,24 @@ import json
 import logging
 import random
 
-from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, AnalysisTemplateVersion
+from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, \
+    AnalysisTemplateVersion, VariantTag
+from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion, AnalysisNodeAlleleSource
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
-from analysis.models.nodes.filters.tag_node import VariantTag
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes, \
     get_toposorted_nodes, get_rendering_dict
+from analysis.serializers import VariantTagSerializer
 from analysis.views.node_json_view import NodeJSONPostView
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
 from library.django_utils import require_superuser
-from snpdb.models import Tag, BuiltInFilters
+from snpdb.models import Tag, BuiltInFilters, GenomeBuild
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
 
 
@@ -172,24 +174,56 @@ def nodes_delete(request, analysis_id):
 
 
 @require_POST
-def set_variant_tag(request, analysis_id):
-    analysis = get_analysis_or_404(request.user, analysis_id, write=True)
+def set_variant_tag(request, location):
+    location = TagLocation(location)
     variant_id = request.POST['variant_id']
-    node_id = request.POST.get('node_id')
     tag_id = request.POST['tag_id']
     op = request.POST['op']
 
+    # Optional
+    variant_tag_id = request.POST.get('variant_tag_id')  # Pass in PK to delete
+    genome_build_name = request.POST.get('genome_build_name')
+
+    if analysis_id := request.POST.get('analysis_id'):
+        node_id = request.POST.get('node_id')
+        analysis = get_analysis_or_404(request.user, analysis_id, write=True)
+    else:
+        analysis = None
+        node_id = None
+
     tag = get_object_or_404(Tag, pk=tag_id)
+    ret = {}  # Empty
     if op == 'add':
-        variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
-                                                                analysis=analysis, user=request.user)
-        variant_tag.node_id = node_id
-        variant_tag.save()
+        if analysis:
+            genome_build = analysis.genome_build
+            variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
+                                                                    genome_build=genome_build, location=location,
+                                                                    analysis=analysis, user=request.user)
+            if node_id:
+                variant_tag.node_id = node_id
+                variant_tag.save()
+        else:
+            if genome_build_name is None:
+                raise ValueError("Adding requires either 'analysis_id' or 'genome_build_name'")
+            genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+
+            variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
+                                                                    analysis=None, location=location,
+                                                                    user=request.user,
+                                                                    defaults={"genome_build": genome_build})
+        if created:  # Only return new if anything created
+            ret = VariantTagSerializer(variant_tag, context={"request": request}).data
     elif op == 'del':
         # Deletion of tags is for analysis (all users)
-        VariantTag.objects.filter(variant_id=variant_id, analysis=analysis, tag=tag).delete()
+        if analysis:
+            VariantTag.objects.filter(variant_id=variant_id, analysis=analysis, tag=tag).delete()
+        elif variant_tag_id:
+            variant_tag = VariantTag.get_for_user(request.user, pk=variant_tag_id, write=True)
+            variant_tag.delete()
+        else:
+            raise ValueError("Deletion requires either 'analysis_id' or 'variant_tag_id'")
 
-    return JsonResponse({})
+    return JsonResponse(ret)
 
 
 @require_POST

@@ -37,7 +37,7 @@ from library.utils import md5sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter
+from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter, Tag
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
@@ -202,7 +202,7 @@ class ClassificationsNodeForm(BaseNodeForm):
 
     class Meta:
         model = ClassificationsNode
-        fields = ("clinical_significance", "comparison")
+        fields = ('other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic')
 
 
 class CohortNodeForm(VCFSourceNodeForm):
@@ -597,6 +597,10 @@ class SelectedInParentNodeForm(BaseNodeForm):
 
 
 class TagNodeForm(BaseNodeForm):
+    tags = forms.ModelMultipleChoiceField(required=False,
+                                          queryset=Tag.objects.all(),
+                                          widget=ModelSelect2Multiple(url='tag_autocomplete',
+                                                                      attrs={'data-placeholder': 'Tags...'}))
 
     class Meta:
         model = TagNode
@@ -605,7 +609,21 @@ class TagNodeForm(BaseNodeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.instance.visible:
-            self.fields["analysis_wide"].widget = HiddenInput()  # Hide in special all tags node (tags button)
+            self.fields["mode"].widget = HiddenInput()  # Hide in special all tags node (tags button)
+
+    def save(self, commit=True):
+        node = super().save(commit=False)
+
+        # TODO: I'm sure there's a way to get Django to handle this via save_m2m()
+        tags_set = self.instance.tagnodetag_set
+        tags_set.all().delete()
+
+        for tag in self.cleaned_data["tags"]:
+            tags_set.create(tag=tag)
+
+        if commit:
+            node.save()
+        return node
 
 
 class TissueNodeForm(BaseNodeForm):

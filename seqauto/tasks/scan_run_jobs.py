@@ -8,7 +8,7 @@ import subprocess
 from library.file_utils import name_from_filename, mk_path
 from library.log_utils import get_traceback
 from seqauto.models import SeqAutoRun
-from seqauto.models_enums import SequencingFileType
+from seqauto.models.models_enums import SequencingFileType
 from seqauto.pbs.create_jobs import create_jobs_and_launch_script
 from seqauto.sequencing_files.create_resource_models import create_resource_models
 
@@ -29,7 +29,8 @@ def get_seqauto_scripts(only_process_file_types):
     for file_type, script_name in SEQAUTO_SCRIPTS:
         if only_process_file_types and file_type not in only_process_file_types:
             continue
-        seqauto_scripts.append((file_type, script_name))
+        if script_name:
+            seqauto_scripts.append((file_type, script_name))
 
     return seqauto_scripts
 
@@ -45,7 +46,9 @@ def scan_resources(seqauto_run, seqauto_scripts):
 
 
 @celery.task(track_started=True)
-def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run_launch_script=False, fake_data=None):
+def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run_launch_script=None, fake_data=None):
+    if run_launch_script is None:
+        run_launch_script = settings.SEQAUTO_SCAN_RUN_SCRIPTS
     if only_launch_file_types is None:
         only_launch_file_types = [SequencingFileType.ILLUMINA_FLOWCELL_QC]
 
@@ -74,7 +77,7 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run
         create_resource_models(seqauto_run, process_seqauto_scripts)
 
         # Jobs
-        all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | set([SequencingFileType.COMBINED_VCF])
+        all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | {SequencingFileType.COMBINED_VCF}
         launch_file_types = only_launch_file_types or all_sequencing_file_types
         seqauto_run.scripts_and_jobs_start = timezone.now()
 
@@ -103,7 +106,7 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run
 
     if seqauto_run.error_exception:
         logging.error(seqauto_run.error_exception)
-    else:
+    elif not settings.DEBUG:
         seqauto_run.remove_scan_resources_dir()
 
     seqauto_run.save()

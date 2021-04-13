@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db.models import F
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from functools import reduce
@@ -19,7 +20,7 @@ from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_
 class VCFListGrid(JqGridUserRowConfig):
     model = VCF
     caption = 'VCFs'
-    fields = ["id", "name", "date", "import_status", "genome_build", "user__username", "source",
+    fields = ["id", "name", "date", "import_status", "genome_build__name", "user__username", "source",
               "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
@@ -56,13 +57,14 @@ class VCFListGrid(JqGridUserRowConfig):
 class SamplesListGrid(JqGridUserRowConfig):
     model = Sample
     caption = 'Samples'
-    fields = ["id", "name", "vcf__date", "import_status", "vcf__genome_build__name", "variants_type",
+    fields = ["id", "name", "het_hom_count", "vcf__date", "import_status", "vcf__genome_build__name", "variants_type",
               "vcf__name", "vcf__user__username", "vcf__uploadedvcf__uploaded_file__import_source",
-              "samplestats__variant_count", "sample_gene_list_count", "activesamplegenelist__id",
+              "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
-              "patient__first_name", "patient__last_name", "patient__sex", "patient__date_of_birth", "patient__date_of_death",
-              "specimen__reference_id", "specimen__tissue", "specimen__collection_date"]
+              "patient__first_name", "patient__last_name", "patient__sex",
+              "patient__date_of_birth", "patient__date_of_death",
+              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,
@@ -84,7 +86,8 @@ class SamplesListGrid(JqGridUserRowConfig):
         'patient__sex': {'label': 'Sex'},
         'patient__date_of_birth': {'label': 'D.O.B.'},
         'patient__date_of_death': {'hidden': True},
-        'samplestats__variant_count': {'label': 'Variant Count', 'width': 50},
+        'het_hom_count': {'name': 'het_hom_count', "model_field": False, 'sorttype': 'int',
+                          'label': 'Het/Hom Count'},
         "specimen__reference_id": {'label': 'Specimen'}
     }
 
@@ -119,7 +122,10 @@ class SamplesListGrid(JqGridUserRowConfig):
             sample_gene_list_count['hidden'] = True
             self._overrides['sample_gene_list_count'] = sample_gene_list_count
 
-        annotation_kwargs = {"sample_gene_list_count": Count("samplegenelist", distinct=True)}
+        annotation_kwargs = {
+            "sample_gene_list_count": Count("samplegenelist", distinct=True),
+            "het_hom_count": F("samplestats__het_count") + F("samplestats__hom_count"),
+        }
         queryset = queryset.annotate(**annotation_kwargs)
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
         self.extra_config.update({'shrinkToFit': False,
@@ -186,6 +192,7 @@ class CohortListGrid(JqGridUserRowConfig):
                  'formatter_kwargs': {"icon_css_class": "cohort-icon",
                                       "url_name": "view_cohort",
                                       "url_object_column": "id"}},
+        "sample_count": {"label": "Sample Count"},
     }
 
     def __init__(self, user):
@@ -196,12 +203,6 @@ class CohortListGrid(JqGridUserRowConfig):
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': "modified",
                                   'sortorder': "desc"})
-
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
-        extra = {'index': 'sample_count', 'name': 'sample_count', 'label': 'Sample Count', 'sorttype': 'int'}
-        colmodels.append(extra)
-        return colmodels
 
 
 class TriosListGrid(JqGridUserRowConfig):

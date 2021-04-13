@@ -9,25 +9,23 @@ from typing import Union, Optional
 from django.utils.safestring import mark_safe
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
-from snpdb.models import VariantAllele, AlleleConversionTool
+from snpdb.models import VariantAllele
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch
+from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolved
 from classification.models.clinical_context_models import ClinicalContext
-from classification.models.discordance_models import DiscordanceReport, \
-    DiscordanceReportClassification
-from classification.models.evidence_key import EvidenceKey, \
-    EvidenceKeyMap
-from classification.models.classification import ClassificationModification, \
-    Classification
+from classification.models.discordance_models import DiscordanceReport, DiscordanceReportClassification
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_ref import ClassificationRef
 from classification.templatetags.js_tags import jsonify
 
 register = Library()
+
 
 @register.inclusion_tag("classification/tags/condition_match.html")
 def condition_match(condition_match: ConditionTextMatch, indent=0):
@@ -36,6 +34,7 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
         "indent": indent + 1,
         "indent_px": (indent + 1) * 16 + 8
     }
+
 
 @register.filter
 def ekey(val, key: str = None):
@@ -54,6 +53,7 @@ def classification_changes(changes):
         "changes": changes
     }
 
+
 @register.inclusion_tag("classification/tags/clinical_significance.html")
 def clinical_significance(value):
     key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -71,6 +71,7 @@ def clinical_significance_select(name, value):
         "options": key.virtual_options,
         "value": value
     }
+
 
 @register.inclusion_tag("classification/tags/clinical_context.html")
 def clinical_context(cc: ClinicalContext, user: User):
@@ -231,6 +232,7 @@ def classification_row(
 
     return {
         "evidence": record.evidence,
+        "condition_obj": vc.condition_resolution_obj,
         "curated": curated,
         "best_hgvs": best_hgvs,
         "gene_symbol": vcm.get(SpecialEKeys.GENE_SYMBOL),
@@ -284,6 +286,7 @@ def classification_discordance_row(row: DiscordanceReportClassification, show_fl
         "vc": vc,
         "icon": icon,
         "action_log": row.action_log,
+        "condition_obj": vc.condition_resolution_obj,
         "best_hgvs": row.classfication_effective.get(SpecialEKeys.C_HGVS, None),
         "starting": row.classification_original,
         "closing": row.classfication_effective,
@@ -294,22 +297,23 @@ def classification_discordance_row(row: DiscordanceReportClassification, show_fl
 
 
 @register.inclusion_tag("classification/tags/variant_card.html", takes_context=True)
-def variant_card(context, allele: Allele, build: GenomeBuild):
+def variant_card(context, allele: Allele, genome_build: GenomeBuild):
     request = context.request
     can_create_classification = Classification.can_create_via_web_form(request.user)
-    va: VariantAllele = allele.variant_alleles().filter(genome_build=build).first()
-    liftover_error_qs = allele.liftovererror_set.filter(liftover__genome_build=build)
+    va: VariantAllele = allele.variant_alleles().filter(genome_build=genome_build).first()
+    liftover_error_qs = allele.liftovererror_set.filter(liftover__genome_build=genome_build)
 
     unfinished_liftover = None
     can_create_variant = False
     if va is None:
-        unfinished_liftover = VariantAlleleSource.get_liftover_for_allele(allele, build)
+        unfinished_liftover = VariantAlleleSource.get_liftover_for_allele(allele, genome_build)
         if unfinished_liftover is None:
             try:
                 check_can_create_variants(request.user)
                 try:
-                    conversion_tool, _ = allele.get_liftover_variant_tuple(build)
-                    can_create_variant = conversion_tool == AlleleConversionTool.CLINGEN_ALLELE_REGISTRY
+                    # See if we can have data already to liftover
+                    conversion_tool, _ = allele.get_liftover_variant_tuple(genome_build)
+                    can_create_variant = conversion_tool is not None
                 except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
                     pass
             except CreateManualVariantForbidden:
@@ -319,7 +323,7 @@ def variant_card(context, allele: Allele, build: GenomeBuild):
         "user": request.user,
         "allele": allele,
         "unfinished_liftover": unfinished_liftover,
-        "genome_build": build,
+        "genome_build": genome_build,
         "variant_allele": va,
         "liftover_error_qs": liftover_error_qs,
         "can_create_classification": can_create_classification,
@@ -328,8 +332,9 @@ def variant_card(context, allele: Allele, build: GenomeBuild):
 
 
 @register.filter
-def quick_link_data(variant: Variant):
-    data = variant_link_info(variant)
+def quick_link_data(variant_allele: VariantAllele):
+    """ Needs to be VariantAllele as we need genome_build too """
+    data = variant_link_info(variant_allele.variant, variant_allele.genome_build)
     return jsonify(data)
 
 
@@ -338,3 +343,8 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
     context = dict(data)
     context['css'] = css
     return context
+
+
+@register.inclusion_tag("classification/tags/condition.html")
+def condition(condition_obj: ConditionResolved):
+    return {"condition": condition_obj}

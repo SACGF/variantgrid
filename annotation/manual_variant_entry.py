@@ -10,10 +10,8 @@ from library.utils import full_class_name
 from library.vcf_utils import write_vcf_from_tuples
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ImportSource
-from upload.models import UploadPipeline, UploadedFile, UploadStep, \
-    UploadedManualVariantEntryCollection
-from upload.models_enums import UploadedFileTypes, UploadStepTaskType, \
-    VCFPipelineStage, UploadStepOrigin
+from upload.models import UploadPipeline, UploadedFile, UploadStep, UploadedManualVariantEntryCollection
+from upload.models.models_enums import UploadedFileTypes, UploadStepTaskType, VCFPipelineStage, UploadStepOrigin
 from upload.upload_processing import process_upload_pipeline
 
 

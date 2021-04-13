@@ -6,9 +6,9 @@ import time
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript
+from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript, TranscriptVersion
 from seqauto.models import EnrichmentKit
-from seqauto.models_enums import DataState
+from snpdb.models import DataState
 
 
 @celery.task
@@ -23,15 +23,19 @@ def reload_gene_coverage_collection(gene_coverage_collection_id):
     gene_coverage_collection.data_state = DataState.RUNNING
     gene_coverage_collection.save()
 
+    genome_build = gene_coverage_collection.genome_build
     gene_matcher = GeneSymbolMatcher()
     canonical_transcript_manager = CanonicalTranscriptManager()
-
+    transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(genome_build,
+                                                                            genome_build.annotation_consortium)
     try:
         enrichment_kit = gene_coverage_collection.qcgenecoverage.qc.sequencing_sample.enrichment_kit
     except ObjectDoesNotExist:
         enrichment_kit = None
 
-    gene_coverage_collection.load_from_file(enrichment_kit, gene_matcher=gene_matcher, canonical_transcript_manager=canonical_transcript_manager)
+    gene_coverage_collection.load_from_file(enrichment_kit, gene_matcher=gene_matcher,
+                                            canonical_transcript_manager=canonical_transcript_manager,
+                                            transcript_versions_by_id=transcript_versions_by_id)
     gene_coverage_collection.data_state = DataState.COMPLETE
     gene_coverage_collection.save()
 
@@ -65,9 +69,9 @@ def create_canonical_gene_coverage_for_enrichment_kit(enrichment_kit_id):
     #    logging.info("Skipping %d already calculated", num_already_calculated)
 
     for cc in coverage_collection_qs.exclude(already_calculated_q):
-        transcript_ids, original_transcript_ids = canonical_transcripts
+        transcript_ids, original_transcript = canonical_transcripts
         qt = Q(transcript_id__in=transcript_ids)
-        qrefseq = Q(original_transcript_id__in=original_transcript_ids)
+        qrefseq = Q(original_transcript__in=original_transcript)
         qs = cc.genecoverage_set.filter(qt | qrefseq)
         if qs.exists():
             #logging.info("Getting GeneCoverage records for %s", cc)

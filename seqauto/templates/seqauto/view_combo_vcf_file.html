@@ -1,6 +1,6 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
-{% load record_data_state_tags %}
+{% load seqauto_record_tags %}
 {% block title %}{{ combo_vcf_file }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
@@ -20,7 +20,7 @@
 	<div>
 		<h3>Input</h3>
 		<ul>
-		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' combo_vcf_file.sample_sheet.sequencing_run.pk %}">{{ combo_vcf_file.sample_sheet.sequencing_run }}</a></li>  
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' combo_vcf_file.sequencing_run.pk %}">{{ combo_vcf_file.sequencing_run }}</a></li>
 		</ul>
 
 		{% if combo_vcf_file.upload_pipeline %}

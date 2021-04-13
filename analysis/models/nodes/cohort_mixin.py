@@ -8,6 +8,7 @@ from django.db.models import Q
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from patients.models_enums import Zygosity
+from snpdb.models import VCFFilter
 
 
 class CohortMixin:
@@ -109,12 +110,12 @@ class CohortMixin:
         cohort = self._get_cohort()
         cgc = self.cohort_genotype_collection
 
-        for sample_id in cohort.get_sample_ids():
+        for sample in cohort.get_samples():
             # Indexes are handled by cohortgenotype (sub cohorts etc)
-            array_index = cgc.get_array_index_for_sample_id(sample_id)
+            array_index = cgc.get_array_index_for_sample_id(sample.pk)
             # https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
             allele_frequency_column = f"{cgc.cohortgenotype_alias}__samples_allele_frequency__{array_index}"
-            q = naff.get_q(allele_frequency_column)
+            q = naff.get_q(allele_frequency_column, sample.vcf.allele_frequency_percent)
             if q:
                 # logging.info("%s => %s => %s", sample_id, allele_frequency_column, q)
                 filters.append(q)
@@ -123,23 +124,6 @@ class CohortMixin:
         if filters:
             q_and.append(GroupOperation.reduce(filters, naff.group_operation))
         return q_and
-
-    def get_vcf_locus_filter_formatter(self):
-        """ This only gets called if has_filters is True """
-        vcf = self._get_vcf()
-        lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
-
-        def filter_string_formatter(row, field):
-            if filter_string := row[field]:
-                formatted_filters = []
-                for f in filter_string:
-                    formatted_filters.append(lookup[f])
-                formatted_filters = ','.join(formatted_filters)
-            else:
-                formatted_filters = "PASS"
-            return formatted_filters
-
-        return filter_string_formatter
 
     def get_vcf_locus_filters_q(self):
         q = self.q_all()
@@ -207,7 +191,8 @@ class CohortMixin:
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
         if self.has_filters:
-            server_side_formatter = self.get_vcf_locus_filter_formatter()
+            vcf = self._get_vcf()
+            server_side_formatter = VCFFilter.get_formatter(vcf)
             cgc = self.cohort_genotype_collection
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
             extra_colmodel_overrides[filters_column] = {

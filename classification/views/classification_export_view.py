@@ -192,6 +192,11 @@ class ClassificationApiExportView(APIView):
 
     def get(self, request: Request, **kwargs) -> HttpResponseBase:
 
+        since = None
+        since_str = request.query_params.get('since', None)
+        if since_str:
+            since = parse_since(since_str)
+
         build_name = request.query_params.get('build', 'GRCh38')
         share_level = request.query_params.get('share_level', 'public')
         genome_build = GenomeBuild.get_name_or_alias(build_name)
@@ -207,8 +212,9 @@ class ClassificationApiExportView(APIView):
                 cs_override_labels[key.upper()] = cs_label
 
         qs = ClassificationModification.objects.filter(is_last_published=True)
-        # don't include withdrawn records in any export
-        qs = qs.exclude(classification__withdrawn=True)
+        # only include excluded if we have a since and need to report deltas of records being withdrawn
+        if not since:
+            qs = qs.exclude(classification__withdrawn=True)
 
         # so the below looks a little switched around but is currently correct
         # the parameter share_level of 'public' should be changed to 'app_users'
@@ -240,11 +246,6 @@ class ClassificationApiExportView(APIView):
                 # exclude ensembl transcripts
                 qs = qs.exclude(published_evidence__c_hgvs__value__startswith='ENS')
 
-        since = None
-        since_str = request.query_params.get('since', None)
-        if since_str:
-            since = parse_since(since_str)
-
         formatter: BaseExportFormatter
         qs = qs.select_related('classification', 'classification__lab')
 
@@ -254,16 +255,6 @@ class ClassificationApiExportView(APIView):
             "user": request.user,
             "since": since
         }
-        report_event(
-            name='variant classification download',
-            request=request,
-            extra_data={
-                'format': file_format,
-                'approx_count': qs.count(),
-                'refer': 'download page',
-                'since': str(since) if since else ''
-            }
-        )
 
         if file_format == 'mvl':
             if request.query_params.get('mvl_detail', 'standard') == 'shell':
@@ -310,16 +301,6 @@ def redcap_data_dictionary(request) -> HttpResponseBase:
 
 
 def record_csv(request, record_id) -> HttpResponseBase:
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'csv',
-            'record_id': record_id,
-            'refer': 'classification form',
-            'approx_count': 1
-        }
-    )
     vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, record_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 

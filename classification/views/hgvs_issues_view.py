@@ -12,21 +12,23 @@ from pytz import timezone
 from django.utils.timezone import now
 from requests.models import Response
 
+from classification.models import Classification
 from flags.models import Flag
-from flags.models.models import FlagCollection, FlagTypeContext
+from flags.models.models import FlagCollection
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
 from library.utils import delimited_row
-from snpdb.models import VariantAllele
+from snpdb.models import VariantAllele, allele_flag_types
 from snpdb.models.models_variant import Allele
 from classification.models.flag_types import classification_flag_types
-from classification.models.classification import Classification,\
-    ClassificationModification
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
-# Only consider alleles that have variant classifications
-# as there are way too many alleles to consider otherwise
-def _alleles_with_variants_qs() -> QuerySet:
-    # find the variant for ALL variant classifications, and keep a dict of variant id to classification id
+
+def _alleles_with_classifications_qs() -> QuerySet:
+    """
+    Only consider alleles that have variant classifications
+    as there are way too many alleles to consider otherwise
+    """
     classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('variant__id', flat=True)
     allele_ids = VariantAllele.objects.filter(variant_id__in=classification_variant_ids_qs).values_list('allele_id', flat=True)
     return Allele.objects.filter(id__in=allele_ids)
@@ -35,44 +37,64 @@ def _alleles_with_variants_qs() -> QuerySet:
 @user_passes_test(is_superuser)
 def view_hgvs_issues(request: HttpRequest) -> Response:
 
-    vcqs = Classification.objects
-    flagged_classifications = FlagCollection.filter_for_open_flags(
-        qs=vcqs,
-        flag_types=[
-            classification_flag_types.matching_variant_flag,
-            classification_flag_types.matching_variant_warning_flag,
-            classification_flag_types.transcript_version_change_flag
-        ]).filter(withdrawn=False)
+    alleles_qs = _alleles_with_classifications_qs().order_by('-id')
+    allele_missing_rep_qs = FlagCollection.filter_for_open_flags(qs=alleles_qs, flag_types=[allele_flag_types.missing_37, allele_flag_types.missing_38])
+    allele_missing_clingen = alleles_qs.filter(clingen_allele__isnull=True)
+    allele_37_not_38 = FlagCollection.filter_for_open_flags(qs=alleles_qs, flag_types=[allele_flag_types.allele_37_not_38])
 
-    flagged_vcms = ClassificationModification.objects.filter(
-        classification__in=flagged_classifications,
-        is_last_published=True
-    ).select_related('classification', 'classification__lab')
+    vcqs = Classification.objects.filter(withdrawn=False)
+    matching_variant = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.matching_variant_flag])
+    matching_variant_warning = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.matching_variant_warning_flag])
+    matching_variant_transcript = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.transcript_version_change_flag])
 
-    variant_alleles_qs = _alleles_with_variants_qs()
-    alleles_qs = FlagCollection.filter_for_open_flags(qs=variant_alleles_qs)
-
-    # Only show missing ClinGen alleles if that's our only option
-    # for now always show alleles missing Clingen Allele ID so we can easily review NCBI lifted over variants
-    show_missing_clingen_alleles = True  # settings.LIFTOVER_NCBI_REMAP_ENABLED is False
-    if show_missing_clingen_alleles:
-        missing_clingen_alleles = variant_alleles_qs.filter(clingen_allele_id__isnull=True)
-        alleles_qs = alleles_qs.union(missing_clingen_alleles)
-    alleles_qs = alleles_qs.order_by('id').distinct()
-
-    context = {
-        "classifications": flagged_vcms,
-        "alleles": alleles_qs,
-        "filter_flags": ' '.join([
-            classification_flag_types.matching_variant_flag.id,
-            classification_flag_types.matching_variant_warning_flag.id,
-            classification_flag_types.transcript_version_change_flag.id,
-        ] +
-        [ft.id for ft in FlagTypeContext.objects.get(pk='allele').flagtype_set.all()]
-    )
+    issue_counts = {
+        "allele": {
+            "missing_rep": allele_missing_rep_qs.count(),
+            "missing_clingen": allele_missing_clingen.count(),
+            "chgvs_37_not_38": allele_37_not_38.count()
+        },
+        "classifications": {
+            "matching_variant": matching_variant.count(),
+            "matching_variant_warning": matching_variant_warning.count(),
+            "matching_variant_transcript": matching_variant_transcript.count()
+        }
     }
+    from classification.views.classification_datatables import ClassificationDatatableConfig
+    context = {
+        "counts": issue_counts,
+        "allele_columns": AlleleColumns(request),
+        "classification_columns": ClassificationDatatableConfig(request)
+    }
+
     return render(request, "classification/hgvs_issues.html", context)
 
+
+class AlleleColumns(DatatableConfig):
+
+    def __init__(self, request):
+        super().__init__(request)
+
+        self.rich_columns = [
+            RichColumn(key="id", label='ID', client_renderer='alleleIdRender', orderable=True, default_sort=SortOrder.DESC),
+            RichColumn(key="clingen_allele__id", client_renderer='clingenIdRenderer', label='ClinGen Allele', orderable=True),
+            RichColumn(key="flag_collection_id", label="Flags", client_renderer='TableFormat.flags')
+        ]
+
+    def get_initial_queryset(self):
+        # exclude where we've auto matched and have 0 outstanding left
+        return _alleles_with_classifications_qs()
+
+    def filter_queryset(self, qs: QuerySet) -> QuerySet:
+        if flag_filter := self.get_query_param('flag'):
+            if flag_filter == 'missing_rep':
+                qs = FlagCollection.filter_for_open_flags(qs=qs, flag_types=[allele_flag_types.missing_37,
+                                                                             allele_flag_types.missing_38])
+            elif flag_filter == 'missing_clingen':
+                qs = qs.filter(clingen_allele__isnull=True)
+            elif flag_filter == 'chgvs_37_not_38':
+                qs = FlagCollection.filter_for_open_flags(qs=qs, flag_types=[allele_flag_types.allele_37_not_38])
+
+        return qs
 
 @user_passes_test(is_superuser)
 def download_hgvs_issues(request: HttpRequest) -> Response:
@@ -87,7 +109,7 @@ def download_hgvs_issues(request: HttpRequest) -> Response:
             "Issue Type",
             "Text"
         ])
-        alleles_qs = FlagCollection.filter_for_open_flags(qs=_alleles_with_variants_qs())
+        alleles_qs = FlagCollection.filter_for_open_flags(qs=_alleles_with_classifications_qs())
         allele: Allele
         for allele in alleles_qs:
             open_flags = Flag.objects.filter(collection=allele.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS)

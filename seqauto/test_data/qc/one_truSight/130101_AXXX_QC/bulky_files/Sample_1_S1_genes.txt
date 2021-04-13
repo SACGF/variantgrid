@@ -1,5 +1,0 @@
-Gene/Exon	Min Coverage	Mean Coverage	Standard Deviation Coverage	% bases >20x	% bases <10x	% bases @ 0x	Estimated Sensitivity of Detection
-AGRN:NM_198576	16	80.53	67.0936670513	95.69	0.00	0.00	0.98
-TNFRSF4:NM_003327	27	125.496402878	79.4135465645	100.00	0.00	0.00	0.98
-B3GALT6:NM_080605	0	66.2838383838	77.0098855088	47.98	35.86	22.12	0.69
-

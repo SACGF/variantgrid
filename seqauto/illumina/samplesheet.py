@@ -48,12 +48,14 @@ def csv_file_from_new_samplesheet(sheet):
     return mem_file
 
 
-def is_standard_valid_flowcell_dir(sequencing_run_path):
+def is_standard_valid_flowcell_dir(sequencing_run_path, date_on_file: str = None):
     filename_parts = sequencing_run_path.split('_')
-    date_on_file = filename_parts[0]
+    if date_on_file is None:
+        date_on_file = filename_parts[0]
 
     if len(date_on_file) != 6:
-        logging.warning('SequencingRun: %s - date from file name section "%s" not in format YY-MM-DD: ', sequencing_run_path, date_on_file)
+        logging.warning('SequencingRun: %s - date from file name section "%s" not in format YY-MM-DD: ',
+                        sequencing_run_path, date_on_file)
         return False
 
     # There are 2 types of naming conventions:
@@ -75,7 +77,7 @@ def is_standard_valid_flowcell_dir(sequencing_run_path):
     return True
 
 
-def convert_sheet_to_df(sheet):
+def convert_sheet_to_df(sheet, date_on_file: str = None):
     """
     columns in returned df:
         sample_id, sample_name, sample_project, flowcell_id, lane, barcode, date, platform
@@ -84,10 +86,11 @@ def convert_sheet_to_df(sheet):
     flow_cell_id = None  # default None = use column from sample sheet
 
     sequencing_run_path = os.path.basename(os.path.dirname(sheet))
-    is_standard_valid_flowcell_dir(sequencing_run_path)
+    is_standard_valid_flowcell_dir(sequencing_run_path, date_on_file=date_on_file)
 
     filename_parts = sequencing_run_path.split('_')
-    date_on_file = filename_parts[0]
+    if date_on_file is None:
+        date_on_file = filename_parts[0]
 
     if is_new_sheet(sheet):
         # 150828_NB501009_0004_AHFCC3BGXX
@@ -106,19 +109,17 @@ def convert_sheet_to_df(sheet):
         sample_id = 'SampleID'
 
     if len(date_on_file) != 6:
-        logging.error('The date indicated in the file name (%s) not in format YY-MM-DD: ', date_on_file)
-        logging.error('\t%s', sheet)
-        exit(1)
+        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YY-MM-DD")
 
     yy, mm, dd = date_on_file[:2], date_on_file[2:4], date_on_file[4:]
     if int(mm) > 12 or int(dd) > 31:
-        logging.error('The date indicated in the file name not in format YY-MM-DD: ')
-        logging.error('\t%s', sheet)
-        exit(1)
+        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YY-MM-DD")
 
     date = '20{yy}-{mm}-{dd}T00:00:00+0930'.format(yy=yy, mm=mm, dd=dd)
 
     df = pd.read_csv(csv_file, index_col=None, comment='#', skip_blank_lines=True, skipinitialspace=True, dtype=str)
+    # Remove empty rows - sometimes left by people editing SampleSheets.csv by hand
+    df = df.dropna(axis=0, how='all')
     df['sample_id'] = df[sample_id].str.strip()
     df['sample_name'] = None
     if 'Sample_Name' in df.columns:

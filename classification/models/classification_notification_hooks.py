@@ -15,7 +15,7 @@ from classification.models import flag_types, Classification, DiscordanceReport
 
 
 @receiver(flag_comment_action, sender=Flag)
-def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
+def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):  # pylint: disable=unused-argument
     if settings.DISCORDANCE_ENABLED:
         resolution = flag_comment.resolution
         if resolution:

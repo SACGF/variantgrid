@@ -26,6 +26,6 @@ refseq_gene_summary_post_save_handler = CachedWebResource.named_handler_factory(
 uniprot_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_UNIPROT, UniProtWebResourceTask)
 
 
-def cached_third_part_gene_list_pre_delete_handler(sender, instance, **kwargs):
+def cached_third_part_gene_list_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     logging.info("Deleting all associated gene lists.")
     GeneListCategory.objects.filter(company=instance.company).delete()

@@ -37,10 +37,7 @@ class DbSNP(TimeStampedModel):
         return dbsnp
 
     @staticmethod
-    def get_for_variant(variant: 'Variant', variant_annotation_version=None) -> 'DbSNP':
-        if variant_annotation_version is None:
-            variant_annotation_version = variant.genome_build.latest_variant_annotation_version
-
+    def get_for_variant(variant: 'Variant', variant_annotation_version) -> 'DbSNP':
         dbsnp = None
         try:
             variant_annotation = variant.variantannotation_set.get(version=variant_annotation_version)

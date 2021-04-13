@@ -55,10 +55,10 @@ class ClassificationTestQuirks(TestCase):
         )
         evidence_keys = EvidenceKeyMap.instance(lab=lab)
         data = VCDataDict(vc.evidence, evidence_keys)
-        self.assertTrue(data['affected_status'].has_validiation_code(ValidationCode.INVALID_VALUE))
+        self.assertTrue(data['affected_status'].has_validation_code(ValidationCode.INVALID_VALUE))
         self.assertEqual(data['ancestry'].value, ['ASJ', 'CA'])
-        self.assertTrue(data['contribution'].has_validiation_code(ValidationCode.TOO_MANY_VALUES))
-        self.assertFalse(data['sample_type'].has_validiation_code(ValidationCode.INVALID_VALUE))
+        self.assertTrue(data['contribution'].has_validation_code(ValidationCode.TOO_MANY_VALUES))
+        self.assertFalse(data['sample_type'].has_validation_code(ValidationCode.INVALID_VALUE))
         self.assertEqual(data['sequencing_platform'].value, 'Illumina_HiSeq')  # option value, that unfornately has come case
 
     def test_verify_source(self):
@@ -95,7 +95,7 @@ class ClassificationTestQuirks(TestCase):
         )
         evidence_keys = EvidenceKeyMap.instance(lab=lab)
         data = VCDataDict(vc.evidence, evidence_keys)
-        self.assertTrue(data['genome_build'].has_validiation_code(ValidationCode.MANDATORY))  # didn't provide genome build, should be created with man error
+        self.assertTrue(data['genome_build'].has_validation_code(ValidationCode.MANDATORY))  # didn't provide genome build, should be created with man error
         self.assertIsNone(data['gene_symbol'].immutability)  # immutable but not in original submission
         self.assertEqual(data[SpecialEKeys.C_HGVS].immutability, SubmissionSource.VARIANT_GRID)  # immutable key set despite no value
         self.assertIsNone(data[SpecialEKeys.GENE_SYMBOL].immutability)

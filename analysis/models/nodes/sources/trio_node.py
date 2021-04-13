@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Set, Tuple
 
 from django.db import models
+from django.db.models import Count
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
@@ -37,8 +38,9 @@ class AbstractTrioInheritance(ABC):
     @staticmethod
     def _zygosity_options(zyg: Set, allow_unknown=False):
         if allow_unknown:
-            zyg.add(Zygosity.UNKNOWN_ZYGOSITY)
-        zyg.discard(Zygosity.MISSING)  # Implementation detail - don't show to user
+            # Make a new set so as to not alter passed in value
+            zyg = zyg | {Zygosity.UNKNOWN_ZYGOSITY}
+        zyg = zyg - {Zygosity.MISSING}  # Implementation detail - don't show to user
         return ", ".join(sorted([Zygosity.display(z) for z in zyg]))
 
     def get_zygosities_method(self, mum_z: Set, dad_z: Set, proband_z: Set):
@@ -126,8 +128,14 @@ class CompHet(AbstractTrioInheritance):
             qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
             return qs.values_list("varianttranscriptannotation__gene", flat=True).distinct()
 
+        # This ends up doing 3 queries (where we call set() - to work out what Q we need to return)
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
-        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(common_genes)
+        q_in_genes = Q(varianttranscriptannotation__gene__in=common_genes)
+        parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
+        parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
+        two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
+        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True))
+        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(two_hit_genes)
         return parent.get_q() & comp_het_q & comp_het_genes
 
     def get_method(self) -> str:
@@ -158,7 +166,7 @@ class TrioNode(AbstractCohortBasedNode):
         errors = []
         if trio:
             if inheritance == TrioInheritance.DOMINANT:
-                if not trio.mother_affected or trio.father_affected:
+                if not (trio.mother_affected or trio.father_affected):
                     errors.append("Dominant inheritance requires an affected parent")
             elif inheritance == TrioInheritance.XLINKED_RECESSIVE:
                 proband_sample = trio.proband.sample
@@ -188,7 +196,7 @@ class TrioNode(AbstractCohortBasedNode):
     def modifies_parents(self):
         return self.trio is not None
 
-    def _inhertiance_factory(self):
+    def _inheritance_factory(self):
         inhertiance_classes = {
             TrioInheritance.COMPOUND_HET: CompHet,
             TrioInheritance.RECESSIVE: Recessive,
@@ -203,14 +211,14 @@ class TrioNode(AbstractCohortBasedNode):
     def _get_node_q(self) -> Optional[Q]:
         cohort, q = self.get_cohort_and_q()
         if cohort:
-            inheritance = self._inhertiance_factory()
+            inheritance = self._inheritance_factory()
             q &= inheritance.get_q()
             q &= self.get_vcf_locus_filters_q()
         return q
 
     def _get_method_summary(self):
         if self._get_cohort():
-            inheritance = self._inhertiance_factory()
+            inheritance = self._inheritance_factory()
             method = inheritance.get_method()
         else:
             method = "No cohort selected"

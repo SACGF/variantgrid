@@ -128,6 +128,7 @@ CELERY_IMPORTS = (
     'upload.tasks.import_gene_list_task',
     'upload.tasks.import_patient_records_task',
     'upload.tasks.import_ped_task',
+    'upload.tasks.import_variant_tags_task',
     'upload.tasks.load_variants_hash_in_redis_task',
     'upload.tasks.vcf.genotype_vcf_tasks',
     'upload.tasks.vcf.import_sql_copy_task',

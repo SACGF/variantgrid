@@ -10,6 +10,7 @@ from django.utils.safestring import SafeString
 
 register = template.Library()
 
+
 @register.simple_tag(takes_context=True)
 def update_django_messages(context):
     """
@@ -93,7 +94,7 @@ class InstallInstructionsTag(template.Node):
             label_str = ""
             id_safe = str(uuid.uuid4()).replace("-", "_") + "_instructions"
         else:
-            id_safe = re.sub("\W", "_", label_str).lower()
+            id_safe = re.sub(r"\W", "_", label_str).lower()
         css_classes = ["install-instructions"]
         if self.installed.resolve(context):
             css_classes.append("collapse")
@@ -147,8 +148,8 @@ class LabelledValueTag(template.Node):
         self.row_css = row_css
         self.shorten_label = shorten_label
 
-    id_regex = re.compile("id=[\"|'](.*?)[\"|']")
-    big_zero = re.compile("^0([.]0+)?$")
+    id_regex = re.compile(r"id=[\"|'](.*?)[\"|']")
+    big_zero = re.compile(r"^0([.]0+)?$")
 
     def render(self, context):
         prefix_id = TagUtils.value_str(context, self.id_prefix)
@@ -249,10 +250,25 @@ def severity_icon(severity: str) -> str:
 
 
 @register.filter()
+def danger_badge(count: Optional[int]) -> str:
+    """
+    If count is None, does nothing
+    If count is 0, shows a success badge with 0 in it
+    If count is anything else, shown in a danger badge
+    """
+    if count is None:
+        return ""
+    if count == 0:
+        return SafeString(' <span class="d-inline-block ml-1 badge badge-success">0</span>')
+    return SafeString(f' <span class="d-inline-block ml-1 badge badge-danger">{count}</span>')
+
+
+@register.filter()
 def checked(test: bool) -> str:
     if test:
         return SafeString('checked="checked"')
     return ''
+
 
 class TagUtils:
 
@@ -271,6 +287,16 @@ class TagUtils:
         val = TagUtils.value(context, value, default)
         if val is not None:
             return str(val)
+        return None
+
+    @staticmethod
+    def value_int(context, value: Any, default: Any = None) -> Optional[int]:
+        val = TagUtils.value(context, value, default)
+        if val is not None and val != '':
+            try:
+                return int(val)
+            except ValueError:
+                pass
         return None
 
     @staticmethod

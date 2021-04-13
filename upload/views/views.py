@@ -18,15 +18,13 @@ from lazy import lazy
 
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
-from library.cache import timed_cache
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
 from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
     UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, VCFSkippedGVCFNonVarBlocks, \
-    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant
-from upload.models_enums import TimeFilterMethod
+    VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
     retry_upload_pipeline

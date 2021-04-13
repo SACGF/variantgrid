@@ -1,12 +1,15 @@
+import json
 import logging
 import re
 from collections import defaultdict
 from datetime import timedelta
+from random import randint
 from typing import Optional
 
 from celery.task.control import inspect  # @UnresolvedImport
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -17,22 +20,25 @@ from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import Analysis
+from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import Event, create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import require_superuser, highest_pk
+from library.django_utils import require_superuser, highest_pk, get_url_from_view_path, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback
+from library.log_utils import report_exc_info, log_traceback, NotificationBuilder
+from library.utils import count, pretty_label
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
+from snpdb.forms import TagForm
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
     AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
@@ -42,9 +48,10 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
+from variantgrid.perm_path import get_visible_url_names
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.interesting_nearby import get_nearby_qs
+from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries
 from variantopedia.search import search_data, SearchResults
 
 
@@ -53,45 +60,55 @@ def variants(request):
     return render(request, "variantopedia/variants.html", context)
 
 
-def get_dashboard_notices(user) -> dict:
+def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     """ returns {} if nothing to show """
     MAX_PAST_DAYS = 30
 
-    upa, created = UserPageAck.objects.get_or_create(user=user, page_id="server_status")
     start_time = 0
     notice_header = ""
-    if created:
-        if user.last_login:
-            start_time = user.last_login
-            notice_header = f"New since last login ({timesince(start_time)} ago)"
-    else:
-        start_time = upa.modified
-        notice_header = f"Since last visit to this page ({timesince(start_time)} ago)"
-        upa.save()  # Update last modified timestamp
 
-    max_days_ago = timezone.now() - timedelta(days=MAX_PAST_DAYS)
-    if max_days_ago > start_time:
-        start_time = max_days_ago
-        notice_header = f"New in the last {MAX_PAST_DAYS} days"
+    if days_ago:
+        # if days ago was passed in, don't update upa
+        days_ago = min(days_ago, MAX_PAST_DAYS)
+        start_time = timezone.now() - timedelta(days=days_ago)
+        notice_header = f"Since the last {days_ago} day{'s' if days_ago > 1 else ''}"
+    else:
+        upa, created = UserPageAck.objects.get_or_create(user=user, page_id="server_status")
+        if created:
+            if user.last_login:
+                start_time = user.last_login
+                notice_header = f"Since last login ({timesince(start_time)} ago)"
+        else:
+            start_time = upa.modified
+            notice_header = f"Since last visit to this page ({timesince(start_time)} ago)"
+            upa.save()  # Update last modified timestamp
+
+        max_days_ago = timezone.now() - timedelta(days=MAX_PAST_DAYS)
+        if max_days_ago > start_time:
+            start_time = max_days_ago
+            notice_header = f"Since the last {MAX_PAST_DAYS} days"
 
     if user.is_superuser:
         events = Event.objects.filter(date__gte=start_time, severity=LogLevel.ERROR)
     else:
         events = Event.objects.none()
+
     vcfs = VCF.filter_for_user(user, True).filter(date__gte=start_time)
     analyses = Analysis.filter_for_user(user)
     analyses_created = analyses.filter(created__gte=start_time)
     analyses_modified = analyses.filter(created__lt=start_time, modified__gte=start_time)
-    any_notices = any(qs.exists() for qs in [events, vcfs, analyses_created, analyses_modified])
+    classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
+    new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
 
-    dashboard_notices = {}
-    if any_notices:
-        dashboard_notices = {"notice_header": notice_header,
-                             "events": events,
-                             "vcfs": vcfs,
-                             "analyses_created": analyses_created,
-                             "analyses_modified": analyses_modified}
-    return dashboard_notices
+    return {
+        "notice_header": notice_header,
+        "events": events,
+        "classifications_of_interest": classifications_of_interest,
+        "classifications_created": new_classification_count,
+        "vcfs": vcfs,
+        "analyses_created": analyses_created,
+        "analyses_modified": analyses_modified,
+    }
 
 
 def strip_celery_from_keys(celery_state):
@@ -126,37 +143,81 @@ def dashboard(request):
     return render(request, "variantopedia/dashboard.html", context)
 
 
+def notify_server_status():
+    dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
+    url = get_url_from_view_path(reverse('server_status')) + '?days=1'
+
+    emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
+    nb = NotificationBuilder(message="Health Check", emoji=emoji)
+    nb.add_header("Health Check")
+    nb.add_markdown(f"URL : <{url}|{url}>")
+    nb.add_markdown("*Disk usage*")
+    disk_usage = list()
+    for _, message in get_disk_messages(info_messages=True):
+        disk_usage.append(f":floppy_disk: {message}")
+    nb.add_markdown("\n".join(disk_usage), indented=True)
+    nb.add_markdown("*In the last 24 hours*")
+
+    keys = set(dashboard_notices.keys())
+    keys.discard('events')
+    keys.discard('notice_header')
+    visible_urls = get_visible_url_names()
+    if not visible_urls.get('analyses'):
+        for exclude_key in ['vcfs', 'analyses_created', 'analyses_modified']:
+            keys.discard(exclude_key)
+    sorted_keys = sorted(list(keys))
+
+    lines = list()
+    for key in sorted_keys:
+        emoji = ":blue_book:"
+        if 'analyses' in key:
+            emoji = ":orange_book:"
+        elif 'vcf' in key:
+            emoji = ":green_book:"
+        count_display = count(dashboard_notices.get(key))
+        if count_display:
+            count_display = f"*{count_display}*"
+
+        lines.append(f"{emoji} {count_display} : {pretty_label(key)}")
+    nb.add_markdown("\n".join(lines), indented=True)
+    nb.send()
+
+
 @require_superuser
 def server_status(request):
-    # This relies on the services being started with the "-n worker_name" with a separate one for each service
-    worker_names = settings.CELERY_WORKER_NAMES.copy()
-    if settings.URLS_APP_REGISTER["analysis"]:
-        worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
-    if settings.SEQAUTO_ENABLED:
-        worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
-
-    i = inspect()
-    pong = strip_celery_from_keys(i.ping())
-    active = strip_celery_from_keys(i.active())
-    scheduled = strip_celery_from_keys(i.scheduled())
+    if request.method == "POST":
+        notify_server_status()
 
     celery_workers = {}
-    for worker in worker_names:
-        data = pong.get(worker)
-        ok = False
-        if data:
-            if data.get('ok') == 'pong':
-                status = 'ok'
-                ok = True
-            else:
-                status = data
-        else:
-            status = 'ERROR - no workers found'
+    if settings.CELERY_ENABLED:
+        # This relies on the services being started with the "-n worker_name" with a separate one for each service
+        worker_names = settings.CELERY_WORKER_NAMES.copy()
+        if settings.URLS_APP_REGISTER["analysis"]:
+            worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
+        if settings.SEQAUTO_ENABLED:
+            worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
 
-        celery_workers[worker] = {"status": status,
-                                  "ok": ok,
-                                  "active": len(active.get(worker, [])),
-                                  "scheduled": len(scheduled.get(worker, []))}
+        i = inspect()
+        pong = strip_celery_from_keys(i.ping())
+        active = strip_celery_from_keys(i.active())
+        scheduled = strip_celery_from_keys(i.scheduled())
+
+        for worker in worker_names:
+            data = pong.get(worker)
+            ok = False
+            if data:
+                if data.get('ok') == 'pong':
+                    status = 'ok'
+                    ok = True
+                else:
+                    status = data
+            else:
+                status = 'ERROR - no workers found'
+
+            celery_workers[worker] = {"status": status,
+                                      "ok": ok,
+                                      "active": len(active.get(worker, [])),
+                                      "scheduled": len(scheduled.get(worker, []))}
 
     can_access_reference = True
     try:
@@ -174,14 +235,15 @@ def server_status(request):
             redis_status = "warning"
             redis_message = "Inserts running - unable to check"
     except ValueError as ve:
-        redis_status = "error"
+        redis_status = "danger"
         redis_message = str(ve)
 
     # Variant Annotation - incredibly quick check
     highest_variant_annotated = {}
     try:
         highest_variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").last()
-        vav = VariantAnnotationVersion.latest(highest_variant.genome_build)
+        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
+        vav = VariantAnnotationVersion.latest(genome_build)
         annotated = highest_variant.variantannotation_set.filter(version=vav).exists()
         if annotated:
             highest_variant_annotated["status"] = "info"
@@ -194,13 +256,15 @@ def server_status(request):
                 highest_variant_annotated["status"] = "warning"
                 highest_variant_annotated["message"] = f"AnnotationRun: {ar}"
             except AnnotationRun.DoesNotExist:
-                highest_variant_annotated["status"] = "error"
+                highest_variant_annotated["status"] = "danger"
                 highest_variant_annotated["message"] = "Not annotated, no AnnotationRun!"
     except Exception as e:
-        highest_variant_annotated["status"] = "error"
+        highest_variant_annotated["status"] = "danger"
         highest_variant_annotated["message"] = str(e)
 
-    sample_enrichment_kits_df = get_sample_enrichment_kits_df()
+    sample_enrichment_kits_df = None
+    if settings.SEQAUTO_ENABLED:
+        sample_enrichment_kits_df = get_sample_enrichment_kits_df()
     disk_messages = get_disk_messages(info_messages=True)
     disk_free = {"status": "info", "messages": []}
     for status, message in disk_messages:
@@ -208,7 +272,15 @@ def server_status(request):
             disk_free["status"] = "warning"
         disk_free["messages"].append(message)
 
-    dashboard_notices = get_dashboard_notices(request.user)
+    days_ago: Optional[int] = None
+    try:
+        if days_ago_str := request.GET.get('days'):
+            days_ago = int(days_ago_str)
+    except ValueError:
+        pass
+
+    dashboard_notices = get_dashboard_notices(request.user, days_ago)
+
     context = {"celery_workers": celery_workers,
                "can_access_reference": can_access_reference,
                "redis_status": redis_status,
@@ -237,20 +309,34 @@ def database_statistics(request):
     return render(request, "variantopedia/database_statistics.html", context)
 
 
-def tagged(request):
-    context = {}
-    return render(request, "variantopedia/tagged.html", context)
-
-
-def view_variant(request, variant_id):
+def view_variant(request, variant_id, genome_build_name=None):
     """ This is to open it with the normal menu around it (ie via search etc) """
     template = 'variantopedia/view_variant.html'
 
     variant = get_object_or_404(Variant, pk=variant_id)
-    igv_data = get_igv_data(request.user, genome_build=variant.genome_build)
+    in_multiple_genome_builds = len(variant.genome_builds) > 1
+    genome_build = None
+    if genome_build_name:
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        if genome_build not in variant.genome_builds:
+            raise ValueError(f"Variant {variant} not in '{genome_build}'")
+    else:
+        if in_multiple_genome_builds:
+            user_settings = UserSettings.get_for_user(request.user)
+            if user_settings.default_genome_build in variant.genome_builds:
+                genome_build = user_settings.default_genome_build
+
+    if genome_build is None:
+        genome_build = next(iter(variant.genome_builds))
+
+    igv_data = get_igv_data(request.user, genome_build=genome_build)
     extra_context = {"igv_data": igv_data,
+                     "in_multiple_genome_builds": in_multiple_genome_builds,
                      "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'}
-    return variant_details(request, variant_id, template=template, extra_context=extra_context)
+
+    annotation_version = AnnotationVersion.latest(genome_build)
+    return variant_details_annotation_version(request, variant_id, annotation_version.pk,
+                                              template=template, extra_context=extra_context)
 
 
 def view_variant_annotation_history(request, variant_id):
@@ -268,6 +354,15 @@ def view_variant_annotation_history(request, variant_id):
                "annotation_versions": annotation_versions,
                "annotation_by_version": variant_annotation_by_version}
     return render(request, "variantopedia/view_variant_annotation_history.html", context)
+
+
+def variant_tags(request, genome_build_name=None):
+    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
+    variant_tags_qs = VariantTag.objects.filter(analysis__genome_build=genome_build)
+    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
+    context = {"genome_build": genome_build,
+               "tag_counts": tag_counts}
+    return render(request, 'variantopedia/variant_tags.html', context)
 
 
 def search(request):
@@ -365,14 +460,8 @@ def create_variant_for_allele(request, allele_id, genome_build_name):
     return redirect(allele)
 
 
-def variant_details(request, variant_id, template='variant_details.html', extra_context: dict = None):
-    """ This views variant details, with an optional template around it
-        So it can be embedded in analysis or as full screen with menu around it.  """
-    return variant_details_annotation_version(request, variant_id, template=template, extra_context=extra_context)
-
-
 def get_genes_canonical_transcripts(variant, annotation_version):
-    """ returns dict of list of (enrichment kit description, original_transcript_id) """
+    """ returns dict of list of (enrichment kit description, original_transcript) """
 
     vav = annotation_version.variant_annotation_version
     vst_anno = variant.varianttranscriptannotation_set.filter(version=vav)
@@ -385,19 +474,20 @@ def get_genes_canonical_transcripts(variant, annotation_version):
                 description = str(enrichment_kit)
                 if ct.collection == default_canonical_transcript_collection:
                     description += " (default)"
-                genes_canonical_transcripts[gene_symbol].append((description, ct.original_transcript_id))
+                genes_canonical_transcripts[gene_symbol].append((description, ct.original_transcript))
 
     return dict(genes_canonical_transcripts)
 
 
-def variant_details_annotation_version(request, variant_id, annotation_version_id=None,
+def variant_details_annotation_version(request, variant_id, annotation_version_id,
                                        template='variantopedia/variant_details.html',
                                        extra_context: dict = None):
     """ Main Variant Details page """
     variant = get_object_or_404(Variant, pk=variant_id)
-    g_hgvs = HGVSMatcher.static_variant_to_g_hgvs(variant)
-    annotation_version = None
-    latest_annotation_version = None
+    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    genome_build = annotation_version.genome_build
+    g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+    latest_annotation_version = AnnotationVersion.latest(genome_build)
     variant_annotation = None
     vts = None
     clinvar = None
@@ -414,14 +504,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
     if variant.can_have_annotation:
         try:
-            latest_annotation_version = AnnotationVersion.latest(variant.genome_build)
-
-            if annotation_version_id:
-                annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
-            else:
-                annotation_version = latest_annotation_version
-
-            vts = VariantTranscriptSelections(variant, variant.genome_build, annotation_version)
+            vts = VariantTranscriptSelections(variant, genome_build, annotation_version)
             variant_annotation = vts.variant_annotation
             for w_msg in vts.warning_messages:
                 messages.add_message(request, messages.WARNING, w_msg)
@@ -452,18 +535,20 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
 
     try:
-        va = variant.variantallele
+        variant_allele = variant.variantallele_set.get(genome_build=genome_build)
         # If we require a ClinGen call (eg have Allele but no ClinGen, and settings say we can get it then don't
         # provide the data so we will do an async call)
-        if not va.needs_clinvar_call():
+        if not variant_allele.needs_clinvar_call():
             logging.info("Skipping as we need clinvar call")
-            variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant.variantallele)
+            variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
         else:
             variant_allele_data = None
     except VariantAllele.DoesNotExist:
         variant_allele_data = None
 
-    variant_tags = VariantTag.get_for_build(variant.genome_build, variant_qs=variant.equivalent_variants)
+    variant_tags = []
+    for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):
+        variant_tags.append(VariantTagSerializer(vt, context={"request": request}).data)
 
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
@@ -472,6 +557,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "classifications": latest_classifications,
         "clinvar": clinvar,
         "genes_canonical_transcripts": genes_canonical_transcripts,
+        "genome_build": genome_build,
         "g_hgvs": g_hgvs,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
@@ -480,10 +566,11 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "clinvar_citations": clinvar_citations,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
         "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
+        "tag_form": TagForm(),
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "variant_tags": variant_tags,
+        "variant_tags": json.dumps(variant_tags),
         "vts": vts,
     }
     if extra_context:
@@ -491,9 +578,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     return render(request, template, context)
 
 
-def variant_sample_information(request, variant_id):
+def variant_sample_information(request, variant_id, genome_build_name):
     variant = get_object_or_404(Variant, pk=variant_id)
-    vsi = VariantSampleInformation(request.user, variant)
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    vsi = VariantSampleInformation(request.user, variant, genome_build)
 
     context = {"variant": variant,
                "vsi": vsi,
@@ -516,17 +604,17 @@ def gene_coverage(request, gene_symbol_id):
     return render(request, "variantopedia/gene_coverage.html", context)
 
 
-def nearby_variants(request, variant_id, annotation_version_id=None):
+def nearby_variants(request, variant_id, annotation_version_id):
     variant = get_object_or_404(Variant, pk=variant_id)
-    latest_annotation_version = AnnotationVersion.latest(variant.genome_build)
+    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
 
-    if annotation_version_id:
-        annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
-    else:
-        annotation_version = latest_annotation_version
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
-    context = {"variant": variant,
-               "variant_annotation": variant_annotation}
+    context = {
+        "method_summaries": get_method_summaries(variant, distance=settings.VARIANT_DETAILS_NEARBY_RANGE),
+        "genome_build": annotation_version.genome_build,
+        "variant": variant,
+        "variant_annotation": variant_annotation
+    }
     context.update(get_nearby_qs(variant, annotation_version))
     return render(request, "variantopedia/nearby_variants.html", context)

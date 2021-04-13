@@ -1,5 +1,7 @@
 import operator
 from collections import defaultdict
+from typing import Tuple, Optional
+
 from django.conf import settings
 from lazy import lazy
 import logging
@@ -23,7 +25,7 @@ from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 VEP_SEPARATOR = '&'
 EMPTY_VALUES = {'', '.'}
-SEPARATOR = '\t'
+DELIMITER = '\t'
 EXTENSIONS = {",": "csv",
               "\t": "tsv"}
 
@@ -104,6 +106,7 @@ class BulkVEPVCFAnnotationInserter:
             logging.warning("BulkVEPVCFAnnotationInserter: Not actually inserting variants")
 
         self.vep_columns = self._get_vep_columns_from_csq(infos)
+        logging.debug("CSQ: %s", self.vep_columns)
         self._setup_vep_fields_and_db_columns(validate_columns)
 
     @staticmethod
@@ -180,7 +183,6 @@ class BulkVEPVCFAnnotationInserter:
                     prefix = cvf.get_vep_custom_display()
                     setting_key = prefix.lower()
                     _ = vc[setting_key]  # May throw exception if not setup
-
                     if cvf.source_field_has_custom_prefix:
                         self.ignored_vep_fields.append(prefix)
 
@@ -216,7 +218,7 @@ class BulkVEPVCFAnnotationInserter:
         self.variant_only_columns = self.all_variant_columns - self.transcript_columns
 
         if validate_columns:
-            # Display any unused VEP columns
+            # Display any unused VEP columns -
             handled_vep_columns = set(self.ignored_vep_fields)
             handled_vep_columns.update(self.source_field_to_columns)
 
@@ -303,39 +305,24 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning(f"Could not find gene_id: '{vep_gene}'")
         return gene_id
 
-    def get_transcript_id(self, vep_transcript_data):
+    def get_transcript_and_version_ids(self, vep_transcript_data) -> Tuple[Optional[str], Optional[str]]:
         transcript_id = None
+        transcript_version_id = None
         vep_feature_type = vep_transcript_data[VEPColumns.FEATURE_TYPE]
         if vep_feature_type == "Transcript":
-            vep_feature = vep_transcript_data[VEPColumns.FEATURE]
-            if vep_feature:
-                feature_no_version, _version = TranscriptVersion.get_transcript_id_and_version(vep_feature)
-                if feature_no_version in self.transcript_versions_by_id:
-                    transcript_id = feature_no_version
+            accession = vep_transcript_data[VEPColumns.FEATURE]
+            if accession:
+                # We pass in --transcript_version so Ensembl IDs will have version
+                t_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
+                transcript_versions = self.transcript_versions_by_id.get(t_id)
+                if transcript_versions:
+                    transcript_id = t_id  # Know it's valid to link
+                    transcript_version_id = transcript_versions.get(version)
+                    if transcript_version_id is None:
+                        logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
                 else:
-                    msg = f"Could not find transcript_id from '{vep_feature}'"
-                    if feature_no_version != vep_feature:
-                        msg += f" (version removed: '{feature_no_version}')"
-                    logging.warning(msg)
-        return transcript_id
-
-    def get_transcript_version_id(self, vep_transcript_data):
-        """ Use c.HGVS as Feature doesn't contain the version """
-        # TODO: VEP added --transcript_version option - could enable that and remove this
-        transcript_version_id = None
-        hgvs_c = vep_transcript_data[VEPColumns.HGVS_C]
-        if hgvs_c:
-            accession = hgvs_c.split(":")[0]
-            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
-            transcript_versions = self.transcript_versions_by_id.get(transcript_id)
-            if transcript_versions is None:
-                logging.warning(f"Could not find transcript: '{transcript_id}'")
-            else:
-                transcript_version_id = transcript_versions.get(version)
-                if transcript_version_id is None:
-                    logging.warning(f"Could not find transcript version: '{accession}'")
-
-        return transcript_version_id
+                    logging.warning(f"Could not find transcript: '{t_id}'")
+        return transcript_id, transcript_version_id
 
     def get_uniprot_id(self, data):
         """ Out of 2M records, only 0.12% contain multiple (ie P0CG04&B9A064) - just take 1st """
@@ -409,8 +396,9 @@ class BulkVEPVCFAnnotationInserter:
                 transcript_data.update(self.constant_data)
                 transcript_data["variant_id"] = variant_id
                 transcript_data["gene_id"] = gene_id
-                transcript_data["transcript_id"] = self.get_transcript_id(vep_transcript_data)
-                transcript_data["transcript_version_id"] = self.get_transcript_version_id(vep_transcript_data)
+                transcript_id, transcript_version_id = self.get_transcript_and_version_ids(vep_transcript_data)
+                transcript_data["transcript_id"] = transcript_id
+                transcript_data["transcript_version_id"] = transcript_version_id
                 if symbol := transcript_data.get("symbol"):
                     overlapping_symbols.add(symbol)
                 if gene_id:
@@ -459,19 +447,19 @@ class BulkVEPVCFAnnotationInserter:
 
         for base_table_name, annotations_list in ANNOTATION_TYPE.items():
             logging.info("bulk_insert")
-            extension = EXTENSIONS[SEPARATOR]
+            extension = EXTENSIONS[DELIMITER]
             base_filename = f"{self.PREFIX}_{base_table_name}_{self.batch_id}.{extension}"
             data_filename = get_import_processing_filename(self.annotation_run.pk, base_filename, prefix=self.PREFIX)
             header = self.get_sql_csv_header(base_table_name)
             row_data = self._annotations_list_to_row_data(header, annotations_list)
-            write_sql_copy_csv(row_data, data_filename, separator=SEPARATOR)
+            write_sql_copy_csv(row_data, data_filename, delimiter=DELIMITER)
 
             if self.insert_variants:
                 vav = self.annotation_run.variant_annotation_version
                 partition_table = vav.get_partition_table(base_table_name=base_table_name)
 
                 logging.info("Inserting file '%s' into partition %s", data_filename, partition_table)
-                sql_copy_csv(data_filename, partition_table, header, separator=SEPARATOR)
+                sql_copy_csv(data_filename, partition_table, header, delimiter=DELIMITER)
                 logging.info("Done!")
 
             annotations_list.clear()
@@ -511,12 +499,7 @@ class BulkVEPVCFAnnotationInserter:
     @lazy
     def transcript_versions_by_id(self):
         vav = self.annotation_run.variant_annotation_version
-        t_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=vav.annotation_consortium,
-                                                genome_build=vav.genome_build)
-        tv_by_id = defaultdict(dict)
-        for pk, transcript_id, version in t_qs.values_list("pk", "transcript_id", "version"):
-            tv_by_id[transcript_id][version] = pk
-        return tv_by_id
+        return TranscriptVersion.transcript_versions_by_id(vav.genome_build, vav.annotation_consortium)
 
     @lazy
     def uniprot_identifiers(self):

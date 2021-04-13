@@ -238,7 +238,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
 
 
 @receiver(post_delete, sender=GeneListNode)
-def post_delete_gene_list_node(sender, instance, *args, **kwargs):
+def post_delete_gene_list_node(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.custom_text_gene_list is not None:
         instance.custom_text_gene_list.delete()
 

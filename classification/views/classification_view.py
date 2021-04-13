@@ -10,16 +10,16 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
     HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from classification.classification_stats import get_lab_gene_counts
-from library.log_utils import report_exc_info
+from library.log_utils import report_exc_info, report_message
 from library.utils import empty_to_none
-from snpdb.models import Lab
+from snpdb.models import Lab, GenomeBuild
 from snpdb.models.models_enums import ImportSource
 from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
 from classification.models import ClassificationRef, ClassificationImport, \
-    ClassificationJsonParams, PatchMeta
+    ClassificationJsonParams, PatchMeta, Classification
 from classification.models.evidence_mixin import EvidenceMixin, VCStore
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification import ClassificationProcessError, \
@@ -36,11 +36,29 @@ class BulkInserter:
         from being published
         """
         self.user = user
-        self.import_for_genome_build = {}
+        self._import_for_genome_build: Dict[Any, ClassificationImport] = {}
         self.single_insert = False
         self.api_version = api_version
 
         self.force_publish = force_publish
+
+    def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
+        """
+        Returns the ClassificationImport record taht a classification should attach to to have its variant processed
+        """
+        if transcript:
+            if not Classification.is_supported_transcript(transcript):
+                report_message(message="Unsupported transcript type imported - will not attempt variant match", extra_data={"transcript": transcript})
+                return None
+
+        if existing := self._import_for_genome_build.get(genome_build):
+            return existing
+        new_import = ClassificationImport.objects.create(genome_build=genome_build, user=self.user)
+        self._import_for_genome_build[genome_build] = new_import
+        return new_import
+
+    def all_imports(self):
+        return self._import_for_genome_build.values()
 
     @transaction.atomic
     def insert(self, data: dict, record_id: str = None, request=None):
@@ -148,20 +166,17 @@ class BulkInserter:
                     # We only want to link the variant on initial create - as patching may cause issues
                     # as classifications change variants. So the variant is immutable
                     if save:
-                        try:
-                            genome_build = record.get_genome_build()
-                            vc_import = self.import_for_genome_build.get(genome_build.pk)
-                            if vc_import is None:
-                                vc_import = ClassificationImport.objects.create(user=user,
-                                                                                       genome_build=genome_build)
-                                self.import_for_genome_build[genome_build.pk] = vc_import
-                            record.classification_import = vc_import
-                        except:
-                            pass
+                        genome_build = record.get_genome_build()
+                        classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
+                        record.classification_import = classification_import
 
-                        #mark the fact that we're searching for a variant
+                        # mark the fact that we're searching for a variant
                         if not record.variant:
-                            record.set_variant()
+                            if not classification_import:
+                                record.set_variant(message=f"Transcript {record.transcript} is not of a currently supported type", failed=True)
+                            else:
+                                record.set_variant()
+
                         record.save()
                         record.publish_latest(user=user)
                 else:
@@ -298,17 +313,17 @@ class BulkInserter:
             return json_data
 
         except ClassificationProcessError as ve:
-            print(ve)
+            # expected error
+            report_exc_info(request=request)
             return {'fatal_error': str(ve)}
         except Exception as e:
-            print(e)
+            # unexpected error
             report_exc_info(request=request)
-            raise e
-            # return {'internal_error': True}  # don't tell client
+            return {'internal_error': str(e)}
 
     def finish(self):
         if settings.VARIANT_CLASSIFICATION_MATCH_VARIANTS:
-            for vc_import in self.import_for_genome_build.values():
+            for vc_import in self.all_imports():
                 task = process_classification_import_task.si(vc_import.pk, ImportSource.API)
                 task.apply_async()
 

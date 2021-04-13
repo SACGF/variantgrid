@@ -23,6 +23,7 @@ table.diff thead th {
   min-width: 260px;
   width: 260px;
   overflow-wrap: break-word;
+  vertical-align: top;
 }
 table.diff tbody {
   background-color: white;
@@ -308,6 +309,7 @@ table.diff tbody tr .explain-icon {
 }
 #vc-extras #vcform-summary .card-body {
   background-color: #fdf;
+  min-height: 100px;
 }
 #vc-extras #vcform-errors .card-header {
   background-color: #dcc;

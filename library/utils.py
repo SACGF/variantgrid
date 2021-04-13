@@ -219,6 +219,20 @@ def empty_to_none(value: T) -> Optional[T]:
     return value
 
 
+def pretty_label(label: str):
+    label = label.replace('_', ' ')
+    tidied = ''
+    last_space = True
+    for char in label:
+        if last_space:
+            char = char.upper()
+            last_space = False
+        if char == ' ':
+            last_space = True
+        tidied = tidied + char
+    return tidied
+
+
 def query_to_array(value):
     try:
         return json.loads(value)
@@ -448,6 +462,41 @@ def get_subclasses(cls):
     return subclasses
 
 
+def count(object: Any) -> int:
+    if object is None:
+        return 0
+    elif isinstance(object, int):
+        return object
+    elif isinstance(object, QuerySet):
+        return object.count()
+    else:
+        return len(object)
+
+
+trailing_zeros_strip = re.compile("(.*?[.]?[0-9]+?)([.]0+|0+)$")
+
+
+def format_significant_digits(num_str: str, significant_digits=3) -> str:
+    if not isinstance(num_str, str):
+        num_str = str(num_str)
+
+    significant_digit_count = None
+    to_sig_places = ''
+    for char in num_str:
+        to_sig_places += char
+        if significant_digit_count is None and char in {'1', '2', '3', '4', '5', '6', '7', '8', '9'}:
+            significant_digit_count = 1
+        elif significant_digit_count and char != '.':
+            significant_digit_count += 1
+        if significant_digit_count == significant_digits:
+            break
+
+    # strip trailing 0s
+    if match := trailing_zeros_strip.match(to_sig_places):
+        to_sig_places = match.group(1)
+    return to_sig_places
+
+
 def delimited_row(data: list, delimiter: str = ',') -> str:
     out = io.StringIO()
     writer = csv.writer(out, delimiter=delimiter)
@@ -565,6 +614,8 @@ class DebugTimer:
 class LimitedCollection:
 
     def __init__(self, data: List[Any], limit: int):
+        if data is None:
+            data = []
         self.true_count = len(data)
         self.data = data
         if len(data) > limit:

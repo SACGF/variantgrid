@@ -1,11 +1,18 @@
 {% load static %}
 {% load jqgrid_tags %}
 {% load help_tags %}
+{% load model_helpers %}
 <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
 <style>
 .qc-column-name {
 	text-align: right;
 }
+
+/* Fix to override global_legacy.scss */
+table th.num, table td.num {
+    text-align: left;
+}
+
 </style>
 <script src="{% static 'js/generated_graphs.js' %}"></script>
 <script>
@@ -42,27 +49,13 @@
 </script>
 
 <div id="exec-summary">
-	{% if exec_summary_list %}
+    {% if qc.data_state == 'C' and exec_summary.data_state == 'C' %}
 		{{ graph_form.as_p }}
 		<div id='qc-exec-summary-graph' class='generated-graph'></div>
 
-		<table>
-			<tr>
-			<th> Name
-			<th> Value
-			<th> Ref Min
-			<th> Ref Max
-			</tr>
-
-		{% for name, exec_data, reference_min, reference_max in exec_summary_list %}
-			<tr class='data-row'>
-			<th class='qc-column-name'>{{ name }}
-			<td> {{ exec_data }}
-			<td> {{ reference_min }}
-			<td> {{ reference_max }}
-			</tr>						
-		{% endfor %}
-		</table>
+        <table class="table">
+            {{ exec_summary | as_table | safe }}
+        </table>
 	{% endif %}
 				
 </div>

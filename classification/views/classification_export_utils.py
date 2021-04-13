@@ -11,13 +11,15 @@ from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
 from django.utils.timezone import now
 from lazy import lazy
 from pytz import timezone
+from threadlocals.threadlocals import get_current_request
 
 from flags.models import FlagComment
 from flags.models.enums import FlagStatus
 from flags.models.models import Flag
 from genes.hgvs import CHGVS
-from library.log_utils import log_traceback, report_exc_info, report_message
+from library.log_utils import log_traceback, report_exc_info, report_message, NotificationBuilder
 from library.utils import delimited_row
+from snpdb.models import Contig
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_genome import GenomeBuild, GenomeBuildContig
 from snpdb.models.models_variant import VariantAllele, Allele
@@ -184,16 +186,18 @@ class AlleleGroup:
         self.allele_id = allele_id
         self.target_variant = None
         self.genome_build = genome_build
-        self.variant_ids = []
-        self.data: List[ClassificationModification] = []
+        self.variant_ids = list()
+        self.data: List[ClassificationModification] = list()
+        self.withdrawn: List[ClassificationModification] = list()
+        self.failed: List[ClassificationModification] = list()
         self.source = source
 
     def filter_out_transcripts(self, transcripts: Set[str]) -> List[ClassificationModification]:
         """
         Returns ClassificationModificats there weren't included due to errors
         """
-        passes: List[ClassificationModification] = []
-        fails: List[ClassificationModification] = []
+        passes: List[ClassificationModification] = list()
+        fails: List[ClassificationModification] = list()
 
         for vcm in self.data:
             if vcm.transcript in transcripts:
@@ -260,17 +264,27 @@ class ExportFormatter(BaseExportFormatter):
 
     def __init__(self, genome_build: GenomeBuild, qs: QuerySet, user: User = None, since: datetime = None):
         self.genome_build = genome_build
-        self.used_contigs = set()
+        self.used_contigs: Set[Contig] = set()
         self.user = user
-        self.allele_groups = []
+        self.allele_groups: List[AlleleGroup] = list()
         self.since = since
-
         self.error_message_ids = dict()
         self.raw_qs = qs
         self.started = datetime.utcnow()
         self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
+        self.row_count = 0
 
         super().__init__()
+
+    @property
+    def supports_fully_withdrawn(self) -> bool:
+        """
+        If True, then alleles that only have withdrawn classifications will be returned by iter_group_by_allele
+        If False, a completely withdrawn allele will not be returned. If False the only impact will be that
+        an allele could pass a since check if the only thing in it that has changed is withdrawn
+        Note this is only relevant if since date is present, otherwise withdrawns are excluded
+        """
+        return False
 
     @property
     def use_full_chgvs(self) -> bool:
@@ -333,15 +347,20 @@ class ExportFormatter(BaseExportFormatter):
         if self.since:
             cm: ClassificationModification
             for cm in ag.data:
-                if cm.modified > self.since:
+                if cm.modified > self.since or cm.classification.modified > self.since:
                     return True
 
             # no modifications passed the check, but maybe a flag has changed on the allele of classifications
+            # and the flag could be attached to a withdrawn classification even
+            # (it could be that the classification is now withdrawn).
             flag_collection_ids = list()
             if allele_flag_id := Allele.objects.filter(pk=ag.allele_id).values_list("flag_collection_id", flat=True).first():
                 flag_collection_ids.append(allele_flag_id)
-            for cm in ag.data:
-                flag_collection_ids.append(cm.classification.flag_collection_id)
+
+            # check withdrawn and failed for new flags (just in case something newly fails a flag check or is newly withdrawn)
+            for data_set in [ag.data, ag.withdrawn, ag.failed]:
+                for cm in data_set:
+                    flag_collection_ids.append(cm.classification.flag_collection_id)
 
             if FlagComment.objects.filter(flag__collection_id__in=flag_collection_ids, created__gt=self.since).exists():
                 return True
@@ -434,11 +453,24 @@ class ExportFormatter(BaseExportFormatter):
     def iter_group_by_allele(self):
         for allele_group in self.allele_groups:
             # actually populate the allele group data now
-            allele_group.data = [vcm for vcm in self.qs.filter(classification__variant__in=allele_group.variant_ids) if self.passes_flag_check(vcm)]
+            all_allele_group_data = self.qs.filter(classification__variant__in=allele_group.variant_ids)
+            vcm: ClassificationModification
+            for vcm in all_allele_group_data:
+                if vcm.classification.withdrawn:
+                    # if something is withdrawn, don't check it for other flags
+                    allele_group.withdrawn.append(vcm)
+                else:
+                    # if not withdrawn, make sure it passes other flag checks
+                    if self.passes_flag_check(vcm):
+                        allele_group.data.append(vcm)
+                    else:
+                        allele_group.failed.append(vcm)
+
             self.filter_mismatched_transcripts(allele_group)
 
-            if allele_group.data and self.passes_since_check(allele_group):
-                yield allele_group
+            if self.passes_since_check(allele_group):
+                if allele_group.data or (allele_group.withdrawn and self.supports_fully_withdrawn):
+                    yield allele_group
 
     def row_iterator(self) -> Iterable[AlleleGroup]:
         return self.iter_group_by_allele()
@@ -477,6 +509,22 @@ class ExportFormatter(BaseExportFormatter):
             ).exists()
         return False
 
+    def report_stats(self, row_count: int):
+        url = None
+        body_parts = [f":simple_smile: {self.user.username}"]
+        if request := get_current_request():
+            body_parts.append(f"URL : `{request.path_info}`")
+        body_parts.append(f"Filename : *{self.filename()}*")
+        body_parts.append(f"Rows Downloaded : *{row_count}*")
+
+        nb = NotificationBuilder(message="Classification Download", emoji=":arrow_down:")\
+            .add_header("Classification Download Completed")\
+            .add_markdown("\n".join(body_parts), indented=True)
+        if request := get_current_request():
+            for key, value in request.GET.items():
+                nb.add_field(key, value)
+        nb.send()
+
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
 
         def iter_allele_to_row():
@@ -489,6 +537,7 @@ class ExportFormatter(BaseExportFormatter):
                 try:
                     row = self.row(vdata)
                     if row:
+                        self.row_count += 1
                         yield row
                 except GeneratorExit:
                     # user has cancelled the download, just stop now
@@ -501,6 +550,8 @@ class ExportFormatter(BaseExportFormatter):
             footer = self.footer()
             if footer:
                 yield footer
+
+            self.report_stats(row_count=self.row_count)
 
         response = StreamingHttpResponse(iter_allele_to_row(), content_type=self.content_type())
         modified_str = self.started.strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'

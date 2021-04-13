@@ -1,3 +1,5 @@
+import socket
+
 from django.apps import apps
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -33,6 +35,10 @@ def settings_context_processor(request):
         'user_feedback_enabled': settings.ROLLBAR.get('enabled', False) and settings.USER_FEEDBACK_ENABLED,
         "variant_show_canonical_hgvs": settings.VARIANT_SHOW_CANONICAL_HGVS,
     }
+
+    if settings.DEBUG:
+        context['debug'] = True
+        context['hostname'] = socket.gethostname()
 
     # We extend templates to provide the menus
     # For clinicians, set them all to a restricted view with less menus

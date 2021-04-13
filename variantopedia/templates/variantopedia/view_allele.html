@@ -22,10 +22,10 @@
             {% for va in allele.variant_alleles %}
                 {
                     let links = vcLinks.generateLinks(
-                        {{ va.variant | quick_link_data }}
+                        {{ va | quick_link_data }}
                     );
                     let anchors = links.filter(link => !link.isMissing()).map(link => link.asAnchor("bootstrap"));
-                    $('#quick-links-{{ va.variant_id }}').html($("<ul>", {class:"list-group", html:anchors}));
+                    $('#quick-links-{{ va.pk }}').html($("<ul>", {class:"list-group", html:anchors}));
                 }
             {% endfor %}
         });

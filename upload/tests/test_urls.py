@@ -7,8 +7,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from snpdb.models import ImportSource, ProcessingStatus, VCF
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import UploadedFile, UploadPipeline, UploadedVCF
-from upload.models_enums import UploadedFileTypes
+from upload.models import UploadedFile, UploadPipeline, UploadedVCF, UploadedFileTypes
 
 
 class Test(URLTestCase):

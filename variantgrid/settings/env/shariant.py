@@ -76,6 +76,10 @@ OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
 
+# login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
+# but turns out it isn't 100% due to user is inactive, disable this functionality until we can handle it better
+# LOGIN_REDIRECT_URL_FAILURE = "/static/error_pages/user_inactive.html"
+
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
 # LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fshariant.org.au'
@@ -94,7 +98,7 @@ ANNOTATION[BUILD_GRCH37]["annotation_consortium"] = "RefSeq"
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
 
-LIFTOVER_NCBI_REMAP_ENABLED = False
+LIFTOVER_NCBI_REMAP_ENABLED = True
 LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
 LOGIN_REDIRECT_URL = '/classification/dashboard'
@@ -109,7 +113,7 @@ SITE_NAME = "Shariant"
 # SITE_MESSAGE = "Shariant is currently in pre-BETA. Please excuse bugs and missing features, and the site may be shut down for upgrades"
 
 VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = False
-VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW = True
+VARIANT_CLASSIFICAITON_DEFAULT_ASTERISK_VIEW = True
 VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = True
 VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME = False  # In Shariant - this may be a lab's API user so hide it
 VARIANT_CLASSIFICATION_STATS_USE_SHARED = True  # False=Use visible to user. True = Shared
@@ -204,8 +208,5 @@ SEARCH_VARIANT_SHOW_SUMMARY = False  # If you want to use this for Shariant we n
 
 UNSHARED_FLAG_ENABLED = True
 VIEW_GENE_SHOW_HOTSPOT_GRAPH = False
-
-LIFTOVER_NCBI_REMAP_ENABLED = True
-LIFTOVER_NCBI_REMAP_USE_PERLBREW = True
 
 PANEL_APP_CHECK_ENABLED = True

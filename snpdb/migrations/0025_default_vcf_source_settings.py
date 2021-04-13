@@ -8,6 +8,7 @@ def _default_vcf_source_settings(apps, schema_editor):
     SOMATIC_ONLY = 'S'  # Eg Tumor/Normal subtraction
     VCFSourceSettings = apps.get_model("snpdb", "VCFSourceSettings")
 
+    VCFSourceSettings.objects.all().delete()  # Delete previous
     VCFSourceSettings.objects.create(source_regex="^freeBayes", sample_variants_type=MIXED)
     VCFSourceSettings.objects.create(source_regex="combine_caller_data", sample_variants_type=SOMATIC_ONLY)
 

@@ -44,5 +44,7 @@ class AlleleFrequencyHistogramGraph(CacheableGraph):
 
     def plot(self, ax):
         af = np.array(self.get_allele_frequency_values_qs())
+        if self.sample.vcf.allele_frequency_percent:
+            af /= 100.0
         ax.hist(af)
         ax.set_title(self.get_title())

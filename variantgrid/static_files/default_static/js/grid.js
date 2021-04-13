@@ -14,12 +14,11 @@ function export_grid(nodeId, unique_code, export_type) {
 }
 
 function load_variant_details(variant_id) {
-    let variant_details_url = Urls.variant_details(variant_id);
     const aWin = getAnalysisWindow();
+    let variant_details_url = Urls.view_variant(variant_id);
     if (aWin.ANALYSIS_SETTINGS) {
         if (aWin.ANALYSIS_SETTINGS.open_variant_details_in_new_window) {
-            const VARIANT_URL = Urls.view_variant(variant_id);
-            let newWin = aWin.open(VARIANT_URL, '_blank');
+            let newWin = aWin.open(variant_details_url, '_blank');
             newWin.focus();
             return;
         } else {
@@ -498,7 +497,7 @@ function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
 function formatClinGenAlleleId(cellValue) {
     // warning: doesn't use settings.CLINGEN_ALLELE_REGISTRY_DOMAIN as static JS
     if (cellValue) {
-        let ca_id = "CA" + cellValue;
+        let ca_id = cellValue;
         let url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${ca_id}`;
         cellValue = `<a href="${url}" target="_blank">${ca_id}</a>`;
     } else {

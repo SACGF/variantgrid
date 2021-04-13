@@ -42,7 +42,8 @@ from classification.classification_stats import get_grouped_classification_count
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.forms import EvidenceKeyForm
 from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames
+    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
+    ConditionResolvedDict
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -263,7 +264,8 @@ def view_classification(request, record_id):
     genome_build = None
     variant = ref.record.variant
     if variant:
-        genome_build = variant.genome_build
+        if len(variant.genome_builds) == 1:
+            genome_build = next(iter(variant.genome_builds))
 
     if genome_build is None:
         user_settings = UserSettings.get_for_user(request.user)
@@ -271,15 +273,16 @@ def view_classification(request, record_id):
 
     vc: Classification = ref.record
 
-    context = {'vc': vc,
-               'record': record,
-               'genome_build': genome_build,
-               'asterix_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERIX_VIEW,
-               'existing_files': existing_files,
-               'other_classifications_summary': other_classifications_summary,
-               'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
-               'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
-               }
+    context = {
+        'vc': vc,
+        'record': record,
+        'genome_build': genome_build,
+        'asterisk_view': settings.VARIANT_CLASSIFICAITON_DEFAULT_ASTERISK_VIEW,
+        'existing_files': existing_files,
+        'other_classifications_summary': other_classifications_summary,
+        'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
+        'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
+    }
     return render(request, 'classification/classification.html', context)
 
 
@@ -338,8 +341,16 @@ def view_classification_diff(request):
         current_user=request.user,
         include_data=True,
         hardcode_extra_data=extra_data.get(vcm.id),
-        fix_data_types=True
+        fix_data_types=True,
+        api_version=1,
     )) for vcm in records]
+
+    for record in records_json:
+        condition_dict: ConditionResolvedDict
+        if condition_dict := record.get('resolved_condition'):
+            condition_ekey = record.get('data').get(SpecialEKeys.CONDITION, {})
+            condition_ekey["resolved"] = condition_dict
+            record.get('data')[SpecialEKeys.CONDITION] = condition_ekey
 
     context = {
         'records_json': records_json
@@ -365,8 +376,20 @@ def classification_qs(request):
 
 def classification_import_tool(request: HttpRequest) -> Response:
     EKeyFormSet = formset_factory(EvidenceKeyForm, extra=3)
+    all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
+    selected_lab = None
+    if len(all_labs) == 1:
+        selected_lab = all_labs[0]
+    else:
+        # choose the first test lab for import to process on
+        for lab in all_labs:
+            if 'test' in lab.name.lower():
+                selected_lab = lab
+                break
+
     context = {
-        "labs": Lab.valid_labs_qs(request.user)
+        "labs": all_labs,
+        "selected_lab": selected_lab
     }
     return render(request, 'classification/classification_import_tool.html', context)
 
@@ -377,30 +400,12 @@ def export_classifications_grid(request):
     """
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'csv',
-            'refer': 'classification listing',
-            'approx_count': qs.count()
-        }
-    )
     return ExportFormatterCSV(user=request.user, genome_build=genome_build, qs=qs).export()
 
 
 def export_classifications_grid_redcap(request):
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    report_event(
-        name='variant classification download',
-        request=request,
-        extra_data={
-            'format': 'redcap',
-            'refer': 'classification listing',
-            'approx_count': qs.count()
-        }
-    )
     return ExportFormatterRedcap(user=request.user, genome_build=genome_build, qs=qs).export()
 
 
@@ -476,8 +481,11 @@ def view_classification_file_attachment_thumbnail(request, pk):
 class CreateClassificationForVariantView(TemplateView):
     template_name = 'classification/create_classification_for_variant.html'
 
-    def _get_variant(self):
+    def _get_variant(self) -> Variant:
         return Variant.objects.get(pk=self.kwargs["variant_id"])
+
+    def _get_genome_build(self) -> GenomeBuild:
+        return GenomeBuild.get_name_or_alias(self.kwargs["genome_build_name"])
 
     def _get_form_post_url(self):
         return reverse("create_classification")
@@ -496,13 +504,14 @@ class CreateClassificationForVariantView(TemplateView):
             msg = "We only classify variants - not reference alleles"
             raise ValueError(msg)
 
-        vts = VariantTranscriptSelections(variant,
-                                          variant.genome_build,
+        genome_build = self._get_genome_build()
+        vts = VariantTranscriptSelections(variant, genome_build,
                                           add_other_annotation_consortium_transcripts=True)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensus = ClassificationConsensus(variant, self.request.user)
         return {'variant': variant,
+                "genome_build": genome_build,
                 "form_post_url": self._get_form_post_url(),
                 'variant_sample_autocomplete_form': self._get_sample_form(),
                 "vts": vts,

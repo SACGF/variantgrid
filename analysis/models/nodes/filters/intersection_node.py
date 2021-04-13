@@ -149,7 +149,7 @@ class IntersectionNode(AnalysisNode):
         # Thus if hgvs_name is set, but hgvs_variant isn't - recheck in save (eg re-connected to diff source node)
         if self.hgvs_name:
             # May need to re-match if analysis template was different genome build
-            if self.hgvs_variant is None or self.hgvs_variant.genome_build != self.analysis.genome_build:
+            if self.hgvs_variant is None or (self.analysis.genome_build not in self.hgvs_variant.genome_builds):
                 self.hgvs_variant = get_hgvs_variant(self.hgvs_name, self.analysis.genome_build)
         return super().save(**kwargs)
 
@@ -187,6 +187,6 @@ class IntersectionNode(AnalysisNode):
 
 
 @receiver(post_delete, sender=IntersectionNode)
-def post_delete_intersection_node(sender, instance, *args, **kwargs):
+def post_delete_intersection_node(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.genomic_interval is not None:
         instance.genomic_interval.delete()

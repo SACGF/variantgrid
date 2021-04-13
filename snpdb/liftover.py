@@ -1,6 +1,7 @@
 """
 Liftover via Clingen Allele Registry or NCBI remap
 """
+import logging
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any
 
@@ -17,8 +18,7 @@ from library.vcf_utils import write_vcf_from_tuples
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_variant import AlleleSource, Liftover, Allele, Variant
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool
-from upload.models import UploadedFile, UploadedLiftover, UploadPipeline
-from upload.models_enums import UploadedFileTypes
+from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
 
@@ -73,11 +73,9 @@ def _get_build_liftover_vcf_tuples(allele_source: AlleleSource, inserted_genome_
 
     other_build_contigs_q_list = []
     other_builds = set()
-    other_build_chrom_contig_id_mappings = {}
     for genome_build in destination_genome_builds:
         if genome_build != inserted_genome_build:
             other_builds.add(genome_build)
-            other_build_chrom_contig_id_mappings[genome_build] = genome_build.get_chrom_contig_id_mappings()
             q = Q(variantallele__variant__locus__contig__in=genome_build.contigs)
             other_build_contigs_q_list.append(q)
 
@@ -87,18 +85,21 @@ def _get_build_liftover_vcf_tuples(allele_source: AlleleSource, inserted_genome_
     other_build_contigs_q = reduce(operator.or_, other_build_contigs_q_list)
 
     allele_qs = allele_source.get_allele_qs().select_related("clingen_allele")
-    allele_contigs = defaultdict(set)
+    allele_builds = defaultdict(set)
     # We want to do a left outer join to variant allele
     qs = Allele.objects.filter(other_build_contigs_q, pk__in=allele_qs)
-    for allele_id, contig_id in qs.values_list("pk", "variantallele__variant__locus__contig"):
-        allele_contigs[allele_id].add(contig_id)
+    for allele_id, genome_build_name in qs.values_list("pk", "variantallele__genome_build"):
+        allele_builds[allele_id].add(genome_build_name)
 
     build_liftover_vcf_tuples = defaultdict(lambda: defaultdict(list))
 
     for allele in allele_qs:
-        existing_contigs = allele_contigs[allele.pk]
+        existing_builds = allele_builds[allele.pk]
         for genome_build in other_builds:
-            chrom_to_contig = other_build_chrom_contig_id_mappings[genome_build]
+            if genome_build.pk in existing_builds:
+                logging.info("%s already lifted over to %s", allele, genome_build)
+                continue
+
             conversion_tool = None
             variant_tuple = None
             try:
@@ -109,10 +110,8 @@ def _get_build_liftover_vcf_tuples(allele_source: AlleleSource, inserted_genome_
             if variant_tuple:
                 # Converted ok - return VCF tuples in desired genome build
                 chrom, position, ref, alt = variant_tuple
-                contig_id = chrom_to_contig[chrom]
-                if contig_id not in existing_contigs:
-                    avt = (chrom, position, allele.pk, ref, alt)
-                    build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
+                avt = (chrom, position, allele.pk, ref, alt)
+                build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
             elif settings.LIFTOVER_NCBI_REMAP_ENABLED:
                 if allele.liftovererror_set.filter(liftover__genome_build=genome_build,
                                                    liftover__conversion_tool=AlleleConversionTool.NCBI_REMAP).exists():

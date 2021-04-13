@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
 
+
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--process-types', action='append')

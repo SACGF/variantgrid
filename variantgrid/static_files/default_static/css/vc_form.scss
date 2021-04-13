@@ -23,6 +23,7 @@ table.diff {
             min-width: 260px;
             width: 260px;
             overflow-wrap: break-word;
+            vertical-align: top;
         }
     }
     tbody {
@@ -332,6 +333,7 @@ table.diff {
         }
         .card-body {
             background-color: #fdf;
+            min-height: 100px;
         }
     }
 
