@@ -18,7 +18,7 @@ VARIANT_VALIDATING_CODES = {ValidationCode.MATCHING_ERROR, ValidationCode.INCONS
 
 
 @receiver(classification_validation_signal, sender=Classification)
-def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:
+def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
     """
     Ensures hgvs fields are valid, and that they match each other and the variant coordinate
     """
@@ -107,7 +107,7 @@ SUB_CLIN_SIG = re.compile(r'this variant .{2,20}? classified .*?[.]', RegexFlag.
 
 
 @receiver(classification_validation_signal, sender=Classification)
-def validate_clinical_significance(sender, **kwargs) -> Optional[ValidationMerger]:
+def validate_clinical_significance(sender, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
     vm = ValidationMerger()
     vm.tested(
         keys=[SpecialEKeys.CLINICAL_SIGNIFICANCE],

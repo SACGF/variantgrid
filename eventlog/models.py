@@ -33,7 +33,7 @@ class Event(models.Model):
         return f"{user_msg}{self.app_name}/{self.name}: {details}"
 
 
-def create_login_event(sender, user, request, **kwargs):
+def create_login_event(sender, user, request, **kwargs):  # pylint: disable=unused-argument
     event = Event(user=user,
                   app_name='snpdb',
                   name='login',

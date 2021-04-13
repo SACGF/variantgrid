@@ -247,7 +247,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
 
 @receiver(pre_delete, sender=Analysis)
-def pre_delete_analysis(sender, instance, *args, **kwargs):
+def pre_delete_analysis(sender, instance, **kwargs):  # pylint: disable=unused-argument
     """ Delete analysis template if not used for a run, otherwise soft delete it """
     try:
         analysis_template = instance.analysistemplate

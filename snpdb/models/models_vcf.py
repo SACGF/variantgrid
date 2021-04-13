@@ -185,7 +185,7 @@ class VCF(models.Model):
 
 
 @receiver(pre_delete, sender=VCF)
-def vcf_pre_delete_handler(sender, instance, **kwargs):
+def vcf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     vcf = instance
     # logging.info("vcf_pre_delete_handler: %s", vcf.pk)
     try:

@@ -912,7 +912,7 @@ class NodeCache(models.Model):
 
 
 @receiver(post_delete, sender=NodeCache)
-def post_delete_intersection_cache(sender, instance, *args, **kwargs):
+def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.variant_collection:
         instance.variant_collection.delete_related_objects()
         instance.variant_collection.delete()

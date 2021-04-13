@@ -97,7 +97,6 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     analyses = Analysis.filter_for_user(user)
     analyses_created = analyses.filter(created__gte=start_time)
     analyses_modified = analyses.filter(created__lt=start_time, modified__gte=start_time)
-    from classification.models import Classification
     classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
     new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
 
@@ -150,7 +149,7 @@ def notify_server_status():
 
     emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
     nb = NotificationBuilder(message="Health Check", emoji=emoji)
-    nb.add_header(f"Health Check")
+    nb.add_header("Health Check")
     nb.add_markdown(f"URL : <{url}|{url}>")
     nb.add_markdown("*Disk usage*")
     disk_usage = list()

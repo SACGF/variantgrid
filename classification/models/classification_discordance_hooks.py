@@ -24,7 +24,7 @@ INTERNAL_REVIEW_RELEVANT_DAYS = 365
 
 
 @receiver(classification_variant_set_signal, sender=Classification)
-def variant_set(sender, **kwargs):
+def variant_set(sender, **kwargs):  # pylint: disable=unused-argument
     record: Classification = kwargs['classification']
     variant = kwargs['variant']
 
@@ -52,7 +52,7 @@ def variant_set(sender, **kwargs):
 
 
 @receiver(post_delete, sender=Classification)
-def deleted_variant(sender, instance: Classification, *args, **kwargs):
+def deleted_variant(sender, instance: Classification, **kwargs):  # pylint: disable=unused-argument
     classification = instance
     if classification.clinical_context:
         cause = f'Classification {instance.friendly_label} deleted'
@@ -60,7 +60,7 @@ def deleted_variant(sender, instance: Classification, *args, **kwargs):
 
 
 @receiver(classification_withdraw_signal, sender=Classification)
-def withdraw_changed(sender, classification: Classification, **kwargs):
+def withdraw_changed(sender, classification: Classification, **kwargs):  # pylint: disable=unused-argument
     if classification.clinical_context:
         cause = ''
         if classification.withdrawn:
@@ -78,7 +78,7 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
-              **kwargs):
+              **kwargs):  # pylint: disable=unused-argument
     """
     Only care about publicly shared records
     """
@@ -141,7 +141,7 @@ def published(sender,
 
 
 @receiver(clinical_context_signal, sender=ClinicalContext)
-def clinical_context_update(sender, clinical_context: ClinicalContext, status: str, is_significance_change: bool, cause: str, *args, **kwargs):
+def clinical_context_update(sender, clinical_context: ClinicalContext, status: str, is_significance_change: bool, cause: str, **kwargs):  # pylint: disable=unused-argument
     if settings.DISCORDANCE_ENABLED:
 
         discordant_classifications = set()
@@ -233,7 +233,7 @@ def apply_classification_flags(sender, clinical_context: ClinicalContext, is_sig
 
 @transaction.atomic
 @receiver(classification_current_state_signal, sender=Classification)
-def discordance_current_state(sender, **kwargs) -> ValidationMerger:
+def discordance_current_state(sender, **kwargs) -> ValidationMerger:  # pylint: disable=unused-argument
     """
     Reports if the classification is in discordance or review
     """

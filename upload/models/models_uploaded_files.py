@@ -115,7 +115,7 @@ class UploadedLiftover(models.Model):
 
 
 @receiver(post_delete, sender=UploadedGeneCoverage)
-def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):
+def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.gene_coverage_collection:
         instance.gene_coverage_collection.delete()
 
@@ -132,7 +132,7 @@ class UploadedClinVarCitations(models.Model):
 
 
 @receiver(post_delete, sender=UploadedClinVarCitations)
-def uploaded_clinvar_citations_post_delete_handler(sender, instance, **kwargs):
+def uploaded_clinvar_citations_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.clinvar_citations_collection:
         instance.clinvar_citations_collection.delete()
 

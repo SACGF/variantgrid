@@ -1185,7 +1185,7 @@ class SampleGeneList(TimeStampedModel):
 
 
 @receiver(post_save, sender=SampleGeneList)
-def sample_gene_list_created(sender, instance, created, **kwargs):
+def sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
     if created:
         sample = instance.sample
         if SampleGeneList.objects.filter(sample=sample).count() > 1:
@@ -1446,7 +1446,7 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
 
 
 @receiver(pre_delete, sender=GeneCoverageCollection)
-def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):
+def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         instance.delete_related_objects()
     except:

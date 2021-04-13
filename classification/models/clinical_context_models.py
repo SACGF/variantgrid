@@ -180,7 +180,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
-def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):
+def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):  # pylint: disable=unused-argument
     ccs = ClinicalContext.objects.filter(flag_collection__in=flag_infos.ids).select_related('allele')
     for cc in ccs:
         flag_infos.set_extra_info(cc.flag_collection_id, {

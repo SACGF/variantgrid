@@ -238,7 +238,7 @@ class Cohort(SortByPKMixin, TimeStampedModel):
 
 
 @receiver(pre_delete, sender=Cohort)
-def pre_delete_cohort(sender, instance, *args, **kwargs):
+def pre_delete_cohort(sender, instance, **kwargs):  # pylint: disable=unused-argument
     # Make sub cohorts not depend on this one (they'll have to be regenerated)
     for sub_cohort in instance.sub_cohort_set.all():
         # logging.info("Updating sub cohorts: %s", sub_cohort)
@@ -388,7 +388,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
 
 
 @receiver(pre_delete, sender=CohortGenotypeCollection)
-def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):
+def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         instance.delete_related_objects()
     except:

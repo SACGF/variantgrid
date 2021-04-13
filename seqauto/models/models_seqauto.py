@@ -191,7 +191,7 @@ class SequencingRun(SeqAutoRecord):
         if self.is_data_out_of_date_from_current_sample_sheet:
             SeqAutoMessage.objects.update_or_create(record=self, severity=LogLevel.ERROR,
                                                     code=sample_sheet_changed_code,
-                                                    message=f"SampleSheet has changed, please confirm in 'Admin' tab",
+                                                    message="SampleSheet has changed, please confirm in 'Admin' tab",
                                                     defaults={"open": True})
         else:
             self._close_messages_with_code(sample_sheet_changed_code)
@@ -1036,8 +1036,6 @@ class QCExecSummary(SeqAutoRecord):
 
     @staticmethod
     def load_for_qc(_seqauto_run, qc, **kwargs):
-        # We switched to loading via TSV - but had to keep the qc.path the same
-        # So that it didn't muck with historical data
         exec_summary_filename = QC.get_tsv_path_from_vcf(qc.vcf_file)
         exec_summary_data = load_exec_summary(exec_summary_filename)
 
@@ -1132,7 +1130,7 @@ class QCGeneCoverage(SeqAutoRecord):
 
 
 @receiver(pre_delete, sender=QCGeneCoverage)
-def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):
+def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         if gcc := instance.gene_coverage_collection:
             instance.gene_coverage_collection = None  # To stop recursive deleting
@@ -1272,7 +1270,7 @@ class JobScript(SeqAutoRecord):
 
 
 @receiver(post_delete, sender=JobScript)
-def post_delete_job_script(sender, instance, *args, **kwargs):
+def post_delete_job_script(sender, instance, **kwargs):  # pylint: disable=unused-argument
     try:
         os.remove(instance.path)
     except:

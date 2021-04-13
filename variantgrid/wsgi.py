@@ -37,7 +37,7 @@ application = get_wsgi_application()
 
 
 @receiver(connection_created)
-def setup_postgres(connection, **kwargs):
+def setup_postgres(connection, **kwargs):  # pylint: disable=unused-argument
     if connection.vendor != 'postgresql':
         return
 

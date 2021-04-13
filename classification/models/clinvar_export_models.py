@@ -218,7 +218,7 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
 
 
 @receiver(post_save, sender=ClinVarExport)
-def set_condition_alias_permissions(sender, created: bool, instance: ClinVarExport, **kwargs):
+def set_condition_alias_permissions(sender, created: bool, instance: ClinVarExport, **kwargs):  # pylint: disable=unused-argument
     if created:
         group = instance.lab.group
         assign_perm(ClinVarExport.get_read_perm(), group, instance)
@@ -247,7 +247,7 @@ def published(sender,
 
 
 @receiver(flag_comment_action, sender=Flag)
-def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
+def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):  # pylint: disable=unused-argument
     """
     Keeps condition_text_match in sync with the classifications when withdraws happen/finish
     """

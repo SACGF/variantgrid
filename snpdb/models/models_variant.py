@@ -202,7 +202,7 @@ class Allele(FlagsMixin, models.Model):
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
-def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):
+def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):  # pylint: disable=unused-argument
     alleles = Allele.objects.filter(flag_collection__in=flag_infos.ids)
     allele: Allele
     for allele in alleles:

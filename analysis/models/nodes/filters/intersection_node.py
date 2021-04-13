@@ -187,6 +187,6 @@ class IntersectionNode(AnalysisNode):
 
 
 @receiver(post_delete, sender=IntersectionNode)
-def post_delete_intersection_node(sender, instance, *args, **kwargs):
+def post_delete_intersection_node(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.genomic_interval is not None:
         instance.genomic_interval.delete()

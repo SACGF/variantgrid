@@ -143,7 +143,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
-def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:
+def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pylint: disable=unused-argument
     """
     Allows us to provide extra info for FlagCollections attached to Classification
     e.g. linking to the appropriate allele page, discordance report etc

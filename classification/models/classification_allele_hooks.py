@@ -8,7 +8,7 @@ from classification.models.classification import Classification
 
 
 @receiver(allele_validate_signal, sender=Allele)
-def compare_chgvs(sender, allele: Allele, **kwargs):
+def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-argument
     vcs = Classification.objects.filter(variant__in=allele.variants).order_by('id')
     v37 = allele.grch37
     v38 = allele.grch38
