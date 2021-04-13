@@ -19,7 +19,6 @@ def analysis_tag_created_task(variant_tag_id):
     _liftover_variant_tag(variant_tag)
 
 
-
 @celery.task
 def analysis_tag_deleted_task(analysis_id, _tag_id):
     """ Do this async to save a few miliseconds when adding/removing tags """

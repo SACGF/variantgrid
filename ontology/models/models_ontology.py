@@ -505,8 +505,7 @@ class OntologySnake:
             terms = terms.union(set(via_omim_mondos))
         if terms:
             return set(OntologyTerm.objects.filter(pk__in=terms))
-        else:
-            return set()
+        return set()
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':

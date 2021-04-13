@@ -89,7 +89,7 @@ class AlleleClingenFilter(admin.SimpleListFilter):
         if value := self.value():
             if value == "present":
                 return queryset.filter(clingen_allele__isnull=False)
-            elif value == "missing":
+            if value == "missing":
                 return queryset.filter(clingen_allele__isnull=True)
         return queryset
 
@@ -108,8 +108,7 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
             genome_builds.append(va.genome_build)
         if genome_builds:
             return ", ".join(str(genome_build) for genome_build in genome_builds)
-        else:
-            return "-"
+        return "-"
 
     def validate(self, request, queryset):
         allele: Allele

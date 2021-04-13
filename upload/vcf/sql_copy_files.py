@@ -26,7 +26,6 @@ GENE_COVERAGE_HEADER = [
 GENE_COVERAGE_CANONICAL_TRANSCRIPT_HEADER = ["canonical_transcript_collection_id"] + GENE_COVERAGE_HEADER
 
 
-
 def get_database_settings():
     """ returns host, database_name, user, password """
 

@@ -45,7 +45,6 @@ def _test_has_legacy_allele_frequency(apps):
     return Classification.objects.filter(evidence__allele_frequency__isnull=False).exists()
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

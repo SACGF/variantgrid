@@ -1,9 +1,8 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from snpdb.models import GenomeBuild, CohortGenotypeCollection, Cohort, CohortSample
-from snpdb.tasks.cohort_genotype_tasks import cohort_genotype_task, create_cohort_genotype_collection, \
-    create_cohort_genotype_and_launch_task
+from snpdb.models import GenomeBuild, Cohort, CohortSample
+from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tests.test_data import create_fake_trio
 
 

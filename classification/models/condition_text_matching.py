@@ -385,8 +385,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             def format_term(term: OntologyTerm) -> str:
                 if name := term.name:
                     return f"{term.id} {term.name}"
-                else:
-                    return term.id
+                return term.id
 
             terms = _sort_terms(terms)  # sorts by name
             text = ", ".join([format_term(term) for term in terms])
@@ -401,8 +400,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 resolved_terms=resolved_term_dicts,
                 resolved_join=self.condition_multi_operation
             )
-        else:
-            return None
+        return None
 
 
 def update_condition_text_match_counts(ct: ConditionText):
@@ -730,7 +728,7 @@ def merge_matches(matches: List[ConditionMatchingSuggestion]) -> Optional[Condit
             # if we matched 2 terms, and one is the child of the other, just return the parent most item
             if is_descendant(terms={matches[0].terms[0]}, ancestors={matches[1].terms[0]}, check_levels=3):
                 return matches[1]
-            elif is_descendant(terms={matches[1].terms[0]}, ancestors={matches[0].terms[0]}, check_levels=3):
+            if is_descendant(terms={matches[1].terms[0]}, ancestors={matches[0].terms[0]}, check_levels=3):
                 return matches[0]
 
         # we had multiple matches and couldn't pick a best option

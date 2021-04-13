@@ -16,7 +16,6 @@ from django.views.generic.edit import UpdateView
 from eventlog.models import create_event
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields, staff_only
-from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from library.utils import full_class_name
 from seqauto import forms
@@ -40,7 +39,7 @@ from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.create_resource_models import assign_old_sample_sheet_data_to_current_sample_sheet
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
 from snpdb.graphs import graphcache
-from snpdb.models import VCF, Sample, UserSettings
+from snpdb.models import Sample, UserSettings
 
 
 def sequencing_data(request):

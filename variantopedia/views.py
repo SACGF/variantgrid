@@ -101,13 +101,15 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
     new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
 
-    return {"notice_header": notice_header,
-             "events": events,
-             "classifications_of_interest": classifications_of_interest,
-             "classifications_created": new_classification_count,
-             "vcfs": vcfs,
-             "analyses_created": analyses_created,
-             "analyses_modified": analyses_modified,}
+    return {
+        "notice_header": notice_header,
+        "events": events,
+        "classifications_of_interest": classifications_of_interest,
+        "classifications_created": new_classification_count,
+        "vcfs": vcfs,
+        "analyses_created": analyses_created,
+        "analyses_modified": analyses_modified,
+    }
 
 
 def strip_celery_from_keys(celery_state):

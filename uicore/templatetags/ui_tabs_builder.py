@@ -126,7 +126,7 @@ class LocalTabContent(template.Node):
             raise ValueError("UI Tab requires a value for 'label'")
 
         # FIXME just replace everything that's not A-Z 0-9 and make sure dont start with a number
-        tab_id = 't' + label.replace(' ', '-').replace('/', '_').replace('!','not').replace('=','_')
+        tab_id = 't' + label.replace(' ', '-').replace('/', '_').replace('!', 'not').replace('=', '_')
 
         tab_key = f"ui-tab-{tab_set}"
         builder: TabBuilder = context.get(tab_key)

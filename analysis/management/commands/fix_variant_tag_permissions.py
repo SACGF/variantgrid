@@ -33,5 +33,3 @@ class Command(BaseCommand):
             num_tags += 1
 
         print(f"Set permission on {num_tags} tags")
-
-

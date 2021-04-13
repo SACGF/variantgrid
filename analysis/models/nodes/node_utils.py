@@ -2,7 +2,6 @@ from typing import List, Set
 
 from celery.canvas import chain, Signature
 from collections import defaultdict
-from django.db.models.expressions import F
 from django.db.models.query_utils import Q
 from toposort import toposort
 import random

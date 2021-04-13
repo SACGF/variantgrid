@@ -16,7 +16,7 @@ def _one_off_copy_to_models_v2(apps, schema_editor):
         "SequencingRunCurrentSampleSheet": [],  # No FK to this
         "SequencingSample": ["sequencing_sample_id"],
         "SequencingSampleData": [],  # No FK to this
-        "SampleFromSequencingSample": [], # No FK to this
+        "SampleFromSequencingSample": [],  # No FK to this
         "VCFFromSequencingRun": [],  # No FK to this
         "IlluminaFlowcellQC": ["illumina_flowcell_qc_id"],
         "ReadQ30": [],  # No FK to this

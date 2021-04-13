@@ -235,10 +235,10 @@ class VariantGrid(JqGridSQL):
                 val = packed_data_formatter(row, field)
                 if val is None:
                     return '.'
-                else:  # empty string ('') is PASS
-                    filter_formatter = VCFFilter.get_formatter(sample.vcf)
-                    row[field] = val
-                    return filter_formatter(row, field)
+                # empty string ('') is PASS
+                filter_formatter = VCFFilter.get_formatter(sample.vcf)
+                row[field] = val
+                return filter_formatter(row, field)
 
             server_side_formatter = sample_filters_formatter
         elif column == "samples_allele_frequency":

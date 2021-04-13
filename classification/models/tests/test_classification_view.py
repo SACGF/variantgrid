@@ -1,5 +1,3 @@
-import json
-
 from django.test import TestCase, RequestFactory, override_settings
 
 from classification.enums import EvidenceKeyValueType, SubmissionSource

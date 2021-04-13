@@ -10,7 +10,6 @@ from annotation.models.models import VariantAnnotation, AnnotationVersion, \
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
-from library.log_utils import report_event
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 

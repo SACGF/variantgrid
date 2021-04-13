@@ -184,7 +184,5 @@ class CreateVariantTagsTask(ImportVCFStepTask):
             raise ValueError(f"Couldn't extract 'variant_tags_import' PK from '{upload_step.input_filename}'")
 
 
-
-
 ImportVariantTagsTask = app.register_task(ImportVariantTagsTask())  # @UndefinedVariable
 CreateVariantTagsTask = app.register_task(CreateVariantTagsTask())  # @UndefinedVariable
