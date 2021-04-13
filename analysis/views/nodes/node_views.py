@@ -230,7 +230,7 @@ class PopulationNodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['num_samples'] = Sample.objects.count()
+        context['num_samples'] = self.object.num_samples_for_build
         return context
 
     def _get_form_initial(self):

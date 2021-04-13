@@ -7,6 +7,8 @@ from django.db.models.query_utils import Q
 from functools import reduce
 import operator
 
+from lazy import lazy
+
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation import population_frequency
@@ -35,6 +37,10 @@ class PopulationNode(AnalysisNode):
     keep_internally_classified_pathogenic = models.BooleanField(default=True)
 
     POPULATION_DATABASE_FIELDS = ["gnomad_af", "gnomad_popmax_af", "af_1kg", "af_uk10k", "topmed_af"]
+
+    @lazy
+    def num_samples_for_build(self) -> int:
+        return Sample.objects.filter(vcf__genome_build=self.analysis.genome_build).count()
 
     @property
     def filtering_by_population(self):
@@ -74,8 +80,7 @@ class PopulationNode(AnalysisNode):
             vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
 
             if self.internal_percent != self.EVERYTHING:
-                num_samples = Sample.objects.filter(vcf__genome_build=self.analysis.genome_build).count()
-                max_samples_from_percent = int(num_samples * (self.internal_percent / 100))
+                max_samples_from_percent = int(self.num_samples_for_build * (self.internal_percent / 100))
                 # Min of 1 - so don't filter out self if only copy!
                 max_samples_from_percent = max(max_samples_from_percent, 1)
                 less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_samples_from_percent})
