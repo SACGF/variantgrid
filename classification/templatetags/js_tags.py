@@ -1,7 +1,7 @@
 import urllib
 from decimal import Decimal
 from html import escape
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 from django import template
 from django.utils.safestring import mark_safe
@@ -10,6 +10,7 @@ import re
 
 # FIXME, move this out of classifications and into snpdb
 from classification.views.classification_datatables import DatatableConfig
+from library.utils import format_significant_digits
 
 register = template.Library()
 
@@ -86,6 +87,17 @@ def format_computer_text(val):
     if val is None:
         return ''
     return val.replace('&', ' & ').replace('_', ' ')
+
+
+@register.filter(is_safe=True)
+def format_unit_as_percent(val: Optional[float]):
+    if val is None:
+        return ''
+    if val == 0:
+        return "0"
+    percent_str = "{:.6f}".format(val * 100)
+
+    return f"{format_significant_digits(percent_str, 3)} %"
 
 
 @register.filter()

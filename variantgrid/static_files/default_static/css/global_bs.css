@@ -591,4 +591,26 @@ ul.compact li:before {
   content: "";
 }
 
+.threshold {
+  display: inline-block;
+  padding: 2px 6px 2px 6px;
+  border-radius: 4px;
+}
+
+.threshold-low {
+  background-color: green;
+}
+
+.threshold-med {
+  background-color: orange;
+}
+
+.threshold-high {
+  background-color: red;
+}
+
+.text-monospace {
+  color: #444;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

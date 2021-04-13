@@ -1,5 +1,4 @@
-import json
-import logging
+﻿import logging
 import re
 from collections import defaultdict
 from datetime import timedelta
@@ -20,25 +19,23 @@ from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import Analysis
-from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import Event, create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import require_superuser, highest_pk, get_url_from_view_path, get_field_counts
+from library.django_utils import require_superuser, highest_pk, get_url_from_view_path
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback, NotificationBuilder
+from library.log_utils import report_exc_info, log_traceback, send_notification, NotificationBuilder
 from library.utils import count, pretty_label
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
-from snpdb.forms import TagForm
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
     AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
@@ -51,7 +48,7 @@ from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.perm_path import get_visible_url_names
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries
+from variantopedia.interesting_nearby import get_nearby_qs
 from variantopedia.search import search_data, SearchResults
 
 
@@ -97,18 +94,17 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     analyses = Analysis.filter_for_user(user)
     analyses_created = analyses.filter(created__gte=start_time)
     analyses_modified = analyses.filter(created__lt=start_time, modified__gte=start_time)
+    from classification.models import Classification
     classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
     new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
 
-    return {
-        "notice_header": notice_header,
-        "events": events,
-        "classifications_of_interest": classifications_of_interest,
-        "classifications_created": new_classification_count,
-        "vcfs": vcfs,
-        "analyses_created": analyses_created,
-        "analyses_modified": analyses_modified,
-    }
+    return {"notice_header": notice_header,
+             "events": events,
+             "classifications_of_interest": classifications_of_interest,
+             "classifications_created": new_classification_count,
+             "vcfs": vcfs,
+             "analyses_created": analyses_created,
+             "analyses_modified": analyses_modified,}
 
 
 def strip_celery_from_keys(celery_state):
@@ -149,7 +145,7 @@ def notify_server_status():
 
     emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
     nb = NotificationBuilder(message="Health Check", emoji=emoji)
-    nb.add_header("Health Check")
+    nb.add_header(f"Health Check")
     nb.add_markdown(f"URL : <{url}|{url}>")
     nb.add_markdown("*Disk usage*")
     disk_usage = list()
@@ -309,6 +305,11 @@ def database_statistics(request):
     return render(request, "variantopedia/database_statistics.html", context)
 
 
+def tagged(request):
+    context = {}
+    return render(request, "variantopedia/tagged.html", context)
+
+
 def view_variant(request, variant_id, genome_build_name=None):
     """ This is to open it with the normal menu around it (ie via search etc) """
     template = 'variantopedia/view_variant.html'
@@ -354,15 +355,6 @@ def view_variant_annotation_history(request, variant_id):
                "annotation_versions": annotation_versions,
                "annotation_by_version": variant_annotation_by_version}
     return render(request, "variantopedia/view_variant_annotation_history.html", context)
-
-
-def variant_tags(request, genome_build_name=None):
-    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    variant_tags_qs = VariantTag.objects.filter(analysis__genome_build=genome_build)
-    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
-    context = {"genome_build": genome_build,
-               "tag_counts": tag_counts}
-    return render(request, 'variantopedia/variant_tags.html', context)
 
 
 def search(request):
@@ -546,9 +538,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     except VariantAllele.DoesNotExist:
         variant_allele_data = None
 
-    variant_tags = []
-    for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):
-        variant_tags.append(VariantTagSerializer(vt, context={"request": request}).data)
+    variant_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
 
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
@@ -566,11 +556,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "clinvar_citations": clinvar_citations,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
         "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
-        "tag_form": TagForm(),
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "variant_tags": json.dumps(variant_tags),
+        "variant_tags": variant_tags,
         "vts": vts,
     }
     if extra_context:
@@ -610,11 +599,8 @@ def nearby_variants(request, variant_id, annotation_version_id):
 
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
-    context = {
-        "method_summaries": get_method_summaries(variant, distance=settings.VARIANT_DETAILS_NEARBY_RANGE),
-        "genome_build": annotation_version.genome_build,
-        "variant": variant,
-        "variant_annotation": variant_annotation
-    }
+    context = {"genome_build": annotation_version.genome_build,
+               "variant": variant,
+               "variant_annotation": variant_annotation}
     context.update(get_nearby_qs(variant, annotation_version))
     return render(request, "variantopedia/nearby_variants.html", context)

@@ -298,7 +298,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 })
 
 # mimic shariant
-VARIANT_DETAILS_SHOW_ANNOTATION = False
+VARIANT_DETAILS_SHOW_ANNOTATION = True
 VARIANT_DETAILS_SHOW_SAMPLES = False
 
 
