@@ -32,7 +32,6 @@ from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedR
     GoldReference, GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage
 from seqauto.models.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
     QCCompareType, SequencingFileType
-from seqauto.qc.exec_summary import EXEC_STATS_LOOKUP
 from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec_summary_data, \
     get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS, QC_EXEC_SUMMARY_QC_COLUMNS
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
@@ -341,46 +340,16 @@ def view_qc_exec_summary_tab(request, qc_id):
     qc = get_object_or_404(QC, pk=qc_id)
     graph_form = None
     exec_summary = None
-    exec_summary_list = None
     historical_exec_summaries = list(qc.qcexecsummary_set.all())
     if historical_exec_summaries:
         exec_summary = historical_exec_summaries.pop()
-        exec_summary_list = []
-
-        try:
-            ref_range = exec_summary.execsummaryreferencerange
-        except:
-            ref_range = None
-
-        for description, field in EXEC_STATS_LOOKUP:
-            exec_data = getattr(exec_summary, field)
-            if field.startswith("percent_") and exec_data is None:
-                continue
-
-            reference_min = ''
-            reference_max = ''
-            if ref_range:
-                r = getattr(ref_range, field, None)
-                if r is not None:
-                    reference_min = r.lower
-                    reference_max = r.upper
-                else:
-                    min_field = "min_" + field
-                    r = getattr(ref_range, min_field, None)
-                    if r is not None:
-                        reference_max = f"Fails if <{r}"
-
-            data = (description, exec_data, reference_min, reference_max)
-            exec_summary_list.append(data)
-
         coverage_columns = list(exec_summary.get_coverage_columns())
         graph_form = forms.QCCompareTypeForm(initial={"compare_against": QCCompareType.SEQUENCING_RUN},
                                              columns=QC_EXEC_SUMMARY_QC_COLUMNS + coverage_columns)
 
     context = {"qc": qc,
                'graph_form': graph_form,
-               "exec_summary": exec_summary,
-               "exec_summary_list": exec_summary_list}
+               "exec_summary": exec_summary}
     return render(request, 'seqauto/tabs/view_qc_exec_summary_tab.html', context)
 
 

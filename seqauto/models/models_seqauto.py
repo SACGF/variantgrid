@@ -1010,8 +1010,8 @@ class QCExecSummary(SeqAutoRecord):
 
     def get_coverage_columns(self):
         # TODO: Is it easier just to return non-null columns?
-        HIGH_COVERAGE = ('percent_500x', 'percent_250x')
-        LOW_COVERAGE = ('percent_20x', 'percent_10x')
+        HIGH_COVERAGE = ('percent_500x_goi', 'percent_250x_goi')
+        LOW_COVERAGE = ('percent_20x_goi', 'percent_10x_goi')
 
         # If enrichment_kit is set, use that to determine columns
         enrichment_kit = self.qc.bam_file.unaligned_reads.sequencing_sample.enrichment_kit

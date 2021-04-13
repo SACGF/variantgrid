@@ -108,7 +108,7 @@ class QCExecSummaryGraph(CacheableGraph):
             "mean_coverage_across_genes": "mean coverage\nacross genes",
             "mean_coverage_across_kit": "mean coverage\nacross kit",
             "percent_read_enrichment": "percentage\nread enrichment",
-            "duplicated_alignable_reads": "duplicated\nalignable reads",
+            "percent_duplication": "percent\nduplication",
         }
 
         bplot = ax.boxplot([column_values], vert=False, patch_artist=True, flierprops={"markersize": 1})
