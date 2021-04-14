@@ -31,6 +31,9 @@ class Command(BaseCommand):
                     # Someone had entered "0..2"
                     # Someone entered '34%'
                     value = old_value.replace("..", ".").replace("%", "")
+                    if old_value == "4.2 (46% in publication)":
+                        value = "4.2"
+
                     try:
                         to_value = float(value) / 100
                     except ValueError:
