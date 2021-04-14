@@ -1,3 +1,4 @@
+import logging
 from collections import Counter
 
 from django.core.management import BaseCommand
@@ -30,7 +31,11 @@ class Command(BaseCommand):
                     # Someone had entered "0..2"
                     # Someone entered '34%'
                     value = old_value.replace("..", ".").replace("%", "")
-                    to_value = float(value) / 100
+                    try:
+                        to_value = float(value) / 100
+                    except ValueError:
+                        logging.error("Couldn't convert classification: %d", classification.pk)
+                        raise
 
                 value_obj["value"] = to_value
                 notes = []
