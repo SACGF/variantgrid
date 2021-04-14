@@ -108,6 +108,7 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
 
     for data in qc_exec_qs.filter(**non_null_kwargs).values(*values):
         for k, v in data.items():
-            run_data[k].append(v)
+            if v is not None:
+                run_data[k].append(v)
 
     return run_data
