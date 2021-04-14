@@ -57,7 +57,9 @@ var CODE_THRESHOLDS = {
     "spliceai_pred_ds_ag": [0.2, 0.6],
     "spliceai_pred_ds_al": [0.2, 0.6],
     "spliceai_pred_ds_dg": [0.2, 0.6],
-    "spliceai_pred_ds_dl": [0.2, 0.6]
+    "spliceai_pred_ds_dl": [0.2, 0.6],
+    "dbscsnv_ada_score": [0.2, 0.6],
+    "dbscsnv_rf_score": [0.2, 0.6],
 };
 var CODE_WORDS = {
     "tolerated": "low",
@@ -492,7 +494,7 @@ function applyVariantValues() {
         </table>
         <div class="d-flex">
             <div>
-                <a href="javascript:showTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button"></div></a>
+                <a href="javascript:showTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button d-inline-block"></div>&nbsp;Add Tag</a>
             </div>
             <form id="variant-tag-form" class="hidden flex-row flex-grow">
                 {% csrf_token %}
@@ -632,11 +634,65 @@ function applyVariantValues() {
                     <div class="card">
                         <div class="card-header">Conservation</div>
                         <div class="card-body">
-                            {% labelled id="gerp_pp_rs" label="Gerp++" hint="tiny" %}{% endlabelled %}
-                            {% labelled id="phastcons_100_way_vertebrate" label="PhastCons 100 way vertebrate" hint="tiny" %}{% endlabelled %}
-                            {% labelled id="phastcons_30_way_mammalian" label="PhastCons 30 way mammalian" hint="tiny" %}{% endlabelled %}
-                            {% labelled id="phylop_100_way_vertebrate" label="PhyloP 100 way vertebrate" hint="tiny" %}{% endlabelled %}
-                            {% labelled id="phylop_30_way_mammalian" label="PhyloP 30 way mammalian" hint="tiny" %}{% endlabelled %}
+                            {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" hint="tiny" %}{% endlabelled %}
+                            {% labelled id="phastcons_100_way_vertebrate" label="PhastCons 100 way vertebrate (0-1)" hint="tiny" %}{% endlabelled %}
+                            {% labelled id="phastcons_30_way_mammalian" label="PhastCons 30 way mammalian (0-1)" hint="tiny" %}{% endlabelled %}
+                            {% labelled id="phylop_100_way_vertebrate" label="PhyloP 100 way vertebrate (-20 - 10)" hint="tiny" %}{% endlabelled %}
+                            {% labelled id="phylop_30_way_mammalian" label="PhyloP 30 way mammalian (-20 - 1.3)" label_css="text-small" hint="tiny" %}{% endlabelled %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mt-4">
+                    <div class="card">
+                        <div class="card-header">Population Frequency</div>
+                        <div class="card-body">
+                            {% labelled id='af_1kg' label='1000 genomes' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_1kg|format_unit_as_percent }}{% endlabelled %}
+                            {% labelled id='af_uk10k' label='UK10K' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_uk10k|format_unit_as_percent }}{% endlabelled %}
+                            {% labelled id='topmed_af' label='TopMed' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
+                            {% if variant_annotation.gnomad_url %}
+                                {% labelled id='gnomad_af' label='gnomAD Allele Frequency' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                    {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
+                                {% endif %}
+                                {% labelled id='gnomad_popmax' label='gnomAD Pop Max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
+
+                                {% if variant_annotation.gnomad_flag %}
+                                    {% labelled label="gnomAD Is Flagged" label_css="gnomad-flagged-label gnomad-flagged" hint="tiny" %}{{ variant_annotation.gnomad_flag }}{% endlabelled %}
+                                {% else %}
+                                    {% labelled label="gnomAD Is Flagged" label_css="gnomad-flagged-label" hint="tiny" %}{% endlabelled %}
+                                {% endif %}
+
+                                {% labelled id='gnomad_total_homozygotes' label='gnomAD Total Homozygotes' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
+                                {% if variant_annotation.has_extended_gnomad_fields %}
+                                    {% labelled id='gnomad_ac' label='gnomAD Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
+                                    {% labelled id='gnomad_an' label='gnomAD Total number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
+                                {% endif %}
+
+                                {% labelled label="View in gnomAD" hint="tiny" %}
+                                    <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
+                                {% endlabelled %}
+                                {% labelled label="gnomAD Populations" hint="tiny" %}
+                                    <a class='toggle-link' data-toggle="collapse" href='#gnomad-pops'>Show gnomAD Pops</a>
+                                {% endlabelled %}
+
+                                <div id="gnomad-pops" class="collapse">
+                                    {% if variant_annotation.has_extended_gnomad_fields %}
+                                        {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
+                                        {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
+                                    {% endif %}
+
+                                    {% labelled id='gnomad_afr_af' label='African' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_eas_af' label='East Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_fin_af' label='European (Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_amr_af' label='Latino' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_sas_af' label='South Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
+                                </div>
+                            {% else %}
+                                {% labelled id='gnomad_none' label='gnomAD' hint="tiny" %}No gnomAD entry{% endlabelled %}
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -646,8 +702,6 @@ function applyVariantValues() {
                         <div class="card-header">Splicing</div>
                         <div class="card-body">
                             {% labelled id="splice_region" label="Splice Region" hint="tiny" %}{% endlabelled %}
-                            {% labelled id="dbscsnv_ada_score" label="dbscSNV (Ada)" hint="tiny" %}{{ variant_annotation.dbscsnv_ada_score|floatformat:2 }}{% endlabelled %}
-                            {% labelled id="dbscsnv_rf_score" label="dbscSNV (RF)" hint="tiny" %}{{ variant_annotation.dbscsnv_rf_score|floatformat:2 }}{% endlabelled %}
 
                             {% labelled id="maxentscan" label="MexEntScan" hint="tiny" %}
                                 <span id="maxentscan_ref"></span>&nbsp;<span class="text-secondary">Ref</span>,
@@ -655,6 +709,9 @@ function applyVariantValues() {
                                 <span id="maxentscan_diff"></span>&nbsp;<span class="text-secondary">Diff</span>
                             {% endlabelled %}
                             {% labelled id="maxentscan_percent_diff_ref" label="MexEnt %Diff/Ref" hint="tiny" %}{% endlabelled %}
+                            {% labelled id="dbscsnv_ada_score" label="dbscSNV (Ada)" hint="tiny" %}{{ variant_annotation.dbscsnv_ada_score|floatformat:2 }}{% endlabelled %}
+                            {% labelled id="dbscsnv_rf_score" label="dbscSNV (RF)" hint="tiny" %}{{ variant_annotation.dbscsnv_rf_score|floatformat:2 }}{% endlabelled %}
+
                             {% if variant_annotation.has_spliceai %}
                                 {% labelled label="SpliceAI Acceptor Gain" hint="tiny" %}
                                     <span id="spliceai_pred_ds_ag" class="text-monospace text-right"></span>
@@ -686,63 +743,6 @@ function applyVariantValues() {
 
                 <div class="col-md-6 mt-4">
                     <div class="card">
-                        <div class="card-header">Population Frequency</div>
-                        <div class="card-body">
-                            {% labelled id='af_1kg' label='1000 genomes' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_1kg|format_unit_as_percent }}{% endlabelled %}
-                            {% labelled id='af_uk10k' label='UK10K' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_uk10k|format_unit_as_percent }}{% endlabelled %}
-                            {% labelled id='topmed_af' label='TopMed' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
-                            {% if variant_annotation.gnomad_url %}
-                                <div class="text-center mb-3">
-                                    <label><i class="fas fa-circle" style="font-size:10px"></i> gnomAD</label>
-                                </div>
-                                {% labelled label="View in gnomAD" hint="tiny" %}
-                                    <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
-                                {% endlabelled %}
-                                {% labelled id='gnomad_af' label='Allele Frequency' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
-                                {% if variant_annotation.has_extended_gnomad_fields %}
-                                    {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
-                                {% endif %}
-                                {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
-
-                                {% if variant_annotation.gnomad_flag %}
-                                    {% labelled label="Is Flagged" label_css="gnomad-flagged-label gnomad-flagged" hint="tiny" %}{{ variant_annotation.gnomad_flag }}{% endlabelled %}
-                                {% else %}
-                                    {% labelled label="Is Flagged" label_css="gnomad-flagged-label" hint="tiny" %}{% endlabelled %}
-                                {% endif %}
-
-                                {% labelled id='gnomad_total_homozygotes' label='Total Homozygotes' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
-                                {% if variant_annotation.has_extended_gnomad_fields %}
-                                    {% labelled id='gnomad_ac' label='Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
-                                    {% labelled id='gnomad_an' label='Total number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
-                                {% endif %}
-
-                                {% labelled label="Populations" hint="tiny" %}
-                                    <a class='toggle-link' data-toggle="collapse" href='#gnomad-pops'>Show gnomAD Pops</a>
-                                {% endlabelled %}
-
-                                <div id="gnomad-pops" class="collapse">
-                                    {% if variant_annotation.has_extended_gnomad_fields %}
-                                        {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
-                                        {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
-                                    {% endif %}
-
-                                    {% labelled id='gnomad_afr_af' label='African' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
-                                    {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
-                                    {% labelled id='gnomad_eas_af' label='East Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
-                                    {% labelled id='gnomad_fin_af' label='European (Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
-                                    {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
-                                    {% labelled id='gnomad_amr_af' label='Latino' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
-                                    {% labelled id='gnomad_sas_af' label='South Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
-                                </div>
-                            {% else %}
-                                {% labelled id='gnomad_none' label='gnomAD' hint="tiny" %}No gnomAD entry{% endlabelled %}
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6 mt-4">
-                    <div class="card">
                         <div class="card-header">External IDs</div>
                         <div class="card-body">
                             <!-- note this used to have css class of "loading" -->
@@ -752,9 +752,9 @@ function applyVariantValues() {
                             {% labelled id='cosmic_count' label='COSMIC Sample Count' hint="tiny" %}{{ variant_annotation.cosmic_count }}{% endlabelled %}
                             {% labelled id='dbsnp_rs_id' label='dbSNP' hint="tiny" %}{% endlabelled %}
                             {% labelled id='ensembl_protein' label='Ensembl Protein' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='swissprot' label='Swiss-prot' hint="tiny" %}{% endlabelled %}
+                            {% comment %}{% labelled id='swissprot' label='Swiss-prot' hint="tiny" %}
                             {% labelled id='trembl' label='Trembl' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='uniparc' label='UniParc' hint="tiny" %}{% endlabelled %}
+                            {% labelled id='uniparc' label='UniParc' hint="tiny" %}{% endlabelled %}{% endcomment %}
 
                             {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
                                 {% with search_term=variant_annotation.get_search_terms %}

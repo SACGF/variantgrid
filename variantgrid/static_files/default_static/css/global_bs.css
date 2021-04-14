@@ -614,4 +614,8 @@ ul.compact li:before {
   color: #444;
 }
 
+.text-small {
+  font-size: 13px;
+}
+
 /*# sourceMappingURL=global_bs.css.map */
