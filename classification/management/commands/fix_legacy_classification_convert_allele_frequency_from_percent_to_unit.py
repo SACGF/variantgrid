@@ -1,9 +1,8 @@
 from collections import Counter
-from typing import Mapping
 
 from django.core.management import BaseCommand
 
-from classification.enums import SubmissionSource, SpecialEKeys
+from classification.enums import SpecialEKeys
 from classification.models import Classification
 from library.guardian_utils import admin_bot
 
@@ -29,7 +28,9 @@ class Command(BaseCommand):
                     to_value = float(old_value) / 100
                 except ValueError:
                     # Someone had entered "0..2"
-                    to_value = float(old_value.replace("..", ".")) / 100
+                    # Someone entered '34%'
+                    value = old_value.replace("..", ".").replace("%", "")
+                    to_value = float(value) / 100
 
                 value_obj["value"] = to_value
                 notes = []
