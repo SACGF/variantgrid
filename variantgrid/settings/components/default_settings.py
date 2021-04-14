@@ -303,7 +303,7 @@ LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to db
 LIFTOVER_NCBI_REMAP_ENABLED = False
 LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
-PANEL_APP_CACHE_DAYS = 30  # Automatically re-check after this time
+PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
 PANEL_APP_CHECK_ENABLED = False
 
 # Non-authenticated (no login) sample gene matrix
