@@ -13,7 +13,7 @@ from library.postgres_utils import postgres_arrays
 import numpy as np
 
 from library.utils import double_quote
-from library.vcf_utils import VCFConstant
+from library.vcf_utils import VCFConstant, cyvcf2_gt_types
 from patients.models_enums import Zygosity
 from snpdb.models import CohortGenotype
 from snpdb.models.models_enums import ProcessingStatus
@@ -38,7 +38,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v12. Ensure missing data in FreeBayes is -1 not -2147483648 (CyVCF2 returns this from format)
     # v13. Support CLCAD2 from CLC workbench
     # v14. Use AF from VCF if provided. Support for sample level filters (FT)
-    VCF_IMPORTER_VERSION = 14  # Change this if you make a major change to the code.
+    # v15. Any genotype as '.' -> unknown zygosity
+    VCF_IMPORTER_VERSION = 15  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -176,7 +177,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 format_array_str = postgres_arrays(format_array.flat)
         return format_array_str
 
-    def get_phred_likelihood_str(self, variant) -> Optional[str]:
+    def get_phred_likelihood_str(self, variant, gt_types) -> Optional[str]:
         phred_likelihood_str = None
         if self.vcf.phred_likelihood_field:
             phred_likelihood = []
@@ -192,7 +193,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
                 pl[missing] = CohortGenotype.MISSING_NUMBER_VALUE  # Handle individual PL array entry missing
                 pl_index_lookup = BulkGenotypeVCFProcessor.CYVCF_PL_INDEX_FOR_PLOIDY[variant.ploidy]
-                for i, gt in enumerate(variant.gt_types):
+                for i, gt in enumerate(gt_types):
                     pl_index = pl_index_lookup[gt]
                     pl_value = int(pl[i][pl_index])
                     phred_likelihood.append(pl_value)
@@ -250,6 +251,13 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         ref, alt = self.get_ref_alt(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
 
+        # Calculate own gt_types, see https://github.com/brentp/cyvcf2/issues/198
+        gt_types = cyvcf2_gt_types(variant.genotypes)
+        ref_count = np.count_nonzero(gt_types == 0)
+        het_count = np.count_nonzero(gt_types == 1)
+        unk_count = np.count_nonzero(gt_types == 2)
+        hom_count = np.count_nonzero(gt_types == 3)
+
         # These ADs come out with empty value as -1 - that's what we want to store
         ref_allele_depth, alt_allele_depth = self.get_ref_alt_allele_depth(variant)
         # We want empty values as 0 so that adding them is ok
@@ -266,20 +274,15 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         read_depth_str = self.get_format_array_str(variant, self.vcf.read_depth_field, as_type=int)
         genotype_quality_str = self.get_format_array_str(variant, self.vcf.genotype_quality_field, as_type=int)
-        phred_likelihood_str = self.get_phred_likelihood_str(variant)
+        phred_likelihood_str = self.get_phred_likelihood_str(variant, gt_types)
         samples_filters_str = self.get_samples_filters_str(variant)
-
-        ref_count = variant.num_hom_ref
-        het_count = variant.num_het
-        hom_count = variant.num_hom_alt
-        unk_count = variant.num_unknown
 
         if self.last_locus_tuple:
             if self.last_locus_tuple != locus_tuple:
                 self.finished_locus()
 
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt)
-        alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
+        alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in gt_types]
         alt_allele_depth_str = postgres_arrays(alt_allele_depth)
 
         cohort_gt = [str(ref_count),

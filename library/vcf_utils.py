@@ -1,3 +1,4 @@
+import numpy as np
 import operator
 import os
 import re
@@ -63,6 +64,33 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
         for vcf_record in vcf_tuples:
             line = "\t".join([str(s) for s in vcf_record]) + empty_columns
             f.write(line + "\n")
+
+
+def cyvcf2_gt_types(genotypes):
+    """ Work around for strict_gt=True not working on phased genotypes
+        ie issue https://github.com/brentp/cyvcf2/issues/198 """
+    HOM_REF = 0
+    HET = 1
+    UNKNOWN = 2
+    HOM_ALT = 3
+
+    gt_types = []
+    for genotype in genotypes:
+        a1 = genotype[0]
+        a2 = genotype[1]
+
+        if a1 == -1 or a2 == -1:  # Strict - any . => Unknown
+            gt = UNKNOWN
+        else:
+            if a1 == a2:
+                if a1 == 0:
+                    gt = HOM_REF
+                else:
+                    gt = HOM_ALT
+            else:
+                gt = HET
+        gt_types.append(gt)
+    return np.array(gt_types)
 
 
 def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
