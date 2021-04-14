@@ -42,9 +42,9 @@ function gnomadGeneConstraintRetrieval(content) {
     return retrievalSummary;
 }
 
-let SIG_CHARS = {"1": true, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true, "8": true, "9": true}
-let STRIP_ZEROS = /(.*?[.]?[0-9]+?)([.]0+|0+)$/
-let CODE_THRESHOLDS = {"revel_score": [0.4, 0.7]}
+var SIG_CHARS = {"1": true, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true, "8": true, "9": true}
+var STRIP_ZEROS = /(.*?[.]?[0-9]+?)([.]0+|0+)$/
+var CODE_THRESHOLDS = {"revel_score": [0.4, 0.7]}
 
 function formatNumberSigDigits(value) {
     let numString = value.toFixed(6);
@@ -177,7 +177,7 @@ function handlePubMedLinks(pubmed) {
         }
         new Citations().refresh();
     } else {
-        $('<span>', {text: 'No Pubmed citations available'}).appendTo(pmCitations);
+        $('<div>', {class:'mb-2 text-center', text: 'No Pubmed citations available'}).appendTo(pmCitations);
     }
 }
 
@@ -507,6 +507,17 @@ $(document).ready(function() {
         </div>
     </div>
 
+    <div class="container">
+        <div class="card mt-4">
+            <div class="card-header">Code</div>
+            <div class="card-body">
+                {% labelled label="low" %}<div class="threshold threshold-low text-monospace">0.2</div>{% endlabelled %}
+                {% labelled label="med" %}<div class="threshold threshold-med text-monospace">0.4</div>{% endlabelled %}
+                {% labelled label="high" %}<div class="threshold threshold-high text-monospace">0.6</div>{% endlabelled %}
+            </div>
+        </div>
+    </div>
+
     {% if variant_annotation.transcript_id %}
         <div id="transcript" class="container mt-4">
             {% page_help page_id="variantdetails/transcript_choice_help" title="Transcript Choice" %}
@@ -586,14 +597,26 @@ $(document).ready(function() {
                             {% labelled id="maxentscan_alt" label="MaxEntScan Alt" hint="tiny" %}{% endlabelled %}
                             {% labelled id="maxentscan_diff" label="MaxEntScan Diff" hint="tiny" %}{% endlabelled %}
                             {% if variant_annotation.has_spliceai %}
-                                {% labelled id="spliceai_pred_ds_ag" label="SpliceAI AG score" hint="tiny" %}{{ variant_annotation.spliceai_pred_ds_ag|floatformat:6 }}{% endlabelled %}
-                                {% labelled id="spliceai_pred_dp_ag" label="SpliceAI AG pos'n" hint="tiny" %}{{ variant_annotation.spliceai_pred_dp_ag }}{% endlabelled %}
-                                {% labelled id="spliceai_pred_ds_al" label="SpliceAI AL score" hint="tiny" %}{{ variant_annotation.spliceai_pred_ds_al|floatformat:6 }}{% endlabelled %}
-                                {% labelled id="spliceai_pred_dp_al" label="SpliceAI AL pos'n" hint="tiny" %}{{ variant_annotation.spliceai_pred_dp_al }}{% endlabelled %}
-                                {% labelled id="spliceai_pred_ds_dg" label="SpliceAI DG score" hint="tiny" %}{{ variant_annotation.spliceai_pred_ds_dg|floatformat:6 }}{% endlabelled %}
-                                {% labelled id="spliceai_pred_dp_dg" label="SpliceAI DG pos'n" hint="tiny" %}{{ variant_annotation.spliceai_pred_dp_dg }}{% endlabelled %}
-                                {% labelled id="spliceai_pred_ds_dl" label="SpliceAI DL score" hint="tiny" %}{{ variant_annotation.spliceai_pred_ds_dl|floatformat:6 }}{% endlabelled %}
-                                {% labelled id="spliceai_pred_dp_dl" label="SpliceAI DL pos'n" hint="tiny" %}{{ variant_annotation.spliceai_pred_dp_dl }}{% endlabelled %}
+                                {% labelled id="spliceai_pred_ds_ag" label="SpliceAI Acceptor Gain" hint="tiny" %}
+                                    <span id="spliceai_pred_ds_ag" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_ds_ag|floatformat:2 }}</span>
+                                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                                    <span id="spliceai_pred_dp_ag" class="d-inline-block text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_ag }}</span>
+                                {% endlabelled %}
+                                {% labelled label="SpliceAI Acceptor Loss" hint="tiny" %}
+                                    <span id="spliceai_pred_ds_al" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_ds_al|floatformat:2 }}</span>
+                                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                                    <span id="spliceai_pred_dp_al" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_al }}</span>
+                                {% endlabelled %}
+                                {% labelled label="SpliceAI Donor Gain" hint="tiny" %}
+                                    <span id="spliceai_pred_ds_dh" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_ds_dg|floatformat:2 }}</span>
+                                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                                    <span id="spliceai_pred_dp_dg" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_dg }}</span>
+                                {% endlabelled %}
+                                {% labelled label="SpliceAI Donor Loss" hint="tiny" %}
+                                    <span id="spliceai_pred_ds_dl" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_ds_dl|floatformat:2 }}</span>
+                                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                                    <span id="spliceai_pred_dp_dl" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_dl }}</span>
+                                {% endlabelled %}
                                 {% labelled id="spliceai_gene_symbol" label="SpliceAI Gene Symbol'n" hint="tiny" %}{{ variant_annotation.spliceai_gene_symbol }}{% endlabelled %}
                             {% else %}
                                 {% labelled id='spliceai_none' label='No SpliceAI data' hint="tiny" %}{% endlabelled %}
@@ -629,18 +652,22 @@ $(document).ready(function() {
                                     {% labelled id='gnomad_an' label='Total number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
                                 {% endif %}
                                 {% labelled id='gnomad_popmax' label='Pop Max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
-                                {% if variant_annotation.has_extended_gnomad_fields %}
-                                    {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
-                                    {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
-                                {% endif %}
 
-                                {% labelled id='gnomad_afr_af' label='African' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_eas_af' label='East Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_fin_af' label='European (Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_amr_af' label='Latino' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
-                                {% labelled id='gnomad_sas_af' label='South Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
+                                <a class='toggle-link' data-toggle="collapse" href='#gnomad-pops'>Show gnomAD Pops</a>
+                                <div id="gnomad-pops" class="collapse">
+                                    {% if variant_annotation.has_extended_gnomad_fields %}
+                                        {% labelled id='gnomad_popmax_ac' label='PopMax Alt Allele Count' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
+                                        {% labelled id='gnomad_popmax_an' label='PopMax number of alleles' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
+                                    {% endif %}
+
+                                    {% labelled id='gnomad_afr_af' label='African' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_asj_af' label='Ashkenazi Jewish' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_eas_af' label='East Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_fin_af' label='European (Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_amr_af' label='Latino' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
+                                    {% labelled id='gnomad_sas_af' label='South Asian' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
+                                </div>
                             {% else %}
                                 {% labelled id='gnomad_none' label='gnomAD' hint="tiny" %}No gnomAD entry{% endlabelled %}
                             {% endif %}

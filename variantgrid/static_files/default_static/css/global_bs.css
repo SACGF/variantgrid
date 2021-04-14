@@ -595,18 +595,19 @@ ul.compact li:before {
   display: inline-block;
   padding: 2px 6px 2px 6px;
   border-radius: 4px;
+  color: white !important;
 }
 
 .threshold-low {
-  background-color: green;
+  background-color: #2dc937;
 }
 
 .threshold-med {
-  background-color: orange;
+  background-color: #e7b416;
 }
 
 .threshold-high {
-  background-color: red;
+  background-color: #C64A42;
 }
 
 .text-monospace {
