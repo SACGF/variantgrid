@@ -3,15 +3,11 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
 from library.graphs.graph_utils import ForceMandKIntFormatter
-from seqauto.models import QCExecSummary
+from seqauto.models import QCExecSummary, QCType
 from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.sequencing_run_utils import get_qc_exec_summary_data
 from snpdb.graphs.graphcache import CacheableGraph
 
-
-MANDATORY_COLUMNS = ("mean_coverage_across_genes", "mean_coverage_across_kit", "uniformity_of_coverage",
-                     "percent_read_enrichment", "duplicated_alignable_reads", "median_insert", "ts_to_tv_ratio",
-                     "number_snps", "snp_dbsnp_percent", "number_indels", "indels_dbsnp_percent")
 
 class QCExecSummaryGraph(CacheableGraph):
     VERSION = 2  # Change to force cache update
@@ -29,6 +25,7 @@ class QCExecSummaryGraph(CacheableGraph):
         self.qc_compare_type = qc_compare_type
         self.bp_color = QCExecSummaryGraph.BOXPLOT_COLORS.get(self.qc_compare_type, QCExecSummaryGraph.DEFAULT_BOXPLOT_COLOR)
         self.type_name = QCCompareType(qc_compare_type).label
+        self.figsize = (12, 8)
 
     def get_params_hash(self):
         """ This uses get_values_list rather than just hashing params as the underlying DB may have changed """
@@ -46,7 +43,9 @@ class QCExecSummaryGraph(CacheableGraph):
         pass
 
     def get_columns(self):
-        return self.qc_exec_summary.get_coverage_columns() + MANDATORY_COLUMNS
+        exec_summary_qc = QCType.objects.get(name="ExecSummaryQC")
+        non_coverage_columns = exec_summary_qc.qccolumn_set.exclude(field__endswith="_goi")
+        return self.qc_exec_summary.get_coverage_columns() + tuple(non_coverage_columns.values_list("field", flat=True))
 
     def get_exec_summary_data(self):
         qc = self.qc_exec_summary

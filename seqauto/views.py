@@ -33,7 +33,7 @@ from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedR
 from seqauto.models.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
     QCCompareType, SequencingFileType
 from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec_summary_data, \
-    get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS, QC_EXEC_SUMMARY_QC_COLUMNS
+    get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.create_resource_models import assign_old_sample_sheet_data_to_current_sample_sheet
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
@@ -342,10 +342,13 @@ def view_qc_exec_summary_tab(request, qc_id):
     exec_summary = None
     historical_exec_summaries = list(qc.qcexecsummary_set.all())
     if historical_exec_summaries:
+        exec_summary_qc = QCType.objects.get(name="ExecSummaryQC")
+        qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("name", flat=True))
+
         exec_summary = historical_exec_summaries.pop()
         coverage_columns = list(exec_summary.get_coverage_columns())
         graph_form = forms.QCCompareTypeForm(initial={"compare_against": QCCompareType.SEQUENCING_RUN},
-                                             columns=QC_EXEC_SUMMARY_QC_COLUMNS + coverage_columns)
+                                             columns=qc_exec_summary_columns + coverage_columns)
 
     context = {"qc": qc,
                'graph_form': graph_form,

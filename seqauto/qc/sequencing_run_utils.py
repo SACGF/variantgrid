@@ -8,7 +8,7 @@ Place to put common data gathering utils for SequencingRunQC and QCExecsummary
 
 from collections import defaultdict
 
-from seqauto.models import SequencingRun, IlluminaFlowcellQC, ReadQ30, QCExecSummary
+from seqauto.models import SequencingRun, IlluminaFlowcellQC, ReadQ30, QCExecSummary, QCType
 from seqauto.models.models_enums import QCCompareType
 
 
@@ -23,12 +23,6 @@ def get_q30_col_name(read):
 
 READ_COLUMNS = [get_q30_col_name(read) for read in PAIRED_END_READS]
 SEQUENCING_RUN_QC_COLUMNS = ILLUMINA_FLOWCELL_QC_COLUMNS + READ_COLUMNS
-
-
-# This doesn't include coverage columns as they change depending on amplicon etc...
-QC_EXEC_SUMMARY_QC_COLUMNS = ["mean_coverage_across_genes", "mean_coverage_across_kit", "uniformity_of_coverage",
-                              "percent_read_enrichment", "duplicated_alignable_reads", "median_insert",
-                              "ts_to_tv_ratio", "number_snps", "snp_dbsnp_percent", "number_indels", "indels_dbsnp_percent"]
 
 
 def get_sequencing_runs_for_compare_type(sequencing_run, qc_compare_type):
@@ -103,10 +97,13 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
     if not include_passed_qc_exec_summary:
         qc_exec_qs = qc_exec_qs.exclude(pk=qc_exec_summary.pk)
 
+    exec_summary_qc = QCType.objects.get(name="ExecSummaryQC")
+    qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("field", flat=True))
+
     coverage_columns = list(qc_exec_summary.get_coverage_columns())
     sequencing_sample = "qc__bam_file__unaligned_reads__sequencing_sample__sample_name"
     sequencing_run_columns = get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
-    values = ["pk", sequencing_sample] + QC_EXEC_SUMMARY_QC_COLUMNS + coverage_columns + sequencing_run_columns
+    values = ["pk", sequencing_sample] + qc_exec_summary_columns + coverage_columns + sequencing_run_columns
     non_null_kwargs = {"%s__isnull" % f: False for f in coverage_columns}
 
     for data in qc_exec_qs.filter(**non_null_kwargs).values(*values):
