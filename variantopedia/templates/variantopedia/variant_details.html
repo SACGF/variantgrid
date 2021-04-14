@@ -507,17 +507,6 @@ $(document).ready(function() {
         </div>
     </div>
 
-    <div class="container">
-        <div class="card mt-4">
-            <div class="card-header">Code</div>
-            <div class="card-body">
-                {% labelled label="low" %}<div class="threshold threshold-low text-monospace">0.2</div>{% endlabelled %}
-                {% labelled label="med" %}<div class="threshold threshold-med text-monospace">0.4</div>{% endlabelled %}
-                {% labelled label="high" %}<div class="threshold threshold-high text-monospace">0.6</div>{% endlabelled %}
-            </div>
-        </div>
-    </div>
-
     {% if variant_annotation.transcript_id %}
         <div id="transcript" class="container mt-4">
             {% page_help page_id="variantdetails/transcript_choice_help" title="Transcript Choice" %}
