@@ -649,9 +649,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             if self.cloned_from:
                 # If cloned (and we or original haven't changed) - use those counts
                 try:
-                    logging.info("Trying to counts for %s", self.cloned_from)
                     node_count = NodeCount.load_for_node(self.cloned_from.node, label)
-                    logging.info("Using clone count of %d!", node_count.count)
                     return node_count.count
                 except NodeCount.DoesNotExist:
                     # Should only ever happen if original bumped version since we were loaded
