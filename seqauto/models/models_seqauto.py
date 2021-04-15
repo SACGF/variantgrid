@@ -441,7 +441,7 @@ class SequencingSampleData(models.Model):
 
 class SampleFromSequencingSample(models.Model):
     sample = models.OneToOneField(Sample, on_delete=CASCADE)
-    sequencing_sample = models.OneToOneField(SequencingSample, on_delete=CASCADE)
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
 
     @property
     def sequencing_run(self):
