@@ -1,9 +1,16 @@
 from rest_framework import serializers
 
 from genes.models import GeneInfo, GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
-    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList
+    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion
 from snpdb.models import Company
-from snpdb.serializers import UserSerializer
+from snpdb.serializers import UserSerializer, GenomeBuildSerializer
+
+
+class GeneSymbolSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = GeneSymbol
+        fields = ('symbol', )
 
 
 class GeneSerializer(serializers.ModelSerializer):
@@ -13,12 +20,31 @@ class GeneSerializer(serializers.ModelSerializer):
         fields = ('identifier', )
 
 
-class TranscriptSerializer(serializers.ModelSerializer):
+class GeneVersionSerializer(serializers.ModelSerializer):
     gene = GeneSerializer()
+    gene_symbol = GeneSymbolSerializer()
+    genome_build = GenomeBuildSerializer()
+
+    class Meta:
+        model = GeneVersion
+        fields = ('gene', 'version', 'gene_symbol', 'genome_build')
+
+
+class TranscriptSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Transcript
-        fields = ('identifier')
+        fields = ('identifier', )
+
+
+class TranscriptVersionSerializer(serializers.ModelSerializer):
+    transcript = TranscriptSerializer()
+    genome_build = GenomeBuildSerializer()
+    gene_version = GeneVersionSerializer()
+
+    class Meta:
+        model = TranscriptVersion
+        fields = ('transcript', 'version', 'genome_build', 'gene_version')
 
 
 class GeneListCategorySerializer(serializers.ModelSerializer):
