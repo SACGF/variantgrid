@@ -14,7 +14,7 @@ def _one_off_fix_link_sample_to_sequencing_samples(apps, schema_editor):
             backend_vcf = vcf.uploadedvcf.backendvcf
             samples_by_sequencing_sample = _get_samples_by_sequencing_sample(backend_vcf.combo_vcf.sample_sheet, vcf)
             for ss, sample in samples_by_sequencing_sample.items():
-                SampleFromSequencingSample.objects.create(sample=sample, sequencing_sample=ss)
+                SampleFromSequencingSample.objects.update_or_create(sample=sample, defaults={"sequencing_sample": ss})
 
 
 # Copy - so don't depend on model code
