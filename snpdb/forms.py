@@ -481,7 +481,7 @@ class UserSettingsGenomeBuildMixin:
             build_field.widget = HiddenInput()
 
 
-class GenomicIntervalsCollectionForm(UserSettingsGenomeBuildMixin, forms.ModelForm, ROFormMixin):
+class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = GenomicIntervalsCollection
         exclude = ['category']

@@ -364,7 +364,7 @@ def view_genomic_intervals(request, genomic_intervals_collection_id):
     if not request.user.has_perm('view_genomicintervalscollection', gic):
         raise PermissionDenied()
 
-    form = forms.GenomicIntervalsCollectionForm(request.POST or None, user=request.user, instance=gic)
+    form = forms.GenomicIntervalsCollectionForm(request.POST or None, instance=gic)
     if request.method == "POST":
         valid = form.is_valid()
         if valid:
