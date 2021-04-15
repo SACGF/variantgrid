@@ -22,6 +22,7 @@ from library.genomics import format_chrom
 from library.log_utils import report_exc_info
 from ontology.models import OntologyTerm
 from patients.models import ExternalPK, Patient
+from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
@@ -271,7 +272,7 @@ class Searcher:
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
             (SearchTypes.CLASSIFICATION, None, search_classification),
             (SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
-            (SearchTypes.SEQUENCING_RUN, r"^\d{6}", search_sequencing_run),
+            (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
             (SearchTypes.TRANSCRIPT, r"^(ENST|NM_)\d+\.?\d*$", search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
@@ -323,8 +324,6 @@ class Searcher:
         :param annotation_consortia: If provided, only annotation consortia searches will be run
         :return: SearchResults
         """
-        print(f"Searching within genome_build {genome_build}")
-
         variant_qs: Optional[QuerySet]
         searches: List[Any]
         results = SearchResults(genome_build_preferred=genome_build)
