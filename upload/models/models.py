@@ -532,7 +532,7 @@ class ModifiedImportedVariants(VCFImportInfo):
 class ModifiedImportedVariant(models.Model):
     """ Keep track of variants that were modified during import pre-processing by vt,
         so people can find out why a variant they expected didn't turn up.  """
-    VT_OLD_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+):([GATC]+)/([GATC]+)$")
+    VT_OLD_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+):([^/]+)/([^/]+)$")
 
     import_info = models.ForeignKey(ModifiedImportedVariants, on_delete=CASCADE, null=True)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
