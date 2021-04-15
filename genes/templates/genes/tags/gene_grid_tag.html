@@ -1312,11 +1312,10 @@ function handleBatchRetrieveGoldCoverage(enrichmentKitId, goldCoverageGenesReque
         let coverageData = data[i];
         // Response can be a matched gene or unmatched, which will just have the gene_symbol
         let geneSymbol;
-        let gene = coverageData.gene;
-        if (gene) {
-            geneSymbol = gene.gene_symbol;
+        if (coverageData.gene_symbol) {
+            geneSymbol = coverageData.gene_symbol.symbol;
         } else {
-            geneSymbol = coverageData.gene_symbol;
+            geneSymbol = coverageData.original_gene_symbol;
         }
         returnedGeneData[geneSymbol] = coverageData;
     }
