@@ -10,7 +10,6 @@ def _one_off_fix_link_sample_to_sequencing_samples(apps, schema_editor):
     for vcf_from_sequencing_run in VCFFromSequencingRun.objects.all():
         vcf = vcf_from_sequencing_run.vcf
         if vcf.sample_set.exclude(samplefromsequencingsample__isnull=False).exists():
-            print(f"VCF {vcf} needs to link samples")
             backend_vcf = vcf.uploadedvcf.backendvcf
             samples_by_sequencing_sample = _get_samples_by_sequencing_sample(backend_vcf.combo_vcf.sample_sheet, vcf)
             for ss, sample in samples_by_sequencing_sample.items():
