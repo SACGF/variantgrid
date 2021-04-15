@@ -269,52 +269,75 @@ const VCForm = (function() {
                 let message = null;
                 let provideSubmitButton = false;
 
-                if (this.record.withdrawn) {
-                    message = "You must unwithdraw to perform any changes.";
-                //} else if (this.hasSendingStatus()) {
-                    // message = "Changes uploading.";
-                    // shouldn't happen as when we have a sending status it just says Sending
-                } else if (this.hasErrors()) {
-                    message = "Errors must be fixed before submitting.";
-                } else {
-                    if (this.record.has_changes) {
-                        message = "This record has unsubmitted changes.";
-                        provideSubmitButton = true;
-                    } else if (this.record.publish_level === 'lab') {
-                        message = `This record is only visible to users in your lab group.`;
-                    } else if (this.record.publish_level === 'institution') {
-                        message = `This record is only visible to users in your organisation.`;
-                        provideSubmitButton = true;
+                if (this.record.can_write) {
+                    if (this.record.withdrawn) {
+                        message = "You must unwithdraw to perform any changes.";
+                    //} else if (this.hasSendingStatus()) {
+                        // message = "Changes uploading.";
+                        // shouldn't happen as when we have a sending status it just says Sending
+                    } else if (this.hasErrors()) {
+                        message = "Errors must be fixed before submitting.";
                     } else {
-                        let message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
-                        $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`}).appendTo(quickSubmitWrapper);
+                        if (this.record.has_changes) {
+                            message = "This record has unsubmitted changes.<br/>Changes won't be visible to other users.";
+                            provideSubmitButton = true;
+                        } else if (this.record.publish_level === 'lab') {
+                            message = `This record is only visible to users in your lab group.`;
+                        } else if (this.record.publish_level === 'institution') {
+                            message = `This record is only visible to users in your organisation.`;
+                            provideSubmitButton = true;
+                        } else {
+                            let message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
+                            $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`}).appendTo(quickSubmitWrapper);
+                        }
                     }
-                }
-                if (message) {
-                    $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:14px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + message}).appendTo(quickSubmitWrapper);
-                }
-                if (this.record.can_write && !this.isEditMode()) {
-                    $('<button>', {class:"mt-1 btn btn-warning w-100", html:`<i class=\"fas fa-unlock-alt\"></i> EDIT`, click:this.editMode}).appendTo(quickSubmitWrapper);
-                } else {
-                    if (this.sendStatus.error) {
-                        $('<div>', {class: 'mt-1 btn btn-danger w-100',
-                            disabled: true,
-                            html: '<i class="fas fa-bomb"></i> Error. Please Reload Page.'
-                        }).appendTo(quickSubmitWrapper);
+                    if (message) {
+                        $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:14px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + message}).appendTo(quickSubmitWrapper);
+                    }
 
-                    } else if (this.hasSendingStatus()) {
-                        $('<div>', {class: 'mt-1 btn btn-secondary w-100',
-                            disabled: true,
-                            html: '<i class="fas fa-clock"></i> Uploading Changes'
-                        }).appendTo(quickSubmitWrapper);
+                    if (!this.isEditMode()) {
+                        $('<button>', {class:"mt-1 btn btn-warning w-100", html:`<i class=\"fas fa-unlock-alt\"></i> EDIT`, click:this.editMode}).appendTo(quickSubmitWrapper);
                     } else {
-                        $('<button>', {
-                            class: 'mt-1 btn btn-primary w-100',
-                            html: '<i class="fas fa-upload"></i> Submit',
-                            title: 'Submit/Share',
-                            click: this.share.bind(this)
-                        }).appendTo(quickSubmitWrapper);
+                        if (this.sendStatus.error) {
+                            $('<div>', {
+                                class: 'mt-1 btn btn-danger w-100',
+                                disabled: true,
+                                html: '<i class="fas fa-bomb"></i> Error. Please Reload Page.'
+                            }).appendTo(quickSubmitWrapper);
+
+                        } else if (this.hasSendingStatus()) {
+                            $('<div>', {
+                                class: 'mt-1 btn btn-secondary w-100',
+                                disabled: true,
+                                html: '<i class="fas fa-clock"></i> Uploading Changes'
+                            }).appendTo(quickSubmitWrapper);
+                        } else {
+                            $('<button>', {
+                                class: 'mt-1 btn btn-primary w-100',
+                                html: '<i class="fas fa-upload"></i> Submit',
+                                title: 'Submit/Share',
+                                click: this.share.bind(this)
+                            }).appendTo(quickSubmitWrapper);
+                        }
                     }
+                } else if (this.record.can_write_latest) {
+                    let goToLatest = () => {
+                        window.open(`/classification/classification/${this.record.id}`, '_self');
+                    };
+
+                    $('<button>', {
+                        class: 'mt-1 btn btn-primary w-100',
+                        html: '<i class="fas fa-stopwatch"></i> Go to Latest Version',
+                        title: 'Submit/Share',
+                        click: goToLatest
+                    }).appendTo(quickSubmitWrapper);
+                } else {
+                    $('<div>', {
+                        class: 'mt-2 border border-information rounded w-100 text-center p-2 text-secondary bg-light hover-detail',
+                        title: `Only users belonging to "${this.record.lab_name}" can edit this record.`,
+                        'data-toggle': 'hover',
+                        html: '<i class="fas fa-eye"></i> Read Only'
+                    }).appendTo(quickSubmitWrapper);
                 }
             }
         },

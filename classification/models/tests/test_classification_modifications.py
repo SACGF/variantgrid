@@ -114,7 +114,7 @@ class ClassificationTestCaseModifications(TestCase):
             )
             ref_depth = vc.evidence.get(SpecialEKeys.REFERENCE_DEPTH)
             # value, note, explain are all merged
-            self.assertEqual(ref_depth, {'value': '12', 'note': 'hello there', 'explain': 'Explain this 2', 'immutable': SubmissionSource.API})
+            self.assertEqual(ref_depth, {'value': 12, 'note': 'hello there', 'explain': 'Explain this 2', 'immutable': SubmissionSource.API})
 
             # try adding PMID so we also have db_refs to deal with and make sure they get cleared out
             vc.patch_value(
