@@ -152,7 +152,7 @@ class SampleNode(SampleMixin, AnalysisNode):
 
         return any([getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET])
 
-    def get_cached_label_count(self, label):
+    def _get_cached_label_count(self, label):
         """ Input counts can be static, so use cached AnnotationStats if we can """
         CLASSES = {
             BuiltInFilters.TOTAL: (SampleStats, SampleStatsPassingFilter),

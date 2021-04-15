@@ -58,8 +58,8 @@ class BuiltInFilterNode(AnalysisNode):
             css_classes.append(f"node-count-{self.built_in_filter}")
         return css_classes
 
-    def get_cached_label_count(self, label):
-        count = super().get_cached_label_count(label)
+    def _get_cached_label_count(self, label):
+        count = super()._get_cached_label_count(label)
         if count is None:
             if label in [BuiltInFilters.TOTAL, self.built_in_filter]:
                 try:

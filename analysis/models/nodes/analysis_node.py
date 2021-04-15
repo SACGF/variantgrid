@@ -60,6 +60,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     shadow_color = models.TextField(null=True)
     load_seconds = models.FloatField(null=True)
     parents_should_cache = models.BooleanField(default=False)  # Node suggests parents use a cache
+    # This is set to node/version you cloned - cleared upon modification
+    cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
 
     PARENT_CAP_NOT_SET = -1
     min_inputs = 1
@@ -624,6 +626,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self.status = NodeStatus.DIRTY
         self.count = None
         self.errors = None
+        self.cloned_from = None
 
     def modifies_parents(self):
         """ Can overwrite and set to False to use parent counts """
@@ -638,10 +641,23 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                 pass
         return None
 
-    def get_cached_label_count(self, label):
-        """ Override for optimisation """
+    def _get_cached_label_count(self, label) -> Optional[int]:
+        """ Override for optimisation.
+            Returning None means we need to run the SQL to get the count """
 
         try:
+            if self.cloned_from:
+                # If cloned (and we or original haven't changed) - use those counts
+                try:
+                    logging.info("Trying to counts for %s", self.cloned_from)
+                    node_count = NodeCount.load_for_node(self.cloned_from.node, label)
+                    logging.info("Using clone count of %d!", node_count.count)
+                    return node_count.count
+                except NodeCount.DoesNotExist:
+                    # Should only ever happen if original bumped version since we were loaded
+                    # otherwise should have cascade set cloned_from to NULL
+                    pass
+
             if self.has_input():
                 parent_non_zero_label_counts = []
                 for parent in self.get_non_empty_parents():
@@ -669,6 +685,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Uses parent node_id/version if possible to re-use cache """
         node_id = self.pk
         version = self.version
+        if self.cloned_from:
+            node_id = self.cloned_from.node_id
+            version = self.cloned_from.version
+
         if parent := self.get_unmodified_single_parent_node():
             node_id, version = parent.get_grid_node_id_and_version()
         return node_id, version
@@ -682,7 +702,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         label_counts = {}
 
         for label in counts_to_get:
-            label_count = self.get_cached_label_count(label)
+            label_count = self._get_cached_label_count(label)
             if label_count is not None:
                 label_counts[label] = label_count
 
@@ -794,20 +814,16 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def save_clone(self):
         node_id = self.pk
+        original_node_version = NodeVersion.get(self)
 
         copy = self
         # Have to set both id/pk to None when using model inheritance
         copy.id = None
         copy.pk = None
         copy.version = 1  # 0 is for those being constructed in analysis templates
+        # Store cloned_from so we can use original's NodeCounts
+        copy.cloned_from = original_node_version
         copy.save()
-        copy_node_version = NodeVersion.get(copy)
-
-        # Copy node counts
-        for nc in NodeCount.objects.filter(node_version__node_id=node_id, node_version__version=self.version):
-            nc.pk = None
-            nc.node_version = copy_node_version
-            nc.save()
 
         for npf in NodeVCFFilter.objects.filter(node_id=node_id):
             npf.pk = None
