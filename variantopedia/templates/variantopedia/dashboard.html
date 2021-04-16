@@ -82,11 +82,10 @@
                     </td>
                     <!-- Commented out showing patients... (bit dodgy) -->
                     {% if ENABLE_PATIENTS_ON_FRONTPAGE %}
-                    <td>{% for sfss in ss.samplefromsequencingsample_set.all %}
-                            {% if sfss.sample.patient %}
-                                <a href="{% url 'view_patient' sfss.sample.patient.pk %}"><div class='patient-icon'></div>{{ sfss.sample.patient }}</a>
-                            {% endif %}
-                        {% endfor %}
+                    <td>
+                        {% if ss.patient %}
+                            <a href="{% url 'view_patient' ss.patient.pk %}"><div class='patient-icon'></div>{{ ss.patient }}</a>
+                        {% endif %}
                     </td>
                     {% endif %}
                     </tr>
