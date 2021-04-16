@@ -1439,7 +1439,8 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
         return warnings
 
     def get_uncovered_gene_symbols(self, gene_symbols, min_coverage):
-        return gene_symbols.exclude(genecoverage__gene_coverage_collection=self, genecoverage__min__gte=min_coverage)
+        return gene_symbols.exclude(genecoveragecanonicaltranscript__gene_coverage_collection=self,
+                                    genecoveragecanonicaltranscript__min__gte=min_coverage)
 
     def __str__(self):
         return "GeneCoverageCollection " + os.path.basename(self.path)
