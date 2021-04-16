@@ -966,8 +966,9 @@ class QCGeneList(SeqAutoRecord):
 
         try:
             # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
-            sample = self.sequencing_sample.samplefromsequencingsample.sample
-            self.create_and_assign_sample_gene_list(sample)  # Also saves
+            for sfss in self.sequencing_sample.samplefromsequencingsample_set.all():
+                sample = sfss.sample
+                self.create_and_assign_sample_gene_list(sample)  # Also saves
         except SampleFromSequencingSample.DoesNotExist:
             self.save()
 
