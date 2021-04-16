@@ -72,9 +72,9 @@
                 {% for ss in sp.sequencing_run.sequencingruncurrentsamplesheet.sample_sheet.sequencingsample_set.all %}
                     {% if not ss.is_control %}
                     <tr>
-                    <td>{% if ss.samplefromsequencingsample %}
-                        <a href="{% url 'view_sample' ss.samplefromsequencingsample.sample.pk %}">
-                        {% endif %}
+                    <td>{% for sfss in ss.samplefromsequencingsample_set.all %}
+                            <a href="{% url 'view_sample' sfss.sample.pk %}">
+                        {% endfor %}
                         {{ ss.sample_name }}
                         {% if ss.samplefromsequencingsample %}
                         </a>
@@ -82,9 +82,11 @@
                     </td>
                     <!-- Commented out showing patients... (bit dodgy) -->
                     {% if ENABLE_PATIENTS_ON_FRONTPAGE %}
-                    <td>{% if ss.samplefromsequencingsample.sample.patient %}
-                        <a href="{% url 'view_patient' ss.samplefromsequencingsample.sample.patient.pk %}"><div class='patient-icon'></div>{{ ss.samplefromsequencingsample.sample.patient }}</a>
-                        {% endif %}
+                    <td>{% for sfss in ss.samplefromsequencingsample_set.all %}
+                            {% if sfss.sample.patient %}
+                                <a href="{% url 'view_patient' sfss.sample.patient.pk %}"><div class='patient-icon'></div>{{ sfss.sample.patient }}</a>
+                            {% endif %}
+                        {% endfor %}
                     </td>
                     {% endif %}
                     </tr>
