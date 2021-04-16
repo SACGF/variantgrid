@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from genes.serializers import GeneSerializer, GeneListSerializer
+from genes.serializers import GeneSerializer, GeneListSerializer, GeneSymbolSerializer
 from pathtests.models import PathologyTestVersion, PathologyTest, \
     PathologyTestGeneModificationRequest
 from snpdb.serializers import UserSerializer
@@ -15,7 +15,7 @@ class PathologyTestSerializer(serializers.ModelSerializer):
 
 
 class PathologyTestGeneModificationRequestSerializer(serializers.ModelSerializer):
-    gene = GeneSerializer()
+    gene_symbol = GeneSymbolSerializer()
     user = UserSerializer()
 
     class Meta:
