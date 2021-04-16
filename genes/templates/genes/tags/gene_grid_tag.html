@@ -1701,7 +1701,7 @@ function pathologyTestModifications(pathologytestgenemodificationrequest_set) {
     let geneModifications = {};
     for (let i=0 ; i<pathologytestgenemodificationrequest_set.length ; ++i) {
         let mod = pathologytestgenemodificationrequest_set[i];
-        let geneSymbol = mod["gene"]["gene_symbol"];
+        let geneSymbol = mod["gene_symbol"]["symbol"];
         let geneMods = geneModifications[geneSymbol] || {};
         let outcome = mod["outcome"];
         // Only show pendings as +/- 1
