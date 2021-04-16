@@ -231,11 +231,9 @@
                     {% endfor %}
                 </td>
                 <td>
-                    {% for sfss in ss.samplefromsequencingsample_set.all %}
-                        {% if sfss.sample.patient %}
-                            <a href="{% url 'view_patient' sfss.sample.patient.pk %}"><div class='patient-icon'></div>{{ sfss.sample.patient }}</a>
-                        {% endif %}
-                    {% endfor %}
+                    {% if ss.patient %}
+                        <a href="{% url 'view_patient' ss.patient.pk %}"><div class='patient-icon'></div>{{ ss.patient }}</a>
+                    {% endif %}
                 </td>
                 {% if has_sequencing_sample_data %}
                 <td>

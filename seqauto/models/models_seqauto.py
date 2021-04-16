@@ -28,7 +28,7 @@ from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
 from library.utils import sorted_nicely
 from library.vcf_utils import get_variant_caller_and_version_from_vcf
-from patients.models import FakeData
+from patients.models import FakeData, Patient
 from seqauto.illumina import illuminate_report
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
@@ -427,6 +427,20 @@ class SequencingSample(models.Model):
     def get_current():
         """ Return SequencingSamples that have not been replaced by newer SampleSheet """
         return SequencingSample.objects.filter(sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
+
+    @lazy
+    def patient(self) -> Optional[Patient]:
+        patients_set = set()
+        for sfss in self.samplefromsequencingsample_set.all():
+            if sfss.sample.patient:
+                patients_set.add(sfss.sample.patient)
+
+        patient = None
+        if patients_set:
+            if len(patients_set) > 1:
+                raise ValueError(f"{self} is linked multiple samples with different patients!")
+            patient = patients_set.pop()
+        return patient
 
     def __str__(self):
         return self.sample_id
