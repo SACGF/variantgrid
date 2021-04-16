@@ -12,18 +12,18 @@
 	}
 
 	function plotColumn() {
-		var column = $('option:selected',this).attr('value');
-		var labels = qc_data[label_column];
-		var is_gold = qc_data[gold_column];
-		var column_data = qc_data[column];
+        const column = $('option:selected', this).attr('value');
+        const labels = qc_data[label_column];
+        const is_gold = qc_data[gold_column];
+        const column_data = qc_data[column];
 
-		var gold = createBar("gold", "rgb(255,215,0)");
-		var active = createBar("current", 'rgba(222,45,38,0.8)');
-		var other = createBar("other", 'rgba(204,204,204,0.8)');
+        const gold = createBar("gold", "rgb(255,215,0)");
+        const active = createBar("current", 'rgba(222,45,38,0.8)');
+        const other = createBar("other", 'rgba(204,204,204,0.8)');
 
-		for (var i=0 ; i<labels.length ; ++i) {
-			var label = labels[i];
-			// JSON can't handle newlines, so had to escape them 
+        for (let i=0 ; i<labels.length ; ++i) {
+            let label = labels[i];
+            // JSON can't handle newlines, so had to escape them
 			label = label.replace("__newline__", "\n");
 
             /*  Issue #701 - Sort bar by date.
@@ -34,11 +34,11 @@
             active['x'].push(label);
             other['x'].push(label);
 
-            var gold_data = NaN;
-            var active_data = NaN;
-            var other_data = NaN;
+            let gold_data = NaN;
+            let active_data = NaN;
+            let other_data = NaN;
 
-			if (label == current_label) {
+            if (label == current_label) {
                 active_data = column_data[i];
 			} else if (is_gold[i]) {
                 gold_data = column_data[i];
@@ -51,15 +51,15 @@
             other['y'].push(other_data);
 		}
 
-		var data = [gold, active, other];
+        const data = [gold, active, other];
 
-		var layout = {
-		  	title: column,
-		    paper_bgcolor: 'rgba(0,0,0,0)',
-		    plot_bgcolor: 'rgba(0,0,0,0)'
-		};
-		
-		Plotly.newPlot('plotly-graph-container', data, layout);
+        const layout = {
+            title: column,
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)'
+        };
+
+        Plotly.newPlot('plotly-graph-container', data, layout);
 	}
 	
 	$(document).ready(function() {

@@ -381,6 +381,10 @@ class GeneListNodeForm(BaseNodeForm):
             for pap in self.cleaned_data[form_name]:
                 pap_set.create(panel_app_panel=pap)
 
+        # Make sure that if we select sample qc gene list
+        if sample := self.cleaned_data["sample"]:
+            node._set_sample(sample)
+
         if commit:
             node.save()
         return node

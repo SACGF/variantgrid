@@ -417,7 +417,8 @@ function updateDirtyNode(node, refresh) {
 					const myNode = getNode(node_id); // get latest version
 					const version_id = myNode.attr("version_id");
 					const loading = myNode.attr("loading");
-					if (version_id === nodeVersion && !loading) {
+
+					if (version_id == nodeVersion && !loading) {
 						if (DEBUG) {
 							console.log(".animate()");
 						}

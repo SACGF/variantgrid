@@ -441,7 +441,7 @@ class SequencingSampleData(models.Model):
 
 class SampleFromSequencingSample(models.Model):
     sample = models.OneToOneField(Sample, on_delete=CASCADE)
-    sequencing_sample = models.OneToOneField(SequencingSample, on_delete=CASCADE)
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
 
     @property
     def sequencing_run(self):
@@ -1010,8 +1010,8 @@ class QCExecSummary(SeqAutoRecord):
 
     def get_coverage_columns(self):
         # TODO: Is it easier just to return non-null columns?
-        HIGH_COVERAGE = ('percent_500x', 'percent_250x')
-        LOW_COVERAGE = ('percent_20x', 'percent_10x')
+        HIGH_COVERAGE = ('percent_500x_goi', 'percent_250x_goi')
+        LOW_COVERAGE = ('percent_20x_goi', 'percent_10x_goi')
 
         # If enrichment_kit is set, use that to determine columns
         enrichment_kit = self.qc.bam_file.unaligned_reads.sequencing_sample.enrichment_kit
@@ -1050,7 +1050,7 @@ class QCExecSummary(SeqAutoRecord):
         # Sanity check sample names match
         # TODO: Better name or way of storing this info than "aligned_pattern"?
         params = qc.get_params()
-        expected_sample_name = params['aligned_pattern']
+        expected_sample_name = params['sample_name']
         sample = exec_summary_data["sample"]
         if sample != expected_sample_name:
             msg = f"Exec summary file '{qc.path}' had sample name of '{sample}' while we expected '{expected_sample_name}'"

@@ -63,7 +63,7 @@ class QCExecSummaryGrid(JqGridUserRowConfig):
     fields = ["qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name",
               "qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_name",
               "percent_500x", "percent_250x", "percent_20x", "percent_10x", "mean_coverage_across_genes", "mean_coverage_across_kit",
-              "uniformity_of_coverage", "percent_read_enrichment", "duplicated_alignable_reads", "median_insert", "ts_to_tv_ratio",
+              "uniformity_of_coverage", "percent_read_enrichment", "median_insert", "ts_to_tv_ratio",
               "number_snps", "snp_dbsnp_percent", "number_indels", "indels_dbsnp_percent"]
     colmodel_overrides = {'qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'SequencingRun'},
                           "qc__bam_file__unaligned_reads__fastq_r1__sequencing_sample__sample_name": {'label': 'SampleName'}}

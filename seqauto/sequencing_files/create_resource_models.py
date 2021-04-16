@@ -307,11 +307,11 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
         relink_samples = missing_linked_sequencing_samples.exists()
 
     try:
-        combo_vcf = current_sample_sheet.samplesheetcombinedvcffile_set.get()
-        backend_vcf = combo_vcf.backendvcf
+        for combo_vcf in current_sample_sheet.samplesheetcombinedvcffile_set.all():
+            backend_vcf = combo_vcf.backendvcf
 
-        if relink_samples or combo_vcf.needs_to_be_linked():
-            link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=True)
+            if relink_samples or combo_vcf.needs_to_be_linked():
+                link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=True)
     except BackendVCF.DoesNotExist:
         pass
 

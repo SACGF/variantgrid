@@ -37,10 +37,12 @@ $(document).ready(function() {
             <div>
                 <b>Name:</b> {{ form.name }} {{ form.auto_node_name }} Auto Node Name.
             </div>
+        {% if node.analysis.template_type %}
             <div>
                 <label>{{ form.output_node.label }}</label>
                 {{ form.output_node }}
             </div>
+        {% endif %}
         {% if form.hide_node_and_descendants_upon_template_configuration_error %}
             <div>
                 <label>{{ form.hide_node_and_descendants_upon_template_configuration_error.label }}</label>

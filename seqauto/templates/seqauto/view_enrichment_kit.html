@@ -15,26 +15,43 @@
     <h2>{{ enrichment_kit }}</h2>
 
     <table id='enrichment-kit-table'>
-    <tr><th>ID
-        <td>{{ enrichment_kit.id }}
-    <tr><th>Name
-        <td>{{ enrichment_kit.name }}
-    <tr><th>Version
-        <td>{{ enrichment_kit.version }}
-    <tr><th>Manufacturer
-        <td>{{ enrichment_kit.manufacturer }}
-    <tr><th>Genomic Intervals
-        <td>{% if enrichment_kit.genomic_intervals %}
-            <a href="{% url 'view_genomic_intervals' enrichment_kit.genomic_intervals.pk %}">{{ enrichment_kit.genomic_intervals }}</a>
+        <tr><th>ID</th>
+            <td>{{ enrichment_kit.id }}</td>
+        <tr><th>Name</th>
+            <td>{{ enrichment_kit.name }}</td>
+        <tr><th>Version</th>
+            <td>{{ enrichment_kit.version }}</td>
+        <tr><th>Manufacturer</th>
+            <td>{{ enrichment_kit.manufacturer }}</td>
+        <tr><th>Genomic Intervals</th>
+            <td>{% if enrichment_kit.genomic_intervals %}
+                    <a href="{% url 'view_genomic_intervals' enrichment_kit.genomic_intervals.pk %}">{{ enrichment_kit.genomic_intervals }}</a>
+                {% endif %}
+            </td>
+        <tr><th>Gene List</th>
+            <td>{% if enrichment_kit.gene_list %}
+                    <a href="{% url 'view_gene_list' enrichment_kit.gene_list.pk %}">{{ enrichment_kit.gene_list }}</a>
+                {% endif %}
+            </td>
+        <tr>
+            <th>Canonical Transcripts</th>
+            <td>
+            {% if enrichment_kit.canonical_transcript_collection %}
+                <a href="{% url 'view_canonical_transcript_collection' enrichment_kit.canonical_transcript_collection.pk %}">{{ enrichment_kit.canonical_transcript_collection }}</a>
+            {% else %}
+                Canonical Transcripts not set.
+
+                {% if default_canonical_transcript_collection %}
+                Using system default of             <a href="{% url 'view_canonical_transcript_collection' default_canonical_transcript_collection.pk %}">{{ default_canonical_transcript_collection }}</a>
+                {% else %}
+                No system default set.
+                {% endif %}
             {% endif %}
-    <tr><th>Gene List
-        <td>{% if enrichment_kit.gene_list %}
-            <a href="{% url 'view_gene_list' enrichment_kit.gene_list.pk %}">{{ enrichment_kit.gene_list }}</a>
-            {% endif %}
+            </td>
+        </tr>
     </table>
 
-    <div>
-    <h2>Gold Standard Runs</h2>
+    <h4>Gold Standard Runs</h4>
     {% if enrichment_kit.goldreference %}
         <p>
             Gold reference created on {{ enrichment_kit.goldreference.created|localtime }}
@@ -59,22 +76,5 @@
     {% else %}
         There are no Gold-standard sequencing runs for this kit. 
     {% endif %}
-    </div>
-
-    <div>
-        <h2>Canonical Transcripts</h2>
-        <p>
-        {% if enrichment_kit.canonicaltranscriptcollection %}
-            <a href="{% url 'view_canonical_transcript_collection' enrichment_kit.canonicaltranscriptcollection.pk %}">{{ enrichment_kit.canonicaltranscriptcollection }}</a>
-        {% else %}
-            Canonical Transcripts not set.
-            
-            {% if default_canonical_transcript_collection %}
-            Using system default of             <a href="{% url 'view_canonical_transcript_collection' default_canonical_transcript_collection.pk %}">{{ default_canonical_transcript_collection }}</a>
-            {% else %}
-            No system default set.
-            {% endif %}
-        {% endif %}
-    </div>
 
 {% endblock %}

@@ -46,7 +46,7 @@ class ClassificationsNode(AnalysisNode):
         class_name = ClassificationsNode.get_node_class_label()
 
         fields = []
-        for field, cs in self.FIELD_CLINICAL_SIGNIFICANCE.items():
+        for field in self.FIELD_CLINICAL_SIGNIFICANCE:
             if getattr(self, field):
                 fields.append(field)
 

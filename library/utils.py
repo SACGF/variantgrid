@@ -1,6 +1,7 @@
 import csv
 import io
 import operator
+import math
 from collections import defaultdict
 from datetime import date, datetime
 from operator import attrgetter
@@ -473,28 +474,20 @@ def count(object: Any) -> int:
         return len(object)
 
 
-trailing_zeros_strip = re.compile("(.*?[.]?[0-9]+?)([.]0+|0+)$")
+trailing_zeros_strip = re.compile("(.*?[.][0-9]*?)(0+)$")
 
 
-def format_significant_digits(num_str: str, significant_digits=3) -> str:
-    if not isinstance(num_str, str):
-        num_str = str(num_str)
+def format_significant_digits(a_number, sig_digits=3) -> str:
+    if a_number == 0:
+        return "0"
+    rounded_number = round(a_number, sig_digits - int(math.floor(math.log10(abs(a_number)))) - 1)
+    rounded_number_str = "{:.12f}".format(rounded_number)
+    if match := trailing_zeros_strip.match(rounded_number_str):
+        rounded_number_str = match.group(1)
+        if rounded_number_str[-1] == '.':
+            rounded_number_str = rounded_number_str[:-1]
 
-    significant_digit_count = None
-    to_sig_places = ''
-    for char in num_str:
-        to_sig_places += char
-        if significant_digit_count is None and char in {'1', '2', '3', '4', '5', '6', '7', '8', '9'}:
-            significant_digit_count = 1
-        elif significant_digit_count and char != '.':
-            significant_digit_count += 1
-        if significant_digit_count == significant_digits:
-            break
-
-    # strip trailing 0s
-    if match := trailing_zeros_strip.match(to_sig_places):
-        to_sig_places = match.group(1)
-    return to_sig_places
+    return rounded_number_str
 
 
 def delimited_row(data: list, delimiter: str = ',') -> str:

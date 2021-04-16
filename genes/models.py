@@ -1405,7 +1405,7 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
                 "gene_symbol_id": gene_symbol_id,
             }
             gc_dict.update(row.to_dict())
-            gc_tup = tuple([gc_dict[f] for f in GENE_COVERAGE_HEADER])
+            gc_tup = tuple([gc_dict.get(f, '') for f in GENE_COVERAGE_HEADER])
 
             if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_ALL:
                 gene_coverage_tuples.append(gc_tup)

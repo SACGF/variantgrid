@@ -2,7 +2,8 @@
 
 from rest_framework import serializers
 
-from genes.serializers import GeneListSerializer, GeneSerializer, TranscriptSerializer
+from genes.serializers import GeneListSerializer, TranscriptSerializer, GeneSymbolSerializer, \
+    TranscriptVersionSerializer
 from seqauto.models import GoldCoverageSummary, GoldReference, EnrichmentKit
 import numpy as np
 
@@ -51,8 +52,9 @@ class GoldReferenceSerializer(serializers.ModelSerializer):
 
 class GoldCoverageSummarySerializer(serializers.ModelSerializer):
     gold_reference = GoldReferenceSerializer()
-    gene = GeneSerializer()
+    gene_symbol = GeneSymbolSerializer()
     transcript = TranscriptSerializer()
+    transcript_version = TranscriptVersionSerializer()
     standard_error = serializers.SerializerMethodField()
 
     class Meta:

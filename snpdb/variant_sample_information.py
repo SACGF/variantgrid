@@ -92,7 +92,7 @@ class VariantSampleInformation:
     @staticmethod
     def _cohort_genotype_to_sample_genotypes(values_qs):
         """ We're now joining to CohortGenotype - break up into samples so old code works """
-        SAMPLE_ENRICHMENT_KIT_PATH = "samplefromsequencingsample__sequencing_sample__enrichment_kit"
+        SAMPLE_ENRICHMENT_KIT_PATH = "samplefromsequencingsample__sequencing_sample__enrichment_kit__name"
 
         # turn a row of CohortGenotype into multiple rows of ObservedVariant values
         for cg_values in values_qs:

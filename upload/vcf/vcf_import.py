@@ -329,15 +329,15 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                 sample.save()
 
             try:
-                q_existing = Q(sequencing_sample=sequencing_sample) | Q(sample=sample)
-                sfss = SampleFromSequencingSample.objects.get(q_existing)
+                sfss = SampleFromSequencingSample.objects.get(sample=sample)
                 if replace_existing or sfss.sample.import_status in ImportStatus.DELETION_STATES:
                     logging.info("Updating SampleFromSequencingSample")
                     sfss.sequencing_sample = sequencing_sample
                     sfss.sample = sample
                     sfss.save()
                 else:
-                    logging.warning("SS %s already linked to sample: %s (%s/%s)", sfss.sequencing_sample, sfss.sample, sfss.sample.pk, sfss.sample.import_status)
+                    logging.warning("SS %s already linked to sample: %s (%s/%s)", sfss.sequencing_sample, sfss.sample,
+                                    sfss.sample.pk, sfss.sample.import_status)
             except SampleFromSequencingSample.DoesNotExist:
                 SampleFromSequencingSample.objects.create(sample=sample,
                                                           sequencing_sample=sequencing_sample)
