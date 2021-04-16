@@ -225,13 +225,17 @@
             {% for ss in sequencing_samples %}
                 <tr>
                 <td>{{ ss.sample_name }}
-                <td>{% if ss.samplefromsequencingsample %}
-                    <a href="{% url 'view_sample' ss.samplefromsequencingsample.sample.pk %}">View Sample</a>
-                    {% endif %}
+                <td>
+                    {% for sfss in ss.samplefromsequencingsample_set.all %}
+                        <a href="{% url 'view_sample' sfss.sample.pk %}">View Sample</a>
+                    {% endfor %}
                 </td>
-                <td>{% if ss.samplefromsequencingsample.sample.patient %}
-                    <a href="{% url 'view_patient' ss.samplefromsequencingsample.sample.patient.pk %}"><div class='patient-icon'></div>{{ ss.samplefromsequencingsample.sample.patient }}</a>
-                    {% endif %}
+                <td>
+                    {% for sfss in ss.samplefromsequencingsample_set.all %}
+                        {% if sfss.sample.patient %}
+                            <a href="{% url 'view_patient' sfss.sample.patient.pk %}"><div class='patient-icon'></div>{{ sfss.sample.patient }}</a>
+                        {% endif %}
+                    {% endfor %}
                 </td>
                 {% if has_sequencing_sample_data %}
                 <td>
