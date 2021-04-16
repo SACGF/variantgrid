@@ -649,7 +649,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             if self.cloned_from:
                 # If cloned (and we or original haven't changed) - use those counts
                 try:
-                    node_count = NodeCount.load_for_node(self.cloned_from.node, label)
+                    node_count = NodeCount.load_for_node_version(self.cloned_from, label)
                     return node_count.count
                 except NodeCount.DoesNotExist:
                     # Should only ever happen if original bumped version since we were loaded
@@ -941,11 +941,15 @@ class NodeCount(models.Model):
         unique_together = ("node_version", "label")
 
     @staticmethod
-    def load_for_node(node, label):
+    def load_for_node_version(node_version: NodeVersion, label: str) -> 'NodeCount':
         try:
-            return NodeCount.objects.get(node_version=NodeVersion.get(node), label=label)
+            return NodeCount.objects.get(node_version=node_version, label=label)
         except IntegrityError:
-            raise NodeNotFoundException(node.pk)
+            raise NodeNotFoundException(node_version.node_id)
+
+    @staticmethod
+    def load_for_node(node: AnalysisNode, label: str) -> 'NodeCount':
+        return NodeCount.load_for_node_version(NodeVersion.get(node), label=label)
 
     def __str__(self):
         return f"NodeCount({self.node_version}, {self.label}) = {self.count}"
