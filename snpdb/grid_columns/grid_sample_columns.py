@@ -44,17 +44,16 @@ def get_columns_and_sql_parts_for_cohorts(values_queryset, cohorts):
     available_format_columns = get_available_format_columns(cohorts)
 
     for cohort in cohorts:
-        num_samples = cohort.get_samples().count()
         partition_table = cohort.cohort_genotype_collection.get_partition_table()
         for column, (is_array, empty_value) in CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE.items():
             if not available_format_columns[column]:
                 continue  # No data, so don't show
 
             if is_array:
-                array_values = ", ".join(str(s) for s in [empty_value] * num_samples)
+                array_values = ", ".join(str(s) for s in [empty_value] * cohort.sample_count)
                 empty_data = f"array[{array_values}]"
             else:
-                empty_data = empty_value * num_samples
+                empty_data = empty_value * cohort.sample_count
                 empty_data = single_quote(empty_data)
 
             pack_entry = f"coalesce({partition_table}.{column}, {empty_data})"
