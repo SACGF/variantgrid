@@ -3,7 +3,7 @@ from functools import reduce
 from typing import Dict, Any, List, Optional, Iterable
 
 from django.conf import settings
-from django.db.models import Q, Subquery, When, Case, TextField, Value
+from django.db.models import Q, Subquery, When, Case, TextField, Value, IntegerField
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from lazy import lazy
@@ -13,7 +13,7 @@ from genes.models import Gene, Transcript, TranscriptVersion, GeneSymbol
 from ontology.models import OntologyTerm
 from snpdb.models import UserSettings, GenomeBuild, Allele, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
-from classification.enums import SpecialEKeys, EvidenceCategory
+from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
 from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap, ConditionResolvedDict
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
@@ -92,7 +92,8 @@ class ClassificationDatatableConfig(DatatableConfig):
         self.rich_columns = [
             RichColumn(
                 key='classification__id',
-                sort_keys=['classification__share_level', 'classification__lab__name', 'classification__lab_record_id'],
+                # share_level_sort annotated column
+                sort_keys=['share_level_sort', 'classification__lab__name', 'classification__lab_record_id'],
                 name='id',
                 label='ID',
                 orderable=True,
@@ -211,6 +212,15 @@ class ClassificationDatatableConfig(DatatableConfig):
         case = Case(*whens, default=KeyTextTransform('value', KeyTransform('clinical_significance', 'published_evidence')),
                     output_field=TextField())
         initial_qs = initial_qs.annotate(clin_sig_sort=case)
+
+        whens = [
+            When(classification__share_level=ShareLevel.LAB.value, then=Value(1)),
+            When(classification__share_level=ShareLevel.INSTITUTION.value, then=Value(2)),
+            When(classification__share_level=ShareLevel.ALL_USERS.value, then=Value(3)),
+            When(classification__share_level=ShareLevel.PUBLIC.value, then=Value(4))
+        ]
+        case = Case(*whens, default=Value(0), output_field=IntegerField())
+        initial_qs = initial_qs.annotate(share_level_sort=case)
 
         case = Case(
             When(
