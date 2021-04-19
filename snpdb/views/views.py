@@ -6,6 +6,7 @@ from collections import OrderedDict, defaultdict
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
+from django.contrib.sites.models import Site
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
@@ -39,6 +40,7 @@ from library.constants import WEEK_SECS, HOUR_SECS
 from library.django_utils import add_save_message, get_model_fields, set_form_read_only
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.keycloak import Keycloak
+from library.log_utils import report_exc_info
 from library.utils import full_class_name, import_class, rgb_invert
 import pandas as pd
 
@@ -62,7 +64,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs
+    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, LabNotificationBuilder
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from upload.uploaded_file_type import retry_upload_pipeline
@@ -634,13 +636,32 @@ def view_lab(request, pk):
 
     if request.method == "POST":
         lab.check_can_write(request.user)
-        all_valid = True
-        for form in all_forms:
-            if form.is_valid():
-                form.save()
+
+        if debug_method := request.POST.get("debug_method"):
+            if "Test Slack" == debug_method:
+                notification_builder = LabNotificationBuilder(lab=lab, message="Testing Slack Integration")
+                if not notification_builder.can_send:
+                    messages.add_message(request, messages.ERROR, "Slack URL not configured correctly")
+                else:
+                    #try:
+                    notification_builder.add_header(f"{settings.SITE_NAME} -> Slack Integration Test")
+                    notification_builder.add_markdown("If you can see this, then integration has worked! :smile:")
+                    notification_builder.send()
+                    messages.add_message(request, messages.SUCCESS, "Message sent, check your Slack to confirm")
+                    #except:
+                    #    report_exc_info()
+                    #    messages.add_message(request, messages.ERROR, "Unable to send test notification")
+                return redirect(reverse('view_lab', kwargs={"pk":pk}))
             else:
-                all_valid = False
-        add_save_message(request, all_valid, "Lab Settings")
+                raise ValueError(f"Un-supported debug method {debug_method}")
+        else:
+            all_valid = True
+            for form in all_forms:
+                if form.is_valid():
+                    form.save()
+                else:
+                    all_valid = False
+            add_save_message(request, all_valid, "Lab Settings")
 
     if has_write_permission is False:
         for form in all_forms:

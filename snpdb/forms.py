@@ -6,6 +6,7 @@ from dal import autocomplete, forward
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.forms import EmailInput, URLInput
 from django.forms.forms import DeclarativeFieldsMetaclass
 from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
 from guardian import shortcuts
@@ -122,7 +123,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = Lab
         # fields = '__all__'
-        exclude = ("classification_config", )
+        exclude = ("classification_config", "css_class")
         read_only = ("name", "external", "group_name", "organization", "upload_location")
         widgets = {
             "name": TextInput(),
@@ -132,7 +133,14 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "url": TextInput(),
             "css_class": TextInput(),
             "group_name": TextInput(),
-            "upload_location": TextInput()
+            "upload_location": TextInput(),
+            "email": EmailInput(),
+            "slack_webhook": URLInput()
+        }
+        help_texts = {
+            "email": "Lab wide email for discordance and general communications.",
+            "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
+            "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI"
         }
 
 
