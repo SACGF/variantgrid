@@ -127,6 +127,7 @@ class ExportFormatterVCF(ExportFormatter):
 
         data.append(info)  # INFO
 
+        self.row_count += 1
         return ExportFormatter.write_single_row(data, '\t')
 
     def filename(self) -> str:

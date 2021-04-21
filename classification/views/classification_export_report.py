@@ -41,6 +41,7 @@ class ExportFormatterReport(ExportFormatter):
             # only support 1 record for now
             break
 
+        self.row_count += 1
         report = ClassificationReportTemplate.preferred_template_for(vcm)
         template_str = report.template or 'No report template has been configured'
         django_engine = engines['django']

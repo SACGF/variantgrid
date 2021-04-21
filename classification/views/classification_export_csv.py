@@ -78,8 +78,8 @@ class ExportFormatterCSV(ExportFormatter):
 
         #url = get_url_from_view_path( group.target_variant.get_absolute_url() )
         for c_parts, vcms in group.iter_c_hgvs():
-
             for vcm in vcms:
+                self.row_count += 1
                 writer.writerow(self.to_row(c_parts, vcm))
 
         return out.getvalue()
@@ -91,8 +91,9 @@ class ExportFormatterCSV(ExportFormatter):
         out = io.StringIO()
         writer = csv.writer(out, delimiter=',')
         for vcm, message in self.record_and_error():
+            # self.row_count += 1
+            # ^ if we want to count errors
             writer.writerow(self.to_row(None, vcm, message))
-            self.row_count += 1
 
         return out.getvalue()
 

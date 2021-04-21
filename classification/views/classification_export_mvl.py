@@ -201,6 +201,7 @@ class ExportFormatterMVL(ExportFormatter):
 
             combined_data = warning_text + f'Data as of {date_str}, <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a><br>' + complete_summary + complete_abstract
 
+            self.row_count += 1
             writer.writerow([transcript, c_hgvs, classification, combined_data, variant_details])
 
         return out.getvalue()

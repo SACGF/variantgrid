@@ -537,7 +537,6 @@ class ExportFormatter(BaseExportFormatter):
                 try:
                     row = self.row(vdata)
                     if row:
-                        self.row_count += 1
                         yield row
                 except GeneratorExit:
                     # user has cancelled the download, just stop now

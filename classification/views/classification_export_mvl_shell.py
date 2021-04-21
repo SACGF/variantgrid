@@ -17,6 +17,7 @@ class ExportFormatterMVLShell(ExportFormatterMVL):
             transcript = c_parts.transcript
             c_hgvs = c_parts.raw_c
 
+            self.row_count += 1
             writer.writerow([transcript, c_hgvs, "VOUS", "This is a test", "This is a test"])
 
         return out.getvalue()
