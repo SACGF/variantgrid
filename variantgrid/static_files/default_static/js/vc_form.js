@@ -141,8 +141,8 @@ const VCForm = (function() {
             this.updateTitle();
             this.updatePublishHistory();
             
-            if (!this.isEditMode() || this.alwaysAsterix) {
-                this.searchAsterix();
+            if (!this.isEditMode()) {
+                this.searchAsterisk();
             } else {
                 /*
                 window.setTimeout(() => {
@@ -1022,7 +1022,6 @@ const VCForm = (function() {
             jLinks = $(params.links);
             jShareButtons = $(params.shareButtons);
             this.citations = params.citations;
-            this.alwaysAsterix = params.alwaysAsterix || false;
             this.attachmentsEnabled = params.attachmentsEnabled || false;
             
             jHelp = $(params.help);
@@ -1649,7 +1648,7 @@ const VCForm = (function() {
             jFilterBox.keyup();
         },
         
-        searchAsterix: function() {
+        searchAsterisk: function() {
             window.setTimeout(() => {
                 jFilterBox.val('*');
                 jFilterBox.keyup();
