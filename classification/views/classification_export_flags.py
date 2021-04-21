@@ -67,6 +67,7 @@ class ExportFormatterFlags(ExportFormatter):
 
         for problem in self.iterate_problems(vcm):
             row = [url, lab, lab_record_id, imported_chgvs, version, problem.code, problem.message]
+            self.row_count += 1
             writer.writerow(row)
 
         return out.getvalue()

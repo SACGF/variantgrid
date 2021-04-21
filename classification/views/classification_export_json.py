@@ -50,6 +50,8 @@ class ExportFormatterJSON(ExportFormatter):
         if self.first_row:
             self.first_row = False
             return json_str
+
+        self.row_count += 1
         return ',\n' + json_str
 
     def row(self, group: AlleleGroup) -> str:

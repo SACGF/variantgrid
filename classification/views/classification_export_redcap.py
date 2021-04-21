@@ -307,6 +307,7 @@ class ExportFormatterRedcap(ExportFormatter):
             row_values = row_values + [vc.id, vc.lab.name, vc.lab_record_id, vcm.created.timestamp(), evidence_weights, citations]
             row_values = row_values + self.used_key_arrays[idx].row(vcm)
 
+        self.row_count += 1
         return ExportFormatter.write_single_row(row_values, delimiter=',')
 
     def filename(self) -> str:

@@ -170,6 +170,7 @@ class ExportFormatterKeys(BaseExportFormatter):
 
             data = {}
             for key, value in self.key_counters.items():
+                self.row_count += 1
                 data[key] = value.to_json()
 
             yield json.dumps(data, indent=4)
