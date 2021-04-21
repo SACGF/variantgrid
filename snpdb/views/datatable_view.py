@@ -34,7 +34,7 @@ class RichColumn:
         return f'TableFormat.choices.bind(null, { json_str })'
 
     def __init__(self,
-                 key: str,
+                 key: Optional[str] = None,
                  name: str = None,
                  sort_keys: List[str] = None,
                  label: str = None,
@@ -63,6 +63,8 @@ class RichColumn:
         self.key = key
         self.sort_keys = sort_keys
         self.name = name or key
+        if not self.name:
+            raise ValueError("key or name must be provided")
         self.label = label
         if not label:
             self.label = name or key
