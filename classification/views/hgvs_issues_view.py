@@ -1,6 +1,6 @@
 import csv
 from dataclasses import dataclass
-from typing import List, io
+from typing import List, io, Dict, Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.decorators import user_passes_test
@@ -18,7 +18,7 @@ from flags.models.models import FlagCollection
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
 from library.utils import delimited_row
-from snpdb.models import VariantAllele, allele_flag_types
+from snpdb.models import VariantAllele, allele_flag_types, GenomeBuild
 from snpdb.models.models_variant import Allele
 from classification.models.flag_types import classification_flag_types
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -71,12 +71,33 @@ def view_hgvs_issues(request: HttpRequest) -> Response:
 
 class AlleleColumns(DatatableConfig):
 
+    def get_allele(self, allele_id: int) -> Allele:
+        if last_allele := self.last_allele:
+            if last_allele.id == allele_id:
+                return last_allele
+        last_allele = Allele.objects.get(id=allele_id)
+        return last_allele
+
+
+    def variant_37(self, row: Dict[str, Any]) -> Optional[str]:
+        allele = self.get_allele(row["id"])
+        if variant := allele.grch37:
+            return variant.get_canonical_c_hgvs(GenomeBuild.grch37())
+
+    def variant_38(self, row: Dict[str, Any]) -> Optional[str]:
+        allele = self.get_allele(row["id"])
+        if variant := allele.grch38:
+            return variant.get_canonical_c_hgvs(GenomeBuild.grch38())
+
     def __init__(self, request):
         super().__init__(request)
+        self.last_allele: Optional[Allele] = None
 
         self.rich_columns = [
             RichColumn(key="id", label='ID', client_renderer='alleleIdRender', orderable=True, default_sort=SortOrder.DESC),
             RichColumn(key="clingen_allele__id", client_renderer='clingenIdRenderer', label='ClinGen Allele', orderable=True),
+            RichColumn(name="variant_37", label='(Canonical) 37 Variant', renderer=self.variant_37, orderable=False),
+            RichColumn(name="variant_38", label='(Canonical) 38 Variant', renderer=self.variant_38, orderable=False),
             RichColumn(key="flag_collection_id", label="Flags", client_renderer='TableFormat.flags')
         ]
 
