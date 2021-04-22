@@ -32,6 +32,8 @@ class AdminExportCsvMixin:
     export_as_csv.short_description = "Export Selected"
 
     def _is_readonly(self, f) -> bool:
+        if not f.editable:
+            return True  # does this make all the below redundant?
         if isinstance(f, (AutoField, ForeignKey)):
             return True
         if isinstance(f, DateTimeField):
