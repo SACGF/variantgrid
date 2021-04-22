@@ -407,6 +407,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def imported_genome_build(self):
         return self.get(SpecialEKeys.GENOME_BUILD)
 
+    @property
+    def imported_c_hgvs(self):
+        return self.get(SpecialEKeys.C_HGVS)
+
     def flag_type_context(self):
         return FlagTypeContext.objects.get(pk='classification')
 

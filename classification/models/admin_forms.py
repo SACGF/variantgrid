@@ -131,7 +131,7 @@ class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
 
 
 class ClassificationAdmin(admin.ModelAdmin):
-    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'imported_genome_build', 'withdrawn', 'chgvs_grch37', 'chgvs_grch38', 'user', 'created']
+    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created']
     list_filter = (ClassificationOrgFilter, ClassificationLabFilter, ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ClassificationUserFilter,)
     search_fields = ('id', 'lab_record_id')
 
