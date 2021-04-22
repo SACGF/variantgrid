@@ -1,6 +1,4 @@
-import csv
-from dataclasses import dataclass
-from typing import List, io, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.decorators import user_passes_test
@@ -18,7 +16,7 @@ from flags.models.models import FlagCollection
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
 from library.utils import delimited_row
-from snpdb.models import VariantAllele, allele_flag_types, GenomeBuild
+from snpdb.models import VariantAllele, allele_flag_types, GenomeBuild, Variant
 from snpdb.models.models_variant import Allele
 from classification.models.flag_types import classification_flag_types
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -78,16 +76,27 @@ class AlleleColumns(DatatableConfig):
         last_allele = Allele.objects.get(id=allele_id)
         return last_allele
 
+    def variant_for(self, row: Dict[str, Any], genome_build: GenomeBuild) -> str:
+        values = list()
+        allele = self.get_allele(row["id"])
+        variant: Variant
+        try:
+            variant = allele.variant_for_build(genome_build=genome_build, best_attempt=False)
+        except ValueError:
+            return "-"
+        values.append(f'<span class="text-secondary">{variant}</span>')
+        if variant_annotation := variant.get_best_variant_transcript_annotation(genome_build):
+            if gene := variant_annotation.gene:
+                gene_symbol = gene.get_gene_symbol(genome_build)
+                values.append(gene_symbol.symbol)
+
+        return "<br/>".join(values)
 
     def variant_37(self, row: Dict[str, Any]) -> Optional[str]:
-        allele = self.get_allele(row["id"])
-        if variant := allele.grch37:
-            return variant.get_canonical_c_hgvs(GenomeBuild.grch37())
+        return self.variant_for(row, GenomeBuild.grch37())
 
     def variant_38(self, row: Dict[str, Any]) -> Optional[str]:
-        allele = self.get_allele(row["id"])
-        if variant := allele.grch38:
-            return variant.get_canonical_c_hgvs(GenomeBuild.grch38())
+        return self.variant_for(row, GenomeBuild.grch38())
 
     def __init__(self, request):
         super().__init__(request)
@@ -96,8 +105,8 @@ class AlleleColumns(DatatableConfig):
         self.rich_columns = [
             RichColumn(key="id", label='ID', client_renderer='alleleIdRender', orderable=True, default_sort=SortOrder.DESC),
             RichColumn(key="clingen_allele__id", client_renderer='clingenIdRenderer', label='ClinGen Allele', orderable=True),
-            RichColumn(name="variant_37", label='(Canonical) 37 Variant', renderer=self.variant_37, orderable=False),
-            RichColumn(name="variant_38", label='(Canonical) 38 Variant', renderer=self.variant_38, orderable=False),
+            RichColumn(name="variant_37", label='37 Variant', renderer=self.variant_37, orderable=False),
+            RichColumn(name="variant_38", label='38 Variant', renderer=self.variant_38, orderable=False),
             RichColumn(key="flag_collection_id", label="Flags", client_renderer='TableFormat.flags')
         ]
 
@@ -118,7 +127,7 @@ class AlleleColumns(DatatableConfig):
         return qs
 
 @user_passes_test(is_superuser)
-def download_hgvs_issues(request: HttpRequest) -> Response:
+def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
 
     def row_generator():
         yield delimited_row([
