@@ -23,11 +23,19 @@ if django_settings_module == DEFAULT_DJANGO_SETTINGS:
     from variantgrid.settings.components.seqauto_settings import *
     """
     flattened_hostname = socket.gethostname().lower().split('.')[0].replace('-', '')
+
+    # can't start with a number
+    if flattened_hostname[0].isnumeric():
+        flattened_hostname = "s" + flattened_hostname
+
     pwd = os.path.dirname(__file__)
     flattened_hostname_path = os.path.join(pwd, 'env', f"{flattened_hostname}.py")
+
     logging.info(f'LOADING settings file {flattened_hostname_path}')
     if os.path.exists(flattened_hostname_path):
         flattened_hostname_module = f"variantgrid.settings.env.{flattened_hostname}"
         exec(f"from {flattened_hostname_module} import *")
+    else:
+        logging.error(f"Settings file doesn't exist {flattened_hostname_path}")
 else:
     exec(f"from {django_settings_module} import *")
