@@ -134,6 +134,7 @@ def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
             "Allele ID",
             "Allele URL",
             "Clingen Allele ID",
+            "Gene",
             "GRCh37",
             "GRCh38",
             "Issue Type",
@@ -146,12 +147,28 @@ def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
             flag: Flag
             for flag in open_flags:
 
+                gene_symbol_str = None
+                for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+                    variant: Optional[Variant]
+                    try:
+                        variant = allele.variant_for_build(genome_build, best_attempt=False)
+                    except ValueError:
+                        pass
+                    if variant:
+                        if variant_annotation := variant.get_best_variant_transcript_annotation(genome_build):
+                            if gene := variant_annotation.gene:
+                                if gene_symbol := gene.get_gene_symbol(genome_build):
+                                    gene_symbol_str = gene_symbol.symbol
+                                    break
+
+
                 yield delimited_row([
                     allele.id,
                     get_url_from_view_path(allele.get_absolute_url()),
                     allele.clingen_allele_id,
-                    str(allele.grch37),
-                    str(allele.grch38),
+                    gene_symbol_str,
+                    str(allele.grch37) if allele.grch37 else "",
+                    str(allele.grch38) if allele.grch38 else "",
                     flag.flag_type.label,
                     flag.flagcomment_set.first().text
                 ])
