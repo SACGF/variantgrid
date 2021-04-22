@@ -14,7 +14,6 @@ from rest_framework.views import APIView
 from typing import List
 
 from library.django_utils import get_url_from_view_path
-from library.log_utils import report_event
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -37,7 +36,9 @@ import re
 
 def parse_since(since_str: str) -> datetime:
     try:
-        return datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
+        since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
+        return since_date
     except:
         pass
 
