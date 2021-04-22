@@ -267,7 +267,7 @@ const VCForm = (function() {
             quickSubmitWrapper.empty();
             if (quickSubmitWrapper.length) {
                 let message = null;
-                let provideSubmitButton = false;
+                let provideSubmitButton = true;
 
                 if (this.record.can_write) {
                     if (this.record.withdrawn) {
@@ -277,15 +277,14 @@ const VCForm = (function() {
                         // shouldn't happen as when we have a sending status it just says Sending
                     } else if (this.hasErrors()) {
                         message = "Errors must be fixed before submitting.";
+                        provideSubmitButton = false;
                     } else {
                         if (this.record.has_changes) {
                             message = "This record has unsubmitted changes.<br/>Changes won't be visible to other users.";
-                            provideSubmitButton = true;
                         } else if (this.record.publish_level === 'lab') {
                             message = `This record is only visible to users in your lab group.`;
                         } else if (this.record.publish_level === 'institution') {
                             message = `This record is only visible to users in your organisation.`;
-                            provideSubmitButton = true;
                         } else {
                             let message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
                             $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`}).appendTo(quickSubmitWrapper);
@@ -312,12 +311,14 @@ const VCForm = (function() {
                                 html: '<i class="fas fa-clock"></i> Uploading Changes'
                             }).appendTo(quickSubmitWrapper);
                         } else {
-                            $('<button>', {
-                                class: 'mt-1 btn btn-primary w-100',
-                                html: '<i class="fas fa-upload"></i> Submit',
-                                title: 'Submit/Share',
-                                click: this.share.bind(this)
-                            }).appendTo(quickSubmitWrapper);
+                            if (provideSubmitButton) {
+                                $('<button>', {
+                                    class: 'mt-1 btn btn-primary w-100',
+                                    html: '<i class="fas fa-upload"></i> Submit',
+                                    title: 'Submit/Share',
+                                    click: this.share.bind(this)
+                                }).appendTo(quickSubmitWrapper);
+                            }
                         }
                     }
                 } else if (this.record.can_write_latest) {
