@@ -492,6 +492,11 @@ class ConditionTextAdmin(ModelAdminBasics):
     list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding"]
     list_filter = [ConditionTextStatusFilter, ClassificationLabFilter]
 
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'normalized_text': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
+
     def auto_match(self, request, queryset):
         condition_text: ConditionText
         for condition_text in queryset:
