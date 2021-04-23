@@ -307,9 +307,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         ct: ConditionText
         ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
 
-        # if condition text has changed, remove the old entries
-        ConditionTextMatch.objects.filter(classification=classification).exclude(condition_text=ct).delete()
-
         # ensure each step of the hierarchy is present
         root, new_root = ConditionTextMatch.objects.get_or_create(
             condition_text=ct,
@@ -334,7 +331,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             classification=None
         )
 
-        save_required = False
+        ct_save_required = False
         if existing:
             if existing.parent != mode_of_inheritance_level or \
                     existing.condition_text != ct or \
@@ -348,7 +345,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 existing.parent = mode_of_inheritance_level
                 existing.condition_text = ct
                 existing.mode_of_inheritance = mode_of_inheritance
-                save_required = True
+                existing.save()
+                ct_save_required = True
                 if update_counts:
                     update_condition_text_match_counts(old_text)
                     old_text.save()
@@ -366,13 +364,13 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         if attempt_automatch and (new_root or new_gene_level):
             ConditionTextMatch.attempt_automatch(ct)
-            save_required = True
+            ct_save_required = True
 
         if update_counts:
             update_condition_text_match_counts(ct)
-            save_required = True
+            ct_save_required = True
 
-        if save_required:
+        if ct_save_required:
             ct.save()
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
