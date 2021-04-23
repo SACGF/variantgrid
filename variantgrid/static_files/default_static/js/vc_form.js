@@ -328,7 +328,7 @@ const VCForm = (function() {
                             }
                         }
                     }
-                } else if (!this.record.is_last_published) {
+                } else if (!this.record.is_last_published || this.record.can_write_latest) {
                     let goToLatest = () => {
                         window.open(`/classification/classification/${this.record.id}`, '_self');
                     };
