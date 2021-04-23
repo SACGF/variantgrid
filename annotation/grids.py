@@ -1,43 +1,64 @@
+from typing import Dict, Any
+
+from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 
-from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance
+from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance, AnnotationStatus
 from annotation.models.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
 from genes.models import GeneVersion
 from library.jqgrid_abstract_genes_grid import AbstractGenesGrid
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
 
-class AnnotationRunGrid(JqGridUserRowConfig):
-    model = AnnotationRun
-    caption = 'AnnotationRun'
-    fields = [
-        'id', 'status',
-        'annotation_range_lock__version__genome_build__name',
-        'annotation_range_lock__version__id', 'annotation_range_lock__count', 'vep_skipped_count',
-        'annotation_range_lock__min_variant__id', 'annotation_range_lock__max_variant__id',
-        'task_id', 'created', 'dump_start', 'dump_end',
-        'annotation_start', 'annotation_end', 'upload_start', 'upload_end',
-        'error_exception', 'vcf_dump_filename', 'vcf_annotated_filename'
-    ]  # 'pipeline_stdout' and 'pipeline_stderr' are too long!
-    colmodel_overrides = {
-        'id': {'width': 20, 'formatter': 'viewAnnotationRunLink'},
-        'annotation_range_lock__version__genome_build__name': {'label': 'Build'},
-        'annotation_range_lock__version__id': {'label': 'Version'},
-        'annotation_range_lock__count': {'label': 'Variant Count'},
-        'annotation_range_lock__min_variant__id': {'label': 'Min Variant'},
-        'annotation_range_lock__max_variant__id': {'label': 'Max Variant'}
-    }
+class AnnotationRunColumns(DatatableConfig):
 
-    def __init__(self, user, genome_build_name):
-        super().__init__(user)
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        queryset = self.model.objects.filter(annotation_range_lock__version__genome_build=genome_build)
-        self.queryset = queryset.values(*self.get_field_names())
+    def status(self, row: Dict[str, Any]):
+        return AnnotationStatus(row["status"]).label
 
-        self.extra_config.update({'sortname': "id",
-                                  'sortorder': "desc",
-                                  'shrinkToFit': False})
+    def __init__(self, request):
+        super().__init__(request)
+
+        self.rich_columns = [
+            RichColumn(key="id", label='ID', orderable=True, client_renderer='idRenderer'),
+            RichColumn(key="status", orderable=True, renderer=self.status),
+            RichColumn(key="annotation_range_lock__version__genome_build__name", label='Build', orderable=True),
+            RichColumn(key="annotation_range_lock__version__id", label='Version', orderable=True),
+            RichColumn(key="annotation_range_lock__count", label='Var Count', orderable=True),
+            RichColumn(key="vep_skipped_count", label="VEP Skipped", orderable=True),
+            RichColumn(key="annotation_range_lock__min_variant__id", label="Min Var", orderable=True),
+            RichColumn(key="annotation_range_lock__max_variant__id", label="Max Var", orderable=True),
+
+            # RichColumn(key="task_id", label="Task ID", orderable=True),
+            RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="dump_start", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="dump_end", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="annotation_start", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="annotation_end", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="upload_start", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="upload_end", client_renderer='TableFormat.timestamp', orderable=True),
+
+            RichColumn(key=None, name='preview', label='Data',
+                       client_renderer='TableFormat.preview.bind(null, ["error_exception", "pipeline_stdout", "pipeline_stderr"])'),
+            RichColumn(key="error_exception", orderable=True, detail=True),
+            RichColumn(key="pipeline_stdout", detail=True),
+            RichColumn(key="pipeline_stderr", detail=True),
+            RichColumn(key="vcf_dump_filename", detail=True),
+            RichColumn(key="vcf_annotated_filename", detail=True),
+        ]
+
+    def get_initial_queryset(self):
+        return AnnotationRun.objects.all()
+
+    def filter_queryset(self, qs: QuerySet) -> QuerySet:
+        if genome_build_str := self.get_query_param("genome_build"):
+            genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build"))
+            qs = qs.filter(annotation_range_lock__version__genome_build=genome_build)
+        if status_str := self.get_query_param("status"):
+            if status_str == "outstanding":
+                qs = qs.exclude(status__in={AnnotationStatus.FINISHED})
+        return qs
 
 
 class VariantAnnotationVersionGrid(JqGridUserRowConfig):

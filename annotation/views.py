@@ -20,6 +20,7 @@ from htmlmin.decorators import not_minified_response
 
 from annotation.annotation_versions import get_variant_annotation_version
 from annotation.citations import get_citations, CitationDetails
+from annotation.grids import AnnotationRunColumns
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     VariantAnnotationVersionDiff
@@ -359,7 +360,8 @@ def variant_annotation_runs(request):
         genome_build_summary[genome_build.pk] = summary_data
         genome_build_field_counts[genome_build.pk] = {as_display[k]: v for k, v in field_counts.items()}
     context = {"genome_build_summary": genome_build_summary,
-               "genome_build_field_counts": genome_build_field_counts}
+               "genome_build_field_counts": genome_build_field_counts,
+               "datatable_config": AnnotationRunColumns(request)}
     return render(request, "annotation/variant_annotation_runs.html", context)
 
 
