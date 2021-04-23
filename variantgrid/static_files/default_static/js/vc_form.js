@@ -276,7 +276,7 @@ const VCForm = (function() {
                         // message = "Changes uploading.";
                         // shouldn't happen as when we have a sending status it just says Sending
                     } else if (this.hasErrors()) {
-                        message = "Errors must be fixed before submitting.";
+                        message = "Messages must be resolved before submitting.";
                         provideSubmitButton = false;
                     } else {
                         if (this.record.has_changes) {
@@ -318,10 +318,17 @@ const VCForm = (function() {
                                     title: 'Submit/Share',
                                     click: this.share.bind(this)
                                 }).appendTo(quickSubmitWrapper);
+                            } else if (this.hasErrors()) {
+                                $('<div>', {
+                                    class: 'mt-2 border border-information rounded w-100 text-center p-2 text-secondary bg-light hover-detail',
+                                    title: `Errors in the messages section must be fixed before you can submit.`,
+                                    'data-toggle': 'hover',
+                                    html: '<i class="fas fa-exclamation-circle"></i> Resolve Messages to Submit'
+                                }).appendTo(quickSubmitWrapper);
                             }
                         }
                     }
-                } else if (this.record.can_write_latest) {
+                } else if (!this.record.is_last_published) {
                     let goToLatest = () => {
                         window.open(`/classification/classification/${this.record.id}`, '_self');
                     };

@@ -1604,6 +1604,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             'publish_level': self.share_level,
             'version_publish_level': version.share_level if version else self.share_level,
             'version_is_published': version.published if version else None,
+            'is_last_published': version.is_last_published if version else True,
             'published_version': last_published_timestamp,
             'can_write': can_write,
             'can_write_latest': can_write,
