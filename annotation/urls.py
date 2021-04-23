@@ -1,8 +1,9 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from annotation import views, views_rest
-from annotation.grids import TissueGeneGrid, VariantAnnotationVersionGrid, AnnotationRunGrid
+from annotation.grids import TissueGeneGrid, VariantAnnotationVersionGrid, AnnotationRunColumns
 from library.django_utils.jqgrid_view import JQGridView
+from snpdb.views.datatable_view import DatabasetableView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -26,7 +27,8 @@ urlpatterns = [
     perm_path('load_cached_web_resource/<pk>', views.load_cached_web_resource, name='load_cached_web_resource'),
 
     perm_path('annotation_version/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=VariantAnnotationVersionGrid), name='variant_annotation_version_grid'),
-    perm_path('annotation_run/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AnnotationRunGrid), name='annotation_run_grid'),
+
+    perm_path('annotation_run/datatables', DatabasetableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
 
     perm_path('tissue_gene/grid/<int:human_protein_atlas_version_id>/<int:tissue_sample_id>/<min_abundance>/<slug:op>/', JQGridView.as_view(grid=TissueGeneGrid, csv_download=True), name='tissue_gene_grid'),
 ]

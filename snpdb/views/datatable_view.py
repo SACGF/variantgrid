@@ -10,6 +10,7 @@ from kombu.utils import json
 from lazy import lazy
 
 from library.log_utils import report_exc_info
+from library.utils import pretty_label
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -62,13 +63,18 @@ class RichColumn:
         """
         self.key = key
         self.sort_keys = sort_keys
+        if orderable and not self.key and not self.sort_keys:
+            raise ValueError("Cannot create an 'orderable' RichColumn without key or sort_keys")
         self.name = name or key
         if not self.name:
-            raise ValueError("key or name must be provided")
+            raise ValueError("Cannot create a RichColumn without key or name must be provided")
         self.label = label
         if not label:
             self.label = name or key
-            self.label = self.label[0].upper() + self.label[1:]
+            self.label = pretty_label(self.label)
+        if not key and not renderer and not client_renderer:
+            raise ValueError("Cannot create a RichColumn without a key, server or client renderer")
+
         self.orderable = orderable
         self.renderer = renderer
         self.client_renderer = client_renderer
@@ -294,7 +300,9 @@ class DatatableMixin(object):
         return None
 
     def filter_queryset(self, qs):
-        return self.config.filter_queryset(qs)
+        if qs := self.config.filter_queryset(qs):
+            return qs
+        raise NotImplementedError("filter_queryset returned None")
 
     def prepare_results(self, qs: QuerySet):
         self.config.pre_render(qs)
