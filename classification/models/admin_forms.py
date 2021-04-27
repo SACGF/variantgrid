@@ -6,6 +6,7 @@ import json
 from django.conf import settings
 
 from annotation.models.models import AnnotationVersion
+from classification.management.commands.evidence_key_to_unit import EvidenceKeyToUnit
 from library.guardian_utils import admin_bot
 from snpdb.admin import ModelAdminBasics
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
@@ -197,29 +198,6 @@ class ClassificationAdmin(admin.ModelAdmin):
 
     populate_base_variant_data.short_description = "Populate base variant data"
 
-    def migration_fixes(self, request, queryset):
-        for vc in queryset:
-            vc.fix_migration_stuff(request.user)
-
-        self.message_user(request, f"{queryset.count()} records migrated")
-
-    migration_fixes.short_description = "Migration fixes"
-
-    def age_fixes(self, request, queryset):
-
-        def age_patches(patch: PatchMeta):
-            patch_merge_age_units(patch)
-            if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
-                patch_fuzzy_age(patch)
-
-        vc: Classification
-        for vc in queryset:
-            vc.patch_history(age_patches)
-
-        self.message_user(request, f"{queryset.count()} records age changes")
-
-    age_fixes.short_description = "** Age fixes"
-
     def revalidate(self, request, queryset):
         for vc in queryset:
             vc.revalidate(request.user)
@@ -230,12 +208,12 @@ class ClassificationAdmin(admin.ModelAdmin):
     def publish_logged_in_users(self, request, queryset):
         self.publish_share_level(request, queryset, ShareLevel.ALL_USERS)
 
-    publish_logged_in_users.short_description = 'Publish - App Users'
+    publish_logged_in_users.short_description = 'Publish - Org'
 
-    def publish_3rd_party_dbs(self, request, queryset):
-        self.publish_share_level(request, queryset, ShareLevel.PUBLIC)
+    def publish_org(self, request, queryset):
+        self.publish_share_level(request, queryset, ShareLevel.INSTITUTION)
 
-    publish_3rd_party_dbs.short_description = 'Publish - 3rd Party Databases'
+    publish_org.short_description = 'Publish - Organisation'
 
     def publish_share_level(self, request, queryset, share_level: ShareLevel):
         already_published = 0
@@ -337,15 +315,21 @@ class ClassificationAdmin(admin.ModelAdmin):
 
     withdraw_false.short_description = 'Un-Withdraw'
 
-    actions = [migration_fixes,
-               revalidate,
+    """
+    def fix_allele_freq_history(self, request, queryset):
+        results = EvidenceKeyToUnit(key_names=["allele_frequency"]).migrate(queryset, dry_run=False)
+        for result in results:
+            self.message_user(request, result)
+    """
+
+    actions = [revalidate,
                populate_base_variant_data,
                publish_logged_in_users,
-               publish_3rd_party_dbs,
+               publish_org,
                reattempt_variant_matching,
                recalculate_cached_chgvs,
                email_discordance_notification,
-               age_fixes,
+               # fix_allele_freq_history,
                withdraw_true,
                withdraw_false]
 
