@@ -24,7 +24,7 @@
             <tbody>
         {% for analysis, sample_info in analysis_details %}
             <tr> 
-            <td><a href="{% url 'analysis' analysis.pk %}">{{ analysis }}</a>
+            <td><a href="{% url 'analysis' analysis.pk %}">{{ analysis.pk }} - {{ analysis }}</a>
             <td>{{ analysis.get_analysis_type_display }}
             <td>{{ analysis.user }}
             {% if show_sample_info %}

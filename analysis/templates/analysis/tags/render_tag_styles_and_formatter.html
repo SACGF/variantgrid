@@ -17,8 +17,9 @@
             formatAnalysis : function(analysisName, options, rowObject) {
                 let analysis = "";
                 if (analysisName) {
-                    const URL = Urls.analysis(rowObject["analysis__id"]);
-                    analysis = "<a href='" + URL + "' target='_blank'>" + analysisName + "</a>";
+                    let analysisId = rowObject["analysis__id"];
+                    const URL = Urls.analysis(analysisId);
+                    analysis = `<a href='${URL}' target='_blank'>${analysisId} - ${analysisName}</a>`;
                 }
                 return analysis;
             },
