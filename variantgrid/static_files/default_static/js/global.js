@@ -547,6 +547,8 @@ TableFormat.timestamp = (data, type, row) => {
     if (data) {
         timestampStr = convertTimestamp(data);
         return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
+    } else {
+        return '';
     }
 };
 TableFormat.choices = (choices, data, type, row) => {
