@@ -54,5 +54,5 @@ class EvidenceKeyToUnit:
 
                 if not dry_run and modified:
                     cm.save(update_fields=['published_evidence', 'delta'])
-                    print(f"Updated history of classification {cm.id}")
+                    print(f"Updated history of classification {c.id} version {cm.id}")
         # return changes
