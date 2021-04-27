@@ -80,6 +80,7 @@ if settings.HEARTBEAT_URL:
         'schedule': MINUTE_SECS * 30,
     }
 
+
 @app.task(bind=True)
 def debug_task(self):
     logging.info(('Request: {0!r}'.format(self.request)))
