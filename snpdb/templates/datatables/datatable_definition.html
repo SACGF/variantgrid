@@ -29,6 +29,7 @@ $(document).ready(function() {
         {% endif %}
         ajax: {
             url: '{% url url %}',
+            type: 'POST',
             {% if data %}data: {{ data | safe }},{% endif %}
         },
         bFilter: false,
