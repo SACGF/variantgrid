@@ -13,7 +13,6 @@ from requests.models import Response
 from classification.models import Classification
 from flags.models import Flag
 from flags.models.models import FlagCollection
-from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
 from library.utils import delimited_row
 from snpdb.models import VariantAllele, allele_flag_types, GenomeBuild, Variant
@@ -126,6 +125,7 @@ class AlleleColumns(DatatableConfig):
 
         return qs
 
+
 @user_passes_test(is_superuser)
 def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
 
@@ -149,22 +149,19 @@ def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
 
                 gene_symbol_str = None
                 for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
-                    variant: Optional[Variant]
                     try:
                         variant = allele.variant_for_build(genome_build, best_attempt=False)
-                    except ValueError:
-                        pass
-                    if variant:
                         if variant_annotation := variant.get_best_variant_transcript_annotation(genome_build):
                             if gene := variant_annotation.gene:
                                 if gene_symbol := gene.get_gene_symbol(genome_build):
                                     gene_symbol_str = gene_symbol.symbol
                                     break
-
+                    except ValueError:
+                        pass
 
                 yield delimited_row([
                     allele.id,
-                    get_url_from_view_path(allele.get_absolute_url()),
+                    request.build_absolute_uri(allele.get_absolute_url()),
                     allele.clingen_allele_id,
                     gene_symbol_str,
                     str(allele.grch37) if allele.grch37 else "",
