@@ -315,6 +315,7 @@ class AnalysesGrid(JqGridUserRowConfig):
                  'formatter_kwargs': {"icon_css_class": "analysis-icon",
                                       "url_name": "analysis",
                                       "url_object_column": "id"}},
+        "genome_build__name": {"label": "Genome Build"},
         "analysis_type": {"label": "Type"},
         "user__username": {'label': 'Created by'},
         "analysislock__locked": {"hidden": True},

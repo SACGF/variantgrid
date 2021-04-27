@@ -31,6 +31,7 @@ class VCFListGrid(JqGridUserRowConfig):
                                       "url_name": "view_vcf",
                                       "url_object_column": "id"}},
         'import_status': {'formatter': 'viewImportStatus'},
+        "genome_build__name": {"label": "Genome Build"},
         'user__username': {'label': 'Uploaded by', 'width': 60},
         'source': {'label': 'VCF source'},
         "project__name": {'label': "Project"},
