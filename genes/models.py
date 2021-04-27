@@ -720,7 +720,13 @@ class TranscriptVersion(SortByPKMixin, models.Model):
                 differences["exon count"] = (my_exon_count, other_exon_count)
             else:
                 exon = 1
-                for my_exon, other_exon in zip(self.data["exons"], transcript.data["exons"]):
+                my_exons = self.data["exons"]
+                other_exons = transcript.data["exons"]
+                if self.data["strand"] == "-":
+                    my_exons = reversed(my_exons)
+                    other_exons = reversed(other_exons)
+
+                for my_exon, other_exon in zip(my_exons, other_exons):
                     my_len = my_exon[1] - my_exon[0]
                     other_len = other_exon[1] - other_exon[0]
                     if my_len != other_len:
