@@ -84,7 +84,7 @@ function getPanelAppGeneEvidenceDiv(server_id, geneSymbol) {
         error: function(qXHR, textStatus, errorThrown) {
             let errorText = "Failed...";
             if (qXHR.status == 404) {
-                errorText = "No found";
+                errorText = "Not found";
             }
             let newDiv = $("<div />").text(errorText);
             panelAppDiv.replaceWith(newDiv);
