@@ -13,7 +13,6 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 from typing import List
 
-from library.django_utils import get_url_from_view_path
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -104,8 +103,8 @@ def export_view(request: HttpRequest) -> Response:
         'default_genome_build': user_settings.default_genome_build,
         'formats': formats,
         'default_format': format_csv,
-        'base_url': get_url_from_view_path(reverse('classification_export_api')),
-        'base_url_redirect': get_url_from_view_path(reverse('classification_export_redirect'))
+        'base_url': request.build_absolute_uri(reverse('classification_export_api')),
+        'base_url_redirect': request.build_absolute_uri(reverse('classification_export_redirect'))
     }
 
     return render(request, 'classification/classification_export.html', context)
