@@ -24,6 +24,8 @@ from library.utils import invert_dict
 
 
 def get_url_from_view_path(view_path):
+    """ If you have the request object, you are probably better off using
+        request.build_absolute_uri(view_path) """
     from django.contrib.sites.models import Site
     current_site = Site.objects.get_current()
     protocol = 'http'
