@@ -1,6 +1,7 @@
+import logging
 import uuid
 from collections import defaultdict
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 from django.conf import settings
 from django.contrib import messages
@@ -525,7 +526,7 @@ class HotspotGraphView(TemplateView):
         return GenomeBuild.get_name_or_alias(genome_build_name)
 
     @lazy
-    def transcript(self):
+    def transcript(self) -> Optional[Transcript]:
         transcript_id = self.kwargs.get("transcript_id")
         gene_id = self.kwargs.get("gene_id")
         gene_symbol_id = self.kwargs.get("gene_symbol")
@@ -543,37 +544,38 @@ class HotspotGraphView(TemplateView):
                 transcript = PfamSequenceIdentifier.get_transcript_for_gene_symbol(gene_symbol, vav)
 
             if transcript is None:
-                raise PfamSequenceIdentifier.DoesNotExist(f"No PfamSequenceIdentifier for {gene_id or gene_symbol_id}")
+                logging.warning("No PfamSequenceIdentifier for %s", gene_id or gene_symbol_id)
         else:
             raise ValueError("At least one of 'gene_symbol', 'gene_id' or 'transcript_id' must be in url kwargs")
         return transcript
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        transcript_version = self.transcript.latest_version(self.genome_build)
+        if self.transcript:
+            transcript_version = self.transcript.latest_version(self.genome_build)
 
-        variant_data = []
-        for hgvs_p, protein_position, consequence, gnomad_af, count in self._get_values(transcript_version):
-            consequence = MolecularConsequenceColors.CONSEQUENCE_LOOKUPS.get(consequence,
-                                                                             MolecularConsequenceColors.OTHER)
-            protein_aa1 = ""
-            if hgvs_p:
-                protein_aa3 = hgvs_p.split(":p.")[1]
-                protein_aa1 = VariantAnnotation.amino_acid_3_to_1(protein_aa3)
+            variant_data = []
+            for hgvs_p, protein_position, consequence, gnomad_af, count in self._get_values(transcript_version):
+                consequence = MolecularConsequenceColors.CONSEQUENCE_LOOKUPS.get(consequence,
+                                                                                 MolecularConsequenceColors.OTHER)
+                protein_aa1 = ""
+                if hgvs_p:
+                    protein_aa3 = hgvs_p.split(":p.")[1]
+                    protein_aa1 = VariantAnnotation.amino_acid_3_to_1(protein_aa3)
 
-            pp = VariantAnnotation.protein_position_to_int(protein_position)
-            variant_data.append((protein_aa1, pp, consequence, gnomad_af, count))
+                pp = VariantAnnotation.protein_position_to_int(protein_position)
+                variant_data.append((protein_aa1, pp, consequence, gnomad_af, count))
 
-        domains = transcript_version.get_domains()
-        molecular_consequence_colors = dict(MolecularConsequenceColors.HOTSPOT_COLORS)
-        context.update({"transcript_version": transcript_version,
-                        "molecular_consequence_colors": molecular_consequence_colors,
-                        "domains": list(domains),
-                        "variant_data": variant_data,
-                        "uuid": uuid.uuid4(),
-                        "title": self._get_title(transcript_version),
-                        "y_title": self._get_y_label(),
-                        "has_graph_filter_toolbar": self.has_graph_filter_toolbar})
+            domains = transcript_version.get_domains()
+            molecular_consequence_colors = dict(MolecularConsequenceColors.HOTSPOT_COLORS)
+            context.update({"transcript_version": transcript_version,
+                            "molecular_consequence_colors": molecular_consequence_colors,
+                            "domains": list(domains),
+                            "variant_data": variant_data,
+                            "uuid": uuid.uuid4(),
+                            "title": self._get_title(transcript_version),
+                            "y_title": self._get_y_label(),
+                            "has_graph_filter_toolbar": self.has_graph_filter_toolbar})
         return context
 
 
@@ -645,7 +647,7 @@ class PublicRUNX1HotspotGraphView(ClassificationsHotspotGraphView):
         return GenomeBuild.get_name_or_alias("GRCh37")  # Hardcoded for server
 
     @lazy
-    def transcript(self):
+    def transcript(self) -> Optional[Transcript]:
         return Transcript.objects.get(pk="ENST00000300305")
 
     def _get_title(self, transcript_version) -> str:
