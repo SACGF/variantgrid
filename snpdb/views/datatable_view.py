@@ -300,7 +300,8 @@ class DatatableMixin(object):
         return None
 
     def filter_queryset(self, qs):
-        if qs := self.config.filter_queryset(qs):
+        qs = self.config.filter_queryset(qs)
+        if qs is not None:
             return qs
         raise NotImplementedError("filter_queryset returned None")
 
