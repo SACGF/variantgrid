@@ -131,7 +131,7 @@ class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
 
 
 class ClassificationAdmin(admin.ModelAdmin):
-    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created']
+    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
     list_filter = (ClassificationOrgFilter, ClassificationLabFilter, ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ClassificationUserFilter,)
     search_fields = ('id', 'lab_record_id')
 
@@ -141,6 +141,18 @@ class ClassificationAdmin(admin.ModelAdmin):
         ('Variant', {'fields': ('chgvs_grch37', 'chgvs_grch38')}),
         ('Data', {'fields': ('clinical_significance', 'evidence',)}),
     )
+
+    def created_detailed(self, obj: Classification):
+        return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+    created_detailed.admin_order_field = 'created'
+    created_detailed.short_description = 'Created'
+
+    def modified_detailed(self, obj: Classification):
+        return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+    modified_detailed.admin_order_field = 'modified'
+    modified_detailed.short_description = 'Modified'
 
     def populate_base_variant_data(self, request, queryset):
         for vc in queryset:
