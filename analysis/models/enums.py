@@ -52,16 +52,15 @@ class GroupOperation(models.TextChoices):
     @classmethod
     def get_operation(cls, group_operation):
         OPERATIONS = {
-            cls.ALL: operator.or_,
-            cls.ANY: operator.and_,
+            cls.ALL: operator.and_,
+            cls.ANY: operator.or_,
         }
         return OPERATIONS[group_operation]
 
     @staticmethod
     def reduce(sequence, group_operation):
-        if group_operation == GroupOperation.ALL:
-            return reduce(operator.and_, sequence)
-        return reduce(operator.or_, sequence)
+        op = GroupOperation.get_operation(group_operation)
+        return reduce(op, sequence)
 
 
 class MinimisationResultType(models.TextChoices):
