@@ -17,6 +17,11 @@ class NodeConfigurationException(NonFatalNodeError):
     pass
 
 
+class NodeOutOfDateException(NonFatalNodeError):
+    """ Node version now superseded """
+    pass
+
+
 class NodeNotFoundException(NonFatalNodeError):
     status = HTTP_404_NOT_FOUND
 

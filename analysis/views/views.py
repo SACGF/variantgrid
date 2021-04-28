@@ -26,7 +26,7 @@ from lazy import lazy
 
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
-from analysis.exceptions import NonFatalNodeError
+from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
 from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, AnalysisChoiceForm, \
     InputSamplesForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
@@ -323,7 +323,11 @@ def node_doc(request, node_id):
 @cache_page(WEEK_SECS)
 @vary_on_cookie
 def node_data_grid(request, analysis_version, node_id, node_version, extra_filters):
-    node = get_node_subclass_or_404(request.user, node_id)
+    try:
+        node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    except NodeOutOfDateException:
+        return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
+
     template = 'analysis/node_data/node_data_grid.html'
     context = {"analysis_version": analysis_version,
                "node_id": node_id,
@@ -448,7 +452,11 @@ def node_async_wait(request, analysis_version, node_id, node_version, extra_filt
 @cache_page(WEEK_SECS)
 @vary_on_cookie
 def node_errors(request, analysis_version, node_id, node_version, extra_filters):
-    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    try:
+        node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    except NodeOutOfDateException:
+        return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
+
     context = {"analysis_version": analysis_version,
                "node_id": node_id,
                "node_version": node_version,
