@@ -6,7 +6,7 @@ from django.db.utils import OperationalError, IntegrityError
 import logging
 from time import sleep
 
-from analysis.exceptions import NodeConfigurationException, NodeParentErrorsException
+from analysis.exceptions import NodeConfigurationException, NodeParentErrorsException, CeleryTasksObsoleteException
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion, NodeCache
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
@@ -84,7 +84,11 @@ def wait_for_cache_task(node_cache_id):
     MAX_CHECKS = 60
     num_checks = 0
     while True:
-        node_cache = NodeCache.objects.get(pk=node_cache_id)
+        try:
+            node_cache = NodeCache.objects.get(pk=node_cache_id)
+        except NodeCache.DoesNotExist:
+            raise CeleryTasksObsoleteException()  # Kills dependent tasks w/o reporting in Rollbar
+
         status = node_cache.variant_collection.status
         if status in ProcessingStatus.FINISHED_STATES:
             print(f"{node_cache} DONE")
