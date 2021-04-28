@@ -1,22 +1,20 @@
-from django.utils import timezone
+import json
+
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
+from django.utils import timezone
 from django_admin_json_editor.admin import JSONEditorWidget
-import json
-from django.conf import settings
 
 from annotation.models.models import AnnotationVersion
-from classification.management.commands.evidence_key_to_unit import EvidenceKeyToUnit
+from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
+from classification.classification_import import process_classification_import
+from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
+from classification.models import EvidenceKey, email_discordance_for_classification, ConditionText, \
+    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification
+from classification.models.classification import Classification, ClassificationImport
 from library.guardian_utils import admin_bot
 from snpdb.admin import ModelAdminBasics
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
-from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
-from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import PatchMeta, EvidenceKey, email_discordance_for_classification, ConditionText, \
-    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification
-from classification.models.classification import Classification, ClassificationImport
-from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
-from classification.classification_import import process_classification_import
 
 
 class VariantMatchedFilter(admin.SimpleListFilter):
