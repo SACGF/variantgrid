@@ -1,5 +1,12 @@
 from rest_framework.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_404_NOT_FOUND
 
+from variantgrid.celery import RollbarIgnoreException
+
+
+class CeleryTasksObsoleteException(RollbarIgnoreException):
+    """ Throw this in a celery task to kill dependent jobs, but not report to rollbar """
+    pass
+
 
 class NonFatalNodeError(Exception):
     status = HTTP_500_INTERNAL_SERVER_ERROR
