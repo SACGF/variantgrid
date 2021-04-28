@@ -17,6 +17,12 @@ from library.constants import HOUR_SECS, MINUTE_SECS
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'variantgrid.settings')
 
+
+class RollbarIgnoreException(Exception):
+    """ Throw an error that subclasses this for Rollbar to ignore """
+    pass
+
+
 app = Celery('variantgrid')
 
 # Using a string here means the worker will not have to
@@ -88,7 +94,7 @@ def debug_task(self):
 
 @app.task(bind=True)
 def fail_task(self):
-    raise ValueError("Born to lose, I've lived my life in vain")
+    raise RollbarIgnoreException("Born to lose, I've lived my life in vain")
 
 
 # Rollbar https://github.com/rollbar/rollbar-celery-example
@@ -104,4 +110,8 @@ rollbar.BASE_DATA_HOOK = celery_base_data_hook
 
 @celery.signals.task_failure.connect
 def on_task_failure(**kwargs):
+    if exception := kwargs.get("exception"):
+        if isinstance(exception, RollbarIgnoreException):
+            return
+
     rollbar.report_exc_info(extra_data=kwargs)

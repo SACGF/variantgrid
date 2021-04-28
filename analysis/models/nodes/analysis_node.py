@@ -926,7 +926,8 @@ class NodeCache(models.Model):
 
 
 @receiver(post_delete, sender=NodeCache)
-def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disable=unused-argument
+def post_delete_node_cache(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ This can sometimes be called multiple times delete_old_node_versions can deletes any obsolete  """
     if instance.variant_collection:
         instance.variant_collection.delete_related_objects()
         instance.variant_collection.delete()
