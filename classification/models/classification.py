@@ -336,10 +336,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
 
         # want to find new tags that are still open
-        flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN).order_by(
-            'collection__id').values_list('collection__id', flat=True).distinct()
-        coi_qs = Classification.objects.filter(Q(flag_collection_id__in=flag_collections) | (
-                    time_range_q & (Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))))
+        flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN)
+        flag_collections = flag_collections.order_by('collection__id').values_list('collection__id', flat=True)
+        flag_q = Q(flag_collection_id__in=flag_collections.distinct())
+        missing_chgvs_q = (Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
+        coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
         coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
 
         summaries: List[ClassificationOutstandingIssues] = list()
@@ -347,10 +348,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         for c in coi_qs:
             coi = ClassificationOutstandingIssues(c)
             this_flags = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN,
-                                             collection=c.flag_collection).values_list('flag_type', flat=True).order_by(
-                'flag_type')
+                                             collection=c.flag_collection)
+
             variant_matching = False
-            for flag_type in this_flags:
+            for flag_type in this_flags.order_by('flag_type').values_list('flag_type', flat=True):
                 if flag_type == 'classification_matching_variant':
                     variant_matching = True
                 coi.add_flag(flag_type)
@@ -1354,10 +1355,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             else:
                 patched.raw = cell.diff(dest=existing, ignore_if_omitted={'immutable'})
                 if patched.value is not None and not source.can_edit(existing_immutability):
-                    warnings.append(
-                        {'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key +
-                                                                     ' from ' + str(existing.value) + ' to ' + str(
-                            patched.value)})
+                    message = f'Cannot change immutable value for {key} from {existing.value} to {patched.value}'
+                    warnings.append({'key': key, 'code': 'immutable', 'message': message})
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
 
