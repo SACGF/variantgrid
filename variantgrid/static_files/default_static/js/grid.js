@@ -507,6 +507,16 @@ function formatClinGenAlleleId(cellValue) {
 }
 
 
+function unitAsPercentFormatter(unitValue) {
+    let percentValue = "";
+    if (unitValue) {
+        let percent = (100.0 * unitValue).toPrecision(3);
+        percentValue = percent + "%";
+    }
+    return percentValue;
+}
+
+
 jQuery.extend($.fn.fmatter , {
     'detailsLink' : detailsLink,
     'tagsFormatter' : tagsFormatter,
@@ -518,6 +528,7 @@ jQuery.extend($.fn.fmatter , {
     'geneSymbolLink' : geneSymbolLink,
     'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
     'gnomadFilteredFormatter' : gnomadFilteredFormatter,
+    'unitAsPercentFormatter' : unitAsPercentFormatter,
 });
 
 

@@ -48,6 +48,21 @@ class VariantGrid(JqGridSQL):
         'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
         'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60, 'formatter': 'omimLink'},
         'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
+        # Unit -> Percent
+        'variantannotation__af_1kg': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__af_uk10k': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad2_liftover_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_afr_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_amr_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_asj_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_eas_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_fin_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_nfe_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_oth_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_popmax_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__gnomad_sas_af': {'formatter': 'unitAsPercentFormatter'},
+        'variantannotation__topmed_af': {'formatter': 'unitAsPercentFormatter'},
     }
 
     def __init__(self, user, node, extra_filters=None, sort_by_contig_and_position=False):
