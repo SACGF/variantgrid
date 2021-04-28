@@ -270,13 +270,13 @@ class VariantGrid(JqGridSQL):
     def get_grid_genotype_columns_and_overrides(cohorts, visibility):
         available_format_columns = get_available_format_columns(cohorts)
         sample_columns = {
-            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55),
-            'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25),
-            'samples_allele_frequency': ('AF', '%(label)s %(sample)s', 25),
-            'samples_read_depth': ('DP', '%(label)s %(sample)s', 25),
-            'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
-            'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
-            'samples_filters': ('FT', '%(label)s %(sample)s', 100),
+            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55, None),
+            'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25, None),
+            'samples_allele_frequency': ('AF', '%(label)s %(sample)s', 30, 'unitAsPercentFormatter'),
+            'samples_read_depth': ('DP', '%(label)s %(sample)s', 25, None),
+            'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25, None),
+            'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25, None),
+            'samples_filters': ('FT', '%(label)s %(sample)s', 100, None),
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -298,7 +298,7 @@ class VariantGrid(JqGridSQL):
         column_names = []
         column_data = []
         for sample, (cohort, cc_index) in sample_cohort_cat_cohorts_index.items():
-            for column, (column_label, label_format, width) in sample_columns.items():
+            for column, (column_label, label_format, width, formatter) in sample_columns.items():
                 if not available_format_columns[column]:
                     continue
                 column_names.append(f"{sample.pk}_{column}")
@@ -309,6 +309,7 @@ class VariantGrid(JqGridSQL):
                 col_data_dict = {
                     "label": label,
                     "width": width,
+                    "formatter": formatter,  # Client side formatter
                     "server_side_formatter": server_side_formatter,
                     "order_by": cohort.get_sample_column_order_by(sample, column)
                 }
