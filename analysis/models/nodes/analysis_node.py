@@ -927,10 +927,15 @@ class NodeCache(models.Model):
 
 @receiver(post_delete, sender=NodeCache)
 def post_delete_node_cache(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    """ This can sometimes be called multiple times delete_old_node_versions can deletes any obsolete  """
-    if instance.variant_collection:
-        instance.variant_collection.delete_related_objects()
-        instance.variant_collection.delete()
+    """ This can sometimes be called multiple times - if node updated again before previous updates
+        delete_old_node_versions is finished """
+    try:
+        if instance.variant_collection:
+            instance.variant_collection.delete_related_objects()
+            instance.variant_collection.delete()
+    except VariantCollection.DoesNotExist:
+        # Deleted already
+        pass
 
 
 class NodeCount(models.Model):
