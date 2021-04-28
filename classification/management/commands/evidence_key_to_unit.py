@@ -41,16 +41,17 @@ class EvidenceKeyToUnit:
                     if earliest_version := converted_in_version.get(e_key.key):
                         if earliest_version > cm.id:
                             for data_name, data in [('evidence', raw_evidence), ('delta', delta)]:
-                                if e_key_blob := data.get(e_key.key):
-                                    if value := e_key_blob.get('value'):
-                                        try:
-                                            e_key_blob['value'] = float(value) / 100
-                                            e_key_blob['note'] = f"Converted from '{value}'%"
-                                            modified = True
-                                            # changes.append(f"Version {c.id}.{cm.id}:{e_key.key} in {data_name} value to {float(value) / 100}")
-                                        except:
-                                            # changes.append(f"Version {c.id}.{cm.id}:{e_key.key} in {data_name} found a value that's not a float: {value}")
-                                            print(f"Version {c.id}.{cm.id}:{e_key.key} in {data_name} found a value that's not a float: {value}")
+                                if data:
+                                    if e_key_blob := data.get(e_key.key):
+                                        if value := e_key_blob.get('value'):
+                                            try:
+                                                e_key_blob['value'] = float(value) / 100
+                                                e_key_blob['note'] = f"Converted from '{value}'%"
+                                                modified = True
+                                                # changes.append(f"Version {c.id}.{cm.id}:{e_key.key} in {data_name} value to {float(value) / 100}")
+                                            except:
+                                                # changes.append(f"Version {c.id}.{cm.id}:{e_key.key} in {data_name} found a value that's not a float: {value}")
+                                                print(f"Version {c.id}.{cm.id}:{e_key.key} in {data_name} found a value that's not a float: {value}")
 
                 if not dry_run and modified:
                     cm.save(update_fields=['published_evidence', 'delta'])
