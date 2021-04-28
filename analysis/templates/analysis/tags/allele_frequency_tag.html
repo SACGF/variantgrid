@@ -48,13 +48,13 @@
 
     function afSetSliderMinMaxLabels(slider, minVal, maxVal) {
         const container = $(slider).parent();
-        $(".slider-min", container).text(minVal);
-        $(".slider-max", container).text(maxVal);
+        $(".slider-min", container).text(Math.floor(minVal * 100));
+        $(".slider-max", container).text(Math.floor(maxVal * 100));
     }
 
     function createSlider(value1, value2) {
         value1 = getValue(value1, 0);
-        value2 = getValue(value2, 100);
+        value2 = getValue(value2, 1);
 
         const sliderTemplate = $('script[data-template="slider"]').html();
         const sliderContainer = $(sliderTemplate);

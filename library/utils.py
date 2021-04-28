@@ -477,6 +477,12 @@ def count(object: Any) -> int:
 trailing_zeros_strip = re.compile("(.*?[.][0-9]*?)(0+)$")
 
 
+def format_percent(number, is_unit=False) -> str:
+    if is_unit:
+        number *= 100
+    return f"{format_significant_digits(number)}%"
+
+
 def format_significant_digits(a_number, sig_digits=3) -> str:
     if a_number == 0:
         return "0"
