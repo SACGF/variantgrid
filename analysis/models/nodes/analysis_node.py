@@ -29,6 +29,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event
+from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource
 from snpdb.variant_collection import write_sql_to_variant_collection
@@ -1085,12 +1086,15 @@ class NodeAlleleFrequencyRange(models.Model):
         has_min = self.min is not None and self.min > self.MIN_VALUE
         has_max = self.max is not None and self.max < self.MAX_VALUE
 
+        min_perc = format_percent(self.min, is_unit=True)
+        max_perc = format_percent(self.max, is_unit=True)
+
         if has_min and has_max:
-            return f"{self.min} - {self.max}"
+            return f"{min_perc} - {max_perc}"
         if has_min:
-            return f">={self.min}"
+            return f">={min_perc}"
         if has_max:
-            return f"<={self.max}"
+            return f"<={max_perc}"
         return ""
 
 
