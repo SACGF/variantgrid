@@ -1026,7 +1026,7 @@ class QCExecSummary(SeqAutoRecord):
     ts_to_tv_ratio = models.FloatField()
     uniformity_of_coverage = models.FloatField()
 
-    def get_coverage_columns(self):
+    def get_coverage_columns(self) -> List[str]:
         COVERAGE_COLUMNS = [
             "percent_10x_goi",
             "percent_20x_goi",

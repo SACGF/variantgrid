@@ -45,7 +45,7 @@ class QCExecSummaryGraph(CacheableGraph):
     def get_columns(self):
         exec_summary_qc = QCType.objects.get(name="ExecSummaryQC")
         non_coverage_columns = exec_summary_qc.qccolumn_set.exclude(field__endswith="_goi")
-        return self.qc_exec_summary.get_coverage_columns() + tuple(non_coverage_columns.values_list("field", flat=True))
+        return self.qc_exec_summary.get_coverage_columns() + list(non_coverage_columns.values_list("field", flat=True))
 
     def get_exec_summary_data(self):
         qc = self.qc_exec_summary
