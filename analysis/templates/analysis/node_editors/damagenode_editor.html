@@ -66,6 +66,10 @@
     });
 </script>
 <div>
+    <div>
+        Show variants meeting any of the following criteria
+    </div>
+
 	<form id="damage-filter" method="post" action="{{ request.path }}">
         {% csrf_token %}
         {% for hidden in form.hidden_fields %}
@@ -85,6 +89,12 @@
                 <td>{{ form.impact_min.errors }} {{ form.impact_min }}</td>
                 <td class="collapse filter-required">{{ form.impact_required }}</td>
                 <td class="collapse filter-required"> <!-- impact_min is non-nullable --> </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td>MODERATE* = HIGH for <span title="Single Nucleotide Variants">SNVs</span> but HIGH or MODERATE for other variant classes.</td>
+                <td></td>
+                <td></td>
             </tr>
             <tr>
                 <th>{{ form.splice_min.label }}</th>
@@ -199,8 +209,16 @@
         {% if has_write_permission %}
     		<button id='damage-save' class="btn btn-primary">save</button>
         {% endif %}
-		<span>Note: Damage, CADD and REVEL settings do not filter indels</span>
 	    {{ form.media }}
 	</form>
+
+    <div>
+        Note: Damage, CADD and REVEL settings do not filter indels.
+        HIGH excludes all missense variants, so you may want to use it in combination with REVEL/CADD/damage thresholds.
+        <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
+            See help for details.
+        </a>
+    </div>
+
 </div>
 {% endblock content %}
