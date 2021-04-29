@@ -66,10 +66,12 @@ class NodeView(UpdateView):
         """ When in AnalysisTemplate mode - want to add a widget wrapper """
         form = super().get_form(form_class=form_class)
 
-        if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE:
+        # In templates, add a widget for analysis template variables for source nodes (sample etc input fields)
+        if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.object.is_source():
             for field_name, field in form.fields.items():
                 if not field.widget.is_hidden:
-                    self._monkey_patch_widget_render(field.widget)
+                    if field_name in ["pedigree", "trio", "cohort", "sample"]:
+                        self._monkey_patch_widget_render(field.widget)
 
         if not form.instance.analysis.can_write(self.request.user):
             set_form_read_only(form)
