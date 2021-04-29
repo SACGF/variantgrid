@@ -31,7 +31,7 @@ table th.num, table td.num {
         const graph_type = $('#id_graph_type', "#exec-summary").val();
 
         clearGraph(graph_selector);
-        var columnSelect = $("select#id_column").parent();
+        const columnSelect = $("select#id_column").parent();
         if (graph_type == 'B') {
             columnSelect.hide();
             const POLL_URL = Urls.qc_exec_summary_graph(EXEC_SUMMARY_ID, compare_against);
