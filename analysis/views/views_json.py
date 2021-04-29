@@ -355,11 +355,10 @@ def analysis_template_variable(request, node_id):
     field = request.POST["field"]
     operation = request.POST["op"]
 
-    class_name = AnalysisVariable.get_node_field_class_name(node, field)
     kwargs = {"node": node, "field": field}
     if operation == 'add':
-        # Could fail here, in which we'll not add to top panel
-        AnalysisVariable.objects.create(class_name=class_name, **kwargs)
+        class_name = AnalysisVariable.get_node_field_class_name(node, field)
+        AnalysisVariable.objects.get_or_create(**kwargs, defaults={"class_name": class_name})
     elif operation == 'del':
         AnalysisVariable.objects.filter(**kwargs).delete()
 
