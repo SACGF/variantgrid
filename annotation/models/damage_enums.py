@@ -1,5 +1,7 @@
 from django.db.models.query_utils import Q
 
+from annotation.models.models_enums import VariantClass
+
 
 class AbstractPathogenicity:
     """ CHOICES *must* be in ascending order of pathogenicity! """
@@ -32,12 +34,16 @@ class AbstractPathogenicity:
         return higher_levels
 
     @classmethod
-    def get_q(cls, min_level=None, allow_null=False):
-        damage_levels = cls.get_damage_or_greater_levels(min_level)
+    def _get_q_for_damage_levels(cls, damage_levels, allow_null=False) -> Q:
         q = Q(**{cls.VARIANT_PATH + "__in": damage_levels})
         if allow_null:
             q |= Q(**{cls.VARIANT_PATH + "__isnull": True})
         return q
+
+    @classmethod
+    def get_q(cls, min_level=None, allow_null=False) -> Q:
+        damage_levels = cls.get_damage_or_greater_levels(min_level)
+        return cls._get_q_for_damage_levels(damage_levels, allow_null)
 
     @classmethod
     def is_level_flagged(cls, level):
@@ -52,16 +58,33 @@ class PathogenicityImpact(AbstractPathogenicity):
     MODIFIER = 'O'
     LOW = 'L'
     MODERATE = 'M'
+    MODERATE_OTHER = '*'  # This is a custom filter not a VEP value, so won't be in annotation data
     HIGH = 'H'
 
     CHOICES = [
         (MODIFIER, "MODIFIER"),
         (LOW, "LOW"),
         (MODERATE, "MODERATE"),
+        (MODERATE_OTHER, "MODERATE*"),
         (HIGH, 'HIGH'),
     ]
     MINIMUM_FLAG_DAMAGE_LEVEL = MODERATE
     VARIANT_PATH = "variantannotation__impact"
+
+    @classmethod
+    def get_damage_or_greater_levels(cls, min_level=None):
+        levels = super().get_damage_or_greater_levels(min_level)
+        levels.discard(cls.MODERATE_OTHER)
+        return levels
+
+    @classmethod
+    def get_q(cls, min_level=None, allow_null=False):
+        q = super().get_q(min_level=min_level, allow_null=allow_null)
+        if min_level == cls.MODERATE_OTHER:
+            # SNV=HIGH, non SNV HIGH or MODERATE
+            q_non_snv = cls._get_q_for_damage_levels([cls.MODERATE], allow_null)
+            q |= q_non_snv & ~Q(variantannotation__variant_class=VariantClass.SNV)
+        return q
 
 
 class SIFTPrediction(AbstractPathogenicity):
