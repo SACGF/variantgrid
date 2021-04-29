@@ -100,7 +100,7 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
     exec_summary_qc = QCType.objects.get(name="ExecSummaryQC")
     qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("field", flat=True))
 
-    coverage_columns = list(qc_exec_summary.get_coverage_columns())
+    coverage_columns = qc_exec_summary.get_coverage_columns()
     sequencing_sample = "qc__bam_file__unaligned_reads__sequencing_sample__sample_name"
     sequencing_run_columns = get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
     values = ["pk", sequencing_sample] + qc_exec_summary_columns + coverage_columns + sequencing_run_columns
