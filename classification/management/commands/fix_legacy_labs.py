@@ -11,7 +11,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         org = Organization.objects.filter(group_name="sa_pathology").get()
-        legacy = Lab.objects.get_or_create(group_name="sa_pathology/legacy", defaults={
+        legacy, _ = Lab.objects.get_or_create(group_name="sa_pathology/legacy", defaults={
             "name": "LEGACY",
             "organization": org,
             "city": "Adelaide",
