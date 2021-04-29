@@ -7,11 +7,13 @@ import subprocess
 
 
 def file_or_filename(f, mode='r'):
+    """ If f is a string (filename), opens (handling gzip)
+        otherwise does nothing if already a file object """
     if isinstance(f, str):
         if 'w' in mode:  # Create path if writing
             mk_path_for_file(f)
 
-        return open(f, mode)
+        return open_handle_gzip(f, mode)
     if all([hasattr(f, method) for method in ["read", "readlines"]]):
         return f  # Already a File object
     raise ValueError(f"'{f}' ({type(f)}) not a file or string")
