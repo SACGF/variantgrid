@@ -3,7 +3,7 @@ import logging
 import subprocess
 import time
 
-from library.log_utils import log_traceback
+from library.log_utils import get_traceback
 from upload.models import UploadPipeline
 
 
@@ -38,10 +38,9 @@ class ImportTask(Task):
                                     processing_seconds_cpu_time=processing_seconds_cpu_time)
         except subprocess.CalledProcessError as e:
             error_message = e.output
-        except Exception as e:
-            error_message = str(e)
+        except:
+            error_message = get_traceback()
 
         if error_message:
             logging.error(error_message)
-            log_traceback()
             upload_pipeline.error(error_message)
