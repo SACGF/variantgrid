@@ -343,7 +343,7 @@ def view_qc_exec_summary_tab(request, qc_id):
     historical_exec_summaries = list(qc.qcexecsummary_set.all())
     if historical_exec_summaries:
         exec_summary_qc = QCType.objects.get(name="ExecSummaryQC")
-        qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("name", flat=True))
+        qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("field", flat=True))
 
         exec_summary = historical_exec_summaries.pop()
         coverage_columns = exec_summary.get_coverage_columns()
