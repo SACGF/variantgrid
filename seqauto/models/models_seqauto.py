@@ -34,7 +34,7 @@ from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd, \
-    SequencingFileType, JobScriptStatus, SeqAutoRunStatus, EnrichmentKitType
+    SequencingFileType, JobScriptStatus, SeqAutoRunStatus
 from seqauto.qc.exec_summary import load_exec_summary
 from seqauto.qc.fastqc_parser import read_fastqc_data
 from seqauto.qc.flag_stats import load_flagstats
@@ -1027,36 +1027,26 @@ class QCExecSummary(SeqAutoRecord):
     uniformity_of_coverage = models.FloatField()
 
     def get_coverage_columns(self):
-        # TODO: Is it easier just to return non-null columns?
-        HIGH_COVERAGE = ('percent_500x_goi', 'percent_250x_goi')
-        LOW_COVERAGE = ('percent_20x_goi', 'percent_10x_goi')
+        COVERAGE_COLUMNS = [
+            "percent_10x_goi",
+            "percent_20x_goi",
+            "percent_20x_kit",
+            "percent_100x_goi",
+            "percent_100x_kit",
+            "percent_250x_goi",
+            "percent_250x_kit",
+            "percent_500x_goi",
+            "percent_500x_kit"
+        ]
 
-        # If enrichment_kit is set, use that to determine columns
-        enrichment_kit = self.qc.bam_file.unaligned_reads.sequencing_sample.enrichment_kit
-        if enrichment_kit is not None:
-            if enrichment_kit.enrichment_kit_type == EnrichmentKitType.AMPLICON:
-                columns = HIGH_COVERAGE
-            else:
-                columns = LOW_COVERAGE
+        columns = []
+        for cc in COVERAGE_COLUMNS:
+            if getattr(self, cc) is not None:
+                columns.append(cc)
 
-            for c in columns:  # Test
-                val = getattr(self, c)
-                if val is None:
-                    msg = f"EnrichmentKit {enrichment_kit} columns {c} is None"
-                    raise ValueError(msg)
-        else:
-            columns = None
-            for cov in [HIGH_COVERAGE, LOW_COVERAGE]:
-                all_ok = True
-                for c in cov:
-                    val = getattr(self, c)
-                    all_ok &= val is not None
-                if all_ok:
-                    columns = cov
-                    break
-            if columns is None:
-                msg = "Couldn't find the 2 non-null coverage columns in QCExecSummary: %r" % self.pk
-                raise ValueError(msg)
+        if not columns:
+            msg = "Couldn't find non-null coverage columns in QCExecSummary: %r" % self.pk
+            raise ValueError(msg)
 
         return columns
 
