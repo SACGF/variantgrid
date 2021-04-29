@@ -346,7 +346,7 @@ def view_qc_exec_summary_tab(request, qc_id):
         qc_exec_summary_columns = list(exec_summary_qc.qccolumn_set.all().values_list("name", flat=True))
 
         exec_summary = historical_exec_summaries.pop()
-        coverage_columns = list(exec_summary.get_coverage_columns())
+        coverage_columns = exec_summary.get_coverage_columns()
         graph_form = forms.QCCompareTypeForm(initial={"compare_against": QCCompareType.SEQUENCING_RUN},
                                              columns=qc_exec_summary_columns + coverage_columns)
 
