@@ -24,10 +24,11 @@ from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 import logging
 from model_utils.managers import InheritanceManager
-from typing import List, TypedDict
+from typing import List, TypedDict, Optional, Dict
 
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
+from library.log_utils import NotificationBuilder, send_notification
 from library.utils import import_class
 from classification.enums.classification_enums import ShareLevel
 
@@ -234,6 +235,19 @@ class Lab(models.Model):
     # location where the lab can upload files to, (in some environments may refer to s3 directory)
     upload_location = models.TextField(null=True, blank=True)
 
+    email = models.TextField(blank=True)
+    slack_webhook = models.TextField(blank=True)
+
+    def send_notification(self,
+            message: str,
+            blocks: Optional[Dict] = None,
+            username: Optional[str] = None,
+            emoji: str = ":dna:"):
+        if slack_url := self.slack_webhook:
+            send_notification(message=message, blocks=blocks, username=username, emoji=emoji, slack_webhook_url=slack_url)
+        else:
+            raise ValueError("Lab is not configured to send Slack notifications")
+
     class Meta:
         ordering = ['name']
 
@@ -368,6 +382,23 @@ class Lab(models.Model):
         if self.organization:
             name += f" ({self.organization})"
         return name
+
+
+class LabNotificationBuilder(NotificationBuilder):
+
+    def __init__(self, lab: Lab, message: str, emoji: str = ":dna:"):
+        self.lab = lab
+        if not isinstance(lab, Lab):
+            raise ValueError(f"Expected lab, got {lab}")
+        super().__init__(message=message, emoji=emoji)
+
+    @property
+    def can_send(self) -> bool:
+        return bool(self.lab.slack_webhook)
+
+    @property
+    def webhook_url(self) -> Optional[str]:
+        return self.lab.slack_webhook
 
 
 class LabHead(models.Model):
