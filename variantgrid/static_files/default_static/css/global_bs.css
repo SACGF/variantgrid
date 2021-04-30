@@ -595,27 +595,22 @@ ul.compact li:before {
   display: inline-block;
   padding: 2px 6px 2px 6px;
   border-radius: 4px;
-  color: white !important;
 }
 
 .threshold-low {
-  background-color: #2dc937;
+  background-color: green;
 }
 
 .threshold-med {
-  background-color: #e7b416;
+  background-color: orange;
 }
 
 .threshold-high {
-  background-color: #C64A42;
+  background-color: red;
 }
 
 .text-monospace {
   color: #444;
-}
-
-.text-small {
-  font-size: 13px;
 }
 
 /*# sourceMappingURL=global_bs.css.map */

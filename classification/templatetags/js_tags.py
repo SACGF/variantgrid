@@ -93,7 +93,11 @@ def format_computer_text(val):
 def format_unit_as_percent(val: Optional[float]):
     if val is None:
         return ''
-    return f"{format_significant_digits(val*100)} %"
+    if val == 0:
+        return "0"
+    percent_str = "{:.6f}".format(val * 100)
+
+    return f"{format_significant_digits(percent_str, 3)} %"
 
 
 @register.filter()
