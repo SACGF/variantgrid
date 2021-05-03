@@ -1931,6 +1931,10 @@ VCForm.format_condition = function(condition_json) {
     if (!condition_json) {
         return dom;
     }
+    if (!condition_json.resolved_terms) {
+        dom.append(condition_json.display_text);
+        return dom;
+    }
 
     let first = true;
     for (let term of condition_json.resolved_terms) {
@@ -1948,8 +1952,7 @@ VCForm.format_condition = function(condition_json) {
             term.name
         ]}).appendTo(dom);
     }
-    if (condition_json.resolved_terms.length > 1) {
-        let joinText = 'Uncertain';
+    if (condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
         $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;

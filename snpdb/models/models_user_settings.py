@@ -332,7 +332,7 @@ class UserSettings:
         return None
 
     @staticmethod
-    def get_genome_build_or_default(user: User, genome_build_name: str) -> GenomeBuild:
+    def get_genome_build_or_default(user: User, genome_build_name: Optional[str] = None) -> GenomeBuild:
         user_settings = UserSettings.get_for_user(user)
         if genome_build_name:
             genome_build = GenomeBuild.get_name_or_alias(genome_build_name)

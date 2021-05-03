@@ -385,40 +385,48 @@ span.cs {
   border-radius: 4px;
 }
 
-span.cs-b {
+.cs-b {
   background-color: #ccccff;
 }
 
-span.cs-lb {
+.cs-lb {
   background-color: #ddddff;
 }
 
-span.cs-vus {
+.cs-vus {
   background-color: #dddddd;
 }
 
-span.cs-vus_a {
+.cs-vus_a {
   background-color: #dddddd;
 }
 
-span.cs-vus_b {
+.cs-vus_b {
   background-color: #dddddd;
 }
 
-span.cs-vus_c {
+.cs-vus_c {
   background-color: #dddddd;
 }
 
-span.cs-lp {
+.cs-lp {
   background-color: #ffdddd;
 }
 
-span.cs-p {
+.cs-p {
   background-color: #ffcccc;
 }
 
-span.cs- {
+.cs- {
   background-color: #f0f0f0;
+}
+
+.cs-card {
+  text-align: center;
+  padding: 0 10px 16px 10px;
+  font-weight: bold;
+  color: #444;
+  letter-spacing: 1px;
 }
 
 /* share icons */
@@ -616,6 +624,38 @@ ul.compact li:before {
 
 .text-small {
   font-size: 13px;
+}
+
+.fade-in-scale {
+  transform-origin: top left;
+  animation: fadeInScale ease-out 0.5s;
+}
+
+.fade-out-scale {
+  transform-origin: top left;
+  animation: fadeOutScale ease-in 0.5s;
+  animation-fill-mode: forwards;
+}
+
+@keyframes fadeInScale {
+  0% {
+    transform: scale(0.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes fadeOutScale {
+  0% {
+    transform: scale(1);
+  }
+  99% {
+    transform: scale(0);
+  }
+  100% {
+    transform: scale(0);
+    display: none;
+  }
 }
 
 /*# sourceMappingURL=global_bs.css.map */

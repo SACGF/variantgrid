@@ -4,6 +4,9 @@ import json
 
 # A little hack that will make call 'to_json' on any non json serializable class
 # So you can implement to_json to become json serializable
+from typing import Union, Dict, Any, List
+
+
 def _default(self, obj):
     return getattr(obj.__class__, "to_json", _default.default)(obj)
 
@@ -33,3 +36,11 @@ def strip_json(json_values):
             ret_value.append(strip_json(value))
         return ret_value
     return json_values
+
+
+# These are too self-referential to define properly
+# so mainly exist to document code
+JsonPrimitiveType = Union[str, int, float, bool, None]
+JsonObjType = Dict[JsonPrimitiveType, Any]
+JsonListType = List[Any]
+JsonDataType = Union[JsonListType, JsonObjType, JsonPrimitiveType]

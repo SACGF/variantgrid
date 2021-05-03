@@ -303,6 +303,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
 
     @property
+    def clinical_grouping_name(self) -> str:
+        if self.share_level not in ShareLevel.DISCORDANT_LEVEL_KEYS:
+            return 'unshared'
+
+        if cc := self.clinical_context:
+            return cc.name
+        return 'no-context'
+
+    @property
     def condition_resolution_dict(self) -> Optional[ConditionResolvedDict]:
         return self.condition_resolution
 
@@ -2039,6 +2048,14 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             return crd.get('display_text')
         else:
             return self.get(SpecialEKeys.CONDITION)
+
+    @property
+    def condition_resolution_dict_fallback(self) -> ConditionResolvedDict:
+        if resolved := self.classification.condition_resolution:
+            return resolved
+        return ConditionResolvedDict(
+            display_text=self.get(SpecialEKeys)
+        )
 
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, use_full: bool = False):

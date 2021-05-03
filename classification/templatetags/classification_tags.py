@@ -4,11 +4,12 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query import QuerySet
 from django.template import Library
-from typing import Union, Optional
+from typing import Union, Optional, Iterable, TypedDict
 
 from django.utils.safestring import mark_safe
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
@@ -16,13 +17,13 @@ from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolved
+from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolved, ConditionResolvedDict
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, DiscordanceReportClassification
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_ref import ClassificationRef
-from classification.templatetags.js_tags import jsonify
+from classification.templatetags.js_tags import jsonify, jsonify_for_js
 
 register = Library()
 
@@ -34,6 +35,33 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
         "indent": indent + 1,
         "indent_px": (indent + 1) * 16 + 8
     }
+
+
+class ClassificationCardData(TypedDict):
+    org: str
+    lab: str
+    c_hgvs: str
+    clinical_significance: str
+    clinical_grouping: str
+    condition: ConditionResolvedDict
+
+
+def _convert_to_card(cm: ClassificationModification):
+    genome_build = GenomeBuildManager.get_current_genome_build()
+    return ClassificationCardData(
+        cid=cm.classification.id,
+        org=cm.classification.lab.organization.name,
+        lab=cm.classification.lab.name,
+        c_hgvs=cm.classification.get_c_hgvs(genome_build) or cm.get(SpecialEKeys.C_HGVS),
+        clinical_significance=cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+        clinical_grouping=cm.classification.clinical_grouping_name,
+        condition=cm.condition_resolution_dict_fallback
+    )
+
+
+@register.filter
+def classification_card_data(classification_modifications: Iterable[ClassificationModification]):
+    return jsonify_for_js([_convert_to_card(cm) for cm in classification_modifications])
 
 
 @register.filter

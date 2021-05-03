@@ -15,7 +15,7 @@ from library.utils import format_significant_digits
 register = template.Library()
 
 
-def _jsonify(json_me, pretty=False) -> Union[str, Any]:
+def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
     if isinstance(json_me, str):
         return json_me
     elif isinstance(json_me, bool):
@@ -36,12 +36,12 @@ def _jsonify(json_me, pretty=False) -> Union[str, Any]:
 
 @register.filter
 def jsonify(json_me) -> Union[str, Any]:
-    return _jsonify(json_me)
+    return jsonify_for_js(json_me)
 
 
 @register.filter
 def jsonify_pretty(json_me) -> Union[str, float]:
-    return _jsonify(json_me, pretty=True)
+    return jsonify_for_js(json_me, pretty=True)
 
 @register.filter
 def query_unquote(query_string):
