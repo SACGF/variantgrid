@@ -9,7 +9,7 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, FakeGeneList, PanelAppServer, \
     PanelAppPanelLocalCacheGeneList, GeneList, GeneListCategory
 from genes.serializers import GeneListGeneSymbolSerializer
-from library.guardian_utils import admin_bot
+from library.guardian_utils import admin_bot, add_public_group_read_permission
 
 PANEL_APP_PREFIX = "panel-app-"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
@@ -156,6 +156,7 @@ def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
     gene_list.import_status = ImportStatus.SUCCESS
     gene_list.save()
 
+    add_public_group_read_permission(gene_list)
     pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.create(panel_app_panel=panel_app_panel,
                                                                    version=version,
                                                                    gene_list=gene_list)
