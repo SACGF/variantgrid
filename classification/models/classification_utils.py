@@ -1,7 +1,6 @@
 # used for validating multiple keys when one changes
 from django.contrib.auth.models import User
 from typing import List, Set, Optional, Union, Any, Dict, Iterable
-
 from flags.models import FlagCollection
 from snpdb.models import VariantCoordinate
 from classification.models.evidence_mixin import VCPatch, VCStore

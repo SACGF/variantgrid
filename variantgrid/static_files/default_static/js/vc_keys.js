@@ -97,6 +97,23 @@ let EKey = (function() {
                 isValidValue: isValidValue
             };
         },
+
+        comparator: function() {
+            let options = this.options;
+            if (options) {
+                // TODO cache this dict
+                let byIndex = {};
+                let index = 1;
+                for (let option of options) {
+                    byIndex[option.key] = index++;
+                }
+                return (a, b) => {
+                    return (byIndex[a] || 1000) - (byIndex[b] || 1000);
+                };
+            } else {
+                return (a, b) => {a.localeCompare(b)};
+            }
+        },
         
         value: function(val) {
             return this.prettyValue(val).val;
