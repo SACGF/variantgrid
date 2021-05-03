@@ -91,12 +91,6 @@
                 <td class="collapse filter-required"> <!-- impact_min is non-nullable --> </td>
             </tr>
             <tr>
-                <td></td>
-                <td>MODERATE* = HIGH for <span title="Single Nucleotide Variants">SNVs</span> but HIGH or MODERATE for other variant classes.</td>
-                <td></td>
-                <td></td>
-            </tr>
-            <tr>
                 <th>{{ form.splice_min.label }}</th>
                 <td>{{ form.splice_min.errors }}
                     <input id="enable-splice"  title="Enable Splicing slider" class="enable-slider" type="checkbox" />
@@ -214,7 +208,8 @@
 
     <div>
         Note: Damage, CADD and REVEL settings do not filter indels.
-        HIGH excludes all missense variants, so you may want to use it in combination with REVEL/CADD/damage thresholds.
+        MODERATE* does not include missense variants, so we suggest you use MODERATE* in combination with one or more
+        of the REVEL, CADD or Damage Predictor options to include damaging missense variants.
         <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
             See help for details.
         </a>
