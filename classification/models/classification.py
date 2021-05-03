@@ -2054,7 +2054,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         if resolved := self.classification.condition_resolution:
             return resolved
         return ConditionResolvedDict(
-            display_text=self.get(SpecialEKeys)
+            display_text=self.get(SpecialEKeys.CONDITION)
         )
 
     @staticmethod

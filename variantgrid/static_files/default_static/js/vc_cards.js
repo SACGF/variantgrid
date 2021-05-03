@@ -85,7 +85,7 @@ const VCCard = (function() {
         },
 
         render: function() {
-            let wrapper = $('<div>', {class: 'col-4 mb-4'});
+            let wrapper = $('<div>', {class: 'col-12 col-lg-4 col-md-6 mb-4'});
             let clinSig = (this.any().clinical_significance || '').toLowerCase();
             let card = $('<div>', {class: 'card'}).appendTo(wrapper);
             if (this.isChild) {
@@ -109,7 +109,7 @@ const VCCard = (function() {
             }
             headerParts.push(this.valuesFor('org').join(", "));
             if (this.classifications.length > 1) {
-                headerParts.push($('<span>', {class: 'badge badge-info ml-2', text: String(this.classifications.length)}));
+                headerParts.push($('<span>', {class: 'badge badge-light ml-2 text-monospace', text: 'x' + String(this.classifications.length)}));
             }
 
             $('<div>', {html:headerParts}).appendTo(cardHeader);
