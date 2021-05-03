@@ -11,10 +11,10 @@
 	}
 	
 	function revealSelectedTab(nodeId, focus) {
-		var aWin = getAnalysisWindow();
-		var variants = aWin.selectedVariants[nodeId];
+		const aWin = getAnalysisWindow();
+		const variants = aWin.selectedVariants[nodeId];
 		if (variants && Object.keys(variants).length > 0) { 
-			var stab = $("#selected-tab");
+			let stab = $("#selected-tab");
 			stab.show();
 			if (focus) {
 				$("#node-editor-tabs").tabs("option", "active", stab.index());
