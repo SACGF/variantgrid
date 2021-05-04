@@ -92,14 +92,23 @@ const VCForm = (function() {
             }
             this.dataUpdated();
         },
-        
+
+        baseUrl() {
+            let url = window.location.href;
+            let questionIndex = url.indexOf("?");
+            if (questionIndex !== -1) {
+                return url.substring(0, questionIndex);
+            }
+            return url;
+        },
+
         csv() {
-            window.open(window.location.href + '/classification.csv');
+            window.open(this.baseUrl() + '/classification.csv');
             return false;
         },
         
         report() {
-            window.open(window.location.href + '/report.html', '_blank');
+            window.open(this.baseUrl() + '/report.html', '_blank');
             return false;
         },
         
@@ -459,7 +468,7 @@ const VCForm = (function() {
                         href += `.${version.timestamp}`;
                     }
                     $('<span>', {class: 'timestamp', text: ' ' + moment(version.timestamp * 1000).format('DD/MMM/YYYY HH:mm') }).appendTo(content);
-                    if (window.location.href.endsWith(href)) {
+                    if (this.baseUrl().endsWith(href)) {
                         $('<li>', {class: 'list-group-item list-group-item-success', html: content, title: version.title, 'data-toggle': 'tooltip'}).appendTo(publishUL);
                     } else {
                         $('<a>', {class: `list-group-item list-group-item-action ${isCurrentVersion ? '' : ''}`, title: version.title, html: content, 'data-toggle': 'tooltip', href: href }).appendTo(publishUL);
