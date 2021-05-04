@@ -1,21 +1,24 @@
+from datetime import datetime
 from html import escape
+from itertools import groupby
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query import QuerySet
 from django.template import Library
-from typing import Union, Optional, Iterable, TypedDict
+from typing import Union, Optional, Iterable, TypedDict, List
 
 from django.utils.safestring import mark_safe
+from lazy import lazy
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
-from snpdb.genome_build_manager import GenomeBuildManager
+from classification.models.evidence_mixin import CriteriaStrength
 from snpdb.models import VariantAllele
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, CriteriaEvaluation
 from classification.enums.classification_enums import ShareLevel
 from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolved, ConditionResolvedDict
 from classification.models.clinical_context_models import ClinicalContext
@@ -37,31 +40,156 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
     }
 
 
-class ClassificationCardData(TypedDict):
-    org: str
-    lab: str
-    c_hgvs: str
-    clinical_significance: str
-    clinical_grouping: str
-    condition: ConditionResolvedDict
+class ClassificationCardData:
+
+    def __init__(self, modifications: List[ClassificationModification]):
+        self.modifications = modifications
+
+    @property
+    def first(self) -> ClassificationModification:
+        return self.modifications[0]
+
+    def clinical_significance(self) -> str:
+        return self.first.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    def clinical_grouping(self) -> str:
+        return self.first.classification.clinical_grouping_name
+
+    def organization(self) -> str:
+        return self.first.classification.lab.organization.name
+
+    def transcript(self) -> str:
+        return self.first.c_parts.without_transcript_version.transcript
+
+    def count(self) -> int:
+        return len(self.modifications)
+
+    def acmg_criteria(self) -> List[CriteriaStrength]:
+        all_met = set()
+        for e_key in EvidenceKeyMap.cached().criteria():
+            for cm in self.modifications:
+                strength = cm.get(e_key.key)
+                if CriteriaEvaluation.is_met(strength):  # exclude neutral, not met, not applicable
+                    all_met.add(CriteriaStrength(e_key, strength))
+        all_met_ordred = list(all_met)
+        all_met_ordred.sort()
+        return all_met_ordred
+
+    @lazy
+    def zygosities(self) -> List[str]:
+        all_zygosities = set()
+        for cm in self.modifications:
+            if zygosities := cm.get(SpecialEKeys.ZYGOSITY):
+                if isinstance(zygosities, str):
+                    zygosities = list([zygosities])
+                all_zygosities = all_zygosities.union(zygosities)
+        # todo sort?
+        return list(all_zygosities)
+
+    def most_recent_curated(self) -> Optional[datetime]:
+        most_recent: Optional[datetime] = None
+        for cm in self.modifications:
+            if curated_date := cm.curated_date:
+                if not most_recent or curated_date > most_recent:
+                    most_recent = curated_date
+        return most_recent
+
+    @lazy
+    def most_recent(self) -> ClassificationModification:
+        most_recent_date: Optional[datetime] = None
+        most_recent_class: List[ClassificationModification] = list()
+        for cm in self.modifications:
+            if curated_date := cm.curated_date:
+                if not most_recent_date or curated_date > most_recent_date:
+                    most_recent = curated_date
+                    most_recent_class = list([cm])
+                elif most_recent_date and curated_date == most_recent_date:
+                    most_recent_class.append(cm)
+
+        if len(most_recent_class) == 0:
+            most_recent_class = self.modifications
+        most_recent_class.sort(key=lambda cm: cm.classification.created)
+        return most_recent_class[0]
 
 
+    def conditions(self) -> List[ConditionResolved]:
+        all_terms = set()
+        all_plain_texts = set()
+        for cm in self.modifications:
+            c = cm.classification
+            if resolved := c.condition_resolution_obj:
+                for term in resolved.terms:
+                    all_terms.add(term)
+            else:
+                if text := cm.get(SpecialEKeys.CONDITION):
+                    all_plain_texts.add(text)
+        all_condition_resolved = list()
+        # TODO sort terms
+        for term in all_terms:
+            all_condition_resolved.append(ConditionResolved(terms=[term], join=None))
+        for plain_text in all_plain_texts:
+            all_condition_resolved.append(ConditionResolved(terms=list(), join=None, plain_text=plain_text))
+        return all_condition_resolved
+
+
+
+"""
 def _convert_to_card(cm: ClassificationModification):
+
+
     genome_build = GenomeBuildManager.get_current_genome_build()
+
+    acmg_map = dict()
+    eKeys = EvidenceKeyMap.instance()
+
+    for ek in eKeys.criteria():
+        strength = cm.get(ek.key)
+        if CriteriaEvaluation.is_met(strength):  # exclude neutral, not met, not applicable
+            acmg_map[ek.key] = str(CriteriaStrength(ek, strength))
+
     return ClassificationCardData(
         cid=cm.classification.id,
         org=cm.classification.lab.organization.name,
         lab=cm.classification.lab.name,
+        acmg_map=acmg_map,
         c_hgvs=cm.classification.get_c_hgvs(genome_build) or cm.get(SpecialEKeys.C_HGVS),
         clinical_significance=cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
         clinical_grouping=cm.classification.clinical_grouping_name,
         condition=cm.condition_resolution_dict_fallback
     )
+"""
 
+@register.inclusion_tag("classification/tags/classification_cards.html")
+def classification_cards(classification_modifications: Iterable[ClassificationModification]):
 
-@register.filter
-def classification_card_data(classification_modifications: Iterable[ClassificationModification]):
-    return jsonify_for_js([_convert_to_card(cm) for cm in classification_modifications])
+    def clin_significance(cm: ClassificationModification) -> Optional[str]:
+        return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    evidence_keys: EvidenceKeyMap = EvidenceKeyMap.instance()
+    sorted_by_clin_sig = list(classification_modifications)
+    sorted_by_clin_sig.sort(key=evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter)
+
+    cards: List[ClassificationCardData] = list()
+
+    # clinical significance, clin grouping, org
+    for _, group1 in groupby(sorted_by_clin_sig, clin_significance):
+        group1 = list(group1)
+        group1.sort(key=lambda cm: cm.classification.clinical_grouping_name)
+        for _, group2 in groupby(group1, lambda cm: cm.classification.clinical_grouping_name):
+            group2 = list(group2)
+            group2.sort(key=lambda cm: cm.classification.lab.organization.name)
+            for _, group3 in groupby(group2, lambda cm: cm.classification.lab.organization.name):
+                group3 = list(group3)
+                group3.sort(key=lambda cm: cm.c_parts.without_transcript_version.transcript or '')
+                for _, group4 in groupby(group3, lambda cm: cm.c_parts.without_transcript_version.transcript or ''):
+                    group4 = list(group4)
+                    cards.append(ClassificationCardData(group4))
+
+    return {"classification_cards": cards}
+
+@register.inclusion_tag("classification/tags/classification_card.html")
+def classification_card(classification_card: ClassificationCardData):
+    return {"card": classification_card}
 
 
 @register.filter

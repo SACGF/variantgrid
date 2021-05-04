@@ -28,12 +28,6 @@
                     $('#quick-links-{{ va.pk }}').html($("<ul>", {class:"list-group", html:anchors}));
                 }
             {% endfor %}
-
-            VCCard.init({
-                classifications: {{ classifications | classification_card_data }},
-                dom: $('#classification-cards'),
-                eKeys: eKeys
-            });
         });
 
 
@@ -136,7 +130,9 @@
 
     <div class="container mt-4">
         <h3>Classifications</h3>
-        <div id="classification-cards" class="row equal"></div>
+        <div id="classification-cards" class="row equal">
+            {% classification_cards classifications %}
+        </div>
     </div>
 
     <div class="container-table mt-4">

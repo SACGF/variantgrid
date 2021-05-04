@@ -1,6 +1,6 @@
 from collections import Counter, namedtuple
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 
@@ -214,6 +214,7 @@ class ConditionResolvedDict(TypedDict):
 class ConditionResolved:
     terms: List[OntologyTerm]
     join: Optional[Any]
+    plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
     @lazy
     def join_text(self):
