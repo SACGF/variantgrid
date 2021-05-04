@@ -1,10 +1,9 @@
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models.deletion import CASCADE
-from django.db.models.query_utils import Q
 
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from snpdb.models.models_enums import ColumnAnnotationLevel, VCFInfoTypes
 
 
@@ -45,7 +44,7 @@ class ColumnVCFInfo(models.Model):
         return f"ID={self.info_id},number={number},type={self.type},descr: {self.description}"
 
 
-class CustomColumnsCollection(models.Model):
+class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, models.Model):
     MANDATORY_COLUMNS = ["variant"]
     name = models.TextField()
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)  # null = Public
@@ -73,30 +72,9 @@ class CustomColumnsCollection(models.Model):
         self.version_id += 1
         self.save()
 
-    @staticmethod
-    def filter_for_user(user):
-        public = Q(user__isnull=True)
-        mine = Q(user=user)
-        return CustomColumnsCollection.objects.filter(public | mine)
-
-    @staticmethod
-    def get_permission_check(user, custom_columns_collection_id, mode='r'):
-        ccc = CustomColumnsCollection.objects.get(pk=custom_columns_collection_id)
-        mine = ccc.user == user
-        if mode == 'r':
-            valid = mine or ccc.user is None
-        else:
-            valid = mine
-
-        if not valid:
-            msg = f"You don't have permission to view CustomColumnsCollection {ccc.pk} (mode='{mode}')"
-            raise PermissionDenied(msg)
-        return ccc
-
     def clone_for_user(self, user):
         name = f"{user}'s copy of {self.name}"
-        clone_cc = CustomColumnsCollection(name=name,
-                                           user=user)
+        clone_cc = CustomColumnsCollection(name=name, user=user)
         clone_cc.save()
 
         # Mandatory columns are already inserted
@@ -106,9 +84,6 @@ class CustomColumnsCollection(models.Model):
             cc.save()
 
         return clone_cc
-
-    def can_write(self, user):
-        return self.user == user
 
     def __str__(self):
         who = self.user or 'global'

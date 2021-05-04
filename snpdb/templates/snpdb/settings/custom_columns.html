@@ -25,6 +25,7 @@
         </p>
 
         {% load jqgrid_tags %}
+        {% user_data_grid_filter 'columns' 'Custom Columns' %}
         {% jqgrid 'custom_columns_grid' 'columns' search=False delete=True gbox_id='columns-grid-filter-container' template_name='snpdb/grids/custom_columns_grid.html' %}
     </div>
 {% endblock %}

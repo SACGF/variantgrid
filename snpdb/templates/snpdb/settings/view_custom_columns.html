@@ -50,7 +50,14 @@
     li#variant {
         display: none;
     }
+
+{% if not has_write_permission %}
+	.cursor-move {
+		cursor: auto;
+	}
+{% endif %}
 </style>
+{% if has_write_permission %}
 <script>
 	// .sortable('serialize') doesn't work with multiple underscores
 	function serialize_columns(select) {
@@ -118,10 +125,11 @@
         $(".columns-list").height(tallest);
 	});
 </script>
-
+{% endif %}
 
 <h3>Custom Columns</h3>
 
+{% if has_write_permission %}
 <form id="custom-columns-form" method="post">
     {% csrf_token %}
     <label for="custom-columns-name">Name:</label>
@@ -130,6 +138,9 @@
     <ul id="save-name-message" class="messages">
     </ul>
 </form>
+{% else %}
+	<h3>{{ custom_columns.name }}</h3>
+{% endif %}
 
 <div>
 	<table id="color-legend">

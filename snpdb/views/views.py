@@ -725,7 +725,7 @@ def custom_columns(request):
 # Based on code from http://j-syk.com/weblog/2012/10/18/jquery-sortables-ajax-django/
 
 def view_custom_columns(request, custom_columns_collection_id):
-    ccc = CustomColumnsCollection.get_permission_check(request.user, custom_columns_collection_id, 'w')
+    ccc = CustomColumnsCollection.get_for_user(request.user, custom_columns_collection_id)
 
     custom_columns_qs = VariantGridColumn.objects.filter(customcolumn__custom_columns_collection=ccc)
     my_columns = list(custom_columns_qs.order_by("customcolumn__sort_order"))
@@ -734,7 +734,12 @@ def view_custom_columns(request, custom_columns_collection_id):
     for vgc in VariantGridColumn.objects.all():
         variant_grid_columns[vgc.pk] = vgc
 
+    has_write_permission = ccc.can_write(request.user)
+    if not has_write_permission:
+        messages.add_message(request, messages.WARNING, "You do not have write permission, to edit these columns")
+
     if request.method == "POST":
+        ccc.check_can_write(request.user)
         if name := request.POST.get("name"):
             ccc.name = name
             ccc.save()
@@ -752,14 +757,17 @@ def view_custom_columns(request, custom_columns_collection_id):
             update_user_columns(my_columns_list, active)
         return HttpResponse()  # Nobody ever looks at this
 
-    context_dict = {'available_columns_list': available_columns,
-                    'my_columns_list': my_columns,
-                    'custom_columns': ccc}
+    context_dict = {
+        'available_columns_list': available_columns,
+        'my_columns_list': my_columns,
+        'custom_columns': ccc,
+        'has_write_permission': has_write_permission,
+    }
     return render(request, 'snpdb/settings/view_custom_columns.html', context_dict)
 
 
 def clone_custom_columns(request, custom_columns_collection_id):
-    ccc = CustomColumnsCollection.get_permission_check(request.user, custom_columns_collection_id, 'r')
+    ccc = CustomColumnsCollection.get_for_user(request.user, custom_columns_collection_id)
     cloned_ccc = ccc.clone_for_user(request.user)
     return HttpResponseRedirect(reverse("view_custom_columns", kwargs={"custom_columns_collection_id": cloned_ccc.pk}))
 
