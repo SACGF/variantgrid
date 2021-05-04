@@ -62,7 +62,16 @@ class PopulationNode(AnalysisNode):
                 population_databases.add(field)
 
             if population_databases:
-                group_operation = GroupOperation.get_operation(self.group_operation)
+                # The group operation is backwards from what you may expect, as the widget takes MAX
+                # but we are filtering for NULL or less than
+                # ANY - remove if frequency is above cutoff in any database (much more strict).
+                # ALL - Only remove if frequency is above cutoff in all databases.
+                # Note: ALL retains variants with a missing entry from any database
+                OPERATIONS = {  # These are opposite of normal GroupOperation
+                    GroupOperation.ALL: operator.or_,
+                    GroupOperation.ANY: operator.and_,
+                }
+                group_operation = OPERATIONS[self.group_operation]
                 max_allele_frequency = self.percent / 100
                 q_pop = population_frequency.get_population_af_q(max_allele_frequency,
                                                                  population_databases=population_databases,
