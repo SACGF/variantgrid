@@ -37,7 +37,7 @@
                 </td>
                 <td style="max-width:200px;">
                     {% for condition in card.conditions %}
-                        <div class="mt-1">{% condition condition %}</div>
+                        <div class="mb-1">{% condition condition %}</div>
                     {% endfor %}
                 </td>
                 <td>
@@ -46,11 +46,9 @@
                     {% endif %}
                 </td>
                 <td>
-                    <div class="mt-2">
-                        {% for acmg in card.acmg_criteria %}
-                            {% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>
-                        {% endfor %}
-                    </div>
+                    {% for acmg in card.acmg_criteria %}
+                        {% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>
+                    {% endfor %}
                 </td>
                 <td>
                     <a  href="{% url 'view_classification' card.most_recent.classification.id %}">
