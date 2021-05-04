@@ -1,8 +1,10 @@
 {% load classification_tags %}
 {% load js_tags %}
+{% comment %}
 {% for classification_card_data in classification_cards %}
     {% classification_card classification_card_data %}
 {% endfor %}
+{% endcomment %}
 
 <table class="table mt-4">
     <thead>
@@ -12,19 +14,19 @@
             <th>Conditions</th>
             <th>Zygosities</th>
             <th>ACMG</th>
-            <th>View</th>
+            <th>Most Recent</th>
         </tr>
     </thead>
     <tbody>
         {% for card in classification_cards %}
-            <tr>
+            <tr {% if card.clinical_grouping == "unshared" %}style="opacity:0.5"{% endif %}>
                 <td>
                     {% if card.clinical_grouping != "default" %}
                         <span class="font-weight-bold text-secondary text-uppercase">{{ card.clinical_grouping }} </span>
                     {% endif %}
                     {{ card.organization }}<br/>
                     {{ card.transcript }}
-                    {% if card.count > 1 %}<br/>{{ card.count }} records{% endif %}
+                    {% if card.count > 1 %}<div class="font-weight-bold">{{ card.count }} records</div>{% endif %}
                 </td>
                 <td class="cs-{{ card.clinical_significance|lower }} text-center">
                     {% if card.clinical_significance %}
@@ -52,7 +54,7 @@
                 </td>
                 <td>
                     <a  href="{% url 'view_classification' card.most_recent.classification.id %}">
-                        {% if card.most_recent.curated_date %}Last curated {% timestamp card.most_recent.curated_date time_ago=True %}{% else %}Most recent{% endif %}
+                        {% if card.most_recent.curated_date %}Curated {% timestamp card.most_recent.curated_date time_ago=True %}{% else %}Uploaded {% timestamp card.most_recent.created %}{% endif %}
                     </a>
                 </td>
             </tr>
