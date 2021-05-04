@@ -193,7 +193,7 @@ If we want to use jqgrid cdn, works for half
         if (kwargs.icon_css_class) {
             icon_list.push(kwargs.icon_css_class);
         }
-        if (typeof(iconCssClassList) !== 'undefined') {
+        if (Array.isArray(iconCssClassList)) {
         	icon_list.push(...iconCssClassList);
 		}
         if (icon_list.length === 0) {
