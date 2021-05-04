@@ -251,9 +251,14 @@ class GenomicIntervalsListGrid(JqGridUserRowConfig):
 class CustomColumnsCollectionListGrid(JqGridUserRowConfig):
     model = CustomColumnsCollection
     caption = 'Custom Columns'
-    fields = ["id", "name", "user__username"]
-    colmodel_overrides = {'id': {'width': 60, 'formatter': 'viewColumnLink'},
-                          'user__username': {'label': 'Owner'}}
+    fields = ["id", "name", "user__username", "modified"]
+    colmodel_overrides = {
+        'id': {"hidden": True},
+        "name": {'formatter': 'linkFormatter',
+                 'formatter_kwargs': {"url_name": "view_custom_columns",
+                                      "url_object_column": "id"}},
+        'user__username': {'label': 'User'},
+    }
 
     def __init__(self, user):
         super().__init__(user)

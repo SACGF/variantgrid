@@ -18,7 +18,7 @@ from library.guardian_utils import DjangoPermission
 from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride
+    OrganizationUserSettingsOverride, CustomColumnsCollection
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
@@ -309,7 +309,7 @@ class SettingsOverrideForm(BaseModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['columns'].queryset = models.CustomColumnsCollection.objects.filter(user__isnull=True)  # public
+        self.fields['columns'].queryset = CustomColumnsCollection.filter_public()
         self.fields['default_genome_build'].queryset = GenomeBuild.builds_with_annotation()
         self.fields['email_weekly_updates'].label = 'Email regular updates'
         self._hide_unused_fields()

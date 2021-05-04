@@ -7,7 +7,7 @@ import json
 import os
 
 from library.django_utils import require_superuser
-from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, VCFAlleleSource
+from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, VCFAlleleSource, CustomColumnsCollection
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
 
@@ -77,3 +77,10 @@ def vcf_populate_clingen_alleles(request, vcf_id):
     vcf_as, _ = VCFAlleleSource.objects.get_or_create(vcf=vcf)
     populate_clingen_alleles_from_allele_source.si(vcf_as.pk, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
     return JsonResponse({})
+
+
+@require_POST
+def clone_custom_columns(request, custom_columns_collection_id):
+    ccc = CustomColumnsCollection.get_for_user(request.user, custom_columns_collection_id)
+    cloned_ccc = ccc.clone_for_user(request.user)
+    return JsonResponse({"pk": cloned_ccc.pk})

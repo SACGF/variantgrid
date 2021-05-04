@@ -8,6 +8,33 @@
 {% block title %}Columns{% endblock %}
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block content %}
+    <script>
+        function grid_init_func(grid, pagerId) {
+            function copy_columns(ccc) {
+                let cccId = grid.getGridParam('selrow');
+                if (cccId) {
+                    $.ajax({
+                        type: "POST",
+                        url: Urls.clone_custom_columns(cccId),
+                        success: function(data) {
+                            grid.jqGrid('setGridParam', {page: 1, sortname: 'id', sortorder: "desc"}).trigger('reloadGrid');
+                        },
+                    });
+                }
+            }
+
+            grid.jqGrid(
+                'navButtonAdd', pagerId, {
+                caption : "Clone",
+                buttonicon : "ui-icon-copy",
+                onClickButton : copy_columns,
+                position : "last",
+                title : "Clone Columns",
+                cursor : "pointer"
+            });
+        }
+    </script>
+
     <div class="container">
         {% page_help page_id='settings/columns_help' title="Custom Columns"%}
 
@@ -26,6 +53,6 @@
 
         {% load jqgrid_tags %}
         {% user_data_grid_filter 'columns' 'Custom Columns' %}
-        {% jqgrid 'custom_columns_grid' 'columns' search=False delete=True gbox_id='columns-grid-filter-container' template_name='snpdb/grids/custom_columns_grid.html' %}
+        {% jqgrid 'custom_columns_grid' 'columns' search=False delete=True gbox_id='columns-grid-filter-container' init_func='grid_init_func' %}
     </div>
 {% endblock %}

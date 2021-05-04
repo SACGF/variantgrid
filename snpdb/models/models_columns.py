@@ -2,8 +2,11 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import CASCADE
+from guardian.shortcuts import get_objects_for_group
+from model_utils.models import TimeStampedModel
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.guardian_utils import public_group
 from snpdb.models.models_enums import ColumnAnnotationLevel, VCFInfoTypes
 
 
@@ -44,7 +47,7 @@ class ColumnVCFInfo(models.Model):
         return f"ID={self.info_id},number={number},type={self.type},descr: {self.description}"
 
 
-class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, models.Model):
+class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     MANDATORY_COLUMNS = ["variant"]
     name = models.TextField()
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)  # null = Public
@@ -84,6 +87,10 @@ class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, models.Mo
             cc.save()
 
         return clone_cc
+
+    @classmethod
+    def filter_public(cls):
+        return get_objects_for_group(public_group(), cls.get_read_perm(), klass=cls)
 
     def __str__(self):
         who = self.user or 'global'

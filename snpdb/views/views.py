@@ -736,7 +736,9 @@ def view_custom_columns(request, custom_columns_collection_id):
 
     has_write_permission = ccc.can_write(request.user)
     if not has_write_permission:
-        messages.add_message(request, messages.WARNING, "You do not have write permission, to edit these columns")
+        msg = "You do not have permission to edit these columns. " \
+              "If you wish to customise them, click 'clone' and modify the copy"
+        messages.add_message(request, messages.WARNING, msg)
 
     if request.method == "POST":
         ccc.check_can_write(request.user)
@@ -764,12 +766,6 @@ def view_custom_columns(request, custom_columns_collection_id):
         'has_write_permission': has_write_permission,
     }
     return render(request, 'snpdb/settings/view_custom_columns.html', context_dict)
-
-
-def clone_custom_columns(request, custom_columns_collection_id):
-    ccc = CustomColumnsCollection.get_for_user(request.user, custom_columns_collection_id)
-    cloned_ccc = ccc.clone_for_user(request.user)
-    return HttpResponseRedirect(reverse("view_custom_columns", kwargs={"custom_columns_collection_id": cloned_ccc.pk}))
 
 
 def tag_settings(request):
