@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from snpdb.models import VCF, log_traceback, SomalierVCFExtract, GenomeBuild
+from snpdb.models import VCF, log_traceback, SomalierVCFExtract, GenomeBuild, SomalierRelatePairs
 from snpdb.tasks.somalier_tasks import somalier_vcf_id, somalier_all_samples
 
 
@@ -13,6 +13,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options.get("clear"):
             SomalierVCFExtract.objects.all().delete()
+            SomalierRelatePairs.objects.all().delete()
 
         vcf_kwargs = {}
         if build_name := options.get("genome_build"):
