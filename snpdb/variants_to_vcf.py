@@ -108,7 +108,10 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                     if sample_whitelist[i]:
                         sample_zygosity_count[i][z] += 1
                         gt = Zygosity.get_genotype(z)
-                        ref_depth = round(dp * (100 - af) / 100)
+                        if vcf.allele_frequency_percent:
+                            ref_depth = round(dp * (100 - af) / 100)
+                        else:
+                            ref_depth = round(dp * (1 - af))
                         ad = f"{ref_depth},{ad}"
                         sample = ":".join((str(s) for s in (gt, ad, dp)))
                         samples_list.append(sample)
