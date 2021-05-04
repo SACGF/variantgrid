@@ -150,9 +150,9 @@ class VariantWithChgvs:
         else:
             return 0
 
-    @lazy
+    @property
     def c_hgvs_without_transcript_version(self) -> CHGVS:
-        return self.chgvs.without_transcript_version()
+        return self.chgvs.without_transcript_version
 
 
 class TranscriptGroup:

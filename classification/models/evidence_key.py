@@ -4,7 +4,7 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set
+from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict
 import re
 
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
@@ -16,6 +16,13 @@ from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.json_serialize import strip_json
 from snpdb.views.datatable_view import RichColumn
+
+
+class EvidenceKeyOption(TypedDict):
+    key: str
+    label: Optional[str]
+    default: Optional[bool]
+    override: Optional[bool]
 
 
 class EvidenceKey(TimeStampedModel):
@@ -113,7 +120,7 @@ class EvidenceKey(TimeStampedModel):
         return [{'key': value, 'label': value}]
 
     @staticmethod
-    def __special_up_options(options, default):
+    def __special_up_options(options, default) -> List[EvidenceKeyOption]:
         use_options = []
         for entry in options:
             if entry.get('key') == default:
@@ -128,7 +135,7 @@ class EvidenceKey(TimeStampedModel):
         return use_options
 
     @property
-    def virtual_options(self):
+    def virtual_options(self) -> Optional[List[EvidenceKeyOption]]:
         if self.options:
             return self.options
         if self.value_type == EvidenceKeyValueType.CRITERIA:
@@ -141,6 +148,21 @@ class EvidenceKey(TimeStampedModel):
             return []
 
         return None
+
+    @lazy
+    def _option_indexes(self) -> Optional[Dict[str, int]]:
+        index_map: Optional[Dict[str, int]] = None
+        if options := self.virtual_options:
+            index_map = dict()
+            for index, option in enumerate(options):
+                index_map[option.get('key')] = index + 1
+        return index_map
+
+    def classification_sorter(self, evidence):
+        val = evidence.get(self.key)
+        if index_map := self._option_indexes:
+            return index_map.get(val, 0)
+        return val
 
     def validate(self):
         if self.options:
@@ -332,7 +354,7 @@ class EvidenceKeyMap:
 
     @staticmethod
     @timed_cache(ttl=60)
-    def instance(lab: Lab = None):
+    def instance(lab: Lab = None) -> 'EvidenceKeyMap':
         return EvidenceKeyMap(lab=lab)
 
     @staticmethod

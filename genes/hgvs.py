@@ -92,6 +92,7 @@ class CHGVS:
         # if there's no transcript we're invalid, not much we can do
         return self
 
+    @lazy
     def without_transcript_version(self) -> 'CHGVS':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier

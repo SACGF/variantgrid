@@ -72,6 +72,9 @@ class CriteriaStrength:
             return False
         return self.ekey == other.ekey and self.strength == other.strength
 
+    def __hash__(self):
+        return hash(self.ekey) + hash(self.strength)
+
     def __lt__(self, other) -> bool:
         if not isinstance(other, CriteriaStrength):
             raise ValueError(f'Cannot sort CriteriaStrength and {other}')
@@ -158,6 +161,10 @@ class EvidenceMixin:
 
         criteria.sort()
         return ", ".join([str(c) for c in criteria])
+
+    @lazy
+    def c_parts(self) -> CHGVS:
+        return CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
 
     @property
     def transcript(self) -> Optional[str]:
