@@ -57,8 +57,20 @@
 	}
 {% endif %}
 </style>
-{% if has_write_permission %}
 <script>
+	function cloneCustomColumns() {
+		$(this).prop("diabled", true);
+
+		const cccId = {{ custom_columns.pk }};
+		$.ajax({
+			type: "POST",
+			url: Urls.clone_custom_columns(cccId),
+			success: function (data) {
+				window.location = Urls.view_custom_columns(data["pk"]);
+			},
+		});
+	}
+
 	// .sortable('serialize') doesn't work with multiple underscores
 	function serialize_columns(select) {
         const ids = [];
@@ -76,7 +88,12 @@
 	    }
 	}
 
-	$(document).ready(function(){
+	$(document).ready(function() {
+		$("#clone-button").click(cloneCustomColumns);
+
+	{% if has_write_permission %}
+		$("#custom-column-tabs").tabs({cache: true});
+
         $("button#change-name-button").click(function() {
             let nameInput = $("#custom-columns-name");
             let name = nameInput.val();
@@ -97,7 +114,6 @@
                 }
             });
         });
-
 
 		$("#my_columns_sortable").sortable({
 		    items: "li.user-column",
@@ -123,24 +139,39 @@
 		// Set the height of both columns-list to be that of largest
         const tallest = Math.max($("#my_columns")[0].scrollHeight, $("#available_columns")[0].scrollHeight);
         $(".columns-list").height(tallest);
-	});
-</script>
 {% endif %}
+	});
+
+</script>
 
 <h3>Custom Columns</h3>
 
 {% if has_write_permission %}
-<form id="custom-columns-form" method="post">
-    {% csrf_token %}
-    <label for="custom-columns-name">Name:</label>
-    <input id="custom-columns-name" size="50" value="{{ custom_columns.name }}" />
-    <button id='change-name-button' type="button" class="btn btn-primary">Change Name</button>
-    <ul id="save-name-message" class="messages">
-    </ul>
-</form>
+    <div id="custom-column-tabs">
+        <ul>
+            <li><a href="#name">Name</a></li>
+	        <li><a href="{% url 'group_permissions' 'snpdb.models.CustomColumnsCollection' custom_columns.pk %}">Sharing / Permissions</a></li>
+		</ul>
+        <div id="name">
+			<form id="custom-columns-form" method="post">
+				{% csrf_token %}
+				<label for="custom-columns-name">Name:</label>
+				<input id="custom-columns-name" size="50" value="{{ custom_columns.name }}" />
+				<button id='change-name-button' type="button" class="btn btn-primary">Change Name</button>
+				<button id='clone-button' title="Create a new copy of these columns" type="button" class="btn btn-primary">Clone</button>
+				<ul id="save-name-message" class="messages">
+				</ul>
+			</form>
+		</div>
+	</div>
+
 {% else %}
 	<h3>{{ custom_columns.name }}</h3>
+	<button id='clone-button' title="Create a new copy of these columns that you can edit" type="button" class="btn btn-primary">Clone</button>
 {% endif %}
+
+
+
 
 <div>
 	<table id="color-legend">
