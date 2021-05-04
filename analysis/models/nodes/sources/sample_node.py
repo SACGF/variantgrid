@@ -172,7 +172,7 @@ class SampleNode(SampleMixin, AnalysisNode):
                     zygosities = [True] * len(zygosities)  # Show everything
 
                 count = obj.count_for_zygosity(*zygosities, label=label)
-            except (KeyError, ObjectDoesNotExist):
+            except (IndexError, KeyError, ObjectDoesNotExist):
                 pass  # OK, will just calculate it
 
         return count
