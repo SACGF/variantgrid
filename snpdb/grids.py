@@ -257,7 +257,13 @@ class CustomColumnsCollectionListGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.filter_for_user(user).order_by("-pk")
+
+        user_grid_config = UserGridConfig.get(user, self.caption)
+        if user_grid_config.show_group_data:
+            queryset = self.model.filter_for_user(user)
+        else:
+            queryset = self.model.objects.filter(Q(user__isnull=True) | Q(user=user))
+
         queryset = queryset.annotate(num_columns=Count("customcolumn"))
         field_names = self.get_field_names() + ["num_columns"]
         self.queryset = queryset.values(*field_names)
