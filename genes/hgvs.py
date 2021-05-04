@@ -96,8 +96,12 @@ class CHGVS:
     def without_transcript_version(self) -> 'CHGVS':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier
-            if transcript and self.gene and self.raw_c:
-                full_c_hgvs = f'{transcript}({self.gene}):{self.raw_c}'
+            if transcript and self.raw_c:
+                full_c_hgvs: str
+                if gene := self.gene:
+                    full_c_hgvs = f'{transcript}({gene}):{self.raw_c}'
+                else:
+                    full_c_hgvs = f'{transcript}:{self.raw_c}'
                 return CHGVS(full_c_hgvs)
         return self
 
