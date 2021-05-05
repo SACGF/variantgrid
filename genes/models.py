@@ -12,6 +12,7 @@ from typing import Tuple, Optional, Dict, List, Set
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.aggregates import StringAgg
+from django.contrib.postgres.fields import CITextField
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models, IntegrityError, transaction
 from django.db.models import Min, Max, QuerySet
@@ -139,7 +140,7 @@ class UniProt(models.Model):
 
 
 class GeneSymbol(models.Model):
-    symbol = models.TextField(primary_key=True)
+    symbol = CITextField(primary_key=True)
 
     @property
     def name(self):
@@ -208,7 +209,7 @@ class GeneSymbolAlias(TimeStampedModel):
          * Source: https://genome.ucsc.edu/cgi-bin/hgTables?command=start export kgAlias table
          * Code: N/A - obsolete
     """
-    alias = models.TextField(unique=True)
+    alias = CITextField(unique=True)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.choices)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
