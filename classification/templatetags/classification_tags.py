@@ -40,10 +40,11 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
     }
 
 
-class ClassificationCardData:
+class ClassificationGroup:
 
-    def __init__(self, modifications: List[ClassificationModification]):
+    def __init__(self, modifications: List[ClassificationModification], group_id: Optional[int] = None):
         self.modifications = modifications
+        self.group_id = group_id
 
     @property
     def first(self) -> ClassificationModification:
@@ -131,36 +132,20 @@ class ClassificationCardData:
             all_condition_resolved.append(ConditionResolved(terms=list(), join=None, plain_text=plain_text))
         return all_condition_resolved
 
+    def sub_groups(self) -> List['ClassificationGroup']:
+        if len(self.modifications) > 1:
+            return [ClassificationGroup([cm]) for cm in self.modifications]
+        return None
 
 
-"""
-def _convert_to_card(cm: ClassificationModification):
+@register.inclusion_tag("classification/tags/classification_group_row.html")
+def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None):
+    print(f"subrow = {sub_row}")
+    return {"group": group, "row_class": f"cc-{sub_row} collapse" if sub_row else "", "sub_index": sub_index}
 
 
-    genome_build = GenomeBuildManager.get_current_genome_build()
-
-    acmg_map = dict()
-    eKeys = EvidenceKeyMap.instance()
-
-    for ek in eKeys.criteria():
-        strength = cm.get(ek.key)
-        if CriteriaEvaluation.is_met(strength):  # exclude neutral, not met, not applicable
-            acmg_map[ek.key] = str(CriteriaStrength(ek, strength))
-
-    return ClassificationCardData(
-        cid=cm.classification.id,
-        org=cm.classification.lab.organization.name,
-        lab=cm.classification.lab.name,
-        acmg_map=acmg_map,
-        c_hgvs=cm.classification.get_c_hgvs(genome_build) or cm.get(SpecialEKeys.C_HGVS),
-        clinical_significance=cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-        clinical_grouping=cm.classification.clinical_grouping_name,
-        condition=cm.condition_resolution_dict_fallback
-    )
-"""
-
-@register.inclusion_tag("classification/tags/classification_cards.html")
-def classification_cards(classification_modifications: Iterable[ClassificationModification]):
+@register.inclusion_tag("classification/tags/classification_groups.html")
+def classification_groups(classification_modifications: Iterable[ClassificationModification]):
 
     def clin_significance(cm: ClassificationModification) -> Optional[str]:
         return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -169,7 +154,7 @@ def classification_cards(classification_modifications: Iterable[ClassificationMo
     sorted_by_clin_sig = list(classification_modifications)
     sorted_by_clin_sig.sort(key=evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter)
 
-    cards: List[ClassificationCardData] = list()
+    groups: List[ClassificationGroup] = list()
 
     # clinical significance, clin grouping, org
     for _, group1 in groupby(sorted_by_clin_sig, clin_significance):
@@ -183,13 +168,9 @@ def classification_cards(classification_modifications: Iterable[ClassificationMo
                 group3.sort(key=lambda cm: cm.c_parts.without_transcript_version.transcript or '')
                 for _, group4 in groupby(group3, lambda cm: cm.c_parts.without_transcript_version.transcript or ''):
                     group4 = list(group4)
-                    cards.append(ClassificationCardData(group4))
+                    groups.append(ClassificationGroup(modifications=group4, group_id=len(groups) + 1))
 
-    return {"classification_cards": cards}
-
-@register.inclusion_tag("classification/tags/classification_card.html")
-def classification_card(classification_card: ClassificationCardData):
-    return {"card": classification_card}
+    return {"classification_groups": groups}
 
 
 @register.filter

@@ -1,0 +1,20 @@
+{% load classification_tags %}
+{% load js_tags %}
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Grouping</th>
+            <th class="text-center">Clinical Significance</th>
+            <th>Conditions</th>
+            <th>Zygosities</th>
+            <th>ACMG</th>
+            <th>Most Recent</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for group in classification_groups %}
+            {% classification_group_row group=group %}
+        {% endfor %}
+    </tbody>
+</table>
