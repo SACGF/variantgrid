@@ -11,7 +11,7 @@
             {% endif %}
             {{ group.organization }}<br/>
             {{ group.transcript }}
-            {% if group.count > 1 %}><div class="font-weight-bold"></div><a href=".cc-{{ group.group_id }}" data-toggle="collapse" class="toggle-link">{{ group.count }} records</a></div>{% endif %}
+            {% if group.count > 1 %}<div class="font-weight-bold"><a href=".cc-{{ group.group_id }}" data-toggle="collapse" class="toggle-link">{{ group.count }} records</a></div>{% endif %}
         {% endif %}
     </td>
     <td class="cs-{{ group.clinical_significance|lower }} text-center">

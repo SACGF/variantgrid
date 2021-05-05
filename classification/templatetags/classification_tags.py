@@ -97,12 +97,15 @@ class ClassificationGroup:
 
     @lazy
     def most_recent(self) -> ClassificationModification:
+        if len(self.modifications) == 1:
+            return self.modifications[0]
+
         most_recent_date: Optional[datetime] = None
         most_recent_class: List[ClassificationModification] = list()
         for cm in self.modifications:
             if curated_date := cm.curated_date:
                 if not most_recent_date or curated_date > most_recent_date:
-                    most_recent = curated_date
+                    most_recent_date = curated_date
                     most_recent_class = list([cm])
                 elif most_recent_date and curated_date == most_recent_date:
                     most_recent_class.append(cm)
@@ -112,6 +115,11 @@ class ClassificationGroup:
         most_recent_class.sort(key=lambda cm: cm.classification.created)
         return most_recent_class[0]
 
+    def __lt__(self, other):
+        if my_curated := self.most_recent.curated_date:
+            if other_curated := other.most_recent.curated_date:
+                return my_curated < other_curated
+        return self.most_recent.classification.created < other.most_recent.classification.created
 
     def conditions(self) -> List[ConditionResolved]:
         all_terms = set()
@@ -134,7 +142,9 @@ class ClassificationGroup:
 
     def sub_groups(self) -> List['ClassificationGroup']:
         if len(self.modifications) > 1:
-            return [ClassificationGroup([cm]) for cm in self.modifications]
+            sub_groups = [ClassificationGroup([cm]) for cm in self.modifications]
+            sub_groups.sort(reverse=True)
+            return sub_groups
         return None
 
 
