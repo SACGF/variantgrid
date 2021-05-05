@@ -164,13 +164,13 @@ class ExportFormatterKeys(BaseExportFormatter):
             self.count_classification(vcm)
 
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
+        row_count = 0
         def stream_response():
             yield '{"keys":'
             self.process()
 
             data = {}
             for key, value in self.key_counters.items():
-                self.row_count += 1
                 data[key] = value.to_json()
 
             yield json.dumps(data, indent=4)
