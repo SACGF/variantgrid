@@ -1,6 +1,6 @@
 from rest_framework.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_404_NOT_FOUND
 
-from variantgrid.celery import RollbarIgnoreException
+from library.django_utils.rollbar_middleware import RollbarIgnoreException
 
 
 class CeleryTasksObsoleteException(RollbarIgnoreException):

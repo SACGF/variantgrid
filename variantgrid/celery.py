@@ -1,7 +1,7 @@
+# noinspection HttpUrlsUsage
 """
-Setup as per:
-
-http://celery.readthedocs.org/en/latest/django/first-steps-with-django.html
+    Set default Django settings module for the 'celery' program. Setup as per:
+    http://celery.readthedocs.org/en/latest/django/first-steps-with-django.html
 """
 
 from celery import Celery
@@ -13,14 +13,9 @@ import os
 import rollbar
 
 from library.constants import HOUR_SECS, MINUTE_SECS
+from library.django_utils.rollbar_middleware import RollbarIgnoreException
 
-# set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'variantgrid.settings')
-
-
-class RollbarIgnoreException(Exception):
-    """ Throw an error that subclasses this for Rollbar to ignore """
-    pass
 
 
 app = Celery('variantgrid')

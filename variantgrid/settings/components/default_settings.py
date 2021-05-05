@@ -502,7 +502,7 @@ MIDDLEWARE = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'global_login_required.GlobalLoginRequiredMiddleware',  # Must be after other auth middleware
-    'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
+    'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
     'htmlmin.middleware.HtmlMinifyMiddleware',
     'htmlmin.middleware.MarkRequestMiddleware',
     'threadlocals.middleware.ThreadLocalMiddleware'
