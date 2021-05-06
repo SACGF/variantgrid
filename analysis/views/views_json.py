@@ -17,7 +17,7 @@ from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
-from analysis.models.nodes.node_utils import reload_analysis_nodes, update_nodes, \
+from analysis.models.nodes.node_utils import reload_analysis_nodes, update_analysis, \
     get_toposorted_nodes, get_rendering_dict
 from analysis.serializers import VariantTagSerializer
 from analysis.views.node_json_view import NodeJSONPostView
@@ -74,7 +74,7 @@ class NodeUpdate(NodeJSONPostView):
             raise ValueError(f"Unknown operation '{op}'")
 
         node.save()
-        update_nodes(node.analysis_id)
+        update_analysis(node.analysis_id)
         return {}
 
 
@@ -96,7 +96,7 @@ def node_create(request, analysis_id, node_type):
 
     node_class = NODE_TYPES_HASH[node_type]
     node = node_class.objects.create(analysis=analysis)
-    update_nodes(node.analysis_id)
+    update_analysis(node.analysis_id)
     return JsonResponse(get_rendering_dict(node))
 
 
@@ -143,7 +143,7 @@ def nodes_copy(request, analysis_id):
             clone_node.save()
             nodes.append(get_rendering_dict(clone_node))
 
-    update_nodes(analysis.pk)
+    update_analysis(analysis.pk)
     return JsonResponse({"nodes": nodes,
                          "edges": edges})
 
@@ -169,7 +169,7 @@ def nodes_delete(request, analysis_id):
 
             node.delete()
 
-    update_nodes(analysis.pk)
+    update_analysis(analysis.pk)
     return JsonResponse({})
 
 
@@ -244,7 +244,7 @@ def set_variant_selected(request, node_id):
         node.queryset_dirty = True
         node.save()
 
-    update_nodes(node.analysis.pk)
+    update_analysis(node.analysis.pk)
     return JsonResponse({})
 
 
@@ -273,7 +273,7 @@ def create_extra_filter_child(request, node_id, extra_filters):
     filter_node.add_parent(node)
     filter_node.save()
 
-    update_nodes(node.analysis.pk)
+    update_analysis(node.analysis.pk)
     data = get_rendering_dict(filter_node)
     data["node_id"] = node.get_css_id()
     return JsonResponse(data)
@@ -290,7 +290,7 @@ def create_selected_child(request, node_id):
                                                         ready=False)
     selected_node.add_parent(node)
     selected_node.save()
-    update_nodes(node.analysis.pk)
+    update_analysis(node.analysis.pk)
 
     data = get_rendering_dict(selected_node)
     data["node_id"] = node.get_css_id()

@@ -63,18 +63,14 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     parents_should_cache = models.BooleanField(default=False)  # Node suggests parents use a cache
     # This is set to node/version you cloned - cleared upon modification
     cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
+    status = models.CharField(max_length=1, choices=NodeStatus.choices, default=NodeStatus.DIRTY)
+    db_pid = models.IntegerField(null=True)
 
     PARENT_CAP_NOT_SET = -1
     min_inputs = 1
     max_inputs = 1
     uses_parent_queryset = True
     disabled = False
-
-    # Task Update fields
-    analysis_update_uuid = models.UUIDField(null=True, default=None)
-    status = models.CharField(max_length=1, choices=NodeStatus.choices, default=NodeStatus.DIRTY)
-    celery_task = models.CharField(max_length=36, null=True)
-    db_pid = models.IntegerField(null=True)
 
     UPDATE_TASK = "analysis.tasks.node_update_tasks.update_node_task"
     NODE_CACHE_TASK = "analysis.tasks.node_update_tasks.node_cache_task"
@@ -733,7 +729,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         self.status = status
         self.count = count
-        self.celery_task = None
         self.db_pid = None
         self.load_seconds = time() - start
         self.save()  # Will re-calculate shadow colors etc based on status
@@ -805,7 +800,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         qs = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
         cursor = connection.cursor()
         db_pid = cursor.db.connection.get_backend_pid()
-        qs.update(celery_task=celery_task, status=status, db_pid=db_pid)
+        qs.update(status=status, db_pid=db_pid)
+
+        NodeTask.objects.filter(node=self, version=self.version).update(celery_task=celery_task)
+
 
     def adjust_cloned_parents(self, old_new_map):
         """ If you need to do something with old/new parents """
@@ -860,6 +858,21 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
 class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
     pass
+
+
+class NodeTask(TimeStampedModel):
+    """ Used to track/lock celery update tasks for nodes (uses DB constraints to ensure 1 per node/version) """
+
+    node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
+    version = models.IntegerField(null=False)
+    analysis_update_uuid = models.UUIDField()
+    celery_task = models.CharField(max_length=36, null=True)
+
+    class Meta:
+        unique_together = ("node", "version")
+
+    def __str__(self):
+        return f"NodeTask: {self.analysis_update_uuid} - {self.node.pk}/{self.version}"
 
 
 class NodeWiki(Wiki):

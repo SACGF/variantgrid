@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 
 from analysis.models import NodeStatus, AnalysisNode
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.node_utils import update_nodes
+from analysis.models.nodes.node_utils import update_analysis
 
 
 class Command(BaseCommand):
@@ -34,4 +34,4 @@ class Command(BaseCommand):
                     break
 
             print(f"Updating nodes for {analysis}")
-            update_nodes(analysis.pk)
+            update_analysis(analysis.pk)

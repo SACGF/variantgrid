@@ -1,13 +1,12 @@
 import celery
-from celery.canvas import chord
 from celery.contrib.abortable import AbortableTask
-from celery.result import AsyncResult, allow_join_result
+from celery.result import AsyncResult
 from django.db.utils import OperationalError, IntegrityError
 import logging
 from time import sleep
 
 from analysis.exceptions import NodeConfigurationException, NodeParentErrorsException, CeleryTasksObsoleteException
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion, NodeCache
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion, NodeCache, NodeTask
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
@@ -20,21 +19,10 @@ def dummy_task():
     pass
 
 
-def add_jobs_to_groups(jobs, groups):
-    if jobs:
-        if len(jobs) > 1:
-            # Use a chord, as groups don't synchronize inside a chain
-            g = chord(jobs, dummy_task.si())  # @UndefinedVariable
-        else:
-            g = jobs[0]  # @UndefinedVariable
-
-        groups.append(g)
-
-
 def wait_for_task(celery_task):
     # Normally celery would die with "Never call result.get() within a task!"
     # See http://docs.celeryq.org/en/latest/userguide/tasks.html#task-synchronous-subtasks
-    with allow_join_result():
+    with celery.result.allow_join_result():
         #logging.info("*** Wait_for_task: %s", celery_task)
         result = AsyncResult(celery_task)
         result.get(timeout=MINUTE_SECS * 5)
@@ -180,19 +168,23 @@ def wait_for_node(node_id):
                 #logging.info("Node was ready")
                 return
 
-            if node.celery_task:
-                wait_for_task(node.celery_task)
-                return
-            else:
-                # QUEUED - there won't be a celery task yet
-                if node.status == NodeStatus.QUEUED:
-                    details = f"Waiting on parent node {node_id} which is QUEUED"
-                    details += f" - waiting for {sleep_time} secs, {total_time} so far!"
-                    create_event(None, EVENT_NAME, details, severity=LogLevel.WARNING)
-                else:
-                    details = f"Waiting on parent node {node_id} status {node.status} no celery task!"
-                    create_event(None, EVENT_NAME, details, severity=LogLevel.ERROR)
+            try:
+                node_task = NodeTask.objects.get(node=node, version=node.version)
+                if node_task.celery_task:
+                    wait_for_task(node_task.celery_task)
                     return
+            except NodeTask.DoesNotExist:
+                pass
+
+            # QUEUED - there won't be a celery task yet
+            if node.status == NodeStatus.QUEUED:
+                details = f"Waiting on parent node {node_id} which is QUEUED"
+                details += f" - waiting for {sleep_time} secs, {total_time} so far!"
+                create_event(None, EVENT_NAME, details, severity=LogLevel.WARNING)
+            else:
+                details = f"Waiting on parent node {node_id} status {node.status} no celery task!"
+                create_event(None, EVENT_NAME, details, severity=LogLevel.ERROR)
+                return
 
             logging.info("Sleeping for %d seconds", sleep_time)
             sleep(sleep_time)

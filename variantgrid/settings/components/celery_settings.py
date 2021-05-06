@@ -95,6 +95,7 @@ CELERY_ROUTES = {
     'snpdb.tasks.validation_task.validate_variant_data': VARIANT_ID_SINGLE_WORKER,
 
     # Scheduling single worker
+    'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.annotation_scheduler_task.annotation_scheduler': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
@@ -105,6 +106,7 @@ CELERY_ROUTES = {
 }
 
 CELERY_IMPORTS = (
+    'analysis.tasks.analysis_update_tasks',
     'analysis.tasks.karyomapping_tasks',
     'analysis.tasks.node_update_tasks',
     'annotation.tasks.annotate_variants',

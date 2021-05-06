@@ -23,7 +23,7 @@ from analysis.models.nodes.filters.selected_in_parent_node import SelectedInPare
 from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
-from analysis.models.nodes.node_utils import update_nodes
+from analysis.models.nodes.node_utils import update_analysis
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.classifications_node import ClassificationsNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
@@ -144,7 +144,7 @@ class FilterNodeView(NodeView):
             self.object.appearance_dirty = True
             self.object.queryset_dirty = True
             self.object.save()
-            update_nodes(self.object.analysis_id)  # Trigger update_node tasks
+            update_analysis(self.object.analysis_id)  # Trigger update_node tasks
 
         return HttpResponse()
 

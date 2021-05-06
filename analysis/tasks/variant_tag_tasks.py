@@ -1,7 +1,7 @@
 import celery
 
 from analysis.models import VariantTag, Analysis
-from analysis.models.nodes.node_utils import update_nodes
+from analysis.models.nodes.node_utils import update_analysis
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
@@ -15,7 +15,7 @@ def analysis_tag_created_task(variant_tag_id):
         variant_tag = VariantTag.objects.get(pk=variant_tag_id)
     except VariantTag.DoesNotExist:
         return  # Deleted before this got run, doesn't matter...
-    update_nodes(variant_tag.analysis.pk)
+    update_analysis(variant_tag.analysis.pk)
     _liftover_variant_tag(variant_tag)
 
 
@@ -23,7 +23,7 @@ def analysis_tag_created_task(variant_tag_id):
 def analysis_tag_deleted_task(analysis_id, _tag_id):
     """ Do this async to save a few miliseconds when adding/removing tags """
     analysis = Analysis.objects.get(pk=analysis_id)
-    update_nodes(analysis.pk)
+    update_analysis(analysis.pk)
 
 
 def _liftover_variant_tag(variant_tag: VariantTag):

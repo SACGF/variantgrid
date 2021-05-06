@@ -5,7 +5,7 @@ from django.views.generic.edit import UpdateView
 from analysis.forms import GraphTypeChoiceForm, ColumnSummaryForm, SNPMatrixForm
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisTemplateType
-from analysis.models.nodes.node_utils import update_nodes
+from analysis.models.nodes.node_utils import update_analysis
 from library.django_utils import set_form_read_only
 from snpdb.models.models_user_settings import UserTagColors, UserSettings
 from snpdb.models.models_enums import BuiltInFilters
@@ -59,7 +59,7 @@ class NodeView(UpdateView):
         self.object.appearance_dirty = True
         self.object.save()
 
-        update_nodes(self.object.analysis_id)  # Trigger update_node tasks
+        update_analysis(self.object.analysis_id)  # Trigger update_node tasks
         return JsonResponse({})
 
     def get_form(self, form_class=None):

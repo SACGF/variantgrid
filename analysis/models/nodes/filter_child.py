@@ -2,7 +2,7 @@ import random
 
 from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
-from analysis.models.nodes.node_utils import update_nodes
+from analysis.models.nodes.node_utils import update_analysis
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import GeneListCategory, CustomTextGeneList
 from snpdb.models import VariantGridColumn
@@ -55,6 +55,6 @@ def create_filter_child_node(node, column_name, column_filter):
     child_node.ready = False
     child_node.save()
 
-    update_nodes(child_node.analysis_id)
+    update_analysis(child_node.analysis_id)
 
     return child_node
