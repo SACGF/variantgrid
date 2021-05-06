@@ -257,21 +257,29 @@ def view_transcript_version(request, transcript_id, version):
         return render(request, "genes/view_transcript_version.html", context)
 
     accession = tv.accession
-    transcripts_by_build = {}
-    for t in tv_set.order_by("genome_build__name"):
-        genome_build_id = t.genome_build.pk
-        transcripts_by_build[genome_build_id] = t
+    transcript_versions_by_build = {}
+    builds_missing_data = set()
+    for tv in tv_set.order_by("genome_build__name"):
+        genome_build_id = tv.genome_build.pk
+        transcript_versions_by_build[genome_build_id] = tv
+        if not tv.has_valid_data:
+            builds_missing_data.add(tv.genome_build)
 
     differences = []
-    for a, b in combinations(transcripts_by_build.keys(), 2):
-        t_a = transcripts_by_build[a]
-        t_b = transcripts_by_build[b]
-        diff = t_a.get_differences(t_b)
-        if diff:
-            differences.append(((a, b), diff))
+    if builds_missing_data:
+        builds = ''.join([str(b) for b in builds_missing_data])
+        msg = f"Transcripts in builds {builds} missing data, no difference comparison possible"
+        messages.add_message(request, messages.WARNING, msg)
+    else:
+        for a, b in combinations(transcript_versions_by_build.keys(), 2):
+            t_a = transcript_versions_by_build[a]
+            t_b = transcript_versions_by_build[b]
+            diff = t_a.get_differences(t_b)
+            if diff:
+                differences.append(((a, b), diff))
 
     context = {**context, **{"accession": accession,
-                             "transcripts_by_build": transcripts_by_build,
+                             "transcript_versions_by_build": transcript_versions_by_build,
                              "differences": differences}}
     return render(request, "genes/view_transcript_version.html", context)
 

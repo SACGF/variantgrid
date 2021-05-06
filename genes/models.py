@@ -699,6 +699,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             coords = f"{self.data['chrom']}:{self.data['start']}-{self.data['end']} ({self.data['strand']})"
         return coords
 
+    @property
+    def has_valid_data(self) -> bool:
+        try:
+            for key in ["chrom", "start", "end", "strand", "exons"]:
+                _ = self.data[key]
+            return True
+        except KeyError:
+            return False
+
     def get_differences(self, transcript):
         """ Used to inform while HGVS may resolve differently """
         differences = {}

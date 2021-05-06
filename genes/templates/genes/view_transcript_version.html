@@ -19,7 +19,7 @@
         {% page_help 'genes/transcript_version_ensembl' 'Ensembl transcript versions' %}
     {% endif %}
 
-    {% if transcripts_by_build %}
+    {% if transcript_versions_by_build %}
         <table class="table">
             <thead>
             <tr>
@@ -35,12 +35,12 @@
                 <th>External Link</th>
             </tr>
             </thead>
-        {% for genome_build_id, transcript_version in transcripts_by_build.items %}
+        {% for genome_build_id, transcript_version in transcript_versions_by_build.items %}
             <tr>
                 <td>{{ genome_build_id }}</td>
                 <td><a class="hover-link" href="{% url 'view_gene' transcript_version.gene.pk %}">{{ transcript_version.gene }}</a></td>
                 <td>{{ transcript_version.biotype }}</td>
-                {% if transcript_version.data %}
+                {% if transcript_version.has_valid_data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
                     <td><a class="hover-link" href="#{{ genome_build_id }}-json" data-toggle="collapse">show</a></td>
