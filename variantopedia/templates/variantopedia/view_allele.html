@@ -128,11 +128,12 @@
         </div>
     </div>
 
+    {% if classifications_new_grouping %}
     <div class="container mt-4">
         <h3>Classifications</h3>
-        {% classification_groups classifications %}
+        {% classification_groups classifications link_discordance_reports=discordance_enabled %}
     </div>
-
+    {% else %}
     <div class="container-table mt-4">
         <h3 style="margin-bottom:0">Classifications</h3>
         {% if classifications %}
@@ -142,4 +143,6 @@
             No internal classifications.
         {% endif %}
     </div>
+    {% endif %}
+
 {% endblock content %}

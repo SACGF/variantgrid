@@ -2,7 +2,7 @@ from functools import total_ordering
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
 from lazy import lazy
 from annotation.models import Citation, CitationSource
-from genes.hgvs import CHGVS
+from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild
@@ -165,6 +165,10 @@ class EvidenceMixin:
     @lazy
     def c_parts(self) -> CHGVS:
         return CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
+
+    @lazy
+    def p_parts(self) -> PHGVS:
+        return PHGVS(self.get(SpecialEKeys.P_HGVS) or "")
 
     @property
     def transcript(self) -> Optional[str]:

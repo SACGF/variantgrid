@@ -87,7 +87,7 @@ def report_exc_info(extra_data=None, request=None):
 
 class NotificationBuilder:
 
-    SLACK_EMOJI_RE = re.compile(r":\w+:")
+    SLACK_EMOJI_RE = re.compile(r"\:\w+\:")
 
     @staticmethod
     def slack_markdown_to_html(markdown_txt: str, surround_with_div: bool = False):
@@ -98,6 +98,8 @@ class NotificationBuilder:
                 markdown_html = f"<div>{markdown_html}</div>"
             return markdown_html
         return ""
+
+    # Different kind of blocks
 
     class Block:
 
@@ -154,6 +156,7 @@ class NotificationBuilder:
                         "fields": [as_field(field) for field in fields]
                     })
 
+            field_list = list()
             for field in self.fields:
                 field_list.append(field)
                 if len(field_list) == 2:
@@ -188,6 +191,7 @@ class NotificationBuilder:
         def as_html(self):
             return "<hr/>"
 
+    # end blocks
 
     def __init__(self, message: str, emoji: str = ":dna:"):
         self.message = message
@@ -205,7 +209,7 @@ class NotificationBuilder:
         return self
 
     def add_field(self, label: str, value: str) -> 'NotificationBuilder':
-        fields_block: NotificationBuilder.FieldsBlock
+        fields_block: Optional[NotificationBuilder.FieldsBlock] = None
         if last_block := self._last_block():
             if isinstance(last_block, NotificationBuilder.FieldsBlock):
                 fields_block = last_block
@@ -261,6 +265,7 @@ class NotificationBuilder:
 
     def send(self):
         self.sent = True
+        print(self.as_html())
         if self.can_send:
             send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=self.webhook_url)
 
