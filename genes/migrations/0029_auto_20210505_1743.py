@@ -23,6 +23,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(_citext_message),
+        CITextExtension(),  # Install for this DB
         migrations.AlterField(
             model_name='genesymbol',
             name='symbol',
