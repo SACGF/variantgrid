@@ -1,3 +1,4 @@
+import logging
 import operator
 import uuid
 from collections import defaultdict
@@ -43,7 +44,7 @@ def _get_analysis_update_tasks(analysis_id) -> List:
     all_nodes_graph.add_nodes_from(node_ids)
     all_nodes_graph.add_edges_from(edges)
 
-    print("-" * 60)
+    logging.info("-" * 60)
 
     for connected_components in nx.weakly_connected_components(all_nodes_graph):
         sub_graph = all_nodes_graph.subgraph(connected_components)
@@ -56,10 +57,10 @@ def _get_analysis_update_tasks(analysis_id) -> List:
         sub_graph_nodes_qs = analysis.analysisnode_set.filter(pk__in=sub_graph_node_ids)
         analysis_update_uuid = uuid.uuid4()
         node_task_records = []
-        print("Dirty nodes:")
+        logging.info("Dirty nodes:")
         for node_id, version in sub_graph_nodes_qs.filter(status=NodeStatus.DIRTY).values_list("pk", "version"):
             node_task = NodeTask(node_id=node_id, version=version, analysis_update_uuid=analysis_update_uuid)
-            print(node_task)
+            logging.info(node_task)
             node_task_records.append(node_task)
 
         if node_task_records:
@@ -68,7 +69,7 @@ def _get_analysis_update_tasks(analysis_id) -> List:
         # Return the ones we got the lock for
         node_tasks = NodeTask.objects.filter(analysis_update_uuid=analysis_update_uuid)
         node_versions_to_update = dict(node_tasks.values_list("node_id", "version"))
-        print(f"Got lock for: {node_versions_to_update}")
+        logging.info(f"Got lock for: {node_versions_to_update}")
 
         groups = []
         if node_versions_to_update:
