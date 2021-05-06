@@ -1,17 +1,27 @@
 {% load classification_tags %}
 {% load js_tags %}
 
-<tr class="{{ row_class }}" {% if group.clinical_grouping == "unshared" %}style="opacity:0.5"{% endif %}>
-    <td>
+<tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_discordant %}text-decoration:line-through;{% endif %}">
+    <td style="min-width:220px;">
         {% if sub_index %}
-            <div class="ml-4"><i style="font-size:8px" class="fas fa-circle text-info"></i> Record {{ sub_index }}</div>
+            {% for c_hgvs in group.c_hgvses %}
+                <div style="font-size:smaller"><i style="font-size:8px" class="fas fa-circle text-info"></i> {% c_hgvs c_hgvs %}</div>
+            {% endfor %}
+            {% for p_hgvs in group.p_hgvses %}
+                <div style="font-size:small" class="text-secondary">{{ p_hgvs.p_dot }}</div>
+            {% endfor %}
         {% else %}
             {% if group.clinical_grouping != "default" %}
                 <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
             {% endif %}
-            {{ group.organization }}<br/>
-            {{ group.transcript }}
-            {% if group.count > 1 %}<div class="font-weight-bold"><a href=".cc-{{ group.group_id }}" data-toggle="collapse" class="toggle-link">{{ group.count }} records</a></div>{% endif %}
+            {{ group.organization }}
+            {% for c_hgvs in group.c_hgvses %}
+                <div style="font-size:smaller">{% c_hgvs c_hgvs %}</div>
+            {% endfor %}
+            {% for p_hgvs in group.p_hgvses %}
+                <div style="font-size:small" class="text-secondary">{{ p_hgvs.p_dot }}</div>
+            {% endfor %}
+            {% if group.count > 1 %}<div class="font-weight-bold font-size-small"><a href=".cc-{{ group.group_id }}" data-toggle="collapse" class="toggle-link">{{ group.count }} records</a></div>{% endif %}
         {% endif %}
     </td>
     <td class="cs-{{ group.clinical_significance|lower }} text-center">
@@ -28,23 +38,23 @@
             <div class="no-value">-</div>
         {% endfor %}
     </td>
-    <td>
+    <td style="max-width:100px;">
         {% if group.zygosities %}
             {{ group.zygosities | ekey:"zygosity" }}
         {% else %}
             <div class="no-value">-</div>
         {% endif %}
     </td>
-    <td>
+    <td  style="max-width:200px;">
         {% for acmg in group.acmg_criteria %}
             {% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>
             {% empty %}
             <div class="no-value">-</div>
         {% endfor %}
     </td>
-    <td>
+    <td width="110px">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
-            {% if group.most_recent.curated_date %}Curated {% timestamp group.most_recent.curated_date time_ago=True %}{% else %}Uploaded {% timestamp group.most_recent.created %}{% endif %}
+            {% if not group.most_recent_curated.is_curated %}Created<br/>{% endif %}{% timestamp group.most_recent_curated.date time_ago=True %}
         </a><br/>
     </td>
 </tr>

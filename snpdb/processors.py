@@ -15,6 +15,7 @@ def settings_context_processor(request):
     context = {
         'form_helper': FORM_HELPER_HELPER,
         'discordance_enabled': settings.DISCORDANCE_ENABLED,
+        'classifications_new_grouping': settings.VARIANT_CLASSIFICATION_NEW_GROUPING,
         'help_url': settings.HELP_URL,
         'inbox_enabled': settings.INBOX_ENABLED,
         'pathology_tests_enabled': settings.PATHOLOGY_TESTS_ENABLED,

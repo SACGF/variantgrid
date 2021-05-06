@@ -30,6 +30,7 @@ DISCORDANCE_ENABLED = True
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 SEND_EMAILS = True
+VARIANT_CLASSIFICATION_NEW_GROUPING = True
 
 # Keycloak
 

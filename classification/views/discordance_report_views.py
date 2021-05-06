@@ -51,6 +51,8 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
         if report == latest_report:
             provide_reopen = True
 
+    effectives = [drc.classfication_effective for drc in report.discordancereportclassification_set.all()]
+
     context = {
         'report': report,
         'clinical_context': clinical_context,
@@ -58,6 +60,7 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
         'preferred_variant': preferred_variant,
         'use_allele_links': use_allele_links,
         'rows': report.discordancereportclassification_set.all(),
+        'classifications': effectives,
         'all_reports': all_reports,
         'ongoing': report.resolution is None,
         'continued_discordance_reasons': continued_discordance_reasons,

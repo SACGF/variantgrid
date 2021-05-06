@@ -68,7 +68,7 @@
 {% endblock %}
 {% block content %}
     <div class="container">
-        <h3>Discordance Report</h3>
+        <h4>Discordance Report</h4>
 
         {% page_help page_id='classification/discordance_report_help' title='Start Resolving' show_title=False %}
 
@@ -113,6 +113,7 @@
         </div>
     </div>
 
+    {% comment %}
     <div class="container-table mt-4">
         <h4>Discordance Summary Table</h4>
         <table class="table classification-table" style="font-size:small">
@@ -134,23 +135,19 @@
             </tbody>
         </table>
     </div>
-
-    {% comment %}
-    <!-- as all the long descriptions currently matched the short descriptions this provided no value -->
-    <div class="chunk borderless legend">
-        Legend<br/>
-        {% for action in all_actions %}
-            <span class="code">{{ action.code }}</span> {{ action.long_description }}<br/>
-        {% endfor %}
-    </div>
     {% endcomment %}
+
+    <div class="container mt-4">
+        <h4>Classifications</h4>
+        {% classification_groups classifications %}
+    </div>
+
 
     {% if provide_reopen %}
 
         <div class="container">
             <h4>Actions</h4>
             <div class="btn-toolbar">
-                <button class="btn btn-outline-primary" onclick="diff()">Show Diffs</button>
                 <button class="btn btn-outline-primary" onclick="download()">Download as CSV</button>
                 <form method="post">
                     {% csrf_token %}
@@ -165,7 +162,6 @@
         <div class="container">
             <h4>Actions</h4>
             <div class="btn-toolbar">
-                <button type="button" class="btn btn-outline-primary" onclick="diff()">Show Diffs</button>
                 <button type="button" class="btn btn-outline-primary" onclick="download()">Download as CSV</button>
                 <button type="button" class="btn btn-outline-secondary" onclick="reorgGroupings()">Reorganise Clinical Groupings</button>
                 <button type="button" class="btn btn-outline-danger" onclick="toggleUnable()">Unable to Resolve Discordance</button>
@@ -200,7 +196,7 @@
     {% endif %}
 
     <div class="container mt-4">
-        <h4>All Discordance Reports for this Clinical Grouping</h4>
+        <h4>History for this Clinical Grouping</h4>
         <table class="table">
             <thead>
                 <tr><th>Opened At</th><th>Closed At</th><th>Resolution</th></tr>

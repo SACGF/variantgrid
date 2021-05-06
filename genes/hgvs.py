@@ -54,6 +54,28 @@ def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> List[st
     return diff_list
 
 
+class PHGVS:
+
+    def __init__(self, full_p_hgvs: str):
+        self.full_p_hgvs = full_p_hgvs
+
+    def p_dot(self):
+        # TODO normalise proteins listed
+        p_dot = self.full_p_hgvs.find('p.')
+        if p_dot != -1:
+            return self.full_p_hgvs[p_dot::]
+        return self.full_p_hgvs
+
+    def __eq__(self, other):
+        return self.full_p_hgvs == other.full_p_hgvs
+
+    def __hash__(self):
+        return hash(self.full_p_hgvs)
+
+    def __bool__(self):
+        return bool(self.full_p_hgvs)
+
+
 class CHGVS:
     """
     Technically this is HGVS now as it will accept c. p. g. n. etc
@@ -85,6 +107,11 @@ class CHGVS:
         else:
             self.raw_c = full_c_hgvs
 
+    @property
+    def gene_symbol(self) -> Optional[str]:
+        # just as "gene" wasn't accurate, migrate to gene_symbol
+        return self.gene
+
     def with_gene_symbol(self, gene_symbol: str) -> 'CHGVS':
         if self.transcript:
             new_full_chgvs = f'{self.transcript}({gene_symbol}):{self.raw_c}'
@@ -110,6 +137,12 @@ class CHGVS:
 
     def __hash__(self):
         return hash(self.full_c_hgvs)
+
+    def __lt__(self, other):
+        """
+        Warning, just does alphabetic sorting for consistent ordering, does not attempt to order by genomic coordinate
+        """
+        return self.full_c_hgvs < other.full_c_hgvs
 
     @lazy
     def transcript_parts(self) -> TranscriptParts:

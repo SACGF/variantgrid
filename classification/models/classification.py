@@ -21,7 +21,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
 import logging
 import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
@@ -246,6 +246,12 @@ class ClassificationOutstandingIssues:
 
     def __str__(self):
         return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
+
+
+@dataclass
+class CuratedDate:
+    date: datetime
+    is_curated: bool
 
 
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
@@ -2106,14 +2112,21 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     @property
     def curated_date(self) -> datetime:
+        return self.curated_date_check.date
+
+    @property
+    def curated_date_check(self) -> CuratedDate:
+        """
+        @return a datetime and a bool indicating if True, value came from curated, if False came from classification created
+        """
         try:
             curated_date_value = Classification.to_date(self.get(SpecialEKeys.CURATION_DATE))
             if curated_date_value:
-                return curated_date_value.replace(tzinfo=None)
+                return CuratedDate(curated_date_value.replace(tzinfo=None), True)
         except:
             pass  # could not parse date
         # if we don't have a curation date, use created date
-        return self.classification.created.replace(tzinfo=None)
+        return CuratedDate(self.classification.created.replace(tzinfo=None), False)
 
     @staticmethod
     def optimize_for_report(qs: QuerySet) -> QuerySet:

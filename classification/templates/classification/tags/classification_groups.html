@@ -1,6 +1,21 @@
 {% load classification_tags %}
 {% load js_tags %}
+{% load static %}
 
+{% if diff_latest %}
+    <div class="btn-toolbar mb-4">
+        <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
+        <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
+        {% for ccg in clinical_contexts %}
+            {% if ccg.latest_report %}
+                <a class="btn btn-outline-secondary" href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">
+                    {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status : {{ ccg.latest_report.resolution_text }}
+                </a>
+            {% endif %}
+        {% endfor %}
+    </div>
+{% endif %}
+{% if classification_groups %}
 <table class="table">
     <thead>
         <tr>
@@ -9,7 +24,7 @@
             <th>Conditions</th>
             <th>Zygosities</th>
             <th>ACMG</th>
-            <th>Most Recent</th>
+            <th>Curated</th>
         </tr>
     </thead>
     <tbody>
@@ -18,3 +33,6 @@
         {% endfor %}
     </tbody>
 </table>
+{% else %}
+    <div class="no-value mb-4 text-center">No records</div>
+{% endif %}

@@ -436,7 +436,7 @@ def view_allele(request, pk):
         user=request.user,
         allele=allele,
         published=True
-    )
+    ).select_related('classification', 'classification__clinical_context', 'classification__lab', 'classification__lab__organization')
 
     allele_merge_log_qs = AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")
     context = {"allele": allele,

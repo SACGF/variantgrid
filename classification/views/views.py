@@ -333,6 +333,10 @@ def view_classification_diff(request):
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True)
         records = compare_all
 
+    elif cids := request.GET.get('cids'):
+        records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
+        records = [record for record in records if record]
+
     # filter out any Nones inserted by filtering on user permission etc
     records = [record for record in records if record]
 
