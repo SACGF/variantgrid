@@ -267,7 +267,7 @@ def view_transcript_version(request, transcript_id, version):
 
     differences = []
     if builds_missing_data:
-        builds = ''.join([str(b) for b in builds_missing_data])
+        builds = ', '.join([str(b) for b in builds_missing_data])
         msg = f"Transcripts in builds {builds} missing data, no difference comparison possible"
         messages.add_message(request, messages.WARNING, msg)
     else:
