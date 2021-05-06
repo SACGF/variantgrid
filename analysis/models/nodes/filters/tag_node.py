@@ -28,22 +28,23 @@ class TagNode(AnalysisNode):
         return list(qs)
 
     def _get_node_q(self) -> Q:
+        # Pull in tags from this analysis - use variant query
+        # VariantTags are same build as analysis, so use this not Allele as it avoids a race condition where
+        # tagging a variant w/o an Allele takes a few seconds to create one via liftover pipelines
+        variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
+        if self.tag_ids:
+            variants_with_tags = variants_with_tags.filter(tag__in=self.tag_ids)
+        variants_set = set(variants_with_tags.values_list("variant_id", flat=True))
+
         if self.mode == TagNodeMode.ALL_TAGS:
             tags_qs = VariantTag.filter_for_user(self.analysis.user)
+            # We already have tags from this analysis, no need to retrieve again
+            tags_qs = tags_qs.exclude(analysis=self.analysis)
             # Builds from different analyses (maybe diff builds) - so do query using Allele
             variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, tags_qs, self.tag_ids)
-            node_q = Q(pk__in=list(variants_qs.values_list("pk", flat=True)))
-        else:
-            # Tags from this analysis - use variant query
-            # VariantTags are same build as analysis, so use this not Allele as it avoids a race condition where
-            # tagging a variant w/o an Allele takes a few seconds to create one via liftover pipelines
-            variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
-            if self.tag_ids:
-                variants_with_tags = variants_with_tags.filter(tag__in=self.tag_ids)
-            variants_list = list(variants_with_tags.values_list("variant_id", flat=True))
-            node_q = Q(pk__in=variants_list)
+            variants_set.update(variants_qs.values_list("pk", flat=True))
 
-        return node_q
+        return Q(pk__in=variants_set)
 
     def get_node_name(self):
         if self.visible:
