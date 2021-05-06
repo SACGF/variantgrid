@@ -11,7 +11,12 @@ def _one_off_fix_lowercase_gene_symbols(apps, schema_editor):
     # Create upper case versions of symbols that don't exist
     lc_symbols_qs = GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).exclude(symbol=F("uc_symbol"))
     lc_symbols = list(lc_symbols_qs.values_list("uc_symbol", flat=True))
-    GeneSymbol.objects.bulk_create([GeneSymbol(symbol=s) for s in lc_symbols], batch_size=2000, ignore_conflicts=True)
+    GeneSymbol.objects.bulk_create([GeneSymbol(symbol=s.upper()) for s in lc_symbols],
+                                   batch_size=2000, ignore_conflicts=True)
+
+    # 'annotation.GeneSymbolPubMedCount' is 1-to-1 with gene symbol, but is just a cache so can delete ok
+    GeneSymbolPubMedCount = apps.get_model("annotation", "GeneSymbolPubMedCount")
+    GeneSymbolPubMedCount.objects.filter(gene_symbol__in=lc_symbols_qs).delete()
 
     # ReleaseGeneSymbol has a unique_together with gene_symbol - so need to delete any lower symbols
     # That already have upper symbols
@@ -44,6 +49,7 @@ def _one_off_fix_lowercase_gene_symbols(apps, schema_editor):
         ("genes", "GeneCoverage"),
         ("genes", "GeneCoverageCanonicalTranscript"),
         ("genes", "GnomADGeneConstraint"),
+        ("genes", "HGNC"),
         ("genes", "ReleaseGeneSymbol"),  # Should work now we cleaned upper/lower dupes above
         ("pathtests", "PathologyTestGeneModificationRequest"),
         ("seqauto", "GoldCoverageSummary"),
