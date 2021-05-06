@@ -60,19 +60,19 @@ def get_toposorted_nodes_from_parent_value_data(nodes, parent_value_data):
     return topo_sorted_nodes
 
 
-def update_nodes(analysis_id, run_async=True):
+def update_nodes(analysis_id):
     tasks = get_analysis_update_tasks(analysis_id)
     for t in tasks:
-        execute_task(t, run_async=run_async)
+        execute_task(t, run_async=True)
 
 
-def reload_analysis_nodes(analysis_id, run_async=True):
+def reload_analysis_nodes(analysis_id):
     for node in AnalysisNode.objects.filter(analysis_id=analysis_id).select_subclasses():
         node.update_children = False  # Will get them all in loop
         node.appearance_dirty = True
         node.queryset_dirty = True
         node.save()
-    return update_nodes(analysis_id, run_async=run_async)
+    return update_nodes(analysis_id)
 
 
 def get_ancestor_set(node_id, parent_value_data):

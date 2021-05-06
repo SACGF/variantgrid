@@ -34,4 +34,4 @@ class Command(BaseCommand):
                     break
 
             print(f"Updating nodes for {analysis}")
-            update_nodes(analysis.pk, run_async=True)
+            update_nodes(analysis.pk)
