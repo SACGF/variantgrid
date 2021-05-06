@@ -7,11 +7,13 @@ from django.db import migrations
 
 def _citext_message(apps, schema_editor):
     print("--------")
-    print("If this migration fails, you need to install the Postgres 'citex' extension")
+    print("If this migration fails, you need to install the Postgres 'citex' extension to the DB (as DB superuser)")
     print("sudo su postgres")
     print("echo 'CREATE EXTENSION IF NOT EXISTS citext;' | psql")
     print("exit # leave 'postgres' user shell")
     print("sudo service postgresql restart")
+    print("--------")
+    print("CITextExtension() should enable it for the specific VG database if extension is installed")
     print("--------")
 
 
