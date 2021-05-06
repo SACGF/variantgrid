@@ -1,8 +1,10 @@
 import json
 import logging
+import operator
 import re
 from collections import defaultdict
 from datetime import timedelta
+from functools import reduce
 from random import randint
 from typing import Optional
 
@@ -21,7 +23,7 @@ from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import Analysis
 from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
-    VariantAnnotationVersion
+    VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import Event, create_event
 from genes.hgvs import HGVSMatcher
@@ -241,7 +243,8 @@ def server_status(request):
     # Variant Annotation - incredibly quick check
     highest_variant_annotated = {}
     try:
-        highest_variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").last()
+        q = reduce(operator.and_, VariantAnnotation.VARIANT_ANNOTATION_Q)
+        highest_variant = Variant.objects.filter(q).order_by("pk").last()
         genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
         vav = VariantAnnotationVersion.latest(genome_build)
         annotated = highest_variant.variantannotation_set.filter(version=vav).exists()

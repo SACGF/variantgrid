@@ -687,6 +687,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "DL": ("spliceai_pred_ds_dl", "spliceai_pred_dp_dl"),
     }
 
+    # List of filters to describe variants that can be annotated
+    VARIANT_ANNOTATION_Q = [
+        Variant.get_no_reference_q(),
+        ~Q(alt__seq__in=['.', '*', "<DEL>"]),  # Exclude non-standard variants
+    ]
+
     @lazy
     def has_extended_gnomad_fields(self):
         """ I grabbed a few new fields but haven't patched back to GRCh37 yet

@@ -14,7 +14,7 @@ from django.db.models.query_utils import Q
 from functools import reduce
 import operator
 
-from annotation.models import AnnotationVersion
+from annotation.models import AnnotationVersion, VariantAnnotation
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.models import Variant, VariantZygosityCountCollection
 
@@ -54,11 +54,7 @@ def get_queryset_for_annotation_version(klass, annotation_version):
 def get_unannotated_variants_qs(annotation_version, min_variant_id=None, max_variant_id=None):
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
-    q_filters = [
-        Q(variantannotation__isnull=True),     # Not annotated
-        Variant.get_no_reference_q(),
-        ~Q(alt__seq__in=['.', '*', "<DEL>"]),  # Exclude non-standard variants
-    ]
+    q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + [Q(variantannotation__isnull=True)]  # Not annotated
 
     if min_variant_id:
         q_filters.append(Q(pk__gte=min_variant_id))
