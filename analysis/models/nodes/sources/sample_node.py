@@ -52,12 +52,12 @@ class SampleNode(SampleMixin, AnalysisNode):
         if self.sample and self.sample.has_genotype is False:
             return [Zygosity.UNKNOWN_ZYGOSITY]
 
-        ZYGOSITY_LOOKUP = {
+        ZYGOSITY_LOOKUP = [
             (self.zygosity_ref, Zygosity.HOM_REF),
             (self.zygosity_het, Zygosity.HET),
             (self.zygosity_hom, Zygosity.HOM_ALT),
             (self.zygosity_unk, Zygosity.UNKNOWN_ZYGOSITY),
-        }
+        ]
         return [z for s, z in ZYGOSITY_LOOKUP if s]
 
     def get_zygosity_description(self):
