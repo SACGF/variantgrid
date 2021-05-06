@@ -804,7 +804,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         NodeTask.objects.filter(node=self, version=self.version).update(celery_task=celery_task)
 
-
     def adjust_cloned_parents(self, old_new_map):
         """ If you need to do something with old/new parents """
         pass
