@@ -15,7 +15,7 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.fields import CITextField
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models, IntegrityError, transaction
-from django.db.models import Min, Max, QuerySet
+from django.db.models import Min, Max, QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
@@ -1145,7 +1145,8 @@ class GeneListGeneSymbol(models.Model):
     @staticmethod
     def get_joined_genes_qs_annotation_for_release(release: GeneAnnotationRelease):
         """ Used to annotate GeneListGeneSymbol queryset """
-        return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True,
+        return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene",
+                         delimiter=',', distinct=True, output_field=TextField(),
                          filter=Q(gene_symbol__releasegenesymbol__release=release))
 
     def __str__(self):
