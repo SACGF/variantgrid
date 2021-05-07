@@ -1455,8 +1455,11 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
         return warnings
 
     def get_uncovered_gene_symbols(self, gene_symbols, min_coverage):
-        return gene_symbols.exclude(genecoveragecanonicaltranscript__gene_coverage_collection=self,
-                                    genecoveragecanonicaltranscript__min__gte=min_coverage)
+        # Do as inner query to ensure we restrict to gene coverage partition
+        covered_qs = GeneCoverageCanonicalTranscript.objects.filter(gene_coverage_collection=self,
+                                                                    min__gte=min_coverage)
+        covered_gene_symbols = covered_qs.values_list("gene_symbol", flat=True)
+        return gene_symbols.exclude(pk__in=covered_gene_symbols)
 
     def __str__(self):
         return "GeneCoverageCollection " + os.path.basename(self.path)
