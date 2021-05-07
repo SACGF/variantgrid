@@ -102,6 +102,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
         cmd.extend(["--pick_order", settings.ANNOTATION_VEP_PICK_ORDER])
 
+    if settings.ANNOTATION_VEP_DISTANCE is not None:
+        cmd.extend(["--distance", settings.ANNOTATION_VEP_DISTANCE])
+
     # Plugins that require data
     PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
                VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
