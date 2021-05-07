@@ -103,7 +103,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         cmd.extend(["--pick_order", settings.ANNOTATION_VEP_PICK_ORDER])
 
     if settings.ANNOTATION_VEP_DISTANCE is not None:
-        cmd.extend(["--distance", settings.ANNOTATION_VEP_DISTANCE])
+        cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
 
     # Plugins that require data
     PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
