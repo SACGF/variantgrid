@@ -1,4 +1,5 @@
 from django.contrib.postgres.aggregates.general import StringAgg
+from django.db.models import TextField
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404
@@ -46,12 +47,16 @@ class PatientListGrid(JqGridUserRowConfig):
         q_hpo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
         q_omim = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
         # Add sample_count to queryset
-        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',', distinct=True),
-                             "hpo": StringAgg(ontology_path, '|', filter=q_hpo, distinct=True),
-                             "omim": StringAgg(ontology_path, '|', filter=q_omim, distinct=True),
-                             "genes": StringAgg(PATIENT_GENE_SYMBOL_PATH, '|', distinct=True),
+        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',',
+                                                       distinct=True, output_field=TextField()),
+                             "hpo": StringAgg(ontology_path, '|',
+                                              filter=q_hpo, distinct=True, output_field=TextField()),
+                             "omim": StringAgg(ontology_path, '|',
+                                               filter=q_omim, distinct=True, output_field=TextField()),
+                             "genes": StringAgg(PATIENT_GENE_SYMBOL_PATH, '|',
+                                                distinct=True, output_field=TextField()),
                              "sample_count": Count("sample", distinct=True),
-                             "samples": StringAgg("sample__name", ", ", distinct=True)}
+                             "samples": StringAgg("sample__name", ", ", distinct=True, output_field=TextField())}
         queryset = queryset.annotate(**annotation_kwargs)
         field_names = self.get_field_names() + list(annotation_kwargs.keys())
         self.queryset = queryset.values(*field_names)

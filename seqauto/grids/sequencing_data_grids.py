@@ -25,7 +25,7 @@ class ExperimentsListGrid(JqGridUserRowConfig):
 
         # Add sample_count to queryset
 #        queryset = queryset.annotate(sequencing_runs=Count("sequencingrun"))
-        queryset = queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ','))
+        queryset = queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ',', output_field=TextField()))
         field_names = self.get_field_names() + ["sequencing_runs"]
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'created',
