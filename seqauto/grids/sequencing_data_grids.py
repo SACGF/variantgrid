@@ -74,9 +74,12 @@ class SequencingRunListGrid(JqGridUserRowConfig):
 
         annotate = {
             "sample_count": Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample"),
-            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), ',', ordering="vcffromsequencingrun"),
-            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", ',', ordering="vcffromsequencingrun"),
-            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", ',', ordering="vcffromsequencingrun"),
+            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), ',',
+                                 output_field=TextField(), ordering="vcffromsequencingrun"),
+            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", ',',
+                                            output_field=TextField(), ordering="vcffromsequencingrun"),
+            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", ',',
+                                           ordering="vcffromsequencingrun"),
         }
 
         # Add sample_count to queryset
