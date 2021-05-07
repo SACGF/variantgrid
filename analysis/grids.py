@@ -456,7 +456,7 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
 class AnalysisNodeIssuesGrid(JqGridUserRowConfig):
     model = AnalysisNode
     caption = 'Analysis Node Issues'
-    fields = ["id", "analysis_id", "analysis__name", "status", "errors"]
+    fields = ["id", "analysis_id", "analysis__name", "status", "modified", "errors"]
     colmodel_overrides = {
         "id": {"hidden": True},
         'analysis_id': {"hidden": True},
