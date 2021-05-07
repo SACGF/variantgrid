@@ -1,3 +1,6 @@
+import operator
+from functools import reduce
+
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
@@ -282,17 +285,20 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
                     gene_list = get_object_or_404(GeneList, pk=gene_list_id)
                     gene_symbols.update(gene_list.get_gene_names())
 
-        queryset = self.get_coverage_queryset(gene_coverage_collection, gene_symbols)
+        q = self.get_coverage_q(gene_coverage_collection, gene_symbols)
+        queryset = self.model.objects.filter(q)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def get_coverage_queryset(self, gene_coverage_collection, gene_symbols):
-        queryset = self.model.objects.filter(gene_coverage_collection=gene_coverage_collection)
+    def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
+        filters = [
+            Q(gene_coverage_collection=gene_coverage_collection),
+        ]
         if gene_symbols:
-            queryset = queryset.filter(gene_symbol__in=gene_symbols)
+            filters.append(Q(gene_symbol__in=gene_symbols))
 
-        return queryset
+        return reduce(operator.and_, filters)
 
 
 class UncoveredGenesGrid(QCGeneCoverageGrid):
@@ -301,6 +307,6 @@ class UncoveredGenesGrid(QCGeneCoverageGrid):
         self.min_depth = min_depth
         super().__init__(user, **kwargs)
 
-    def get_coverage_queryset(self, gene_coverage_collection, gene_symbols):
-        queryset = super().get_coverage_queryset(gene_coverage_collection, gene_symbols)
-        return queryset.filter(min__lt=self.min_depth)
+    def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
+        q = super().get_coverage_q(gene_coverage_collection, gene_symbols)
+        return q & Q(min__lt=self.min_depth)
