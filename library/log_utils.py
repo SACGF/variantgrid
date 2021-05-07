@@ -2,18 +2,21 @@ import json
 from logging import StreamHandler
 import logging
 import socket
-from typing import Dict, Optional, List, Tuple, Any
+import markdown
+from typing import Dict, Optional, List, Tuple, Any, Union
 
 import requests
 import rollbar
 import sys
 import traceback
+import re
 
 from django.conf import settings
 from django.http import Http404
 from django.utils import timezone
 
 from django.contrib.auth.models import User
+from markdown import markdown
 from rest_framework.request import Request
 from rollbar.contrib.django.middleware import RollbarNotifierMiddleware
 
@@ -84,90 +87,194 @@ def report_exc_info(extra_data=None, request=None):
 
 class NotificationBuilder:
 
-    def __init__(self, message: str, emoji: str = ":dna:"):
-        self.message = message
-        self.emoji = emoji
-        self.blocks = list()
-        self.sent = False
-        self.fields: List[Tuple[str, Any]] = list()
+    SLACK_EMOJI_RE = re.compile(r":\w+:")
 
-    def add_header(self, text) -> 'NotificationBuilder':
-        self._check()
-        self.blocks.append({
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": text,
-                "emoji": True
-            }
-        })
-        return self
+    @staticmethod
+    def slack_markdown_to_html(markdown_txt: str, surround_with_div: bool = False):
+        if markdown_txt:
+            markdown_txt = NotificationBuilder.SLACK_EMOJI_RE.sub(markdown_txt, "")
+            markdown_html = markdown(markdown_txt)
+            if surround_with_div:
+                markdown_html = f"<div>{markdown_html}</div>"
+            return markdown_html
+        return ""
 
-    def _check(self):
-        self._field_check()
+    class Block:
 
-    def _field_check(self):
-        def as_field(field: Tuple[str, Any]):
+        def as_html(self) -> str:
+            raise NotImplementedError(f"{self} has not implemented as_html method")
+
+        def as_slack(self) -> Union[Dict, List]:
+            raise NotImplementedError(f"{self} has not implemented as_slack method")
+
+    class HeaderBlock(Block):
+
+        def __init__(self, header_text: str):
+            self.header_text = header_text
+
+        def as_html(self):
+            return f"<h4>{self.header_text}</h4>"
+
+        def as_slack(self):
             return {
-                "type": "mrkdwn",
-                "text": f"*{field[0]}:*\n{field[1]}"
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": self.header_text,
+                    "emoji": True
+                }
             }
 
-        def add_field_list(fields: List[Tuple[str, Any]]):
-            if fields:
-                self.blocks.append({
-                    "type": "section",
-                    "fields": [as_field(field) for field in fields]
-                })
+    class FieldsBlock(Block):
 
-        if fields := self.fields:
-            field_list = list()
-            for field in fields:
+        def __init__(self):
+            self.fields: List[Union[str, Any]] = list()
+
+        def add_field(self, label: str, value: str):
+            self.fields.append((label, value))
+
+        def as_html(self):
+            def as_field(field: Tuple[str, Any]):
+                return f"<label>{NotificationBuilder.slack_markdown_to_html(field[0])}</label>: {field[1]}";
+            return "<br/>".join([as_field(field) for field in self.fields])
+        def as_slack(self):
+
+            blocks = list()
+
+            def as_field(field: Tuple[str, Any]):
+                return {
+                    "type": "mrkdwn",
+                    "text": f"*{field[0]}:*\n{field[1]}"
+                }
+
+            def add_field_list(fields: List[Tuple[str, Any]]):
+                if fields:
+                    blocks.append({
+                        "type": "section",
+                        "fields": [as_field(field) for field in fields]
+                    })
+
+            for field in self.fields:
                 field_list.append(field)
                 if len(field_list) == 2:
                     add_field_list(field_list)
                     field_list = list()
             add_field_list(field_list)
-            self.fields = list()
+            return blocks
 
-    def add_field(self, label: str, value: str, single=False):
-        self.fields.append((label, value))
+    class MarkdownBlock(Block):
+
+        def __init__(self, markdown_txt: str, indented: bool = False):
+            self.markdown_txt = markdown_txt
+            self.indented = indented
+
+        def as_slack(self):
+            text = self.markdown_txt
+            if self.indented:
+                text = ">>> " + (text or "_No Data_")
+            return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+        def as_html(self):
+            return NotificationBuilder.slack_markdown_to_html(self.markdown_txt)
+
+    class DividerBlock(Block):
+
+        def __init__(self):
+            pass
+
+        def as_slack(self):
+            return {"type": "divider"}
+
+        def as_html(self):
+            return "<hr/>"
+
+
+    def __init__(self, message: str, emoji: str = ":dna:"):
+        self.message = message
+        self.emoji = emoji
+        self.blocks: List[NotificationBuilder.Block] = list()
+        self.sent = False
+
+    def _last_block(self) -> Optional[Block]:
+        if self.blocks:
+            return self.blocks[-1]
+        return None
+
+    def add_header(self, text) -> 'NotificationBuilder':
+        self.blocks.append(NotificationBuilder.HeaderBlock(text))
+        return self
+
+    def add_field(self, label: str, value: str) -> 'NotificationBuilder':
+        fields_block: NotificationBuilder.FieldsBlock
+        if last_block := self._last_block():
+            if isinstance(last_block, NotificationBuilder.FieldsBlock):
+                fields_block = last_block
+        if not fields_block:
+            fields_block = NotificationBuilder.FieldsBlock()
+            self.blocks.append(fields_block)
+        fields_block.add_field(label=label, value=value)
+        return self
 
     def add_divider(self) -> 'NotificationBuilder':
-        self._check()
-        self.blocks.append({"type": "divider"})
+        self.blocks.append(NotificationBuilder.DividerBlock())
         return self
 
     def add_markdown(self, text, indented=False):
-        self._check()
-        if indented:
-            text = ">>> " + (text or "_No Data_")
-        self.blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
+        self.blocks.append(NotificationBuilder.MarkdownBlock(markdown_txt=text, indented=indented))
         return self
 
+    @property
+    def webhook_url(self) -> Optional[str]:
+        return None
+
+    @property
+    def can_send(self) -> bool:
+        return True
+
+    def as_slack(self):
+        slack_blocks: List = list()
+        for block in self.blocks:
+            slack_bit = block.as_slack()
+            if isinstance(slack_bit, dict):
+                slack_blocks.append(slack_bit)
+            elif isinstance(slack_bit, list):
+                slack_blocks += slack_bit
+
+        env_name = socket.gethostname().lower().split('.')[0].replace('-', '')
+        slack_blocks.append({
+            "type": "context",
+            "elements": [
+                {
+                    "type": "plain_text",
+                    "text": env_name,
+                    "emoji": False
+                }
+            ]
+        })
+        return slack_blocks
+
+    def as_html(self):
+        html_str: str = ""
+        for block in self.blocks:
+            html_str += block.as_html()
+        return html_str
+
     def send(self):
-        self._check()
         self.sent = True
-        if blocks := self.blocks:
-            env_name = socket.gethostname().lower().split('.')[0].replace('-', '')
-            blocks.append({
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "plain_text",
-                        "text": env_name,
-                        "emoji": False
-                    }
-                ]
-            })
-            send_notification(message=self.message, blocks=blocks, emoji=self.emoji)
+        if self.can_send:
+            send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=self.webhook_url)
 
     def __del__(self):
         if not self.sent:
             report_message(f"Created a NotificationBuilder but did not call send {self.message}")
 
 
-def send_notification(message: str, blocks: Optional[Dict] = None, username: Optional[str] = None, emoji: str = ":dna:"):
+def send_notification(
+        message: str,
+        blocks: Optional[Dict] = None,
+        username: Optional[str] = None,
+        emoji: str = ":dna:",
+        slack_webhook_url: Optional[str] = None):
     """
     Sends a message to your notification service, currently Slack centric.
     If Slack is not configured, this will do nothing.
@@ -175,31 +282,35 @@ def send_notification(message: str, blocks: Optional[Dict] = None, username: Opt
     @param blocks See https://api.slack.com/messaging/webhooks#advanced_message_formatting
     @param username The username that will appear in Slack
     @param emoji The emoji that will
+    @param slack_webhook_url Provide the slack URL, if not provided will get from settings (if enabled)
     """
     sent = False
-    if slack := settings.SLACK:
-        if slack.get('enabled'):
-            if admin_callback_url := slack.get('admin_callback_url'):
-                data = {
-                    "username": (settings.SITE_NAME + (f" {username}" if username else "")).strip(),
-                    "text": message,
-                    "icon_emoji": emoji
-                }
-                if blocks:
-                    data["blocks"] = blocks
-                data_str = json.dumps(data)
-                print(data_str)
-                r = requests.request(
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                    url=admin_callback_url,
-                    json=data
-                )
-                try:
-                    r.raise_for_status()
-                    sent = True
-                except:
-                    report_exc_info()
+    if slack_webhook_url is None:
+        if slack := settings.SLACK:
+            if slack.get('enabled'):
+                slack_webhook_url = slack.get('admin_callback_url')
+
+    if slack_webhook_url:
+        data = {
+            "username": (settings.SITE_NAME + (f" {username}" if username else "")).strip(),
+            "text": message,
+            "icon_emoji": emoji
+        }
+        if blocks:
+            data["blocks"] = blocks
+        data_str = json.dumps(data)
+
+        r = requests.request(
+            headers={"Content-Type": "application/json"},
+            method="POST",
+            url=slack_webhook_url,
+            json=data
+        )
+        try:
+            r.raise_for_status()
+            sent = True
+        except:
+            report_exc_info()
     if not sent:
         print("Slack not enabled, did not send message")
         print(message)
