@@ -21,6 +21,7 @@ KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
 
 # import all the base settings #
+VARIANT_CLASSIFICATION_NEW_GROUPING = True
 DISCORDANCE_ENABLED = True
 DISCORDANCE_EMAIL = None  # 'discordance@shariant.org.au'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'

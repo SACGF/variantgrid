@@ -24,6 +24,7 @@ from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
+from classification.models.classification_utils import classification_gene_symbol_filter
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
@@ -185,6 +186,13 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     has_gene_coverage = GeneCoverage.get_for_symbol(genome_build, gene_symbol).exists()
     has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).exists()
 
+    # TODO move me into an ajax window
+    classifications = list()
+    if settings.VARIANT_CLASSIFICATION_NEW_GROUPING:
+        if filters := classification_gene_symbol_filter(gene_symbol):
+            classifications = ClassificationModification.objects.filter(filters).filter(is_last_published=True).exclude(classification__withdrawn=True)
+            xf = ClassificationModification.filter_for_user(user=request.user, queryset=classifications)
+
     context = {
         "consortium_genes_and_aliases": defaultdict_to_dict(consortium_genes_and_aliases),
         "citations": citations,
@@ -198,6 +206,8 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "panel_app_servers": PanelAppServer.objects.order_by("pk"),
         "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
         "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
+        # TODO move to its own
+        "classifications": classifications,
         "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
         "has_variants": has_variants,
         "omim_and_hpo_for_gene": omim_and_hpo_for_gene,

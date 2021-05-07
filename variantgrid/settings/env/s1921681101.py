@@ -19,7 +19,7 @@ KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
 
 SYNC_DETAILS = get_shariant_sync_secrets()
-
+VARIANT_CLASSIFICATION_NEW_GROUPING = True
 COMPRESS_ENABLED = False
 BASH_ZCAT = 'gzcat'
 POPEN_SHELL = True

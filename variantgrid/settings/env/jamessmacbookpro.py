@@ -25,6 +25,7 @@ BASH_ZCAT = 'gzcat'
 POPEN_SHELL = True
 
 USER_SETTINGS_SHOW_GROUPS = False
+VARIANT_CLASSIFICATION_NEW_GROUPING = True
 
 # import all the base settings #
 CELERY_ENABLED = False

@@ -369,6 +369,12 @@
             <div id='classifications-hotspot-graph-container'></div>
         {% endif %}
 
+        {% if classifications_new_grouping %}
+            FIXME : load this in ajax<br/>
+            {% load classification_tags %}
+            {% classification_groups classifications %}
+        {% endif %}
+
         <span class="hidden">
             <span class="filter-message" id="gene-classifications-grid-filtering-message"></span>
             <a class='hover-link' href="javascript:clearGeneClassificationsGrid()">Show all...</a>

@@ -116,15 +116,14 @@
                     {% labelled hint="tiny" label='Description' %}{{ allele.clingen_error.description }}{% endlabelled %}
                     </div>
                 {% endif %}
-
-                <div class="row equal">
-                {% for genome_build in annotated_builds %}
-                    <div class="col col-md-6 mt-2">
-                    {% variant_card allele genome_build %}
-                    </div>
-                {% endfor %}
-                </div>
             </div>
+        </div>
+        <div class="row equal mt-2">
+        {% for genome_build in annotated_builds %}
+            <div class="col col-md-6 mt-2">
+            {% variant_card allele genome_build %}
+            </div>
+        {% endfor %}
         </div>
     </div>
 
@@ -133,7 +132,8 @@
         <h3>Classifications</h3>
         {% classification_groups classifications link_discordance_reports=discordance_enabled %}
     </div>
-    {% else %}
+    {% endif %}
+
     <div class="container-table mt-4">
         <h3 style="margin-bottom:0">Classifications</h3>
         {% if classifications %}
@@ -143,6 +143,6 @@
             No internal classifications.
         {% endif %}
     </div>
-    {% endif %}
+
 
 {% endblock content %}

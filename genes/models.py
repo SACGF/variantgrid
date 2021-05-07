@@ -7,7 +7,7 @@ from collections import namedtuple, defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import total_ordering
-from typing import Tuple, Optional, Dict, List, Set
+from typing import Tuple, Optional, Dict, List, Set, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -141,6 +141,13 @@ class UniProt(models.Model):
 
 class GeneSymbol(models.Model):
     symbol = CITextField(primary_key=True)
+
+    @staticmethod
+    def cast(symbol: Union[str, 'GeneSymbol']) -> 'GeneSymbol':
+        if isinstance(symbol, str):
+            return GeneSymbol.objects.first(symbol=symbol)
+        return symbol
+
 
     @property
     def name(self):

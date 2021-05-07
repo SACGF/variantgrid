@@ -66,6 +66,9 @@ class PHGVS:
             return self.full_p_hgvs[p_dot::]
         return self.full_p_hgvs
 
+    def __lt__(self, other):
+        return self.full_p_hgvs < other.full_p_hgvs
+
     def __eq__(self, other):
         return self.full_p_hgvs == other.full_p_hgvs
 

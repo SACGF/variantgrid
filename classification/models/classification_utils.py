@@ -1,8 +1,16 @@
 # used for validating multiple keys when one changes
+import operator
+from functools import reduce
+
 from django.contrib.auth.models import User
 from typing import List, Set, Optional, Union, Any, Dict, Iterable
+
+from django.db.models import QuerySet, Q
+
+from classification.enums import SpecialEKeys
 from flags.models import FlagCollection
-from snpdb.models import VariantCoordinate
+from genes.models import GeneSymbol, Gene, Transcript
+from snpdb.models import VariantCoordinate, Allele
 from classification.models.evidence_mixin import VCPatch, VCStore
 
 
@@ -259,3 +267,33 @@ class UserClassificationStats:
         return FlagCollection.filter_for_open_flags(
             Classification.filter_for_user(user=self.user)
         ).order_by('-created').exclude(withdrawn=True).count()
+
+
+def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
+
+    # We want to filter using the genes set via variant annotation
+    genes: Optional[Iterable[Gene]] = None
+    symbols: Optional[Iterable[str]] = None
+    if gene_symbol := GeneSymbol.cast(gene_symbol):
+        genes = gene_symbol.alias_meta.genes
+        symbols = gene_symbol.alias_meta.alias_symbol_strs
+
+        if genes:
+            allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
+            match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
+            evidence_q_list = list()
+
+            for symbol in symbols:
+                evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
+
+            t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
+            for transcript_id, annotation_consortium in t_qs.values_list("identifier", "annotation_consortium"):
+                e_key = SpecialEKeys.ANNOTATION_CONSORTIUM_KEYS[annotation_consortium]
+                evidence_q_list.append(Q(**{f"published_evidence__{e_key}__value__startswith": transcript_id}))
+
+            match_evidence = reduce(operator.or_, evidence_q_list)
+        else:
+            return None
+    else:
+        return None
+    return match_gene | match_evidence

@@ -6,6 +6,7 @@
     <div class="btn-toolbar mb-4">
         <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
         <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
+        <a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>
         {% for ccg in clinical_contexts %}
             {% if ccg.latest_report %}
                 <a class="btn btn-outline-secondary" href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">
