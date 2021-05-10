@@ -29,6 +29,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
 
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
     sample_gene_list = models.ForeignKey(SampleGeneList, null=True, blank=True, on_delete=SET_NULL)
+    has_gene_coverage = models.BooleanField(null=True)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
     pathology_test_version = models.ForeignKey(PathologyTestVersion, null=True, blank=True, on_delete=SET_NULL)
     exclude = models.BooleanField(default=False)
@@ -179,9 +180,9 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         # TODO: Also add to analysis settings and require that too
         check_for_gene_coverage = settings.SEQAUTO_ENABLED
         if check_for_gene_coverage:
-            has_gene_coverage = self.calculate_if_has_gene_coverage()
-            logging.debug("has_gene_coverage = %s", has_gene_coverage)
-            if not has_gene_coverage:
+            self.has_gene_coverage = self.calculate_if_has_gene_coverage()
+            logging.debug("has_gene_coverage = %s", self.has_gene_coverage)
+            if not self.has_gene_coverage:
                 self.shadow_color = NodeColors.WARNING
             else:
                 self.shadow_color = None
