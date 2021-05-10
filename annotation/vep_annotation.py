@@ -102,6 +102,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
         cmd.extend(["--pick_order", settings.ANNOTATION_VEP_PICK_ORDER])
 
+    if settings.ANNOTATION_VEP_DISTANCE is not None:
+        cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
+
     # Plugins that require data
     PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
                VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
@@ -222,6 +225,7 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
 
     vc = VEPConfig(genome_build)
     kwargs["annotation_consortium"] = vc.annotation_consortium
+    kwargs["distance"] = getattr(settings, "ANNOTATION_VEP_DISTANCE", 5000)
 
     # Plugins are optional
     try:

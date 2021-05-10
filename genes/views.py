@@ -480,6 +480,7 @@ def qc_gene_list_coverage_graphs(request, genome_build_name, gene_list_id):
 
 def sample_gene_lists_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
+    has_write_permission = sample.can_write(request.user)
 
     create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user,
                                                     initial={"name": "Sample Gene List"})
@@ -504,6 +505,7 @@ def sample_gene_lists_tab(request, sample_id):
         gene_grid_url = None
 
     context = {"sample": sample,
+               "has_write_permission": has_write_permission,
                "gene_grid_url": gene_grid_url,
                "create_gene_list_form": create_gene_list_form,
                "sample_gene_lists_data": sample_gene_lists_data}

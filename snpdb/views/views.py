@@ -276,6 +276,9 @@ def view_sample(request, sample_id):
     has_write_permission = sample.can_write(request.user)
 
     form = forms.SampleForm(request.POST or None, instance=sample)
+    if not has_write_permission:
+        set_form_read_only(form)
+
     if request.method == 'POST':
         if not has_write_permission:
             raise PermissionDenied("Can't modify public data")

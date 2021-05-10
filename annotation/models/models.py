@@ -341,6 +341,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     regbuild = models.TextField()
     sift = models.TextField()
     dbnsfp = models.TextField()
+    distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
     @staticmethod
     def latest(genome_build):

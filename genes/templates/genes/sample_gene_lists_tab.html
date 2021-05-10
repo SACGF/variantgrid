@@ -97,19 +97,21 @@ $(document).ready(function() {
     </a>
 {% endif %}
 
-<a class='hover-link' data-toggle="collapse" href="#new-gene-list-form-container">Create new Sample GeneList</a>
+{% if has_write_permission %}
+    <a class='hover-link' data-toggle="collapse" href="#new-gene-list-form-container">Create new Sample GeneList</a>
 
-<div id="new-gene-list-form-container" class="collapse">
-  <form id="new-gene-list-form" method="post" action="{% url 'sample_gene_lists_tab' sample.pk %}">
-    {% csrf_token %}
-      <fieldset class="form-fields small">
-          <legend>Create</legend>
-          {{ create_gene_list_form.as_p }}
-          {% include "messages/messages.html" %}
-          <button id='submit-button' class="btn btn-primary">Create GeneList</button>
-      </fieldset>
-  </form>
-</div>
+    <div id="new-gene-list-form-container" class="collapse">
+      <form id="new-gene-list-form" method="post" action="{% url 'sample_gene_lists_tab' sample.pk %}">
+        {% csrf_token %}
+          <fieldset class="form-fields small">
+              <legend>Create</legend>
+              {{ create_gene_list_form.as_p }}
+              {% include "messages/messages.html" %}
+              <button id='submit-button' class="btn btn-primary">Create GeneList</button>
+          </fieldset>
+      </form>
+    </div>
+{% endif %}
 
 
 <div id="sample-gene-lists" class="hidden">
@@ -125,11 +127,13 @@ $(document).ready(function() {
                 <span class="sample-gene-list-name">{{ sample_gene_list.gene_list.name }}</span> {{ sample_gene_list.created | localtime }}
             </div>
             <div class="card-body">
+                {% if has_write_permission %}
                 <div class="sample-gene-list-toolbar">
                     <button class="btn btn-outline-primary make-active">Make active</button>
                     <button class="btn btn-outline-primary hide">Hide</button>
                     <button class="btn btn-outline-primary un-hide">Un-Hide</button>
                 </div>
+                {% endif %}
 
                 <div class="sample-gene-list-analysis-templates">
                     <b>Analysis Templates - using this gene list</b>

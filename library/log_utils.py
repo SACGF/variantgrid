@@ -12,20 +12,15 @@ import traceback
 import re
 
 from django.conf import settings
-from django.http import Http404
 from django.utils import timezone
 
 from django.contrib.auth.models import User
 from markdown import markdown
 from rest_framework.request import Request
-from rollbar.contrib.django.middleware import RollbarNotifierMiddleware
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
 from threadlocals.threadlocals import get_current_request
-
-
-
 
 
 def report_event(name: str, request: Request = None, extra_data: Dict = None):

@@ -25,7 +25,7 @@ class ExperimentsListGrid(JqGridUserRowConfig):
 
         # Add sample_count to queryset
 #        queryset = queryset.annotate(sequencing_runs=Count("sequencingrun"))
-        queryset = queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ','))
+        queryset = queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ',', output_field=TextField()))
         field_names = self.get_field_names() + ["sequencing_runs"]
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'created',
@@ -74,9 +74,12 @@ class SequencingRunListGrid(JqGridUserRowConfig):
 
         annotate = {
             "sample_count": Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample"),
-            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), ',', ordering="vcffromsequencingrun"),
-            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", ',', ordering="vcffromsequencingrun"),
-            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", ',', ordering="vcffromsequencingrun"),
+            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), ',',
+                                 output_field=TextField(), ordering="vcffromsequencingrun"),
+            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", ',',
+                                            output_field=TextField(), ordering="vcffromsequencingrun"),
+            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", ',',
+                                           ordering="vcffromsequencingrun"),
         }
 
         # Add sample_count to queryset

@@ -15,7 +15,7 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.fields import CITextField
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models, IntegrityError, transaction
-from django.db.models import Min, Max, QuerySet
+from django.db.models import Min, Max, QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
@@ -1152,7 +1152,8 @@ class GeneListGeneSymbol(models.Model):
     @staticmethod
     def get_joined_genes_qs_annotation_for_release(release: GeneAnnotationRelease):
         """ Used to annotate GeneListGeneSymbol queryset """
-        return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True,
+        return StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene",
+                         delimiter=',', distinct=True, output_field=TextField(),
                          filter=Q(gene_symbol__releasegenesymbol__release=release))
 
     def __str__(self):
@@ -1462,8 +1463,11 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
         return warnings
 
     def get_uncovered_gene_symbols(self, gene_symbols, min_coverage):
-        return gene_symbols.exclude(genecoveragecanonicaltranscript__gene_coverage_collection=self,
-                                    genecoveragecanonicaltranscript__min__gte=min_coverage)
+        # Do as inner query to ensure we restrict to gene coverage partition
+        covered_qs = GeneCoverageCanonicalTranscript.objects.filter(gene_coverage_collection=self,
+                                                                    min__gte=min_coverage)
+        covered_gene_symbols = covered_qs.values_list("gene_symbol", flat=True)
+        return gene_symbols.exclude(pk__in=covered_gene_symbols)
 
     def __str__(self):
         return "GeneCoverageCollection " + os.path.basename(self.path)

@@ -17,4 +17,4 @@ class CustomRollbarNotifierMiddleware(RollbarNotifierMiddleware):
         elif isinstance(exc, RollbarIgnoreException):
             return
         else:
-            super(self).process_exception(request, exc)
+            super().process_exception(request, exc)
