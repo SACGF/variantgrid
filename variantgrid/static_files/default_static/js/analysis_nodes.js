@@ -10,7 +10,7 @@ function getNode(nodeId) {
 // Nodes should also create a "updateState(args)" method, this will be called after creation  
 
 function createDefaultNode(nodeData) {
-	const div = jQuery('<div></div>', nodeData["attributes"]);
+	const div = $('<div></div>', nodeData["attributes"]);
 	div.addClass("default-node-container");
 	div.append("<div class='user-tag-colored node-overlay'><span class='node-name'>" + nodeData["name"] + "</span></div>");
 	div[0].updateState = function(args) { };
@@ -18,19 +18,20 @@ function createDefaultNode(nodeData) {
 }
 
 function createVennNode(nodeData) {
-	const div = jQuery('<div></div>', nodeData["attributes"]);
+	const div = $('<div></div>', nodeData["attributes"]);
 	div.addClass("default-node-container");
 	venn2(div[0], 64, 45);
 
-	overlay_style = {	width: '100%',
-						height: '100%',
-		    			position: 'absolute',
-	    				top: 0,
-	 	 	 			left: 0,
+	const overlayStyle = {
+		width: '100%',
+		height: '100%',
+		position: 'absolute',
+		top: 0,
+		left: 0,
 	};
-	$('.' + VENN_TOGGLE_WIDGET_CLASS, div[0]).css(overlay_style);
-	span = $("<span class='node-name'>" + nodeData["name"] + "</span>");
-	span.css(overlay_style);
+	$('.' + VENN_TOGGLE_WIDGET_CLASS, div[0]).css(overlayStyle);
+	const span = $("<span class='node-name'>" + nodeData["name"] + "</span>");
+	span.css(overlayStyle);
 	span.css("z-index", 30);
 	div.append(span);
 	div[0].updateState = function(args) {
