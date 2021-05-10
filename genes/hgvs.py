@@ -8,6 +8,7 @@ https://github.com/SACGF/variantgrid/issues/839
 """
 from dataclasses import dataclass
 
+from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 import enum
 from lazy import lazy
@@ -57,32 +58,6 @@ def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> List[st
 
 
 _P_DOT_PARTS = re.compile("^([A-Z*]{1,3})([0-9]+)([A-Z*]{1,3})(.*?)$", re.IGNORECASE)
-_P_AMINO_ACIDS = {
-    "A": "Ala",
-    "B": "Asx",
-    "C": "Cys",
-    "D": "Asp",
-    "E": "Glu",
-    "F": "Phe",
-    "G": "Gly",
-    "H": "His",
-    "I": "Ile",
-    "K": "Lys",
-    "L": "Leu",
-    "M": "Met",
-    "N": "Asn",
-    "P": "Pro",
-    "Q": "Gln",
-    "R": "Arg",
-    "S": "Ser",
-    "T": "Thr",
-    "V": "Val",
-    "W": "Trp",
-    "X": "X",
-    "Y": "Tyr",
-    "Z": "Glx"
-}
-
 
 @dataclass(repr=False, eq=False, frozen=True)
 class PHGVS:
@@ -120,10 +95,9 @@ class PHGVS:
                     p_dot = p_dot[1:-1]
                     is_confirmed = False
                 if match := _P_DOT_PARTS.match(p_dot):
-                    # TODO normalise amino acids
-                    aa_from = _P_AMINO_ACIDS.get(match[1], match[1])
+                    aa_from = protein_letters_1to3_extended.get(match[1], match[1])
                     codon = match[2]
-                    aa_to = _P_AMINO_ACIDS.get(match[3], match[3])
+                    aa_to = protein_letters_1to3_extended.get(match[3], match[3])
                     extra = match[4]
                     fallback = None  # able to parse everything, no fallback required
 
@@ -151,7 +125,7 @@ class PHGVS:
     @lazy
     def p_dot(self) -> str:
         if self.intron:
-            return "?"
+            return "p.?"
         elif self.aa_from:
             if self.is_confirmed:
                 return f"p.{self.aa_from}{self.codon}{self.aa_to}{self.extra}"
@@ -171,6 +145,19 @@ class PHGVS:
 
     def __bool__(self):
         return bool(self.full_p_hgvs)
+
+    @property
+    def without_transcript(self) -> 'PHGVS':
+        return PHGVS(
+            fallback=self.fallback,
+            transcript="",
+            intron=self.intron,
+            aa_from=self.aa_from,
+            codon=self.codon,
+            aa_to=self.aa_to,
+            extra=self.extra,
+            is_confirmed=self.is_confirmed
+        )
 
 
 class CHGVS:

@@ -88,7 +88,7 @@ class ClassificationGroup:
         unique_p = set()
         for cm in self.modifications:
             if p_hgvs := cm.p_parts:
-                unique_p.add(p_hgvs)
+                unique_p.add(p_hgvs.without_transcript)
         p_list = list(unique_p)
         p_list.sort()
         return p_list
