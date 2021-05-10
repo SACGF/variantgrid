@@ -4,7 +4,7 @@ from typing import Tuple, Dict, List
 from django.apps import apps
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Model, Q
+from django.db.models import Model, Q, Count
 from django.db.models.deletion import SET_NULL, CASCADE, SET_DEFAULT, PROTECT, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -356,21 +356,33 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if atv_kwargs is None:
             atv_kwargs = {}
 
-        template_versions_qs = AnalysisTemplateVersion.objects.filter(active=True, **atv_kwargs)
+        qs = AnalysisTemplateVersion.objects.filter(active=True, **atv_kwargs)
 
         if requires_sample_somatic is not None:
-            template_versions_qs = template_versions_qs.filter(requires_sample_somatic=requires_sample_somatic)
+            qs = qs.filter(requires_sample_somatic=requires_sample_somatic)
 
         if requires_sample_gene_list is not None:
-            template_versions_qs = template_versions_qs.filter(requires_sample_gene_list=requires_sample_gene_list)
+            qs = qs.filter(requires_sample_gene_list=requires_sample_gene_list)
 
         if class_name:
-            # Restrict to template versions who's variables are all of class_name
-            # unsupported_variables = AnalysisVariable.objects.exclude(class_name=class_name)
-            q_class_name = Q(analysis_snapshot__analysisnode__analysisvariable__class_name=class_name)
-            template_versions_qs = template_versions_qs.exclude(~q_class_name)
+            # Must not have any other types not supported
+            supported_types = {class_name}
+            EXTRA_PROVIDED_TYPES = {
+                'snpdb.Sample': {'genes.SampleGeneList'},
+                'snpdb.Trio': {'snpdb.Sample'},
+            }
 
-        return AnalysisTemplate.filter_for_user(user).filter(analysistemplateversion__in=template_versions_qs)
+            if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
+                supported_types.update(extra_types)
+            q_provided_types = Q(analysis_snapshot__analysisnode__analysisvariable__class_name__in=supported_types)
+            count_kwargs = {"filter": ~q_provided_types}
+
+            count_unsupported = Count("analysis_snapshot__analysisnode__analysisvariable__class_name", **count_kwargs)
+            qs = qs.annotate(unsupported_args=count_unsupported).filter(unsupported_args=0)
+            # Required to take main type as variable
+            qs = qs.filter(analysis_snapshot__analysisnode__analysisvariable__class_name=class_name)
+
+        return AnalysisTemplate.filter_for_user(user).filter(analysistemplateversion__in=qs)
 
     def default_name_template(self):
         """ The initial analysis_name_template in form for save version """
