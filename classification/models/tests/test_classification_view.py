@@ -149,6 +149,7 @@ class ClassificationTestCaseViews(TestCase):
             #"published_version": 1590471912.520569,
             #"title": "instx/labby/test_123456",
             #"version": 1590471912.520569,
+            'is_last_published': True,
             "version_is_published": None,
             "version_publish_level": "lab",
             "withdrawn": False
@@ -185,6 +186,7 @@ class ClassificationTestCaseViews(TestCase):
             'resolved_condition': None,
             'version_is_published': None,
             'version_publish_level': 'lab',
+            'is_last_published': None,
             'can_write': False,
             'can_write_latest': False,
             'clinical_context': None,
