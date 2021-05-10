@@ -225,6 +225,7 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
 
     vc = VEPConfig(genome_build)
     kwargs["annotation_consortium"] = vc.annotation_consortium
+    kwargs["distance"] = getattr(settings, "ANNOTATION_VEP_DISTANCE", 5000)
 
     # Plugins are optional
     try:

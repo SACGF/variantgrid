@@ -68,7 +68,7 @@ class VariantAnnotationVersionGrid(JqGridUserRowConfig):
         'id', "vep", "annotation_consortium", 'created', 'last_checked_date', 'gene_annotation_release__id',
         "ensembl", "ensembl_funcgen", "ensembl_variation", "ensembl_io",
         "thousand_genomes", "cosmic", "hgmd", "assembly", "dbsnp",
-        "gencode", "genebuild", "gnomad", "refseq", "regbuild", "sift", "dbnsfp"
+        "gencode", "genebuild", "gnomad", "refseq", "regbuild", "sift", "dbnsfp", "distance"
     ]
 
     def __init__(self, user, genome_build_name):
