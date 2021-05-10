@@ -1,9 +1,9 @@
 from analysis.forms import SampleNodeForm
 from analysis.models.nodes.sources.sample_node import SampleNode
-from analysis.views.nodes.node_view import NodeView
+from analysis.views.nodes import GeneCoverageNodeView
 
 
-class SampleNodeView(NodeView):
+class SampleNodeView(GeneCoverageNodeView):
     model = SampleNode
     form_class = SampleNodeForm
 
