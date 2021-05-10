@@ -143,13 +143,11 @@ table.zygosity-table tr.top-header th {
             <div>
                 <span id='sample-gene-list'> <b>Sample Gene List:</b> {{ form.sample_gene_list }} </span>
             </div>
-        {% endif %}
-
-        {% if node.analysis.template_type or form.restrict_to_qc_gene_list %}
             <div>
                 <span id='qc-gene-list'> <b>Restrict to Sample Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
             </div>
         {% endif %}
+
         <div>
             {% load vcf_locus_filter_tags %}
             {% vcf_locus_filter node sample.vcf %}
