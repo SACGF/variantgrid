@@ -24,6 +24,7 @@ fieldset.form-fields {
             <th>Molecular Consequence
             {% if show_all_transcript_details %}
             <th>Impact
+            <th>Protein Length</th>
             {% endif %}
             <th>Properties
         </tr>
@@ -50,6 +51,7 @@ fieldset.form-fields {
             <td>{{ transcript_data.consequence | format_computer_text }}
             {% if show_all_transcript_details %}
             <td>{{ transcript_data.impact }}
+            <td>{{ transcript_data.protein_length }}
             {% endif %}
             <td><span class="pills">
                 {% if transcript_data.representative %}<span class="pill important" data-toggle="tooltip" title="representative transcript (picked by VEP, changes per variant)">rep.</span>{% endif %}

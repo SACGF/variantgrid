@@ -689,12 +689,16 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return None
 
     @property
-    def protein_length(self) -> int:
+    def coding_length(self) -> int:
         return sum([b-a for a, b in self.cds])
 
     @property
     def num_amino_acids(self) -> int:
-        return self.protein_length // 3
+        return self.coding_length // 3
+
+    @property
+    def protein_length(self) -> int:
+        return self.num_amino_acids - 1  # stop codon doesn't count
 
     @property
     def coordinates(self):
