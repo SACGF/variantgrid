@@ -5,10 +5,10 @@
     <td style="min-width:220px;">
         {% if sub_index %}
             {% for c_hgvs in group.c_hgvses %}
-                <div style="font-size:smaller"><i style="font-size:8px" class="fas fa-circle text-info"></i> {% c_hgvs c_hgvs %}</div>
+                <div style="font-size:smaller" class="mt-1"><i style="font-size:8px" class="fas fa-circle text-info"></i> {% c_hgvs c_hgvs %}</div>
             {% endfor %}
             {% for p_hgvs in group.p_hgvses %}
-                <div style="font-size:small" class="text-secondary">{{ p_hgvs.p_dot }}</div>
+                <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
             {% endfor %}
         {% else %}
             {% if group.clinical_grouping != "default" %}
@@ -16,12 +16,12 @@
             {% endif %}
             {{ group.organization }}
             {% for c_hgvs in group.c_hgvses %}
-                <div style="font-size:smaller">{% c_hgvs c_hgvs %}</div>
+                <div style="font-size:smaller" class="my-1">{% c_hgvs c_hgvs %}</div>
             {% endfor %}
             {% for p_hgvs in group.p_hgvses %}
-                <div style="font-size:small" class="text-secondary">{{ p_hgvs.p_dot }}</div>
+                <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
             {% endfor %}
-            {% if group.count > 1 %}<div class="font-weight-bold font-size-small"><a href=".cc-{{ group.group_id }}" data-toggle="collapse" class="toggle-link">{{ group.count }} records</a></div>{% endif %}
+            {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1"><a href=".cc-{{ group.group_id }}" data-toggle="collapse" class="toggle-link">{{ group.count }} records</a></div>{% endif %}
         {% endif %}
     </td>
     <td class="cs-{{ group.clinical_significance|lower }} text-center max-width:100px;">

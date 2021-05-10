@@ -6,6 +6,8 @@ block external postgres connections. See discussion at:
 https://github.com/SACGF/variantgrid/issues/839
 
 """
+from dataclasses import dataclass
+
 from django.conf import settings
 import enum
 from lazy import lazy
@@ -54,26 +56,118 @@ def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> List[st
     return diff_list
 
 
+_P_DOT_PARTS = re.compile("^([A-Z*]{1,3})([0-9]+)([A-Z*]{1,3})(.*?)$", re.IGNORECASE)
+_P_AMINO_ACIDS = {
+    "A": "Ala",
+    "B": "Asx",
+    "C": "Cys",
+    "D": "Asp",
+    "E": "Glu",
+    "F": "Phe",
+    "G": "Gly",
+    "H": "His",
+    "I": "Ile",
+    "K": "Lys",
+    "L": "Leu",
+    "M": "Met",
+    "N": "Asn",
+    "P": "Pro",
+    "Q": "Gln",
+    "R": "Arg",
+    "S": "Ser",
+    "T": "Thr",
+    "V": "Val",
+    "W": "Trp",
+    "X": "X",
+    "Y": "Tyr",
+    "Z": "Glx"
+}
+
+
+@dataclass(repr=False, eq=False, frozen=True)
 class PHGVS:
 
-    def __init__(self, full_p_hgvs: str):
-        self.full_p_hgvs = full_p_hgvs
+    fallback: Optional[str] = None
+    transcript: str = ""
+    intron: bool = False
+    aa_from: str = ""
+    codon: str = ""
+    aa_to: str = ""
+    extra: str = ""
+    is_confirmed: bool = False
 
-    def p_dot(self):
-        # TODO normalise proteins listed
-        p_dot = self.full_p_hgvs.find('p.')
-        if p_dot != -1:
-            return self.full_p_hgvs[p_dot::]
-        return self.full_p_hgvs
+    @staticmethod
+    def parse(raw: str, override_is_confirmed_to: Optional[bool] = None) -> 'PHGVS':
+        raw = raw or ""
+        fallback = raw
+        transcript = None
+        intron = False
+        aa_from = None
+        codon = None
+        aa_to = None
+        extra = None
+        is_confirmed = False
+        p_dot_index = raw.find('p.')
+        if p_dot_index != -1:
+            if p_dot_index != 0:
+                transcript = raw[0::p_dot_index - 1]
+            p_dot = raw[p_dot_index + 2::]
+            if p_dot == "?":
+                intron = True
+            else:
+                is_confirmed = True
+                if p_dot.startswith("(") and p_dot.endswith(")"):
+                    p_dot = p_dot[1:-1]
+                    is_confirmed = False
+                if match := _P_DOT_PARTS.match(p_dot):
+                    # TODO normalise amino acids
+                    aa_from = _P_AMINO_ACIDS.get(match[1], match[1])
+                    codon = match[2]
+                    aa_to = _P_AMINO_ACIDS.get(match[3], match[3])
+                    extra = match[4]
+                    fallback = None  # able to parse everything, no fallback required
 
-    def __lt__(self, other):
-        return self.full_p_hgvs < other.full_p_hgvs
+        if override_is_confirmed_to is not None:
+            is_confirmed = override_is_confirmed_to
+
+        return PHGVS(
+            fallback=fallback,
+            transcript=transcript,
+            intron=intron,
+            aa_from=aa_from,
+            codon=codon,
+            aa_to=aa_to,
+            extra=extra,
+            is_confirmed=is_confirmed
+        )
+
+    @lazy
+    def full_p_hgvs(self) -> str:
+        if self.transcript:
+            return f"{self.transcript}:{self.p_dot}"
+        else:
+            return self.p_dot
+
+    @lazy
+    def p_dot(self) -> str:
+        if self.intron:
+            return "?"
+        elif self.aa_from:
+            if self.is_confirmed:
+                return f"p.{self.aa_from}{self.codon}{self.aa_to}{self.extra}"
+            else:
+                return f"p.({self.aa_from}{self.codon}{self.aa_to}{self.extra})"
+        else:
+            return self.fallback
 
     def __eq__(self, other):
         return self.full_p_hgvs == other.full_p_hgvs
 
     def __hash__(self):
         return hash(self.full_p_hgvs)
+
+    def __lt__(self, other):
+        return self.full_p_hgvs < other.full_p_hgvs
 
     def __bool__(self):
         return bool(self.full_p_hgvs)

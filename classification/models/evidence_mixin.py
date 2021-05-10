@@ -168,7 +168,7 @@ class EvidenceMixin:
 
     @lazy
     def p_parts(self) -> PHGVS:
-        return PHGVS(self.get(SpecialEKeys.P_HGVS) or "")
+        return PHGVS.parse(self.get(SpecialEKeys.P_HGVS), override_is_confirmed_to=False)
 
     @property
     def transcript(self) -> Optional[str]:
