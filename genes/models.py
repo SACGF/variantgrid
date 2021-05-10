@@ -539,10 +539,6 @@ class TranscriptVersion(SortByPKMixin, models.Model):
                 cds.append((start, end))
         return cds
 
-    @property
-    def num_amino_acids(self):
-        return sum([b-a for a, b in self.cds]) / 3
-
     @staticmethod
     def transcript_parts(identifier: str) -> TranscriptParts:
         t_regex = re.compile(r"^([_A-Z0-9]+)(?:[.]([0-9]+))?$", re.RegexFlag.IGNORECASE)
@@ -687,10 +683,18 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return make_transcript(transcript_version.data)
 
     @property
-    def length(self):
+    def length(self) -> Optional[int]:
         if 'exons' in self.data:
             return sum([e - s for s, e in self.data["exons"]])
         return None
+
+    @property
+    def protein_length(self) -> int:
+        return sum([b-a for a, b in self.cds])
+
+    @property
+    def num_amino_acids(self) -> int:
+        return self.protein_length // 3
 
     @property
     def coordinates(self):
