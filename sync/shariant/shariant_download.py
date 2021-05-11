@@ -93,11 +93,14 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                 external=True,
             )
 
-        return {
+        data = {
             "id": record.get('id'),
             "publish": record.get('publish'),
             "data": data,
         }
+        if delete := record.get('delete'):
+            data['delete'] = delete
+        return data
 
     run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
     run.save()

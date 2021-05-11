@@ -14,20 +14,24 @@ class HistoricalEKeyConverter:
     """
 
     HISTORICAL_AND_SHARIANT = [
-        # historical is (key_name, actual_historical_type) as the types were wrong...
-        (("cadd", None), ("cadd", EvidenceKeyValueType.FLOAT)),
-        (("1000_genomes", EvidenceKeyValueType.UNIT), ("1000_genomes_af", EvidenceKeyValueType.UNIT)),
-        (("esp", EvidenceKeyValueType.PERCENT), ("esp_af", EvidenceKeyValueType.UNIT)),
-        (("exac", EvidenceKeyValueType.PERCENT), ("exac_af", EvidenceKeyValueType.UNIT)),
-        (("flossies", EvidenceKeyValueType.PERCENT), ("flossies_af", EvidenceKeyValueType.UNIT)),
-        (("gnomad", EvidenceKeyValueType.PERCENT), ("gnomad_af", EvidenceKeyValueType.UNIT)),
-        (("gnomad_hp", None), ("gnomad_popmax", EvidenceKeyValueType.SELECT)),
-        (("gnomad_hp_maf", None), ("gnomad_popmax_af", EvidenceKeyValueType.UNIT)),
-        (("grantham", None), ("grantham", EvidenceKeyValueType.INTEGER)),
-        (("uk10k", EvidenceKeyValueType.UNIT), ("uk10k_af", EvidenceKeyValueType.UNIT)),
-        (("sample", None), ("sample_type", EvidenceKeyValueType.SELECT)),  # renamed 2019-05-22
-        (("variant_type", None), (None, None)),  # No easy mappings - don't send
+        # if Shariant and other environment diverge from keys, add converters here, see below for historical examples
     ]
+    # historical is (key_name, actual_historical_type) as the types were wrong...
+    #
+    """
+    (("cadd", None), ("cadd", EvidenceKeyValueType.FLOAT)),
+    (("1000_genomes", EvidenceKeyValueType.UNIT), ("1000_genomes_af", EvidenceKeyValueType.UNIT)),
+    (("esp", EvidenceKeyValueType.PERCENT), ("esp_af", EvidenceKeyValueType.UNIT)),
+    (("exac", EvidenceKeyValueType.PERCENT), ("exac_af", EvidenceKeyValueType.UNIT)),
+    (("flossies", EvidenceKeyValueType.PERCENT), ("flossies_af", EvidenceKeyValueType.UNIT)),
+    (("gnomad", EvidenceKeyValueType.PERCENT), ("gnomad_af", EvidenceKeyValueType.UNIT)),
+    (("gnomad_hp", None), ("gnomad_popmax", EvidenceKeyValueType.SELECT)),
+    (("gnomad_hp_maf", None), ("gnomad_popmax_af", EvidenceKeyValueType.UNIT)),
+    (("grantham", None), ("grantham", EvidenceKeyValueType.INTEGER)),
+    (("uk10k", EvidenceKeyValueType.UNIT), ("uk10k_af", EvidenceKeyValueType.UNIT)),
+    (("sample", None), ("sample_type", EvidenceKeyValueType.SELECT)),  # renamed 2019-05-22
+    (("variant_type", None), (None, None)),  # No easy mappings - don't send
+    """
 
     # Everything is stored as string - so arg = string
     TYPE_CONVERTERS = {

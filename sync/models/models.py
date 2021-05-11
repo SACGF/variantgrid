@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
@@ -18,9 +20,9 @@ class SyncDestination(models.Model):
     config = models.JSONField(null=False, blank=True, default=empty_dict)
     enabled = models.BooleanField(null=False, blank=True, default=True)
 
-    def run(self, full_sync: bool = False):
+    def run(self, full_sync: bool = False, max_rows: Optional[int] = None):
         from sync.sync_runner import run_sync
-        run_sync(self, full_sync=full_sync)
+        run_sync(self, full_sync=full_sync, max_rows=max_rows)
 
     def __str__(self):
         return self.name
