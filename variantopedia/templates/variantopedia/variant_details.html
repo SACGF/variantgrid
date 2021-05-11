@@ -536,22 +536,29 @@ function applyVariantValues() {
         </div>
     </div>
 
-    {% if classifications %}
-        <!-- Needs to be full width to show data table -->
-        <div id='classifications' class='container-table mt-4'>
-            <h3>Classifications</h3>
-                {% classification_table classifications genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
+    {% if classifications_new_grouping %}
+        <div class="container mt-4">
+            <h4>Classifications</h4>
+            {% classification_groups classifications link_discordance_reports=discordance_enabled %}
         </div>
     {% else %}
-        <!-- Nicer table that lines up with others -->
-        <div class="container mt-4">
-            <div class="card">
-                <div class="card-header">Classifications</div>
-                <div class="card-body">
-                    No internal classifications.
+        {% if classifications %}
+            <!-- Needs to be full width to show data table -->
+            <div id='classifications' class='container-table mt-4'>
+                <h3>Classifications</h3>
+                    {% classification_table classifications genome_build user=user show_variant_link=False show_clinical_context=True variant=variant edit_clinical_groupings=edit_clinical_groupings %}
+            </div>
+        {% else %}
+            <!-- Nicer table that lines up with others -->
+            <div class="container mt-4">
+                <div class="card">
+                    <div class="card-header">Classifications</div>
+                    <div class="card-body">
+                        No internal classifications.
+                    </div>
                 </div>
             </div>
-        </div>
+        {% endif %}
     {% endif %}
 
 {% if show_annotation and variant_annotation %}

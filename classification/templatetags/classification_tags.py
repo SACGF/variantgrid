@@ -7,12 +7,13 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query import QuerySet
 from django.template import Library
-from typing import Union, Optional, Iterable, TypedDict, List
+from typing import Union, Optional, Iterable, TypedDict, List, Any
 
 from django.utils.safestring import mark_safe
 from lazy import lazy
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from classification.models.classification_groups import ClassificationGroup, ClassificationGroups
 from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
 from snpdb.models import VariantAllele
@@ -43,115 +44,6 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
     }
 
 
-class ClassificationGroup:
-
-    def __init__(self, modifications: List[ClassificationModification], group_id: Optional[int] = None):
-        self.modifications = list(modifications)
-        self.modifications.sort(key=lambda cm: ClassificationGroup.sort_modifications(cm), reverse=True)
-        self.group_id = group_id
-
-    @staticmethod
-    def sort_modifications(mod1: ClassificationModification):
-        curated_date = mod1.curated_date_check
-        return [not mod1.classification.withdrawn, curated_date.is_curated, curated_date.date]
-
-    @property
-    def most_recent(self) -> ClassificationModification:
-        return self.modifications[0]
-
-    @property
-    def clinical_significance(self) -> str:
-        return self.most_recent.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-    @property
-    def clinical_grouping(self) -> str:
-        return self.most_recent.classification.clinical_grouping_name
-
-    @property
-    def organization(self) -> str:
-        return self.most_recent.classification.lab.organization.name
-
-    @property
-    def is_discordant(self) -> bool:
-        return all(cm.classification.withdrawn for cm in self.modifications)
-
-    @property
-    def c_hgvses(self) -> List[CHGVS]:
-        unique_c = set()
-        for cm in self.modifications:
-            unique_c.add(cm.c_parts)
-        c_list = list(unique_c)
-        c_list.sort()
-        return c_list
-
-    def p_hgvses(self) -> List[PHGVS]:
-        unique_p = set()
-        for cm in self.modifications:
-            if p_hgvs := cm.p_parts:
-                unique_p.add(p_hgvs.without_transcript)
-        p_list = list(unique_p)
-        p_list.sort()
-        return p_list
-
-    def count(self) -> int:
-        return len(self.modifications)
-
-    def acmg_criteria(self) -> List[CriteriaStrength]:
-        all_met = set()
-        for e_key in EvidenceKeyMap.cached().criteria():
-            for cm in self.modifications:
-                strength = cm.get(e_key.key)
-                if CriteriaEvaluation.is_met(strength):  # exclude neutral, not met, not applicable
-                    all_met.add(CriteriaStrength(e_key, strength))
-        all_met_ordred = list(all_met)
-        all_met_ordred.sort()
-        return all_met_ordred
-
-    @lazy
-    def zygosities(self) -> List[str]:
-        all_zygosities = set()
-        for cm in self.modifications:
-            if zygosities := cm.get(SpecialEKeys.ZYGOSITY):
-                if isinstance(zygosities, str):
-                    zygosities = list([zygosities])
-                all_zygosities = all_zygosities.union(zygosities)
-        # todo sort?
-        return list(all_zygosities)
-
-    def most_recent_curated(self) -> CuratedDate:
-        return self.most_recent.curated_date_check
-
-    def __lt__(self, other):
-        if my_curated := self.most_recent.curated_date:
-            if other_curated := other.most_recent.curated_date:
-                return my_curated < other_curated
-        return self.most_recent.classification.created < other.most_recent.classification.created
-
-    def conditions(self) -> List[ConditionResolved]:
-        all_terms = set()
-        all_plain_texts = set()
-        for cm in self.modifications:
-            c = cm.classification
-            if resolved := c.condition_resolution_obj:
-                for term in resolved.terms:
-                    all_terms.add(term)
-            else:
-                if text := cm.get(SpecialEKeys.CONDITION):
-                    all_plain_texts.add(text)
-        all_condition_resolved = list()
-        # TODO sort terms
-        for term in all_terms:
-            all_condition_resolved.append(ConditionResolved(terms=[term], join=None))
-        for plain_text in all_plain_texts:
-            all_condition_resolved.append(ConditionResolved(terms=list(), join=None, plain_text=plain_text))
-        return all_condition_resolved
-
-    def sub_groups(self) -> List['ClassificationGroup']:
-        if len(self.modifications) > 1:
-            return [ClassificationGroup([cm]) for cm in self.modifications]
-        return None
-
-
 @register.inclusion_tag("classification/tags/classification_group_row.html")
 def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None):
     return {"group": group, "row_class": f"cc-{sub_row} collapse" if sub_row else "", "sub_index": sub_index}
@@ -163,38 +55,17 @@ def classification_groups(
         show_diffs: bool = True,
         link_discordance_reports: bool = False):
 
-    def clin_significance(cm: ClassificationModification) -> Optional[str]:
-        return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    groups = ClassificationGroups(classification_modifications)
 
-    evidence_keys: EvidenceKeyMap = EvidenceKeyMap.instance()
-    sorted_by_clin_sig = list(classification_modifications)
-    sorted_by_clin_sig.sort(key=evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter)
-
-    groups: List[ClassificationGroup] = list()
-    ordered_classifications: List[ClassificationModification] = list()
-
-    # clinical significance, clin grouping, org
-    for _, group1 in groupby(sorted_by_clin_sig, clin_significance):
-        group1 = list(group1)
-        group1.sort(key=lambda cm: cm.classification.clinical_grouping_name)
-        for _, group2 in groupby(group1, lambda cm: cm.classification.clinical_grouping_name):
-            group2 = list(group2)
-            group2.sort(key=lambda cm: cm.classification.lab.organization.name)
-            for _, group3 in groupby(group2, lambda cm: cm.classification.lab.organization.name):
-                group3 = list(group3)
-                group3.sort(key=lambda cm: cm.c_parts.without_transcript_version)
-                for _, group4 in groupby(group3, lambda cm: cm.c_parts.without_transcript_version):
-                    group4 = list(group4)
-                    actual_group = ClassificationGroup(modifications=group4, group_id=len(groups) + 1)
-                    groups.append(ClassificationGroup(modifications=group4, group_id=len(groups) + 1))
-                    for cm in actual_group.modifications:
-                        ordered_classifications.append(cm)
-
-    diff_latest = ",".join([str(group.most_recent.classification.id) for group in groups])
     context = {"classification_groups": groups}
+    ordered_classifications = list(groups.modifications)
+
     if show_diffs:
-        context["diff_latest"] = diff_latest
-        context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
+        if len(groups) > 1 and len(groups) <= 20:
+            diff_latest = ",".join([str(group.most_recent.classification.id) for group in groups])
+            context["diff_latest"] = diff_latest
+        if len(ordered_classifications) > 1 and len(ordered_classifications) <= 20:
+            context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
 
     if link_discordance_reports:
         all_clinical_groupings = set()

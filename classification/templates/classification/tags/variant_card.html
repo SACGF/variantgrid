@@ -6,9 +6,9 @@
         <div class="card-header">{{ variant_allele.genome_build }}</div>
         <div class="card-body">
             {% if variant_show_canonical_hgvs %}
-                {% labelled label='Canonical c.HGVS' value_css="variant-c-hgvs" hint="tiny" %}{{ variant_allele.canonical_c_hgvs }}{% endlabelled %}
+                {% labelled label='Canonical c.HGVS' value_css="variant-c-hgvs" hint="chunky" %}{{ variant_allele.canonical_c_hgvs }}{% endlabelled %}
             {% endif %}
-            {% labelled label='Variant Coordinate' value_css="variant-coordinate" hint="tiny" %}
+            {% labelled label='Variant Coordinate' value_css="variant-coordinate" hint="chunky" %}
                 <a href="{% url 'view_variant' variant_allele.variant.pk %}">{{ variant_allele.variant }}</a>
                 {% if variant_allele.variant.is_abbreviated %}
                     <a class="ml-2" data-toggle="collapse" href="#variant-coordinate-{{ variant_allele.pk }}">Show all bases</a>
@@ -20,9 +20,10 @@
             {% if user.is_superuser and variant_allele.error %}
                 {% labelled label="Error" value_clss="variant-coordinate" hint="tiny" %}{{ variant_allele.error | jsonify }}{% endlabelled %}
             {% endif %}
-            {% labelled label='Origin' hint="tiny" %}{{ variant_allele.get_origin_display }}{% endlabelled%}
-            {% labelled label='Conversion Tool' hint="tiny" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
-            {% labelled id_prefix="quick-links" hint="tiny" id=variant_allele.pk value_css="quick-links" label="Quick Links" %}Loading ...{% endlabelled %}
+            {% labelled label='Origin' hint="chunky" %}{{ variant_allele.get_origin_display }}{% endlabelled%}
+            {% labelled label='Conversion Tool' hint="chunky" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
+            <a class="toggle-link" data-toggle="collapse" href=".quick-links">Quick Links</a>
+            <div class="quick-links collapse" id="quick-links-{{ variant_allele.pk }}">Loading ...</div>
         </div>
         {% if can_create_classification %}
             <div class="card-footer">

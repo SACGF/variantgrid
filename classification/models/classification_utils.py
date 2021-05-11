@@ -269,6 +269,7 @@ class UserClassificationStats:
         ).order_by('-created').exclude(withdrawn=True).count()
 
 
+
 def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
 
     # We want to filter using the genes set via variant annotation
