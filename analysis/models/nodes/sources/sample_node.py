@@ -7,6 +7,7 @@ from django.db.models.query_utils import Q
 from functools import reduce
 import operator
 
+from analysis.models import GeneCoverageMixin
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter
 from analysis.models.nodes.cohort_mixin import SampleMixin
 from annotation.models import SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, \
@@ -18,12 +19,13 @@ from snpdb.models import SampleStats, SampleStatsPassingFilter, Sample
 from snpdb.models.models_enums import BuiltInFilters
 
 
-class SampleNode(SampleMixin, AnalysisNode):
+class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     """ Use restrict_to_qc_gene_list to keep track of that as sample_gene_list is cleared when a sample changes
         including in an AnalysisTemplates """
     sample = models.ForeignKey(Sample, null=True, on_delete=SET_NULL)
     # When setting sample, if restrict_to_qc_gene_list = True, sample_gene_list is set to active sample gene list
     sample_gene_list = models.ForeignKey(SampleGeneList, null=True, blank=True, on_delete=SET_NULL)
+    has_gene_coverage = models.BooleanField(null=True)
     min_ad = models.IntegerField(default=0)
     min_dp = models.IntegerField(default=0)
     min_gq = models.IntegerField(default=0)
@@ -144,6 +146,13 @@ class SampleNode(SampleMixin, AnalysisNode):
                 name_parts.append(f"\n({filter_description})")
 
         return "\n".join(name_parts)
+
+    def get_gene_lists(self) -> List:
+        """ Used for gene coverage """
+        gene_lists = []
+        if self.sample_gene_list and self.restrict_to_qc_gene_list:
+            gene_lists.append(self.sample_gene_list.gene_list)
+        return gene_lists
 
     def _has_filters_that_affect_label_counts(self):
         # This returns None if no filters to apply

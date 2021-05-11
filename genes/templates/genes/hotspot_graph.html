@@ -34,7 +34,7 @@
     _ = function() {
         const GNOMAD_PERCENT = [0.1, 1, 5, 100];
         let molecularConsequenceColors = {{ molecular_consequence_colors | jsonify }};
-        let numAminoAcids = {{ transcript_version.num_amino_acids }};
+        let numCodons = {{ transcript_version.num_codons }};
         let domains = {{ domains | jsonify }};
         let variantData = {{ variant_data | jsonify }};
 
@@ -163,7 +163,7 @@
                     type: "rect",
                     x0: 0,
                     y0: geneYTop,
-                    x1: numAminoAcids + 1, // Ends "on" that AA so need to go to next one to cover it.
+                    x1: numCodons + 1, // Ends "on" that AA so need to go to next one to cover it.
                     y1: geneYBottom,
                     fillcolor: "#b0b0b0",
                 }

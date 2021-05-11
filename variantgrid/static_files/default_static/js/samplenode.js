@@ -3,9 +3,9 @@ DEFAULT_SHADOW_COLOR = "#aaa";
 
 
 function maleSVG(svg, sideLength) {
-	var sideSize = sideLength * 0.88;
-	var offset = (sideLength - sideSize) / 2;
-	var translate = "translate(" + offset + "," + offset + ")";
+	const sideSize = sideLength * 0.88;
+	const offset = (sideLength - sideSize) / 2;
+	const translate = "translate(" + offset + "," + offset + ")";
 
 	svg.append("svg:rect")
 	   .attr("class", "sample-shadow")
@@ -25,7 +25,7 @@ function maleSVG(svg, sideLength) {
 
 
 function femaleSVG(svg, sideLength) {
-	var radius = sideLength * 0.44;
+	const radius = sideLength * 0.44;
 
 	svg.append("svg:circle")
 	   .attr("class", "sample-shadow")
@@ -56,25 +56,26 @@ function addDeceasedStroke(svg, sideLength) {
 
 
 function createSampleNode(nodeData) {
-	var attributes = nodeData["attributes"];
-	var sideLength = SIDE_LENGTH;
+	const attributes = nodeData["attributes"];
+	const sideLength = SIDE_LENGTH;
 	attributes["width"] = sideLength;
 	attributes["height"] = sideLength;
 
-	var sampleNode = jQuery('<div></div>', attributes);
-	
-	var valign = $("<div class='node-overlay' />");
-	overlay_style = {	width: '100%',
-						height: '100%',
-		    			position: 'absolute',
-	    				top: 0,
-	 	 	 			left: 0,
-	 	 	 			'line-height': sideLength + 'px',
-	 	 	 			'z-index' : 30,
+	const sampleNode = $('<div></div>', attributes);
+
+	const valign = $("<div class='node-overlay' />");
+	const overlay_style = {
+		width: '100%',
+		height: '100%',
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		'line-height': sideLength + 'px',
+		'z-index' : 30,
 	};
 	valign.css(overlay_style);
-	
-	var span = $("<span class='node-name'>" + nodeData["name"] + "</span>");
+
+	const span = $("<span class='node-name'>" + nodeData["name"] + "</span>");
 	span.css({padding: '8px', display: 'inline-block', 'vertical-align' : 'middle', 'line-height' : '1em'});
 
 	valign.append(span);
@@ -87,17 +88,17 @@ function createSampleNode(nodeData) {
 function sampleNodeUpdateState(args) {
 	// remove existing SVG
 	$('svg', this).remove();
-	var sideLength = SIDE_LENGTH;
-	
-	patient = args['patient']
-	if (patient) {
-		var sex = patient['sex'];
-		var deceased = patient['deceased'];
+	const sideLength = SIDE_LENGTH;
 
-		var svg = d3.select(this).append("svg:svg")
-		   .attr("version", "1.1")
-		   .attr("width", sideLength)
-		   .attr("height", sideLength);
+	const patient = args['patient']
+	if (patient) {
+		const sex = patient['sex'];
+		const deceased = patient['deceased'];
+
+		const svg = d3.select(this).append("svg:svg")
+			.attr("version", "1.1")
+			.attr("width", sideLength)
+			.attr("height", sideLength);
 
 		if (sex == 'F') {
 			femaleSVG(svg, sideLength);

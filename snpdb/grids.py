@@ -59,13 +59,13 @@ class SamplesListGrid(JqGridUserRowConfig):
     model = Sample
     caption = 'Samples'
     fields = ["id", "name", "het_hom_count", "vcf__date", "import_status", "vcf__genome_build__name", "variants_type",
-              "vcf__name", "vcf__user__username", "vcf__uploadedvcf__uploaded_file__import_source",
+              "vcf__user__username", "vcf__source", "vcf__name", "vcf__uploadedvcf__uploaded_file__import_source",
               "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
               "patient__first_name", "patient__last_name", "patient__sex",
               "patient__date_of_birth", "patient__date_of_death",
-              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date"]
+              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date", "vcf_id"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,
@@ -74,8 +74,16 @@ class SamplesListGrid(JqGridUserRowConfig):
                                       "url_name": "view_sample",
                                       "url_object_column": "id"}},
         'import_status': {'formatter': 'viewImportStatus'},
+        'vcf_id': {"hidden": True},
         "vcf__genome_build__name": {"label": "Genome Build"},
-        'vcf__name': {'label': 'VCF Name'},
+        'vcf__source': {'label': 'VCF source'},
+        'vcf__name': {
+            'label': 'VCF Name', "width": 600,
+            "formatter": 'linkFormatter',
+            'formatter_kwargs': {"icon_css_class": "vcf-icon",
+                                 "url_name": "view_vcf",
+                                 "url_object_column": "vcf_id"}
+        },
         "sample_gene_list_count": {'name': 'sample_gene_list_count', 'label': '# Sample GeneLists',
                                    "model_field": False, "formatter": "viewSampleGeneList", 'sorttype': 'int'},
         'activesamplegenelist__id': {'hidden': True},

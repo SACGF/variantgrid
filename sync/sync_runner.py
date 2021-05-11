@@ -1,13 +1,16 @@
+from typing import Optional
+
 from library.log_utils import report_exc_info
 from sync.models.models import SyncDestination, SyncRun
 from sync.shariant.shariant_download import sync_shariant_download
 from sync.shariant.shariant_upload import sync_shariant_upload
 
 
-def run_sync(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
+def run_sync(sync_destination: SyncDestination, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
     """
     :param sync_destination: which sync are we running
     :param full_sync: if True all eligible records will be synced regardless of if they've been synced before, otherwise only changes
+    :param max_rows: If not None, then the number of rows uploaded will be limited to this (doesn't apply to download)
 
     Only allowed value currently
     {
@@ -39,8 +42,10 @@ def run_sync(sync_destination: SyncDestination, full_sync: bool = False) -> Sync
         if sync_type in ('shariant', 'variantgrid'):
             direction = config.get('direction')
             if direction == 'upload':
-                return sync_shariant_upload(sync_destination=sync_destination, full_sync=full_sync)
+                return sync_shariant_upload(sync_destination=sync_destination, full_sync=full_sync, max_rows=max_rows)
             if direction == 'download':
+                if max_rows is not None:
+                    raise ValueError("Row limit is not supported on downloads")
                 return sync_shariant_download(sync_destination=sync_destination, full_sync=full_sync)
             raise ValueError('config.direction must be upload or download')
         raise ValueError(f'unknown sync_type: {sync_type}')

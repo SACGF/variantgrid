@@ -1,6 +1,5 @@
 from typing import Optional, List
 
-from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -8,11 +7,12 @@ from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 import logging
 
-from analysis.models.nodes.analysis_node import NodeColors, AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
+from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.models import GeneList, CustomTextGeneList, GeneCoverageCollection, GeneSymbol, SampleGeneList, \
+from genes.models import GeneList, CustomTextGeneList, SampleGeneList, \
     ActiveSampleGeneList, PanelAppPanelLocalCacheGeneList, PanelAppPanel
 from genes.panel_app import get_local_cache_gene_list
 from pathtests.models import PathologyTestVersion
@@ -20,7 +20,7 @@ from snpdb.models import Sample
 from snpdb.models.models_enums import ImportStatus
 
 
-class GeneListNode(AncestorSampleMixin, AnalysisNode):
+class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
     SELECTED_GENE_LIST = 0
     CUSTOM_GENE_LIST = 1
     SAMPLE_GENE_LIST = 2
@@ -177,43 +177,7 @@ class GeneListNode(AncestorSampleMixin, AnalysisNode):
         if self.use_custom_gene_list:
             create_custom_text_gene_list(self.custom_text_gene_list, self.analysis.user.username, hidden=True)
 
-        # TODO: Also add to analysis settings and require that too
-        check_for_gene_coverage = settings.SEQAUTO_ENABLED
-        if check_for_gene_coverage:
-            self.has_gene_coverage = self.calculate_if_has_gene_coverage()
-            logging.debug("has_gene_coverage = %s", self.has_gene_coverage)
-            if not self.has_gene_coverage:
-                self.shadow_color = NodeColors.WARNING
-            else:
-                self.shadow_color = None
-
-    def calculate_if_has_gene_coverage(self):
-        """ True/False/None (unknown) """
-
-        coverage = None
-        sample_coverage_and_uncovered = self.get_sample_coverage_and_uncovered()
-        for _, _, uncovered_genes in sample_coverage_and_uncovered:
-            if uncovered_genes is not None:
-                coverage = True if coverage is None else coverage
-                coverage &= not uncovered_genes.exists()
-
-        return coverage
-
-    def get_sample_coverage_and_uncovered(self):
-        """ Returns a dict of { sample : uncovered genes queryset } """
-        gene_sample_coverage_and_uncovered = []
-        if self.modifies_parents():
-            gene_symbols = GeneSymbol.objects.filter(genelistgenesymbol__gene_list__in=self.get_gene_lists()).distinct()
-            for sample in self.get_samples():
-                gene_coverage_collection = GeneCoverageCollection.get_gene_coverage_for_sample(sample)
-
-                if gene_coverage_collection:
-                    uncovered_genes = gene_coverage_collection.get_uncovered_gene_symbols(
-                        gene_symbols, settings.SEQAUTO_MIN_COVERAGE)
-                else:
-                    uncovered_genes = None
-                gene_sample_coverage_and_uncovered.append((sample, gene_coverage_collection, uncovered_genes))
-        return gene_sample_coverage_and_uncovered
+        super()._load()
 
     def _get_configuration_errors(self) -> List:
         errors = super()._get_configuration_errors()

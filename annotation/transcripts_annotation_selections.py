@@ -108,6 +108,7 @@ class VariantTranscriptSelections:
                     break
 
             if obj.transcript_version:
+                data["protein_length"] =obj.transcript_version.protein_length
                 ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
                 if ggc:
                     data[self.GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY] = ggc.oe_lof_summary
@@ -219,8 +220,14 @@ class VariantTranscriptSelections:
                     other_ac_key: transcript_version.accession,
                     "transcript_id": transcript_version.accession,  # for transcript data keys
                     self.REPRESENTATIVE: False,
-                    "consequence": "?"
+                    "consequence": "?",
                 }
+                try:
+                    # Transcript data may not be well formed
+                    t_data["protein_length"] = transcript_version.protein_length
+                except (ValueError, KeyError):
+                    pass
+
                 try:
                     t_data["hgvs_c"] = hgvs_matcher.variant_to_c_hgvs(variant, transcript_version.accession)
                 except (ValueError, KeyError):

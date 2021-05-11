@@ -61,7 +61,7 @@ URLS_NAME_REGISTER["view_patient_contact_tab"] = True
 # CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.test.genome.network"
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1
 
-_SAPATHOLOGY_MODE = False
+_SAPATHOLOGY_MODE = True
 _SHARIANT_MODE = False
 _RUNX1_MODE = False
 
@@ -71,6 +71,7 @@ SOMALIER["enabled"] = True
 USE_OIDC = False
 
 if _SAPATHOLOGY_MODE:
+    SEQAUTO_ENABLED = True
     SAPATH_APP = 'sapath.apps.SapathConfig'
     INSTALLED_APPS += [SAPATH_APP]
     CELERY_IMPORTS += ('sapath.tasks.import_helix_task',)

@@ -1,15 +1,14 @@
 from collections import defaultdict
 
-from django.conf import settings
 from django.utils.timesince import timesince
 
 from analysis.forms.forms_nodes import GeneListNodeForm
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
-from analysis.views.nodes.node_view import NodeView
+from analysis.views.nodes.gene_coverage_node_view import GeneCoverageNodeView
 from genes.models import GeneListCategory, GeneList, SampleGeneList, PanelAppServer, PanelAppPanel
 
 
-class GeneListNodeView(NodeView):
+class GeneListNodeView(GeneCoverageNodeView):
     model = GeneListNode
     form_class = GeneListNodeForm
 
@@ -37,38 +36,11 @@ class GeneListNodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        gene_lists = self.object.get_gene_lists()
-        context['gene_lists'] = gene_lists
-        context['gene_list_id_list'] = "/".join([str(gl.pk) for gl in gene_lists])
-        gene_lists_errors = {}
-        gene_lists_warnings = {}
 
-        for gl in gene_lists:
-            if gl.error_message:
-                gene_lists_errors[gl] = gl.error_message
-            if warnings := gl.get_warnings(self.object.analysis.gene_annotation_release):
-                gene_lists_warnings[gl] = ", ".join(warnings)
-        context["gene_lists_errors"] = gene_lists_errors
-        context["gene_lists_warnings"] = gene_lists_warnings
-
-        context.update(self._get_coverage_context())
         context.update(self._get_sample_gene_lists_context())
         context.update(self._get_pathology_test_context())
         context.update(self._get_panel_app_context())
         return context
-
-    def _get_coverage_context(self):
-        sample_coverage_and_uncovered = self.object.get_sample_coverage_and_uncovered()
-        incomplete_gene_coverage = []
-        if not self.object.has_gene_coverage:
-            for sample, gene_coverage_collection, uncovered_genes in sample_coverage_and_uncovered:
-                if uncovered_genes and uncovered_genes.exists():
-                    uncovered_gene_names = ','.join(map(str, uncovered_genes))
-                    incomplete_gene_coverage.append((sample, gene_coverage_collection, uncovered_gene_names))
-
-        return {"min_coverage": settings.SEQAUTO_MIN_COVERAGE,
-                "sample_coverage_and_uncovered": sample_coverage_and_uncovered,
-                "incomplete_gene_coverage": incomplete_gene_coverage}
 
     def _get_sample_gene_lists_context(self):
         has_sample_gene_lists = SampleGeneList.objects.filter(sample__in=self.object.get_sample_ids()).exists()

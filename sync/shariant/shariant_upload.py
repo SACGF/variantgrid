@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 from django.db.models.query_utils import Q
 import json
@@ -16,7 +16,7 @@ from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_utils import ClassificationJsonParams
 
-SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary']
+SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use']
 
 
 def insert_nones(data: Dict) -> Dict:
@@ -27,7 +27,7 @@ def insert_nones(data: Dict) -> Dict:
     return data
 
 
-def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
+def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
     config = sync_destination.config
     shariant = OAuthConnector.shariant_oauth_connector()
 
@@ -108,8 +108,11 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         run.save()
     else:
 
+        if max_rows is not None:
+            qs = qs[:max_rows]
+
         try:
-            for batch in batch_iterator(qs, batch_size=10):
+            for batch in batch_iterator(qs, batch_size=50):
 
                 json_to_send = {"records": [classification_to_json(vcm) for vcm in batch]}
                 print(json.dumps(json_to_send))

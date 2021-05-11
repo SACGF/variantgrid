@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.contrib import admin
 from sync import models
 from sync.models.models import SyncDestination
@@ -21,12 +23,23 @@ class ByDestinationFilter(admin.SimpleListFilter):
 class SyncDestinationAdmin(admin.ModelAdmin):
     list_display = ('name', 'config', 'enabled')
 
-    def run_sync(self, request, queryset):
+    def _run_sync(self, request, queryset, max_rows: Optional[int] = None):
         sync_destination: SyncDestination
         for sync_destination in queryset:
-            sync_destination.run(full_sync=False)
-            self.message_user(request, message=f"Completed {str(sync_destination)}")
+            sync_destination.run(full_sync=False, max_rows=max_rows)
+            self.message_user(request, message=f"Completed {str(sync_destination)} row limit = {max_rows}")
+
+    def run_sync(self, request, queryset):
+        self._run_sync(request, queryset)
     run_sync.short_description = "Run now (delta sync)"
+
+    def run_sync_single(self, request, queryset):
+        self._run_sync(request, queryset, max_rows=1)
+    run_sync_single.short_description = "Run now (delta sync) single row"
+
+    def run_sync_ten(self, request, queryset):
+        self._run_sync(request, queryset, max_rows=10)
+    run_sync_ten.short_description = "Run now (delta sync) 10 rows"
 
     def run_sync_full(self, request, queryset):
         sync_destination: SyncDestination
@@ -35,7 +48,7 @@ class SyncDestinationAdmin(admin.ModelAdmin):
             self.message_user(request, message=f"Completed {str(sync_destination)}")
     run_sync_full.short_description = "Run now (full sync)"
 
-    actions = [run_sync, run_sync_full]
+    actions = [run_sync, run_sync_single, run_sync_ten, run_sync_full]
 
 
 class SyncRunAdmin(admin.ModelAdmin):
