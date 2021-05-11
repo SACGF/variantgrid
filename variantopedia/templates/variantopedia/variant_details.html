@@ -517,6 +517,8 @@ function applyVariantValues() {
         </div>
     </div>
 
+    {% if show_annotation %}
+        {% comment %}Not actually annotations but always linked with them{% endcomment %}
     <div class="container mt-4">
         <h4>Tags</h4>
         <table id='tags-table' class="table hidden">
@@ -535,6 +537,7 @@ function applyVariantValues() {
             </form>
         </div>
     </div>
+    {% endif %}
 
     {% if classifications_new_grouping %}
         <div class="container mt-4">
@@ -567,31 +570,31 @@ function applyVariantValues() {
             <div class="card-header">ClinVar</div>
             <div class="card-body">
             {% if clinvar %}
-                {% labelled label="Allele" hint="tiny" %}
+                {% labelled label="Allele" %}
                  <a class='hover-link' target='_blank' href='https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}'>{{ clinvar.clinvar_variation_id }}</a>
                     &nbsp;<b>AlleleID</b> {{ clinvar.clinvar_allele_id }}
                 {% endlabelled %}
-                {% labelled label="Highest pathogenicity" hint="tiny" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
-                {% labelled label="Clinical significance" hint="tiny" %}{{ clinvar.clinical_significance }}{% endlabelled %}
+                {% labelled label="Highest pathogenicity" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
+                {% labelled label="Clinical significance" %}{{ clinvar.clinical_significance }}{% endlabelled %}
                 {% if clinvar.conflicting_clinical_significance %}
-                    {% labelled label="Conflicting clinical significance" hint="tiny" %}{{ clinvar.conflicting_clinical_significance }}{% endlabelled %}
+                    {% labelled label="Conflicting clinical significance" %}{{ clinvar.conflicting_clinical_significance }}{% endlabelled %}
                 {% endif %}
-                {% labelled label="Preferred disease name" hint="tiny" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
-                {% labelled label="Disease database name" hint="tiny" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
-                {% labelled label="Review status" hint="tiny" %}
+                {% labelled label="Preferred disease name" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
+                {% labelled label="Disease database name" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
+                {% labelled label="Review status" %}
                     {% load clinvar_tags %}
                     <a class='hover-link' target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/">
                     {% clinvar_stars clinvar.stars %} {{ clinvar.get_clinvar_review_status_display }}
                     </a>
                 {% endlabelled %}
-                {% labelled label="Clinical sources" hint="tiny" %}{{ clinvar.clinvar_clinical_sources }}{% endlabelled %}
-                {% labelled label="Origin" hint="tiny" %}{{ clinvar.get_origin_display }}{% endlabelled %}
+                {% labelled label="Clinical sources" %}{{ clinvar.clinvar_clinical_sources }}{% endlabelled %}
+                {% labelled label="Origin" %}{{ clinvar.get_origin_display }}{% endlabelled %}
                 {% if clinvar_suspect_reason_code %}
-                    {% labelled label="Suspect reason code" hint="tiny" %}{{ clinvar.get_suspect_reason_code_display }}{% endlabelled %}
+                    {% labelled label="Suspect reason code" %}{{ clinvar.get_suspect_reason_code_display }}{% endlabelled %}
                 {% endif %}
-                {% labelled label="Drug response" hint="tiny" %}{{ clinvar.drug_response }}{% endlabelled %}
-                {% labelled label="Citations" hint="tiny" %}
-                    {% if num_clinvar_citations %}<a class='hover-link hide-citations' data-toggle="collapse" href='#clinvar-citation-div'>Show {{ num_clinvar_citations }} Literature Citations</a>
+                {% labelled label="Drug response" %}{{ clinvar.drug_response }}{% endlabelled %}
+                {% labelled label="Citations" %}
+                    {% if num_clinvar_citations %}<a class='toggle-link' data-toggle="collapse" href='#clinvar-citation-div'>Show {{ num_clinvar_citations }} Literature Citations</a>
                     {% else %}No Citations.
                     {% endif %}
                 {% endlabelled %}
@@ -831,6 +834,7 @@ function applyVariantValues() {
                             <div id='pubmed-citations-overflow' class="hidden"></div>
 
                             {% if variant_annotation.mastermind_mmid3 %}
+                                <div class="mt-2"></div>
                                 {% labelled id="mastermind_count_1_cdna" label="MM variant article count" hint="tiny" %}{{ variant_annotation.mastermind_count_1_cdna }}{% endlabelled %}
                                 {% labelled id="mastermind_count_2_cdna_prot" label="MM variant/protein article count" hint="tiny" %}{{ variant_annotation.mastermind_count_2_cdna_prot }}{% endlabelled %}
                                 {% labelled id="mastermind_count_3_aa_change" label="MM AA article count" hint="tiny" %}{{ variant_annotation.mastermind_count_3_aa_change }}{% endlabelled %}

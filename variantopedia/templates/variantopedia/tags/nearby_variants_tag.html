@@ -1,32 +1,8 @@
-<div class="form-group row mb-4 mb-md-3">
-    <label class="col-12 col-md-6 text-md-right" for="nearby_codon">Codon</label>
-    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_codon">
-        {{ codon_summary|default_if_none:"-" }}
-    </div>
-</div>
-<div class="form-group row mb-4 mb-md-3">
-    <label class="col-12 col-md-6 text-md-right" for="nearby_exon">Exon</label>
-    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_exon">
-        {{ exon_summary|default_if_none:"-" }}
-    </div>
-</div>
-<div class="form-group row mb-4 mb-md-3">
-    <label class="col-12 col-md-6 text-md-right" for="nearby_domain">Domain</label>
-    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_domain">
-        {{ domain_summary|default_if_none:"-" }}
-    </div>
-</div>
-<div class="form-group row mb-4 mb-md-3">
-    <label class="col-12 col-md-6 text-md-right" for="nearby_range">Range (+/- {{ distance }})</label>
-    <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_range">
-        {{ range_summary|default_if_none:"-" }}
-    </div>
-</div>
+{% load ui_utils %}
+{% labelled label="Codon"  id="nearby_codon" %}{{ codon_summary }}{% endlabelled %}
+{% labelled label="Exon"   id="nearby_exon" %}{{ exon_summary }}{% endlabelled %}
+{% labelled label="Domain" id="nearby_domain" %}{{ domain_summary }}{% endlabelled %}
+{% labelled label="Range (+/- "|add:distance_str|add:")" id="nearby_range" %}{{ range_summary }}{% endlabelled %}
 {% if codon_summary or exon_summary or domain_summary or range_summary %}
-    <div class="form-group row mb-4 mb-md-3">
-        <label class="col-12 col-md-6 text-md-right" for="nearby_details">Details</label>
-        <div class="col-12 col-md-6 text-left align-self-center text-break" id="nearby_details">
-            <a href="{% url 'nearby_variants_annotation_version' variant.pk annotation_version.pk %}">See nearby variants...</a>
-        </div>
-    </div>
+    {% labelled label="Details" id="nearby_details" %}<a href="{% url 'nearby_variants_annotation_version' variant.pk annotation_version.pk %}">See nearby variants...</a>{% endlabelled %}
 {% endif %}

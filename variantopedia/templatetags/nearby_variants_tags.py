@@ -17,6 +17,7 @@ def nearby_variants(context, variant: Variant, annotation_version: AnnotationVer
         'variant': variant,
         "annotation_version": annotation_version,
         "distance": distance,
+        "distance_str": str(distance)
     })
     context.update(get_nearby_summaries(user, variant, annotation_version,
                                         distance=distance, clinical_significance=clinical_significance))

@@ -7,7 +7,6 @@
 {% load js_tags %}
 {% load user_tag_color_tags %}
 {% load jqgrid_tags %}
-{% load help_tags %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block title %}Nearby to {{ variant }}{% endblock title %}
@@ -45,7 +44,7 @@
             </div>
         </div>
 
-        {% page_help user 'variantopedia/nearby_variants_help' 'Nearby variants & transcript choice' %}
+        {% page_help 'variantopedia/nearby_variants_help' 'Nearby variants & transcript choice' %}
 
         <h4>Codon</h4>
         <div><b>Method:</b> {{ method_summaries.codon }}</div>

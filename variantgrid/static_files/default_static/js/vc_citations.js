@@ -108,7 +108,7 @@ let Citations = (function() {
                         let authors = citation.authors.split(',');
                         if (authors.length) {
                             authorShort = authors[0];
-                            singleAuthor = authors.length == 1;
+                            singleAuthor = authors.length === 1;
                         }
                     } else if (authorShort && citation.authors) {
                         singleAuthor = authorShort == citation.authors;
@@ -142,7 +142,8 @@ let Citations = (function() {
                     linkDom.appendTo(citDom);
 
                     if (citation.abstract || !singleAuthor || citation.journal) {
-                        let detailContainer = $('<div>', {class: 'detail'}).css('display', 'none').appendTo(citDom);
+                        $('<a>', {class: 'toggle-link', 'data-toggle':"collapse", href:`#detail-${citation.citation_id}`, text: 'Toggle detail'}).appendTo(citDom);
+                        let detailContainer = $('<div>', {class: 'collapse', id:`detail-${citation.citation_id}`}).appendTo(citDom);
                         if (citation.journal) {
                             $('<p>', {class: 'journal', text: citation.journal}).appendTo(detailContainer);
                         }
@@ -154,31 +155,7 @@ let Citations = (function() {
                             detailContainer.slideToggle();
                             return false;
                         };
-                        $('<a>', {class: 'show-abstract-link', href: '#', text: 'Toggle detail', click: toggleAbstract}).appendTo(citDom);
                     }
-
-                    //$('<div>', {text: JSON.stringify(citation)}).appendTo(citDom);
-                    /*
-                    $('<p>', {html:$('<a>', {class: 'title', text: citation.title, href: dbRef.url, target: '_blank'})}).appendTo(citDom);
-                    if (citation.authors) {
-                        $('<div>', {class: 'desc', text: citation.authors}).appendTo(citDom);
-                    }
-                    let details = $('<div>', {class: 'details'}).appendTo(citDom);
-                    if (citation.journal) {
-                        $('<span>', {class: 'journal', text: citation.journal}).appendTo(details);
-                        details.append(document.createTextNode(' '));
-                    }
-                    $('<span>', {class: 'aux', html: $('<span>', {class: 'rprtid', text: `${citation.source}: ${citation.citation_id}`})}).appendTo(details);
-                    details.append(document.createTextNode(' '));
-                    if (citation.abstract) {
-                        let abstractDom = $('<p>', {class: 'abstract', text: citation.abstract}).css('display', 'none').appendTo(citDom);
-                        let toggleAbstract = () => {
-                            abstractDom.slideToggle();
-                            return false;
-                        };
-                        $('<a>', {class: 'show-abstract-link', href: '#', text: 'Toggle abstract', click: toggleAbstract}).appendTo(details);
-                    }
-                     */
                 }
             }
         },
