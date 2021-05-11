@@ -173,7 +173,7 @@
                and abbreviate or not show if they overflow the protein domain shape */
             const MIN_CHARS = 2;
             let graphSize = $("#" + selector).width();
-            let fontScale = graphSize / (numAminoAcids + 1);
+            let fontScale = graphSize / (numCodons + 1);
             let fontSize = 10;
             let fontWidth = fontSize / fontScale;
 
@@ -228,7 +228,7 @@
                 showlegend: true,
                 xaxis: {
                     title: "Amino acid",
-                    range: [0, numAminoAcids + 1],
+                    range: [0, numCodons + 1],
                     showgrid: false
                 },
                 yaxis: {
