@@ -279,7 +279,7 @@ a {
   margin-right: 4px;
 }
 
-.toggle-link[aria-expanded=true]:before {
+.toggle-link[aria-expanded=true]:before, tr.parent .toggle-link:before {
   content: "";
 }
 
@@ -459,6 +459,7 @@ div.background-image {
 
 .toggle-link {
   color: #88B;
+  cursor: pointer;
 }
 
 .hover-detail {

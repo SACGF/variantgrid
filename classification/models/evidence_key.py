@@ -158,11 +158,14 @@ class EvidenceKey(TimeStampedModel):
                 index_map[option.get('key')] = index + 1
         return index_map
 
-    def classification_sorter(self, evidence):
-        val = evidence.get(self.key)
+    def classification_sorter_value(self, val):
         if index_map := self._option_indexes:
             return index_map.get(val, 0)
         return val
+
+    def classification_sorter(self, evidence):
+        val = evidence.get(self.key)
+        return self.classification_sorter_value(val)
 
     def validate(self):
         if self.options:

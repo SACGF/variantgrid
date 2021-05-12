@@ -58,6 +58,7 @@ def classification_groups(
     groups = ClassificationGroups(classification_modifications)
 
     context = {"classification_groups": groups}
+    context["table_id"] = "classification_table";
     ordered_classifications = list(groups.modifications)
 
     if show_diffs:
@@ -225,9 +226,11 @@ def classification_table(
         "discordance_enabled": settings.DISCORDANCE_ENABLED
     }
 
+
 @register.inclusion_tag("classification/tags/c_hgvs.html")
 def c_hgvs(c_hgvs: CHGVS):
     return {"c_hgvs": c_hgvs}
+
 
 @register.inclusion_tag("classification/tags/hgvs.html", takes_context=True)
 def hgvs(context, hgvs: BestHGVS, show_variant_link: bool = True):

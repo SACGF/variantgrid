@@ -19,7 +19,7 @@
     {% endfor %}
 </div>
 {% if classification_groups %}
-<table class="table sticky-header">
+<table class="table sticky-header" id="{{ table_id }}">
     <thead>
         <tr>
             <th>Grouping</th>
@@ -27,7 +27,10 @@
             <th>Conditions</th>
             <th>Zygosities</th>
             <th>ACMG</th>
-            <th>Curated</th>
+            <th>Last Curated</th>
+            <th>Allele</th>
+            <th>Gene Symbol</th>
+            <th>Records</th>
         </tr>
     </thead>
     <tbody>
@@ -36,6 +39,29 @@
         {% endfor %}
     </tbody>
 </table>
+<script>$(document).ready(() => {$('#{{ table_id }}').DataTable({
+    responsive: {
+        details: {
+            // type: 'column',
+            // target: 'td.dt-preview',
+            // renderer: TableFormat.detailRenderer
+            type: 'column',
+            target: 'td.dt-id',
+            renderer: TableFormat.detailRendererHtml
+        }
+    },
+    columns: [
+        {'className': 'dt-id toggle-link'}, // ID
+        {}, // Clinical Sig
+        {}, // Conditions
+        {}, // Zygosities
+        {}, // ACMG
+        {}, // last record
+        {'className': 'none'}, // allele
+        {'className': 'none'}, // gene link
+        {'className': 'none'}, // record count
+    ]
+})})</script>
 {% else %}
     <div class="no-value mb-4 text-center">No records</div>
 {% endif %}

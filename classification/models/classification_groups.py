@@ -7,6 +7,7 @@ from classification.enums import SpecialEKeys, CriteriaEvaluation
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved
 from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
+from snpdb.models import Allele
 
 
 class ClassificationGroup:
@@ -15,6 +16,20 @@ class ClassificationGroup:
         self.modifications = list(modifications)
         self.modifications.sort(key=lambda cm: ClassificationGroup.sort_modifications(cm), reverse=True)
         self.group_id = group_id
+        self.clinical_significance_score = 0
+
+    @property
+    def allele(self) -> Optional[Allele]:
+        if variant := self.most_recent.classification.variant:
+            return variant.allele
+        return None
+
+    def diff_ids(self) -> str:
+        return ",".join([str(cm.classification_id) for cm in self.modifications])
+
+    @property
+    def gene_symbol(self) -> Optional[str]:
+        return self.most_recent.get(SpecialEKeys.GENE_SYMBOL)
 
     @staticmethod
     def sort_modifications(mod1: ClassificationModification):
@@ -140,8 +155,9 @@ class ClassificationGroups:
 
         # clinical significance, clin grouping, org
         sorted_by_clin_sig = list(classification_modifications)
-        sorted_by_clin_sig.sort(key=evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter)
-        for _, group1 in groupby(sorted_by_clin_sig, clin_significance):
+        e_key_clin_sig = evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        sorted_by_clin_sig.sort(key=e_key_clin_sig.classification_sorter)
+        for clin_sig, group1 in groupby(sorted_by_clin_sig, clin_significance):
             group1 = list(group1)
             # breakup by clinical grouping
             group1.sort(key=lambda cm: cm.classification.clinical_grouping_name)
@@ -158,6 +174,7 @@ class ClassificationGroups:
                         group4.sort(key=lambda cm: condition_sorter(cm))
                         for _, group5 in groupby(group4, lambda cm: condition_grouper(cm)):
                             actual_group = ClassificationGroup(modifications=group5, group_id=len(groups) + 1)
+                            actual_group.clinical_significance_score = e_key_clin_sig.classification_sorter_value(clin_sig)
                             groups.append(actual_group)
         self.groups = groups
 

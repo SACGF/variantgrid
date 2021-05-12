@@ -587,7 +587,6 @@ TableFormat.detailRenderer = function ( api, rowIdx, columns ) {
     console.log(api);
     let fieldset = $('<div>', {class:'mt-3'});
     for (let col of columns) {
-
         if (col.hidden) {
             if (col === null || col.data.length === 0) {
                 // pass
@@ -598,6 +597,27 @@ TableFormat.detailRenderer = function ( api, rowIdx, columns ) {
                     }),
                     $('<div>', {class: 'col-10', html:
                         $('<span>', {class: 'dt-detail', text: col.data})
+                    }),
+                ]}).appendTo(fieldset);
+            }
+        }
+    }
+    return fieldset;
+};
+TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
+    console.log(api);
+    let fieldset = $('<div>', {class:'mt-3'});
+    for (let col of columns) {
+        if (col.hidden) {
+            if (col === null || col.data.length === 0) {
+                // pass
+            } else {
+                $('<div>', {class:'row mt-2', html:[
+                    $('<div>', {class: 'col-2 text-right', html:
+                        $('<label>', {text: col.title})
+                    }),
+                    $('<div>', {class: 'col-10', html:
+                        $('<span>', {class: 'dt-detail', html: col.data})
                     }),
                 ]}).appendTo(fieldset);
             }
