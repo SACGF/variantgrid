@@ -58,7 +58,7 @@
     </td>
     <td width="110px" data-order="{{ group.most_recent_curated.date.timestamp }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
-            {% if not group.most_recent_curated.is_curated %}Created<br/>{% endif %}{% timestamp group.most_recent_curated.date time_ago=True %}
+            {% if not group.most_recent_curated.is_curated %}Created<br/>{% endif %}{% timestamp group.most_recent_curated.date.timestamp time_ago=True %}
         </a><br/>
     </td>
     <td>

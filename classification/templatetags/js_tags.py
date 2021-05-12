@@ -107,7 +107,7 @@ def dash_if_empty(val):
 def timestamp(timestamp, time_ago: bool = False):
     css_class = 'time-ago' if time_ago else ''
     if timestamp:
-        if not isinstance(timestamp, int):
+        if not isinstance(timestamp, int) and not isinstance(timestamp, float):
             timestamp = timestamp.timestamp()
         return {
             "timestamp": timestamp,
