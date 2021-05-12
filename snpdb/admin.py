@@ -9,6 +9,7 @@ from guardian.admin import GuardedModelAdmin
 
 from classification.models.clinvar_export_models import ClinVarExport
 from snpdb import models
+from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models_admin_forms import LabAdmin, OrganizationAdmin
@@ -119,6 +120,12 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
 
     validate.short_description = 'Validate'
 
+    def liftover(self, request, queryset):
+        liftover_alleles(allele_qs=queryset, user=request.user)
+        self.message_user(request, message=f'Liftover queued', level=messages.INFO)
+
+    liftover.short_description = 'Liftover'
+
     def prepare_clinvar(self, request, queryset):
         allele: Allele
         for allele in queryset:
@@ -128,7 +135,7 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
 
     prepare_clinvar.short_description = 'ClinVar Export Prepare'
 
-    actions = ["export_as_csv", validate, prepare_clinvar]
+    actions = ["export_as_csv", validate, liftover, prepare_clinvar]
     search_fields = ('id', 'clingen_allele__id')
     # flag collection and clingen allele blow up as drop downs as there's so many choices in them
     fieldsets = (
