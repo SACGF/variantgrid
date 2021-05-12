@@ -102,6 +102,10 @@ class CohortNodeView(NodeView):
         context['num_samples'] = num_samples
         return context
 
+    def get_form_kwargs(self):
+        form_kwargs = super().get_form_kwargs()
+        form_kwargs["genome_build"] = self.object.analysis.genome_build
+        return form_kwargs
 
 class DamageNodeView(NodeView):
     model = DamageNode
