@@ -10,6 +10,11 @@
 {% endblock node_editor_not_visible_tab_links %}
 
 {% block content %}
+<style>
+    .tag-top-checkboxes {
+        margin-right: 10px;
+    }
+</style>
 <script>
 function classificationFilter(data, type) {
     data.analysis_id = "{{ node.analysis_id }}";
@@ -58,8 +63,20 @@ $(document).ready(function() {
             {{ hidden }}
         {% endfor %}
         <div>
+            <span class="tag-top-checkboxes">
+                <label>{{ form.parent_input.label }}:</label> {{ form.parent_input }}
+            </span>
+            <span class="tag-top-checkboxes">
+                <label>{{ form.exclude.label }}:</label> {{ form.exclude }}
+            </span>
+        </div>
+        <div>
     		{% if node.visible %}
-    		<b>Tags from:</b> {{ form.mode }}
+            <div class="display-flex">
+                <label>Tags From:</label>
+                {{ form.mode }}
+            </div>
+
     		{% else %}
     		<b>All tags for analysis</b> 
     		{% endif %}

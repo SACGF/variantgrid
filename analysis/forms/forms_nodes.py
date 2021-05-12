@@ -609,6 +609,9 @@ class TagNodeForm(BaseNodeForm):
     class Meta:
         model = TagNode
         exclude = ANALYSIS_NODE_FIELDS
+        widgets = {
+            "mode": forms.RadioSelect(attrs={'class': 'horizontal-radio'}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
