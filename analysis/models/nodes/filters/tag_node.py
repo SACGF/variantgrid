@@ -60,7 +60,7 @@ class TagNode(AnalysisNode):
             if self.mode == TagNodeMode.ALL_TAGS:
                 description_list.append("Global")
             else:
-                description_list.append("Anaylsis")
+                description_list.append("Analysis")
 
             if self.tag_ids:
                 description_list.append(', '.join(self.tag_ids))
