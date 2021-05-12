@@ -85,6 +85,8 @@ if _SAPATHOLOGY_MODE:
         TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
     PATHOLOGY_TESTS_ENABLED = False
 elif _SHARIANT_MODE:
+
+    VARIANT_DETAILS_SHOW_ANNOTATION = False
     VARIANT_CLASSIFICATION_STATS_USE_SHARED = True  # False=Use visible to user. True = Shared
 
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
@@ -105,6 +107,14 @@ elif _SHARIANT_MODE:
 
     URLS_NAME_REGISTER.update({"classification_dashboard": True,
                                "classification_import_tool": True})
+
+    URLS_NAME_REGISTER.update({  # Disable selected urls
+        # Variants
+        "variants": False,
+        "variant_tags": False,
+        "manual_variant_entry": False,
+        "variantopedia_wiki": False,
+    })
 
 elif _RUNX1_MODE:
     RUNX1_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "runx1_static")
