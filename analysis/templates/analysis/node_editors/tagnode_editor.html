@@ -62,6 +62,7 @@ $(document).ready(function() {
         {% for hidden in form.hidden_fields %}
             {{ hidden }}
         {% endfor %}
+        {% if node.visible %}
         <div>
             <span class="tag-top-checkboxes">
                 <label>{{ form.parent_input.label }}:</label> {{ form.parent_input }}
@@ -70,6 +71,7 @@ $(document).ready(function() {
                 <label>{{ form.exclude.label }}:</label> {{ form.exclude }}
             </span>
         </div>
+        {% endif %}
         <div>
     		{% if node.visible %}
             <div class="display-flex">
