@@ -13,10 +13,13 @@ import operator
 import os
 
 from library.django_utils.django_file_utils import get_import_processing_dir
+from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.vcf_utils import write_vcf_from_tuples
+from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
-from snpdb.models.models_variant import AlleleSource, Liftover, Allele, Variant
+from snpdb.models.models_variant import AlleleSource, Liftover, Allele, Variant, VariantAlleleCollectionSource, \
+    VariantAllele, VariantAlleleCollectionRecord
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
@@ -125,3 +128,24 @@ def _get_build_liftover_vcf_tuples(allele_source: AlleleSource, inserted_genome_
                 build_liftover_vcf_tuples[genome_build][AlleleConversionTool.NCBI_REMAP].append(avt)
 
     return build_liftover_vcf_tuples
+
+
+def liftover_alleles(allele_qs, user: User = None):
+    """ Creates then runs (async) liftover pipelines for a queryset of alleles """
+    if user is None:
+        user = admin_bot()
+
+    for genome_build in GenomeBuild.builds_with_annotation():
+        allele_source = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
+
+        records = []
+        for variant_allele in VariantAllele.objects.filter(genome_build=genome_build, allele__in=allele_qs):
+            records.append(VariantAlleleCollectionRecord(collection=allele_source,
+                                                         variant_allele=variant_allele))
+        if records:
+            VariantAlleleCollectionRecord.objects.bulk_create(records)
+
+            variants_qs = allele_source.get_variants_qs()
+            populate_clingen_alleles_for_variants(genome_build, variants_qs)
+            create_liftover_pipelines(user, allele_source, ImportSource.WEB,
+                                      inserted_genome_build=genome_build)
