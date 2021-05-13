@@ -1129,14 +1129,17 @@ class GeneList(models.Model):
         return reverse('gene_lists')
 
 
-class FakeGeneList(GeneList):
-    """ Fake for serializing """
+def create_fake_gene_list(*args, **kwargs):
+    """  Create via a function so Django doesn't see it as a real model and make a table in DB
+         Originally FakeGeneList had abstract=True but with Django 3.2 got "Abstract models cannot be instantiated" """
 
-    class Meta:
-        abstract = True
+    class FakeGeneList(GeneList):
+        """ Fake for serializing """
 
-    def get_absolute_url(self):
-        return None
+        def get_absolute_url(self):
+            return None
+
+    return FakeGeneList(*args, **kwargs)
 
 
 class GeneListGeneSymbol(models.Model):

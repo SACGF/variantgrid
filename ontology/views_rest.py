@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
-from genes.models import FakeGeneList, GeneListGeneSymbol
+from genes.models import GeneListGeneSymbol, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from ontology.models import OntologyTerm, OntologySnake
 from ontology.ontology_matching import OntologyMatching
@@ -30,7 +30,7 @@ class OntologyTermGeneListView(APIView):
         ontology_term = OntologyTerm.get_from_slug(term_slug)
 
         name = str(ontology_term)
-        gene_list = FakeGeneList(name=name, user=None)
+        gene_list = create_fake_gene_list(name=name, user=None)
         gene_list_genes = []
         for gene_symbol in OntologySnake.gene_symbols_for_terms([ontology_term.pk]):
             glg = GeneListGeneSymbol(gene_list=gene_list, original_name=gene_symbol, gene_symbol=gene_symbol)

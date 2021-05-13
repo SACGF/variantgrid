@@ -6,8 +6,8 @@ from rest_framework.exceptions import NotFound
 
 from annotation.models import CachedWebResource, ImportStatus
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, FakeGeneList, PanelAppServer, \
-    PanelAppPanelLocalCacheGeneList, GeneList, GeneListCategory
+from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, \
+    PanelAppPanelLocalCacheGeneList, GeneList, GeneListCategory, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.guardian_utils import admin_bot, add_public_group_read_permission
 
@@ -57,7 +57,7 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
         gene_names_list.append(gene_symbol)
 
     gene_matcher = GeneSymbolMatcher()
-    gene_list = FakeGeneList(name=name, user=None)
+    gene_list = create_fake_gene_list(name=name, user=None)
     gene_list_gene_symbols = gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list, save=False)
     genelistgenesymbol_set = GeneListGeneSymbolSerializer(gene_list_gene_symbols, many=True).data  # sorted(glg_set)
 
