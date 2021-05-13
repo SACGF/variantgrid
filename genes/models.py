@@ -215,8 +215,12 @@ class GeneSymbolAlias(TimeStampedModel):
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     description = models.TextField(null=True)
 
+    @property
+    def match_info(self) -> str:
+        return f"{self.alias} is an alias for {self.gene_symbol_id} ({self.get_source_display()})"
+
     def __str__(self):
-        return f"{self.gene_symbol_id} : {self.alias} is an alias for {self.gene_symbol_id} ({self.get_source_display()})"
+        return f"{self.gene_symbol_id} : {self.match_info}"
 
     def get_absolute_url(self):
         """ So search sends it to the symbol """

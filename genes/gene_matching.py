@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Iterable, Dict
+from typing import Iterable, Dict, List
 
 from django.db.models import F, Q, Subquery, OuterRef
 from django.db.models.functions import Upper
@@ -104,7 +104,7 @@ class GeneMatcher:
         return genes_dict
 
     @lazy
-    def aliases_dict(self):
+    def aliases_dict(self) -> Dict[str, List]:
         """ Get symbols from other GeneVersions that match genes from our release """
         qs = GeneVersion.objects.filter(gene__in=self.release.get_genes())
         release_symbol = GeneSymbol.objects.filter(geneversion__gene=OuterRef("gene"),
@@ -114,41 +114,86 @@ class GeneMatcher:
 
         values = diff_version_symbols.values_list("symbol_upper", "gene__identifier", "version", "genome_build__name")
         genes_dict = defaultdict(list)
-        for symbol_upper, gene_id, version, genome_build in values:
-            genes_dict[symbol_upper].append((gene_id, version, genome_build))
+        for symbol_upper, gene_id, version, genome_build_name in values:
+            match_info = f"Gene v{version}/{genome_build_name}"
+            genes_dict[symbol_upper].append((gene_id, match_info))
+
+        # Gene Symbol alias
+        qs = GeneSymbolAlias.objects.filter(gene_symbol__releasegenesymbol__release=self.release)
+        qs = qs.exclude(alias=F("gene_symbol_id"))
+        alias_graph = {gsa.alias: gsa for gsa in qs}
+
+        for gsa in qs:
+            match_path = [gsa.match_info]
+            gene_symbol = gsa.gene_symbol_id
+            visited_symbols = {gene_symbol}  # To detect loops in graph
+
+            while True:
+                if gene_id_list := self.genes.get(gene_symbol):
+                    match_info = ", ".join(match_path)
+                    for gene_id in gene_id_list:
+                        genes_dict[gsa.alias].append((gene_id, match_info))
+                elif alias_list := genes_dict.get(gsa.gene_symbol_id):
+                    for gene_id, alias_match_info in alias_list:
+                        match_info = ", ".join(match_path + [alias_match_info])
+                        genes_dict[gsa.alias].append((gene_id, match_info))
+                else:
+                    # Go through aliases?
+                    if gsa := alias_graph.get(gene_symbol):
+                        gene_symbol = gsa.gene_symbol_id
+                        if gene_symbol in visited_symbols:
+                            # Circular loop
+                            break
+                        else:
+                            match_path.append(gsa.match_info)
+                            continue  # Try again
+
+                break  # Give up
+
         return genes_dict
 
-    def match_gene_symbols(self, gene_symbols: Iterable[str]):
-        """ Will fail if ReleaseGeneSymbol already exists """
-        release_gene_symbols = []
+    def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> Dict[str, List]:
         gene_symbol_gene_id_and_match_info = defaultdict(list)  # list items = (gene_id, match_info)
         for gene_symbol_id in gene_symbols:
-            release_gene_symbols.append(ReleaseGeneSymbol(release=self.release,
-                                                          gene_symbol_id=gene_symbol_id))
             gene_name = str(gene_symbol_id).upper()
 
             if gene_id_list := self.genes.get(gene_name):
                 for gene_id in gene_id_list:
                     gene_symbol_gene_id_and_match_info[gene_symbol_id].append((gene_id, None))
             elif alias_list := self.aliases_dict.get(gene_name):
-                for gene_id, version, genome_build_name in alias_list:
-                    match_info = f"Gene v{version}/{genome_build_name}"
+                for gene_id, match_info in alias_list:
                     gene_symbol_gene_id_and_match_info[gene_symbol_id].append((gene_id, match_info))
+            # Else - no match?
 
+        return gene_symbol_gene_id_and_match_info
+
+    def match_symbols_to_genes(self, release_gene_symbols):
+        gene_symbols = (rgs.gene_symbol_id for rgs in release_gene_symbols)
+        gene_symbol_gene_id_and_match_info = self._get_gene_id_and_match_info_for_symbol(gene_symbols)
+
+        matches = []
+        for release_gene_symbol in release_gene_symbols:
+            gene_symbol = release_gene_symbol.gene_symbol_id
+            if gene_id_and_match_list := gene_symbol_gene_id_and_match_info.get(gene_symbol):
+                for gene_id, match_info in gene_id_and_match_list:
+                    matches.append(ReleaseGeneSymbolGene(release_gene_symbol=release_gene_symbol,
+                                                         gene_id=gene_id,
+                                                         match_info=match_info))
+
+        if matches:
+            ReleaseGeneSymbolGene.objects.bulk_create(matches, ignore_conflicts=True, batch_size=2000)
+
+    def match_gene_symbols(self, gene_symbols: Iterable[str]):
+        """ OK if already exists (bulk create ignores conflicts)  """
+
+        release_gene_symbols = [ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
+                                for gene_symbol_id in gene_symbols]
         if release_gene_symbols:
             # Need ignore_conflicts=False so we get back PKs
-            release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols, batch_size=2000)
-            matches = []
-            for release_gene_symbol in release_gene_symbols:
-                gene_symbol = release_gene_symbol.gene_symbol_id
-                if gene_id_and_match_list := gene_symbol_gene_id_and_match_info.get(gene_symbol):
-                    for gene_id, match_info in gene_id_and_match_list:
-                        matches.append(ReleaseGeneSymbolGene(release_gene_symbol=release_gene_symbol,
-                                                             gene_id=gene_id,
-                                                             match_info=match_info))
+            release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols,
+                                                                         batch_size=2000, ignore_conflicts=True)
 
-            if matches:
-                ReleaseGeneSymbolGene.objects.bulk_create(matches, ignore_conflicts=True, batch_size=2000)
+            self.match_symbols_to_genes(release_gene_symbols)
 
     def _match_unmatched_gene_symbol_qs(self, gene_symbol_qs):
         """ Match any matched symbols without matched genes """
