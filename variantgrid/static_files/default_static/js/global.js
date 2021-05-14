@@ -635,20 +635,30 @@ TableFormat.detailRenderer = function ( api, rowIdx, columns ) {
 };
 TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
     console.log(api);
-    let fieldset = $('<div>', {class:'mt-3'});
+    let fieldset = $('<div>', {style:'position:relative'});
     for (let col of columns) {
         if (col.hidden) {
             if (col === null || col.data.length === 0) {
                 // pass
             } else {
-                $('<div>', {class:'row mt-2', html:[
-                    $('<div>', {class: 'col-2 text-right', html:
-                        $('<label>', {text: col.title})
-                    }),
-                    $('<div>', {class: 'col-10', html:
-                        $('<span>', {class: 'dt-detail', html: col.data})
-                    }),
-                ]}).appendTo(fieldset);
+                if (col.data.startsWith('<table')) {
+                    tableDom = $(col.data);
+                    tableDom.css('margin-top', 0);
+                    fieldset.append(tableDom);
+                } else {
+                    $('<div>', {
+                        class: 'row mt-2', html: [
+                            $('<div>', {
+                                class: 'col-2 text-right', html:
+                                    $('<label>', {text: col.title})
+                            }),
+                            $('<div>', {
+                                class: 'col-10', html:
+                                    $('<span>', {class: 'dt-detail', html: col.data})
+                            }),
+                        ]
+                    }).appendTo(fieldset);
+                }
             }
         }
     }

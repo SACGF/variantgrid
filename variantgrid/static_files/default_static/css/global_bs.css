@@ -99,6 +99,10 @@ table.dataTable td.dataTables_empty {
   padding-bottom: 12px;
 }
 
+table.dataTable td.child {
+  padding: 0;
+}
+
 .variant-coordinate {
   word-break: break-all;
 }

@@ -29,8 +29,6 @@
                 }
             {% endfor %}
         });
-
-
     });
 </script>
 {% endblock head %}
@@ -56,7 +54,7 @@
         <div class="row equal">
             <div class="col col-md-4">
                 <div class="card">
-                    <div class="card-header">Allele</div>
+                    <div class="card-header">Allele <div class="d-inline-block ml-2" style="position:absolute" data-flags="{{allele.flag_collection_safe.id}}"></div></div>
                     <div class="card-body">
                         {% labelled label="Internal Allele ID" hint="chunky" %}{{ allele.id }}{% endlabelled %}
                         {% if allele.clingen_allele %}
@@ -125,7 +123,6 @@
                             {% labelled hint="tiny" label='Description' %}{{ allele.clingen_error.description }}{% endlabelled %}
                             </div>
                         {% endif %}
-                        {% labelled label="Flags" hint="tiny" %}<div data-flags="{{allele.flag_collection_safe.id}}"></div>{% endlabelled %}
                     </div>
                 </div>
             </div>

@@ -1,78 +1,81 @@
 {% load classification_tags %}
 {% load js_tags %}
 <tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_discordant %}text-decoration:line-through;{% endif %}">
-    <td style="min-width:220px;" data-order="{{ group.organization }}">
-        {% comment %}
-            {% if sub_index %}
-                {% for c_hgvs in group.c_hgvses %}
-                    <div style="font-size:smaller" class="mt-1"><i style="font-size:8px" class="fas fa-circle text-info"></i> {% c_hgvs c_hgvs %}</div>
-                {% endfor %}
-                {% for p_hgvs in group.p_hgvses %}
-                    <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
-                {% endfor %}
-            {% else %}
-        {% endcomment %}
-        {% if group.clinical_grouping != "default" %}
-            <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
-        {% endif %}
-        {{ group.organization }}
-        {% for c_hgvs in group.c_hgvses %}
-            <div style="font-size:smaller" class="my-1">{% c_hgvs c_hgvs %}</div>
-        {% endfor %}
-        {% for p_hgvs in group.p_hgvses %}
-            <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
-        {% endfor %}
-        {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
-        {% comment %}
-                {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1"><a href=".cc-{{ group.group_id }}" data-toggle="collapse" class="toggle-link">{{ group.count }} records</a></div>{% endif %}
+    <td style="width:271px;" data-order="{{ group.organization }}">
+        {% if sub_index %}
+            {% for c_hgvs in group.c_hgvses %}
+                <div style="font-size:smaller" class="mt-1"><i style="font-size:8px" class="fas fa-circle text-info"></i> {% c_hgvs c_hgvs %}</div>
+            {% endfor %}
+            {% for p_hgvs in group.p_hgvses %}
+                <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
+            {% endfor %}
+        {% else %}
+            {% if group.clinical_grouping != "default" %}
+                <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
             {% endif %}
-        {% endcomment %}
+            {{ group.organization }}
+            {% for c_hgvs in group.c_hgvses %}
+                <div style="font-size:smaller" class="my-1">{% c_hgvs c_hgvs %}</div>
+            {% endfor %}
+            {% for p_hgvs in group.p_hgvses %}
+                <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
+            {% endfor %}
+            {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
+        {% endif %}
     </td>
-    <td class="cs-{{ group.clinical_significance|lower }} text-center max-width:100px;" data-order="{{ group.clinical_significance_score }}">
+    <td style="width:186px;" class="cs-{{ group.clinical_significance|lower }} text-center" data-order="{{ group.clinical_significance_score }}">
         {% if group.clinical_significance %}
             {{ group.clinical_significance | ekey:"clinical_significance" }}
         {% else %}
             Unclassified
         {% endif %}
     </td>
-    <td style="max-width:200px;">
+    <td style="width:186px;">
         {% for condition in group.conditions %}
             <div class="mb-1">{% condition condition %}</div>
             {% empty %}
             <div class="no-value">-</div>
         {% endfor %}
     </td>
-    <td style="max-width:100px;">
+    <td style="width:121px;">
         {% if group.zygosities %}
             {{ group.zygosities | ekey:"zygosity" }}
         {% else %}
             <div class="no-value">-</div>
         {% endif %}
     </td>
-    <td  style="max-width:200px;">
+    <td  style="width:155px;">
         {% for acmg in group.acmg_criteria %}
             {% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>
             {% empty %}
             <div class="no-value">-</div>
         {% endfor %}
     </td>
-    <td width="110px" data-order="{{ group.most_recent_curated.date.timestamp }}">
+    <td style="width:131px" data-order="{{ group.most_recent_curated.date.timestamp }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
             {% if not group.most_recent_curated.is_curated %}Created<br/>{% endif %}{% timestamp group.most_recent_curated.date.timestamp time_ago=True %}
         </a><br/>
     </td>
-    <td>
-        {% if group.allele %}<a href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
-    </td>
-    <td>
-        {% if group.gene_symbol %}<a href="{% url 'view_gene_symbol' group.gene_symbol %}">{{ group.gene_symbol }}</a>{% else %}<span class="no-value">-</span>{% endif %}
-    </td>
-    <td>
-        {% if group.count == 1 %}<a href="{% url 'view_classification' group.most_recent.classification.id %}">1 Record</a>
-        {% else %}<a href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">{{ group.count }} Records</a>
-        {% endif %}
-        {% for cm in group.modifications %}{% if not forloop.first %}, {% endif %}{{ cm.classification.lab_record_id }}{% endfor %}
-    </td>
+    {% if not sub_index %}
+        <td>
+            {% if group.count > 0 %}
+                {% comment %}<a href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">{{ group.count }} Records</a><br/>{% endcomment %}
+                <table class="table" style="position:relative;left:-5px">
+                    <tbody>
+                    {% for group in group.sub_groups %}
+                        {% classification_group_row group sub_index=forloop.counter %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </td>
+        <td>
+            {% if group.allele %}<a href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
+        </td>
+        <td>
+            {% if group.gene_symbol %}<a href="{% url 'view_gene_symbol' group.gene_symbol %}">{{ group.gene_symbol }}</a>{% else %}<span class="no-value">-</span>{% endif %}
+        </td>
+    {% endif %}
 </tr>
 {% comment %}
 {% if group.count > 1 %}
