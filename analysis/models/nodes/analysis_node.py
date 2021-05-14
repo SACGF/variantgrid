@@ -64,7 +64,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     # This is set to node/version you cloned - cleared upon modification
     cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
     status = models.CharField(max_length=1, choices=NodeStatus.choices, default=NodeStatus.DIRTY)
-    db_pid = models.IntegerField(null=True)
 
     PARENT_CAP_NOT_SET = -1
     min_inputs = 1
@@ -729,7 +728,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         self.status = status
         self.count = count
-        self.db_pid = None
         self.load_seconds = time() - start
         self.save()  # Will re-calculate shadow colors etc based on status
 
@@ -800,9 +798,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         qs = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
         cursor = connection.cursor()
         db_pid = cursor.db.connection.get_backend_pid()
-        qs.update(status=status, db_pid=db_pid)
+        qs.update(status=status)
 
-        NodeTask.objects.filter(node=self, version=self.version).update(celery_task=celery_task)
+        NodeTask.objects.filter(node=self, version=self.version).update(celery_task=celery_task, db_pid=db_pid)
 
     def adjust_cloned_parents(self, old_new_map):
         """ If you need to do something with old/new parents """
@@ -866,6 +864,7 @@ class NodeTask(TimeStampedModel):
     version = models.IntegerField(null=False)
     analysis_update_uuid = models.UUIDField()
     celery_task = models.CharField(max_length=36, null=True)
+    db_pid = models.IntegerField(null=True)
 
     class Meta:
         unique_together = ("node", "version")

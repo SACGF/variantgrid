@@ -36,7 +36,7 @@ from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, An
 from analysis.models.enums import SNPMatrix, MinimisationResultType, NodeStatus, TrioSample
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification
+from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
 from analysis.models.nodes.node_types import NodeHelp
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
@@ -499,16 +499,16 @@ def node_load(request, node_id):
 @require_POST
 def node_cancel_load(request, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    if node.celery_task:
-        logging.debug("TODO: Cancelling task %s", node.celery_task)
-        app.control.revoke(node.celery_task, terminate=True)  # @UndefinedVariable
+    if node_task := NodeTask.objects.filter(node=node, version=node.version).first():
+        logging.debug("TODO: Cancelling task %s", node_task.celery_task)
+        app.control.revoke(node_task.celery_task, terminate=True)  # @UndefinedVariable
 
-        result = AbortableAsyncResult(node.celery_task)
+        result = AbortableAsyncResult(node_task.celery_task)
         result.abort()
         logging.debug("tried to kill...")
 
-        if node.db_pid:
-            run_sql("select pg_cancel_backend(%s)", [node.db_pid])
+        if node_task.db_pid:
+            run_sql("select pg_cancel_backend(%s)", [node_task.db_pid])
     else:
         logging.error("No task set for node %s", node_id)
 
