@@ -26,6 +26,7 @@ import subprocess
 import time
 from django.conf import settings
 from django.utils import html
+from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
@@ -640,3 +641,53 @@ class LimitedCollection:
 
     def __bool__(self):
         return self.true_count > 0
+
+
+class LazyAttribute:
+    """
+    LazyAttributes allow you to easily make a context map for a view where properties
+    will only be evaluated when accessed.
+    Importantly this works for attributes marked with @lazy which are ironically eagerly
+    evaluated by SimpleLazyObject
+
+    class SomeClass:
+        @lazy
+        def lazy_prop():
+            return "foo"
+
+        def method():
+            return "bar"
+
+    instance = SomeClass()
+    LazySimpleObject(instance.lazy_prop) # is eager
+    LazySimpleObject(lambda: instance.lazy_prop) # is eager
+    LazySimpleObject(instance.method) # is lazy
+    LazySimpleObject(LazyAttribute(instance, "lazy_prop") # is lazy
+    """
+
+    def __init__(self, obj: Any, attr: str):
+        self.obj = obj
+        self.attr = attr
+
+    def eval(self):
+        attr = getattr(self.obj, self.attr)
+        if callable(attr):
+            attr = attr()
+        return attr
+
+    @staticmethod
+    def lazy_context(obj: Any, attributes: List[str]) -> Dict[str, SimpleLazyObject]:
+        """
+        Create a dict used for contexts retrieve attributes from obj and having them only
+        evaluate when the template first mentions them
+        """
+        all_attributes = set(dir(obj))
+        print(all_attributes)
+
+        context = {}
+        for attribute in attributes:
+            if attribute not in all_attributes:
+                raise ValueError(f"{obj} does not have attribute {attribute}")
+            lazy_att = LazyAttribute(obj, attribute)
+            context[attribute] = SimpleLazyObject(lazy_att.eval)
+        return context

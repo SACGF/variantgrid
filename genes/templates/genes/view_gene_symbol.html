@@ -338,17 +338,17 @@
                     </tbody>
                 </table>
             {% endif %}
+
+            {% if citations %}
+                {% load citation_tags %}
+                {% retrieve_cached_citations citations %}
+            {% endif %}
         {% endif %}
 
         {% if show_wiki %}
-        <h4>Wiki</h4>
+            <h4>Wiki</h4>
 
-        {% wiki_editor gene_symbol.genesymbolwiki class_name='genes.models.GeneSymbolWiki' unique_keyword='gene_symbol_id' unique_value=gene_symbol.pk %}
-        {% endif %}
-
-        {% if citations %}
-        {% load citation_tags %}
-        {% retrieve_cached_citations citations %}
+            {% wiki_editor gene_symbol.genesymbolwiki class_name='genes.models.GeneSymbolWiki' unique_keyword='gene_symbol_id' unique_value=gene_symbol.pk %}
         {% endif %}
     </div>
     <div class="{% if classifications_new_grouping %}container{% else %}container-table{% endif %} mt-4">

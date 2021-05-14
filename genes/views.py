@@ -1,10 +1,12 @@
 import logging
 import uuid
 from collections import defaultdict
-from typing import Tuple, List, Optional
+from dataclasses import dataclass
+from typing import Tuple, List, Optional, Dict, Set, Iterable, Union, Any, Callable
 
 from django.conf import settings
 from django.contrib import messages
+from django.db.models import QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http.response import JsonResponse
@@ -12,6 +14,7 @@ from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.utils.decorators import method_decorator
+from django.utils.functional import SimpleLazyObject
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from itertools import combinations
@@ -31,15 +34,16 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm,
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, PanelAppServer, SampleGeneList
+    PfamSequenceIdentifier, PanelAppServer, SampleGeneList, HGNC, GeneVersion
+from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.log_utils import report_exc_info
-from library.utils import defaultdict_to_dict
+from library.utils import defaultdict_to_dict, LazyAttribute
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample, AnnotationConsortium
+from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
@@ -127,94 +131,191 @@ def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[Ont
     return omim_and_hpo_for_gene
 
 
-def view_gene_symbol(request, gene_symbol, genome_build_name=None):
-    gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-    consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
-    for gene in gene_symbol.genes:
-        aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
-        aliases.update(gene.get_symbols().exclude(symbol=gene_symbol))
+@dataclass(frozen=True)
+class HasVariants:
+    has_tagged_variants: bool
+    has_observed_variants: bool
+    has_classified_variants: bool
 
-    desired_genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    genome_build = desired_genome_build
+    @property
+    def has_variants(self) -> bool:
+        return self.has_tagged_variants or self.has_observed_variants or self.has_classified_variants
 
-    has_classified_variants = False
-    has_observed_variants = False
-    has_tagged_variants = False
+    def __bool__(self):
+        return self.has_variants
 
-    # There cn be multiple HGNCs per symbol (eg MMP21) - take Approved (A) over others
-    hgnc = gene_symbol.hgnc_set.order_by("status").first()
-    # Gene Summary only populated in RefSeq
-    gene_summary = None
-    if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
-                                          geneversion__gene_symbol=gene_symbol).first():
-        gene_summary = refseq_gene.summary
 
-    gene_versions = gene_symbol.geneversion_set.all()
-    if gene_versions.exists():
-        # This page is shown using the users default genome build
-        # However - it's possible the gene doesn't exist for a particular genome build.
-        # If gene has a version for a build in user settings, use that and show a warning message
-        gene_version = gene_versions.filter(genome_build=desired_genome_build).first()
-        if not gene_version:
-            gene_version = gene_versions.first()  # Try another build
-        genome_build = gene_version.genome_build
-        if genome_build != desired_genome_build:
-            msg = f"This symbol is not associated with any genes in build {desired_genome_build}, viewing in build {genome_build}"
-            messages.add_message(request, messages.WARNING, msg)
+class GeneSymbolViewInfo:
 
-        gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build, traverse_aliases=True)
-        gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
-        has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
+    def __init__(self, gene_symbol: GeneSymbol, desired_genome_build: GenomeBuild, user):
+        self.gene_symbol = gene_symbol
+        self.desired_genome_build = desired_genome_build
+        self.user = user
 
-        has_tagged_variants = VariantTag.get_for_build(genome_build, variant_qs=gene_variant_qs).exists()
+    @lazy
+    def omim_and_hpo_for_gene(self) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
+        return _get_omim_and_hpo_for_gene_symbol(self.gene_symbol)
 
-        # has classifications isn't 100% in sync with the classification table: this code looks at VariantAlleles
-        # wheras the classification table will filter on gene symbol and transcript evidence keys
-        q = get_has_classifications_q(genome_build)
-        has_classified_variants = gene_variant_qs.filter(q).exists()
-    else:
-        messages.add_message(request, messages.WARNING, "There are no genes linked against this symbol!")
+    @lazy
+    def hgnc(self) -> Optional[HGNC]:
+        return self.gene_symbol.hgnc_set.order_by("status").first()
 
-    has_variants = has_observed_variants or has_classified_variants or has_tagged_variants
+    @lazy
+    def citations(self) -> Union[QuerySet, Iterable[Citation]]:
+        return Citation.objects.filter(genesymbolcitation__gene_symbol=self.gene_symbol).distinct()
 
-    omim_and_hpo_for_gene = _get_omim_and_hpo_for_gene_symbol(gene_symbol)
-    gene_lists_qs = GeneList.filter_for_user(request.user)
-    gene_in_gene_lists = GeneList.visible_gene_lists_containing_gene_symbol(gene_lists_qs, gene_symbol).exists()
+    @lazy
+    def gene_summary(self) -> Optional[str]:
+        refseq_gene: Gene
+        if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
+                                              geneversion__gene_symbol=self.gene_symbol).first():
+            return refseq_gene.summary
+        return None
 
-    citations = Citation.objects.filter(genesymbolcitation__gene_symbol=gene_symbol).distinct()
+    @lazy
+    def gene_version(self) -> Optional[GeneVersion]:
+        gene_versions = self.gene_symbol.geneversion_set.all()
+        if gene_versions.exists():
+            # This page is shown using the users default genome build
+            # However - it's possible the gene doesn't exist for a particular genome build.
+            # If gene has a version for a build in user settings, use that and show a warning message
+            gene_version = gene_versions.filter(genome_build=self.desired_genome_build).first()
+            if not gene_version:
+                gene_version = gene_versions.first()  # Try another build
+            return gene_version
+        return None
 
-    has_gene_coverage = GeneCoverage.get_for_symbol(genome_build, gene_symbol).exists()
-    has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol).exists()
+    @lazy
+    def genome_build(self) -> GenomeBuild:
+        if gene_version := self.gene_version:
+            return gene_version.genome_build
+        return self.desired_genome_build
 
-    # TODO move me into an ajax window
-    classifications = list()
-    if settings.VARIANT_CLASSIFICATION_NEW_GROUPING:
-        if filters := classification_gene_symbol_filter(gene_symbol):
-            classifications = ClassificationModification.objects.filter(filters).filter(is_last_published=True).exclude(classification__withdrawn=True)
-            xf = ClassificationModification.filter_for_user(user=request.user, queryset=classifications)
+    def warnings(self) -> List[str]:
+        warnings = list()
+        if self.gene_version:
+            # This page is shown using the users default genome build
+            # However - it's possible the gene doesn't exist for a particular genome build.
+            # If gene has a version for a build in user settings, use that and show a warning message
+            if self.genome_build != self.desired_genome_build:
+                warnings.append(f"This symbol is not associated with any genes in build {self.desired_genome_build}, viewing in build {self.genome_build}")
+        else:
+            warnings.append("There are no genes linked against this symbol!")
+        return warnings
 
-    context = {
-        "consortium_genes_and_aliases": defaultdict_to_dict(consortium_genes_and_aliases),
-        "citations": citations,
-        "gene_symbol": gene_symbol,
-        "gene_in_gene_lists": gene_in_gene_lists,
-        "gene_infos": GeneInfo.get_for_gene_symbol(gene_symbol),
-        "gene_summary": gene_summary,
-        "genome_build": genome_build,
-        "has_classified_variants": has_classified_variants,
-        "hgnc": hgnc,
-        "panel_app_servers": PanelAppServer.objects.order_by("pk"),
-        "show_classifications_hotspot_graph": settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and has_classified_variants,
-        "show_hotspot_graph": settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and has_observed_variants,
-        # TODO move to its own
-        "classifications": classifications,
-        "has_gene_coverage": has_gene_coverage or has_canonical_gene_coverage,
-        "has_variants": has_variants,
-        "omim_and_hpo_for_gene": omim_and_hpo_for_gene,
-        "show_wiki": settings.VIEW_GENE_SHOW_WIKI,
-        "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
-        "datatable_config": ClassificationDatatableConfig(request)
-    }
+    @lazy
+    def has_variants(self) -> HasVariants:
+
+        has_tagged_variants = False
+        has_observed_variants = False
+        has_classified_variants = False
+
+        if self.gene_version:
+            gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=self.gene_symbol, genome_build=self.genome_build,
+                                                                   traverse_aliases=True)
+            gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(
+                gene_variant_qs)
+            has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
+
+            has_tagged_variants = VariantTag.get_for_build(self.genome_build, variant_qs=gene_variant_qs).exists()
+
+            # has classifications isn't 100% in sync with the classification table: this code looks at VariantAlleles
+            # wheras the classification table will filter on gene symbol and transcript evidence keys
+            q = get_has_classifications_q(self.genome_build)
+            has_classified_variants = gene_variant_qs.filter(q).exists()
+
+        return HasVariants(
+            has_tagged_variants=has_tagged_variants,
+            has_observed_variants=has_observed_variants,
+            has_classified_variants=has_classified_variants)
+
+    @property
+    def has_classified_variants(self):
+        return self.has_variants.has_classified_variants
+
+    @lazy
+    def consortium_genes_and_aliases(self) -> Dict[str, Set[str]]:
+        consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
+        gene: Gene
+        for gene in self.gene_symbol.genes:
+            aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
+            aliases.update(gene.get_symbols().exclude(symbol=self.gene_symbol))
+        return defaultdict_to_dict(consortium_genes_and_aliases)
+
+    @lazy
+    def has_gene_coverage(self) -> bool:
+        has_gene_coverage = GeneCoverage.get_for_symbol(self.genome_build, self.gene_symbol).exists()
+        if has_gene_coverage:
+            return True
+        else:
+            has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(self.genome_build, self.gene_symbol).exists()
+            return has_canonical_gene_coverage
+
+    @lazy
+    def gene_in_gene_lists(self) -> bool:
+        gene_lists_qs = GeneList.filter_for_user(self.user)
+        gene_in_gene_lists = GeneList.visible_gene_lists_containing_gene_symbol(gene_lists_qs, self.gene_symbol).exists()
+        return gene_in_gene_lists
+
+    @lazy
+    def gene_infos(self):
+        return GeneInfo.get_for_gene_symbol(self.gene_symbol)
+
+    @lazy
+    def classifications(self) -> List[ClassificationModification]:
+        # TODO move me into an ajax window
+        classifications = list()
+        if filters := classification_gene_symbol_filter(self.gene_symbol):
+            classifications = ClassificationModification.objects.filter(filters).filter(
+                is_last_published=True).exclude(classification__withdrawn=True)
+            classifications = ClassificationModification.filter_for_user(user=self.user, queryset=classifications)
+        return classifications
+
+    def panel_app_servers(self) -> Union[QuerySet, Iterable[PanelAppServer]]:
+        return PanelAppServer.objects.order_by("pk")
+
+    def show_classifications_hotspot_graph(self) -> bool:
+        return settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and self.has_variants.has_classified_variants
+
+    def show_hotspot_graph(self) -> bool:
+        return settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and self.has_variants.has_observed_variants
+
+
+def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str] = None):
+
+    view_info = GeneSymbolViewInfo(
+        gene_symbol=get_object_or_404(GeneSymbol, pk=gene_symbol),
+        desired_genome_build=UserSettings.get_genome_build_or_default(request.user, genome_build_name),
+        user=request.user)
+
+    for warning in view_info.warnings():
+        messages.add_message(request, messages.WARNING, warning)
+
+    context = LazyAttribute.lazy_context(
+        view_info,
+        [
+            "consortium_genes_and_aliases",
+            "citations",
+            "gene_symbol",
+            "gene_in_gene_lists",
+            "gene_infos",
+            "gene_summary",
+            "genome_build",
+            "has_classified_variants",
+            "has_gene_coverage",
+            "hgnc",
+            "panel_app_servers",
+            "omim_and_hpo_for_gene",
+            "has_variants",
+            "show_classifications_hotspot_graph",
+            "show_hotspot_graph",
+            "classifications"
+        ]
+    )
+    context["show_wiki"] = settings.VIEW_GENE_SHOW_WIKI
+    context["show_annotation"] = settings.VARIANT_DETAILS_SHOW_ANNOTATION
+    context["datatable_config"] = ClassificationDatatableConfig(request)
+
     return render(request, "genes/view_gene_symbol.html", context)
 
 
