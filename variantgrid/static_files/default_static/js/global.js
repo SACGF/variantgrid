@@ -61,6 +61,31 @@ function setupTooltips() {
     observer.observe($('body')[0], { attributes: false, childList: true, subtree: true });
 }
 
+function setupAjaxBlocks() {
+    $('[data-toggle=ajax]').each((index, child) => {
+        console.log("WE GOT AN AJAX BLOCK");
+        child = $(child);
+        let url = child.attr('href');
+        (child).LoadingOverlay('show');
+        $.ajax({
+            type: "GET",
+            url: url,
+            success: (results) => {
+                child.LoadingOverlay('hide');
+                child.html(results);
+                child.find('.convert-timestamp').each((index, elem) => {
+                    convertTimestampDom(elem);
+                });
+                convertTimestamps();
+            },
+            error: (call, status, text) => {
+                $(child).LoadingOverlay('hide');
+                child.replaceWith("Error Loading Data");
+            }
+        });
+    });
+}
+
 function setupAjaxTabs(element) {
 
     function loadTab(tab) {
@@ -112,6 +137,7 @@ function setupListGroupCheckboxes() {
 function globalSetup() {
     convertTimestamps();
     setupAjaxTabs();
+    setupAjaxBlocks();
     handleAjaxErrors();
     setupTooltips();
     highlightImportStatus();
@@ -424,29 +450,32 @@ function convertTimestamps() {
     };
 
     $('.convert-timestamp').each((index, elem) => {
-        elem = $(elem);
-        let unix = Number(elem.attr('data-timestamp'));
-        let m = moment();
-        if (unix) {
-            m = moment(unix * 1000);
-        }
-        if (elem.hasClass('time-ago')) {
-            let isFuture = moment().diff(m) < 0;
-            let newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.format(JS_DATE_FORMAT_DETAILED)});
-            if (isFuture) {
-                newElement.addClass('future');
-            }
-            elem.replaceWith(newElement);
-            newElement.timeago();
-            newElement.tooltip();
-        } else if (elem.hasClass('seconds')) {
-            let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
-            elem.replaceWith(newElement);
-        } else {
-            let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
-            elem.replaceWith(newElement);
-        }
+        convertTimestampDom(elem);
     });
+}
+function convertTimestampDom(elem) {
+    elem = $(elem);
+    let unix = Number(elem.attr('data-timestamp'));
+    let m = moment();
+    if (unix) {
+        m = moment(unix * 1000);
+    }
+    if (elem.hasClass('time-ago')) {
+        let isFuture = moment().diff(m) < 0;
+        let newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.format(JS_DATE_FORMAT_DETAILED)});
+        if (isFuture) {
+            newElement.addClass('future');
+        }
+        elem.replaceWith(newElement);
+        newElement.timeago();
+        newElement.tooltip();
+    } else if (elem.hasClass('seconds')) {
+        let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
+        elem.replaceWith(newElement);
+    } else {
+        let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
+        elem.replaceWith(newElement);
+    }
 }
 function createTimestampDom(unix, timeAgo) {
     let jsTime = unix * 1000;

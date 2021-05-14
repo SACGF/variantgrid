@@ -309,7 +309,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "has_variants",
             "show_classifications_hotspot_graph",
             "show_hotspot_graph",
-            "classifications"
+            # "classifications"
         ]
     )
     context["show_wiki"] = settings.VIEW_GENE_SHOW_WIKI
@@ -318,6 +318,16 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
 
     return render(request, "genes/view_gene_symbol.html", context)
 
+
+def view_classifications(request, gene_symbol: str):
+    view_info = GeneSymbolViewInfo(
+        gene_symbol=get_object_or_404(GeneSymbol, pk=gene_symbol),
+        desired_genome_build=UserSettings.get_genome_build_or_default(request.user),
+        user=request.user)
+
+    return render(request, "genes/view_gene_symbol_classifications.html", {
+        "classifications": view_info.classifications
+    })
 
 def view_transcript(request, transcript_id):
     transcript = get_object_or_404(Transcript, pk=transcript_id)

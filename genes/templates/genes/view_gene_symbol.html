@@ -2,6 +2,7 @@
 {% load crispy_forms_field %}
 {% load ui_help %}
 {% load ui_utils %}
+{% load ui_tabs_builder %}
 {% load ui_menu_bars %}
 {% load static %}
 {% load tz %}
@@ -374,8 +375,7 @@
         {% endif %}
 
         {% if classifications_new_grouping %}
-            {% load classification_tags %}
-            {% classification_groups classifications show_diffs=False %}
+            <div data-toggle="ajax" href="{% url 'view_gene_symbol_classifications' gene_symbol.symbol %}">Loading...</div>
         {% endif %}
 
         <span class="hidden">
