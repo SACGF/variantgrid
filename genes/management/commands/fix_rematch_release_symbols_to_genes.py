@@ -1,7 +1,6 @@
 from django.core.management import BaseCommand
 from genes.models import GeneAnnotationRelease, ReleaseGeneSymbolGene, ReleaseGeneSymbol
 from genes.gene_matching import GeneMatcher
-from library.log_utils import log_traceback
 
 
 class Command(BaseCommand):
@@ -20,5 +19,3 @@ class Command(BaseCommand):
 
             print(f"{gar} - matched {num_genes - num_genes_original} genes")
             print(f"{gar} - {no_match_qs.count() - num_no_match_original} less symbols w/o genes")
-
-

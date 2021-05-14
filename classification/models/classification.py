@@ -2037,8 +2037,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     def condition_text(self):
         if crd := self.classification.condition_resolution_dict:
             return crd.get('display_text')
-        else:
-            return self.get(SpecialEKeys.CONDITION)
+        return self.get(SpecialEKeys.CONDITION)
 
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, use_full: bool = False):

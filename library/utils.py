@@ -444,8 +444,9 @@ def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
 
 def timestamp_as_number_formatter(row: Dict, field: str):
     """
-    Useful for jqgrids where we want to send down time as a timestamp so we can put it in the user's timezone
-    :param val: A timestamp
+    Useful for JQGrids where we want to send down time as a timestamp so we can put it in the user's timezone
+    :param row: JQGrid row object
+    :param field: field to access row (row[field] should be a timestamp)
     :return: unix time
     """
     val = row[field]
@@ -463,15 +464,14 @@ def get_subclasses(cls):
     return subclasses
 
 
-def count(object: Any) -> int:
-    if object is None:
+def count(obj: Any) -> int:
+    if obj is None:
         return 0
-    elif isinstance(object, int):
-        return object
-    elif isinstance(object, QuerySet):
-        return object.count()
-    else:
-        return len(object)
+    if isinstance(obj, int):
+        return obj
+    if isinstance(obj, QuerySet):
+        return obj.count()
+    return len(obj)
 
 
 trailing_zeros_strip = re.compile("(.*?[.][0-9]*?)(0+)$")
