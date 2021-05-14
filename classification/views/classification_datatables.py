@@ -283,7 +283,7 @@ class ClassificationDatatableConfig(DatatableConfig):
                 # now they wont be included, revert if this causes problems
                 # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
 
-        if genes:
+        if genes is not None:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
             match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
             evidence_q_list = []
