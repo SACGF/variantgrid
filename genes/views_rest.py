@@ -13,8 +13,8 @@ from rest_framework.views import APIView
 import json
 
 from genes.gene_matching import GeneSymbolMatcher, GeneMatcher
-from genes.models import GeneInfo, GeneList, FakeGeneList, GeneAnnotationRelease, \
-    ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList
+from genes.models import GeneInfo, GeneList, GeneAnnotationRelease, \
+    ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList, create_fake_gene_list
 from genes.panel_app import get_panel_app_panel_as_gene_list_json
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json
 from genes.serializers import GeneInfoSerializer, GeneListGeneSymbolSerializer, GeneListSerializer, \
@@ -139,7 +139,7 @@ class TextToGeneListView(APIView):
         name = self.request.query_params.get('name')
         gene_list_text = self.request.query_params.get('gene_list_text')
 
-        gene_list = FakeGeneList(name=name, user=request.user)
+        gene_list = create_fake_gene_list(name=name, user=request.user)
         serializer = GeneListSerializer(gene_list, context={"request": request})
         data = serializer.data
 

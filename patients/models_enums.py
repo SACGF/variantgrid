@@ -31,7 +31,7 @@ class Zygosity:
     MISSING = '.'  # Sample has reference (ie is missing variant) in a multi-sample VCF
 
     CHOICES = [
-        (HOM_REF, "HOM_REF"),
+        (HOM_REF, "REF"),
         (HET, "HET"),
         (HOM_ALT, "HOM_ALT"),
         (UNKNOWN_ZYGOSITY, '?'),

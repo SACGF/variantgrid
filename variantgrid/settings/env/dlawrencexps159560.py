@@ -48,7 +48,7 @@ ANNOTATION[BUILD_GRCH38]["vep_config"].update({
 LIFTOVER_NCBI_REMAP_ENABLED = True
 LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = None  # Use system Perl
 
-_SA_PATH_ENRICHMENT_KITS = [{"name": "roche_1k_disease", "version": 6}, {"name": "medical_exomes"}]
+_SA_PATH_ENRICHMENT_KITS = [{"name": "idt_gmp_focus"}, {"name": "idt_exome"}]
 SEQAUTO_COVERAGE_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 PATHOLOGY_TEST_SORTED_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
@@ -85,6 +85,8 @@ if _SAPATHOLOGY_MODE:
         TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
     PATHOLOGY_TESTS_ENABLED = False
 elif _SHARIANT_MODE:
+
+    VARIANT_DETAILS_SHOW_ANNOTATION = False
     VARIANT_CLASSIFICATION_STATS_USE_SHARED = True  # False=Use visible to user. True = Shared
 
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
@@ -105,6 +107,14 @@ elif _SHARIANT_MODE:
 
     URLS_NAME_REGISTER.update({"classification_dashboard": True,
                                "classification_import_tool": True})
+
+    URLS_NAME_REGISTER.update({  # Disable selected urls
+        # Variants
+        "variants": False,
+        "variant_tags": False,
+        "manual_variant_entry": False,
+        "variantopedia_wiki": False,
+    })
 
 elif _RUNX1_MODE:
     RUNX1_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "runx1_static")

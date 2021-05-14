@@ -56,15 +56,12 @@ def update_node_task(node_id, version):
     else:
         status = AnalysisNode.get_status_from_errors(node_errors)
 
-    if status:
-        node.status = status
-        node.celery_task = None
-        node.db_pid = None
-        node.errors = errors
-        try:
-            node.save()  # Will set background color etc based on errors
-        except IntegrityError:
-            pass  # Analysis or node deleted... just ignore
+    node.status = status
+    node.errors = errors
+    try:
+        node.save()  # Will set background color etc based on errors
+    except IntegrityError:
+        pass  # Analysis or node deleted... just ignore
 
 
 @celery.task
@@ -132,8 +129,6 @@ def node_cache_task(node_id, version):
 
     if node.status != NodeStatus.READY:
         node.status = status
-        node.celery_task = None
-        node.db_pid = None
         node.save()
 
 

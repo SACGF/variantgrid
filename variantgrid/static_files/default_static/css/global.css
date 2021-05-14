@@ -307,6 +307,11 @@ input[type='checkbox'], input[type='radio'] {
 
 .horizontal-radio li {
   display: inline-block;
+  margin-right: 10px;
+}
+
+input.horizontal-radio {
+  margin-right: 2px;
 }
 
 form .form-fields + .form-fields {

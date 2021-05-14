@@ -511,9 +511,9 @@ class HGVSMatcher:
             if old_transcript and GeneSymbol.objects.filter(pk=old_transcript).exists():
                 hgvs.gene = old_transcript  # Old transcript was a gene symbol
             return hgvs.format()
-        elif GeneSymbol.objects.filter(pk=hgvs.gene).exists():
-            pass  # TODO: Need to work out canonical for gene
 
+        # if GeneSymbol.objects.filter(pk=hgvs.gene).exists():
+        #    pass  # TODO: Need to work out canonical for gene
         return None  # No fix
 
 

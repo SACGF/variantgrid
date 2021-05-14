@@ -88,11 +88,12 @@ class CustomColumnAutocompleteView(AutocompleteView):
     fields = ['column__grid_column_name']
 
     def get_user_queryset(self, user):
-        custom_columns_collections_qs = CustomColumnsCollection.filter_for_user(user)
         # Called different things in Analysis/UserSettings
         columns = self.forwarded.get('columns') or self.forwarded.get('custom_columns_collection')
         if columns:
-            custom_columns_collections_qs = custom_columns_collections_qs.filter(pk=columns)
+            custom_columns_collections_qs = CustomColumnsCollection.filter_for_user(user).filter(pk=columns)
+        else:
+            custom_columns_collections_qs = CustomColumnsCollection.objects.none()
 
         return CustomColumn.objects.filter(custom_columns_collection__in=custom_columns_collections_qs)
 

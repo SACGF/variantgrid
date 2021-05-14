@@ -2053,8 +2053,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     def condition_text(self):
         if crd := self.classification.condition_resolution_dict:
             return crd.get('display_text')
-        else:
-            return self.get(SpecialEKeys.CONDITION)
+        return self.get(SpecialEKeys.CONDITION)
 
     @property
     def condition_resolution_dict_fallback(self) -> ConditionResolvedDict:

@@ -151,6 +151,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # Variants
     "variants": False,
+    "variant_tags": False,
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
 

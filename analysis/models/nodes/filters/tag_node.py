@@ -13,7 +13,9 @@ from snpdb.models import Tag
 
 class TagNode(AnalysisNode):
     ANALYSIS_TAGS_NAME = "Tagged Variants"
-    mode = models.CharField(max_length=1, choices=TagNodeMode.choices, default=TagNodeMode.PARENT)
+    parent_input = models.BooleanField(default=True)
+    exclude = models.BooleanField(default=False)
+    mode = models.CharField(max_length=1, choices=TagNodeMode.choices, default=TagNodeMode.THIS_ANALYSIS)
 
     def modifies_parents(self):
         return True
@@ -44,17 +46,28 @@ class TagNode(AnalysisNode):
             variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, tags_qs, self.tag_ids)
             variants_set.update(variants_qs.values_list("pk", flat=True))
 
-        return Q(pk__in=variants_set)
+        q = Q(pk__in=variants_set)
+        if self.exclude:
+            q = ~q
+        return q
 
     def get_node_name(self):
         if self.visible:
-            if self.tag_ids:
-                description = f"Tagged {', '.join(self.tag_ids)}"
+            description_list = []
+            if self.exclude:
+                description_list.append("Exclude")
+
+            if self.mode == TagNodeMode.ALL_TAGS:
+                description_list.append("Global")
             else:
-                if self.mode == TagNodeMode.ALL_TAGS:
-                    description = "Global Tags"
-                else:
-                    description = "Analysis Tags"
+                description_list.append("Analysis")
+
+            if self.tag_ids:
+                description_list.append(', '.join(self.tag_ids))
+            else:
+                description_list.append("Tags")
+
+            description = " ".join(description_list)
         else:
             description = self.ANALYSIS_TAGS_NAME  # Has to be set to this
 
@@ -86,7 +99,7 @@ class TagNode(AnalysisNode):
 
     @property
     def max_inputs(self):
-        if self.mode == TagNodeMode.PARENT:
+        if self.parent_input:
             return 1
         return 0
 
@@ -96,6 +109,7 @@ class TagNode(AnalysisNode):
 
         node, created = TagNode.objects.get_or_create(analysis=analysis,
                                                       name=TagNode.ANALYSIS_TAGS_NAME,
+                                                      parent_input=False,
                                                       mode=TagNodeMode.THIS_ANALYSIS,
                                                       visible=False)
         if created:
