@@ -63,7 +63,6 @@ function setupTooltips() {
 
 function setupAjaxBlocks() {
     $('[data-toggle=ajax]').each((index, child) => {
-        console.log("WE GOT AN AJAX BLOCK");
         child = $(child);
         let url = child.attr('href');
         (child).LoadingOverlay('show');
@@ -128,7 +127,6 @@ function setupAjaxTabs(element) {
 
 function setupListGroupCheckboxes() {
     $('.list-group-checkbox').click(function(event) {
-        console.log("Clickity clickity");
         $(this).find('input[type=radio]').prop("checked", true); //.trigger("click");
         // return false;
     });
@@ -634,38 +632,30 @@ TableFormat.detailRenderer = function ( api, rowIdx, columns ) {
     return fieldset;
 };
 TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
-    console.log(api);
-    let fieldset = $('<div>', {style:'position:relative'});
+    let fieldset = $('<div>', {class:'mt-3'});
     for (let col of columns) {
         if (col.hidden) {
             if (col === null || col.data.length === 0) {
                 // pass
             } else {
-                if (col.data.startsWith('<table')) {
-                    tableDom = $(col.data);
-                    tableDom.css('margin-top', 0);
-                    fieldset.append(tableDom);
-                } else {
-                    $('<div>', {
-                        class: 'row mt-2', html: [
-                            $('<div>', {
-                                class: 'col-2 text-right', html:
-                                    $('<label>', {text: col.title})
-                            }),
-                            $('<div>', {
-                                class: 'col-10', html:
-                                    $('<span>', {class: 'dt-detail', html: col.data})
-                            }),
-                        ]
-                    }).appendTo(fieldset);
-                }
+                $('<div>', {
+                    class: 'row mt-2', html: [
+                        $('<div>', {
+                            class: 'col-2 text-right', html:
+                                $('<label>', {text: col.title})
+                        }),
+                        $('<div>', {
+                            class: 'col-10', html:
+                                $('<span>', {class: 'dt-detail', html: col.data})
+                        }),
+                    ]
+                }).appendTo(fieldset);
             }
         }
     }
     return fieldset;
 };
 TableFormat.boolean = function(style, data, type, columns) {
-    console.log(data);
     if (style == 'warning') {
         if (data) {
             return '<i class="fas fa-exclamation-circle"></i>';

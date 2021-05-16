@@ -1,6 +1,6 @@
 {% load classification_tags %}
 {% load js_tags %}
-<tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_discordant %}text-decoration:line-through;{% endif %}">
+<tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_discordant %}text-decoration:line-through;{% endif %}cursor:pointer">
     <td style="width:271px;" data-order="{{ group.organization }}">
         {% if sub_index %}
             {% for c_hgvs in group.c_hgvses %}
@@ -50,6 +50,7 @@
             {% empty %}
             <div class="no-value">-</div>
         {% endfor %}
+        {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records" data-toggle="tooltip"></i>{% endif %}
     </td>
     <td style="width:131px" data-order="{{ group.most_recent_curated.date.timestamp }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
@@ -58,22 +59,18 @@
     </td>
     {% if not sub_index %}
         <td>
-            {% if group.count > 0 %}
-                {% comment %}<a href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">{{ group.count }} Records</a><br/>{% endcomment %}
-                <table class="table" style="position:relative;left:-5px">
-                    <tbody>
-                    {% for group in group.sub_groups %}
-                        {% classification_group_row group sub_index=forloop.counter %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {% endif %}
-        </td>
-        <td>
             {% if group.allele %}<a href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
         </td>
         <td>
             {% if group.gene_symbol %}<a href="{% url 'view_gene_symbol' group.gene_symbol %}">{{ group.gene_symbol }}</a>{% else %}<span class="no-value">-</span>{% endif %}
+        </td>
+        <td>
+            {% if group.count == 1 %}
+                1 Record
+            {% else %}
+                <a href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">{{ group.count }} Records</a>
+            {% endif %}&nbsp;
+            {% for record in group.modifications %}{% if not forloop.first %}, {% endif %}{{ record.classification.lab_record_id }}{% endfor %}
         </td>
     {% endif %}
 </tr>

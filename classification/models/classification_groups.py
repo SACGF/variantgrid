@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from itertools import groupby
-from typing import Optional, List, Iterable, Any
+from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set
 
 from lazy import lazy
 
@@ -8,6 +9,33 @@ from classification.models import ClassificationModification, EvidenceKeyMap, Cu
 from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
 from snpdb.models import Allele
+
+D = TypeVar("D")
+
+
+@dataclass(frozen=True)
+class MultiValues(Generic[D]):
+
+    values: Iterable[D]
+    uniform: bool
+
+    def __iter__(self):
+        return iter(self.values)
+
+    def __len__(self):
+        return len(self.values)
+
+    @staticmethod
+    def convert(all_value_sets: List[Set[D]]) -> 'MultiValues[D]':
+        first_value_set = all_value_sets[0]
+        values = list(first_value_set)
+        values.sort()
+
+        uniform = True
+        for other_value_set in all_value_sets[1:]:
+            if other_value_set and other_value_set != first_value_set:
+                uniform = False
+        return MultiValues(values=values, uniform=uniform)
 
 
 class ClassificationGroup:
@@ -77,16 +105,18 @@ class ClassificationGroup:
     def count(self) -> int:
         return len(self.modifications)
 
-    def acmg_criteria(self) -> List[CriteriaStrength]:
-        all_met = set()
-        for e_key in EvidenceKeyMap.cached().criteria():
-            for cm in self.modifications:
+    @lazy
+    def acmg_criteria(self) -> MultiValues[CriteriaStrength]:
+
+        def criteria_converter(cm: ClassificationModification) -> Set[str]:
+            strengths: Set[str] = set()
+            for e_key in EvidenceKeyMap.cached().criteria():
                 strength = cm.get(e_key.key)
-                if CriteriaEvaluation.is_met(strength):  # exclude neutral, not met, not applicable
-                    all_met.add(CriteriaStrength(e_key, strength))
-        all_met_ordered = list(all_met)
-        all_met_ordered.sort()
-        return all_met_ordered
+                if CriteriaEvaluation.is_met(strength):
+                    strengths.add(strength)
+            return strengths
+
+        return MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
 
     @lazy
     def zygosities(self) -> List[str]:

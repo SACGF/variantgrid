@@ -30,7 +30,7 @@
             <th>Last Curated</th>
             <th>Allele</th>
             <th>Gene Symbol</th>
-            <th>Records</th>
+            <th>Record Count</th>
         </tr>
     </thead>
     <tbody>
@@ -46,7 +46,7 @@
             // target: 'td.dt-preview',
             // renderer: TableFormat.detailRenderer
             type: 'column',
-            target: 'td.dt-id',
+            target: 'tr',
             renderer: TableFormat.detailRendererHtml
         }
     },
@@ -57,9 +57,9 @@
         {}, // Zygosities
         {}, // ACMG
         {}, // last record
-        {'className': 'none'}, // record sub-table
         {'className': 'none'}, // allele
         {'className': 'none'}, // gene link
+        {'className': 'none'}, // record sub-table
     ]
 })})</script>
 {% else %}
