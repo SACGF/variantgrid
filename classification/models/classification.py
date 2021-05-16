@@ -277,7 +277,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     :cvar withdrawn: Soft delete, if withdrawn classification should not appear in most places
     """
 
-    SUPPORTED_TRANSCRIPTS = {"NM", "ENST"}
+    SUPPORTED_TRANSCRIPTS = {"NR", "NM", "ENST"}
 
     @staticmethod
     def is_supported_transcript(transcript_or_chgvs: str):
