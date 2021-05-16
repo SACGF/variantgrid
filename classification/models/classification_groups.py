@@ -113,7 +113,7 @@ class ClassificationGroup:
             for e_key in EvidenceKeyMap.cached().criteria():
                 strength = cm.get(e_key.key)
                 if CriteriaEvaluation.is_met(strength):
-                    strengths.add(strength)
+                    strengths.add(CriteriaStrength(e_key, strength))
             return strengths
 
         return MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
