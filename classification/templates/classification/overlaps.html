@@ -83,7 +83,6 @@
     </table>
 
     {% if overlaps %}
-        {% comment %}
     <div class="mt-5">
         <p>Note that records that are unshared or classified as Drug Response or Artefact are not used for calculations.</p>
         <h5>Overlap Records</h5>
@@ -122,13 +121,6 @@
     </div>
     {% else %}
         <div class="no-value">No Records</div>
-        {% endcomment %}
     {% endif %}
-    <div class="mt-5">
-        {% for overlap in overlaps %}
-            {% classification_groups overlap.vcms link_discordance_reports=True enable_paging=False %}
-            <hr class="my-4" />
-        {% endfor %}
-    </div>
 </div>
 {% endblock %}
