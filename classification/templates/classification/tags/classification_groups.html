@@ -47,6 +47,10 @@
 </table>
 <script>$(document).ready(() => {$('#{{ table_id }}').DataTable({
     "order": [[ 1, "desc" ]],
+    {% if not enable_paging %}
+        "paging": false,
+        dom: '<"top">rt<"bottom"><"clear">',
+    {% endif %}
     responsive: {
         details: {
             // type: 'column',

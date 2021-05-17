@@ -1,3 +1,4 @@
+import uuid
 from html import escape
 
 from django.conf import settings
@@ -46,12 +47,13 @@ def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] 
 def classification_groups(
         classification_modifications: Iterable[ClassificationModification],
         show_diffs: bool = True,
-        link_discordance_reports: bool = False):
+        link_discordance_reports: bool = False,
+        enable_paging: bool = True):
 
     groups = ClassificationGroups(classification_modifications)
 
     context = {"classification_groups": groups}
-    context["table_id"] = "classification_table";
+    context["table_id"] = str(uuid.uuid4()).replace("-", "_")
     ordered_classifications = list(groups.modifications)
 
     if show_diffs:
