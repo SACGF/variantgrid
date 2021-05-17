@@ -642,7 +642,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
                     class: 'row mt-2', html: [
                         $('<div>', {
                             class: 'col-2 text-right', html:
-                                $('<label>', {text: col.title})
+                                $('<label>', {html: col.title})
                         }),
                         $('<div>', {
                             class: 'col-10', html:
