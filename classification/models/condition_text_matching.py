@@ -965,7 +965,6 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                         cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
                         # for message in root_cms.messages:
                         #    cms.add_message(message)
-                    pass
     return suggestions
 
 

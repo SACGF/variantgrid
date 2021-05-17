@@ -10,7 +10,7 @@ todo, put in support for
     if Clinician.user_is_clinician(request.user):
         for base_template in MENU_BASE_TEMPLATES:
             context[base_template] = "snpdb/clinician_view_base.html"
-            
+
 also, put in support for
 
     def get_sequencing_software_versions_template():
