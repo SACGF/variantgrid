@@ -46,35 +46,38 @@
         {% endfor %}
     </tbody>
 </table>
-<script>$(document).ready(() => {$('#{{ table_id }}').DataTable({
-    "order": [[ 2, "desc" ]],
-    {% if not enable_paging %}
-        "paging": false,
-        dom: '<"top">rt<"bottom"><"clear">',
-    {% endif %}
-    responsive: {
-        details: {
-            // type: 'column',
-            // target: 'td.dt-preview',
-            // renderer: TableFormat.detailRenderer
-            type: 'column',
-            target: 'tr',
-            renderer: TableFormat.detailRendererHtml
-        }
-    },
-    columns: [
-        {'className': 'dt-id toggle-link'}, // ID
-        {}, // HGVS
-        {}, // Clinical Sig
-        {}, // Conditions
-        {}, // Zygosities
-        {}, // ACMG
-        {}, // last record
-        {'className': 'none'}, // allele
-        {'className': 'none'}, // gene link
-        {'className': 'none'}, // record sub-table
-    ]
-})})</script>
+<script>$(document).ready(() => {
+    $('#{{ table_id }}').DataTable({
+        "order": [[ 2, "desc" ]],
+        {% if not enable_paging %}
+            "paging": false,
+            dom: '<"top">rt<"bottom"><"clear">',
+        {% endif %}
+        responsive: {
+            details: {
+                // type: 'column',
+                // target: 'td.dt-preview',
+                // renderer: TableFormat.detailRenderer
+                type: 'column',
+                target: 'tr',
+                renderer: TableFormat.detailRendererHtml
+            }
+        },
+        columns: [
+            {'className': 'dt-id toggle-link'}, // ID
+            {}, // HGVS
+            {}, // Clinical Sig
+            {}, // Conditions
+            {}, // Zygosities
+            {}, // ACMG
+            {}, // last record
+            {'className': 'none'}, // allele
+            {'className': 'none'}, // gene link
+            {'className': 'none'}, // record sub-table
+        ]
+    });
+})
+</script>
 {% else %}
     <div class="no-value mb-4 text-center">No records</div>
 {% endif %}

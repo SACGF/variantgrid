@@ -43,8 +43,9 @@ def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] 
     return {"group": group, "row_class": f"cc-{sub_row} collapse" if sub_row else "", "sub_index": sub_index}
 
 
-@register.inclusion_tag("classification/tags/classification_groups.html")
+@register.inclusion_tag("classification/tags/classification_groups.html", takes_context=True)
 def classification_groups(
+        context,
         classification_modifications: Iterable[ClassificationModification],
         show_diffs: bool = True,
         link_discordance_reports: bool = False,
@@ -52,8 +53,11 @@ def classification_groups(
 
     groups = ClassificationGroups(classification_modifications)
 
-    context = {"classification_groups": groups}
-    context["table_id"] = str(uuid.uuid4()).replace("-", "_")
+    context = {
+        "classification_groups": groups,
+        "user": context.request.user,
+        "table_id": str(uuid.uuid4()).replace("-", "_")
+    }
     ordered_classifications = list(groups.modifications)
 
     if show_diffs:

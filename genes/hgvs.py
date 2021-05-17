@@ -175,6 +175,9 @@ class CHGVS:
         self.gene = None
         self.overrode_transcript = True
 
+        self.is_normalised: Optional[bool] = None
+        self.genome_build: Optional[GenomeBuild] = None
+
         c_regex = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
         match = c_regex.match(full_c_hgvs)
         if match:

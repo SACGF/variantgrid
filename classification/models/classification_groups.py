@@ -3,12 +3,14 @@ from itertools import groupby
 from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set
 
 from lazy import lazy
+from threadlocals.threadlocals import get_thread_variable
 
 from classification.enums import SpecialEKeys, CriteriaEvaluation
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved
 from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
-from snpdb.models import Allele
+from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.models import Allele, GenomeBuild
 
 D = TypeVar("D")
 
@@ -40,10 +42,15 @@ class MultiValues(Generic[D]):
 
 class ClassificationGroup:
 
-    def __init__(self, modifications: Iterable[ClassificationModification], group_id: Optional[int] = None):
+    def __init__(self,
+                 modifications: Iterable[ClassificationModification],
+                 genome_build: GenomeBuild,
+                 group_id: Optional[int] = None
+                ):
         self.modifications = list(modifications)
         self.modifications.sort(key=lambda cm: ClassificationGroup.sort_modifications(cm), reverse=True)
         self.group_id = group_id
+        self.genome_build = genome_build
         self.clinical_significance_score = 0
 
     @property
@@ -92,7 +99,20 @@ class ClassificationGroup:
     def c_hgvses(self) -> List[CHGVS]:
         unique_c = set()
         for cm in self.modifications:
-            unique_c.add(cm.c_parts)
+            c_parts: CHGVS
+            if c_str := cm.classification.get_c_hgvs(self.genome_build):
+                c_parts = CHGVS(c_str)
+                c_parts.is_normalised = True
+                c_parts.genome_build = self.genome_build
+            else:
+                c_parts = cm.classification.c_parts
+                c_parts.is_normalised = False
+                try:
+                    c_parts.genome_build = cm.classification.get_genome_build()
+                except KeyError:
+                    pass
+
+            unique_c.add(c_parts)
         c_list = list(unique_c)
         c_list.sort()
         return c_list
@@ -164,13 +184,18 @@ class ClassificationGroup:
 
     def sub_groups(self) -> Optional[List['ClassificationGroup']]:
         if len(self.modifications) > 1:
-            return [ClassificationGroup([cm]) for cm in self.modifications]
+            return [ClassificationGroup([cm], genome_build=self.genome_build) for cm in self.modifications]
         return None
 
 
 class ClassificationGroups:
 
-    def __init__(self, classification_modifications: Iterable[ClassificationModification]):
+    def __init__(self,
+                 classification_modifications: Iterable[ClassificationModification],
+                 genome_build: Optional[GenomeBuild] = None):
+
+        if not genome_build:
+            genome_build = GenomeBuildManager.get_current_genome_build()
 
         def clin_significance(cm: ClassificationModification) -> Optional[str]:
             return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -208,7 +233,7 @@ class ClassificationGroups:
                         group4 = list(group4)
                         group4.sort(key=lambda cm: condition_sorter(cm))
                         for _, group5 in groupby(group4, lambda cm: condition_grouper(cm)):
-                            actual_group = ClassificationGroup(modifications=group5, group_id=len(groups) + 1)
+                            actual_group = ClassificationGroup(modifications=group5, genome_build=genome_build, group_id=len(groups) + 1)
                             actual_group.clinical_significance_score = e_key_clin_sig.classification_sorter_value(clin_sig)
                             groups.append(actual_group)
         self.groups = groups
