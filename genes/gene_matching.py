@@ -211,14 +211,14 @@ class GeneMatcher:
             ReleaseGeneSymbolGene.objects.bulk_create(matches, ignore_conflicts=True, batch_size=2000)
 
     def match_gene_symbols(self, gene_symbols: Iterable[str]):
-        """ OK if already exists (bulk create ignores conflicts)  """
+        """ gene_symbols must not have been matched  """
 
         release_gene_symbols = [ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
                                 for gene_symbol_id in gene_symbols]
         if release_gene_symbols:
             # Need ignore_conflicts=False so we get back PKs
             release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols,
-                                                                         batch_size=2000, ignore_conflicts=True)
+                                                                         batch_size=2000, ignore_conflicts=False)
 
             self.match_symbols_to_genes(release_gene_symbols)
 

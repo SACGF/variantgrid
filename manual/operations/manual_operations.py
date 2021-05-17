@@ -52,12 +52,12 @@ class ManualOperation(Operation):
         ManualMigrationRequsted.objects.create(task=task, note=self.note)
 
     @staticmethod
-    def operation_manage(args: List[str], note: Optional[str] = None):
-        return ManualOperation(task_id=ManualOperation._task_id_generate("manage", args), note=note)
+    def operation_manage(args: List[str], note: Optional[str] = None, test: Callable = None):
+        return ManualOperation(task_id=ManualOperation._task_id_generate("manage", args), note=note, test=test)
 
     @staticmethod
-    def operation_other(args: List[str], note: Optional[str] = None):
-        return ManualOperation(task_id=ManualOperation._task_id_generate("other", args), note=note)
+    def operation_other(args: List[str], note: Optional[str] = None, test: Callable = None):
+        return ManualOperation(task_id=ManualOperation._task_id_generate("other", args), note=note, test=test)
 
     @staticmethod
     def escape_arg(arg: str):
