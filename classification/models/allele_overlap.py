@@ -11,26 +11,8 @@ from library.guardian_utils import admin_bot
 from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
-from classification.models.clinical_context_models import ClinicalContext, CS_TO_NUMBER
+from classification.models.clinical_context_models import ClinicalContext, CS_TO_NUMBER, DiscordanceLevel
 from classification.models.classification import Classification
-
-"""
-Above values are assigned based on how big the differences are considered when it comes to discordance
-e.g. difference between Benign and Likely Benign isn't as important as the difference between Likely Benign and VUS etc
-"""
-
-class DiscordanceLevel(str, Enum):
-    CONCORDANT_AGREEMENT = 'concordant_agreement'
-    CONCORDANT_CONFIDENCE = 'concordant_confidence'
-    DISCORDANT = 'discordant'
-
-    @property
-    def label(self):
-        if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
-            return "Concordant (Agreement)"
-        if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            return "Concordant (Confidence)"
-        return "Discordant"
 
 
 @total_ordering
@@ -43,20 +25,7 @@ class AlleleOverlap:
 
     @lazy
     def discordant_level(self) -> DiscordanceLevel:
-        cs_scores = set()
-        cs_values = set()
-        for vcm in self.vcms:
-            clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
-                strength = CS_TO_NUMBER.get(clin_sig)
-                if strength:
-                    cs_scores.add(strength)
-                    if len(cs_scores) > 1:
-                        return DiscordanceLevel.DISCORDANT
-                    cs_values.add(clin_sig)
-        if len(cs_values) > 1:
-            return DiscordanceLevel.CONCORDANT_CONFIDENCE
-        return DiscordanceLevel.CONCORDANT_AGREEMENT
+        return DiscordanceLevel.calculate(self.vcms)
 
     @lazy
     def discordance_score(self) -> int:

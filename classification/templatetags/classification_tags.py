@@ -65,7 +65,9 @@ def classification_groups(
         all_clinical_groupings = set()
         for cm in ordered_classifications:
             all_clinical_groupings.add(cm.classification.clinical_context)
-        context["clinical_contexts"] = list(all_clinical_groupings)
+        clinical_grouping_list = list(all_clinical_groupings)
+        clinical_grouping_list.sort(key=lambda cg:(not cg.is_default, cg.name))
+        context["clinical_contexts"] = clinical_grouping_list
 
     return context
 

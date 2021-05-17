@@ -1,3 +1,5 @@
+from enum import Enum
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
@@ -7,7 +9,7 @@ import django.dispatch
 from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from typing import List, Optional
+from typing import List, Optional, Iterable
 
 from lazy import lazy
 
@@ -37,6 +39,42 @@ CS_TO_NUMBER = {
 }
 
 
+class DiscordanceLevel(str, Enum):
+    """
+    Values are assigned based on how big the differences are considered when it comes to discordance
+    e.g. difference between Benign and Likely Benign isn't as important as the difference between Likely Benign and VUS etc
+    """
+
+    CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
+    CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
+    DISCORDANT = 'discordant'
+
+    @property
+    def label(self):
+        if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
+            return "Concordant (Agreement)"
+        if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
+            return "Concordant (Confidence)"
+        return "Discordant"
+
+    @staticmethod
+    def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceLevel':
+        cs_scores = set()
+        cs_values = set()
+        for vcm in modifications:
+            clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
+                strength = CS_TO_NUMBER.get(clin_sig)
+                if strength:
+                    cs_scores.add(strength)
+                    if len(cs_scores) > 1:
+                        return DiscordanceLevel.DISCORDANT
+                    cs_values.add(clin_sig)
+        if len(cs_values) > 1:
+            return DiscordanceLevel.CONCORDANT_CONFIDENCE
+        return DiscordanceLevel.CONCORDANT_AGREEMENT
+
+
 class ClinicalContext(FlagsMixin, TimeStampedModel):
     default_name = 'default'
 
@@ -53,28 +91,17 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return FlagTypeContext.objects.get(pk='clinical_context')
 
     def calculate_status(self) -> str:
-        min_score = None
-        max_score = None
-        has_vcs = False
-
-        for vcm in self.classification_modifications:
-            has_vcs = True
-            cs = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            # database jsonb requires string indexes only
-            score = CS_TO_NUMBER.get(cs)
-            if score is None:
-                pass
-            else:
-                if min_score is None or score < min_score:
-                    min_score = score
-                if max_score is None or score > max_score:
-                    max_score = score
-
-        if not has_vcs:
+        """
+        deprecated, try to use DiscordanceLevels instead
+        """
+        level = self.calculate_discordance_level()
+        if level == DiscordanceLevel.DISCORDANT:
+            return ClinicalContextStatus.DISCORDANT
+        else:
             return ClinicalContextStatus.CONCORDANT
-        if min_score is None or max_score is None or min_score == max_score:
-            return ClinicalContextStatus.CONCORDANT
-        return ClinicalContextStatus.DISCORDANT
+
+    def calculate_discordance_level(self) -> DiscordanceLevel:
+        return DiscordanceLevel.calculate(self.classification_modifications)
 
     @lazy
     def relevant_classification_count(self) -> int:
