@@ -464,13 +464,18 @@ def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
 def search_transcript(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
     """ return Transcript or TranscriptVersion (build independent) """
     transcript_id, version = TranscriptVersion.get_transcript_id_and_version(search_string)
+    obj = None
+    message = None
     if version:
         obj = TranscriptVersion.objects.filter(transcript_id=transcript_id, version=version).first()
-    else:
+        if obj is None:
+            message = f"Unknown transcript version {version}, see transcript page for available versions."
+
+    if obj is None:  # No version specified or loading version failed
         obj = Transcript.objects.filter(identifier=transcript_id).first()
 
     if obj:
-        return [obj]
+        return [SearchResult(obj, message=message)]
     return []
 
 
