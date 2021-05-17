@@ -1,36 +1,29 @@
-from builtins import all
-from datetime import datetime
 from html import escape
-from itertools import groupby
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query import QuerySet
 from django.template import Library
-from typing import Union, Optional, Iterable, TypedDict, List, Any
-
+from typing import Union, Optional, Iterable
 from django.utils.safestring import mark_safe
-from lazy import lazy
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups
-from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
 from snpdb.models import VariantAllele
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
-from classification.enums import SpecialEKeys, CriteriaEvaluation
+from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolved, ConditionResolvedDict, \
-    CuratedDate
+from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolved
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, DiscordanceReportClassification
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_ref import ClassificationRef
-from classification.templatetags.js_tags import jsonify, jsonify_for_js
+from classification.templatetags.js_tags import jsonify
 
 register = Library()
 
@@ -62,10 +55,10 @@ def classification_groups(
     ordered_classifications = list(groups.modifications)
 
     if show_diffs:
-        if len(groups) > 1 and len(groups) <= 20:
+        if 1 < len(groups) <= 20:
             diff_latest = ",".join([str(group.most_recent.classification.id) for group in groups])
             context["diff_latest"] = diff_latest
-        if len(ordered_classifications) > 1 and len(ordered_classifications) <= 20:
+        if 1 < len(ordered_classifications) <= 20:
             context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
 
     if link_discordance_reports:

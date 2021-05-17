@@ -3,13 +3,6 @@
 {% load static %}
 
 <div class="btn-toolbar mb-4">
-    {% if diff_latest %}
-    <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
-    {% endif %}
-    {% if diff_all %}
-    <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
-    {% endif %}
-    {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
     {% for ccg in clinical_contexts %}
         {% if ccg.latest_report %}
             <a class="btn btn-outline-secondary" href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">
@@ -17,6 +10,14 @@
             </a>
         {% endif %}
     {% endfor %}
+
+    {% if diff_latest %}
+    <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
+    {% endif %}
+    {% if diff_all %}
+    <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
+    {% endif %}
+    {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
 </div>
 {% if classification_groups %}
 <table class="table sticky-header" id="{{ table_id }}">
@@ -26,11 +27,11 @@
             <th class="text-center">Clinical Significance</th>
             <th>Conditions</th>
             <th>Zygosities</th>
-            <th>ACMG</th>
+            <th>Last ACMG</th>
             <th>Last Curated</th>
             <th>Allele</th>
             <th>Gene Symbol</th>
-            <th>Record Count</th>
+            <th>Records</th>
         </tr>
     </thead>
     <tbody>

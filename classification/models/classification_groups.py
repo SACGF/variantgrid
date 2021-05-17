@@ -126,8 +126,9 @@ class ClassificationGroup:
                 if isinstance(zygosities, str):
                     zygosities = list([zygosities])
                 all_zygosities = all_zygosities.union(zygosities)
-        # todo sort?
-        return list(all_zygosities)
+        zygosities = list(all_zygosities)
+        zygosities.sort()
+        return zygosities
 
     def most_recent_curated(self) -> CuratedDate:
         return self.most_recent.curated_date_check

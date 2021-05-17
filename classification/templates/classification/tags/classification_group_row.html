@@ -59,18 +59,18 @@
     </td>
     {% if not sub_index %}
         <td>
-            {% if group.allele %}<a href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
+            {% if group.allele %}<a class="hover-link" href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
         </td>
         <td>
-            {% if group.gene_symbol %}<a href="{% url 'view_gene_symbol' group.gene_symbol %}">{{ group.gene_symbol }}</a>{% else %}<span class="no-value">-</span>{% endif %}
+            {% if group.gene_symbol %}<a class="hover-link" href="{% url 'view_gene_symbol' group.gene_symbol %}" style="letter-spacing: 0.5px">{{ group.gene_symbol }}</a>{% else %}<span class="no-value">-</span>{% endif %}
         </td>
         <td>
-            {% if group.count == 1 %}
-                1 Record
-            {% else %}
-                <a href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">{{ group.count }} Records</a>
+            {% for record in group.modifications %}
+                <div class="mb-2"><i style="font-size:8px" class="fas fa-circle text-info"></i> <a class="hover-link" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.lab_record_id }}</a></div>
+            {% endfor %}
+            {% if group.count > 1 %}
+                <div><a class="hover-link" href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">Compare {{ group.count }} Records</a></div>
             {% endif %}&nbsp;
-            {% for record in group.modifications %}{% if not forloop.first %}, {% endif %}{{ record.classification.lab_record_id }}{% endfor %}
         </td>
     {% endif %}
 </tr>
