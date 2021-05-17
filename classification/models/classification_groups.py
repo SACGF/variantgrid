@@ -81,6 +81,10 @@ class ClassificationGroup:
         return self.most_recent.classification.lab.organization.name
 
     @property
+    def lab(self) -> str:
+        return self.most_recent.classification.lab.name
+
+    @property
     def is_discordant(self) -> bool:
         return all(cm.classification.withdrawn for cm in self.modifications)
 
@@ -195,8 +199,8 @@ class ClassificationGroups:
             for _, group2 in groupby(group1, lambda cm: cm.classification.clinical_grouping_name):
                 group2 = list(group2)
                 # break up by org (TODO breakup by lab with optional breakup by org)
-                group2.sort(key=lambda cm: cm.classification.lab.organization.name)
-                for _, group3 in groupby(group2, lambda cm: cm.classification.lab.organization.name):
+                group2.sort(key=lambda cm: cm.classification.lab.name)
+                for _, group3 in groupby(group2, lambda cm: cm.classification.lab.name):
                     group3 = list(group3)
                     # breakup by transcript
                     group3.sort(key=lambda cm: cm.c_parts.without_transcript_version)

@@ -5,21 +5,23 @@
 {% for ccg in clinical_contexts %}
     {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
         <div class="my-1">
-            <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="text-danger">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status : {{ ccg.latest_report.resolution_text }}</a>
+            <a href="{% url 'discordance_report' ccg.latest_report.id %}">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status : <span class="text-danger">{{ ccg.latest_report.resolution_text }} (Click for Discordance Report)</span></a>
         </div>
     {% else %}
-        <div class="my-1">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status : {{ ccg.calculate_discordance_level.label }}</div>
+        {% with discordance_level=ccg.calculate_discordance_level %}
+        <div class="my-1">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status : <span class="text-{% if discordance_level == 'concordant_agreement' %}success{% else %}warning{% endif %}">{{ discordance_level.label }}</span></div>
+        {% endwith %}
     {% endif %}
 {% endfor %}
 {% if diff_latest or diff_all %}
     <div class="btn-toolbar mb-4">
-        {% if diff_latest %}
+    {% if diff_latest %}
         <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
-        {% endif %}
-        {% if diff_all %}
+    {% endif %}
+    {% if diff_all %}
         <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
-        {% endif %}
-        {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
+    {% endif %}
+    {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
     </div>
 {% endif %}
 {% if classification_groups %}
@@ -30,8 +32,8 @@
             <th class="text-center">Clinical Significance</th>
             <th>Conditions</th>
             <th>Zygosities</th>
-            <th>Last ACMG</th>
-            <th>Last Curated</th>
+            <th>ACMG <span class="text-secondary">Lastest</span></th>
+            <th>Curated <span class="text-secondary">Lastest</span></th>
             <th>Allele</th>
             <th>Gene Symbol</th>
             <th>Records</th>

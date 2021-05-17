@@ -1,7 +1,7 @@
 {% load classification_tags %}
 {% load js_tags %}
 <tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_discordant %}text-decoration:line-through;{% endif %}cursor:pointer">
-    <td style="width:271px;" data-order="{% if group.clinical_grouping == "unshared" %}AA{% endif %}{{ group.organization }}">
+    <td style="width:271px;" data-order="{% if group.clinical_grouping == "unshared" %}AA{% endif %}{{ group.lab }}">
         {% if sub_index %}
             {% for c_hgvs in group.c_hgvses %}
                 <div style="font-size:smaller" class="mt-1"><i style="font-size:8px" class="fas fa-circle text-info"></i> {% c_hgvs c_hgvs %}</div>
