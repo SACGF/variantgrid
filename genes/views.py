@@ -121,7 +121,7 @@ def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[Ont
             hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
             omim_and_hpo_for_gene.append((omim, hpo_list))
     except ValueError:  # in case we don't have this gene symbol available
-        report_exc_info()
+        pass
 
     return omim_and_hpo_for_gene
 
