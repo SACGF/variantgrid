@@ -104,7 +104,7 @@ class GeneMatcher:
         return genes_dict
 
     @lazy
-    def aliases_dict(self) -> Dict[str, List]:
+    def aliases_dict(self) -> Dict[str, Dict]:
         """ Get symbols from other GeneVersions that match genes from our release """
         qs = GeneVersion.objects.filter(gene__in=self.release.get_genes())
         release_symbol = GeneSymbol.objects.filter(geneversion__gene=OuterRef("gene"),
@@ -113,44 +113,71 @@ class GeneMatcher:
             ~Q(gene_symbol=F("release_symbol"))).annotate(symbol_upper=Upper("gene_symbol"))
 
         values = diff_version_symbols.values_list("symbol_upper", "gene__identifier", "version", "genome_build__name")
-        genes_dict = defaultdict(list)
+        genes_dict = defaultdict(dict)
         for symbol_upper, gene_id, version, genome_build_name in values:
             match_info = f"Gene v{version}/{genome_build_name}"
-            genes_dict[symbol_upper].append((gene_id, match_info))
+            genes_dict[symbol_upper][gene_id] = match_info
 
         # Gene Symbol alias
         qs = GeneSymbolAlias.objects.filter(gene_symbol__releasegenesymbol__release=self.release)
         qs = qs.exclude(alias=F("gene_symbol_id"))
-        alias_graph = {gsa.alias: gsa for gsa in qs}
-
+        alias_graph = defaultdict(list)
         for gsa in qs:
-            match_path = [gsa.match_info]
-            gene_symbol = gsa.gene_symbol_id
-            visited_symbols = {gene_symbol}  # To detect loops in graph
+            alias_graph[gsa.alias].append(gsa)
+            alias_graph[gsa.gene_symbol_id].append(gsa)
 
-            while True:
-                if gene_id_list := self.genes.get(gene_symbol):
-                    match_info = ", ".join(match_path)
-                    for gene_id in gene_id_list:
-                        genes_dict[gsa.alias].append((gene_id, match_info))
-                elif alias_list := genes_dict.get(gsa.gene_symbol_id):
-                    for gene_id, alias_match_info in alias_list:
-                        match_info = ", ".join(match_path + [alias_match_info])
-                        genes_dict[gsa.alias].append((gene_id, match_info))
-                else:
-                    # Go through aliases?
-                    if gsa := alias_graph.get(gene_symbol):
-                        gene_symbol = gsa.gene_symbol_id
-                        if gene_symbol in visited_symbols:
-                            # Circular loop
-                            break
-                        else:
-                            match_path.append(gsa.match_info)
-                            continue  # Try again
+        for gene_symbol_alias in qs:
+            for gene_symbol in [gene_symbol_alias.alias, gene_symbol_alias.gene_symbol_id]:
+                symbol_match_path = {gene_symbol: gene_symbol_alias.match_info}
 
-                break  # Give up
+                self._aliases(alias_graph, genes_dict, gene_symbol, symbol_match_path)
 
         return genes_dict
+
+    def _aliases(self, alias_graph, genes_dict, gene_symbol, symbol_match_path, visited_symbols=None):
+        # print(f"_aliases(alias_graph, genes_dict, {gene_symbol} - ({symbol_match_path})")
+        # Keep track of visited symbols to detect loops in graph
+        if visited_symbols is None:
+            visited_symbols = set()
+        else:
+            if gene_symbol in visited_symbols:  # Stop unnecessary descent
+                return
+            visited_symbols.add(gene_symbol)
+
+        if gene_id_list := self.genes.get(gene_symbol):
+            # Only need to build up match path for where we are
+            symbol_total_path = {}
+            match_paths = list(symbol_match_path.values())
+            for i, symbol in enumerate(symbol_match_path):
+                mp = ", ".join(match_paths[i+1:])
+                symbol_total_path[symbol] = mp
+
+            for symbol in symbol_match_path:
+                if symbol != gene_symbol:  # No point putting actual one in
+                    match_info = symbol_total_path[symbol]
+                    for gene_id in gene_id_list:
+                        if existing_match_info := genes_dict[symbol].get(gene_id):
+                            if len(match_info) >= len(existing_match_info):
+                                continue  # Don't override with longer
+                        genes_dict[symbol][gene_id] = match_info
+        else:
+            if aliases_list := alias_graph.get(gene_symbol):
+                original_gene_symbol = gene_symbol
+
+                for gene_symbol_alias in aliases_list:
+                    # We may have looked it up via alias or gene symbol - use the other one
+
+                    if gene_symbol_alias.gene_symbol_id == original_gene_symbol:
+                        gene_symbol = gene_symbol_alias.alias
+                    else:
+                        gene_symbol = gene_symbol_alias.gene_symbol_id
+
+                    # Make a copy for recursion
+                    child_symbol_match_path = symbol_match_path.copy()
+                    child_symbol_match_path[gene_symbol] = gene_symbol_alias.match_info
+
+                    self._aliases(alias_graph, genes_dict, gene_symbol, child_symbol_match_path,
+                                  visited_symbols=visited_symbols)
 
     def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> Dict[str, List]:
         gene_symbol_gene_id_and_match_info = defaultdict(list)  # list items = (gene_id, match_info)
@@ -160,8 +187,8 @@ class GeneMatcher:
             if gene_id_list := self.genes.get(gene_name):
                 for gene_id in gene_id_list:
                     gene_symbol_gene_id_and_match_info[gene_symbol_id].append((gene_id, None))
-            elif alias_list := self.aliases_dict.get(gene_name):
-                for gene_id, match_info in alias_list:
+            elif alias_items := self.aliases_dict.get(gene_name):
+                for gene_id, match_info in alias_items.items():
                     gene_symbol_gene_id_and_match_info[gene_symbol_id].append((gene_id, match_info))
             # Else - no match?
 
@@ -184,14 +211,14 @@ class GeneMatcher:
             ReleaseGeneSymbolGene.objects.bulk_create(matches, ignore_conflicts=True, batch_size=2000)
 
     def match_gene_symbols(self, gene_symbols: Iterable[str]):
-        """ OK if already exists (bulk create ignores conflicts)  """
+        """ gene_symbols must not have been matched  """
 
         release_gene_symbols = [ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
                                 for gene_symbol_id in gene_symbols]
         if release_gene_symbols:
             # Need ignore_conflicts=False so we get back PKs
             release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols,
-                                                                         batch_size=2000, ignore_conflicts=True)
+                                                                         batch_size=2000, ignore_conflicts=False)
 
             self.match_symbols_to_genes(release_gene_symbols)
 

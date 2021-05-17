@@ -216,11 +216,14 @@ class GeneSymbolAlias(TimeStampedModel):
          * Source: https://genome.ucsc.edu/cgi-bin/hgTables?command=start export kgAlias table
          * Code: N/A - obsolete
     """
-    alias = CITextField(unique=True)
+    alias = CITextField()
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.choices)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     description = models.TextField(null=True)
+
+    class Meta:
+        unique_together = ('alias', 'gene_symbol')
 
     @property
     def match_info(self) -> str:

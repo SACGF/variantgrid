@@ -2,11 +2,7 @@
 
 # Data can be downloaded here:
 # * ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-import re
-
 from django.core.management.base import BaseCommand
-from django.db.models.functions import Upper
-
 from genes.models import GeneSymbol, GeneSymbolAlias
 import pandas as pd
 
@@ -43,7 +39,10 @@ class Command(BaseCommand):
 
             for s in synonyms.split("|"):
                 if s not in known_symbols:
+                    s = s.upper()
                     known_symbols.add(s)
+                    if s == gene_symbol_id:
+                        continue  # Our aliases are case insensitive so no need to store these
                     gene_symbol_aliases.append(GeneSymbolAlias(alias=s,
                                                                gene_symbol_id=gene_symbol_id,
                                                                source=GeneSymbolAliasSource.NCBI))
