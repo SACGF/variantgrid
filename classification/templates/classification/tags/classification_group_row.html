@@ -1,29 +1,22 @@
 {% load classification_tags %}
 {% load js_tags %}
 <tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_discordant %}text-decoration:line-through;{% endif %}cursor:pointer">
-    <td style="width:271px;" data-order="{% if group.clinical_grouping == "unshared" %}AA{% endif %}{{ group.lab }}">
-        {% if sub_index %}
-            {% for c_hgvs in group.c_hgvses %}
-                <div style="font-size:smaller" class="mt-1"><i style="font-size:8px" class="fas fa-circle text-info"></i> {% c_hgvs c_hgvs %}</div>
-            {% endfor %}
-            {% for p_hgvs in group.p_hgvses %}
-                <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
-            {% endfor %}
-        {% else %}
-            {% if group.clinical_grouping != "default" %}
-                <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
-            {% endif %}
-            {{ group.organization }}
-            {% for c_hgvs in group.c_hgvses %}
-                <div style="font-size:smaller" class="my-1">{% c_hgvs c_hgvs %}</div>
-            {% endfor %}
-            {% for p_hgvs in group.p_hgvses %}
-                <div style="font-size:smaller" class="mt-1 text-secondary text-monospace">{{ p_hgvs.p_dot }}</div>
-            {% endfor %}
-            {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
+    <td style="width:150px;" data-order="{% if group.clinical_grouping == "unshared" %}AA{% endif %}{{ group.lab }}">
+        {% if group.clinical_grouping != "default" %}
+            <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
         {% endif %}
+        {{ group.lab }}
+        {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
     </td>
-    <td style="width:186px;" class="cs-{{ group.clinical_significance|lower }} text-center" data-order="{{ group.clinical_significance_score }}">
+    <td>
+        {% for c_hgvs in group.c_hgvses %}
+            <div class="my-1" style="font-size:11px">{% c_hgvs c_hgvs %}</div>
+        {% endfor %}
+        {% for p_hgvs in group.p_hgvses %}
+            <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
+        {% endfor %}
+    </td>
+    <td style="width:100px;" class="cs-{{ group.clinical_significance|lower }} text-center" data-order="{{ group.clinical_significance_score }}">
         {% if group.clinical_significance %}
             {{ group.clinical_significance | ekey:"clinical_significance" }}
         {% else %}
@@ -37,7 +30,7 @@
             <div class="no-value">-</div>
         {% endfor %}
     </td>
-    <td style="width:121px;">
+    <td style="width:100px;">
         {% if group.zygosities %}
             {{ group.zygosities | ekey:"zygosity" }}
         {% else %}
@@ -45,14 +38,12 @@
         {% endif %}
     </td>
     <td  style="width:155px;">
-        {% for acmg in group.acmg_criteria %}
-            {% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>
-            {% empty %}
+        {% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>{% empty %}
             <div class="no-value">-</div>
         {% endfor %}
         {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records" data-toggle="tooltip"></i>{% endif %}
     </td>
-    <td style="width:131px" data-order="{{ group.most_recent_curated.date.timestamp }}">
+    <td style="width:100px" data-order="{{ group.most_recent_curated.date.timestamp }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
             {% if not group.most_recent_curated.is_curated %}Created<br/>{% endif %}{% timestamp group.most_recent_curated.date.timestamp time_ago=True %}
         </a><br/>

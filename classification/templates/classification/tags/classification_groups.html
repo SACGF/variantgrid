@@ -25,15 +25,16 @@
     </div>
 {% endif %}
 {% if classification_groups %}
-<table class="table sticky-header" id="{{ table_id }}">
+<table class="table sticky-header" id="{{ table_id }}" width="100%">
     <thead>
         <tr>
-            <th>Grouping</th>
+            <th>Lab</th>
+            <th>HGVS</th>
             <th class="text-center">Clinical Significance</th>
             <th>Conditions</th>
             <th>Zygosities</th>
-            <th>ACMG <span class="text-secondary">Lastest</span></th>
-            <th>Curated <span class="text-secondary">Lastest</span></th>
+            <th>ACMG <span class="text-secondary">Latest</span></th>
+            <th>Curated <span class="text-secondary">Latest</span></th>
             <th>Allele</th>
             <th>Gene Symbol</th>
             <th>Records</th>
@@ -63,6 +64,7 @@
     },
     columns: [
         {'className': 'dt-id toggle-link'}, // ID
+        {}, // HGVS
         {}, // Clinical Sig
         {}, // Conditions
         {}, // Zygosities
