@@ -261,6 +261,16 @@ class GeneSymbolViewInfo:
     def gene_infos(self):
         return GeneInfo.get_for_gene_symbol(self.gene_symbol)
 
+    @lazy
+    def classifications(self) -> List[ClassificationModification]:
+        # Note this is loaded in Ajax
+        classifications = list()
+        if filters := classification_gene_symbol_filter(self.gene_symbol):
+            classifications = ClassificationModification.objects.filter(filters).filter(
+                is_last_published=True).exclude(classification__withdrawn=True)
+            classifications = ClassificationModification.filter_for_user(user=self.user, queryset=classifications)
+        return classifications
+
     def panel_app_servers(self) -> Union[QuerySet, Iterable[PanelAppServer]]:
         return PanelAppServer.objects.order_by("pk")
 
