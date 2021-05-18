@@ -1,6 +1,6 @@
 from typing import Optional
 
-from threadlocals.threadlocals import get_thread_variable, get_current_user, set_thread_variable
+from threadlocals.threadlocals import get_thread_variable, get_current_user, set_thread_variable, get_current_request
 
 from snpdb.models import UserSettings, GenomeBuild
 

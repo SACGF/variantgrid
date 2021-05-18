@@ -375,7 +375,7 @@
         {% endif %}
 
         {% if classifications_new_grouping %}
-            <div data-toggle="ajax" href="{% url 'view_gene_symbol_classifications' gene_symbol.symbol %}">Loading...</div>
+            <div data-toggle="ajax" href="{% url 'view_gene_symbol_classifications' gene_symbol.symbol genome_build.name %}">Loading...</div>
         {% endif %}
 
         <span class="hidden">

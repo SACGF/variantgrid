@@ -318,14 +318,17 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     return render(request, "genes/view_gene_symbol.html", context)
 
 
-def view_classifications(request, gene_symbol: str):
+def view_classifications(request, gene_symbol: str, genome_build_name:str):
+
+    genome_build = GenomeBuild.get_from_fuzzy_string(genome_build_name)
     view_info = GeneSymbolViewInfo(
         gene_symbol=get_object_or_404(GeneSymbol, pk=gene_symbol),
-        desired_genome_build=UserSettings.get_genome_build_or_default(request.user),
+        desired_genome_build=genome_build,
         user=request.user)
 
     return render(request, "genes/view_gene_symbol_classifications.html", {
-        "classifications": view_info.classifications
+        "classifications": view_info.classifications,
+        "genome_build": genome_build
     })
 
 def view_transcript(request, transcript_id):
