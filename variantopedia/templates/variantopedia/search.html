@@ -104,10 +104,11 @@
                 <div class="card">
                     <div class="card-header">Data</div>
                     <div class="card-body">
+                        {% labelled label="Gene Symbol" %}
+                            1 word, case insensitive name match <span class="example">gata2</span>, <span class="example">GATA2</span>.<br/>
+                        {% endlabelled %}
                         {% if url_name_visible.genes %}
-                            {% labelled label="Gene Symbol" %}
-                                1 word, case insensitive name match <span class="example">gata2</span>, <span class="example">GATA2</span>.<br/>
-                            {% endlabelled %}
+                            {% comment %}This stuff is still searchable even if genes URL is not visible, but of limited use in such environments{% endcomment %}
                             {% labelled label="Gene ID" %}
                                 <span class="example">ENSG00000179348</span>
                             {% endlabelled %}
