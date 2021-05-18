@@ -261,16 +261,6 @@ class GeneSymbolViewInfo:
     def gene_infos(self):
         return GeneInfo.get_for_gene_symbol(self.gene_symbol)
 
-    @lazy
-    def classifications(self) -> List[ClassificationModification]:
-        # TODO move me into an ajax window
-        classifications = list()
-        if filters := classification_gene_symbol_filter(self.gene_symbol):
-            classifications = ClassificationModification.objects.filter(filters).filter(
-                is_last_published=True).exclude(classification__withdrawn=True)
-            classifications = ClassificationModification.filter_for_user(user=self.user, queryset=classifications)
-        return classifications
-
     def panel_app_servers(self) -> Union[QuerySet, Iterable[PanelAppServer]]:
         return PanelAppServer.objects.order_by("pk")
 
@@ -308,8 +298,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "omim_and_hpo_for_gene",
             "has_variants",
             "show_classifications_hotspot_graph",
-            "show_hotspot_graph",
-            # "classifications"
+            "show_hotspot_graph"
         ]
     )
     context["show_wiki"] = settings.VIEW_GENE_SHOW_WIKI

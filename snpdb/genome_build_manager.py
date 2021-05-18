@@ -22,3 +22,10 @@ class GenomeBuildManager:
 
         set_thread_variable("genome_build", genome_build)
         return genome_build
+
+    @staticmethod
+    def set_current_genome_build(genome_build: GenomeBuild):
+        """
+        Only needs to be called if the genome build wont be the user's default
+        """
+        set_thread_variable("genome_build", genome_build)

@@ -109,6 +109,7 @@ class ClassificationGroup:
                 c_parts.is_normalised = False
                 try:
                     c_parts.genome_build = cm.classification.get_genome_build()
+                    c_parts.is_desired_build = self.genome_build.name == c_parts.genome_build.name
                 except KeyError:
                     pass
 
@@ -196,6 +197,7 @@ class ClassificationGroups:
 
         if not genome_build:
             genome_build = GenomeBuildManager.get_current_genome_build()
+        self.genome_build = genome_build
 
         def clin_significance(cm: ClassificationModification) -> Optional[str]:
             return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)

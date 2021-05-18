@@ -682,7 +682,6 @@ class LazyAttribute:
         evaluate when the template first mentions them
         """
         all_attributes = set(dir(obj))
-        print(all_attributes)
 
         context = {}
         for attribute in attributes:

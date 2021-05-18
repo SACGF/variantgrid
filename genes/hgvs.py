@@ -175,7 +175,9 @@ class CHGVS:
         self.gene = None
         self.overrode_transcript = True
 
+        # properties to help replace BestHGVS
         self.is_normalised: Optional[bool] = None
+        self.is_desired_build: Optional[bool] = None
         self.genome_build: Optional[GenomeBuild] = None
 
         c_regex = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')

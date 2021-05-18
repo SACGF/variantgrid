@@ -40,6 +40,7 @@ from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
 from snpdb.forms import TagForm
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
     AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
@@ -331,6 +332,8 @@ def view_variant(request, variant_id, genome_build_name=None):
 
     if genome_build is None:
         genome_build = next(iter(variant.genome_builds))
+
+    GenomeBuildManager.set_current_genome_build(genome_build)
 
     igv_data = get_igv_data(request.user, genome_build=genome_build)
     extra_context = {"igv_data": igv_data,

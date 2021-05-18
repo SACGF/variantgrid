@@ -56,6 +56,7 @@ def classification_groups(
     context = {
         "classification_groups": groups,
         "user": context.request.user,
+        "genome_build": groups.genome_build,
         "table_id": str(uuid.uuid4()).replace("-", "_")
     }
     ordered_classifications = list(groups.modifications)
