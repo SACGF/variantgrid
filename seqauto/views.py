@@ -10,8 +10,10 @@ from django.http.response import HttpResponseRedirect, JsonResponse, HttpRespons
 from django.shortcuts import render, get_object_or_404
 from django.urls.base import reverse
 from django.utils.decorators import method_decorator
+from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import UpdateView
+from htmlmin.decorators import not_minified_response
 
 from eventlog.models import create_event
 from genes.models import CanonicalTranscriptCollection
@@ -111,6 +113,7 @@ def software_pipeline(request):
     return render(request, 'seqauto/software_pipeline.html', {'dag_list': qs})
 
 
+@not_minified_response  # so stack traces are formatted
 def view_seqauto_run(request, seqauto_run_id):
 
     seqauto_run = get_object_or_404(SeqAutoRun, pk=seqauto_run_id)
@@ -123,7 +126,7 @@ def view_seqauto_run(request, seqauto_run_id):
 
     if seqauto_run.error_exception:
         status = messages.ERROR
-        messages.add_message(request, status, seqauto_run.error_exception, extra_tags='import-message')
+        messages.add_message(request, status, mark_safe(seqauto_run.error_exception), extra_tags='stack-trace import-message')
 
     context = {"seqauto_run": seqauto_run,
                "pbs_script_counts": pbs_script_counts}
