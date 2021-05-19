@@ -922,12 +922,15 @@ def process_other_qc(seqauto_run, existing_qcs, qc_set):
     canonical_transcript_manager = CanonicalTranscriptManager()
     transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id()  # Don't know build - just get all
 
-    process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id, existing_qcs, qc_set, QCGeneList)
+    process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id,
+                           existing_qcs, qc_set, QCGeneList)
     if settings.SEQAUTO_LOAD_GENE_COVERAGE:
-        process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id, existing_qcs, qc_set, QCGeneCoverage)
+        process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id,
+                               existing_qcs, qc_set, QCGeneCoverage, delete_out_of_date_records=True)
 
 
-def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id, existing_qcs, qc_set, klass):
+def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id,
+                           existing_qcs, qc_set, klass, delete_out_of_date_records=False):
     logging.info("process_other_qc_class: %s", klass)
 
     existing_other_qc_records = returning_existing_records_by_path(klass)
@@ -979,6 +982,11 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
                 if exists and int(file_last_modified) > int(record.file_last_modified):
                     logging.info("**** RECORD last modified has changed: old: %s, new: %s ***",
                                  record.file_last_modified, file_last_modified)
+
+                    if delete_out_of_date_records:
+                        # Can only have 1 QCGeneCoverage for QC
+                        record.delete()
+
                     record = _create_new_record()
                     load_from_file_if_complete(seqauto_run,
                                                record,
