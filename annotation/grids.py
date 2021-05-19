@@ -65,11 +65,14 @@ class VariantAnnotationVersionGrid(JqGridUserRowConfig):
     model = VariantAnnotationVersion
     caption = 'VariantAnnotationVersion'
     fields = [
-        'id', "vep", "annotation_consortium", 'created', 'last_checked_date', 'gene_annotation_release__id',
+        'id', "vep", "annotation_consortium", 'created', 'last_checked_date', 'gene_annotation_release__version',
         "ensembl", "ensembl_funcgen", "ensembl_variation", "ensembl_io",
         "thousand_genomes", "cosmic", "hgmd", "assembly", "dbsnp",
         "gencode", "genebuild", "gnomad", "refseq", "regbuild", "sift", "dbnsfp", "distance"
     ]
+    colmodel_overrides = {
+        'gene_annotation_release__version': {"label": "Gene Annotation Release"},
+    }
 
     def __init__(self, user, genome_build_name):
         super().__init__(user)

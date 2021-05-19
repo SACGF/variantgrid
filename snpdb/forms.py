@@ -160,7 +160,7 @@ class VCFForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.VCF
         fields = ['name', 'date', 'genome_build', 'user', 'project', 'import_status']
-        read_only = ('import_status', )
+        read_only = ('date', 'import_status')
         widgets = {'name': TextInput()}
 
     def __init__(self, *args, **kwargs):

@@ -812,7 +812,7 @@ class GeneAnnotationRelease(models.Model):
 
         This release can be set on a VariantAnnotationVersion to be able to get genes/transcripts from a VEP build
     """
-    version = models.IntegerField()
+    version = models.TextField()  # Needs to support eg "109.20190607"
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     gene_annotation_import = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)

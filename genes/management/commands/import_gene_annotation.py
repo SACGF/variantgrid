@@ -45,7 +45,7 @@ class Command(BaseCommand):
         parser.add_argument('--genome-build', choices=builds, required=True)
         parser.add_argument('--annotation-consortium', choices=consortia, required=True)
         parser.add_argument('--replace', action='store_true', help="Replace gene symbols and relations")
-        parser.add_argument('--release', type=int, required=False,
+        parser.add_argument('--release', required=False,
                             help="Make a release (to match VEP) store all gene/transcript versions")
 
         gff3_help = 'Use "None" if using only genePred (not recommended)'
