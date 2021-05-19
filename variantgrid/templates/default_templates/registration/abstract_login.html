@@ -9,19 +9,19 @@
         text-align: center;
     }
 </style>
-{%  if use_oidc %}
 <script type="text/javascript">
+{%  if use_oidc %}
     $(document).ready(function () {
         $("button").button();
     });
     function login() {
         window.location = '{% url 'oidc_authentication_init' %}'
     }
+{% endif %}
     function resume() {
         window.location = '/';
     }
 </script>
-{% endif %}
 {{ block.super }}
 <meta name="description" content="VariantGrid: An source available variant database, and web analysis platform."/>
 {% endblock %}
