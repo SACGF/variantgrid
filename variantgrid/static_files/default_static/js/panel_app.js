@@ -53,7 +53,7 @@ function addGeneEvidence(geneSymbol, evidence, geneContainer) {
 
 function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceResultsList) {
     let newDiv = $("<div />");
-    if (panelAppEvidenceResultsList) {
+    if (panelAppEvidenceResultsList.length) {
         for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
             let evidence = panelAppEvidenceResultsList[i];
             addGeneEvidence(geneSymbol, evidence, newDiv);
