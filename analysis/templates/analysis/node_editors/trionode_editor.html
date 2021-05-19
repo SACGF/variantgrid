@@ -38,6 +38,7 @@
                 url: Urls.api_view_trio(trioId),
                 success: displayTrioInfo,
             });
+            setCrossLink($("#trio-link"), Urls.view_trio, trioId);
         }
     }
     $("#id_trio").change(changeTrio);
@@ -66,7 +67,7 @@
         {% endfor %}
 		<div>
             <div>
-                <b>Trio:</b> {{ form.trio }}{{ form.trio.errors }}
+                <b>Trio:</b> {{ form.trio }}{{ form.trio.errors }} <a class="cross-link" id="trio-link" target="_blank">View Trio</a>
             </div>
             <div id='trio-info'>
                 <table>
