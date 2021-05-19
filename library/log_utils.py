@@ -226,10 +226,6 @@ class NotificationBuilder:
     def webhook_url(self) -> Optional[str]:
         return None
 
-    @property
-    def can_send(self) -> bool:
-        return True
-
     def as_slack(self):
         slack_blocks: List = list()
         for block in self.blocks:
@@ -260,9 +256,7 @@ class NotificationBuilder:
 
     def send(self):
         self.sent = True
-        print(self.as_html())
-        if self.can_send:
-            send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=self.webhook_url)
+        send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=self.webhook_url)
 
     def __del__(self):
         if not self.sent:

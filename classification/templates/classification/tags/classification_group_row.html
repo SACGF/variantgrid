@@ -1,6 +1,6 @@
 {% load classification_tags %}
 {% load js_tags %}
-<tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_discordant %}text-decoration:line-through;{% endif %}cursor:pointer">
+<tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_withdrawn %}text-decoration:line-through;{% endif %}cursor:pointer">
     <td style="width:150px;" data-order="{% if group.clinical_grouping == "unshared" %}AA{% endif %}{{ group.lab }}">
         {% if group.clinical_grouping != "default" %}
             <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
@@ -8,7 +8,7 @@
         {{ group.lab }}
         {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
     </td>
-    <td>
+    <td data-order="{{ group.c_hgvs.sort_str }}">
         {% for c_hgvs in group.c_hgvses %}
             <div class="mb-1" style="font-size:11px">{% c_hgvs c_hgvs %}</div>
         {% endfor %}
@@ -22,6 +22,7 @@
         {% else %}
             Unclassified
         {% endif %}
+        {% if group.is_discordant %}<div title="This row is in discordance with other rows for the same allele" data-toggle="tooltip" class="flag flag-clinical_context_discordance hover-detail" style="position:relative;top:5px;left:6px"></div>{% endif %}
     </td>
     <td style="width:186px;">
         {% for condition in group.conditions %}
@@ -41,7 +42,7 @@
         {% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>{% empty %}
             <div class="no-value">-</div>
         {% endfor %}
-        {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records" data-toggle="tooltip"></i>{% endif %}
+        {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records<br/>Only showing latest" data-toggle="tooltip"></i>{% endif %}
     </td>
     <td style="width:100px" data-order="{{ group.most_recent_curated.date.timestamp }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">

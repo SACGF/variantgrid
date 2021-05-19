@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, Set
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -6,12 +6,42 @@ from django.dispatch import receiver
 from django.template.loader import render_to_string
 from django.urls import reverse
 
+from classification.enums import SpecialEKeys
+from classification.models.classification_groups import ClassificationGroups
 from email_manager.models import EmailLog
 from flags.models import flag_comment_action, Flag, FlagResolution, FlagComment, FlagStatus
 from library.django_utils import get_url_from_view_path
 from library.log_utils import report_event
-from snpdb.models import UserSettings
-from classification.models import flag_types, Classification, DiscordanceReport
+from snpdb.models import UserSettings, LabNotificationBuilder
+from classification.models import flag_types, Classification, DiscordanceReport, discordance_change_signal, \
+    EvidenceKeyMap
+
+
+@receiver(discordance_change_signal, sender=DiscordanceReport)
+def notify_discordance_change(discordance_report: DiscordanceReport, **kwargs):
+    pass
+    # send_discordance_notification(discordance_report=discordance_report)
+
+
+def send_discordance_notification(discordance_report: DiscordanceReport):
+    all_labs = discordance_report.all_actively_involved_labs()
+    all_lab_names = ", ".join(lab.name for lab in all_labs)
+    groups = ClassificationGroups(discordance_report.all_classification_modifications())
+    report_url = get_url_from_view_path(
+        reverse('discordance_report', kwargs={'report_id': discordance_report.id}),
+    )
+    clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    for lab in all_labs:
+        notification = LabNotificationBuilder(lab=lab, message="Discordance Update")
+        if not discordance_report.is_active:
+            notification.add_markdown(f"This discordance is now marked as *{discordance_report.resolution_text}*")
+        notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
+        listing = ""
+        for group in groups:
+            listing += f"- {group.lab} `{group.most_recent.c_parts}` {clin_sig_key.pretty_value(group.clinical_significance)}\n"
+        notification.add_markdown(listing)
+        notification.add_markdown(f"Full details of the discordance can be seen here : <{report_url}>")
+        notification.send()
 
 
 @receiver(flag_comment_action, sender=Flag)

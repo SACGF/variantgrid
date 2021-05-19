@@ -6,6 +6,7 @@ etc and things that don't fit anywhere else.
 'snpdb' was the highly unoriginal name I used before 'VariantGrid'
 """
 import json
+from enum import Enum
 from functools import total_ordering
 
 from celery.result import AsyncResult
@@ -386,15 +387,29 @@ class Lab(models.Model):
 
 class LabNotificationBuilder(NotificationBuilder):
 
-    def __init__(self, lab: Lab, message: str, emoji: str = ":dna:"):
-        self.lab = lab
+    class NotificationType(Enum):
+        DISCORDANCE = "Discordance"
+        GENERAL_UPDATE = "General Update"
+
+    def __init__(self, lab: Lab, message: str, emoji: str = ":dna:", notification_type: NotificationType = NotificationType.DISCORDANCE):
         if not isinstance(lab, Lab):
             raise ValueError(f"Expected lab, got {lab}")
+        self.lab = lab
+        self.notification_type = notification_type
         super().__init__(message=message, emoji=emoji)
 
     @property
     def can_send(self) -> bool:
         return bool(self.lab.slack_webhook)
+
+    def send(self):
+        self.sent = True
+        if slack_web_hook := self.lab.slack_webhook:
+            send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=slack_web_hook)
+        if lab_email := self.lab.email:
+            # send_weekly_emails
+            pass
+        self.as_html()
 
     @property
     def webhook_url(self) -> Optional[str]:

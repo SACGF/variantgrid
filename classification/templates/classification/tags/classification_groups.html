@@ -48,11 +48,8 @@
 </table>
 <script>$(document).ready(() => {
     $('#{{ table_id }}').DataTable({
-        "order": [[ 2, "desc" ]],
-        {% if not enable_paging %}
-            "paging": false,
-            dom: '<"top">rt<"bottom"><"clear">',
-        {% endif %}
+        order: [[ 2, "desc" ]],
+        pageLength: 50,
         responsive: {
             details: {
                 // type: 'column',

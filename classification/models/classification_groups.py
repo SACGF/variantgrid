@@ -5,7 +5,7 @@ from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set
 from lazy import lazy
 from threadlocals.threadlocals import get_thread_variable
 
-from classification.enums import SpecialEKeys, CriteriaEvaluation
+from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved
 from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
@@ -92,31 +92,43 @@ class ClassificationGroup:
         return self.most_recent.classification.lab.name
 
     @property
-    def is_discordant(self) -> bool:
+    def is_withdrawn(self) -> bool:
         return all(cm.classification.withdrawn for cm in self.modifications)
 
     @property
+    def is_discordant(self):
+        if self.most_recent.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
+            if cc := self.most_recent.classification.clinical_context:
+                return cc.is_discordant()
+
+    def _c_hgvs_for(self, cm: ClassificationModification) -> CHGVS:
+        c_parts: CHGVS
+        if c_str := cm.classification.get_c_hgvs(self.genome_build):
+            c_parts = CHGVS(c_str)
+            c_parts.is_normalised = True
+            c_parts.genome_build = self.genome_build
+        else:
+            c_parts = cm.classification.c_parts
+            c_parts.is_normalised = False
+            try:
+                c_parts.genome_build = cm.classification.get_genome_build()
+                c_parts.is_desired_build = self.genome_build.name == c_parts.genome_build.name
+            except KeyError:
+                pass
+        return c_parts
+
+    @lazy
     def c_hgvses(self) -> List[CHGVS]:
         unique_c = set()
         for cm in self.modifications:
-            c_parts: CHGVS
-            if c_str := cm.classification.get_c_hgvs(self.genome_build):
-                c_parts = CHGVS(c_str)
-                c_parts.is_normalised = True
-                c_parts.genome_build = self.genome_build
-            else:
-                c_parts = cm.classification.c_parts
-                c_parts.is_normalised = False
-                try:
-                    c_parts.genome_build = cm.classification.get_genome_build()
-                    c_parts.is_desired_build = self.genome_build.name == c_parts.genome_build.name
-                except KeyError:
-                    pass
-
-            unique_c.add(c_parts)
+            unique_c.add(self._c_hgvs_for(cm))
         c_list = list(unique_c)
         c_list.sort()
         return c_list
+
+    @property
+    def c_hgvs(self) -> CHGVS:
+        return self.c_hgvses[0]
 
     def p_hgvses(self) -> List[PHGVS]:
         unique_p = set()

@@ -10,7 +10,7 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import get_
 from classification.classification_import import process_classification_import
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, email_discordance_for_classification, ConditionText, \
-    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification
+    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification, send_discordance_notification
 from classification.models.classification import Classification, ClassificationImport
 from library.guardian_utils import admin_bot
 from snpdb.admin import ModelAdminBasics
@@ -577,6 +577,15 @@ class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
 class DiscordanceReportAdmin(ModelAdminBasics):
     list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "labs"]
     list_filter = [DiscordanceReportAdminLabFilter]
+
+    def send_notification(self, request, queryset):
+        ds: DiscordanceReport
+        for ds in queryset:
+            send_discordance_notification(ds)
+
+    send_notification.short_description = "Send discordance notification"
+
+    actions = [send_notification]
 
     def allele(self, obj: DiscordanceReport):
         cc = obj.clinical_context

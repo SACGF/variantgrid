@@ -164,6 +164,8 @@ class CHGVS:
     """
     Technically this is HGVS now as it will accept c. p. g. n. etc
     """
+    HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
+    NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
 
     def __init__(self, full_c_hgvs: str, transcript: str = None):
         if transcript:
@@ -180,8 +182,7 @@ class CHGVS:
         self.is_desired_build: Optional[bool] = None
         self.genome_build: Optional[GenomeBuild] = None
 
-        c_regex = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
-        match = c_regex.match(full_c_hgvs)
+        match = CHGVS.HGVS_REGEX.match(full_c_hgvs)
         if match:
             self.gene = match[2]
             self.raw_c = match[3]
@@ -231,7 +232,24 @@ class CHGVS:
         """
         Warning, just does alphabetic sorting for consistent ordering, does not attempt to order by genomic coordinate
         """
-        return self.full_c_hgvs < other.full_c_hgvs
+        return self.sort_str < other.sort_str
+
+    def __str__(self):
+        return self.full_c_hgvs
+
+    @lazy
+    def sort_str(self) -> str:
+        """
+        Returns a string that can be used for sorting, works on numerical part of c., followed by the extra, followed by the transcript
+        Each part being padded so equivalent comparing
+        """
+        sort_str = ""
+        if c_part := self.raw_c:
+            if parts := CHGVS.NUM_PART.match(c_part):
+                num_part = parts.group(1).rjust(10, '0')
+                extra = parts.group(2)
+                return num_part + extra + self.transcript
+        return self.full_c_hgvs or ""
 
     @lazy
     def transcript_parts(self) -> TranscriptParts:
@@ -274,8 +292,8 @@ class CHGVS:
                 m1 = r_regex.match(self.raw_c)
                 m2 = r_regex.match(other.raw_c)
                 if m1 and m2 and m1.group(1) == m2.group(1):
-                    #allowed combos
-                    #num and anything, blank and anything
+                    # allowed combos
+                    # num and anything, blank and anything
                     trailing1 = m1.group(2)
                     trailing2 = m2.group(2)
                     if trailing_okay(trailing1, trailing2):

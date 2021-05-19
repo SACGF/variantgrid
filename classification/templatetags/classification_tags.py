@@ -49,7 +49,6 @@ def classification_groups(
         classification_modifications: Iterable[ClassificationModification],
         show_diffs: bool = True,
         link_discordance_reports: bool = False,
-        enable_paging: bool = True,
         genome_build: Optional[GenomeBuild] = None):
 
     groups = ClassificationGroups(classification_modifications, genome_build=genome_build)

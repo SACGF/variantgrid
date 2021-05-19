@@ -17,6 +17,11 @@ from classification.enums.classification_enums import SpecialEKeys, ClinicalSign
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification import ClassificationModification, Classification
+from snpdb.models import Lab
+import django.dispatch
+
+
+discordance_change_signal = django.dispatch.Signal(providing_args=["discordance_report"])
 
 
 class DiscordanceReport(TimeStampedModel):
@@ -75,6 +80,8 @@ class DiscordanceReport(TimeStampedModel):
         for drc in DiscordanceReportClassification.objects.filter(report=self):  # type: DiscordanceReportClassification
             drc.close()
 
+        discordance_change_signal.send(DiscordanceReport, discordance_report=self)
+
     @transaction.atomic
     def update(self, cause_text: str = ''):
         if not self.is_active:
@@ -87,11 +94,13 @@ class DiscordanceReport(TimeStampedModel):
         for drc_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__classification', flat=True):
             existing_vms.add(drc_id)
 
+        newly_added_labs: Set[Lab] = set()
         for vcm_id in self.clinical_context.classifications_qs.values_list('id', flat=True):
             if vcm_id in existing_vms:
                 existing_vms.remove(vcm_id)
             else:
                 vcm = ClassificationModification.objects.filter(is_last_published=True, classification=vcm_id).get()
+                newly_added_labs.add(vcm.classification.lab)
                 DiscordanceReportClassification(
                     report=self,
                     classification_original=vcm
@@ -101,7 +110,17 @@ class DiscordanceReport(TimeStampedModel):
 
         if not self.clinical_context.is_discordant():
             # hey we've reached concordance, let's close this
+            # close will fire off a notification event
             self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
+        else:
+            if newly_added_labs: # change is significant
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self)
+
+    def all_actively_involved_labs(self):
+        all_lab_ids = set()
+        for lab_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__classification__lab', flat=True):
+            all_lab_ids.add(lab_id)
+        return list(Lab.objects.filter(id__in=all_lab_ids).all())
 
     @transaction.atomic
     def create_new_report(self, only_if_necessary: bool = True, cause: str = ''):
@@ -186,6 +205,7 @@ class DiscordanceReport(TimeStampedModel):
         for dr in DiscordanceReportClassification.objects.filter(report=self):
             vcms.append(dr.classfication_effective)
         return vcms
+
 
 class DiscordanceAction:
 
