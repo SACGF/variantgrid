@@ -1131,7 +1131,7 @@ div#content {
 }
 
 .loading {
-  background-image: url(/static/images/loading.gif);
+  background-image: url(/static/icons/loading.gif);
   background-repeat: no-repeat;
 }
 
