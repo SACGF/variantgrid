@@ -18,13 +18,6 @@
         width: 50%;
     }
 
-    div.loading {
-        background: url({% static 'icons/loading.gif' %}) no-repeat center center;
-        width: 16px;
-        height: 16px;
-        float: left;
-    }
-
     #plotly-graph-container {
         float: right;
         width: 50%;
@@ -35,11 +28,11 @@
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     <script>
     $(document).ready(() => {
-        var gcContainer = $("#qc-gene-coverage-graph-container");
+        const gcContainer = $("#qc-gene-coverage-graph-container");
         const GENOME_BUILD = "{{ genome_build.name }}";
 
         function load_graph(url) {
-            var loading_icon = $('<label>').attr({class : 'loading', style: 'margin-right:10px;'});
+            const loading_icon = $('<label>').attr({class : 'loading icon32', style: 'margin-right:10px;'});
             gcContainer.html(loading_icon);
             gcContainer.load(url);
         }
@@ -49,7 +42,7 @@
         }
 
         $('#id_gene_symbol').change(function() {
-            var geneSymbol = $(this).val();
+            const geneSymbol = $(this).val();
             if (geneSymbol) {
                 load_graph(Urls.gene_symbol_coverage_collection_graphs(GENOME_BUILD, geneSymbol));
             } else {
@@ -58,7 +51,7 @@
         });
 
         $('#id_gene_list').change(function() {
-            var geneListId = $(this).val();
+            const geneListId = $(this).val();
             if (geneListId) {
                 load_gene_list(geneListId);
             } else {

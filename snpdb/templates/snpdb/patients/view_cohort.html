@@ -55,13 +55,6 @@
 		float: left;
 		background-image: url({% static 'icons/arrow_red_left_small.png' %});	
 	}
-
-	div.loading {
-		background: url({% static 'icons/loading.gif' %}) no-repeat center center;
-	    width: 16px;
-	    height: 16px;
-	    float: left;
-	}
 	
 	.cohort-message {
 		display: none;
@@ -117,7 +110,7 @@
                 samplesTabState = "warning";
 			} else if (cohortCountStatus == CC_STATUS_RUNNING) {
 				var task_info = $('#task-info');
-				var loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
+				var loading_icon = $('<div>').attr({class : 'loading icon16', style: 'margin-right:10px;'});
 				task_info.html(loading_icon);
 				task_info.append("Cohort Count task is running...");
 				$('#task-info').show();

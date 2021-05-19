@@ -71,14 +71,6 @@ table#gene-grid tr {
     width: 16px;
 }
 
-.loading {
-    background-image: url({% static 'images/spinner.gif' %});
-    height: 16px;
-    width: 16px;
-    background-repeat: no-repeat;
-    margin: auto;
-}
-
 .gene-coverage-tooltip {
     min-width: 600px;
     min-height: 320px;
@@ -610,7 +602,7 @@ function getGeneRowColumns(geneSymbol, headerRow, canAddGene) {
                 };
             } else {
                 columnData["initFunc"] = function(cell, geneSymbol) {
-                    let coverageDiv = $("<div />").addClass("loading");
+                    let coverageDiv = $("<div />").addClass("loading icon16");
                     cell.append(coverageDiv);
 
                     requestGeneIdentifiersForRelease(geneSymbol, myReleaseId);
@@ -663,7 +655,7 @@ function getGeneRowColumns(geneSymbol, headerRow, canAddGene) {
                 } else {
                     if (c === loadingColumn) { // Only need 1 for set of cols
                         columnData["initFunc"] = function(cell, geneSymbol) {
-                            let coverageDiv = $("<div />").addClass("loading");
+                            let coverageDiv = $("<div />").addClass("loading icon16");
                             cell.append(coverageDiv);
                             
                             requestEnrichmentKitCoverage(geneSymbol, myEnrichmentKitId);
@@ -1569,7 +1561,7 @@ function emptyGeneHoverHandler(geneContainer, recordId, className, gene, addFunc
 
 
 function clinGenCellInit(cell, gene_symbol) {
-    let clinGenDiv = $("<div />").addClass("loading");
+    let clinGenDiv = $("<div />").addClass("loading icon16");
     cell.append(clinGenDiv);
     // make API call and when done - replace with this
     $.ajax({

@@ -1165,6 +1165,11 @@ div#content {
     background-image: url(/static/icons/settings-icon.png);
 }
 
+.loading {
+    background-image: url(/static/images/loading.gif);
+    background-repeat: no-repeat;
+}
+
 .ui-layout-pane { /* all panes' */
     background: #FFF;
     border: 1px solid #BBB;
