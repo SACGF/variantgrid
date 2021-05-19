@@ -45,6 +45,10 @@
         font-weight: bold;
     }
 
+    #analysis-genome-build {
+        font-weight: bold;
+    }
+
 	{% render_rgb_css 'node-count-' node_count_colors %}
     {% render_node_count_colors_css %}
 </style>
@@ -209,6 +213,7 @@
                     <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
                     {% endif %}
                     </div>
+                    <span id="analysis-genome-build">{{ analysis.genome_build }}</span>
                 </div>
 
             <div id="analysis-container" class="ui-layout-center">
