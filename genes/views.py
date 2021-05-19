@@ -129,9 +129,11 @@ def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[Ont
 def view_gene_symbol(request, gene_symbol, genome_build_name=None):
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
+    gene_external_urls = {}
     for gene in gene_symbol.genes:
         aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
         aliases.update(gene.get_symbols().exclude(symbol=gene_symbol))
+        gene_external_urls[gene.identifier] = gene.get_external_url()
 
     desired_genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     genome_build = desired_genome_build
@@ -192,6 +194,7 @@ def view_gene_symbol(request, gene_symbol, genome_build_name=None):
         "gene_in_gene_lists": gene_in_gene_lists,
         "gene_infos": GeneInfo.get_for_gene_symbol(gene_symbol),
         "gene_summary": gene_summary,
+        "gene_external_urls": gene_external_urls,
         "genome_build": genome_build,
         "has_classified_variants": has_classified_variants,
         "hgnc": hgnc,
