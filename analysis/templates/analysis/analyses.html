@@ -64,7 +64,7 @@
             });
 
             $('#id_analysis').change(function () {
-                var analysisId = $("#id_analysis").val();
+                const analysisId = $("#id_analysis").val();
                 window.location = Urls.analysis(analysisId);
             });
         });
@@ -99,11 +99,9 @@
           </form>
         </div>
 
-        {% if analysis_choice_form %}
         <form>
             {% labelled label="Open Analysis" %}{{ analysis_choice_form.analysis }} {{ analysis_choice_form.media }}{% endlabelled %}
         </form>
-        {% endif %}
 
         {# Needs to be called 'node-editor-container' to match how it's loaded in analysis #}
         <div id="node-editor-container">

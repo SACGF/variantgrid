@@ -24,6 +24,13 @@ class AnalysisChoiceForm(forms.Form):
                                                                        attrs={'data-placeholder': 'Analysis...'}))
 
 
+class AnalysisTemplateTypeChoiceForm(forms.Form):
+    analysis = forms.ModelChoiceField(queryset=Analysis.objects.all(),
+                                      widget=autocomplete.ModelSelect2(url='analysis_autocomplete',
+                                                                       attrs={'data-placeholder': 'Analysis...'},
+                                                                       forward=(forward.Const(AnalysisTemplateType.TEMPLATE, 'template_type'),)))
+
+
 def get_analysis_template_form_for_variables_only_of_class(class_name, autocomplete_field=True,
                                                            requires_sample_somatic=None, requires_sample_gene_list=None):
     """ Returns a AnalysisTemplateForm - with either autocomplete forwards set or hidden input """
