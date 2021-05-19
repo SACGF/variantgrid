@@ -28,7 +28,7 @@
 {% endblock head %}
 {% block content %}
 
-    <div class="container">
+    <div class="container-table">
         {% page_help page_id='seqauto/sequencing_data_help' title='Sequencing Data' %}
 
         <ul>
@@ -49,6 +49,7 @@
     {% ui_register_tab tab_set="sequencing-tabs" label="VCF" url="vcf_files" %}
     {% ui_register_tab tab_set="sequencing-tabs" label="QC" url="qcs" %}
 
-    {% ui_render_tabs tab_set="sequencing-tabs" css="container" %}
+    {% ui_render_tabs tab_set="sequencing-tabs" css="container-table" %}
+
 
 {% endblock content %}

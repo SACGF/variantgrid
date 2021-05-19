@@ -24,6 +24,8 @@
 </script>
 
 <div class="container">
+    {% page_help page_id='analysis/analysis_templates_help' title='Analyses Templates' %}
+
     <div id="analysis-template-form-container">
       <form id="analysis-template-form" method="post">
         {% csrf_token %}
@@ -44,8 +46,8 @@
         {% labelled label="Open Analysis Template" %}{{ analysis_template_choice_form.analysis }} {{ analysis_template_choice_form.media }}{% endlabelled %}
     </form>
 
-    {% page_help page_id='analysis/analysis_templates_help' title='Analyses Templates' %}
-
+</div>
+<div class="container-table">
     {% user_data_grid_filter 'analysis_templates' 'Analysis Templates' %}
     {% jqgrid 'analysis_templates_grid' 'analysis_templates' search=False delete=True %}
 </div>

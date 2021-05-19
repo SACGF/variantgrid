@@ -106,7 +106,9 @@
         {# Needs to be called 'node-editor-container' to match how it's loaded in analysis #}
         <div id="node-editor-container">
         </div>
+    </div>
 
+    <div class="container-table">
         {% load jqgrid_tags %}
         {% user_data_grid_filter 'analyses' 'Analyses' %}
         {% jqgrid 'analyses_grid' 'analyses' search=False delete=True download_grid_json_as_csv=True init_func='grid_init_func' %}
