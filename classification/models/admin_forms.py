@@ -9,7 +9,7 @@ from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.classification_import import process_classification_import
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import EvidenceKey, email_discordance_for_classification, ConditionText, \
+from classification.models import EvidenceKey, ConditionText, \
     ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification, send_discordance_notification
 from classification.models.classification import Classification, ClassificationImport
 from library.guardian_utils import admin_bot
@@ -276,19 +276,6 @@ class ClassificationAdmin(admin.ModelAdmin):
 
     recalculate_cached_chgvs.short_description = 'Re-calculate cached chgvs'
 
-    def email_discordance_notification(self, request, queryset):
-        emails_sent = False
-        for vc in queryset:
-            this_vc_sent = email_discordance_for_classification(vc)
-            if this_vc_sent:
-                emails_sent = True
-        if emails_sent:
-            self.message_user(request, 'Some emails were sent')
-        else:
-            self.message_user(request, 'No emails were sent')
-
-    email_discordance_notification.short_description = 'Send Discordance Notifications'
-
     def set_withdraw(self, request, queryset, withdraw: bool) -> int:
         vc: Classification
         count = 0
@@ -326,7 +313,6 @@ class ClassificationAdmin(admin.ModelAdmin):
                publish_org,
                reattempt_variant_matching,
                recalculate_cached_chgvs,
-               email_discordance_notification,
                # fix_allele_freq_history,
                withdraw_true,
                withdraw_false]

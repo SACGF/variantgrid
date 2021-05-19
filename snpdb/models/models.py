@@ -385,37 +385,6 @@ class Lab(models.Model):
         return name
 
 
-class LabNotificationBuilder(NotificationBuilder):
-
-    class NotificationType(Enum):
-        DISCORDANCE = "Discordance"
-        GENERAL_UPDATE = "General Update"
-
-    def __init__(self, lab: Lab, message: str, emoji: str = ":dna:", notification_type: NotificationType = NotificationType.DISCORDANCE):
-        if not isinstance(lab, Lab):
-            raise ValueError(f"Expected lab, got {lab}")
-        self.lab = lab
-        self.notification_type = notification_type
-        super().__init__(message=message, emoji=emoji)
-
-    @property
-    def can_send(self) -> bool:
-        return bool(self.lab.slack_webhook)
-
-    def send(self):
-        self.sent = True
-        if slack_web_hook := self.lab.slack_webhook:
-            send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=slack_web_hook)
-        if lab_email := self.lab.email:
-            # send_weekly_emails
-            pass
-        self.as_html()
-
-    @property
-    def webhook_url(self) -> Optional[str]:
-        return self.lab.slack_webhook
-
-
 class LabHead(models.Model):
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=CASCADE)

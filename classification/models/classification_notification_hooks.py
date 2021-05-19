@@ -11,16 +11,16 @@ from classification.models.classification_groups import ClassificationGroups
 from email_manager.models import EmailLog
 from flags.models import flag_comment_action, Flag, FlagResolution, FlagComment, FlagStatus
 from library.django_utils import get_url_from_view_path
-from library.log_utils import report_event
-from snpdb.models import UserSettings, LabNotificationBuilder
+from library.log_utils import report_event, send_notification
+from snpdb.models import UserSettings
 from classification.models import flag_types, Classification, DiscordanceReport, discordance_change_signal, \
     EvidenceKeyMap
+from snpdb.utils import LabNotificationBuilder
 
 
 @receiver(discordance_change_signal, sender=DiscordanceReport)
 def notify_discordance_change(discordance_report: DiscordanceReport, **kwargs):
-    pass
-    # send_discordance_notification(discordance_report=discordance_report)
+    send_discordance_notification(discordance_report=discordance_report)
 
 
 def send_discordance_notification(discordance_report: DiscordanceReport):
@@ -34,7 +34,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
     for lab in all_labs:
         notification = LabNotificationBuilder(lab=lab, message="Discordance Update")
         if not discordance_report.is_active:
-            notification.add_markdown(f"This discordance is now marked as *{discordance_report.resolution_text}*")
+            notification.add_markdown(f"This overlap is now marked as *{discordance_report.resolution_text}*")
         notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
         listing = ""
         for group in groups:
@@ -42,8 +42,10 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
         notification.add_markdown(listing)
         notification.add_markdown(f"Full details of the discordance can be seen here : <{report_url}>")
         notification.send()
+    send_notification(message=f"Discordance notification re Discordance Report {discordance_report.id} sent", emoji=":email:")
 
 
+"""
 @receiver(flag_comment_action, sender=Flag)
 def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):  # pylint: disable=unused-argument
     if settings.DISCORDANCE_ENABLED:
@@ -102,3 +104,4 @@ def email_discordance_for_classification(vc: Classification) -> bool:
         return sent
 
     return False
+"""

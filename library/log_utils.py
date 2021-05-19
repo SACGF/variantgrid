@@ -82,12 +82,12 @@ def report_exc_info(extra_data=None, request=None):
 
 class NotificationBuilder:
 
-    SLACK_EMOJI_RE = re.compile(r"\:\w+\:")
+    SLACK_EMOJI_RE = re.compile(r"[:][A-Z_]+[:]", re.IGNORECASE)
 
     @staticmethod
     def slack_markdown_to_html(markdown_txt: str, surround_with_div: bool = False):
         if markdown_txt:
-            markdown_txt = NotificationBuilder.SLACK_EMOJI_RE.sub(markdown_txt, "")
+            markdown_txt = re.sub(NotificationBuilder.SLACK_EMOJI_RE, "", markdown_txt)
             markdown_html = markdown(markdown_txt)
             if surround_with_div:
                 markdown_html = f"<div>{markdown_html}</div>"
@@ -97,6 +97,9 @@ class NotificationBuilder:
     # Different kind of blocks
 
     class Block:
+
+        def as_text(self) -> str:
+            raise NotImplementedError(f"{self} has not implemented as_text method")
 
         def as_html(self) -> str:
             raise NotImplementedError(f"{self} has not implemented as_html method")
@@ -108,6 +111,9 @@ class NotificationBuilder:
 
         def __init__(self, header_text: str):
             self.header_text = header_text
+
+        def as_text(self):
+            return self.header_text
 
         def as_html(self):
             return f"<h4>{self.header_text}</h4>"
@@ -130,10 +136,15 @@ class NotificationBuilder:
         def add_field(self, label: str, value: str):
             self.fields.append((label, value))
 
+        def as_text(self):
+            def as_line(field: Tuple[str, Any]):
+                return f"{field[0]}: {field[1]}"
+            return "\n".join(as_line(field) for field in self.fields)
+
         def as_html(self):
             def as_field(field: Tuple[str, Any]):
                 return f"<label>{NotificationBuilder.slack_markdown_to_html(field[0])}</label>: {field[1]}";
-            return "<br/>".join([as_field(field) for field in self.fields])
+            return "<div>" + "<br/>".join([as_field(field) for field in self.fields]) + "</div>"
 
         def as_slack(self):
             blocks = list()
@@ -166,6 +177,12 @@ class NotificationBuilder:
             self.markdown_txt = markdown_txt
             self.indented = indented
 
+        def as_text(self):
+            text = self.markdown_txt
+            if self.indented:
+                text = "    " + (text or "<No Data>")
+            return text
+
         def as_slack(self):
             text = self.markdown_txt
             if self.indented:
@@ -179,6 +196,9 @@ class NotificationBuilder:
 
         def __init__(self):
             pass
+
+        def as_text(self):
+            return "--------------"
 
         def as_slack(self):
             return {"type": "divider"}
@@ -249,10 +269,10 @@ class NotificationBuilder:
         return slack_blocks
 
     def as_html(self):
-        html_str: str = ""
-        for block in self.blocks:
-            html_str += block.as_html()
-        return html_str
+        return "<br/>".join([block.as_html() for block in self.blocks])
+
+    def as_text(self):
+        return "\n".join([block.as_text() for block in self.blocks])
 
     def send(self):
         self.sent = True

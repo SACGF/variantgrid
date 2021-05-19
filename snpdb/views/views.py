@@ -65,6 +65,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
+from snpdb.utils import LabNotificationBuilder
 from upload.uploaded_file_type import retry_upload_pipeline
 from classification.classification_stats import get_grouped_classification_counts
 from classification.views.classification_datatables import ClassificationDatatableConfig
