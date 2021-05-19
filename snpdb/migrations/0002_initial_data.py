@@ -282,7 +282,7 @@ def create_columns(apps, schema_editor):
          'variant_column': 'clinvar__drug_response',
          'annotation_level': 'C',
          'width': None,
-         'label': 'ClinVar Drug Respose',
+         'label': 'ClinVar Drug Response',
          'description': 'ClinVar - set if CLNSIG contains 6 - drug response.',
          'model_field': True,
          'queryset_field': True},
