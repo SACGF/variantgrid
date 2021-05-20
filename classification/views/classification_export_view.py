@@ -197,6 +197,7 @@ class ClassificationApiExportView(APIView):
         since_str = request.query_params.get('since', None)
         if since_str:
             since = parse_since(since_str)
+        optimize_since = not request.query_params.get('old_since', '') == 'true'
 
         build_name = request.query_params.get('build', 'GRCh38')
         share_level = request.query_params.get('share_level', 'public')
@@ -254,7 +255,8 @@ class ClassificationApiExportView(APIView):
             "genome_build": genome_build,
             "qs": qs,
             "user": request.user,
-            "since": since
+            "since": since,
+            "optimize_since": optimize_since
         }
 
         if file_format == 'mvl':

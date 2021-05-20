@@ -82,6 +82,10 @@
         if (since.length) {
             params.since = since;
         }
+        let old_since = $("input[name='old_since']:checked");
+        if (old_since.length) {
+            params.old_since = 'true';
+        }
 
         let paramParts = [];
         for (let [key, value] of Object.entries(params)) {
@@ -199,6 +203,15 @@
         Recommended for users of Alissa 5.2
         </div>
     {% endlabelled %}
+    {% labelled label="Use old since logic"%}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input id="old_since" name="old_since" value="true" type="checkbox" class="form-check-input" />
+                {{ org.name }}
+            </label>
+        </div>
+    {% endlabelled %}
+
     {% labelled label="Organistion exclusion" %}
         {% for org in orgs %}
             <div class="form-check">
