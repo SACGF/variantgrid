@@ -431,7 +431,8 @@
 
                     function tagClick(tagId) {
                         geneVariantsGridParams = {"tag" : tagId};
-                        $("#gene-variants-grid").trigger("reloadGrid");
+                        let grid = $("#gene-variants-grid");
+                        grid.jqGrid('setGridParam', {page: 1, sortname: 'id', sortorder: "desc"}).trigger('reloadGrid');
                     }
                 </script>
                 {% tag_counts_filter genome_build=genome_build gene_symbol=gene_symbol click_func='tagClick' show_all_func='clearGeneVariantsGrid' %}
