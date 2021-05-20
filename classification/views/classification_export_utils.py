@@ -271,10 +271,29 @@ class ExportFormatter(BaseExportFormatter):
         self.error_message_ids = dict()
         self.raw_qs = qs
         self.started = datetime.utcnow()
-        self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
+        if self.enforce_cached_value:
+            self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
         self.row_count = 0
 
+        if self.since:
+            # This mess is to find all the alleles that have:
+            # a recent flag change
+            # a recent classification change (via variant / variant allele)
+            # a classification with a recent flag change (via variant / variant allele)
+            modified_classifications_variants = qs.filter(modified__gte=self.since).values_list('classification__variant', flat=True)
+            modified_flags = Flag.objects.filter(modified__gte=self.since).values_list('collection_id', flat=True).distinct()
+            if modified_classifications_variants.count() <= 1000 and modified_flags.count() <= 1000:
+                modified_classification_flag_variants = qs.filter(classification__flag_collection__in=modified_flags).values_list('classification__variant', flat=True)
+                modified_allele_flags = Allele.objects.filter(flag_collection__in=modified_flags).values_list('id', flat=True)
+                modified_allele_classifications = VariantAllele.objects.filter(variant__id__in=modified_classifications_variants.union(modified_classification_flag_variants)).values_list('allele', flat=True)
+                all_variants = VariantAllele.objects.filter(allele_id__in=modified_allele_flags.union(modified_allele_classifications)).values_list('variant', flat=True)
+                self.qs = qs.filter(classification__variant__in=all_variants)
+
         super().__init__()
+
+    @property
+    def enforce_cached_value(self) -> bool:
+        return True
 
     @property
     def supports_fully_withdrawn(self) -> bool:

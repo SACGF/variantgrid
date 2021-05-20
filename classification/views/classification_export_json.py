@@ -21,6 +21,10 @@ class ExportFormatterJSON(ExportFormatter):
     def supports_fully_withdrawn(self) -> bool:
         return True
 
+    @property
+    def enforce_cached_value(self) -> bool:
+        return False
+
     def header(self) -> str:
         return '{"records":[\n'
 
