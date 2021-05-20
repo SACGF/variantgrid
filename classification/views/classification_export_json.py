@@ -18,10 +18,6 @@ class ExportFormatterJSON(ExportFormatter):
         self.first_row = True
 
     @property
-    def supports_fully_withdrawn(self) -> bool:
-        return True
-
-    @property
     def enforce_cached_value(self) -> bool:
         return False
 

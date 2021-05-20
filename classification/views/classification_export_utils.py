@@ -4,6 +4,7 @@ from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from django.http.response import StreamingHttpResponse
 from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
@@ -274,13 +275,14 @@ class ExportFormatter(BaseExportFormatter):
 
         self.raw_qs = qs
         self.qs = qs
+        self.started = datetime.utcnow()
 
         if self.since and optimize_since:
             # This mess is to find all the alleles that have:
             # a recent flag change
             # a recent classification change (via variant / variant allele)
             # a classification with a recent flag change (via variant / variant allele)
-            modified_classifications_variants = qs.filter(modified__gte=self.since).values_list('classification__variant', flat=True)
+            modified_classifications_variants = qs.filter(Q(modified__gte=self.since) | Q(classification__modified__gte=self.since)).values_list('classification__variant', flat=True)
             modified_flags = Flag.objects.filter(modified__gte=self.since).values_list('collection_id', flat=True).distinct()
 
             modified_classification_flag_variants = qs.filter(classification__flag_collection__in=modified_flags).values_list('classification__variant', flat=True)
@@ -290,14 +292,9 @@ class ExportFormatter(BaseExportFormatter):
             self.raw_qs = qs.filter(classification__variant__in=all_variants)
             self.qs = self.raw_qs
 
-        if self.enforce_cached_value:
-            self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
+        self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
 
         super().__init__()
-
-    @property
-    def enforce_cached_value(self) -> bool:
-        return True
 
     @property
     def supports_fully_withdrawn(self) -> bool:
@@ -533,6 +530,7 @@ class ExportFormatter(BaseExportFormatter):
         return False
 
     def report_stats(self, row_count: int):
+        now = datetime.utcnow()
         url = None
         body_parts = [f":simple_smile: {self.user.username}"]
         if request := get_current_request():
@@ -546,6 +544,7 @@ class ExportFormatter(BaseExportFormatter):
         if request := get_current_request():
             for key, value in request.GET.items():
                 nb.add_field(key, value)
+        nb.add_field("Duration", str((now - self.started).seconds) + " seconds")
         nb.send()
 
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
