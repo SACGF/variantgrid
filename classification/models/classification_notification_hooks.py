@@ -1,20 +1,10 @@
-from typing import List, Optional, Set
-
-from django.conf import settings
-from django.contrib.auth.models import User, Group
 from django.dispatch import receiver
-from django.template.loader import render_to_string
 from django.urls import reverse
-
 from classification.enums import SpecialEKeys
 from classification.models.classification_groups import ClassificationGroups
-from email_manager.models import EmailLog
-from flags.models import flag_comment_action, Flag, FlagResolution, FlagComment, FlagStatus
 from library.django_utils import get_url_from_view_path
-from library.log_utils import report_event, send_notification
-from snpdb.models import UserSettings
-from classification.models import flag_types, Classification, DiscordanceReport, discordance_change_signal, \
-    EvidenceKeyMap
+from library.log_utils import send_notification
+from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap
 from snpdb.utils import LabNotificationBuilder
 
 
@@ -32,17 +22,22 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
     )
     clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     for lab in all_labs:
-        notification = LabNotificationBuilder(lab=lab, message="Discordance Update")
-        if not discordance_report.is_active:
-            notification.add_markdown(f"This overlap is now marked as *{discordance_report.resolution_text}*")
+        notification = LabNotificationBuilder(lab=lab, message=f"Discordance Update ({discordance_report.id})")
+        if resolution_text := discordance_report.resolution_text:
+            notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")
         notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
         listing = ""
         for group in groups:
-            listing += f"- {group.lab} `{group.most_recent.c_parts}` {clin_sig_key.pretty_value(group.clinical_significance)}\n"
+            listing += f"- {group.lab} `{group.most_recent.c_parts}` {clin_sig_key.pretty_value(group.clinical_significance)}"
+            if group.count() > 1:
+                listing += f" x {group.count()} records"
+            if group.is_withdrawn:
+                listing += " *WITHDRAWN*"
+            listing += "\n"
         notification.add_markdown(listing)
         notification.add_markdown(f"Full details of the discordance can be seen here : <{report_url}>")
         notification.send()
-    send_notification(message=f"Discordance notification re Discordance Report {discordance_report.id} sent", emoji=":email:")
+        send_notification(message=f"Discordance notification re Discordance Report <{report_url}> sent to {lab.name}", emoji=":email:")
 
 
 """

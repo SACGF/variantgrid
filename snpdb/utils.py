@@ -36,17 +36,12 @@ class LabNotificationBuilder(NotificationBuilder):
         if slack_web_hook := self.lab.slack_webhook:
             # send to lab's external slack
             send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=slack_web_hook)
-            # send to our slack as confirmation
-            send_notification(
-                message=self.message,
-                blocks=[NotificationBuilder.MarkdownBlock(indented=True, markdown_txt=f"This was sent to {self.lab.name}'s Slack").as_slack()] + self.as_slack(),
-                emoji=self.emoji)
 
         recipient_list: List[str] = list()
         if lab_email := self.lab.email:
             recipient_list.append(lab_email)
         else:
-            lab_users = Group.objects.get(name=self.lab.group_name).user_set.filter(is_active=True)
+            lab_users = Group.objects.get(name=self.lab.group_name).user_set.filter(is_active=True, email__isnull=False)
             user: User
             for user in lab_users:
                 passes_check = False
@@ -54,13 +49,15 @@ class LabNotificationBuilder(NotificationBuilder):
                     passes_check = UserSettings.get_for_user(user).email_discordance_updates
                 elif self.notification_type == LabNotificationBuilder.NotificationType.GENERAL_UPDATE:
                     passes_check = UserSettings.get_for_user(user).email_weekly_updates
+                if passes_check:
+                    recipient_list.append(user.email)
 
         if recipient_list:
             EmailLog.send_mail(subject=self.message,
                                html=self.as_html(),
                                text=self.as_text(),
                                from_email=settings.DISCORDANCE_EMAIL,
-                               recipient_list=[lab_email],
+                               recipient_list=recipient_list,
                                allow_users_to_see_others=True
             )
 

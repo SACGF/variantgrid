@@ -24,12 +24,11 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
             return HttpResponseRedirect(newly_opened.get_absolute_url())
 
         elif action == 'close':
-            report.report_closed_by = request.user
-            report.continued_discordance_reason = request.POST.get('continued_discordance_reason')
-            report.continued_discordance_text = request.POST.get('continued_discordance_text')
-            report.resolution = DiscordanceReportResolution.CONTINUED_DISCORDANCE
-            report.report_completed_date = now()
-            report.save()
+            report.unresolve_close(
+                user=request.user,
+                continued_discordance_reason=request.POST.get('continued_discordance_reason'),
+                continued_discordance_text=request.POST.get('continued_discordance_text')
+            )
 
         return HttpResponseRedirect(report.get_absolute_url())
 

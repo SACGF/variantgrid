@@ -83,6 +83,13 @@ class DiscordanceReport(TimeStampedModel):
         discordance_change_signal.send(DiscordanceReport, discordance_report=self)
 
     @transaction.atomic
+    def unresolve_close(self, user: User, continued_discordance_reason: str, continued_discordance_text: str):
+        self.report_closed_by = user
+        self.continued_discordance_reason = continued_discordance_reason
+        self.continued_discordance_text = continued_discordance_text
+        self.close(expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE, cause_text="Unable to resolve")
+
+    @transaction.atomic
     def update(self, cause_text: str = ''):
         if not self.is_active:
             raise ValueError('Cannot update non active Discordance Report')
