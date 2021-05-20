@@ -99,6 +99,8 @@ urlpatterns = [
     # Autocompletes
     perm_path('autocomplete/QCColumn/', views_autocomplete.QCColumnAutocompleteView.as_view(), name='qc_column_autocomplete'),
     perm_path('autocomplete/EnrichmentKit/', views_autocomplete.EnrichmentKitAutocompleteView.as_view(), name='enrichment_kit_autocomplete'),
+    perm_path('autocomplete/SequencingRun/', views_autocomplete.SequencingRunAutocompleteView.as_view(),
+              name='sequencing_run_autocomplete'),
 ]
 
 #router = routers.DefaultRouter()

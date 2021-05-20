@@ -3,7 +3,7 @@ from django import forms
 
 from library.forms import ROFormMixin
 from seqauto import models
-from seqauto.models import QCType, QCColumn, EnrichmentKit
+from seqauto.models import QCType, QCColumn, EnrichmentKit, SequencingRun
 from seqauto.models.models_enums import QCCompareType, QCGraphTypes2, \
     QCGraphEnrichmentKitSeparationChoices, QCGraphType
 from snpdb.forms import BaseDeclareForm
@@ -77,3 +77,9 @@ class AllEnrichmentKitForm(forms.Form):
                                             widget=autocomplete.ModelSelect2(url='enrichment_kit_autocomplete',
                                                                              forward=(forward.Const(True, 'show_obsolete'),),
                                                                              attrs={'data-placeholder': 'Enrichment Kit...'}))
+
+
+class AutocompleteSequencingRunForm(forms.Form):
+    sequencing_run = forms.ModelChoiceField(queryset=SequencingRun.objects.all(),
+                                            widget=autocomplete.ModelSelect2(url='sequencing_run_autocomplete',
+                                                                             attrs={'data-placeholder': 'SequencingRun...'}))

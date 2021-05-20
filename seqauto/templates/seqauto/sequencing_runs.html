@@ -3,7 +3,7 @@
 {% load crispy_forms_field %}
 
 <script>
-    var gridExtraFilters = {};
+    let gridExtraFilters = {};
 
     function showAll() {
         clearAutoCompletes();
@@ -64,21 +64,36 @@
             gridExtraFilters["enrichment_kit_id"] = $(this).val();
             filterGrid();
         });
+        $('#id_sequencing_run').change(function () {
+            const sequencingRunId = $("#id_sequencing_run").val();
+            window.location = Urls.view_sequencing_run(sequencingRunId);
+        });
     });
 </script>
 <div>
     {% page_help page_id='seqauto/sequencing_runs_help' title='Sequencing Runs' show_title=False %}
+    <form>
+        {% labelled label="Jump to SequencingRun" %}
+            {{ sequencing_run_form.sequencing_run }}
+            {{ sequencing_run_form.media }}
+        {% endlabelled %}
+    </form>
 
-    <div>    
+    <div>
         <form>
-            {% labelled label="Enrichment Kit" %}
-                {{ enrichment_kit_form.enrichment_kit }}
-                {{ enrichment_kit_form.media }}
-            {% endlabelled %}
+            <fieldset class="form-fields small">
+                <legend>Filter Grid</legend>
+                <div class="pair">
+                    {% labelled label="Enrichment Kit" %}
+                        {{ enrichment_kit_form.enrichment_kit }}
+                        {{ enrichment_kit_form.media }}
+                    {% endlabelled %}
+                </div>
+                <div id='sequencing-runs-filter-description' class='hidden'>
+                    Filtering to <span id='sequencing-runs-filter'></span>. <a href='javascript:showAll()'>Show All</a>
+                </div>
+            </fieldset>
         </form>
-        <div id='sequencing-runs-filter-description' class='hidden'>
-            Filtering to <span id='sequencing-runs-filter'></span>. <a href='javascript:showAll()'>Show All</a>
-        </div>
     </div>
 
 	{% load jqgrid_tags %}

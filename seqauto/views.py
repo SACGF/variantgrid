@@ -21,7 +21,7 @@ from library.django_utils import get_model_fields, staff_only
 from library.log_utils import log_traceback
 from library.utils import full_class_name
 from seqauto import forms
-from seqauto.forms import SequencingRunForm, AllEnrichmentKitForm
+from seqauto.forms import SequencingRunForm, AllEnrichmentKitForm, AutocompleteSequencingRunForm
 from seqauto.graphs.index_metrics_qc_graph import IndexMetricsQCGraph
 from seqauto.graphs.qc_column_boxplot_graph import QCColumnBoxPlotGraph
 from seqauto.graphs.qc_column_line_graph import QCColumnLineGraph
@@ -80,6 +80,7 @@ def experiments(request):
 def sequencing_runs(request):
     context = {
         "enrichment_kit_form": AllEnrichmentKitForm(),
+        "sequencing_run_form": AutocompleteSequencingRunForm(),
     }
     return render(request, 'seqauto/sequencing_runs.html', context)
 
