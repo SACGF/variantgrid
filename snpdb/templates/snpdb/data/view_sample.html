@@ -42,8 +42,8 @@
 </style>
 <script>
 function getBams() {
-    var bams = [];
-    var bamFilePath = $("#id_bam_file_path").val();
+    const bams = [];
+    const bamFilePath = $("#id_bam_file_path").val();
     if (bamFilePath) {
         bams.push(bamFilePath);
     }
@@ -57,10 +57,10 @@ window.ANALYSIS_SETTINGS = {
 };
 
 function setPatientLink() {
-    var patientSelector = $("#id_patient");
+    const patientSelector = $("#id_patient");
     patientSelector.parent().append("<a class='cross-link' id='patient-link'>View Patient</a>");
     function mySetPatientLink() {
-        var pk = patientSelector.find(":selected").val();
+        const pk = patientSelector.find(":selected").val();
         setCrossLink($("#patient-link"), Urls.view_patient, pk);
     }
     mySetPatientLink();
@@ -69,10 +69,10 @@ function setPatientLink() {
 
 
 function setIGVLink() {
-    var bfpl = $("<span id='bam-files-path-container'></span>");
-    var bamFilePathSelector = $("#id_bam_file_path");
-    var parentContainer = bamFilePathSelector.parent();
-    var kids = parentContainer.children();
+    const bfpl = $("<span id='bam-files-path-container'></span>");
+    const bamFilePathSelector = $("#id_bam_file_path");
+    const parentContainer = bamFilePathSelector.parent();
+    const kids = parentContainer.children();
     kids.each(function() {
         $(this).appendTo(bfpl);
     });
@@ -81,10 +81,10 @@ function setIGVLink() {
     parentContainer.append("<div class='clear'></div>");
 
     function setBamFilesPathLink() {
-        var lc = $("#igv-link-container");
+        const lc = $("#igv-link-container");
         lc.empty();
         if (bamFilePathSelector.val()) {
-            var igvLinkHMTL = create_igv_link('', 'getBams');
+            const igvLinkHMTL = create_igv_link('', 'getBams');
             lc.append(igvLinkHMTL);
             $('.igv-link-container', bfpl).append("<div>Open BAM in IGV</div>");
         }
@@ -99,14 +99,14 @@ $(document).ready(function() {
 
     $("#sample-tabs").tabs();
 
-    var sampleForm = $("#sample-form");
-    var patientSelect = $("#id_patient", sampleForm);
+    const sampleForm = $("#sample-form");
+    const patientSelect = $("#id_patient", sampleForm);
     patientSelect.change(function() {
         let specimenSelect = $("#id_specimen", sampleForm);
         clearAutocompleteChoice(specimenSelect);
     });
-    var dialog = setupCreatePatientDialog();
-    var sampleName = $("#id_name").val();
+    const dialog = setupCreatePatientDialog();
+    const sampleName = $("#id_name").val();
     addCreatePatientButton(dialog, patientSelect, sampleName);
 });
 </script>
@@ -120,6 +120,8 @@ $(document).ready(function() {
 <div id="sample">
     {% load vcf_history_trail_tags %}
     {% vcf_history_trail sample.vcf %}
+
+    <h1>Sample: {{ sample.name }}</h1>
 
     <div id="sample-tabs">
         <ul>

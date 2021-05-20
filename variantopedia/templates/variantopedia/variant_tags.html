@@ -11,7 +11,6 @@
 {{ block.super }}
 {% render_tag_styles_and_formatter %}
 <script>
-    const REQUIRES_CLASSIFICATION = "{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}";
     window.ANALYSIS_SETTINGS = {
         show_igv_links : false,
         open_variant_details_in_new_window: true,
@@ -39,32 +38,11 @@
         grid2.trigger("reloadGrid");
     }
 
-    function classifyAndCloseButton(tagId) {
-        let classifyUrl = Urls.create_classification_for_variant_tag(tagId);
-        window.open(classifyUrl, "_blank");
-        $(`#tag-button-${tagId}`).remove();
-    }
-
-    function formatVariantTagFirstColumn(variantString, options, rowObject) {
-        const variantURL = Urls.view_variant(rowObject["variant__id"]);
-        let cellValue = "<a href='" + variantURL + "' target='_blank'>" + variantString + "</a>";
-        if (rowObject.tag__id == REQUIRES_CLASSIFICATION) {
-            let tagId = rowObject.id;
-            cellValue += `<a id="tag-button-${tagId}" class="btn btn-primary new-classification-button" href="javascript:classifyAndCloseButton(${tagId})"><i class="fas fa-plus-circle"></i> New Classification</a>`;
-        }
-        return cellValue;
-    }
-
     function tagClick(tagId) {
         gridParams = {"tag" : tagId};
         reloadGrid();
     }
 
-$(document).ready(function() {
-    jQuery.extend($.fn.fmatter , {
-        formatVariantTagFirstColumn: formatVariantTagFirstColumn,
-    });
-});
 </script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <style>

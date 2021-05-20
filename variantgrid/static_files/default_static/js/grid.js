@@ -460,6 +460,24 @@ function tagsGlobalFormatter(value, a, rowData) {
 }
 
 
+function classifyAndCloseButton(tagId) {
+    let classifyUrl = Urls.create_classification_for_variant_tag(tagId);
+    window.open(classifyUrl, "_blank");
+    $(`#tag-button-${tagId}`).remove();
+}
+
+function formatVariantTagFirstColumn(variantString, options, rowObject) {
+    const REQUIRES_CLASSIFICATION = "RequiresClassification";
+    const variantURL = Urls.view_variant(rowObject["variant__id"]);
+    let cellValue = "<a href='" + variantURL + "' target='_blank'>" + variantString + "</a>";
+    if (rowObject.tag__id == REQUIRES_CLASSIFICATION) {
+        let tagId = rowObject.id;
+        cellValue += `<a id="tag-button-${tagId}" class="btn btn-primary new-classification-button" href="javascript:classifyAndCloseButton(${tagId})"><i class="fas fa-plus-circle"></i> New Classification</a>`;
+    }
+    return cellValue;
+}
+
+
 function gnomADVariant(rowData) {
     let chrom = rowData["locus__contig__name"];
     if (chrom.startsWith("chr")) {

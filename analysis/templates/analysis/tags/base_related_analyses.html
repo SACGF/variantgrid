@@ -75,7 +75,7 @@
         {% load jqgrid_tags %}
         {%  for genome_build_name in variant_tag_genome_build_names %}
             {% user_data_grid_filter genome_build_name 'Variant Tags' %}
-            {% jqgrid 'variant_tags_grid' genome_build_name genome_build_name=genome_build_name search=False download_grid_json_as_csv=True jqgrid_config_get_parameters_func='getRelatedVariantTagsConfigUrl' init_func='relatedAnalysesGridInitFunc' %}
+            {% jqgrid 'variant_tags_grid' genome_build_name template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build_name search=False download_grid_json_as_csv=True jqgrid_config_get_parameters_func='getRelatedVariantTagsConfigUrl' init_func='relatedAnalysesGridInitFunc' %}
         {%  endfor %}
     {% endif %}
     
