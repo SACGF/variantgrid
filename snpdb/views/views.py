@@ -250,6 +250,10 @@ def view_vcf(request, vcf_id):
     for warning, _ in vcf.get_warnings():
         messages.add_message(request, messages.WARNING, warning, extra_tags='import-message')
 
+    has_write_permission = vcf.can_write(request.user)
+    if not has_write_permission:
+        messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -259,7 +263,7 @@ def view_vcf(request, vcf_id):
         'vcf_form': vcf_form,
         'samples_form': samples_form,
         'patient_form': PatientForm(user=request.user),  # blank
-        'has_write_permission': vcf.can_write(request.user),
+        'has_write_permission': has_write_permission,
         'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
@@ -279,6 +283,7 @@ def view_sample(request, sample_id):
     form = forms.SampleForm(request.POST or None, instance=sample)
     if not has_write_permission:
         set_form_read_only(form)
+        messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
 
     if request.method == 'POST':
         if not has_write_permission:

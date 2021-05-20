@@ -169,10 +169,18 @@ function addCreateProjectButtonAndForm() {
       width: 350,
       modal: true,
       buttons: {
-        "Create new project": createNewProject,
-        Cancel: function() {
-          dialog.dialog("close");
-        }
+        "Create new project": {
+            "click": createNewProject,
+            "class": "btn btn-primary",
+            "text": "Create new project",
+        },
+        Cancel: {
+            "click": function () {
+                dialog.dialog("close");
+            },
+            "class": "btn btn-secondary",
+            "text": "Cancel",
+        },
       },
       close: function() {
         form[0].reset();
@@ -249,6 +257,7 @@ $(document).ready(function() {
     });
 });
 </script>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 {% endblock %}
 
 
@@ -395,8 +404,6 @@ $(document).ready(function() {
                     Populate ClinGen Alleles
                 </button>
             {% endif %}
-        {% else %}
-            You can view but not modify this data.
         {% endif %}
         </p>
 
@@ -411,7 +418,6 @@ $(document).ready(function() {
         {% endif %}
         <div class='clear'></div>
         
-        {% include "messages/messages.html" %}
         {% vcf_import_info vcf 'Please see "View upload processing" in VCF info tab.' %}
 
         </p>

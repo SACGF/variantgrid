@@ -110,9 +110,7 @@ $(document).ready(function() {
     addCreatePatientButton(dialog, patientSelect, sampleName);
 });
 </script>
-<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 {% endblock %}
 
 {% block submenu_page_content %}
@@ -166,10 +164,7 @@ $(document).ready(function() {
                 {{ form.as_p }}
                 {% if has_write_permission %}
                     <button id='save-sample' class="btn btn-primary">save</button>
-                {% else %}
-                    You can view but not modify this data.
                 {% endif %}
-                {% include "messages/messages.html" %}
                 {% vcf_import_info sample.vcf 'Please click the VCF icon at the top of the page, then the "View upload processing" link.' %}
 
                 {{ form.media }}
