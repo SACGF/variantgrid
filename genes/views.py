@@ -243,6 +243,13 @@ class GeneSymbolViewInfo:
         return defaultdict_to_dict(consortium_genes_and_aliases)
 
     @lazy
+    def gene_external_urls(self) -> Dict[str, str]:
+        gene_external_urls: Dict[str, str] = dict()
+        for gene in self.gene_symbol.genes:
+            gene_external_urls[gene.identifier] = gene.get_external_url()
+        return gene_external_urls
+
+    @lazy
     def has_gene_coverage(self) -> bool:
         has_gene_coverage = GeneCoverage.get_for_symbol(self.genome_build, self.gene_symbol).exists()
         if has_gene_coverage:
@@ -297,6 +304,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "consortium_genes_and_aliases",
             "citations",
             "gene_symbol",
+            "gene_external_urls",
             "gene_in_gene_lists",
             "gene_infos",
             "gene_summary",
