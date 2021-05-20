@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.dispatch import receiver
 from django.urls import reverse
 from classification.enums import SpecialEKeys
@@ -10,7 +11,8 @@ from snpdb.utils import LabNotificationBuilder
 
 @receiver(discordance_change_signal, sender=DiscordanceReport)
 def notify_discordance_change(discordance_report: DiscordanceReport, **kwargs):
-    send_discordance_notification(discordance_report=discordance_report)
+    if settings.DISCORDANCE_ENABLED:
+        send_discordance_notification(discordance_report=discordance_report)
 
 
 def send_discordance_notification(discordance_report: DiscordanceReport):
