@@ -70,8 +70,7 @@ def analysis_list(request):
         add_save_message(request, False, "Analysis")
 
     context = {"create_analysis_form": form,
-               "analysis_choice_form": AnalysisChoiceForm(),
-               "analysis_type_description": "Analysis"}
+               "analysis_choice_form": AnalysisChoiceForm()}
     return render(request, 'analysis/analyses.html', context)
 
 

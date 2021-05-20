@@ -174,7 +174,9 @@
 	</div>
 
 {% else %}
-	<h3>{{ custom_columns.name }}</h3>
+	<label for="custom-columns-name">Name:</label>
+	<input id="custom-columns-name" size="50" readonly="readonly" value="{{ custom_columns.name }}" />
+
 	<button id='clone-button' title="Create a new copy of these columns that you can edit" type="button" class="btn btn-primary">Clone these columns</button>
 {% endif %}
 

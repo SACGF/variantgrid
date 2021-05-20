@@ -2,6 +2,7 @@
 {% load static %}
 {% load ui_help %}
 {% load ui_utils %}
+{% load crispy_forms_field %}
 {% load jqgrid_tags %}
 {% block title %}Analysis templates{% endblock title %}
 
@@ -29,16 +30,17 @@
     <div id="analysis-template-form-container">
       <form id="analysis-template-form" method="post">
         {% csrf_token %}
-        <fieldset class="form-fields small">
-            <legend>Create Template</legend>
-            <div class="pair">
-                <label>Unique Name</label>
-                <div>{{ create_analysis_template_form.name }}{{ create_analysis_template_form.name.errors }}</div>
+        <div class="card">
+            <div class="card-header">Create Template</div>
+            <div class="card-body">
+                {% labelled label="Unique Name" %}
+                    {% crispy_field create_analysis_template_form.name %}{{ create_analysis_template_form.name.errors }}
+                {% endlabelled %}
+                <div class="buttons">
+                    <button id='create-analysis-template' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create New Template</button>
+                </div>
             </div>
-            <div class="buttons">
-                <button id='create-analysis-template' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create New Template</button>
-            </div>
-        </fieldset>
+        </div>
       </form>
     </div>
 
