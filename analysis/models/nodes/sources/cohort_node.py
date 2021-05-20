@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 
 from django.db import models
 from django.db.models import Q
@@ -9,11 +9,13 @@ from django.urls.base import reverse
 from functools import reduce
 import operator
 
+from lazy import lazy
+
 from analysis.models import GroupOperation, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import Zygosity, SimpleZygosity
-from snpdb.models import Cohort, CohortSample, VariantsType
+from snpdb.models import Cohort, CohortSample, VariantsType, CohortGenotypeCollection
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
@@ -136,26 +138,40 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             q = self.q_all()
         return q
 
-    def get_cohort_simple_zygosity_q_list(self):
-        COLUMNS = {
+    @lazy
+    def simple_zygosity_columns(self) -> Dict:
+        return {
             SimpleZygosity.REF: self.ref_count_column,
             SimpleZygosity.HET: self.het_count_column,
             SimpleZygosity.HOM_ALT: self.hom_count_column,
             SimpleZygosity.ANY_GERMLINE: self.any_germline_count_column,
             SimpleZygosity.ANY_ZYGOSITY: self.any_zygosity_count_column,
         }
+
+    def _get_simple_zygosity_min_count(self) -> int:
+        """ Returns None if not configured correctly """
+        min_count = 0
+        if self.zygosity_op == GroupOperation.ALL:
+            min_count = len(self.cohort.get_samples())
+        elif self.zygosity_op == GroupOperation.ANY:
+            min_count = 1
+        return min_count
+
+    def get_cohort_simple_zygosity_q_list(self):
         q_and = []
         if self.zygosity:
-            column = COLUMNS[self.zygosity]
-            min_count = None
-            if self.zygosity_op == GroupOperation.ALL:
-                min_count = len(self.cohort.get_samples())
-            elif self.zygosity_op == GroupOperation.ANY:
-                min_count = 1
-
-            if column and min_count:
+            if min_count := self._get_simple_zygosity_min_count():
+                column = self.simple_zygosity_columns[self.zygosity]
                 q_and = [Q(**{column + "__gte": min_count})]
         return q_and
+
+    def _get_cohort_simple_zygosity_description(self) -> str:
+        description = ""
+        if self.zygosity:
+            if min_count := self._get_simple_zygosity_min_count():
+                zyg = SimpleZygosity(self.zygosity)
+                description = f"{zyg.label} >= {min_count}"
+        return description
 
     def get_cohort_per_sample_zygosity_q_list(self, cohort_genotype_collection):
         sample_zygosities_dict = {}
@@ -177,27 +193,35 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
         return [cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict)]
 
-    def _get_method_summary(self):
-        return f"Cohort ({self.cohort.name})"
+    def _get_cohort_per_sample_zygosity_description(self) -> str:
+        return "Per Sample Zygosity"
 
-    def get_node_name(self):
-        name = ''
+    def _get_description(self) -> List[str]:
+        description_list = []
         if self.cohort:
-            num_samples = self.cohort.cohortsample_set.count()
-            if self.minimum_count:
-                num_message = f"({self.minimum_count} of {num_samples}"
-            else:
-                num_message = f"({num_samples})"
-
-            if self.zygosity:
-                zygosity_message = f" ({self.get_zygosity_display()})"
-            else:
-                zygosity_message = ''
-            name = f"{self.cohort.name}{zygosity_message}\n{num_message}"
+            if self.accordion_panel == self.COUNT:
+                description_list.append(self._get_zygosity_count_description())
+            elif self.accordion_panel == self.SIMPLE_ZYGOSITY:
+                description_list.append(self._get_cohort_simple_zygosity_description())
+            elif self.accordion_panel == self.PER_SAMPLE_ZYGOSITY:
+                description_list.append(self._get_cohort_per_sample_zygosity_description())
 
             filter_description = self.get_filter_description()
             if filter_description:
-                name += f"\n({filter_description})"
+                description_list.append(filter_description)
+        return description_list
+
+    def _get_method_summary(self) -> str:
+        if description_list := self._get_description():
+            description = "\n".join([f"Cohort ({self.cohort.name})"] + description_list)
+        else:
+            description = "No cohort selected."
+        return description
+
+    def get_node_name(self):
+        name = ''
+        if description_list := self._get_description():
+            name = "\n".join([self.cohort.name] + description_list)
         return name
 
     @staticmethod
@@ -211,8 +235,8 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         else:
             errors.extend(self._get_genome_build_errors("cohort", self.cohort.genome_build))
             try:
-                self.cohort.cohort_genotype_collection
-            except:
+                _ = self.cohort.cohort_genotype_collection
+            except CohortGenotypeCollection.DoesNotExist:
                 cohort_name = self.cohort.name or "cohort"
                 url = reverse("view_cohort", kwargs={"cohort_id": self.cohort.pk})
                 msg = "Your cohort has not finished processing - please visit cohort page for "
