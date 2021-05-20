@@ -53,6 +53,7 @@
                                             <td>
                                                 {% if d %}
                                                     <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>
+                                                    {{ d.coordinate }}
                                                 {% endif %}
                                             </td>
                                         {% endif %}

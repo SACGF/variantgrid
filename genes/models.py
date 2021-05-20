@@ -441,15 +441,28 @@ class GeneVersion(models.Model):
         return self._transcript_extents["strands"]
 
     @lazy
+    def coordinate(self) -> str:
+        return f"{self.chrom}:{self.start}-{self.end} ({self.strand})"
+
+    @lazy
     def _transcript_extents(self):
         """ Stores chroms/min_start/max_end/strands - which are aggregate of all linked TranscriptVersions """
         DELIMITER = ","
         qs = self.transcriptversion_set.filter(data__strand__isnull=False)
         qs = qs.annotate(**{k: KeyTextTransform(k, "data") for k in ["chrom", "start", "end", "strand"]})
-        data = qs.aggregate(chroms=StringAgg("chrom", delimiter=DELIMITER, distinct=True),
+        data = qs.aggregate(chroms=StringAgg("chrom", delimiter=DELIMITER, distinct=True, output_field=TextField()),
                             min_start=Min("start"), max_end=Max("end"),
-                            strands=StringAgg("strand", delimiter=DELIMITER, distinct=True))
-        for k in ["chroms", "strands"]:
+                            strands=StringAgg("strand", delimiter=DELIMITER, distinct=True, output_field=TextField()))
+
+        # Sometimes chrom is a contig so we'll end up with chrom as "3,NC_000003.11" - check only 1 and convert to name
+        chrom_list = data["chroms"].split(DELIMITER)
+        if len(chrom_list) > 1:
+            contigs = {self.genome_build.chrom_contig_mappings[chrom] for chrom in chrom_list}
+            if len(contigs) > 1:
+                raise ValueError(f"{self}: 'chrom' ({data['chroms']}) mapped to >1 contigs: '{contigs}'")
+            data["chroms"] = contigs.pop().name
+
+        for k in ["strands"]:
             v = data[k]
             if len(v.split(DELIMITER)) != 1:
                 raise ValueError(f"{self}: Not exactly 1 value for {k}, was: {v}")
