@@ -106,11 +106,16 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
         },
         center: centerLayoutParams,
         east: { onresize: resizeGrid,
+                minSize: 200,
                 triggerEventsOnLoad: true,
                 size: initialGridAndEditorWidth,
         }
     });
-    $('div#analysis-and-toolbar-container').layout({});
+    $('div#analysis-and-toolbar-container').layout({
+        north: {
+            minSize: 32,
+        },
+    });
 
     // Make clicking the background send a "click event" but not if you click on the .window
     // This is so we can make the editor switch out and then add nodes etc....
