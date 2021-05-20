@@ -6,6 +6,11 @@
             <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
         {% endif %}
         {{ group.lab }}
+        {% if show_username %}
+            {% for user in group.users %}
+                <div class="text-secondary mt-1">{{ user.username }}</div>
+            {% endfor %}
+        {% endif %}
         {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
     </td>
     <td data-order="{{ group.c_hgvs.sort_str }}">
@@ -32,6 +37,9 @@
         {% endfor %}
     </td>
     <td style="width:100px;">
+        {% if show_allele_origin %}
+            <div class="mb-1">{{ group.allele_origins | ekey:"allele_origin" }}</div>
+        {% endif %}
         {% if group.zygosities %}
             {{ group.zygosities | ekey:"zygosity" }}
         {% else %}

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from itertools import groupby
 from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set
 
+from django.contrib.auth.models import User
 from lazy import lazy
 from threadlocals.threadlocals import get_thread_variable
 
@@ -92,6 +93,13 @@ class ClassificationGroup:
         return self.most_recent.classification.lab.name
 
     @property
+    def users(self) -> List[User]:
+        data = set([cm.classification.user for cm in self.modifications])
+        data_list = list(data)
+        data_list.sort(key=lambda x: x.username)
+        return data_list
+
+    @property
     def is_withdrawn(self) -> bool:
         return all(cm.classification.withdrawn for cm in self.modifications)
 
@@ -155,17 +163,24 @@ class ClassificationGroup:
 
         return MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
 
+    def _evidence_key_set(self, key: str) -> List[str]:
+        all_values = set()
+        for cm in self.modifications:
+            if value := cm.get(key):
+                if isinstance(value, str):
+                    value = list([value])
+                all_values = all_values.union(value)
+        all_values = list(all_values)
+        all_values.sort()
+        return all_values
+
     @lazy
     def zygosities(self) -> List[str]:
-        all_zygosities = set()
-        for cm in self.modifications:
-            if zygosities := cm.get(SpecialEKeys.ZYGOSITY):
-                if isinstance(zygosities, str):
-                    zygosities = list([zygosities])
-                all_zygosities = all_zygosities.union(zygosities)
-        zygosities = list(all_zygosities)
-        zygosities.sort()
-        return zygosities
+        return self._evidence_key_set(SpecialEKeys.ZYGOSITY)
+
+    @lazy
+    def allele_origins(self) -> List[str]:
+        return self._evidence_key_set(SpecialEKeys.ALLELE_ORIGIN)
 
     def most_recent_curated(self) -> CuratedDate:
         return self.most_recent.curated_date_check

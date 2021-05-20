@@ -40,7 +40,14 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
 
 @register.inclusion_tag("classification/tags/classification_group_row.html")
 def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None):
-    return {"group": group, "row_class": f"cc-{sub_row} collapse" if sub_row else "", "sub_index": sub_index}
+    return {
+        "group": group,
+        "row_class": f"cc-{sub_row} collapse" if sub_row else "",
+        "sub_index": sub_index,
+        "show_username": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
+        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
+        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID
+    }
 
 
 @register.inclusion_tag("classification/tags/classification_groups.html", takes_context=True)
@@ -57,7 +64,8 @@ def classification_groups(
         "classification_groups": groups,
         "user": context.request.user,
         "genome_build": groups.genome_build,
-        "table_id": str(uuid.uuid4()).replace("-", "_")
+        "table_id": str(uuid.uuid4()).replace("-", "_"),
+        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN
     }
     ordered_classifications = list(groups.modifications)
 
@@ -87,6 +95,8 @@ def ekey(val, key: str = None):
     pretty_val = e_key.pretty_value(val, dash_for_none=True)
     if val is None or val == '':
         return mark_safe(f'<span class="no-value">{escape(pretty_val)}</span>')
+    elif (isinstance(val, list) or isinstance(val, set)) and len(val) == 0:
+        return mark_safe(f'<span class="no-value">-</span>')
     return pretty_val
 
 

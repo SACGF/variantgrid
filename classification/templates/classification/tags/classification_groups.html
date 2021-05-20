@@ -32,7 +32,7 @@
             <th>HGVS <span class="text-secondary">{{ genome_build }}</span></th>
             <th class="text-center">Clinical Significance</th>
             <th>Conditions</th>
-            <th>Zygosities</th>
+            <th>{% if show_allele_origin %}Origin, {% endif %}Zygosities</th>
             <th>ACMG <span class="text-secondary">Latest</span></th>
             <th>Curated <span class="text-secondary">Latest</span></th>
             <th>Allele</th>
