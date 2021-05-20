@@ -86,7 +86,6 @@ class Test(URLTestCase):
                          "op": "config"}
         GRID_LIST_URLS = [
             ("variant_annotation_version_grid", build_kwargs, 200),
-            ("annotation_run_grid", build_kwargs, 200),
             ("tissue_gene_grid", tissue_kwargs, 200),
         ]
         self._test_urls(GRID_LIST_URLS, self.user)

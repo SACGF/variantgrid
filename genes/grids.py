@@ -4,7 +4,7 @@ from functools import reduce
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count
+from django.db.models import Count, TextField
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
@@ -224,19 +224,21 @@ class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
     model = CanonicalTranscriptCollection
     caption = 'CanonicalTranscripts'
     fields = ["id", "description", "annotation_consortium"]
-    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'viewCanonicalTranscriptCollection'}}
+    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True,
+                                 'formatter': 'viewCanonicalTranscriptCollection'}}
 
     def __init__(self, user):
         super().__init__(user)
 
         queryset = self.model.objects.all()
-        queryset = queryset.annotate(enrichment_kits=StringAgg("enrichmentkit__name", ','))
+        queryset = queryset.annotate(enrichment_kits=StringAgg("enrichmentkit__name", ',', output_field=TextField()))
         field_names = self.get_field_names() + ["enrichment_kits"]
         self.queryset = queryset.values(*field_names)
 
     def get_colmodels(self, remove_server_side_only=False):
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        enrichment_kits_colmodel = {'index': 'enrichment_kits', 'name': 'enrichment_kits', 'label': 'Enrichment Kits', 'width': 230}
+        enrichment_kits_colmodel = {'index': 'enrichment_kits', 'name': 'enrichment_kits',
+                                    'label': 'Enrichment Kits', 'width': 230}
         colmodels += [enrichment_kits_colmodel]
         return colmodels
 

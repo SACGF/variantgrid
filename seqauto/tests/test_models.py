@@ -16,9 +16,8 @@ from snpdb.models import Manufacturer, GenomeBuild, DataState
 
 
 class TestSeqAutoModels(TestCase):
-    TEST_DATA = os.path.join(settings.BASE_DIR, "seqauto", "test_data")
+    TEST_DATA = os.path.join(settings.BASE_DIR, "seqauto", "test_data", "clinical_hg38")
     GENES_TEST_DATA = os.path.join(settings.BASE_DIR, "genes", "tests", "test_data")
-    QC_DIR = os.path.join(TEST_DATA, "qc")
 
     SEQUENCING_RUN_CAPTURE = "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG"
     CANONICAL_TRANSCRIPTS = os.path.join(GENES_TEST_DATA, "canonical_transcripts.tsv")
@@ -54,8 +53,8 @@ class TestSeqAutoModels(TestCase):
         variant_caller, _ = VariantCaller.objects.get_or_create(name="Fake Caller")
         vcf_file, _ = VCFFile.objects.get_or_create(bam_file=bam_file,
                                                     variant_caller=variant_caller)
-        path = os.path.join(TestSeqAutoModels.QC_DIR,
-                            "idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/4_QC/exec_stats/hiseq_sample_1_stats.txt")
+        path = os.path.join(TestSeqAutoModels.TEST_DATA,
+                            "idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/4_QC/exec_stats/hiseq_sample1_stats.txt")
         qc, _ = QC.objects.get_or_create(bam_file=bam_file, vcf_file=vcf_file,
                                          defaults={"path": path})
         return qc
@@ -104,7 +103,7 @@ class TestSeqAutoModels(TestCase):
     def test_gene_coverage_capture(self):
         """ Capture uses headers: ["% bases >20x", "% bases <10x"] """
 
-        CAPTURE_GENES = os.path.join(self.QC_DIR, f"idt_exome/{self.SEQUENCING_RUN_CAPTURE}/4_QC/bam_stats/samples/hiseq_sample1.per_gene_coverage.tsv.gz")
+        CAPTURE_GENES = os.path.join(self.TEST_DATA, f"idt_exome/{self.SEQUENCING_RUN_CAPTURE}/4_QC/bam_stats/samples/hiseq_sample1.per_gene_coverage.tsv.gz")
         enrichment_kit = self._create_enrichment_kit()
         sequencing_run = TestSeqAutoModels._create_sequencing_run(self.SEQUENCING_RUN_CAPTURE,
                                                                   enrichment_kit=enrichment_kit)
@@ -123,7 +122,7 @@ class TestSeqAutoModels(TestCase):
 
     def test_deleted_gene_coverage(self):
         """ #1619 - Ensure missing file sets data_state=DELETED and doesn't throw error. """
-        MISSING_GENES_FILE = os.path.join(self.QC_DIR, "no_such_file.txt")
+        MISSING_GENES_FILE = os.path.join(self.TEST_DATA, "no_such_file.txt")
         enrichment_kit = self._create_enrichment_kit()
         sequencing_run = TestSeqAutoModels._create_sequencing_run(self.SEQUENCING_RUN_CAPTURE,
                                                                   enrichment_kit=enrichment_kit)
@@ -142,7 +141,7 @@ class TestSeqAutoModels(TestCase):
         """ This test doesn't work very well as there's no genes/Transcripts/UCSC aliases etc """
 
         SEQUENCING_RUN_NAME = "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG"
-        GENE_FILES_PATTERN = os.path.join(self.QC_DIR, "idt_exome", SEQUENCING_RUN_NAME, "4_QC", "bam_stats",
+        GENE_FILES_PATTERN = os.path.join(self.TEST_DATA, "idt_exome", SEQUENCING_RUN_NAME, "4_QC", "bam_stats",
                                           "samples", "%s.per_gene_coverage.tsv.gz")
 
         enrichment_kit = self._create_enrichment_kit()
@@ -151,7 +150,7 @@ class TestSeqAutoModels(TestCase):
         sequencing_run.gold_standard = True
         sequencing_run.save()
 
-        SAMPLE_NAMES = ["sample_1", "sample_2"]
+        SAMPLE_NAMES = ["hiseq_sample1", "hiseq_sample2"]
         for sample_name in SAMPLE_NAMES:
             qc = TestSeqAutoModels._create_sequencing_qc(sequencing_run,
                                                          sample_name,
@@ -160,6 +159,7 @@ class TestSeqAutoModels(TestCase):
             gene_filename = GENE_FILES_PATTERN % sample_name
             logging.info(gene_filename)
             qcgc = self._create_qc_gene_coverage(qc, gene_filename, self.genome_build)
+            print(f"created coverage for qc: {qc} - data state: {qcgc.get_data_state_display()} path: {qc.path}")
             qcgc.load_from_file(None,
                                 gene_matcher=self.gene_matcher,
                                 canonical_transcript_manager=self.canonical_transcript_manager,

@@ -166,7 +166,6 @@ class Test(URLTestCase):
         URL_NAMES_AND_KWARGS = [
             ("analyses", {}, 200),
             ("analysis_templates", {}, 200),
-            ("analyses_variant_tags", {}, 200),
             ("karyomapping_analyses", {}, 200),
         ]
 

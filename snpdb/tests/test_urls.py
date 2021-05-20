@@ -116,6 +116,7 @@ class Test(URLTestCase):
             ("view_user_settings", {}, 200),
             ("labs", {}, 200),
             ("index", {}, 200),
+            ("variant_tags", {}, 200),
         ]
 
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
