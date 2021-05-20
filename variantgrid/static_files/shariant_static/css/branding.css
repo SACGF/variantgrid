@@ -1,5 +1,5 @@
 .bg-theme {
-  background-color: #054f94 !important;
+  background-color: #1b75bc !important;
 }
 
 .bg-theme {
@@ -37,7 +37,8 @@ nav.navbar a.nav-link.active {
 }
 
 .navbar-brand {
-  background-image: url("/static/images/AGHA WHITE REVERSED LOGO 3L stacked-01.png");
+  background-image: url("/static/images/Australian Genomics logo_white transp.png");
+  margin-right: 0;
 }
 
 #site-name::after {

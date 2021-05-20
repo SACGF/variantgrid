@@ -1,7 +1,29 @@
 .bg-theme {
-    background-color: #ccdcba !important;
+  background-color: rgb(27, 117, 188) !important;
 }
-a.nav-link {
+.bg-theme {
+    color: white !important;
+    & * {
+      color: #ddd !important;
+      border-color: #ccc !important;
+    }
+    .fas {
+      color: #ccc !important;
+    }
+    input {
+        color: #444 !important;
+    }
+}
+nav.navbar a.nav-link {
+    color: #ddd !important;
+    &:hover {
+        color: #fff !important;
+    }
+    &.active {
+        color: #eee !important;
+    }
+}
+.nav-side-bar a.nav-link {
     color: #444 !important;
     &:hover {
         color: #000 !important;
@@ -11,11 +33,12 @@ a.nav-link {
     }
 }
 
-// used by 50x.html
-#site-name::after {
-    content: "Shariant Test"
+.navbar-brand {
+    background-image: url("/static/images/Australian Genomics logo_white transp.png");
+    margin-right: 0;
 }
 
-.navbar-brand {
-    background-image: url("/static/images/AGHA WHITE REVERSED LOGO 3L stacked-01.png");
+// used by 50x.html
+#site-name::after {
+    content: "Shariant"
 }
