@@ -67,7 +67,7 @@ class BuiltInFilters:
 
     FILTER_CHOICES = [
         # Don't include total (as that's no filter at all!
-        (CLINVAR, 'ClinVar'),
+        (CLINVAR, 'ClinVar LP/P'),
         (OMIM, 'OMIM Phenotype'),
         (IMPACT_HIGH_OR_MODERATE, 'High or Mod impact'),
         (CLASSIFIED, 'Classified'),

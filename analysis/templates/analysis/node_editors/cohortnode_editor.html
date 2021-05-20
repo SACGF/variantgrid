@@ -12,7 +12,7 @@
                 suppressErrors: true,
             });
         } else {
-            $(".num_samples").text("No samples");
+            $(".num_samples").text("N/A");
         }
     }
 
@@ -148,7 +148,7 @@
 
 		<div>
             <div>
-                <b>Cohort:</b> {{ form.cohort }} <a class="cross-link" id="cohort-link">View Cohort</a>
+                <b>Cohort:</b> {{ form.cohort }} <a class="cross-link" id="cohort-link" target="_blank" >View Cohort</a>
             </div>
             <div>
                 {% load vcf_locus_filter_tags %}

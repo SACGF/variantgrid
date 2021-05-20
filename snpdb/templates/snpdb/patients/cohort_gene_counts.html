@@ -3,21 +3,13 @@
 {% block title %}Gene Counts{% endblock %}
 
 {% block head %}
-<style>
-div.loading {
-    background: url({% static 'icons/loading.gif' %}) no-repeat center center;
-    width: 16px;
-    height: 16px;
-    float: left;
-}
-</style>
 <script>
 
 $(document).ready(function() {
-    var gcContainer = $("#cohort-gene-counts-graph-container");
+    const gcContainer = $("#cohort-gene-counts-graph-container");
 
     function load_graph(url) {
-        var loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
+        const loading_icon = $('<div>').attr({class: 'loading icon16', style: 'margin-right:10px;'});
         gcContainer.html(loading_icon);
         gcContainer.load(url);
     }
@@ -28,7 +20,7 @@ $(document).ready(function() {
     }
 
     $('#id_gene_list').change(function() {
-        var geneListId = $(this).val();
+        const geneListId = $(this).val();
         if (geneListId) {
             load_gene_list(geneListId);
         } else {

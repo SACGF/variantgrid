@@ -62,6 +62,12 @@ table th.num, table td.num {
         <table class="table">
             {{ exec_summary | as_table | safe }}
         </table>
+    {% else %}
+        {% if exec_summary %}
+            Exec summary is not ready (status={{ exec_summary.get_data_state_display }})
+        {% else %}
+            Exec summary not available.
+        {% endif %}
 	{% endif %}
 				
 </div>

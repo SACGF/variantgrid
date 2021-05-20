@@ -1,42 +1,58 @@
 {% extends menu_analysis_base %}
 {% load static %}
 {% load ui_help %}
+{% load ui_utils %}
+{% load crispy_forms_field %}
 {% load jqgrid_tags %}
 {% block title %}Analysis templates{% endblock title %}
 
-{% block jsdocumentready %}
-	jQuery.extend($.fn.fmatter , {
-	    analysisLink : function(cellvalue, options, rowObject) {
-            let analysisId = rowObject.id;
-    		let analysisLink = linkFormatter(cellvalue, options, rowObject);
-		    return "<span>" + analysisLink + "</span>";
-		}
-	});
-
-{% endblock jsdocumentready %}
-
 {% block submenu_page_content %}
+<script>
+    $(document).ready(() => {
+        jQuery.extend($.fn.fmatter , {
+            analysisLink : function(cellvalue, options, rowObject) {
+                let analysisId = rowObject.id;
+                let analysisLink = linkFormatter(cellvalue, options, rowObject);
+                return "<span>" + analysisLink + "</span>";
+            }
+        });
+
+        $('#id_analysis').change(function () {
+            const analysisId = $("#id_analysis").val();
+            window.location = Urls.analysis(analysisId);
+        });
+    });
+</script>
+
+<div class="container">
+    {% page_help page_id='analysis/analysis_templates_help' title='Analyses Templates' %}
+
     <div id="analysis-template-form-container">
       <form id="analysis-template-form" method="post">
         {% csrf_token %}
-        <fieldset class="form-fields small">
-            <legend>Create Template</legend>
-            <div class="pair">
-                <label>Unique Name</label>
-                <div>{{ create_analysis_template_form.name }}{{ create_analysis_template_form.name.errors }}</div>
+        <div class="card">
+            <div class="card-header">Create Template</div>
+            <div class="card-body">
+                {% labelled label="Unique Name" %}
+                    {% crispy_field create_analysis_template_form.name %}{{ create_analysis_template_form.name.errors }}
+                {% endlabelled %}
+                <div class="buttons">
+                    <button id='create-analysis-template' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create New Template</button>
+                </div>
             </div>
-            <div class="buttons">
-                <button id='create-analysis-template' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create New Template</button>
-            </div>
-        </fieldset>
+        </div>
       </form>
     </div>
 
-    {% page_help page_id='analysis/analysis_templates_help' title='Analyses Templates' %}
+    <form>
+        {% labelled label="Open Analysis Template" %}{{ analysis_template_choice_form.analysis }} {{ analysis_template_choice_form.media }}{% endlabelled %}
+    </form>
 
+</div>
+<div class="container-table">
     {% user_data_grid_filter 'analysis_templates' 'Analysis Templates' %}
     {% jqgrid 'analysis_templates_grid' 'analysis_templates' search=False delete=True %}
-
+</div>
 
 {% endblock submenu_page_content %}
 

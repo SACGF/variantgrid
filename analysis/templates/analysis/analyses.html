@@ -64,7 +64,7 @@
             });
 
             $('#id_analysis').change(function () {
-                var analysisId = $("#id_analysis").val();
+                const analysisId = $("#id_analysis").val();
                 window.location = Urls.analysis(analysisId);
             });
         });
@@ -82,7 +82,7 @@
             <div class="card">
                 <div class="card-header">Create</div>
                 <div class="card-body">
-                    {% labelled label="New "|add:analysis_type_description|add:" Name" %}
+                    {% labelled label="New Analysis Name" %}
                         {% crispy_field create_analysis_form.name %}
                     {% endlabelled %}
                     {% if not create_analysis_form.genome_build_hidden %}
@@ -99,16 +99,16 @@
           </form>
         </div>
 
-        {% if analysis_choice_form %}
         <form>
             {% labelled label="Open Analysis" %}{{ analysis_choice_form.analysis }} {{ analysis_choice_form.media }}{% endlabelled %}
         </form>
-        {% endif %}
 
         {# Needs to be called 'node-editor-container' to match how it's loaded in analysis #}
         <div id="node-editor-container">
         </div>
+    </div>
 
+    <div class="container-table">
         {% load jqgrid_tags %}
         {% user_data_grid_filter 'analyses' 'Analyses' %}
         {% jqgrid 'analyses_grid' 'analyses' search=False delete=True download_grid_json_as_csv=True init_func='grid_init_func' %}

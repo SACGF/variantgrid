@@ -164,17 +164,19 @@
                 {% if consortium_genes_and_aliases %}
                     {% for annotation_consortium, genes_and_aliases in consortium_genes_and_aliases.items %}
                         {% for gene_id, aliases in genes_and_aliases.items %}
-                            {% if aliases %}
-                                <li class="list-group-item">
-                                  {{ annotation_consortium }} Gene : <a class="hover-link text-monospace" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
-                                     (aka: {% for alias in aliases %}<a class="comma-sep" href="{% url 'view_gene_symbol' alias %}">{{ alias }}</a>{% endfor %})
-                                  </a>
-                                </li>
-                            {% else %}
-                                <a class="list-group-item list-group-item-action" href="{% url 'view_gene' gene_id %}">
-                                    {{ annotation_consortium }} Gene : <span class="text-monospace">{{ gene_id }}</span>
-                                </a>
-                            {% endif %}
+                            <li class="list-group-item">
+                                {% if aliases %}
+                                      {{ annotation_consortium }} Gene : <a class="hover-link text-monospace" href="{% url 'view_gene' gene_id %}">{{ gene_id }}</a>
+                                         ( <a href="{{ gene_external_urls|get_item:gene_id }}" target="_blank">{{ annotation_consortium }}</a>)
+                                         (aka: {% for alias in aliases %}<a class="comma-sep" href="{% url 'view_gene_symbol' alias %}">{{ alias }}</a>{% endfor %})
+                                      </a>
+                                {% else %}
+                                    <a href="{% url 'view_gene' gene_id %}">
+                                        {{ annotation_consortium }} Gene : <span class="text-monospace">{{ gene_id }}</span>
+                                    </a>
+                                    ( <a href="{{ gene_external_urls|get_item:gene_id }}" target="_blank">{{ annotation_consortium }}</a>)
+                                {% endif %}
+                            </li>
                         {% endfor %}
                     {% endfor %}
                 {% endif %}
@@ -293,7 +295,9 @@
                         <div class="card-header">UniProt</div>
                         <div class="card-body">
                             {% labelled label="UniProt IDs" %}
-                                {{ hgnc.uniprot_ids }}
+                                {% for uniprot_id in hgnc.uniprot_list %}
+                                    <a href="https://www.uniprot.org/uniprot/{{ uniprot_id }}" target="_blank">{{ uniprot_id }}</a>
+                                {% endfor %}
                             {% endlabelled %}
                             <a data-toggle="collapse" href="#more-uniprot">More UniProt...</a>
                             <div id="more-uniprot" class="collapse">

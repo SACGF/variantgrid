@@ -102,7 +102,7 @@ $("button#confirm-test").click(function() {
     </div>
 
 	{% load jqgrid_tags %}
-	{% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' False gene_list_id=pathology_test_version.gene_list.pk %}
+	{% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' download_grid_json_as_csv=True gene_list_id=pathology_test_version.gene_list.pk %}
 {% endif %}
 
 

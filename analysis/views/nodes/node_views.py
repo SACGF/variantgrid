@@ -86,7 +86,11 @@ class ClassificationsNodeView(NodeView):
         modified = self.object.modified
         count = Classification.objects.filter(modified__gt=modified).count()
         if count:
-            context["out_of_date_message"] = f"{count} new classifications since last save."
+            if count == 1:
+                plural = ""
+            else:
+                plural = "s"
+            context["out_of_date_message"] = f"{count} new classification{plural} since last save."
         return context
 
 

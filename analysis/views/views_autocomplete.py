@@ -13,7 +13,11 @@ class AnalysisAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, user):
         qs = Analysis.filter_for_user(user)
-        return qs.filter(template_type__isnull=True)  # Hide templates
+        if template_type := self.forwarded.get('template_type', None):
+            qs = qs.filter(template_type=template_type)
+        else:
+            qs = qs.filter(template_type__isnull=True)  # Hide templates
+        return qs
 
 
 class AnalysisTemplateAutocompleteView(AutocompleteView):

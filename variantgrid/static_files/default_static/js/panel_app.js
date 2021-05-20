@@ -53,7 +53,7 @@ function addGeneEvidence(geneSymbol, evidence, geneContainer) {
 
 function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceResultsList) {
     let newDiv = $("<div />");
-    if (panelAppEvidenceResultsList) {
+    if (panelAppEvidenceResultsList.length) {
         for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
             let evidence = panelAppEvidenceResultsList[i];
             addGeneEvidence(geneSymbol, evidence, newDiv);
@@ -66,6 +66,8 @@ function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceRes
                 newDiv.append(diseaseSpan);
             }
         }
+    } else {
+        newDiv.append("No evidence.");
     }
     return newDiv;
 }
@@ -73,7 +75,7 @@ function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceRes
 
 function getPanelAppGeneEvidenceDiv(server_id, geneSymbol) {
     // Returns a Div which is loading, then is filled in when API retrieved ok
-    let panelAppDiv = $("<div />").addClass("loading");
+    let panelAppDiv = $("<div />").addClass("loading icon16");
     $.ajax({
         type: "GET",
         url: Urls.api_panel_app_gene_evidence(server_id, geneSymbol),

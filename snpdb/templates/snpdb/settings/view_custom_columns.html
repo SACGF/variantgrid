@@ -4,6 +4,14 @@
 
 {% block submenu_page_content %}
 <style>
+	#custom-columns-name {
+		font-size: 1.5em;
+	}
+
+	#clone-button {
+		margin-left: 10px;
+	}
+
 	.sort_placeholder {height: 15px; border: red 3px solid;}
 	.list_placeholder { font-weight: bolder; }
 	.columns-list {
@@ -158,7 +166,7 @@
 				<label for="custom-columns-name">Name:</label>
 				<input id="custom-columns-name" size="50" value="{{ custom_columns.name }}" />
 				<button id='change-name-button' type="button" class="btn btn-primary">Change Name</button>
-				<button id='clone-button' title="Create a new copy of these columns" type="button" class="btn btn-primary">Clone</button>
+				<button id='clone-button' title="Create a new copy of these columns" type="button" class="btn btn-primary">Clone these columns</button>
 				<ul id="save-name-message" class="messages">
 				</ul>
 			</form>
@@ -166,8 +174,10 @@
 	</div>
 
 {% else %}
-	<h3>{{ custom_columns.name }}</h3>
-	<button id='clone-button' title="Create a new copy of these columns that you can edit" type="button" class="btn btn-primary">Clone</button>
+	<label for="custom-columns-name">Name:</label>
+	<input id="custom-columns-name" size="50" readonly="readonly" value="{{ custom_columns.name }}" />
+
+	<button id='clone-button' title="Create a new copy of these columns that you can edit" type="button" class="btn btn-primary">Clone these columns</button>
 {% endif %}
 
 

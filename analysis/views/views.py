@@ -27,8 +27,8 @@ from lazy import lazy
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, AnalysisChoiceForm, \
-    InputSamplesForm
+from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, InputSamplesForm, \
+    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
@@ -70,8 +70,7 @@ def analysis_list(request):
         add_save_message(request, False, "Analysis")
 
     context = {"create_analysis_form": form,
-               "analysis_choice_form": AnalysisChoiceForm(),
-               "analysis_type_description": "Analysis"}
+               "analysis_choice_form": AnalysisChoiceForm()}
     return render(request, 'analysis/analyses.html', context)
 
 
@@ -82,7 +81,8 @@ def analysis_templates(request):
             analysis_template = form.save()
             return redirect(analysis_template.analysis)
 
-    context = {"create_analysis_template_form": form}
+    context = {"create_analysis_template_form": form,
+               "analysis_template_choice_form": AnalysisTemplateTypeChoiceForm()}
     return render(request, 'analysis/analysis_templates.html', context)
 
 

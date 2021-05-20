@@ -9,12 +9,21 @@
 #classifications-node-form input {
     margin: 0px 5px 0px 5px;
 }
+
+
+#classification-node-form-widgets label:not(:first-of-type):before {
+            color: #bbbbbb;
+            content: "|";
+            margin-left: 4px;
+            margin-right: 4px;
+}
+
+
 </style>
 <div>
 	<form id="classifications-node-form" method="post" action="{{ request.path }}">
         {% csrf_token %}
-		<div>
-            <div>
+            <div id="classification-node-form-widgets">
                 {{ form }}
             </div>
             <div>
@@ -26,7 +35,6 @@
 		      <p>{{ out_of_date_message }}</p>
             {% endif %}
 		    </div>
-        </div>
         {% if has_write_permission %}
             <button id='classifications-node-save' class="btn btn-primary">save</button>
         {% endif %}

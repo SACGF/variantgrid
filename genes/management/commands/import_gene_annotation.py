@@ -108,6 +108,8 @@ class Command(BaseCommand):
         if replace:
             print(f"Please run command classification_cache_chgvs to update classification records with new gene symbols")
             print(f"Please run command allele_validate to update warnings about alleles")
+        if release_version:
+            print(f"Please run command gene_annotation to add new Gene Annotation for the release (HPO/OMIM/gnomAD)")
 
     def update_known_gene_versions_by_gene_id(self, gv_qs):
         for gv in gv_qs:
