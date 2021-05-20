@@ -2,7 +2,7 @@ import logging
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Tuple, List, Optional, Dict, Set, Iterable, Union, Any, Callable
+from typing import Tuple, List, Optional, Dict, Set, Iterable, Union
 
 from django.conf import settings
 from django.contrib import messages
@@ -14,7 +14,6 @@ from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.utils.decorators import method_decorator
-from django.utils.functional import SimpleLazyObject
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from itertools import combinations
@@ -39,7 +38,6 @@ from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
-from library.log_utils import report_exc_info
 from library.utils import defaultdict_to_dict, LazyAttribute
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
@@ -254,9 +252,8 @@ class GeneSymbolViewInfo:
         has_gene_coverage = GeneCoverage.get_for_symbol(self.genome_build, self.gene_symbol).exists()
         if has_gene_coverage:
             return True
-        else:
-            has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(self.genome_build, self.gene_symbol).exists()
-            return has_canonical_gene_coverage
+        has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(self.genome_build, self.gene_symbol).exists()
+        return has_canonical_gene_coverage
 
     @lazy
     def gene_in_gene_lists(self) -> bool:
@@ -326,7 +323,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     return render(request, "genes/view_gene_symbol.html", context)
 
 
-def view_classifications(request, gene_symbol: str, genome_build_name:str):
+def view_classifications(request, gene_symbol: str, genome_build_name: str):
 
     genome_build = GenomeBuild.get_from_fuzzy_string(genome_build_name)
     view_info = GeneSymbolViewInfo(
@@ -338,6 +335,7 @@ def view_classifications(request, gene_symbol: str, genome_build_name:str):
         "classifications": view_info.classifications,
         "genome_build": genome_build
     })
+
 
 def view_transcript(request, transcript_id):
     transcript = get_object_or_404(Transcript, pk=transcript_id)

@@ -21,7 +21,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
 import logging
 import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation

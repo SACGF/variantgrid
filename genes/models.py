@@ -148,7 +148,6 @@ class GeneSymbol(models.Model):
             return GeneSymbol.objects.first(symbol=symbol)
         return symbol
 
-
     @property
     def name(self):
         """ For use by TextPhenotypeMatch """

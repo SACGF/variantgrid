@@ -5,7 +5,7 @@ from functools import reduce
 from django.contrib.auth.models import User
 from typing import List, Set, Optional, Union, Any, Dict, Iterable
 
-from django.db.models import QuerySet, Q
+from django.db.models import Q
 
 from classification.enums import SpecialEKeys
 from flags.models import FlagCollection
@@ -267,7 +267,6 @@ class UserClassificationStats:
         return FlagCollection.filter_for_open_flags(
             Classification.filter_for_user(user=self.user)
         ).order_by('-created').exclude(withdrawn=True).count()
-
 
 
 def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:

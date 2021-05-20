@@ -4,7 +4,6 @@ from typing import Optional, List
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 
-from classification.management.commands import send_weekly_emails
 from email_manager.models import EmailLog
 from library.log_utils import NotificationBuilder, send_notification
 from snpdb.models import Lab, UserSettings
@@ -58,8 +57,7 @@ class LabNotificationBuilder(NotificationBuilder):
                                text=self.as_text(),
                                from_email=settings.DISCORDANCE_EMAIL,
                                recipient_list=recipient_list,
-                               allow_users_to_see_others=True
-            )
+                               allow_users_to_see_others=True)
 
     @property
     def webhook_url(self) -> Optional[str]:

@@ -6,7 +6,6 @@ etc and things that don't fit anywhere else.
 'snpdb' was the highly unoriginal name I used before 'VariantGrid'
 """
 import json
-from enum import Enum
 from functools import total_ordering
 
 from celery.result import AsyncResult
@@ -29,7 +28,7 @@ from typing import List, TypedDict, Optional, Dict
 
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
-from library.log_utils import NotificationBuilder, send_notification
+from library.log_utils import send_notification
 from library.utils import import_class
 from classification.enums.classification_enums import ShareLevel
 

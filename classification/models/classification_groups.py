@@ -4,7 +4,6 @@ from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set
 
 from django.contrib.auth.models import User
 from lazy import lazy
-from threadlocals.threadlocals import get_thread_variable
 
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved
@@ -94,7 +93,7 @@ class ClassificationGroup:
 
     @property
     def users(self) -> List[User]:
-        data = set([cm.classification.user for cm in self.modifications])
+        data = {cm.classification.user for cm in self.modifications}
         data_list = list(data)
         data_list.sort(key=lambda x: x.username)
         return data_list
@@ -240,7 +239,7 @@ class ClassificationGroups:
 
         evidence_keys: EvidenceKeyMap = EvidenceKeyMap.instance()
 
-        groups: List[ClassificationGroup] = list()
+        groups: List[ClassificationGroup] = []
 
         # clinical significance, clin grouping, org
         sorted_by_clin_sig = list(classification_modifications)

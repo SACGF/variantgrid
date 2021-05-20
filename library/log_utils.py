@@ -143,7 +143,7 @@ class NotificationBuilder:
 
         def as_html(self):
             def as_field(field: Tuple[str, Any]):
-                return f"<label>{NotificationBuilder.slack_markdown_to_html(field[0])}</label>: {field[1]}";
+                return f"<label>{NotificationBuilder.slack_markdown_to_html(field[0])}</label>: {field[1]}"
             return "<div>" + "<br/>".join([as_field(field) for field in self.fields]) + "</div>"
 
         def as_slack(self):

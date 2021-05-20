@@ -690,5 +690,3 @@ class LazyAttribute:
             lazy_att = LazyAttribute(obj, attribute)
             context[attribute] = SimpleLazyObject(lazy_att.eval)
         return context
-
-

@@ -120,7 +120,7 @@ class DiscordanceReport(TimeStampedModel):
             # close will fire off a notification event
             self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
         else:
-            if newly_added_labs: # change is significant
+            if newly_added_labs:  # change is significant
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self)
 
     def all_actively_involved_labs(self):

@@ -1,5 +1,4 @@
 from collections import defaultdict
-from enum import Enum
 from functools import total_ordering
 from operator import attrgetter
 from typing import Dict, List, Collection, Set
