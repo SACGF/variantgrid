@@ -203,14 +203,16 @@
         Recommended for users of Alissa 5.2
         </div>
     {% endlabelled %}
-    {% labelled label="Use old since logic"%}
-        <div class="form-check">
-            <label class="form-check-label">
-                <input id="old_since" name="old_since" value="true" type="checkbox" class="form-check-input" />
-                {{ org.name }}
-            </label>
-        </div>
-    {% endlabelled %}
+    {% if user.is_superuser %} %}
+        {% labelled label="Use old since logic"%}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="old_since" name="old_since" value="true" type="checkbox" class="form-check-input" />
+                    {{ org.name }}
+                </label>
+            </div>
+        {% endlabelled %}
+    {% endif %}
 
     {% labelled label="Organistion exclusion" %}
         {% for org in orgs %}
