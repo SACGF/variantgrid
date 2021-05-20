@@ -272,9 +272,6 @@ class ExportFormatter(BaseExportFormatter):
         self.error_message_ids = dict()
         self.started = datetime.utcnow()
         self.row_count = 0
-
-        self.raw_qs = qs
-        self.qs = qs
         self.started = datetime.utcnow()
 
         if self.since and optimize_since:
@@ -289,9 +286,9 @@ class ExportFormatter(BaseExportFormatter):
             modified_allele_flags = Allele.objects.filter(flag_collection__in=modified_flags).values_list('id', flat=True)
             modified_allele_classifications = VariantAllele.objects.filter(variant__id__in=modified_classifications_variants.union(modified_classification_flag_variants)).values_list('allele', flat=True)
             all_variants = VariantAllele.objects.filter(allele_id__in=modified_allele_flags.union(modified_allele_classifications)).values_list('variant', flat=True)
-            self.raw_qs = qs.filter(classification__variant__in=all_variants)
-            self.qs = self.raw_qs
+            qs = qs.filter(classification__variant__in=all_variants)
 
+        self.raw_qs = qs
         self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
 
         super().__init__()
