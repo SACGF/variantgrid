@@ -636,7 +636,7 @@ class HotspotGraphView(TemplateView):
     has_graph_filter_toolbar = True
 
     def _get_title(self, transcript_version) -> str:
-        return f"Variants for {transcript_version}"
+        return f"Het/Hom variants for {transcript_version}"
 
     def _get_y_label(self) -> str:
         return "# samples"
