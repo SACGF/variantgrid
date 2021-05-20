@@ -232,8 +232,10 @@ class TriosListGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = Trio.filter_for_user(user).order_by("-pk")
+        queryset = Trio.filter_for_user(user)
         self.queryset = queryset.values(*self.get_field_names())
+        self.extra_config.update({'sortname': "pk",
+                                  'sortorder': "desc"})
 
 
 class GenomicIntervalsListGrid(JqGridUserRowConfig):
