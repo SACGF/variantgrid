@@ -5,6 +5,7 @@ from django.db.models.query_utils import Q
 from functools import reduce
 import operator
 
+from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from genes.models import GeneSymbol, Gene
 from snpdb.models import VariantZygosityCountCollection
@@ -32,20 +33,22 @@ def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, genome_build: 
     return qs.filter(variantgeneoverlap__gene__in=genes)
 
 
-def get_has_classifications_q(genome_build):
+def get_has_classifications_q(genome_build) -> Q:
     va_build_qs = VariantAllele.objects.filter(genome_build=genome_build,
                                                allele__variantallele__variant__classification__isnull=False)
     return Q(variantallele__in=va_build_qs)
 
 
-def get_has_variant_tags():
-    return Q(varianttag__isnull=False)
+def get_has_variant_tags(genome_build) -> Q:
+    tags_qs = VariantTag.get_for_build(genome_build)
+    return Q(variantallele__genome_build=genome_build,
+             variantallele__allele__in=tags_qs.values_list("variant__variantallele__allele", flat=True))
 
 
 def variant_qs_filter_has_internal_data(variant_qs: QuerySet, genome_build: GenomeBuild) -> QuerySet:
     qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(variant_qs)
     interesting = [Q(**{f"{count_column}__gt": 0}),
                    get_has_classifications_q(genome_build),
-                   get_has_variant_tags()]
+                   get_has_variant_tags(genome_build)]
     q = reduce(operator.or_, interesting)
     return qs.filter(q)
