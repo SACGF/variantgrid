@@ -322,9 +322,9 @@
                 {% panel_app_gene_evidence server gene_symbol %}
             {% endfor %}
 
-            {% if omim_and_hpo_for_gene %}
                 <h4>OMIM and Human Phenotype Ontology</h4>
 
+            {% if omim_and_hpo_for_gene %}
                 <table class="table">
                     <thead>
                     <tr><th>OMIM</th><th>Name</th><th>HPOs</th>
@@ -342,6 +342,8 @@
                     {% endfor %}
                     </tbody>
                 </table>
+            {% else %}
+                <p>HPO or OMIM terms associated with this gene symbol</p>
             {% endif %}
 
             {% if citations %}

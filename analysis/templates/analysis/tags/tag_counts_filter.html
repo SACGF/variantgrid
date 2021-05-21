@@ -7,6 +7,11 @@
     #tag-filter-description {
         display: none;
     }
+
+    #filter-to-any-tag-button {
+        margin: 5px;
+    }
+
     </style>
 
     <script>
@@ -19,19 +24,28 @@
     }
 
     $(document).ready(function() {
+    {% if click_func %}
+        let clickFunc = {{ click_func | safe }};
+
         $(".grid-tag", "#tag-top-bar").click(function() {
             const tagId = $(this).attr("tag_id");
             const tagHtml = '<span class="tagged-' + tagId + '" title="Tagged as ' + tagId + '"><span class="user-tag-colored">' + tagId + '</span></span>';
             $("#tag-filter-description-text").html("Filtering to " + tagHtml);
             $("#tag-filter-description").show();
-            {% if click_func %}
-                let clickFunc = {{ click_func | safe }};
-                clickFunc(tagId);
-            {% endif %}
+            clickFunc(tagId);
         });
+
+        $("#filter-to-any-tag-button").click(function() {
+            $("#tag-filter-description-text").html("Filtering to any tag");
+            $("#tag-filter-description").show();
+            clickFunc(""); // no arg means filter to all tags
+        });
+    {% endif %}
     });
+
     </script>
     <div id='tag-top-bar'> Click to filter:
+        <button id="filter-to-any-tag-button" class="btn btn-outline-secondary"><i class="fas fa-tags"></i> Any Tag</button>
     {% for tag, count in tag_counts %}
         <span class="grid-tag tagged-{{tag}}" title="Tagged as {{tag}}" tag_id="{{tag}}">
             <span class="user-tag-colored">{{ tag }}</span> : {{ count }}
