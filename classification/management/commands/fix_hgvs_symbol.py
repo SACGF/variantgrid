@@ -1,5 +1,3 @@
-from typing import Optional
-
 from django.core.management import BaseCommand
 
 from classification.enums import SpecialEKeys

@@ -1,8 +1,5 @@
-import sys
-
 from django.core.management.base import BaseCommand
 
-from analysis.analysis_import_export import analysis_export_to_file
 from analysis.models.models_analysis import Analysis
 
 # Analysis templates didn't set permissions correctly until fix on October 19th 2020
