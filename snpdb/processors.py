@@ -27,7 +27,6 @@ def settings_context_processor(request):
         'site': Site.objects.get_current(),
         'site_messages': SiteMessage.get_site_messages(),
         'site_name': settings.SITE_NAME,
-        'somalier_enabled': settings.SOMALIER.get("enabled", False),
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
         'url_name': request.resolver_match.url_name,
@@ -40,6 +39,9 @@ def settings_context_processor(request):
     if settings.DEBUG:
         context['debug'] = True
         context['hostname'] = socket.gethostname()
+
+    if settings.SOMALIER.get("enabled"):
+        context['somalier_enabled'] = request.user.is_superuser or not settings.SOMALIER.get("admin_only")
 
     # We extend templates to provide the menus
     # For clinicians, set them all to a restricted view with less menus

@@ -66,6 +66,8 @@ _SHARIANT_MODE = False
 _RUNX1_MODE = False
 
 SOMALIER["enabled"] = True
+SOMALIER["admin_only"] = True
+
 # SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
 
 USE_OIDC = False

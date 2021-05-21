@@ -713,6 +713,7 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 
 SOMALIER = {
     "enabled": False,
+    "admin_only": False,
     "vcf_base_dir": os.path.join(PRIVATE_DATA_ROOT, "somalier"),  # Private data
     "report_base_dir": os.path.join(MEDIA_ROOT, "somalier"),  # Static files served by Nginx
     "annotation_base_dir": os.path.join(ANNOTATION_BASE_DIR, "somalier"),
