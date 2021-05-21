@@ -159,9 +159,9 @@ table#gene-grid.color-coverage td.sub-column.coverage-none {
 /* evidenceColumns/enrichmentKits/pathologyTestVersions/geneLists are the 1
    true source of column order. Whenever we add a row, make sure columns are
    set via createRowColumns() */
+let geneAnnotationReleases = []
 let evidenceColumns = [];
 let enrichmentKits = [];
-let geneAnnotationReleases = []
 let labClassificationCounts = [];
 let pathologyTestVersions = [];
 let geneLists = [];
@@ -573,11 +573,6 @@ function createRowColumns(tr, headerRow) {
 
 function getGeneRowColumns(geneSymbol, headerRow, canAddGene) {
     let columns = [];
-    for (let i=0 ; i<evidenceColumns.length ; ++i) {
-        let evidenceType = evidenceColumns[i];
-        let eci = EVIDENCE_COLUMN_INFO[evidenceType];
-        columns.push({"txType": 'td', "class": evidenceType, "initFunc": eci["initFunc"],});
-    }
 
     for (let i=0 ; i<geneAnnotationReleases.length ; ++i) {
         let releaseId = geneAnnotationReleases[i];
@@ -610,6 +605,12 @@ function getGeneRowColumns(geneSymbol, headerRow, canAddGene) {
             }
         })();
         columns.push(columnData);
+    }
+
+    for (let i=0 ; i<evidenceColumns.length ; ++i) {
+        let evidenceType = evidenceColumns[i];
+        let eci = EVIDENCE_COLUMN_INFO[evidenceType];
+        columns.push({"txType": 'td', "class": evidenceType, "initFunc": eci["initFunc"],});
     }
 
     for (let i=0 ; i<enrichmentKits.length ; ++i) {
