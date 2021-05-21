@@ -93,11 +93,11 @@ class GeneListGenesGrid(JqGridUserRowConfig):
             field_name = f"release_{release.pk}"
             self.annotation_field_labels[field_name] = str(release)
             annotation_kwargs[field_name] = GeneListGeneSymbol.get_joined_genes_qs_annotation_for_release(release)
-        queryset = queryset.annotate(**annotation_kwargs)
+        queryset = queryset.annotate(**annotation_kwargs).order_by("original_name")
         field_names = self.get_field_names() + list(sorted(self.annotation_field_labels))
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'original_name',
-                                  'sortorder': 'desc'})
+                                  'sortorder': 'asc'})
 
     def get_colmodels(self, remove_server_side_only=False):
         colmodels = super().get_colmodels(remove_server_side_only=False)
