@@ -25,7 +25,6 @@ from lazy import lazy
 import logging
 from model_utils.managers import InheritanceManager
 from typing import List, TypedDict, Optional, Dict
-
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
 from library.log_utils import send_notification
@@ -303,21 +302,25 @@ class Lab(models.Model):
         return self.classifications.count()
 
     @lazy
-    def total_shared_classifications(self):
+    def total_shared_classifications(self) -> int:
         return self.shared_classifications.count()
 
     @lazy
-    def total_unshared_classifications(self):
+    def total_unshared_classifications(self) -> int:
         all_classifications = self.classification_set.exclude(withdrawn=True).count()
         return all_classifications - self.total_shared_classifications
 
     @lazy
-    def classifications_by_created(self):
+    def classifications_by_created(self) -> QuerySet:
         return self.classifications.order_by("created")
 
     @lazy
-    def classifications_by_modified(self):
+    def classifications_by_modified(self) -> QuerySet:
         return self.classifications.order_by("-modified")
+
+    @property
+    def first_classification_ever_shared(self) -> 'Classification':
+        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('-created').first()
 
     @lazy
     def classifications_per_day(self):

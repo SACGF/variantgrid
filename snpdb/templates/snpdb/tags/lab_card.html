@@ -45,7 +45,7 @@
                 {{ lab.total_classifications}} ({{ lab.total_shared_classifications }} shared)
                 {% endlabelled %}
             {% endif %}
-            {% labelled hint="tiny" label="First Record" %}{% timestamp lab.classifications_by_created.first.created time_ago=True %}{% endlabelled %}
+            {% labelled hint="tiny" label="First Record" %}{% timestamp lab.first_classification_ever_shared.created time_ago=True %}{% endlabelled %}
             {% labelled hint="tiny" label="Last Updated" %}{% timestamp lab.classifications_by_modified.first.modified time_ago=True %}{% endlabelled %}
             {% labelled hint="tiny" label="Last New Record" %}{% timestamp lab.classifications_by_created.last.created time_ago=True %}{% endlabelled %}
             {% labelled hint="tiny" label="Avg/Week" %}{{ lab.classifications_per_week | floatformat:1 }}{% endlabelled %}
