@@ -64,6 +64,7 @@ GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1
 _SAPATHOLOGY_MODE = True
 _SHARIANT_MODE = False
 _RUNX1_MODE = False
+_VG_COM_MODE = False
 
 SOMALIER["enabled"] = True
 SOMALIER["admin_only"] = True
@@ -137,3 +138,10 @@ elif _RUNX1_MODE:
     SITE_NAME = "RUNX1db"
 
     PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = True
+elif _VG_COM_MODE:
+    _VG_COM_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "variantgrid_com_static")
+    STATICFILES_DIRS = (_VG_COM_STATIC_FILES_DIR,) + STATICFILES_DIRS
+
+    _VG_COM_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/variantgrid_com_templates")
+    if os.path.exists(_VG_COM_TEMPLATES_DIR):
+        TEMPLATES[0]["DIRS"].insert(0, _VG_COM_TEMPLATES_DIR)
