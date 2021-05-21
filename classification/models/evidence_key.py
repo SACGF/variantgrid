@@ -402,6 +402,9 @@ class EvidenceKeyMap:
             return self.key_dict[key]
         return EvidenceKey.dummy_key(key)
 
+    def __getitem__(self, item):
+        return self.get(item)
+
     def __contains__(self, item):
         return item in self.key_dict
 

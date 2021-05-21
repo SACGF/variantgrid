@@ -181,6 +181,7 @@ class ClassificationGroup:
     def allele_origins(self) -> List[str]:
         return self._evidence_key_set(SpecialEKeys.ALLELE_ORIGIN)
 
+    @lazy
     def most_recent_curated(self) -> CuratedDate:
         return self.most_recent.curated_date_check
 

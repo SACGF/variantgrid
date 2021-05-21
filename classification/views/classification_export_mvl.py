@@ -11,7 +11,7 @@ from annotation.views import simple_citation_html
 from genes.hgvs import CHGVS
 from library.django_utils import get_url_from_view_path
 from classification.enums.classification_enums import SpecialEKeys
-from classification.models import EvidenceKey
+from classification.models import EvidenceKey, ClassificationGroups
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.regexes import db_ref_regexes
 from classification.views.classification_export_utils import ExportFormatter, \
@@ -69,63 +69,6 @@ class ExportFormatterMVL(ExportFormatter):
 
         return str(value).replace('<', '&lt;').replace('\n', '<br>').replace('\t', '&emsp')
 
-    def summarise_vcm(self, vcmc: VariantWithChgvs, row_chgvs: CHGVS) -> Tuple[str, str]:
-        vcm = vcmc.vcm
-        vc = vcm.classification
-
-        def format_label(label: str) -> str:
-            return f'<span style="color:#888">{label} </span> '
-
-        def get_value(ekey: EvidenceKey) -> str:
-            return ExportFormatterMVL.mvl_safe(ekey.pretty_value(vcm.get(ekey.key))) or 'None'
-
-        def format_key(ekey: EvidenceKey, override_value=None) -> str:
-            nonlocal vcm
-
-            label = ekey.pretty_label
-            value = override_value or get_value(ekey)
-            value = db_ref_regexes.link_html(value)
-            return f'{format_label(label)} {value}'
-
-        def citation_title(cd: CitationDetails) -> str:
-            if cd.title == CITATION_COULD_NOT_LOAD_TEXT:
-                return ''
-            else:
-                return cd.title
-
-        # no longer provide link to individual classifications (as you might then miss the overall changes)
-        record_label = vc.friendly_label
-
-        notes: List[str] = list()
-
-        if self.is_discordant(vc):
-            notes.append('<span style="color:#c44">This record is in discordance</span>')
-
-        my_raw_c = vcmc.chgvs.raw_c
-        row_raw_c = row_chgvs.raw_c
-        if my_raw_c != row_raw_c:
-            notes.append('<span style="color:#c44">Warning c.hgvs representation is different across transcript versions</span>')
-
-        # we don't want to display 1,000,000 etc nucleotides to the user, show the user friendly short version
-        short_hgvs = format_label('c.hgvs') + vc.get_c_hgvs(self.genome_build, use_full=False)
-
-        cs = format_key(self.ekeys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
-        curated = format_key(self.ekeys.get(SpecialEKeys.CURATION_DATE))
-        condition = format_key(self.ekeys.get(SpecialEKeys.CONDITION), ExportFormatterMVL.mvl_safe(vcmc.vcm.condition_text))
-
-        criteria_summary = format_label('Criteria met') + (vcm.criteria_strength_summary(self.ekeys) or 'None')
-        #citation_anchors = [html_link(cd.citation_link, f'{cd.source}:{cd.citation_id}') + ' ' + citation_title(cd) for cd in get_citations(vcm.citations)]
-        citation_anchors = [simple_citation_html(cd) for cd in get_citations(vcm.citations)]
-        # interpretation summary is too large to include for every record
-        #summary = format_key(self.ekeys.get(SpecialEKeys.INTERPRETATION_SUMMARY))
-        citations_string = format_label('Citations') + (('<br>' + '<br>'.join(citation_anchors)) if citation_anchors else 'None')
-
-        short_summary = f"{format_label(record_label)} {get_value(self.ekeys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))}"
-        record_label_bold = f'<b>{record_label}</b>'
-        note = '<br>'.join(notes)
-        long_summary = '<br>'.join(x for x in [record_label_bold, short_hgvs, note, cs, curated, condition, criteria_summary, citations_string] if x is not None)
-        return short_summary, long_summary
-
     def row(self, group: AlleleGroup) -> str:
         out = io.StringIO()
         writer = csv.writer(out, delimiter='\t')
@@ -133,6 +76,7 @@ class ExportFormatterMVL(ExportFormatter):
         date_str = now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
         url = get_url_from_view_path(group.target_variant.get_absolute_url()) + f'?refer=mvl&seen={date_str}'
         variant_details = f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
+        all_citations: Dict[str, CitationDetails] = dict()
 
         for c_parts, vcms_w_chgvs in group.iter_c_hgvs_versionless_transcripts():
 
@@ -170,12 +114,55 @@ class ExportFormatterMVL(ExportFormatter):
                     using_classification_score = this_classification_score
                     classification = this_classification
 
-                summary, abstract = self.summarise_vcm(vcm_w_chgvs, c_parts)
-                summaries.append(summary)
-                abstracts.append(abstract)
-
                 if vcm_w_chgvs.chgvs.raw_c != c_hgvs:
                     has_diff_chgvs = True
+
+                for citation in get_citations(vcm.citations):
+                    all_citations[citation.source + ":" + str(citation.citation_id)] = citation
+
+            groups = ClassificationGroups(classification_modifications=[cnchgvs.vcm for cnchgvs in vcms_w_chgvs], genome_build=self.genome_build)
+            group_html= "<ul>"
+            divider = "<span style='color:gray'>|</span>"
+            for group in groups.groups:
+                parts = []
+                if group.clinical_grouping != 'default':
+                    parts.append(ExportFormatterMVL.mvl_safe(group.clinical_grouping))
+                parts.append(group.lab)
+                if group.count() > 1:
+                    parts.append(f"* {group.count()} records")
+                parts.append(divider)
+                for c_hgvs in group.c_hgvses:
+                    parts.append("<span style='font-family:monospace'>" + ExportFormatterMVL.mvl_safe(str(c_hgvs)) + "</span>")
+                parts.append(divider)
+                parts.append("<b>" + ExportFormatterMVL.mvl_safe((self.ekeys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(group.clinical_significance)) or "Unclassified") + "</b>")
+                parts.append(divider)
+                has_condition = False
+                for condition in group.conditions():
+                    if terms := condition.terms:
+                        for term in terms:
+                            parts.append(f"<a href='{term.url}'>{term.id}</a> {term.name}")
+                            has_condition = True
+                    elif plain_text := condition.plain_text:
+                        parts.append(plain_text)
+                        has_condition = True
+                if not has_condition:
+                    parts.append("No condition provided")
+                parts.append(divider)
+                if zygosity := group.zygosities:
+                    parts.append(ExportFormatterMVL.mvl_safe(self.ekeys.get(SpecialEKeys.ZYGOSITY).pretty_value(zygosity)))
+                else:
+                    parts.append("zygosity unknown")
+                parts.append(divider)
+                if criteria := group.acmg_criteria:
+                    parts.append(f"<span style='font-family:monospace'>{' '.join([str(strength) for strength in criteria])}</span>")
+                else:
+                    parts.append("No ACMG criteria provided")
+                parts.append(divider)
+                parts.append(group.most_recent_curated.date.strftime("%Y-%m-%d"))
+                parts = [p for p in parts if p] # filter out any Nones
+                parts_line = " ".join(parts)
+                group_html += f"<li>{parts_line}</li>"
+            group_html += "</ul>"
 
             if has_diff_chgvs:
                 warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')
@@ -196,10 +183,11 @@ class ExportFormatterMVL(ExportFormatter):
             if warning_text:
                 warning_text = warning_text + '<br/>'
 
-            complete_summary = '<ul>' + ''.join(f'<li>{summary}</li>' for summary in summaries) + '</ul><br>'
-            complete_abstract = '<br><br>'.join(abstracts)
+            all_citation_list = list(all_citations.values())
+            all_citation_list.sort(key=lambda x: x.source + ":" + str(x.citation_id).rjust(10, ' '))
+            citations_html = "All Citations:<br>" + ("<br>".join([simple_citation_html(citation) for citation in all_citation_list] if all_citation_list else "No citations provided"))
 
-            combined_data = warning_text + f'Data as of {date_str}, <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a><br>' + complete_summary + complete_abstract
+            combined_data = f'Data as of {date_str} <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a><br>{warning_text}{group_html}{citations_html}'
 
             self.row_count += 1
             writer.writerow([transcript, c_hgvs, classification, combined_data, variant_details])

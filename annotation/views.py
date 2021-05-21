@@ -488,7 +488,7 @@ def _citations_tab(request, citations):
     return render(request, "annotation/citations_tab.html", context)
 
 
-def simple_citation_html(cd: CitationDetails):
+def simple_citation_html(cd: CitationDetails) -> str:
     first_author = cd.authors_short
     single_author = cd.authors_short == cd.authors
     if cd.authors and not first_author:
