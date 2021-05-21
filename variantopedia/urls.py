@@ -28,6 +28,8 @@ urlpatterns = [
               views.create_variant_for_allele, name='create_variant_for_allele'),
     perm_path('view/<int:variant_id>/<int:annotation_version_id>', views.variant_details_annotation_version,
               name='variant_details_annotation_version'),
+    perm_path('nearby_tab/<int:variant_id>/<int:annotation_version_id>', views.nearby_variants_tab,
+              name='nearby_variants_tab'),
     perm_path('nearby/<int:variant_id>/<int:annotation_version_id>', views.nearby_variants,
               name='nearby_variants_annotation_version'),
     perm_path('gene_coverage/<slug:gene_symbol_id>', views.gene_coverage, name='gene_coverage'),

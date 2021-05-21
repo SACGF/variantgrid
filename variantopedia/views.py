@@ -54,7 +54,7 @@ from variantgrid.celery import app
 from variantgrid.perm_path import get_visible_url_names
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries
+from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
 from variantopedia.search import search_data, SearchResults
 
 
@@ -608,6 +608,20 @@ def gene_coverage(request, gene_symbol_id):
     context = {"gene_symbol": gene_symbol,
                "twenty_x_coverage_percent_counts": twenty_x_coverage_percent_counts}
     return render(request, "variantopedia/gene_coverage.html", context)
+
+
+def nearby_variants_tab(request, variant_id, annotation_version_id):
+    variant = get_object_or_404(Variant, pk=variant_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
+    distance: int = settings.VARIANT_DETAILS_NEARBY_RANGE
+    context = {
+        'variant': variant,
+        "annotation_version": annotation_version,
+        "distance": distance,
+        "distance_str": str(distance)
+    }
+    context.update(get_nearby_summaries(request.user, variant, annotation_version, distance=distance))
+    return render(request, "variantopedia/nearby_variants_tab.html", context)
 
 
 def nearby_variants(request, variant_id, annotation_version_id):

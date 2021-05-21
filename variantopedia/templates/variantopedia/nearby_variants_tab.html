@@ -1,0 +1,8 @@
+{% load ui_utils %}
+{% labelled label="Codon"  id="nearby_codon" %}{{ codon_summary }}{% endlabelled %}
+{% labelled label="Exon"   id="nearby_exon" %}{{ exon_summary }}{% endlabelled %}
+{% labelled label="Domain" id="nearby_domain" %}{{ domain_summary }}{% endlabelled %}
+{% labelled label="Range (+/- "|add:distance_str|add:")" id="nearby_range" %}{{ range_summary }}{% endlabelled %}
+{% if codon_summary or exon_summary or domain_summary or range_summary %}
+    {% labelled label="Details" id="nearby_details" %}<a href="{% url 'nearby_variants_annotation_version' variant.pk annotation_version.pk %}">See nearby variants...</a>{% endlabelled %}
+{% endif %}
