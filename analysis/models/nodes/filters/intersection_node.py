@@ -114,10 +114,12 @@ class IntersectionNode(AnalysisNode):
         return pbi, enrichment_kit
 
     def handle_ancestor_input_samples_changed(self):
-        pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
-        if pbi:
-            logging.info("Setting to backend enrichment_kit")
-            self.accordion_panel = self.BACKEND_ENRICHMENT_KIT
+        AUTO_SWITCH_TO_PANEL_KIT = False
+        if AUTO_SWITCH_TO_PANEL_KIT:
+            pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
+            if pbi:
+                logging.info("Setting to backend enrichment_kit")
+                self.accordion_panel = self.BACKEND_ENRICHMENT_KIT
 
     def _get_method_summary(self):
         method_summary = 'No filtering applied.'
