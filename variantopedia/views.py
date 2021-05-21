@@ -183,6 +183,12 @@ def notify_server_status():
 
         lines.append(f"{emoji} {count_display} : {pretty_label(key)}")
     nb.add_markdown("\n".join(lines), indented=True)
+    nb.add_markdown("*In Total*")
+    nb.add_markdown(
+        f":people_holding_hands: {Classification.dashboard_total_shared_classifications()} : Classifications Shared" +
+        f"\n:cry: {Classification.dashboard_total_unshared_classifications()} : Classifications UnShared",
+        indented=True
+    )
     nb.send()
 
 

@@ -345,6 +345,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return Classification.objects.filter(created__gte=since).count()
 
     @staticmethod
+    def dashboard_total_shared_classifications() -> int:
+        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False).count()
+
+    @staticmethod
+    def dashboard_total_unshared_classifications() -> int:
+        return Classification.objects.filter(lab__external=False, withdrawn=False).exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
+
+    @staticmethod
     def dashboard_report_classifications_of_interest(since) -> Iterable[ClassificationOutstandingIssues]:
         min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
             minutes=2)  # give records 2 minutes to matching properly before reporting
