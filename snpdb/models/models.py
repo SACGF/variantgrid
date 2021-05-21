@@ -7,7 +7,7 @@ etc and things that don't fit anywhere else.
 """
 import json
 from functools import total_ordering
-
+from datetime import datetime
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -319,16 +319,14 @@ class Lab(models.Model):
         return self.classifications.order_by("-modified")
 
     @property
-    def first_classification_ever_shared(self) -> 'Classification':
-        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('-created').first()
+    def first_classification_ever_shared_date(self) -> Optional[datetime]:
+        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('created', flat=True).order_by('-created').first()
 
     @lazy
     def classifications_per_day(self):
         try:
-            data = self.classifications.aggregate(earliest=Min("created"))
-            earliest = data["earliest"]
             latest = now()
-            days = (latest - earliest).days
+            days = (latest - self.first_classification_ever_shared_date).days
             if days == 0:
                 days = 1
             cpd = self.total_classifications / days
