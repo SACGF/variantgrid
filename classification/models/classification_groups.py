@@ -1,12 +1,14 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from itertools import groupby
-from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set
+from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set, Dict
 
 from django.contrib.auth.models import User
 from lazy import lazy
 
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
-from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved
+from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
+    flag_types, classification_flag_types
 from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -108,18 +110,19 @@ class ClassificationGroup:
             if cc := self.most_recent.classification.clinical_context:
                 return cc.is_discordant()
 
-    def _c_hgvs_for(self, cm: ClassificationModification) -> CHGVS:
+    @staticmethod
+    def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> CHGVS:
         c_parts: CHGVS
-        if c_str := cm.classification.get_c_hgvs(self.genome_build):
+        if c_str := cm.classification.get_c_hgvs(genome_build):
             c_parts = CHGVS(c_str)
             c_parts.is_normalised = True
-            c_parts.genome_build = self.genome_build
+            c_parts.genome_build = genome_build
         else:
             c_parts = cm.classification.c_parts
             c_parts.is_normalised = False
             try:
                 c_parts.genome_build = cm.classification.get_genome_build()
-                c_parts.is_desired_build = self.genome_build.name == c_parts.genome_build.name
+                c_parts.is_desired_build = genome_build.name == c_parts.genome_build.name
             except KeyError:
                 pass
         return c_parts
@@ -128,7 +131,7 @@ class ClassificationGroup:
     def c_hgvses(self) -> List[CHGVS]:
         unique_c = set()
         for cm in self.modifications:
-            unique_c.add(self._c_hgvs_for(cm))
+            unique_c.add(ClassificationGroup.c_hgvs_for(cm, self.genome_build))
         c_list = list(unique_c)
         c_list.sort()
         return c_list
@@ -136,6 +139,19 @@ class ClassificationGroup:
     @property
     def c_hgvs(self) -> CHGVS:
         return self.c_hgvses[0]
+
+    @lazy
+    def flag_types(self) -> Set[str]:
+        types: Set[str] = set()
+        for type_n_res in self.most_recent.classification.flag_collection_safe.flags(only_open=True).filter(flag_type__in=[
+            classification_flag_types.matching_variant_flag,
+            classification_flag_types.matching_variant_warning_flag,
+            classification_flag_types.transcript_version_change_flag]).values_list('flag_type', 'resolution'):
+
+            types.add(type_n_res[0] + '.' + type_n_res[1])
+        type_list = list(types)
+        type_list.sort()
+        return [part.split(".") for part in type_list]
 
     def p_hgvses(self) -> List[PHGVS]:
         unique_p = set()
@@ -238,6 +254,15 @@ class ClassificationGroups:
         def condition_grouper(cm: ClassificationModification) -> Any:
             return cm.classification.condition_resolution_obj
 
+        cached_chgvs: Dict[int, CHGVS] = dict()
+
+        def c_hgvs_group(cm) -> CHGVS:
+            if existing := cached_chgvs.get(cm.id):
+                return existing
+            c_hgvs = ClassificationGroup.c_hgvs_for(cm, genome_build)
+            cached_chgvs[cm.id] = c_hgvs.without_transcript_version
+            return c_hgvs
+
         evidence_keys: EvidenceKeyMap = EvidenceKeyMap.instance()
 
         groups: List[ClassificationGroup] = []
@@ -257,8 +282,8 @@ class ClassificationGroups:
                 for _, group3 in groupby(group2, lambda cm: cm.classification.lab.name):
                     group3 = list(group3)
                     # breakup by transcript
-                    group3.sort(key=lambda cm: cm.c_parts.without_transcript_version)
-                    for _, group4 in groupby(group3, lambda cm: cm.c_parts.without_transcript_version):
+                    group3.sort(key=lambda cm: c_hgvs_group(cm))
+                    for _, group4 in groupby(group3, lambda cm: c_hgvs_group(cm)):
                         group4 = list(group4)
                         group4.sort(key=lambda cm: condition_sorter(cm))
                         for _, group5 in groupby(group4, lambda cm: condition_grouper(cm)):
