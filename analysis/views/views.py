@@ -500,12 +500,12 @@ def node_load(request, node_id):
 def node_cancel_load(request, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     if node_task := NodeTask.objects.filter(node=node, version=node.version).first():
-        logging.debug("TODO: Cancelling task %s", node_task.celery_task)
-        app.control.revoke(node_task.celery_task, terminate=True)  # @UndefinedVariable
+        if node_task.celery_task:
+            logging.debug("TODO: Cancelling task %s", node_task.celery_task)
+            app.control.revoke(node_task.celery_task, terminate=True)  # @UndefinedVariable
 
-        result = AbortableAsyncResult(node_task.celery_task)
-        result.abort()
-        logging.debug("tried to kill...")
+            result = AbortableAsyncResult(node_task.celery_task)
+            result.abort()
 
         if node_task.db_pid:
             run_sql("select pg_cancel_backend(%s)", [node_task.db_pid])
