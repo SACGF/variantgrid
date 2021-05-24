@@ -271,7 +271,8 @@ function addNewNodeAndFlash(data) {
 		});
 	};
 	endpointVis(false);
-	
+
+	bringNodeToFront(newNode);
 	$(newNode).fadeOut(500).fadeIn(500, function() {
 		endpointVis(true);
 	});
