@@ -185,7 +185,11 @@ class ExportFormatterMVL(ExportFormatter):
 
             all_citation_list = list(all_citations.values())
             all_citation_list.sort(key=lambda x: x.source + ":" + str(x.citation_id).rjust(10, ' '))
-            citations_html = "All Citations:<br>" + ("<br>".join([simple_citation_html(citation) for citation in all_citation_list] if all_citation_list else "No citations provided"))
+            citations_html = "All Citations:<br>"
+            if all_citation_list:
+                citations_html += "<br>".join([simple_citation_html(citation) for citation in all_citation_list])
+            else:
+                citations_html += "No citations provided"
 
             combined_data = f'Data as of {date_str} <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a><br>{warning_text}{group_html}{citations_html}'
 
