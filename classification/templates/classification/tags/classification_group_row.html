@@ -5,7 +5,7 @@
         {% if group.clinical_grouping != "default" %}
             <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
         {% endif %}
-        {{ group.lab }}
+        &#32;<span class="font-weight-bold">{{ group.lab }}</span>
         {% if show_username %}
             {% for user in group.users %}
                 <div class="text-secondary mt-1">{{ user.username }}</div>

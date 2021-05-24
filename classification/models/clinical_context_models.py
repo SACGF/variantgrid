@@ -52,7 +52,7 @@ class DiscordanceLevel(str, Enum):
     DISCORDANT = 'discordant'
 
     @property
-    def label(self):
+    def label(self) -> str:
         if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
             return "Concordant (Agreement)"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
@@ -61,7 +61,20 @@ class DiscordanceLevel(str, Enum):
             return "No Shared Submissions"
         if self == DiscordanceLevel.SINGLE_ENTRY:
             return "Single Submitter"
-        return "Discordant"
+        if self == DiscordanceLevel.DISCORDANT:
+            return "Discordant"
+        return "Unknown"
+
+    @property
+    def bs_status(self) -> str:
+        if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
+            return "success"
+        if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
+            return "warning"
+        if self == DiscordanceLevel.NO_ENTRIES or self == DiscordanceLevel.SINGLE_ENTRY:
+            return "secondary"
+        return "danger"
+
 
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceLevel':
