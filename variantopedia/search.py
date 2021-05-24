@@ -273,7 +273,7 @@ class Searcher:
             (SearchTypes.CLASSIFICATION, None, search_classification),
             (SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
-            (SearchTypes.TRANSCRIPT, r"^(ENST|NM_)\d+\.?\d*$", search_transcript),
+            (SearchTypes.TRANSCRIPT, r"^(ENST|NM_|NR_)\d+\.?\d*$", search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
             (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org),
