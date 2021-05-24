@@ -37,6 +37,7 @@
             <th>{% if show_allele_origin %}Origin, {% endif %}Zygosities</th>
             <th>ACMG <span class="text-secondary">Latest</span></th>
             <th>Curated <span class="text-secondary">Latest</span></th>
+            <th>Imported as <span class="text-secondary">Latest</span></th>
             <th>Allele</th>
             <th>Gene Symbol</th>
             <th>Records</th>
@@ -70,6 +71,7 @@
             {}, // Zygosities
             {}, // ACMG
             {}, // last record
+            {'className': 'none'}, // imported c.hgvs
             {'className': 'none'}, // allele
             {'className': 'none'}, // gene link
             {'className': 'none'}, // record sub-table

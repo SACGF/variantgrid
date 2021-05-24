@@ -15,7 +15,7 @@
     </td>
     <td data-order="{{ group.c_hgvs.sort_str }}">
         {% for c_hgvs in group.c_hgvses %}
-            <div class="mb-1" style="font-size:11px">{% c_hgvs c_hgvs %}</div>
+            <div class="mb-1" style="font-size:11px">{% c_hgvs group.c_hgvs %}</div>
         {% endfor %}
         {% for p_hgvs in group.p_hgvses %}
             <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
@@ -65,6 +65,9 @@
         </a><br/>
     </td>
     {% if not sub_index %}
+        <td>
+            {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }} {{ group.most_recent | get_item:'c_hgvs' | default_if_none:'(No c.hgvs provided)' }}
+        </td>
         <td>
             {% if group.allele %}<a class="hover-link" href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
         </td>
