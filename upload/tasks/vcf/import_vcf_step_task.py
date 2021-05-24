@@ -1,5 +1,5 @@
 from celery.app.task import Task
-from celery.canvas import chord
+from celery.canvas import chord, chain
 from django.db.models.aggregates import Min, Max
 from django.db.models.expressions import F
 from django.utils import timezone
@@ -132,14 +132,18 @@ def schedule_pipeline_stage_steps(upload_pipeline_id, pipeline_stage):
             task_class = import_class(upload_step.script)
             parallel_tasks.append(task_class.si(upload_step.pk, 0))
 
-        if parallel_tasks:
+        if pipeline_stage == VCFPipelineStage.FINISH:
+            # Getting infinite celery.chord_unlock - see #175
+            # chord_task = chord(parallel_tasks, pipeline_success_task.si(upload_pipeline_id))
+            # So using chain to run in sequence not parallel
+
             # Add on pipeline success task at the end of FINISH jobs
-            if pipeline_stage == VCFPipelineStage.FINISH:
-                chord_task = chord(parallel_tasks, pipeline_success_task.si(upload_pipeline_id))
-                chord_task.apply_async()
-            else:
-                for task in parallel_tasks:
-                    task.apply_async()
+            parallel_tasks.append(pipeline_success_task.si(upload_pipeline_id))
+            chain_task = chain(parallel_tasks)
+            chain_task.apply_async()
+        else:
+            for task in parallel_tasks:
+                task.apply_async()
     except AttributeError:
         message = get_traceback()
         message += "\nYou probably didn't register your Celery class via app.register_task().\n"
