@@ -27,17 +27,34 @@ function classifyAndCloseButton(tagId) {
     $(`#tag-button-${tagId}`).remove();
 }
 
-$(document).ready(function() {
-    var tagNodeForm = $("form#tag-node-form");
-    ajaxForm(tagNodeForm);
-	var tagSelect = $("select#id_tag");
+function enableDisableExclude() {
+    const excludeSection = $("#tagnode-exclude-section");
+    const exclude = $("#id_exclude", excludeSection);
+    if ($("#id_parent_input").is(":checked")) {
+        exclude.prop("disabled", false);
+        excludeSection.css("opacity", "100%");
+    } else {
+        exclude.prop("checked", false);
+        exclude.prop("disabled", true);
+        excludeSection.css("opacity", "50%");
+    }
+}
 
-	// Set dropdown options to have tag colors
+
+$(document).ready(function() {
+    const tagNodeForm = $("form#tag-node-form");
+    ajaxForm(tagNodeForm);
+    const tagSelect = $("select#id_tag");
+
+    // Set dropdown options to have tag colors
 	$("option", tagSelect).each(function() {
 		if (this.value) {
 			$(this).addClass("tagged-" + this.value);
 		}
 	});
+
+    enableDisableExclude();
+	$("#id_parent_input", tagNodeForm).change(enableDisableExclude);
 
     {%  if not requires_classification_tags %}
         {% if not node.analysis.analysisclassification_set.exists %}
@@ -52,8 +69,6 @@ $(document).ready(function() {
             Flags.instance.init({userId: '{{user.id}}'});
         });
     });
-
-
 });
 </script>
 <div>
@@ -67,9 +82,6 @@ $(document).ready(function() {
             <span class="tag-top-checkboxes">
                 <label>{{ form.parent_input.label }}:</label> {{ form.parent_input }}
             </span>
-            <span class="tag-top-checkboxes">
-                <label>{{ form.exclude.label }}:</label> {{ form.exclude }}
-            </span>
         </div>
         {% endif %}
         <div>
@@ -78,7 +90,6 @@ $(document).ready(function() {
                 <label>Tags From:</label>
                 {{ form.mode }}
             </div>
-
     		{% else %}
     		<b>All tags for analysis</b> 
     		{% endif %}
@@ -86,6 +97,10 @@ $(document).ready(function() {
 		<div>
     		<b>Tag:</b> {{ form.tags }}
 		</div>
+        <div id="tagnode-exclude-section">
+            <label>{{ form.exclude.label }}:</label> {{ form.exclude }}
+            (Filter OUT variants with selected tags, only works with parent input)
+        </div>
         {% if has_write_permission %}
             <button id='tag-node-save' class="btn btn-primary">save</button>
         {% endif %}
