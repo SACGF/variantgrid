@@ -21,7 +21,7 @@ from seqauto.signals import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
     Cohort, CohortSample, UserSettings, VCFSourceSettings
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_enums import ImportSource
+from snpdb.models.models_enums import ImportSource, VariantsType
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
     BackendVCF, UploadStep, ModifiedImportedVariants, UploadStepTaskType, VCFPipelineStage
@@ -323,9 +323,19 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
 
         for sequencing_sample, sample in samples_by_sequencing_sample.items():
-            bam_file = sequencing_sample.get_single_bam()
-            if bam_file:
+            modified_sample = False
+            # Set sample.variants_type from EnrichmentKit (eg to Mixed somatic for somatic panels)
+            if ek := sequencing_sample.enrichment_kit:
+                if ek.sample_variants_type != VariantsType.UNKNOWN:
+                    sample.variants_type = ek.sample_variants_type
+                sample.variant_zygosity_count = ek.variant_zygosity_count
+                modified_sample = True
+
+            if bam_file := sequencing_sample.get_single_bam():
                 sample.bam_file_path = bam_file.path
+                modified_sample = True
+
+            if modified_sample:
                 sample.save()
 
             try:
