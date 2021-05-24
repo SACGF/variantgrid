@@ -55,11 +55,11 @@ class AbstractPathogenicity:
 
 
 class PathogenicityImpact(AbstractPathogenicity):
-    MODIFIER = 'O'
-    LOW = 'L'
-    MODERATE = 'M'
+    MODIFIER = '1'
+    LOW = '2'
+    MODERATE = '3'
     MODERATE_OTHER = '*'  # This is a custom filter not a VEP value, so won't be in annotation data
-    HIGH = 'H'
+    HIGH = '4'
 
     CHOICES = [
         (MODIFIER, "MODIFIER"),

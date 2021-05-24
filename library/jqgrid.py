@@ -33,7 +33,7 @@ from typing import Dict
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.core.paginator import Paginator, InvalidPage
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import fields, JSONField
+from django.db.models import fields, JSONField, F
 from django.db.models.fields.json import KeyTransform
 from django.db.models.query_utils import Q
 from django.utils.encoding import smart_str
@@ -284,8 +284,13 @@ class JqGrid:
         sidx = request.GET.get('sidx')
         if sidx is not None:
             sord = request.GET.get('sord')
-            maybe_negate = '-' if sord == 'desc' else ''
-            order_by = f"{maybe_negate}{sidx}"
+            order_by = F(sidx)
+            # dlawrence - sort nulls first/last via
+            # https://docs.djangoproject.com/en/3.1/ref/models/expressions/#using-f-to-sort-null-values
+            if sord == "desc":
+                order_by = order_by.desc(nulls_last=True)
+            else:
+                order_by = order_by.asc(nulls_first=True)
 
             # always fall back to a second sort column
             # to ensure reliable results, by default have that
