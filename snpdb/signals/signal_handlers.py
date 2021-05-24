@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.db import transaction
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from snpdb.models import UserDataPrefix, SettingsInitialGroupPermission, Organization, Lab
@@ -48,5 +49,5 @@ def backend_vcf_import_success_handler(*args, **kwargs):
 def trio_save_handler(sender, instance, **kwargs):
     created = kwargs.get("created")
     if created:
-        task = create_genome_karyomapping_for_trio.si(instance.pk)  # @UndefinedVariable
-        task.apply_async()
+        celery_task = create_genome_karyomapping_for_trio.si(instance.pk)  # @UndefinedVariable
+        transaction.on_commit(lambda: celery_task.apply_async())

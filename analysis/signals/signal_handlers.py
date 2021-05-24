@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Q
 
 from analysis.models import TagNode, Analysis, Tag
@@ -17,11 +18,14 @@ def variant_tag_create(sender, instance, created=False, **kwargs):
         if instance.analysis:
             _analysis_tag_nodes_set_dirty(instance.analysis, instance.tag)
             # want to be as quick as we can so do analysis reload + liftover async
-            analysis_tag_created_task.si(instance.pk).apply_async()
+            # Need to launch this at end of transaction so we know VariantTag is in DB for celery job
+            celery_task = analysis_tag_created_task.si(instance.pk)
+            transaction.on_commit(lambda: celery_task.apply_async())
 
 
 def variant_tag_delete(sender, instance, **kwargs):
     if instance.analysis:
         _analysis_tag_nodes_set_dirty(instance.analysis, instance.tag)
         # want to be as quick as we can so do analysis reload + liftover async
-        analysis_tag_deleted_task.si(instance.analysis_id, instance.tag_id).apply_async()
+        celery_task = analysis_tag_deleted_task.si(instance.analysis_id, instance.tag_id)
+        transaction.on_commit(lambda: celery_task.apply_async())
