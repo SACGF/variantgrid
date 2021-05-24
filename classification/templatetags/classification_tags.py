@@ -70,7 +70,7 @@ def classification_groups(
     ordered_classifications = list(groups.modifications)
 
     if show_diffs:
-        if 1 < len(groups) <= 20:
+        if 1 < len(groups) <= 20 and len(groups) != len(ordered_classifications):
             diff_latest = ",".join([str(group.most_recent.classification.id) for group in groups])
             context["diff_latest"] = diff_latest
         if 1 < len(ordered_classifications) <= 20:
