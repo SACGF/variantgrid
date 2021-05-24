@@ -195,6 +195,11 @@
   background-image: url(/static/icons/flags/flag.svg);
   position: relative;
 }
+.flag.flag-little {
+  width: 16px;
+  height: 16px;
+  background-size: 16px 16px;
+}
 .flag.flag-classification_suggestion {
   background-image: url(/static/icons/flags/lightbulb.svg);
 }

@@ -223,7 +223,7 @@ class CHGVS:
         return self
 
     def __eq__(self, other):
-        return self.full_c_hgvs == other.full_c_hgvs
+        return self.full_c_hgvs == other.full_c_hgvs and self.is_normalised == other.is_normalised
 
     def __hash__(self):
         return hash(self.full_c_hgvs)
@@ -244,12 +244,17 @@ class CHGVS:
         Each part being padded so equivalent comparing
         """
         sort_str = ""
+        if self.is_normalised:
+            sort_str = "A"
+        else:
+            sort_str = "Z"
+
         if c_part := self.raw_c:
             if parts := CHGVS.NUM_PART.match(c_part):
                 num_part = parts.group(1).rjust(10, '0')
                 extra = parts.group(2)
-                return num_part + extra + self.transcript
-        return self.full_c_hgvs or ""
+                return sort_str + num_part + extra + self.transcript
+        return sort_str + self.full_c_hgvs or ""
 
     @lazy
     def transcript_parts(self) -> TranscriptParts:

@@ -20,6 +20,13 @@
         {% for p_hgvs in group.p_hgvses %}
             <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
         {% endfor %}
+        {% if group.flag_types %}
+            <div class="flags mt-1" title="This may not appear in the download due to outstanding variant matching issues" data-toggle="tooltip">
+            {% for flag in group.flag_types %}
+                <div class="flag flag-little flag-{{ flag.0 }} res-{{ flag.1 }}"></div>
+            {% endfor %}
+            </div>
+        {% endif %}
     </td>
     <td style="width:100px;" class="cs-{{ group.clinical_significance|lower }} text-center" data-order="{{ group.clinical_significance_score }}">
         {% if group.clinical_significance %}

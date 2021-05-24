@@ -45,6 +45,8 @@ class DiscordanceLevel(str, Enum):
     e.g. difference between Benign and Likely Benign isn't as important as the difference between Likely Benign and VUS etc
     """
 
+    NO_ENTRIES = 'no_entries'
+    SINGLE_ENTRY = 'single'  # there's only one lab submitting
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
     DISCORDANT = 'discordant'
@@ -55,13 +57,19 @@ class DiscordanceLevel(str, Enum):
             return "Concordant (Agreement)"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "Concordant (Confidence)"
+        if self == DiscordanceLevel.NO_ENTRIES:
+            return "No Shared Submissions"
+        if self == DiscordanceLevel.SINGLE_ENTRY:
+            return "Single Submitter"
         return "Discordant"
 
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceLevel':
         cs_scores = set()
         cs_values = set()
+        labs = set()
         for vcm in modifications:
+            labs.add(vcm.classification.lab)
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
                 strength = CS_TO_NUMBER.get(clin_sig)
@@ -72,6 +80,10 @@ class DiscordanceLevel(str, Enum):
                     cs_values.add(clin_sig)
         if len(cs_values) > 1:
             return DiscordanceLevel.CONCORDANT_CONFIDENCE
+        if len(labs) == 0:
+            return DiscordanceLevel.NO_ENTRIES
+        if len(labs) == 1:
+            return DiscordanceLevel.SINGLE_ENTRY
         return DiscordanceLevel.CONCORDANT_AGREEMENT
 
 
