@@ -223,7 +223,7 @@ def current_sample_sheet_changed(seqauto_run, sequencing_run_current_sample_shee
     if not meaningfully_changed:
         # Can go through and update models etc...
         # Update samples from sequencing sample
-        for combo_vcf in sequencing_run.samplesheetcombinedvcffile_set.all():
+        for combo_vcf in SampleSheetCombinedVCFFile.objects.filter(sequencing_run=sequencing_run):
             if vcf := combo_vcf.vcf:
                 # TODO: Raise some kind of manual task here to fix things???
 
