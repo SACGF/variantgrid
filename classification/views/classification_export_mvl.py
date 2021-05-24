@@ -131,8 +131,8 @@ class ExportFormatterMVL(ExportFormatter):
                 if group.count() > 1:
                     parts.append(f"* {group.count()} records")
                 parts.append(divider)
-                for c_hgvs in group.c_hgvses:
-                    parts.append("<span style='font-family:monospace'>" + ExportFormatterMVL.mvl_safe(str(c_hgvs)) + "</span>")
+                for c_hgvs_full in group.c_hgvses:
+                    parts.append("<span style='font-family:monospace'>" + ExportFormatterMVL.mvl_safe(str(c_hgvs_full)) + "</span>")
                 parts.append(divider)
                 parts.append("<b>" + ExportFormatterMVL.mvl_safe((self.ekeys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(group.clinical_significance)) or "Unclassified") + "</b>")
                 parts.append(divider)
