@@ -28,6 +28,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from copy import deepcopy
+from typing import Dict
+
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.core.paginator import Paginator, InvalidPage
 from django.core.serializers.json import DjangoJSONEncoder
@@ -82,7 +84,8 @@ class JqGrid:
     caption = None
     colmodel_overrides = {}  # Class member, do not modify in instances!
 
-    def __init__(self):
+    def __init__(self, case_sensitive_search=True):
+        self.case_sensitive_search = case_sensitive_search
         self.extra_config = {}
         self._overrides = deepcopy(self.colmodel_overrides)
         if not self.fields:
@@ -199,8 +202,7 @@ class JqGrid:
 
         return items
 
-    def get_q(self, json_filters):
-        # TODO: Add option to use case insensitive filters
+    def _get_filter_map(self) -> Dict:
         # TODO: Add more support for RelatedFields (searching and displaying)
         # FIXME: Validate data types are correct for field being searched.
         filter_map = {
@@ -226,6 +228,27 @@ class JqGrid:
             'ic': ('%(field)s__icontains', False),  # Case
         }
 
+        if not self.case_sensitive_search:
+            # Case insensitive search
+            # Could possibly do via https://github.com/free-jqgrid/jqGrid/wiki/Custom-filtering-searching-Operation
+            filter_map.update({
+                'ne': ('%(field)s__iexact', True),
+                'bn': ('%(field)s__istartswith', True),
+                'en': ('%(field)s__iendswith', True),
+                'nc': ('%(field)s__icontains', True),
+                # TODO: Can't make in work... maybe use F object?
+                # 'ni': ('%(field)s__in', True),
+                # 'in': ('%(field)s__in', False),
+                'eq': ('%(field)s__iexact', False),
+                'bw': ('%(field)s__istartswith', False),
+                'ew': ('%(field)s__iendswith', False),
+                'cn': ('%(field)s__icontains', False),
+            })
+
+        return filter_map
+
+    def get_q(self, json_filters):
+        filter_map = self._get_filter_map()
         q_filters = []
         for rule in json_filters['rules']:
             op, field, data = rule['op'], rule['field'], rule['data']

@@ -66,4 +66,5 @@ $(document).ready(function() {
 </script>
 <div id="FilterNode-editor"></div>
 <div id="filter-messages"></div>
+Note: Search is case insensitive (except "in"). Some columns contain NULL (no value) which will not match anything. You may want to use "is null" to include or "is not null" to exclude them.
 {% endblock content %}
