@@ -84,8 +84,7 @@ class JqGrid:
     caption = None
     colmodel_overrides = {}  # Class member, do not modify in instances!
 
-    def __init__(self, case_sensitive_search=True):
-        self.case_sensitive_search = case_sensitive_search
+    def __init__(self):
         self.extra_config = {}
         self._overrides = deepcopy(self.colmodel_overrides)
         if not self.fields:
@@ -202,7 +201,7 @@ class JqGrid:
 
         return items
 
-    def _get_filter_map(self) -> Dict:
+    def get_q(self, json_filters):
         # TODO: Add more support for RelatedFields (searching and displaying)
         # FIXME: Validate data types are correct for field being searched.
         filter_map = {
@@ -223,32 +222,19 @@ class JqGrid:
             'cn': ('%(field)s__contains', False),
             'nu': ('%(field)s__isnull', True),
             'nn': ('%(field)s__isnull', False),
-
-            # 2/10/2018 - dlawrence - Add case insensitive - no way to do it via UI but can pass it explicitly
-            'ic': ('%(field)s__icontains', False),  # Case
         }
+        if self.get_config(False)['ignoreCase']:
+            filter_map.update({'ne': ('%(field)s__iexact', True),
+                               'eq': ('%(field)s__iexact', False),
+                               'bn': ('%(field)s__istartswith', True),
+                               'bw': ('%(field)s__istartswith', False),
+                               'en': ('%(field)s__iendswith', True),
+                               'ew': ('%(field)s__iendswith', False),
+                               'nc': ('%(field)s__icontains', True),
+                               'cn': ('%(field)s__icontains', False)
+                               }
+                              )
 
-        if not self.case_sensitive_search:
-            # Case insensitive search
-            # Could possibly do via https://github.com/free-jqgrid/jqGrid/wiki/Custom-filtering-searching-Operation
-            filter_map.update({
-                'ne': ('%(field)s__iexact', True),
-                'bn': ('%(field)s__istartswith', True),
-                'en': ('%(field)s__iendswith', True),
-                'nc': ('%(field)s__icontains', True),
-                # TODO: Can't make in work... maybe use F object?
-                # 'ni': ('%(field)s__in', True),
-                # 'in': ('%(field)s__in', False),
-                'eq': ('%(field)s__iexact', False),
-                'bw': ('%(field)s__istartswith', False),
-                'ew': ('%(field)s__iendswith', False),
-                'cn': ('%(field)s__icontains', False),
-            })
-
-        return filter_map
-
-    def get_q(self, json_filters):
-        filter_map = self._get_filter_map()
         q_filters = []
         for rule in json_filters['rules']:
             op, field, data = rule['op'], rule['field'], rule['data']
@@ -375,6 +361,7 @@ class JqGrid:
             'datatype': 'json',
             'autowidth': True,
             'forcefit': True,
+            'ignoreCase': True,
             'shrinkToFit': True,
             'jsonReader': {'repeatitems': False},
             'rowNum': 10,

@@ -26,7 +26,7 @@ class FilterNode(AnalysisNode):
 
         # This filter uses JQGrid's built in query filter.
         # Load stored params from the DB, convert to JSON and send to a fake request
-        fake_filter_grid = FakeFilterGrid(case_sensitive_search=False)
+        fake_filter_grid = FakeFilterGrid()
         return fake_filter_grid.get_q(self.get_filters())
 
     def get_extra_grid_config(self):
