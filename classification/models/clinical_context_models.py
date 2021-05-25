@@ -75,7 +75,6 @@ class DiscordanceLevel(str, Enum):
             return "secondary"
         return "danger"
 
-
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceLevel':
         cs_scores = set()

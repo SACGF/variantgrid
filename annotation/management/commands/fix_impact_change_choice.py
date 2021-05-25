@@ -8,7 +8,8 @@ from annotation.models import VariantAnnotationVersion, VariantAnnotation, Varia
 class Command(BaseCommand):
     """ Do this as a management command not migration so its not in a transaction (which got too big) """
     def add_arguments(self, parser):
-        parser.add_argument('--small_updates', action='store_true', help="Do update in small chunks (to reduce transaction size)")
+        parser.add_argument('--small_updates', action='store_true',
+                            help="Do update in small chunks (to reduce transaction size)")
 
     def handle(self, *args, **options):
         small_updates = options["small_updates"]

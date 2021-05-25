@@ -37,7 +37,6 @@ class Test(unittest.TestCase):
     @skip
     def test_historical_keys(self):
         # No longer required
-
         """ SA Path keys using old IVAT annotation as of August 2019 deployment """
 
         FakeVCM = namedtuple('FakeVCM', ['user'])

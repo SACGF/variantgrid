@@ -49,4 +49,3 @@ class AbstractZygosityCountNode(Model):
                 if max_count:
                     name.append(f"{column} <= {max_count}")
         return ", ".join(name)
-
