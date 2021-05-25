@@ -316,13 +316,13 @@ $(document).ready(function() {
         const filterMessages = [];
         if (familyCode) {
             filterMessages.push("FamilyCode: '" + familyCode + "'");
-            filterFields["family_code"] = {field: "family_code", op: 'ic', data: familyCode};
+            filterFields["family_code"] = {field: "family_code", op: 'cn', data: familyCode};
         } else {
             delete filterFields["family_code"];
         }
         if (patientPhenotype) {
             filterMessages.push("Phenotype/Description contains: '" + patientPhenotype + "'");
-            filterFields["phenotype"] = {field: "phenotype", op: 'ic', data: patientPhenotype};
+            filterFields["phenotype"] = {field: "phenotype", op: 'cn', data: patientPhenotype};
         } else {
             delete filterFields["phenotype"];
         }
