@@ -22,6 +22,7 @@ class FilterNode(AnalysisNode):
 
     def _get_node_q(self) -> Optional[Q]:
         class FakeFilterGrid(jqgrid.JqGrid):
+            caption = "Fake"
             fields = ["id"]  # Needs to be defined
 
         # This filter uses JQGrid's built in query filter.
