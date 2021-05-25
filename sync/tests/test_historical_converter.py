@@ -6,6 +6,8 @@ The key changes happened in:
 classification.migrations.0042_vep_ekeys.modifying_existing_keys
 """
 from collections import namedtuple
+from unittest import skip
+
 from django.contrib.auth.models import User
 import unittest
 
@@ -32,7 +34,10 @@ class Test(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
+    @skip
     def test_historical_keys(self):
+        # No longer required
+
         """ SA Path keys using old IVAT annotation as of August 2019 deployment """
 
         FakeVCM = namedtuple('FakeVCM', ['user'])

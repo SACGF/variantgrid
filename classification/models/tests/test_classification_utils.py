@@ -87,4 +87,4 @@ class ClassificationTestCaseUtils(TestCase):
 
     def test_is_valid_transcript(self):
         self.assertTrue(Classification.is_supported_transcript("NM_002739.5(PRKCG):c.1397T>C"))
-        self.assertFalse(Classification.is_supported_transcript("NR_023343.1(RNU4ATAC):n.50G>A"))
+        self.assertFalse(Classification.is_supported_transcript("NX_023343.1(RNU4ATAC):n.50G>A"))
