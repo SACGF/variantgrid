@@ -92,6 +92,8 @@ def ekey(val, key: str = None):
     if not key:
         raise ValueError('ekey filter must have a key')
     e_key = EvidenceKeyMap.cached_key(key)
+    if e_key.is_dummy:
+        print(f"Warning, dummy evidence key {key}")
     pretty_val = e_key.pretty_value(val, dash_for_none=True)
     if val is None or val == '':
         return mark_safe(f'<span class="no-value">{escape(pretty_val)}</span>')

@@ -1,0 +1,27 @@
+{% load classification_tags %}
+<table>
+    <thead>
+        <tr>
+            <th>Lab</th>
+            <th>c.hgvs {{ groups.genome_build }}</th>
+            <th>Clinical Significance</th>
+            <th>Conditions</th>
+            <th>Zygosities</th>
+            <th>ACMG Latest</th>
+            <th>Curated Latest</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for group in groups %}
+        <tr>
+            <td>{{ group.lab }}{% if group.count > 1 %} * {{ group.count }} records{% endif %}</td>
+            <td style='font-family:monospace;word-break:break-all'>{{ group.c_hgvs }}</td>
+            <td>{{ group.clinical_significance |ekey:'clinical_significance' }}</td>
+            <td>{% for condition in group.conditions %}<div>{% condition condition %}</div>{% endfor %}</td>
+            <td>{{ group.zygosities | ekey:"zygosity" }}</td>
+            <td style='font-family:monospace'>{% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}{{ acmg }}{% endfor %}</td>
+            <td style='font-family:monospace'>{{ group.most_recent_curated.date | date:"Y-m-d" }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

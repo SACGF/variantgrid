@@ -1,21 +1,20 @@
 import csv
 import io
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List
 
 from django.conf import settings
+from django.template.loader import render_to_string
 from django.utils.timezone import now
 from pytz import timezone
 
-from annotation.citations import get_citations, CITATION_COULD_NOT_LOAD_TEXT, CitationDetails
+from annotation.citations import get_citations, CitationDetails
 from annotation.views import simple_citation_html
-from genes.hgvs import CHGVS
 from library.django_utils import get_url_from_view_path
 from classification.enums.classification_enums import SpecialEKeys
 from classification.models import EvidenceKey, ClassificationGroups
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.regexes import db_ref_regexes
 from classification.views.classification_export_utils import ExportFormatter, \
-    AlleleGroup, ConflictStrategy, VariantWithChgvs
+    AlleleGroup, ConflictStrategy
 
 
 class ExportFormatterMVL(ExportFormatter):
@@ -61,13 +60,6 @@ class ExportFormatterMVL(ExportFormatter):
 
     def header(self) -> str:
         return '\t'.join(['transcript', 'c_nomen', 'classification', 'variant information', 'report abstract']) + '\n'
-
-    @staticmethod
-    def mvl_safe(value: str) -> str:
-        if value is None:
-            return ''
-
-        return str(value).replace('<', '&lt;').replace('\n', '<br>').replace('\t', '&emsp')
 
     def row(self, group: AlleleGroup) -> str:
         out = io.StringIO()
@@ -121,48 +113,7 @@ class ExportFormatterMVL(ExportFormatter):
                     all_citations[citation.source + ":" + str(citation.citation_id)] = citation
 
             groups = ClassificationGroups(classification_modifications=[cnchgvs.vcm for cnchgvs in vcms_w_chgvs], genome_build=self.genome_build)
-            group_html= "<ul>"
-            divider = "<span style='color:gray'>|</span>"
-            for group in groups.groups:
-                parts = []
-                if group.clinical_grouping != 'default':
-                    parts.append(ExportFormatterMVL.mvl_safe(group.clinical_grouping))
-                parts.append(group.lab)
-                if group.count() > 1:
-                    parts.append(f"* {group.count()} records")
-                parts.append(divider)
-                for c_hgvs_full in group.c_hgvses:
-                    parts.append("<span style='font-family:monospace'>" + ExportFormatterMVL.mvl_safe(str(c_hgvs_full)) + "</span>")
-                parts.append(divider)
-                parts.append("<b>" + ExportFormatterMVL.mvl_safe((self.ekeys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(group.clinical_significance)) or "Unclassified") + "</b>")
-                parts.append(divider)
-                has_condition = False
-                for condition in group.conditions():
-                    if terms := condition.terms:
-                        for term in terms:
-                            parts.append(f"<a href='{term.url}'>{term.id}</a> {term.name}")
-                            has_condition = True
-                    elif plain_text := condition.plain_text:
-                        parts.append(plain_text)
-                        has_condition = True
-                if not has_condition:
-                    parts.append("No condition provided")
-                parts.append(divider)
-                if zygosity := group.zygosities:
-                    parts.append(ExportFormatterMVL.mvl_safe(self.ekeys.get(SpecialEKeys.ZYGOSITY).pretty_value(zygosity)))
-                else:
-                    parts.append("zygosity unknown")
-                parts.append(divider)
-                if criteria := group.acmg_criteria:
-                    parts.append(f"<span style='font-family:monospace'>{' '.join([str(strength) for strength in criteria])}</span>")
-                else:
-                    parts.append("No ACMG criteria provided")
-                parts.append(divider)
-                parts.append(group.most_recent_curated.date.strftime("%Y-%m-%d"))
-                parts = [p for p in parts if p] # filter out any Nones
-                parts_line = " ".join(parts)
-                group_html += f"<li>{parts_line}</li>"
-            group_html += "</ul>"
+            groups_html = render_to_string('classification/classification_groups_mvl.html', {"groups": groups}).replace('\n', '').strip()
 
             if has_diff_chgvs:
                 warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')
@@ -185,13 +136,13 @@ class ExportFormatterMVL(ExportFormatter):
 
             all_citation_list = list(all_citations.values())
             all_citation_list.sort(key=lambda x: x.source + ":" + str(x.citation_id).rjust(10, ' '))
-            citations_html = "All Citations:<br>"
+            citations_html = "<br><b>All Citations</b>:<br>"
             if all_citation_list:
-                citations_html += "<br>".join([simple_citation_html(citation) for citation in all_citation_list])
+                citations_html += "".join(["<p>" + simple_citation_html(citation) + "</p>" for citation in all_citation_list])
             else:
                 citations_html += "No citations provided"
 
-            combined_data = f'Data as of {date_str} <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a><br>{warning_text}{group_html}{citations_html}'
+            combined_data = f'Data as of {date_str} <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a><br>{warning_text}{groups_html}{citations_html}'
 
             self.row_count += 1
             writer.writerow([transcript, c_hgvs, classification, combined_data, variant_details])
