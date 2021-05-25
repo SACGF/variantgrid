@@ -7,7 +7,7 @@ import json
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from library import jqgrid
-from snpdb.models import VariantGridColumn
+from snpdb.models import VariantGridColumn, Variant
 
 
 # TODO: This node has quite a few redundant operations - eg it will filter the queryset
@@ -22,8 +22,8 @@ class FilterNode(AnalysisNode):
 
     def _get_node_q(self) -> Optional[Q]:
         class FakeFilterGrid(jqgrid.JqGrid):
-            caption = "Fake"
-            fields = ["id"]  # Needs to be defined
+            model = Variant
+            fields = ["id"]
 
         # This filter uses JQGrid's built in query filter.
         # Load stored params from the DB, convert to JSON and send to a fake request
