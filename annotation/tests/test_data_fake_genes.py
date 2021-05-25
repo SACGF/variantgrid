@@ -15,9 +15,9 @@ def create_fake_transcript_version(genome_build: GenomeBuild) -> TranscriptVersi
                                                         genome_build=genome_build, import_source=import_source)
 
     data = {'id': 'ENST00000300305.7', 'end': 35049344, 'chrom': '21',
-             'exons': [[34787800, 34792610], [34799300, 34799462], [34834409, 34834601], [34859473, 34859578],
-                       [34880556, 34880713], [34886842, 34887096], [34892924, 34892963], [35048841, 35049344]],
-             'start': 34787801, 'strand': '-', 'cds_end': 35048899, 'cds_start': 34792134}
+            'exons': [[34787800, 34792610], [34799300, 34799462], [34834409, 34834601], [34859473, 34859578],
+                      [34880556, 34880713], [34886842, 34887096], [34892924, 34892963], [35048841, 35049344]],
+            'start': 34787801, 'strand': '-', 'cds_end': 35048899, 'cds_start': 34792134}
 
     transcript_version, _ = TranscriptVersion.objects.get_or_create(transcript=transcript, gene_version=gene_version,
                                                                     version=7, genome_build=genome_build,

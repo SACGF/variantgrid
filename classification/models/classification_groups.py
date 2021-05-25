@@ -1,4 +1,3 @@
-from collections import defaultdict
 from dataclasses import dataclass
 from itertools import groupby
 from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set, Dict
@@ -8,7 +7,7 @@ from lazy import lazy
 
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
-    flag_types, classification_flag_types
+    classification_flag_types
 from classification.models.evidence_mixin import CriteriaStrength
 from genes.hgvs import CHGVS, PHGVS
 from snpdb.genome_build_manager import GenomeBuildManager

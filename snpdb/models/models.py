@@ -15,7 +15,7 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import QuerySet
-from django.db.models.aggregates import Min, Count
+from django.db.models.aggregates import Count
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
 from django.utils import timezone

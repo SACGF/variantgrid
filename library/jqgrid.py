@@ -28,7 +28,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from copy import deepcopy
-from typing import Dict
 
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.core.paginator import Paginator, InvalidPage
