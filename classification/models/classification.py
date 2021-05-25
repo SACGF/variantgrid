@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 
+import pytz
 from datetimeutc.fields import DateTimeUTCField
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -2126,14 +2127,15 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         """
         @return a datetime and a bool indicating if True, value came from curated, if False came from classification created
         """
+        tzinfo = pytz.timezone(settings.TIME_ZONE)
         try:
             curated_date_value = Classification.to_date(self.get(SpecialEKeys.CURATION_DATE))
             if curated_date_value:
-                return CuratedDate(curated_date_value.replace(tzinfo=None), True)
+                return CuratedDate(curated_date_value.astimezone(tzinfo), True)
         except:
             pass  # could not parse date
         # if we don't have a curation date, use created date
-        return CuratedDate(self.classification.created.replace(tzinfo=None), False)
+        return CuratedDate(self.classification.created.astimezone(tzinfo), False)
 
     @staticmethod
     def optimize_for_report(qs: QuerySet) -> QuerySet:

@@ -1,3 +1,4 @@
+{% if not c_hgvs.full_c_hgvs %}<span class="no-value">-</span>{% else %}
 <span class="text-monospace">
     {% if c_hgvs.is_desired_build == False or c_hgvs.is_normalised == False %}
 {% comment %}Specfically check for False rather than not as these properties default to None and are rarely populated{% endcomment %}
@@ -8,3 +9,4 @@
     {% endif %}
     <span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:&#8203;<span>{{ c_hgvs.raw_c }}</span>
 </span>
+{% endif %}

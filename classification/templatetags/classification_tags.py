@@ -240,7 +240,9 @@ def classification_table(
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: CHGVS):
+def c_hgvs(c_hgvs: Union[CHGVS, str]):
+    if isinstance(c_hgvs, str):
+        c_hgvs = CHGVS(c_hgvs)
     return {"c_hgvs": c_hgvs}
 
 

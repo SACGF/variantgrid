@@ -21,7 +21,7 @@
             <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
         {% endfor %}
         {% if group.flag_types %}
-            <div class="flags mt-1" title="This may not appear in the download due to outstanding variant matching issues" data-toggle="tooltip">
+            <div class="flags mt-1" title="This row may not appear in downloads due to outstanding variant matching issues" data-toggle="tooltip">
             {% for flag in group.flag_types %}
                 <div class="flag flag-little flag-{{ flag.0 }} res-{{ flag.1 }}"></div>
             {% endfor %}
@@ -66,7 +66,7 @@
     </td>
     {% if not sub_index %}
         <td>
-            {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }} {{ group.most_recent | get_item:'c_hgvs' | default_if_none:'(No c.hgvs provided)' }}
+            {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }} {% c_hgvs group.most_recent.c_parts %}
         </td>
         <td>
             {% if group.allele %}<a class="hover-link" href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
