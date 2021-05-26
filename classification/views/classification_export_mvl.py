@@ -1,6 +1,7 @@
 import csv
 import io
-from typing import Dict, List
+from collections import defaultdict
+from typing import Dict, List, Set, Any, Tuple, Iterable
 
 from django.conf import settings
 from django.template.loader import render_to_string
@@ -15,6 +16,24 @@ from classification.models import EvidenceKey, ClassificationGroups
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_export_utils import ExportFormatter, \
     AlleleGroup, ConflictStrategy
+from snpdb.models import Lab
+
+
+class CitationCounter:
+
+    def __init__(self):
+        self.all_citations: Dict[CitationDetails, Set[Any]] = defaultdict(set)
+
+    def reference_citation(self, citation: CitationDetails, reference: Any):
+        self.all_citations[citation].add(reference)
+
+    def ordered_references(self) -> Iterable[Tuple[CitationDetails, List[Any]]]:
+        citation_list = list(self.all_citations.keys())
+        citation_list.sort()
+        for citation in citation_list:
+            labs = list(self.all_citations[citation])
+            labs.sort()
+            yield citation, labs
 
 
 class ExportFormatterMVL(ExportFormatter):
@@ -24,7 +43,7 @@ class ExportFormatterMVL(ExportFormatter):
 
     @property
     def version(self):
-        return '2.1'
+        return '3'
 
     @property
     def use_full_chgvs(self):
@@ -68,7 +87,6 @@ class ExportFormatterMVL(ExportFormatter):
         date_str = now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
         url = get_url_from_view_path(group.target_variant.get_absolute_url()) + f'?refer=mvl&seen={date_str}'
         variant_details = f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
-        all_citations: Dict[str, CitationDetails] = dict()
 
         for c_parts, vcms_w_chgvs in group.iter_c_hgvs_versionless_transcripts():
 
@@ -109,11 +127,12 @@ class ExportFormatterMVL(ExportFormatter):
                 if vcm_w_chgvs.chgvs.raw_c != c_hgvs:
                     has_diff_chgvs = True
 
-                for citation in get_citations(vcm.citations):
-                    all_citations[citation.source + ":" + str(citation.citation_id)] = citation
-
             groups = ClassificationGroups(classification_modifications=[cnchgvs.vcm for cnchgvs in vcms_w_chgvs], genome_build=self.genome_build)
             groups_html = render_to_string('classification/classification_groups_mvl.html', {"groups": groups}).replace('\n', '').strip()
+            citation_counter = CitationCounter()
+            for group in groups:
+                for citation in get_citations(group.most_recent.citations):
+                    citation_counter.reference_citation(citation, group.lab)
 
             if has_diff_chgvs:
                 warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')
@@ -131,18 +150,18 @@ class ExportFormatterMVL(ExportFormatter):
                 warnings.append(f'Warning <b>Multiple clinical significances recorded for this transcript : {strength_list}</b>')
 
             warning_text = '<br>'.join(warnings)
-            if warning_text:
-                warning_text = warning_text + '<br/>'
 
-            all_citation_list = list(all_citations.values())
-            all_citation_list.sort(key=lambda x: x.source + ":" + str(x.citation_id).rjust(10, ' '))
-            citations_html = "<br><b>All Citations</b>:<br>"
-            if all_citation_list:
-                citations_html += "".join(["<p>" + simple_citation_html(citation) + "</p>" for citation in all_citation_list])
-            else:
+            citations_html = "<br><b>Citations Latest</b>:<br>"
+            has_citation = False
+            for citation, labs in citation_counter.ordered_references():
+                has_citation = True
+                references = ", ".join(labs)
+                citations_html += f"<p>{simple_citation_html(citation)}<br><i>Referenced by</i>: {references}</p>"
+
+            if not has_citation:
                 citations_html += "No citations provided"
 
-            combined_data = f'Data as of {date_str} <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a><br>{warning_text}{groups_html}{citations_html}'
+            combined_data = f'{warning_text}{groups_html}<p>Data as of {date_str} <a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a></p>{citations_html}'
 
             self.row_count += 1
             writer.writerow([transcript, c_hgvs, classification, combined_data, variant_details])

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, Any, Union
 
 from Bio import Entrez, Medline
@@ -12,7 +13,35 @@ from annotation.models.models_enums import CitationSource
 # @param citation_id The id as it's known in the external database, e.g. PMID:9003501 has a citation_id of 9003501
 from library.log_utils import report_exc_info, report_message
 
-CitationDetails = collections.namedtuple('CitationDetails', 'id title journal journal_short year authors authors_short citation_id citation_link source abstract')
+
+@dataclass
+class CitationDetails:
+    id: int
+    title: str
+    journal: str
+    journal_short: str
+    year: str
+    authors: str
+    authors_short: str
+    citation_id: str
+    citation_link: str
+    source: str
+    abstract: str
+
+    def __eq__(self, other):
+        return self.source == other.source and self.citation_id == other.citation_id
+
+    def __hash__(self):
+        return hash(self.source) + hash(self.citation_id)
+
+    def __lt__(self, other):
+        if self.source < other.source:
+            return True
+        if self.source == other.source:
+            return self.citation_id.rjust(10,'0') < other.citation_id.rjust(10,'0')
+        return False
+
+
 CITATION_COULD_NOT_LOAD_TEXT = 'Could not load citation summary'
 
 
@@ -211,6 +240,6 @@ def get_citations(citations: Iterable[Citation]) -> List[CitationDetails]:
         cc = citations_by_citation_id[k]
         cached_citations.append(cc)
 
-    cached_citations.sort(key=lambda x: (x.source, x.citation_id))
+    cached_citations.sort()
 
     return cached_citations

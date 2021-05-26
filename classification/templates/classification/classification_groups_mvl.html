@@ -18,10 +18,10 @@
             <td style='padding:8px'>{{ group.lab }}{% if group.count > 1 %} * {{ group.count }} records{% endif %}</td>
             <td style='font-family:monospace;word-break:break-all;padding:8px'>{{ group.c_hgvs }}</td>
             <td style='padding:8px'>{{ group.clinical_significance |ekey:'clinical_significance' }}</td>
-            <td style='padding:8px'>{% for condition in group.conditions %}<div>{% condition condition %}</div>{% endfor %}</td>
+            <td style='padding:8px'>{% for condition in group.conditions %}<div>{% condition condition %}</div>{% empty %}-{% endfor %}</td>
             <td style='padding:8px'>{{ group.zygosities | ekey:'zygosity' }}</td>
-            <td style='font-family:monospace;padding:8px'>{% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}{{ acmg }}{% endfor %}</td>
-            <td style='font-family:monospace;padding:8px'>{{ group.most_recent_curated.date | date:'Y-m-d' }}</td>
+            <td style='font-family:monospace;padding:8px'>{% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}{{ acmg }}{% empty %}-{% endfor %}</td>
+            <td style='font-family:monospace;padding:8px'><div style='white-space: nowrap'>{{ group.most_recent_curated.date | date:'Y-m-d' }}</div></td>
         </tr>
     {% endfor %}
     </tbody>

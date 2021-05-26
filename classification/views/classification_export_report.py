@@ -68,7 +68,7 @@ class ExportFormatterReport(ExportFormatter):
             report_blob['label'] = e_key.pretty_label
             context[e_key.key] = report_blob
 
-        context['citations'] = [dict(citation._asdict()) for citation in get_citations(record.citations)]
+        context['citations'] = [vars(citation) for citation in get_citations(record.citations)]
         context['evidence_weights'] = Classification.summarize_evidence_weights(evidence)
         context['acmg_criteria'] = record.criteria_strength_summary(e_keys)
         context['editable'] = record.classification.can_write(self.user)

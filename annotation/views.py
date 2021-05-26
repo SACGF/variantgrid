@@ -500,7 +500,7 @@ def simple_citation_html(cd: CitationDetails) -> str:
         "first_author": first_author,
         "single_author": single_author,
     }
-    context = {**context, **cd._asdict()}
+    context = {**context, **vars(cd)}
     return render_to_string('annotation/citation_simple.html', context).replace('\n', '').strip()
 
 
@@ -524,4 +524,4 @@ def citations_json(request, citations_ids_list):
 
     cached_citations = get_citations(citations)
 
-    return JsonResponse({'citations': [cc._asdict() for cc in cached_citations]})
+    return JsonResponse({'citations': [vars(cc) for cc in cached_citations]})
