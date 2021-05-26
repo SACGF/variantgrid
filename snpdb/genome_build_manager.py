@@ -1,6 +1,6 @@
 from typing import Optional
 
-from threadlocals.threadlocals import get_thread_variable, get_current_user, set_thread_variable
+from threadlocals.threadlocals import get_thread_variable, get_current_user, set_thread_variable, get_current_session
 
 from snpdb.models import UserSettings, GenomeBuild
 
@@ -12,8 +12,9 @@ class GenomeBuildManager:
         # FIXME, allow overriding of current genome build in a consistent way
         # e.g. "genome_build" in the request
         genome_build: Optional[GenomeBuild] = None
-        if genome_build := get_thread_variable("genome_build"):
-            return genome_build
+        if session := get_current_session():
+            if genome_build := session.get("building_manager_genome_build"):
+                return genome_build
 
         if user := get_current_user():
             genome_build = UserSettings.get_genome_build_or_default(user)
@@ -29,4 +30,5 @@ class GenomeBuildManager:
         """
         Only needs to be called if the genome build wont be the user's default
         """
-        set_thread_variable("genome_build", genome_build)
+        if session := get_current_session():
+            session["building_manager_genome_build"] = genome_build
