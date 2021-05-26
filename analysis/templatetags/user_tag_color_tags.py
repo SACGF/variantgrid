@@ -98,7 +98,8 @@ def render_tag_styles_and_formatter(context):
 
 
 @register.inclusion_tag("analysis/tags/tag_counts_filter.html", takes_context=True)
-def tag_counts_filter(context, genome_build: GenomeBuild, click_func=None, show_all_func=None, gene_symbol=None):
+def tag_counts_filter(context, genome_build: GenomeBuild,
+                      click_func=None, show_all_func=None, gene_symbol=None, any_tag_button=True):
     tag_kwargs = {}
     if gene_symbol:
         gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build,
@@ -107,7 +108,8 @@ def tag_counts_filter(context, genome_build: GenomeBuild, click_func=None, show_
     variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
     tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
     return {
+        "any_tag_button": any_tag_button,
         "tag_counts": tag_counts,
         "click_func": click_func,
-        "show_all_func": show_all_func
+        "show_all_func": show_all_func,
     }

@@ -60,7 +60,7 @@
 
     <a href="{% url 'tag_settings' %}">Tag Settings</a>
 
-    {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' %}
+    {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
 
     <h3>Variants</h3>
 

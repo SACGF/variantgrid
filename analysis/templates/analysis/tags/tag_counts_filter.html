@@ -45,7 +45,9 @@
 
     </script>
     <div id='tag-top-bar'> Click to filter:
+        {% if any_tag_button %}
         <button id="filter-to-any-tag-button" class="btn btn-outline-secondary"><i class="fas fa-tags"></i> Any Tag</button>
+        {% endif %}
     {% for tag, count in tag_counts %}
         <span class="grid-tag tagged-{{tag}}" title="Tagged as {{tag}}" tag_id="{{tag}}">
             <span class="user-tag-colored">{{ tag }}</span> : {{ count }}
