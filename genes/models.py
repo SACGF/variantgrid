@@ -449,7 +449,8 @@ class GeneVersion(models.Model):
 
     @lazy
     def coordinate(self) -> str:
-        return f"{self.chrom}:{self.start}-{self.end} ({self.strand})"
+        """ 1-based for humans """
+        return f"{self.chrom}:{self.start + 1}-{self.end} ({self.strand})"
 
     @lazy
     def _transcript_extents(self):
@@ -729,9 +730,10 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     @property
     def coordinates(self):
+        """ 1-based for humans """
         coords = None
         if self.data:
-            coords = f"{self.data['chrom']}:{self.data['start']}-{self.data['end']} ({self.data['strand']})"
+            coords = f"{self.data['chrom']}:{self.data['start'] + 1}-{self.data['end']} ({self.data['strand']})"
         return coords
 
     @property
