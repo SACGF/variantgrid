@@ -320,7 +320,7 @@ class Lab(models.Model):
 
     @property
     def first_classification_ever_shared_date(self) -> Optional[datetime]:
-        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('created', flat=True).order_by('-created').first()
+        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('created', flat=True).order_by('created').first()
 
     @lazy
     def classifications_per_day(self):
