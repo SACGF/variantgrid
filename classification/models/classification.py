@@ -347,11 +347,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def dashboard_total_shared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False).count()
+        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False).exclude(lab__name__icontains='legacy').count()
 
     @staticmethod
     def dashboard_total_unshared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, withdrawn=False).exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
+        return Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy').exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
 
     @staticmethod
     def dashboard_report_classifications_of_interest(since) -> Iterable[ClassificationOutstandingIssues]:
