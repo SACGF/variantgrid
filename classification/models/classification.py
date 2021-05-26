@@ -897,12 +897,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Normalises the value and adds any validation
         """
+        # parse all notes looking for references
+        value = cell.value
+        e_key = cell.e_key
+        note = cell.note
+
+        if value and e_key.value_type in (EvidenceKeyValueType.FREE_ENTRY, EvidenceKeyValueType.TEXT_AREA):
+            scan_value = str(value)
+            if results := db_ref_regexes.search(scan_value, default_regex=_key_to_regex.get(e_key.key)):
+                cell.db_refs = [r.to_json() for r in results]
+
+        if note:
+            if results := db_ref_regexes.search(note):
+                cell.db_refs = (cell.db_refs or []) + [r.to_json() for r in results]
+
         if self.lab.external:
             # leave external data exactly how it was provided
             return
-
-        value = cell.value
-        e_key = cell.e_key
 
         if source == SubmissionSource.API and isinstance(value, str):
             # we often get escaped > sent to us as part of
@@ -1010,8 +1021,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
-                if results := db_ref_regexes.search(value, default_regex=_key_to_regex.get(e_key.key)):
-                    cell.db_refs = [r.to_json() for r in results]
 
             elif e_key.value_type == EvidenceKeyValueType.PERCENT:
                 valid = False
@@ -1073,12 +1082,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if e_key.is_dummy:
                 cell.add_validation(code=ValidationCode.UNKNOWN_KEY, severity='warning',
                                     message='This key ' + str(e_key.key) + ' has not been registered')
-
-        # parse all notes looking for references
-        note = cell.note
-        if note:
-            if results := db_ref_regexes.search(note):
-                cell.db_refs = (cell.db_refs or []) + [r.to_json() for r in results]
 
         if e_key.key == SpecialEKeys.REFSEQ_TRANSCRIPT_ID and isinstance(value, str):
             version_regex = re.compile('.*?[.][0-9]+')
