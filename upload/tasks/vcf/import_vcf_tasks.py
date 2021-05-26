@@ -158,3 +158,4 @@ ProcessVCFLinkAllelesSetMaxVariantTask = app.register_task(ProcessVCFLinkAlleles
 DoNothingVCFTask = app.register_task(DoNothingVCFTask())
 LiftoverCreateVCFTask = app.register_task(LiftoverCreateVCFTask())
 LiftoverCompleteTask = app.register_task(LiftoverCompleteTask())
+

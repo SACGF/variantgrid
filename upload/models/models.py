@@ -232,9 +232,11 @@ class UploadPipeline(models.Model):
             genome_build = uploaded_file.uploadedliftover.liftover.genome_build
         elif file_type == UploadedFileTypes.CLINVAR:
             genome_build = uploaded_file.uploadedclinvarversion.clinvar_version.genome_build
+        elif file_type == UploadedFileTypes.VARIANT_TAGS:
+            genome_build = uploaded_file.uploadedvarianttags.variant_tags_import.genome_build
 
         if genome_build is None:
-            msg = "Don't know how to get GenomeBuild for UploadedFile type '%s'" % uploaded_file.get_file_type_display()
+            msg = f"Don't know how to get GenomeBuild for UploadedFile type '{uploaded_file.get_file_type_display()}'"
             raise ValueError(msg)
 
         return genome_build

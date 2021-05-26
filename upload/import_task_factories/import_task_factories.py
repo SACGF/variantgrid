@@ -1,5 +1,7 @@
+import pandas as pd
 from django.conf import settings
 
+from library.django_utils.django_file_utils import get_import_processing_filename
 from library.utils import import_class, full_class_name
 from patients.models import PatientColumns
 from upload.import_task_factories.abstract_vcf_import_task_factory import AbstractVCFImportTaskFactory
@@ -13,14 +15,12 @@ from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
-from upload.tasks.import_variant_tags_task import ImportVariantTagsTask
-from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, \
-    ProcessGenotypeVCFDataTask, ImportGenotypeVCFSuccessTask, \
-    UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
+from upload.tasks.import_variant_tags_task import VariantTagsCreateVCFTask, VariantTagsInsertTask
+from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessGenotypeVCFDataTask, \
+    ImportGenotypeVCFSuccessTask, UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
     ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
 from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
     ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask
-import pandas as pd
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -228,7 +228,9 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
         return [LiftoverCompleteTask] + task_classes
 
 
-class VariantTagsImportTaskFactory(ImportTaskFactory):
+class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
+    """ VariantTags may have variants we don't know about, so need to create a VCF and run them through
+        VCFInsertVariantsOnly pipeline, then afterwards we can insert tags """
 
     def get_uploaded_file_type(self):
         return UploadedFileTypes.VARIANT_TAGS
@@ -247,5 +249,23 @@ class VariantTagsImportTaskFactory(ImportTaskFactory):
                 return 0
         return 1000
 
-    def create_import_task(self, upload_pipeline):
-        return ImportVariantTagsTask.si(upload_pipeline.pk)
+    def _get_vcf_filename(self, upload_pipeline) -> str:
+        return get_import_processing_filename(upload_pipeline.pk, "variant_tag_variants.vcf")
+
+    def get_pre_vcf_task(self, upload_pipeline):
+        """ Need to write a VCF for variants used in tags """
+
+        variant_tags_filename = upload_pipeline.uploaded_file.get_filename()
+        vcf_filename = self._get_vcf_filename(upload_pipeline)
+        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                name="Create VariantTags Variant VCF",
+                                                sort_order=self.get_sort_order(),
+                                                task_type=UploadStepTaskType.CELERY,
+                                                script=full_class_name(VariantTagsCreateVCFTask),
+                                                input_filename=variant_tags_filename,
+                                                output_filename=vcf_filename)
+        return VariantTagsCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_post_data_insertion_classes(self):
+        post_data_insertion_classes = super().get_post_data_insertion_classes()
+        return post_data_insertion_classes + [VariantTagsInsertTask]

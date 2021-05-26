@@ -138,7 +138,7 @@ def uploaded_clinvar_citations_post_delete_handler(sender, instance, **kwargs): 
 
 
 class UploadedVariantTags(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
+    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
     variant_tags_import = models.OneToOneField(VariantTagsImport, on_delete=CASCADE)
 
     def get_data(self):
