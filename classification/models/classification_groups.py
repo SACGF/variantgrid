@@ -218,11 +218,12 @@ class ClassificationGroup:
                 if text := cm.get(SpecialEKeys.CONDITION):
                     all_plain_texts.add(text)
         all_condition_resolved = list()
-        # TODO sort terms
         for term in all_terms:
             all_condition_resolved.append(ConditionResolved(terms=[term], join=None))
         for plain_text in all_plain_texts:
             all_condition_resolved.append(ConditionResolved(terms=list(), join=None, plain_text=plain_text))
+
+        all_condition_resolved.sort()
         return all_condition_resolved
 
     def sub_groups(self) -> Optional[List['ClassificationGroup']]:

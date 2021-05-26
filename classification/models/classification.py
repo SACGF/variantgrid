@@ -227,6 +227,15 @@ class ConditionResolved:
                 pass
         return None
 
+    def __lt__(self, other):
+        self_terms = self.terms or list()
+        other_terms = other.terms or list()
+        if len(self_terms) != len(other_terms):
+            return len(self_terms) < len(other_terms)
+        if len(self_terms) >= 1:
+            return self_terms[0] < other_terms[0]
+        return (self.plain_text or '') < (other.plain_text or '')
+
 
 class ClassificationOutstandingIssues:
 
