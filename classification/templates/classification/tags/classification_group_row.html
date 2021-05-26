@@ -15,7 +15,7 @@
     </td>
     <td data-order="{{ group.c_hgvs.sort_str }}">
         {% for c_hgvs in group.c_hgvses %}
-            <div class="mb-1" style="font-size:11px">{% c_hgvs group.c_hgvs %}</div>
+            <div class="mb-1" style="font-size:11px">{% c_hgvs c_hgvs %}</div>
         {% endfor %}
         {% for p_hgvs in group.p_hgvses %}
             <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
