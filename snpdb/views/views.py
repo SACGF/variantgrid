@@ -647,7 +647,7 @@ def view_lab(request, pk):
         if debug_method := request.POST.get("debug_method"):
             if "Test Slack" == debug_method:
                 notification_builder = LabNotificationBuilder(lab=lab, message="Testing Slack Integration")
-                if not notification_builder.can_send:
+                if not lab.slack_webhook:
                     messages.add_message(request, messages.ERROR, "Slack URL not configured correctly")
                 else:
                     #try:
