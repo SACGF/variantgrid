@@ -52,6 +52,19 @@ table#sample-formset input[type=checkbox] {
     margin-left: 10px;
 }
 
+#change-zygosity-count {
+    margin-left: 5px;
+}
+
+.zygosity-count-button {
+    margin-left: 5px;
+}
+
+.loading {
+    background-image: url(/static/icons/loading.gif);
+    background-repeat: no-repeat;
+}
+
 </style>
 <script>
 function showBulkSet() {
@@ -191,7 +204,6 @@ function addCreateProjectButtonAndForm() {
 
     form = dialog.find( "form" ).on( "submit", function( event ) {
       event.preventDefault();
-      console.log("dialog submit");
       createNewProject();
     });
 
@@ -254,6 +266,32 @@ $(document).ready(function() {
                 },
             });
         }
+    });
+
+    $("button.zygosity-count-button").click(function() {
+        let vcfId = "{{ vcf.pk }}";
+        let vzccId = $(this).attr("vzcc-id");
+        let operation = $(this).attr("operation");
+        let url = Urls.vcf_change_zygosity_count(vcfId, vzccId, operation);
+        let countInfo = $(this).parent(".zygosity-count-container");
+        countInfo.empty();
+        let msgBox = $("<ul/>").addClass("messages");
+        countInfo.append(msgBox);
+        let vzccName = $(this).attr("vzcc-name");
+        let jobName = `${vzccName} (${operation} )`;
+
+        $.ajax({
+            type: "POST",
+            url: url,
+            success: function (data) {
+                msgBox.append(`<li class='alert-info'>Submitted job: ${jobName}</li>`);
+                msgBox.fadeIn().delay(2000).fadeOut(1000);
+            },
+            error: function() {
+                msgBox.append(`<li class='error'>Error submitting job: ${jobName}</li>`);
+                msgBox.fadeIn();
+            },
+        });
     });
 });
 </script>
@@ -491,12 +529,31 @@ $(document).ready(function() {
             <p>
                 <label>Variant Zygosity Count</label>
                 <span>
-                    {% if vcf.has_genotype and vcf.variant_zygosity_count %}
-                        {% for vzc in vcf.variantzygositycountforvcf_set.all %}
-                            {{ vzc.collection.name }}
+                    {% if vcf.has_genotype %}
+                        {% for vzcc, vzcc_for_vcf in variant_zygosity_count_collections.items %}
+                            <span class="zygosity-count-container">
+                            {% if vzcc_for_vcf.count_complete and not vzcc_for_vcf.deleted %}
+                                {{ vzcc.name }}
+                                {% if request.user.is_superuser %}
+                                    ({{ vzcc_for_vcf.count_complete }})
+                                    <button class="collapse btn btn-outline-danger fas fa-delete zygosity-count-button" type='button' vzcc-id="{{ vzcc.pk }}" operation="del" vzcc-name="{{ vzcc.name }}">
+                                        Remove from '{{ vzcc.name }}' zygosity counts
+                                    </button>
+                                {% endif %}
+                            {% else %}
+                                -
+                                {% if request.user.is_superuser %}
+                                    <button class="collapse btn btn-outline-danger fas zygosity-count-button" type='button' vzcc-id="{{ vzcc.pk }}" operation="add" vzcc-name="{{ vzcc.name }}">
+                                        Add to '{{ vzcc.name }}' zygosity counts
+                                    </button>
+                                {% endif %}
+                            {% endif %}
+                            </span>
                         {% endfor %}
-                    {% else %}
-                        -
+
+                        {% if request.user.is_superuser %}
+                            <a id="change-zygosity-count" class="hover-link" data-toggle="collapse" href=".zygosity-count-button">change...</a>
+                        {% endif %}
                     {% endif %}
                 </span>
             </p>

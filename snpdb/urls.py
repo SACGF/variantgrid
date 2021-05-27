@@ -28,6 +28,7 @@ urlpatterns = [
     perm_path('cohorts', views.cohorts, name='cohorts'),
     perm_path('view_vcf/<int:vcf_id>', views.view_vcf, name='view_vcf'),
     perm_path('vcf/<int:vcf_id>/populate_clingen_alleles', views_json.vcf_populate_clingen_alleles, name='vcf_populate_clingen_alleles'),
+    perm_path('vcf/<int:vcf_id>/change_zygosity_count/<int:vzcc_id>/<operation>', views_json.vcf_change_zygosity_count, name='vcf_change_zygosity_count'),
     perm_path('get_patient_upload_csv_for_vcf/<int:pk>', views.get_patient_upload_csv_for_vcf, name='get_patient_upload_csv_for_vcf'),
 
     perm_path('view_sample/<int:sample_id>', views.view_sample, name='view_sample'),

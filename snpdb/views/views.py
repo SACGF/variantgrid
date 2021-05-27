@@ -62,7 +62,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs
+    LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
+    VariantZygosityCountCollection, VariantZygosityCountForVCF
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
@@ -254,6 +255,11 @@ def view_vcf(request, vcf_id):
     if not has_write_permission:
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
 
+    variant_zygosity_count_collections = {}
+    for vzcc in VariantZygosityCountCollection.objects.all():
+        vzc_vcf = VariantZygosityCountForVCF.objects.filter(vcf=vcf, collection=vzcc).first()
+        variant_zygosity_count_collections[vzcc] = vzc_vcf
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -264,7 +270,8 @@ def view_vcf(request, vcf_id):
         'samples_form': samples_form,
         'patient_form': PatientForm(user=request.user),  # blank
         'has_write_permission': has_write_permission,
-        'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser
+        'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
+        "variant_zygosity_count_collections": variant_zygosity_count_collections,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
 

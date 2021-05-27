@@ -101,7 +101,7 @@ class AbstractVariantZygosityCountRecord(TimeStampedModel):
             raise ValueError(msg)
 
         if self.deleted is not None:
-            msg = f"GlobalZygosityCount for {count_object}: Attempting to delete record already delete on {self.deleted} - aborting"
+            msg = f"GlobalZygosityCount for {count_object}: Attempting to delete record already deleted on {self.deleted} - aborting"
             raise ValueError(msg)
 
     def get_count_object(self):

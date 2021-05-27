@@ -304,6 +304,9 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
         logging.info("link_samples_and_vcfs_to_sequencing backend_vcf: %s", backend_vcf.pk)
         sequencing_run = backend_vcf.sample_sheet.sequencing_run
         vcf = backend_vcf.vcf
+        if ek := sequencing_run.enrichment_kit:
+            vcf.variant_zygosity_count = ek.variant_zygosity_count
+            logging.info("Setting %s variant_zygosity_count to %s", vcf, vcf.variant_zygosity_count)
         vcf.fake_data = sequencing_run.fake_data
         vcf.save()
 
@@ -328,8 +331,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
             if ek := sequencing_sample.enrichment_kit:
                 if ek.sample_variants_type != VariantsType.UNKNOWN:
                     sample.variants_type = ek.sample_variants_type
-                sample.variant_zygosity_count = ek.variant_zygosity_count
-                modified_sample = True
+                    modified_sample = True
 
             if bam_file := sequencing_sample.get_single_bam():
                 sample.bam_file_path = bam_file.path

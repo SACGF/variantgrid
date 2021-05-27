@@ -43,7 +43,6 @@ function setupCreatePatientDialog() {
 }
 
 function addCreatePatientButton(dialog, patientSelect, sampleName) {
-    console.log("addCreatePatientButton");
     const form = dialog.find("form");
     const createPatientButton = $("<div/>")
         .addClass("click-to-add-button flex-row")
@@ -71,11 +70,6 @@ function addCreatePatientButton(dialog, patientSelect, sampleName) {
 
     const parent = patientSelect.parents(".sample-patient");
     parent.append(createPatientButton);
-    console.log("patientSelect");
-    console.log(patientSelect);
-    console.log("parent");
-    console.log(parent);
-    console.log("/addCreatePatientButton");
 }
 </script>
 <div id="new-patient-dialog" title="New Patient">

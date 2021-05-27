@@ -10,6 +10,7 @@ from library.django_utils import require_superuser
 from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, VCFAlleleSource, CustomColumnsCollection
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
+from snpdb.tasks.vcf_zygosity_count_tasks import update_variant_zygosity_count_for_vcf_task
 
 
 def job_status(request, job_id):
@@ -76,6 +77,19 @@ def vcf_populate_clingen_alleles(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     vcf_as, _ = VCFAlleleSource.objects.get_or_create(vcf=vcf)
     populate_clingen_alleles_from_allele_source.si(vcf_as.pk, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
+    return JsonResponse({})
+
+
+@require_POST
+def vcf_change_zygosity_count(request, vcf_id, vzcc_id, operation):
+    vcf = VCF.get_for_user(request.user, vcf_id)
+    if not vcf.can_write(request.user):
+        raise PermissionError(f"You do not have write permission on VCF pk={vcf_id}")
+
+    OPERATION = {"add": "+", "del": "-"}
+    operation = OPERATION[operation]
+    task = update_variant_zygosity_count_for_vcf_task.si(vzcc_id, vcf_id, operation)
+    task.apply_async()
     return JsonResponse({})
 
 

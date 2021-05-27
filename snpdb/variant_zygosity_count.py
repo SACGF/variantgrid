@@ -87,13 +87,14 @@ def update_all_variant_zygosity_counts_for_vcf(vcf: VCF, operation):
         update_variant_zygosity_count_for_vcf(collection, vcf, operation)
 
 
-def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollection, vcf: VCF, operation):
+def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollection, vcf: VCF, operation,
+                                          manual_override=False):
     UPDATE_VARIANT_ZYG_COUNT_EVENT = 'update_variant_zygosity_count_for_vcf'
 
     try:
         check_valid_count_ops(operation)
         logging.info("update_variant_zygosity_count_for_vcf(%s, %s, %s)", collection, vcf, operation)
-        if not (vcf.has_genotype and vcf.variant_zygosity_count):
+        if not (vcf.has_genotype and (vcf.variant_zygosity_count or manual_override)):
             logging.info("VCF %s genotype=%s, variant_zygosity_count=%s - skipping VariantZygosityCount",
                          vcf, vcf.has_genotype, vcf.variant_zygosity_count)
             return
@@ -106,18 +107,27 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
 
         # Want to be able to throw exceptions here
         if operation == '+':
-            gvzcp = VariantZygosityCountForVCF.objects.create(collection=collection, vcf=vcf)
+            vzcv, created = VariantZygosityCountForVCF.objects.get_or_create(collection=collection, vcf=vcf)
+            if created:
+                if vzcv.deleted is None:
+                    logging.warning("VCF pk=%d, collection=%s (Add) existing non-deleted VariantZygosityCountForVCF. Skipping",
+                                    vcf.pk, collection.name)
+                    return
+                else:
+                    vzcv.count_complete = None
+                    vzcv.deleted = None
+                    vzcv.save()
         else:
             try:
-                gvzcp = VariantZygosityCountForVCF.objects.get(collection=collection, vcf=vcf)
+                vzcv = VariantZygosityCountForVCF.objects.get(collection=collection, vcf=vcf)
             except VariantZygosityCountForVCF.DoesNotExist:
                 logging.warning("No VariantZygosityCountForVCF for VCF pk=%d (%s)",
                                 vcf.pk, vcf.get_import_status_display())
                 return  # no need to do anything
 
-            gvzcp.check_can_delete()
+            vzcv.check_can_delete()
 
-        use_cohort_genotype_collection = gvzcp and not gvzcp.is_split_to_sample_counts
+        use_cohort_genotype_collection = vzcv and not vzcv.is_split_to_sample_counts
         if use_cohort_genotype_collection:
             logging.info("Updating from Cohort Zygosity Collection %d", cohort_genotype_collection.pk)
             sql, params = _get_update_sql_and_params(collection, vcf, operation)
@@ -125,10 +135,10 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
 
             now = timezone.now()
             if operation == '+':
-                gvzcp.count_complete = now
+                vzcv.count_complete = now
             else:
-                gvzcp.deleted = now
-            gvzcp.save()
+                vzcv.deleted = now
+            vzcv.save()
         else:
             logging.info("Updating from sample...")
 
