@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import timedelta
 from functools import reduce
 from random import randint
-from typing import Optional
+from typing import Optional, Dict
 
 from django.conf import settings
 from django.contrib import messages
@@ -31,7 +31,7 @@ from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk, get_url_from_view_path, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
-from library.guardian_utils import admin_bot
+from library.guardian_utils import admin_bot, bot_group
 from library.log_utils import report_exc_info, log_traceback, NotificationBuilder
 from library.utils import count, pretty_label
 from pathtests.models import cases_for_user
@@ -61,6 +61,13 @@ from variantopedia.search import search_data, SearchResults
 def variants(request):
     context = {}
     return render(request, "variantopedia/variants.html", context)
+
+
+def get_total_counts(user: User) -> Dict[str, int]:
+    return {
+        "classifications_shared": Classification.dashboard_total_shared_classifications(),
+        "classifications_unshared": Classification.dashboard_total_unshared_classifications()
+    }
 
 
 def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
@@ -96,6 +103,8 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     else:
         events = Event.objects.none()
 
+    active_users = list(User.objects.filter(pk__in=Event.objects.filter(date__gte=start_time).exclude(user__groups=bot_group()).values_list('user', flat=True).distinct()).order_by('-username').values_list('username', flat=True))
+
     vcfs = VCF.filter_for_user(user, True).filter(date__gte=start_time)
     analyses = Analysis.filter_for_user(user)
     analyses_created = analyses.filter(created__gte=start_time)
@@ -104,6 +113,7 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
 
     return {
+        "active_users": active_users,
         "notice_header": notice_header,
         "events": events,
         "classifications_of_interest": classifications_of_interest,
@@ -171,22 +181,33 @@ def notify_server_status():
     sorted_keys = sorted(list(keys))
 
     lines = list()
+
     for key in sorted_keys:
+        display_individuals = False
         emoji = ":blue_book:"
         if 'analyses' in key:
             emoji = ":orange_book:"
         elif 'vcf' in key:
             emoji = ":green_book:"
-        count_display = count(dashboard_notices.get(key))
+        elif 'active_users' in key:
+            emojis = [":nerd_face:", ":thinking_face:", ":face_with_monocle:", ":face_with_cowboy_hat:"]
+            emoji = emojis[randint(0, len(emojis) - 1)]
+            display_individuals = True
+        values = dashboard_notices.get(key)
+        count_display = count(values)
         if count_display:
             count_display = f"*{count_display}*"
 
-        lines.append(f"{emoji} {count_display} : {pretty_label(key)}")
+        line = f"{emoji} {count_display} : {pretty_label(key)}"
+        if display_individuals:
+            line = f"{line} : {', '.join(str(value) for value in values)}"
+
+        lines.append(line)
     nb.add_markdown("\n".join(lines), indented=True)
     nb.add_markdown("*In Total*")
     nb.add_markdown(
-        f":people_holding_hands: {Classification.dashboard_total_shared_classifications()} : Classifications Shared" +
-        f"\n:cry: {Classification.dashboard_total_unshared_classifications()} : Classifications UnShared",
+        f":people_holding_hands: {Classification.dashboard_total_shared_classifications():,} : Classifications Shared" +
+        f"\n:cry: {Classification.dashboard_total_unshared_classifications():,} : Classifications Un-Shared",
         indented=True
     )
     nb.send()
@@ -290,6 +311,7 @@ def server_status(request):
         pass
 
     dashboard_notices = get_dashboard_notices(request.user, days_ago)
+    total_counts = get_total_counts(request.user)
 
     context = {"celery_workers": celery_workers,
                "can_access_reference": can_access_reference,
@@ -298,7 +320,8 @@ def server_status(request):
                "disk_free": disk_free,
                "highest_variant_annotated": highest_variant_annotated,
                "sample_enrichment_kits_df": sample_enrichment_kits_df,
-               "dashboard_notices": dashboard_notices}
+               "dashboard_notices": dashboard_notices,
+               "total_counts": total_counts}
     return render(request, "variantopedia/server_status.html", context)
 
 

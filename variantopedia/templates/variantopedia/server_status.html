@@ -1,6 +1,7 @@
 {% extends "uicore/page/base.html" %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_field %}
+{% load humanize %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
 {% load ui_help %}
@@ -97,6 +98,22 @@
             <a class="hover-link" href="{% url 'server_status' %}?days=14">14 Days</a>,
             <a class="hover-link" href="{% url 'server_status' %}?days=30">30 Days</a>
         </div>
+        {% if dashboard_notices.active_users %}
+        <div class="row mt-4">
+            <div class="col-3">
+                <a class="toggle-link" data-toggle="collapse" href="#active-users">{% count dashboard_notices.active_users singular='1 Active User' plural='Active Users' %}</a>
+            </div>
+            <div class="col-9">
+                <a href="{% url 'eventlog' %}">Goto EventLog</a> (Note EventLog is not comprehensive at detecting active users)
+            </div>
+        </div>
+        <ul class="list-group collapse" id="active-users">
+            {% for user in dashboard_notices.active_users %}
+                <li class='list-group-item list-group-item-success'>{{ user }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
         {% if dashboard_notices.events %}
             <div class="row mt-4">
                 <div class="col-3">
@@ -208,6 +225,11 @@
             </ul>
         {% endif %}
 
+        <h4>In Total</h4>
+        {% labelled label="Total Shared Classifications" %}{{ total_counts.classifications_shared | intcomma }}{% endlabelled %}
+        {% labelled label="Total Un-Shared Classifications" %}{{ total_counts.classifications_unshared | intcomma }}{% endlabelled %}
+
+        <div class="row mt-4"></div>
         <form method="POST">
             {% csrf_token %}
             <div class="btn-toolbar mt-4">
