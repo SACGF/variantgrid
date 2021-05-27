@@ -1102,12 +1102,11 @@ const VCForm = (function() {
                 if (!filtering) {
                     let scrollMe = $('.main-content');
                     let scrollTo = $(this).closest('.card');
-                    console.log(scrollTo);
                     let scrollToOffset = scrollTo.position().top;
                     // scrollMe.scrollTop(scrollToOffset + 15);
                     scrollMe.animate({scrollTop: scrollToOffset + 15}, 200);
                 } else {
-                    console.log('STILL FILTERING, NO JUMPINT');
+                    // console.log('STILL FILTERING, NO JUMPINT');
                 }
             });
 
@@ -1223,7 +1222,7 @@ const VCForm = (function() {
             }
             this.showHideFamilies();
             if (oldFiltering !== filtering) {
-                let allPanels = $('#vc-form .collapse');
+                let allPanels = $('#vc-form [data-parent].collapse');
                 let scrollMe = $('.main-content');
                 if (filtering) {
                     this.previously_expanded = allPanels.filter('.show');

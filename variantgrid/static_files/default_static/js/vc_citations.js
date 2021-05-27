@@ -142,7 +142,7 @@ let Citations = (function() {
                     linkDom.appendTo(citDom);
 
                     if (citation.abstract || !singleAuthor || citation.journal) {
-                        $('<a>', {class: 'toggle-link', 'data-toggle':"collapse", href:`#detail-${citation.citation_id}`, text: 'Toggle detail'}).appendTo(citDom);
+                        $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${citation.citation_id}`, text: 'Toggle detail'}).appendTo(citDom);
                         let detailContainer = $('<div>', {class: 'collapse', id:`detail-${citation.citation_id}`}).appendTo(citDom);
                         if (citation.journal) {
                             $('<p>', {class: 'journal', text: citation.journal}).appendTo(detailContainer);
@@ -151,10 +151,6 @@ let Citations = (function() {
                             $('<p>', {class: 'authors', text: citation.authors}).appendTo(detailContainer);
                         }
                         $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
-                        let toggleAbstract = () => {
-                            detailContainer.slideToggle();
-                            return false;
-                        };
                     }
                 }
             }
