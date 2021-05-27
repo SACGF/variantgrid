@@ -183,6 +183,9 @@ def notify_server_status():
     lines = list()
 
     for key in sorted_keys:
+        values = dashboard_notices.get(key)
+        count_display = count(values)
+
         display_individuals = False
         emoji = ":blue_book:"
         if 'analyses' in key:
@@ -190,11 +193,13 @@ def notify_server_status():
         elif 'vcf' in key:
             emoji = ":green_book:"
         elif 'active_users' in key:
-            emojis = [":nerd_face:", ":thinking_face:", ":face_with_monocle:", ":face_with_cowboy_hat:"]
-            emoji = emojis[randint(0, len(emojis) - 1)]
-            display_individuals = True
-        values = dashboard_notices.get(key)
-        count_display = count(values)
+            if count_display == 0:
+                emoji = ":ghost:"
+            else:
+                emojis = [":nerd_face:", ":thinking_face:", ":face_with_monocle:", ":face_with_cowboy_hat:"]
+                emoji = emojis[randint(0, len(emojis) - 1)]
+                display_individuals = True
+
         if count_display:
             count_display = f"*{count_display}*"
 
