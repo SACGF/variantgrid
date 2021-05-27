@@ -103,7 +103,7 @@ def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
     else:
         events = Event.objects.none()
 
-    active_users = list(User.objects.filter(pk__in=Event.objects.filter(date__gte=start_time).exclude(user__groups=bot_group()).values_list('user', flat=True).distinct()).order_by('-username').values_list('username', flat=True))
+    active_users = list(User.objects.filter(pk__in=Event.objects.filter(date__gte=start_time).exclude(user__groups=bot_group()).values_list('user', flat=True).distinct()).order_by('username').values_list('username', flat=True))
 
     vcfs = VCF.filter_for_user(user, True).filter(date__gte=start_time)
     analyses = Analysis.filter_for_user(user)
