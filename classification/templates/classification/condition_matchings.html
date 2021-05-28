@@ -43,8 +43,22 @@
         <h3>Condition Matching Listing</h3>
         {% page_help_embedded title='Condition Matching Listing' %}
             <p>
-            Help will go here for matching text to conditions
+            This page shows the summary of the different text that appears in the condition field in your classifications.<br/>
+            By default it only shows details about text that has not yet been matched to standard ontology terms.
             </p>
+            <p>
+            "Text" column is the text as it appears in the classification. Click on this column to edit the matching.
+            </p>
+            <p>
+            "Classification Count" is the number of classifications that have this text.
+            </p>
+            <p>
+            "Classifications Outstanding" is the number of classifications that have that text that have not been matched to standard ontology terms.
+            </p>
+            <p>
+            Often the outstanding count will match the total count, but condition text can be matched on a gene by gene basis, allowing some records with the same text to be resolved while others aren't.
+            </p>
+            Classifications that haven't had their condition text resolved cannot be uploaded to ClinVar.
         {% end_page_help_embedded %}
         <div class="form-row align-items-center">
             <div class="input-group col-8">
