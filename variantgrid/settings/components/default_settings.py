@@ -554,6 +554,7 @@ INBOX_ENABLED = True
 HELP_URL = "https://variantgrid.readthedocs.io/en/latest/"
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = "dashboard"  # Remember to put @terms_required around this view
+LOGIN_USERNAME_PLACEHOLDER = None
 LOGOUT_REDIRECT_URL = '/'
 
 ACCOUNT_ACTIVATION_DAYS = 7  # One-week activation window
