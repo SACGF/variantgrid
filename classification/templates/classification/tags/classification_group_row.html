@@ -55,9 +55,9 @@
     </td>
     <td  style="width:155px;">
         {% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>{% empty %}
-            <div class="no-value">-</div>
+            <div class="d-inline-block no-value">-</div>
         {% endfor %}
-        {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records<br/>Only showing latest" data-toggle="tooltip"></i>{% endif %}
+        {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records within this row<br/>Only showing latest" data-toggle="tooltip"></i>{% endif %}
     </td>
     <td style="width:100px" data-order="{{ group.most_recent_curated.date.timestamp }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
