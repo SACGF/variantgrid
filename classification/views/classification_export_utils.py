@@ -18,6 +18,7 @@ from flags.models import FlagComment
 from flags.models.enums import FlagStatus
 from flags.models.models import Flag
 from genes.hgvs import CHGVS
+from library.guardian_utils import bot_group
 from library.log_utils import log_traceback, report_exc_info, report_message, NotificationBuilder
 from library.utils import delimited_row
 from snpdb.models import Contig
@@ -528,6 +529,10 @@ class ExportFormatter(BaseExportFormatter):
         return False
 
     def report_stats(self, row_count: int):
+        # don't report bots downloading
+        if self.user.groups.filter(name=bot_group().name):
+            return
+
         now = datetime.utcnow()
         url = None
         body_parts = [f":simple_smile: {self.user.username}"]
