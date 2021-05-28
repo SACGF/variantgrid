@@ -87,8 +87,7 @@ def classification_groups(
     return context
 
 
-@register.filter
-def ekey(val, key: str = None):
+def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):
     if not key:
         raise ValueError('ekey filter must have a key')
     e_key = EvidenceKeyMap.cached_key(key)
@@ -96,10 +95,27 @@ def ekey(val, key: str = None):
         print(f"Warning, dummy evidence key {key}")
     pretty_val = e_key.pretty_value(val, dash_for_none=True)
     if val is None or val == '':
+        if value_if_none is not None:
+            return value_if_none
         return mark_safe(f'<span class="no-value">{escape(pretty_val)}</span>')
     elif (isinstance(val, list) or isinstance(val, set)) and len(val) == 0:
+        if value_if_none is not None:
+            return value_if_none
         return mark_safe(f'<span class="no-value">-</span>')
     return pretty_val
+
+
+@register.filter
+def ekey(val, key: Optional[str] = None):
+    return render_ekey(val, key)
+
+
+@register.filter
+def ekey_raw(val, key: Optional[str] = None):
+    """
+    Renders blank if no value
+    """
+    return render_ekey(val, key, "")
 
 
 @register.inclusion_tag("classification/tags/classification_history.html")
