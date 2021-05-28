@@ -30,3 +30,12 @@ class PhgvsTest(TestCase):
         p1 = PHGVS.parse("p.?")
         self.assertTrue(p1.intron)
         self.assertEqual(p1.full_p_hgvs, "p.?")
+
+    def test_transcript(self):
+        p1 = PHGVS.parse("NP_001269862.1:p.A808=", override_is_confirmed_to=False)
+        self.assertEqual("NP_001269862.1", p1.transcript,)
+        self.assertEqual("p.(Ala808=)", str(p1.without_transcript))
+
+        # can't parse the p. but should at least be able to separate out the transcript
+        p1 = PHGVS.parse("NP_001269862.1:p.BLAGAMUDO", override_is_confirmed_to=False)
+        self.assertEqual("p.BLAGAMUDO", str(p1.without_transcript))

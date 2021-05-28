@@ -57,7 +57,7 @@ def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> List[st
     return diff_list
 
 
-_P_DOT_PARTS = re.compile("^([A-Z*]{1,3})([0-9]+)([A-Z*]{1,3})(.*?)$", re.IGNORECASE)
+_P_DOT_PARTS = re.compile("^([A-Z*]{1,3})([0-9]+)([A-Z*]{1,3}|=)(.*?)$", re.IGNORECASE)
 
 @dataclass(repr=False, eq=False, frozen=True)
 class PHGVS:
@@ -85,7 +85,7 @@ class PHGVS:
         p_dot_index = raw.find('p.')
         if p_dot_index != -1:
             if p_dot_index != 0:
-                transcript = raw[0::p_dot_index - 1]
+                transcript = raw[:p_dot_index - 1]
             p_dot = raw[p_dot_index + 2::]
             if p_dot == "?":
                 intron = True
@@ -122,6 +122,9 @@ class PHGVS:
         else:
             return self.p_dot
 
+    def __str__(self):
+        return self.full_p_hgvs
+
     @lazy
     def p_dot(self) -> str:
         if self.intron:
@@ -148,8 +151,12 @@ class PHGVS:
 
     @property
     def without_transcript(self) -> 'PHGVS':
+        fallback = self.fallback
+        if self.transcript and fallback:
+            fallback = fallback[len(self.transcript)+1:]
+
         return PHGVS(
-            fallback=self.fallback,
+            fallback=fallback,
             transcript="",
             intron=self.intron,
             aa_from=self.aa_from,
