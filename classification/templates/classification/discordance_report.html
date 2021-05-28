@@ -162,7 +162,9 @@
             <h4>Actions</h4>
             <div class="btn-toolbar">
                 <button type="button" class="btn btn-outline-primary" onclick="download()">Download as CSV</button>
+                {% comment %}
                 <button type="button" class="btn btn-outline-secondary" onclick="reorgGroupings()">Reorganise Clinical Groupings</button>
+                {% endcomment %}
                 <button type="button" class="btn btn-outline-danger" onclick="toggleUnable()">Unable to Resolve Discordance</button>
             </div>
             <div id="discordance-reasons" style="display:none">

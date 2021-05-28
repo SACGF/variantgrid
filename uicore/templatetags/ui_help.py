@@ -6,6 +6,7 @@ from django.template.base import FilterExpression
 from django.utils.safestring import SafeText
 import os
 
+from library.log_utils import report_message
 from uicore.templatetags.ui_utils import parse_tag, TagUtils
 
 register = Library()
@@ -32,9 +33,13 @@ def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3")
     page_help_html = None
     page_help_path = f"page_help/{page_id}.html"
     page_help_filename = finders.find(page_help_path)
+    file_exists = False
     if page_help_filename and os.path.exists(page_help_filename):
         with open(page_help_filename) as ph:
+            file_exists = True
             page_help_html = ph.read()
+    if not file_exists:
+        report_message(f"Could not find help for {page_help_path}")
 
     return {
         'page_id': page_id.replace('/', '-').replace(' ', '-'),
