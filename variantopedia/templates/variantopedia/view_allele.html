@@ -134,7 +134,7 @@
         </div>
     </div>
 
-    {% if classifications_new_grouping %}
+    {% if classifications_new_grouping and not edit_clinical_groupings %}
         <div class="container mt-4">
             <h3>Classifications</h3>
             {% classification_groups classifications link_discordance_reports=discordance_enabled %}
