@@ -911,6 +911,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         e_key = cell.e_key
         note = cell.note
 
+        if self.lab.external:
+            cell.validate = False
+
         if value and e_key.value_type in (EvidenceKeyValueType.FREE_ENTRY, EvidenceKeyValueType.TEXT_AREA):
             scan_value = str(value)
             if results := db_ref_regexes.search(scan_value, default_regex=_key_to_regex.get(e_key.key)):
@@ -919,10 +922,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if note:
             if results := db_ref_regexes.search(note):
                 cell.db_refs = (cell.db_refs or []) + [r.to_json() for r in results]
-
-        if self.lab.external:
-            # leave external data exactly how it was provided
-            return
 
         if source == SubmissionSource.API and isinstance(value, str):
             # we often get escaped > sent to us as part of
@@ -1006,6 +1005,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     parts = value
                 else:
                     parts = [value]
+                parts = [part for part in parts if part is not None and part != ""]  # filter out any blanks
 
                 # sets the value of cell to the valid options
                 value = Classification.process_option_values(cell, parts)

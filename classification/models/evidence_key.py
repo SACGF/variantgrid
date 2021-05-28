@@ -455,6 +455,7 @@ class VCDataCell:
     def __init__(self, data: VCPatch, e_key: EvidenceKey):
         self.data = data
         self.e_key = e_key
+        self.validate = True
 
     def __str__(self):
         return f'"{self.e_key.key}": {str(self.raw)}'
@@ -647,7 +648,8 @@ class VCDataCell:
         """
         Add a validation message to this cell
         """
-        VCDataDict.add_validation(self._ensure_my_data(), code=code, severity=severity, message=message, options=options)
+        if self.validate:
+            VCDataDict.add_validation(self._ensure_my_data(), code=code, severity=severity, message=message, options=options)
 
     def has_validation_code(self, code: str) -> bool:
         """
