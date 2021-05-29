@@ -15,7 +15,7 @@
 
     $(document).ready(function() {
         fixLinks();
-        Flags.instance.init({userId: '{{user.id}}'});
+        Flags.instance.init({userId: '{{user.id}}', filter:'#allele-card'});
 
         EKeys.load().then(eKeys => {
             let vcLinks = new VCLinks(eKeys);
@@ -53,7 +53,7 @@
 
         <div class="row equal">
             <div class="col col-md-4">
-                <div class="card">
+                <div class="card" id="allele-card">
                     <div class="card-header">Allele <div class="d-inline-block ml-2" style="position:absolute" data-flags="{{allele.flag_collection_safe.id}}"></div></div>
                     <div class="card-body">
                         {% labelled label="Internal Allele ID" hint="chunky" %}{{ allele.id }}{% endlabelled %}

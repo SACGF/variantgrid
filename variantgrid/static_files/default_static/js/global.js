@@ -639,7 +639,7 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
                 // pass
             } else {
                 $('<div>', {
-                    class: 'row mt-2', html: [
+                    class: 'row mt-2', style:'align-items:center', html: [
                         $('<div>', {
                             class: 'col-2 text-right', html:
                                 $('<label>', {html: col.title})

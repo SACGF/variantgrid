@@ -50,7 +50,7 @@
     </tbody>
 </table>
 <script>$(document).ready(() => {
-    $('#{{ table_id }}').DataTable({
+    var table = $('#{{ table_id }}').DataTable({
         order: [[ 1, "asc" ]],
         pageLength: 50,
         responsive: {
@@ -76,6 +76,12 @@
             {'className': 'none'}, // gene link
             {'className': 'none'}, // record sub-table
         ]
+    });
+    table.on('responsive-display', (e, datatable, row, showHide, update) => {
+        window.setTimeout(() => {
+            Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child'});
+            console.log(`Display = ${showHide}`);
+        },1);
     });
 })
 </script>
