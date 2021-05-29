@@ -322,11 +322,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def clinical_grouping_name(self) -> str:
         if self.share_level not in ShareLevel.DISCORDANT_LEVEL_KEYS:
-            return 'unshared'
+            return 'not-shared'
 
         if cc := self.clinical_context:
             return cc.name
-        return 'no-context'
+        return 'not-matched'
 
     @property
     def condition_resolution_dict(self) -> Optional[ConditionResolvedDict]:

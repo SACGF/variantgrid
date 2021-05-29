@@ -1,7 +1,7 @@
 {% load classification_tags %}
 {% load js_tags %}
-<tr class="{{ row_class }}" style="{% if group.clinical_grouping == "unshared" %}opacity:0.5;{% endif %}{% if group.is_withdrawn %}text-decoration:line-through;{% endif %}cursor:pointer">
-    <td style="width:150px;" data-order="{% if group.clinical_grouping == "unshared" %}AA{% endif %}{{ group.lab }}">
+<tr class="{{ row_class }}" style="{% if group.clinical_grouping == "not-shared" %}opacity:0.5;{% endif %}{% if group.is_withdrawn %}text-decoration:line-through;{% endif %}cursor:pointer">
+    <td style="width:150px;" data-order="{% if group.clinical_grouping == "not-shared" %}AA{% endif %}{{ group.lab }}">
         {% if group.clinical_grouping != "default" %}
             <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
         {% endif %}

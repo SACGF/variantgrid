@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum
 
 from django.conf import settings
@@ -46,7 +47,6 @@ class DiscordanceLevel(str, Enum):
     """
 
     NO_ENTRIES = 'no_entries'
-    SINGLE_ENTRY = 'single'  # there's only one lab submitting
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
     DISCORDANT = 'discordant'
@@ -59,8 +59,6 @@ class DiscordanceLevel(str, Enum):
             return "Concordant (Confidence)"
         if self == DiscordanceLevel.NO_ENTRIES:
             return "No Shared Submissions"
-        if self == DiscordanceLevel.SINGLE_ENTRY:
-            return "Single Submitter"
         if self == DiscordanceLevel.DISCORDANT:
             return "Discordant"
         return "Unknown"
@@ -71,15 +69,22 @@ class DiscordanceLevel(str, Enum):
             return "success"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "warning"
-        if self == DiscordanceLevel.NO_ENTRIES or self == DiscordanceLevel.SINGLE_ENTRY:
+        if self == DiscordanceLevel.NO_ENTRIES:
             return "secondary"
         return "danger"
 
+
+@dataclass
+class DiscordanceStatus:
+    level: DiscordanceLevel
+    lab_count: int
+
     @staticmethod
-    def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceLevel':
+    def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceStatus':
         cs_scores = set()
         cs_values = set()
         labs = set()
+        level: Optional[DiscordanceLevel] = None
         for vcm in modifications:
             labs.add(vcm.classification.lab)
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -87,16 +92,16 @@ class DiscordanceLevel(str, Enum):
                 strength = CS_TO_NUMBER.get(clin_sig)
                 if strength:
                     cs_scores.add(strength)
-                    if len(cs_scores) > 1:
-                        return DiscordanceLevel.DISCORDANT
                     cs_values.add(clin_sig)
-        if len(cs_values) > 1:
-            return DiscordanceLevel.CONCORDANT_CONFIDENCE
-        if len(labs) == 0:
-            return DiscordanceLevel.NO_ENTRIES
-        if len(labs) == 1:
-            return DiscordanceLevel.SINGLE_ENTRY
-        return DiscordanceLevel.CONCORDANT_AGREEMENT
+        if len(cs_scores) > 1:
+            level = DiscordanceLevel.DISCORDANT
+        elif len(cs_values) > 1:
+            level = DiscordanceLevel.CONCORDANT_CONFIDENCE
+        elif len(labs) == 0:
+            level = DiscordanceLevel.NO_ENTRIES
+        else:
+            level = DiscordanceLevel.CONCORDANT_AGREEMENT
+        return DiscordanceStatus(level=level, lab_count=len(labs))
 
 
 class ClinicalContext(FlagsMixin, TimeStampedModel):
@@ -124,8 +129,8 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         else:
             return ClinicalContextStatus.CONCORDANT
 
-    def calculate_discordance_level(self) -> DiscordanceLevel:
-        return DiscordanceLevel.calculate(self.classification_modifications)
+    def calculate_discordance_level(self) -> DiscordanceStatus:
+        return DiscordanceStatus.calculate(self.classification_modifications)
 
     @lazy
     def relevant_classification_count(self) -> int:
