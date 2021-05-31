@@ -103,7 +103,7 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
                 "genome_build": vcf.genome_build}
     cohort, created = Cohort.objects.update_or_create(vcf=vcf, defaults=defaults)
     logging.info("Cohort: %s (created: %s) version=%d", cohort, created, cohort.version)
-    if created:
+    if not created:
         cohort.cohortgenotypecollection_set.all().delete()
 
     assign_permission_to_user_and_groups(vcf.user, cohort)
