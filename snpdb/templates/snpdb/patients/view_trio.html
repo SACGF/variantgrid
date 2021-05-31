@@ -6,9 +6,14 @@
 
 {% block title %}Trio {{ trio }}{% endblock %}
 
-{% block jsdocumentready %}
-    $("#trio-tabs").tabs();
-
+{% block head %}
+{{ block.super }}
+<script type="text/javascript">
+    $(document).ready(function() {
+        $("#trio-tabs").tabs();
+    });
+</script>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 {% endblock %}
 
 {% block submenu_page_content %}
