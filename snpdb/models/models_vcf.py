@@ -147,6 +147,10 @@ class VCF(models.Model):
     def has_genotype(self):
         return self.genotype_samples > 0
 
+    @lazy
+    def samples_by_vcf_name(self) -> Dict[str, 'Sample']:
+        return {s.vcf_sample_name: s for s in self.sample_set.all()}
+
     def get_sample_ids(self):
         """ Often we just want this not all the objects """
         return self.sample_set.all().values_list("pk", flat=True)

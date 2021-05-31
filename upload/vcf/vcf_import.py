@@ -92,7 +92,7 @@ def create_vcf_filters(vcf, header_types):
             continue
 
 
-def create_cohort_genotype_collection_from_vcf(vcf: VCF):
+def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
     """ Cohort will exist if reloading from existing VCF """
     assert vcf.genome_build, "VCF must have a genome build"
 
@@ -103,18 +103,23 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF):
                 "genome_build": vcf.genome_build}
     cohort, created = Cohort.objects.update_or_create(vcf=vcf, defaults=defaults)
     if created:
-        assign_permission_to_user_and_groups(vcf.user, cohort)
+        cohort.cohortgenotypecollection_set.all().delete()
 
-        for i, sample in enumerate(vcf.sample_set.order_by("pk")):
-            CohortSample.objects.create(cohort=cohort,
-                                        sample=sample,
-                                        cohort_genotype_packed_field_index=i,
-                                        sort_order=i)
+    assign_permission_to_user_and_groups(vcf.user, cohort)
 
-        create_cohort_genotype_collection(cohort)
+    for i, sample_name in enumerate(vcf_samples):
+        sample = vcf.samples_by_vcf_name[sample_name]
+        CohortSample.objects.create_or_update(cohort=cohort,
+                                              sample=sample,
+                                              defaults={
+                                                "cohort_genotype_packed_field_index": i,
+                                                "sort_order": i
+                                              })
+
+    create_cohort_genotype_collection(cohort)
 
 
-def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
+def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     """ Reads header only - returns VCF object """
 
     upload_pipeline = upload_step.upload_pipeline
@@ -132,7 +137,6 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
                                                   upload_pipeline=upload_pipeline)
         logging.info("import_vcf_file: CREATED uploaded_vcf: %d", uploaded_vcf.pk)
 
-    vcf_reader = cyvcf2.VCF(vcf_filename)
     num_genotype_samples = len(vcf_reader.samples)
     vcf = create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples)
     # Save header ASAP if case something goes wrong
@@ -142,14 +146,26 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
         vcf.genome_build = vcf_detect_genome_build_from_header(vcf_reader)
     except GenomeBuildDetectionException:
         pass
-    vcf.save()
+    configure_vcf_from_header(vcf, vcf_reader)
+    uploaded_vcf.vcf = vcf
+    uploaded_vcf.save()
 
+    backend_vcf = create_backend_vcf_links(uploaded_vcf)
+    if backend_vcf:
+        link_samples_and_vcfs_to_sequencing(backend_vcf)
+        backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
+
+    return vcf
+
+
+def configure_vcf_from_header(vcf, vcf_reader):
+    """ Can also be called on an existing VCF during reload """
     header_types = cyvcf2_header_types(vcf_reader)
     create_vcf_filters(vcf, header_types)
     vcf_formats = set(header_types["FORMAT"])
     source = cyvcf2_header_get(vcf_reader, "source", "")
     vcf.source = source
-    if num_genotype_samples:
+    if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
         vcf.read_depth_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_READ_DEPTH_FIELD)
         vcf.genotype_quality_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_QUALITY_FIELD)
@@ -159,14 +175,11 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
         vcf.sample_filters_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_SAMPLE_FILTERS_FIELD)
 
     vcf.save()
-    uploaded_vcf.vcf = vcf
-    uploaded_vcf.save()
 
-    backend_vcf = create_backend_vcf_links(uploaded_vcf)
-    if num_genotype_samples > 0:
+    if vcf.genotype_samples > 0:
         sample_names = vcf_reader.samples
     else:  # Need at least 1 sample per VCF
-        default_name = uploaded_vcf.uploaded_file.name
+        default_name = vcf.uploadedvcf.uploaded_file.name
         sample_names = [default_name]
 
     no_dna_control_sample_pattern = None
@@ -179,15 +192,14 @@ def create_vcf_from_vcf(upload_step, vcf_filename) -> VCF:
         if no_dna_control_sample_pattern and no_dna_control_sample_pattern.findall(sample_name):
             no_dna_control = True
 
-        Sample.objects.create(vcf=vcf, vcf_sample_name=sample_name, name=sample_name, no_dna_control=no_dna_control,
-                              import_status=ImportStatus.IMPORTING)
-
-    if backend_vcf:
-        link_samples_and_vcfs_to_sequencing(backend_vcf)
-        backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
+        sample_defaults = {
+            "name": sample_name,
+            "no_dna_control": no_dna_control,
+            "import_status": ImportStatus.IMPORTING,
+        }
+        Sample.objects.update_or_create(vcf=vcf, vcf_sample_name=sample_name, defaults=sample_defaults)
 
     handle_vcf_source(vcf)
-    return vcf
 
 
 def handle_vcf_source(vcf):

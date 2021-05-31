@@ -2,6 +2,8 @@ import celery
 import logging
 import os
 
+import cyvcf2
+
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from annotation.models.models import AnnotationVersion, VCFAnnotationStats
@@ -21,7 +23,8 @@ from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, Uplo
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
 from upload.vcf.vcf_import import create_vcf_from_vcf, create_import_success_message, import_vcf_file, \
-    create_cohort_genotype_collection_from_vcf,  get_preprocess_vcf_import_info, genotype_vcf_processor_factory
+    create_cohort_genotype_collection_from_vcf, get_preprocess_vcf_import_info, genotype_vcf_processor_factory, \
+    configure_vcf_from_header
 from variantgrid.celery import app
 
 
@@ -32,12 +35,16 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
         vcf_filename = upload_step.input_filename
         upload_pipeline = upload_step.upload_pipeline
 
+        vcf_reader = cyvcf2.VCF(vcf_filename)
+
         try:
             vcf = upload_pipeline.uploadedvcf.vcf
             _ = vcf.pk  # Throws exception if VCF is None
             logging.info("VCF already existed - reusing!")
+            # Maybe reloading really old VCF - need to re-detect format fields etc
+            configure_vcf_from_header(vcf, vcf_reader)
         except AttributeError:
-            vcf = create_vcf_from_vcf(upload_step, vcf_filename)
+            vcf = create_vcf_from_vcf(upload_step, vcf_reader)
 
         # If build not set, end
         if vcf.genome_build is None:
@@ -50,7 +57,7 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
             return
 
         # If past this point - we have VCF w/genome build
-        create_cohort_genotype_collection_from_vcf(vcf)
+        create_cohort_genotype_collection_from_vcf(vcf, vcf_reader.samples)
 
         # CalculateVCFStatsTask - called after annotation finished
         vcf_stats_task_class_name = full_class_name(CalculateVCFStatsTask)
