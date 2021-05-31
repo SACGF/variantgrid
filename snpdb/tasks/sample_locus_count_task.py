@@ -12,7 +12,7 @@ def do_sample_locus_count_for_vcf_id(vcf_id):
     cgc = vcf.cohort.cohort_genotype_collection
     qs = vcf.get_variant_qs().order_by("locus_id")
 
-    total_sample_locus_count = [Counter() for _ in vcf.genotype_samples]
+    total_sample_locus_count = [Counter()] * vcf.genotype_samples
     sample_locus_count = [0] * vcf.genotype_samples
     last_locus_id = 0
     for locus_id, samples_zygosity in qs.values_list("locus_id", f"{cgc.cohortgenotype_alias}__samples_zygosity"):
