@@ -4,7 +4,7 @@ from django.shortcuts import render
 from guardian.shortcuts import get_objects_for_user
 from gunicorn.config import User
 
-from classification.models import ClinVarExport, EvidenceKeyMap, ConditionTextMatch
+from classification.models import ClinVarExport, EvidenceKeyMap, ConditionTextMatch, ClassificationModification
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
 
@@ -114,10 +114,12 @@ def clinvar_export_review_view(request, pk):
     user: User = request.user
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
     condition_text_match = ConditionTextMatch.objects.filter(classification=clinvar_export.classification_based_on.classification).first()
+    cm: ClassificationModification = clinvar_export.classification_based_on
 
     return render(request, 'classification/clinvar_export.html', context={
         'clinvar_export': clinvar_export,
-        'condition_text_match': condition_text_match
+        'condition_text_match': condition_text_match,
+        'cm': cm
         # 'ontology_terms': ontologyMatches.as_json(),
         # "same_text_vcs": same_text,
         # "same_text_gene_vcs": same_text_and_gene

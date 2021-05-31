@@ -80,8 +80,7 @@
     });
     table.on('responsive-display', (e, datatable, row, showHide, update) => {
         window.setTimeout(() => {
-            Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child'});
-            console.log(`Display = ${showHide}`);
+            Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child', flagGroup:'classifications'});
         },1);
     });
 })

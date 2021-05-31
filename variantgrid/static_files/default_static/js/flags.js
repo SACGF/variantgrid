@@ -1241,6 +1241,7 @@ let Flags = (function () {
                 this.userId = props.userId;
             }
             let flagDoms = null;
+            let flagGroup = props.flagGroup || 'default';
             if (props.filter) {
                 flagDoms = $(`${props.filter} *[data-flags]`);
             } else {
@@ -1286,12 +1287,15 @@ let Flags = (function () {
                 console.log(entry);
                 this.collections.upsert({
                     id: id,
-                    dom: data.dom
+                    dom: data.dom,
+                    flagGroup: flagGroup
                 });
             }
 
             for (let collection of Object.values(existingCollections)) {
-                collection.remove();
+                if (collection.flagGroup === flagGroup) {
+                    collection.remove();
+                }
             }
             if (changes || props.forceRender) {
                 this.refresh();
