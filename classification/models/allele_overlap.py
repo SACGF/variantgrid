@@ -10,21 +10,24 @@ from library.guardian_utils import admin_bot
 from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
-from classification.models.clinical_context_models import ClinicalContext, CS_TO_NUMBER, DiscordanceLevel
+from classification.models.clinical_context_models import ClinicalContext, CS_TO_NUMBER, DiscordanceLevel, \
+    DiscordanceStatus
 from classification.models.classification import Classification
 
 
 @total_ordering
 class AlleleOverlap:
+
     def __init__(self, genome_build: GenomeBuild, allele: Allele, vcms: Collection[ClassificationModification], ccs: Collection[ClinicalContext]):
         self.genome_build = genome_build
         self.allele = allele
         self.ccs = ccs
         self.vcms = sorted(vcms, key=attrgetter('share_level_enum', 'id'), reverse=True)
+        self.discordance_status = DiscordanceStatus.calculate(self.vcms)
 
     @lazy
     def discordant_level(self) -> DiscordanceLevel:
-        return DiscordanceLevel.calculate(self.vcms)
+        return self.discordance_status.level
 
     @lazy
     def discordance_score(self) -> int:
@@ -36,7 +39,7 @@ class AlleleOverlap:
         """
 
         score = 0
-        if self.is_multiple_labs_shared:
+        if self.discordance_status.lab_count > 1:
             score += 1000
 
         level = self.discordant_level
@@ -52,23 +55,19 @@ class AlleleOverlap:
 
     @lazy
     def is_multiple_labs_shared(self) -> bool:
-        labs: Set[int] = set()
-        for vcm in self.vcms:
-            clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            if vcm.share_level_enum.is_discordant_level and CS_TO_NUMBER.get(clin_sig):
-                labs.add(vcm.classification.lab_id)
-                if len(labs) > 1:
-                    return True
-        return False
+        return self.discordance_status.lab_count > 1
 
     @lazy
     def is_multi_shared(self):
         count = 0
         for vcm in self.vcms:
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            if vcm.share_level_enum.is_discordant_level and CS_TO_NUMBER.get(clin_sig):
+            if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
                 count += 1
-        return count >= 2
+                if count >= 2:
+                    return True
+        return False
+
 
     def __eq__(self, other: 'AlleleOverlap'):
         return self.allele == other.allele

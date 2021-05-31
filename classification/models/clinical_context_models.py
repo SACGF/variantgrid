@@ -84,7 +84,7 @@ class DiscordanceStatus:
         cs_scores = set()
         cs_values = set()
         labs = set()
-        level: Optional[DiscordanceLevel] = None
+        level: Optional[DiscordanceLevel]
         for vcm in modifications:
             labs.add(vcm.classification.lab)
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -123,13 +123,14 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         """
         deprecated, try to use DiscordanceLevels instead
         """
-        level = self.calculate_discordance_level()
+        status = self.calculate_discordance_status()
+        level = status.level
         if level == DiscordanceLevel.DISCORDANT:
             return ClinicalContextStatus.DISCORDANT
         else:
             return ClinicalContextStatus.CONCORDANT
 
-    def calculate_discordance_level(self) -> DiscordanceStatus:
+    def calculate_discordance_status(self) -> DiscordanceStatus:
         return DiscordanceStatus.calculate(self.classification_modifications)
 
     @lazy

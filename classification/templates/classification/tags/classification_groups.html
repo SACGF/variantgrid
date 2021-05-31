@@ -8,7 +8,7 @@
             <a href="{% url 'discordance_report' ccg.latest_report.id %}">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status : {{ ccg.latest_report.resolution_text }} (Click for Discordance Report)</a>
         </div>
     {% else %}
-        {% with discordance_status=ccg.calculate_discordance_level %}
+        {% with discordance_status=ccg.calculate_discordance_status %}
         <div class="my-1 alert alert-{{ discordance_status.level.bs_status }}">
             {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
             {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
