@@ -109,12 +109,14 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
 
     for i, sample_name in enumerate(vcf_samples):
         sample = vcf.samples_by_vcf_name[sample_name]
-        CohortSample.objects.update_or_create(cohort=cohort,
-                                              sample=sample,
-                                              defaults={
+        logging.info("Creating cohort sample for: %s", sample)
+        CohortSample.objects.get_or_create(cohort=cohort,
+                                           sample=sample,
+                                           defaults={
                                                 "cohort_genotype_packed_field_index": i,
-                                                "sort_order": i
-                                              })
+                                                "sort_order": i,
+                                           })
+        logging.info("Done creating cohorts...")
 
     create_cohort_genotype_collection(cohort)
 
@@ -152,6 +154,7 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
 
     backend_vcf = create_backend_vcf_links(uploaded_vcf)
     if backend_vcf:
+        logging.info("Handle backend VCF")
         link_samples_and_vcfs_to_sequencing(backend_vcf)
         backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
 
