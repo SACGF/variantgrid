@@ -109,7 +109,7 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
 
     for i, sample_name in enumerate(vcf_samples):
         sample = vcf.samples_by_vcf_name[sample_name]
-        CohortSample.objects.create_or_update(cohort=cohort,
+        CohortSample.objects.update_or_create(cohort=cohort,
                                               sample=sample,
                                               defaults={
                                                 "cohort_genotype_packed_field_index": i,
