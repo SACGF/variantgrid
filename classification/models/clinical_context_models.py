@@ -78,6 +78,7 @@ class DiscordanceLevel(str, Enum):
 class DiscordanceStatus:
     level: DiscordanceLevel
     lab_count: int
+    counted_classifications: int
 
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceStatus':
@@ -85,12 +86,14 @@ class DiscordanceStatus:
         cs_values = set()
         labs = set()
         level: Optional[DiscordanceLevel]
+        counted_classifications = 0
         for vcm in modifications:
-            labs.add(vcm.classification.lab)
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
                 strength = CS_TO_NUMBER.get(clin_sig)
                 if strength:
+                    counted_classifications += 1
+                    labs.add(vcm.classification.lab)
                     cs_scores.add(strength)
                     cs_values.add(clin_sig)
         if len(cs_scores) > 1:
@@ -101,7 +104,7 @@ class DiscordanceStatus:
             level = DiscordanceLevel.NO_ENTRIES
         else:
             level = DiscordanceLevel.CONCORDANT_AGREEMENT
-        return DiscordanceStatus(level=level, lab_count=len(labs))
+        return DiscordanceStatus(level=level, lab_count=len(labs), counted_classifications=counted_classifications)
 
 
 class ClinicalContext(FlagsMixin, TimeStampedModel):

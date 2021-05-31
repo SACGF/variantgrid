@@ -14,8 +14,11 @@
     {% else %}
         <div class="my-1 alert alert-{{ discordance_status.level.bs_status }}">
             {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
-            {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
-            <span>{{ discordance_status.level.label }}</span>
+            {% if discordance_status.counted_classifications == 1 %}Single Submission
+            {% else %}
+                {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
+                <span>{{ discordance_status.level.label }}</span>
+            {% endif %}
         </div>
     {% endif %}
     {% endwith %}
