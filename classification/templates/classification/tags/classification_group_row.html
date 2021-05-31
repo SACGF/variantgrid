@@ -77,7 +77,7 @@
         <td>
             {% for record in group.modifications %}
                 <div class="mb-2" style="position:relative;top:6px;"><i style="font-size:8px;" class="fas fa-circle text-info"></i> <a class="hover-link" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.lab_record_id }}</a>
-                <div class="flags d-inline-block" style="margin-left:12px;top:4px;position:relative;" data-flags="{{ record.classification.flag_collection_id }}">{{ record.classification.flag_collection_id }}</div>
+                <div class="flags d-inline-block" style="margin-left:12px;top:4px;position:relative;" data-flags="{{ record.classification.flag_collection_id }}">...</div>
                 </div>
             {% endfor %}
             {% if group.count > 1 %}
