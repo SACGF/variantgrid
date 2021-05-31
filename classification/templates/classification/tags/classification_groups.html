@@ -3,6 +3,7 @@
 {% load static %}
 
 {% for ccg in clinical_contexts %}
+    {% with discordance_status=ccg.calculate_discordance_status %}
     {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
         <div class="my-1 alert alert-danger">
             <a href="{% url 'discordance_report' ccg.latest_report.id %}">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}
@@ -11,13 +12,13 @@
                 {{ ccg.latest_report.resolution_text }} (Click for Discordance Report)</a>
         </div>
     {% else %}
-        {% with discordance_status=ccg.calculate_discordance_status %}
         <div class="my-1 alert alert-{{ discordance_status.level.bs_status }}">
             {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
             {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
-            <span>{{ discordance_status.level.label }}</span></div>
-        {% endwith %}
+            <span>{{ discordance_status.level.label }}</span>
+        </div>
     {% endif %}
+    {% endwith %}
 {% endfor %}
 {% if diff_latest or diff_all %}
     <div class="btn-toolbar mb-4">
