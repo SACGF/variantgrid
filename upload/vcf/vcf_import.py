@@ -102,6 +102,7 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
                 "import_status": ImportStatus.IMPORTING,
                 "genome_build": vcf.genome_build}
     cohort, created = Cohort.objects.update_or_create(vcf=vcf, defaults=defaults)
+    logging.info("Cohort: %s (created: %s) version=%d", cohort, created, cohort.version)
     if created:
         cohort.cohortgenotypecollection_set.all().delete()
 
@@ -118,6 +119,7 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
                                            })
         logging.info("Done creating cohorts...")
 
+    logging.info("Cohort: %s version=%d", cohort, cohort.version)
     create_cohort_genotype_collection(cohort)
 
 
