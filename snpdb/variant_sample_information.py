@@ -1,3 +1,4 @@
+import logging
 from collections import Counter
 from collections import defaultdict
 from django.contrib.postgres.aggregates.general import StringAgg
@@ -108,6 +109,9 @@ class VariantSampleInformation:
             samples_phred_likelihood = cg_values["variant__cohortgenotype__samples_phred_likelihood"] or empty
 
             cgc = CohortGenotypeCollection.objects.get(pk=cgc_id)
+            if cgc.cohort_version != cgc.cohort.version:
+                logging.warning("CohortGenotypeCollection %s out of date with Cohort.version", cgc.pk)
+                continue
             samples_qs = cgc.cohort.get_samples()
 
             ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__name"
