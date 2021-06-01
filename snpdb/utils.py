@@ -14,6 +14,7 @@ class LabNotificationBuilder(NotificationBuilder):
     class NotificationType(Enum):
         DISCORDANCE = "Discordance"
         GENERAL_UPDATE = "General Update"
+        SLACK_ONLY = "Slack Only"
 
     def __init__(self, lab: Lab, message: str, emoji: str = ":dna:", notification_type: NotificationType = NotificationType.DISCORDANCE):
         if not isinstance(lab, Lab):
@@ -35,6 +36,9 @@ class LabNotificationBuilder(NotificationBuilder):
         if slack_web_hook := self.lab.slack_webhook:
             # send to lab's external slack
             send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=slack_web_hook)
+
+        if self.notification_type == LabNotificationBuilder.NotificationType.SLACK_ONLY:
+            return
 
         recipient_list: List[str] = list()
         if lab_email := self.lab.email:
