@@ -5,6 +5,7 @@ import cyvcf2
 from django.core.management import BaseCommand
 
 from snpdb.models import CohortGenotypeCollection
+from upload.models import UploadedVCF
 
 
 class Command(BaseCommand):
@@ -15,7 +16,12 @@ class Command(BaseCommand):
             vcf = cohort.vcf
             if not vcf.has_genotype:
                 continue  # Will only have 1 sample
-            filename = vcf.uploadedvcf.uploaded_file.get_filename()
+            try:
+                filename = vcf.uploadedvcf.uploaded_file.get_filename()
+            except UploadedVCF.DoesNotExist:
+                logging.info("VCF %d missing uploadedvcf", vcf.pk)
+                continue
+
             if os.path.exists(filename):
                 cohort_samples_by_vcf_sample_name = {cs.sample.vcf_sample_name: cs for cs in
                                                      cohort.cohortsample_set.all()}
