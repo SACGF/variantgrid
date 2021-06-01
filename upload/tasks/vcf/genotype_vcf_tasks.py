@@ -57,7 +57,7 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
             return
 
         # If past this point - we have VCF w/genome build
-        create_cohort_genotype_collection_from_vcf(vcf, vcf_reader.samples)
+        create_cohort_genotype_collection_from_vcf(vcf, vcf_reader)
 
         # CalculateVCFStatsTask - called after annotation finished
         vcf_stats_task_class_name = full_class_name(CalculateVCFStatsTask)
@@ -162,8 +162,10 @@ class SomalierVCFTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
-        somalier_vcf_id(uploaded_vcf.vcf.pk)
-        somalier_all_samples()
+        vcf = uploaded_vcf.vcf
+        if vcf.has_genotype:
+            somalier_vcf_id(vcf.pk)
+            somalier_all_samples()
 
 
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):

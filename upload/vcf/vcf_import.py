@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 
 import cyvcf2
 from django.conf import settings
@@ -92,7 +92,7 @@ def create_vcf_filters(vcf, header_types):
             continue
 
 
-def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
+def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_reader):
     """ Cohort will exist if reloading from existing VCF """
     assert vcf.genome_build, "VCF must have a genome build"
 
@@ -108,7 +108,8 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_samples):
 
     assign_permission_to_user_and_groups(vcf.user, cohort)
 
-    for i, sample_name in enumerate(vcf_samples):
+    sample_names = _get_vcf_sample_names(vcf, vcf_reader)
+    for i, sample_name in enumerate(sample_names):
         sample = vcf.samples_by_vcf_name[sample_name]
         logging.info("Creating cohort sample for: %s", sample)
         CohortSample.objects.get_or_create(cohort=cohort,
@@ -150,9 +151,10 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
         vcf.genome_build = vcf_detect_genome_build_from_header(vcf_reader)
     except GenomeBuildDetectionException:
         pass
-    configure_vcf_from_header(vcf, vcf_reader)
     uploaded_vcf.vcf = vcf
     uploaded_vcf.save()
+
+    configure_vcf_from_header(vcf, vcf_reader)
 
     backend_vcf = create_backend_vcf_links(uploaded_vcf)
     if backend_vcf:
@@ -163,8 +165,18 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     return vcf
 
 
+def _get_vcf_sample_names(vcf, vcf_reader) -> List[str]:
+    if vcf.genotype_samples > 0:
+        sample_names = vcf_reader.samples
+    else:  # Need at least 1 sample per VCF
+        default_name = vcf.uploadedvcf.uploaded_file.name
+        sample_names = [default_name]
+    return sample_names
+
+
 def configure_vcf_from_header(vcf, vcf_reader):
-    """ Can also be called on an existing VCF during reload """
+    """ Needs to have UploadedVCF saved against VCF
+        Can also be called on an existing VCF during reload """
     header_types = cyvcf2_header_types(vcf_reader)
     create_vcf_filters(vcf, header_types)
     vcf_formats = set(header_types["FORMAT"])
@@ -181,17 +193,12 @@ def configure_vcf_from_header(vcf, vcf_reader):
 
     vcf.save()
 
-    if vcf.genotype_samples > 0:
-        sample_names = vcf_reader.samples
-    else:  # Need at least 1 sample per VCF
-        default_name = vcf.uploadedvcf.uploaded_file.name
-        sample_names = [default_name]
-
     no_dna_control_sample_pattern = None
     if settings.VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX:
         no_dna_control_sample_pattern = re.compile(settings.VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX)
 
     logging.info("Creating samples")
+    sample_names = _get_vcf_sample_names(vcf, vcf_reader)
     for sample_name in sample_names:
         no_dna_control = False
         if no_dna_control_sample_pattern and no_dna_control_sample_pattern.findall(sample_name):
