@@ -27,7 +27,7 @@ from analysis.analysis_templates import get_sample_analysis
 from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate, SampleStats, SampleStatsPassingFilter
 from annotation.forms import GeneCountTypeChoiceForm
-from annotation.manual_variant_entry import create_manual_variants
+from annotation.manual_variant_entry import create_manual_variants, can_create_variants
 from annotation.models import AnnotationVersion
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
@@ -440,17 +440,22 @@ def messages_bulk_delete(request):
 
 
 def manual_variant_entry(request):
-    form = forms.ManualVariantEntryForm(request.POST or None, user=request.user)
-    if request.method == 'POST':
-        valid = form.is_valid()
-        if valid:
-            variants_text = form.cleaned_data['variants_text']
-            genome_build_pk = form.cleaned_data['genome_build']
-            genome_build = GenomeBuild.objects.get(pk=genome_build_pk)
-            create_manual_variants(request.user, genome_build, variants_text)
-            form = forms.ManualVariantEntryForm(None, user=request.user)  # Reset form
 
-        add_save_message(request, valid, "Manually entered variants")
+    if can_create_variants(request.user):
+        form = forms.ManualVariantEntryForm(request.POST or None, user=request.user)
+        if request.method == 'POST':
+            valid = form.is_valid()
+            if valid:
+                variants_text = form.cleaned_data['variants_text']
+                genome_build_pk = form.cleaned_data['genome_build']
+                genome_build = GenomeBuild.objects.get(pk=genome_build_pk)
+                create_manual_variants(request.user, genome_build, variants_text)
+                form = forms.ManualVariantEntryForm(None, user=request.user)  # Reset form
+
+            add_save_message(request, valid, "Manually entered variants")
+    else:
+        form = None
+        messages.add_message(request, messages.INFO, "Manual variant entry has been disabled by an admin.")
 
     mvec_qs = ManualVariantEntryCollection.objects.order_by("-id")
     context = {"form": form,

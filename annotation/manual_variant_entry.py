@@ -19,10 +19,14 @@ class CreateManualVariantForbidden(PermissionDenied):
     pass
 
 
-def check_can_create_variants(user):
+def can_create_variants(user) -> bool:
     can_create = settings.UPLOAD_ENABLED and settings.VARIANT_MANUAL_CREATE
     can_create &= user.is_superuser or settings.VARIANT_MANUAL_CREATE_BY_NON_ADMIN
-    if not can_create:
+    return can_create
+
+
+def check_can_create_variants(user):
+    if not can_create_variants(user):
         raise CreateManualVariantForbidden()
 
 
