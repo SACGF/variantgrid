@@ -24,7 +24,7 @@ class TestVCFProcessors(TestCase):
             Sequence.objects.get_or_create(seq=base, seq_md5_hash=md5sum_str(base), length=len(base))
 
     @classmethod
-    def _create_fake_upload_step_and_vcf(cls, vcf_filename) -> Tuple[UploadStep, UploadedVCF]:
+    def _create_fake_upload_step_and_vcf(cls, vcf_filename, vcf_reader) -> Tuple[UploadStep, UploadedVCF]:
         user = User.objects.get_or_create(username='testuser')[0]
         uploaded_file = UploadedFile.objects.create(path=vcf_filename,
                                                     import_source=ImportSource.COMMAND_LINE,
@@ -36,16 +36,16 @@ class TestVCFProcessors(TestCase):
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                 input_filename=vcf_filename,
                                                 sort_order=0)
-        create_vcf_from_vcf(upload_step, vcf_filename)
+        create_vcf_from_vcf(upload_step, vcf_reader)
         uploaded_vcf = UploadedVCF.objects.get(upload_pipeline=upload_pipeline)
         return upload_step, uploaded_vcf
 
     def _test_genotype_processor(self, vcf_filename, processor_klass):
         """ I keep forgetting to adjust the columns to match the CSV """
-        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename)
+        fast_vcf_reader = cyvcf2.VCF(vcf_filename)
+        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, fast_vcf_reader)
         processor = processor_klass(upload_step, None, uploaded_vcf, None)
 
-        fast_vcf_reader = cyvcf2.VCF(upload_step.input_filename)
         for v in fast_vcf_reader:
             processor.process_entry(v)
             break
