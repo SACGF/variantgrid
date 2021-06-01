@@ -41,13 +41,13 @@ class Command(BaseCommand):
             impact_case = self._get_case(IMPACT_OLD_NEW, "impact")
             for vav in VariantAnnotationVersion.objects.all():
                 print(f"Updating {vav} VariantAnnotation... (may take a while)")
-                VariantAnnotation.objects.filter(version=vav, impact_min__in=IMPACT_OLD_NEW).update(impact=impact_case)
+                VariantAnnotation.objects.filter(version=vav, impact__in=IMPACT_OLD_NEW).update(impact=impact_case)
                 if vacuum:
                     table = vav.get_partition_table("annotation_variantannotation")
                     self._run_vacuum(table)
 
                 print(f"Updating {vav} VariantTranscriptAnnotation... (may take a really long while)")
-                VariantTranscriptAnnotation.objects.filter(version=vav, impact_min__in=IMPACT_OLD_NEW).update(impact=impact_case)
+                VariantTranscriptAnnotation.objects.filter(version=vav, impact__in=IMPACT_OLD_NEW).update(impact=impact_case)
                 if vacuum:
                     table = vav.get_partition_table("annotation_varianttranscriptannotation")
                     self._run_vacuum(table)
