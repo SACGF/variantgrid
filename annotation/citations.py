@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, List, Any, Union
 
 from Bio import Entrez, Medline
-import collections
 import json
 
 from annotation.models import Citation
@@ -38,7 +37,7 @@ class CitationDetails:
         if self.source < other.source:
             return True
         if self.source == other.source:
-            return self.citation_id.rjust(10,'0') < other.citation_id.rjust(10,'0')
+            return self.citation_id.rjust(10, '0') < other.citation_id.rjust(10, '0')
         return False
 
 

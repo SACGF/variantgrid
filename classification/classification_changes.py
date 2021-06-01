@@ -3,14 +3,15 @@ from datetime import datetime
 from functools import total_ordering
 from typing import Any, List, Optional, Union
 
-from django.db.models import Q
 from django.contrib.auth.models import User
+from django.db.models import Q
+from django.utils.timezone import now
+
+from classification.enums import SubmissionSource
+from classification.models import ClassificationModification, Classification, classification_flag_types
 from flags.models import FlagComment, Flag, FlagResolution
 from library.utils import IterableTransformer, IteratableStitcher
 from snpdb.models import Allele
-from classification.enums import SubmissionSource
-from classification.models import ClassificationModification, Classification, classification_flag_types
-from django.utils.timezone import now
 
 
 class ClassificationChange:

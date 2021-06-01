@@ -122,7 +122,7 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
 
     def liftover(self, request, queryset):
         liftover_alleles(allele_qs=queryset, user=request.user)
-        self.message_user(request, message=f'Liftover queued', level=messages.INFO)
+        self.message_user(request, message='Liftover queued', level=messages.INFO)
 
     liftover.short_description = 'Liftover'
 

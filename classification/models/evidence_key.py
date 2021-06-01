@@ -1,20 +1,20 @@
+import re
 from enum import Enum
+from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict
-import re
 
-from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
-from library.cache import timed_cache
-from library.utils import empty_to_none
-from snpdb.models import VariantGridColumn, Lab
 from classification.enums import CriteriaEvaluation, SubmissionSource
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.json_serialize import strip_json
+from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
+from library.cache import timed_cache
+from library.utils import empty_to_none
+from snpdb.models import VariantGridColumn, Lab
 from snpdb.views.datatable_view import RichColumn
 
 

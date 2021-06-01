@@ -2,6 +2,7 @@ import logging
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import combinations
 from typing import Tuple, List, Optional, Dict, Set, Iterable, Union
 
 from django.conf import settings
@@ -16,8 +17,6 @@ from django.utils.datastructures import OrderedSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
-from itertools import combinations
-
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from lazy import lazy
@@ -26,7 +25,10 @@ from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
+from classification.enums import ShareLevel
+from classification.models import ClassificationModification, Classification
 from classification.models.classification_utils import classification_gene_symbol_filter
+from classification.views.classification_datatables import ClassificationDatatableConfig
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
@@ -46,9 +48,6 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 from snpdb.variant_queries import get_has_classifications_q, get_variant_queryset_for_gene_symbol
-from classification.enums import ShareLevel
-from classification.models import ClassificationModification, Classification
-from classification.views.classification_datatables import ClassificationDatatableConfig
 
 
 def genes(request, genome_build_name=None):

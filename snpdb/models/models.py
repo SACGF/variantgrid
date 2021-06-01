@@ -238,10 +238,10 @@ class Lab(models.Model):
     slack_webhook = models.TextField(blank=True)
 
     def send_notification(self,
-            message: str,
-            blocks: Optional[Dict] = None,
-            username: Optional[str] = None,
-            emoji: str = ":dna:"):
+                          message: str,
+                          blocks: Optional[Dict] = None,
+                          username: Optional[str] = None,
+                          emoji: str = ":dna:"):
         if slack_url := self.slack_webhook:
             send_notification(message=message, blocks=blocks, username=username, emoji=emoji, slack_webhook_url=slack_url)
         else:

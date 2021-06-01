@@ -1,3 +1,6 @@
+import logging
+import os
+import subprocess
 from typing import Optional, List
 
 from django.conf import settings
@@ -6,16 +9,13 @@ from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
-import logging
-import os
-import subprocess
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 from genes.hgvs import get_hgvs_variant
 from snpdb.models import GenomicIntervalsCollection, GenomicInterval, Sample, \
     VCFBedIntersection, Cohort, VariantCollection
 from snpdb.models.models_variant import Variant
+from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 
 
 class IntersectionNode(AnalysisNode):

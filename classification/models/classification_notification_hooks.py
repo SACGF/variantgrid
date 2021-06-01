@@ -1,11 +1,12 @@
 from django.conf import settings
 from django.dispatch import receiver
 from django.urls import reverse
+
 from classification.enums import SpecialEKeys
+from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap
 from classification.models.classification_groups import ClassificationGroups
 from library.django_utils import get_url_from_view_path
 from library.log_utils import send_notification
-from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap
 from snpdb.utils import LabNotificationBuilder
 
 

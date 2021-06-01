@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import total_ordering
 from operator import attrgetter
-from typing import Dict, List, Collection, Set
+from typing import Dict, List, Collection
 
 from django.contrib.auth.models import User
 from lazy import lazy
@@ -10,8 +10,7 @@ from library.guardian_utils import admin_bot
 from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
-from classification.models.clinical_context_models import ClinicalContext, CS_TO_NUMBER, DiscordanceLevel, \
-    DiscordanceStatus
+from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
 from classification.models.classification import Classification
 
 
@@ -67,7 +66,6 @@ class AlleleOverlap:
                 if count >= 2:
                     return True
         return False
-
 
     def __eq__(self, other: 'AlleleOverlap'):
         return self.allele == other.allele
