@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db import connection
 from django.db.models import Case, When, Value
 
 from analysis.models import DamageNode
@@ -10,9 +11,12 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--small_updates', action='store_true',
                             help="Do update in small chunks (to reduce transaction size)")
+        parser.add_argument('--vacuum', action='store_true',
+                            help="Run VACUUM FULL on each table after update")
 
     def handle(self, *args, **options):
         small_updates = options["small_updates"]
+        vacuum = options["vacuum"]
         IMPACT_OLD_NEW = {
             "O": "1",
             "L": "2",
@@ -38,8 +42,20 @@ class Command(BaseCommand):
             for vav in VariantAnnotationVersion.objects.all():
                 print(f"Updating {vav} VariantAnnotation... (may take a while)")
                 VariantAnnotation.objects.filter(version=vav, impact_min__in=IMPACT_OLD_NEW).update(impact=impact_case)
+                if vacuum:
+                    table = vav.get_partition_table("annotation_variantannotation")
+                    self._run_vacuum(table)
+
                 print(f"Updating {vav} VariantTranscriptAnnotation... (may take a really long while)")
                 VariantTranscriptAnnotation.objects.filter(version=vav, impact_min__in=IMPACT_OLD_NEW).update(impact=impact_case)
+                if vacuum:
+                    table = vav.get_partition_table("annotation_varianttranscriptannotation")
+                    self._run_vacuum(table)
+
+    @staticmethod
+    def _run_vacuum(table):
+        with connection.cursor() as cursor:
+            cursor.execute(f"VACUUM FULL {table};")
 
     @staticmethod
     def _get_case(old_new, field_name) -> Case:
