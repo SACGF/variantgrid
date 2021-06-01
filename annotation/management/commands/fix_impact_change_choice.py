@@ -20,7 +20,9 @@ class Command(BaseCommand):
             "H": "4",
         }
 
-        DamageNode.objects.update(impact_min=self._get_case(IMPACT_OLD_NEW, "impact_min"))
+        # Have to remember the old "*" - ie MODIFIED* which didn't change
+        old_codes_qs = DamageNode.objects.filter(impact_min__in=IMPACT_OLD_NEW)
+        old_codes_qs.update(impact_min=self._get_case(IMPACT_OLD_NEW, "impact_min"))
 
         if small_updates:
             for vav in VariantAnnotationVersion.objects.all():
@@ -35,9 +37,9 @@ class Command(BaseCommand):
             impact_case = self._get_case(IMPACT_OLD_NEW, "impact")
             for vav in VariantAnnotationVersion.objects.all():
                 print(f"Updating {vav} VariantAnnotation... (may take a while)")
-                VariantAnnotation.objects.filter(version=vav).update(impact=impact_case)
+                VariantAnnotation.objects.filter(version=vav, impact_min__in=IMPACT_OLD_NEW).update(impact=impact_case)
                 print(f"Updating {vav} VariantTranscriptAnnotation... (may take a really long while)")
-                VariantTranscriptAnnotation.objects.filter(version=vav).update(impact=impact_case)
+                VariantTranscriptAnnotation.objects.filter(version=vav, impact_min__in=IMPACT_OLD_NEW).update(impact=impact_case)
 
     @staticmethod
     def _get_case(old_new, field_name) -> Case:
