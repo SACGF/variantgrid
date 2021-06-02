@@ -322,15 +322,13 @@ class VariantGrid(JqGridSQL):
 class AnalysesGrid(JqGridUserRowConfig):
     model = Analysis
     caption = 'Analyses'
-    fields = ["id", "name", "modified", "genome_build__name", "analysis_type", "description",
+    fields = ["id", "name", "created", "modified", "genome_build__name", "analysis_type", "description",
               "user__username", "analysislock__locked"]
     colmodel_overrides = {
-        'id': {"hidden": True},
-        'name': {"width": 400,
-                 'formatter': 'analysisLink',
-                 'formatter_kwargs': {"icon_css_class": "analysis-icon",
-                                      "url_name": "analysis",
-                                      "url_object_column": "id"}},
+        'id': {'formatter': 'analysisLink',
+               'formatter_kwargs': {"icon_css_class": "analysis-icon",
+                                    "url_name": "analysis"}},
+        "name": {"width": 500},
         "genome_build__name": {"label": "Genome Build"},
         "analysis_type": {"label": "Type"},
         "user__username": {'label': 'Created by'},
@@ -364,16 +362,15 @@ class AnalysesGrid(JqGridUserRowConfig):
 class AnalysisTemplatesGrid(JqGridUserRowConfig):
     model = AnalysisTemplate
     caption = 'Analysis Templates'
-    fields = ["id", "name", "modified", "analysis", "analysis__genome_build", "analysis__description", "user__username"]
+    fields = ["analysis__id", "name", "created", "modified",
+              "analysis__genome_build__name", "analysis__description", "user__username"]
 
     colmodel_overrides = {
-        "id": {"hidden": True},
+        'analysis__id': {'formatter': 'analysisLink',
+                         'formatter_kwargs': {"icon_css_class": "analysis-icon",
+                                              "url_name": "analysis"}},
+        "name": {"width": 500},
         "analysis": {"hidden": True},
-        'name': {"width": 400,
-                 'formatter': 'analysisLink',
-                 'formatter_kwargs': {"icon_css_class": "analysis-icon",
-                                      "url_name": "analysis",
-                                      "url_object_column": "analysis"}},
         "modified": {'label': 'Modified'},
         "user__username": {'label': 'Created by'},
     }

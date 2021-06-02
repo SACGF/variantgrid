@@ -5,7 +5,7 @@
 {% load crispy_forms_field %}
 {% load menu_tags %}
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
-{% block title %}{{ analysis_type_description }}{% endblock title %}
+{% block title %}VariantGrid: Analyses{% endblock title %}
 {% block head %}
     <style>
         .settings-button {
@@ -56,8 +56,7 @@
                     if (rowObject.analysislock__locked) {
                         iconCssClassList.push("fa fa-lock fa-lg");
                     }
-                    let analysisName = `${analysisId} - ${cellvalue}`;
-                    let analysisLink = linkFormatter(analysisName, options, rowObject, iconCssClassList);
+                    let analysisLink = linkFormatter(analysisId, options, rowObject, iconCssClassList);
                     let settingsLink = "<a class='settings-button' href='javascript:analysisSettings(" + analysisId + ")' title='Open Settings'></a>";
                     return "<span>" + analysisLink + settingsLink + "</span>";
                 }
@@ -91,7 +90,7 @@
                             {{ create_analysis_form.genome_build.errors }}
                         {% endlabelled %}
                     {% endif %}
-                    <button class="btn btn-primary" id='create-analysis'><i class="fas fa-plus-circle"></i> Create New {{ analysis_type_description }}</button>
+                    <button class="btn btn-primary" id='create-analysis'><i class="fas fa-plus-circle"></i> Create New Analysis</button>
                 </div>
             </div>
 

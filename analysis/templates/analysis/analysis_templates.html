@@ -4,14 +4,13 @@
 {% load ui_utils %}
 {% load crispy_forms_field %}
 {% load jqgrid_tags %}
-{% block title %}Analysis templates{% endblock title %}
+{% block title %}VariantGrid: Analysis templates{% endblock title %}
 
 {% block submenu_page_content %}
 <script>
     $(document).ready(() => {
         jQuery.extend($.fn.fmatter , {
             analysisLink : function(cellvalue, options, rowObject) {
-                let analysisId = rowObject.id;
                 let analysisLink = linkFormatter(cellvalue, options, rowObject);
                 return "<span>" + analysisLink + "</span>";
             }
