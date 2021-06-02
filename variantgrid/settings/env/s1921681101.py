@@ -169,7 +169,7 @@ if _SHARIANT_MODE:
 
     MIMIC = "shariant"
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", f"{MIMIC}_static")
-    # SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")
+    SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")
     STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
     SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, f"templates/{MIMIC}_templates")

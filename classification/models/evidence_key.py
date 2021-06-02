@@ -93,7 +93,7 @@ class EvidenceKey(TimeStampedModel):
         Given a value (or possibly list of values) generate or find the options that match.
         e.g. for the value ["maternal","xsdfdwerew"] for variant inheritance we'd get
         [{"key":"maternal", "value":"Maternal"}, {"key":"xsdfdwerew", "label":"xsdfdwerew"}]
-        With he fist one being the result of a match, and the second on being the result of not being matched
+        With the fist one being the result of a match, and the second on being the result of not being matched
         :param normal_value_obj: A value or dict with a key value
         :return: A list of options that matched
         """

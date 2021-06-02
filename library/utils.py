@@ -16,7 +16,7 @@ from django.db import models
 from enum import Enum
 from itertools import islice
 from json.encoder import JSONEncoder
-from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict
+from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union
 import hashlib
 import importlib
 import json
@@ -30,6 +30,10 @@ from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
+
+
+# isn't restrictive enough, but helps documention
+JSON = Union[Dict[str,Any], List[Any], int, float, str]
 
 
 class DjangoJSONEncoder(JSONEncoder):
