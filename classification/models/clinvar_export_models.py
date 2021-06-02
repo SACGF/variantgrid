@@ -433,7 +433,6 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
             data["citations"] = [citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
-            # FIXME strip out HTML
             data["comment"] = interpret
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
             # FIXME also check validation date?

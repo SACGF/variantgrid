@@ -111,7 +111,11 @@
                     {% else %}
                         <span class="text-danger">No condition matching found for this classification</span>
                     {% endif %}
+                    {% if ondition_text_match.condition_text %}
                     <a class="btn btn-outline-primary ml-2" target="_blank" href="{% url 'condition_matching' pk=condition_text_match.condition_text.pk %}"><i class="fas fa-edit"></i></a>
+                    {% else %}
+                    ERROR: Not linked to a Condition Text Match
+                    {% endif %}
                 {% endwith %}
                 {% endlabelled %}
             {% labelled label="Citations" %}
