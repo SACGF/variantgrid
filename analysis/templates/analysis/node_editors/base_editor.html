@@ -1,280 +1,290 @@
-{% block includejs %}{% endblock includejs %}
 {% load static %}
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'css/vertical_tabs.css' %}" />
-<script type="text/javascript">
-NODE_ID = "#analysis-node-{{ node.pk }}";
+{% load js_tags %}
+{% if errors %}
+	<script type="text/javascript">
+		$(document).ready(function() {
+			const errors = {{ errors|jsonify }};
+			on_error_function(errors);
+		});
+	</script>
+{% else %}
+	{% block includejs %}{% endblock includejs %}
+	<link rel="stylesheet" type="text/css" media="screen" href="{% static 'css/vertical_tabs.css' %}" />
+	<script type="text/javascript">
+	NODE_ID = "#analysis-node-{{ node.pk }}";
 
-function ajaxForm(selector, beforeSerializeFunc, successFunc) {
-    const options = {
-        target: "#node-editor-wrapper",
-        beforeSerialize: function () {
-            // Common hidden fields
-            if (typeof getAlleleFrequencyValues !== 'undefined') {
-                const afData = getAlleleFrequencyValues();
-                const afVal = JSON.stringify(afData);
-                $("input#id_allele_frequency").val(afVal);
-            }
-            if (typeof getVCFLocusFilters !== 'undefined') {
-                const vcfFiltersData = getVCFLocusFilters();
-                const vcfFiltersVal = JSON.stringify(vcfFiltersData);
-                $("input#id_vcf_locus_filters").val(vcfFiltersVal);
-            }
+	function ajaxForm(selector, beforeSerializeFunc, successFunc) {
+		const options = {
+			target: "#node-editor-wrapper",
+			beforeSerialize: function () {
+				// Common hidden fields
+				if (typeof getAlleleFrequencyValues !== 'undefined') {
+					const afData = getAlleleFrequencyValues();
+					const afVal = JSON.stringify(afData);
+					$("input#id_allele_frequency").val(afVal);
+				}
+				if (typeof getVCFLocusFilters !== 'undefined') {
+					const vcfFiltersData = getVCFLocusFilters();
+					const vcfFiltersVal = JSON.stringify(vcfFiltersData);
+					$("input#id_vcf_locus_filters").val(vcfFiltersVal);
+				}
 
-            if (beforeSerializeFunc) {
-                beforeSerializeFunc();
-            }
-        },
-        success: function (res, status, xhr, a, b, c) {
-            // JSON back = success, otherwise we'll get the form to re-render
-            if (xhr.responseJSON) {
-                if (successFunc) {
-                    successFunc();
-                }
-                reloadNodeAndData({{ node.pk }});
-            }
-        },
-    };
-    selector.ajaxForm(options);
-}
-
-
-function accordionForm(formSelector) {
-    // Expects: ul.accordion and hidden input #id_accordion_panel that maps to accordion settings 
-
-    const accordion = $(".accordion", formSelector);
-    const accordionStateInput = $("#id_accordion_panel", formSelector);
-
-    accordion.accordion({
-        heightStyle: "content",
-        widthStyle: "fill",
-        active: parseInt(accordionStateInput.val()),
-        activate: function() {
-            const accordionId = $(this).accordion("option", "active");
-            accordionStateInput.val(accordionId);
-        }
-    });
-
-}
+				if (beforeSerializeFunc) {
+					beforeSerializeFunc();
+				}
+			},
+			success: function (res, status, xhr, a, b, c) {
+				// JSON back = success, otherwise we'll get the form to re-render
+				if (xhr.responseJSON) {
+					if (successFunc) {
+						successFunc();
+					}
+					reloadNodeAndData({{ node.pk }});
+				}
+			},
+		};
+		selector.ajaxForm(options);
+	}
 
 
-function changeNodeSize(event, ui) {
-	size = ui.value;
-}
+	function accordionForm(formSelector) {
+		// Expects: ul.accordion and hidden input #id_accordion_panel that maps to accordion settings
 
-function switch_node_data(activeTabLinkId) {
-    const DEFAULT_NODE_DATA = '#node-data-grid';
-    const tabLookup = {
-        'tab-link-summary': '#node-data-summary',
-        'tab-link-doc': '#node-data-docs',
-        'tab-link-graphs': '#node-data-graphs',
-    };
-    const nodeData = tabLookup[activeTabLinkId] || DEFAULT_NODE_DATA;
-    const dataContainer = $("#node-data-container");
-    const DEFAULT_LOAD_FUNC = function () {
-        $(nodeData, dataContainer).fadeIn();
-    };
+		const accordion = $(".accordion", formSelector);
+		const accordionStateInput = $("#id_accordion_panel", formSelector);
 
-    const loadFuncLookup = {
-        'tab-link-doc': function () {
-            const loadDiv = $(nodeData, dataContainer);
-            const descriptionUrl = "{% url 'node_method_description' node.id node.version %}";
-            loadDiv.load(descriptionUrl).fadeIn();
-        }
-    };
+		accordion.accordion({
+			heightStyle: "content",
+			widthStyle: "fill",
+			active: parseInt(accordionStateInput.val()),
+			activate: function() {
+				const accordionId = $(this).accordion("option", "active");
+				accordionStateInput.val(accordionId);
+			}
+		});
 
-    const fadeInFunc = loadFuncLookup[activeTabLinkId] || DEFAULT_LOAD_FUNC;
-    $('.node-data', dataContainer).fadeOut().promise().done(fadeInFunc);
-}
-
-function load_column_summary() {
-    const column = $("select#id_column", "form#column-summary-form").val();
-    const base_url = "{% url 'node_column_summary' node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
-    const url = base_url.replace('COLUMN', column);
-    const nodeDataSummary = $("#node-data-summary");
-
-    nodeDataSummary.load(url);
-}
+	}
 
 
-function createFilterChild(columnName, columnFilter) {
-	const CREATE_FILTER_CHILD_URL = "{% url 'create_filter_child' node.id %}";
-	const data = 'column_name=' + columnName + '&column_filter=' + encodeURIComponent(columnFilter);
-	$.ajax({
-	    type: "POST",
-	    data: data,
-	    url: CREATE_FILTER_CHILD_URL,
-	    success: getAnalysisWindow().addConnectedNode,
+	function changeNodeSize(event, ui) {
+		size = ui.value;
+	}
+
+	function switch_node_data(activeTabLinkId) {
+		const DEFAULT_NODE_DATA = '#node-data-grid';
+		const tabLookup = {
+			'tab-link-summary': '#node-data-summary',
+			'tab-link-doc': '#node-data-docs',
+			'tab-link-graphs': '#node-data-graphs',
+		};
+		const nodeData = tabLookup[activeTabLinkId] || DEFAULT_NODE_DATA;
+		const dataContainer = $("#node-data-container");
+		const DEFAULT_LOAD_FUNC = function () {
+			$(nodeData, dataContainer).fadeIn();
+		};
+
+		const loadFuncLookup = {
+			'tab-link-doc': function () {
+				const loadDiv = $(nodeData, dataContainer);
+				const descriptionUrl = "{% url 'node_method_description' node.id node.version %}";
+				loadDiv.load(descriptionUrl).fadeIn();
+			}
+		};
+
+		const fadeInFunc = loadFuncLookup[activeTabLinkId] || DEFAULT_LOAD_FUNC;
+		$('.node-data', dataContainer).fadeOut().promise().done(fadeInFunc);
+	}
+
+	function load_column_summary() {
+		const column = $("select#id_column", "form#column-summary-form").val();
+		const base_url = "{% url 'node_column_summary' node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
+		const url = base_url.replace('COLUMN', column);
+		const nodeDataSummary = $("#node-data-summary");
+
+		nodeDataSummary.load(url);
+	}
+
+
+	function createFilterChild(columnName, columnFilter) {
+		const CREATE_FILTER_CHILD_URL = "{% url 'create_filter_child' node.id %}";
+		const data = 'column_name=' + columnName + '&column_filter=' + encodeURIComponent(columnFilter);
+		$.ajax({
+			type: "POST",
+			data: data,
+			url: CREATE_FILTER_CHILD_URL,
+			success: getAnalysisWindow().addConnectedNode,
+		});
+	}
+
+
+	function createExtraFilterChild(columnName, columnFilter) {
+		const CREATE_EXTRA_FILTER_CHILD_URL = "{% url 'create_extra_filter_child' node.id extra_filters %}";
+		$.ajax({
+			type: "POST",
+			url: CREATE_EXTRA_FILTER_CHILD_URL,
+			success: getAnalysisWindow().addConnectedNode,
+		});
+	}
+
+
+	function load_snp_matrix_summary() {
+		const snpmatrix_form = $("form#snp-matrix-form");
+		const conversion = $("#id_conversion", snpmatrix_form).val();
+		const significant_figures = $("#id_significant_figures", snpmatrix_form).val();
+		const base_url = "{% url 'node_snp_matrix' node.pk node.version 'CONVERSION' 0 %}";
+		let url = base_url.replace('CONVERSION', conversion);
+		url = url.substr(0, url.length-1) + significant_figures; // Replace last 0
+		const nodeDataSummary = $("#node-data-summary");
+		nodeDataSummary.html("Loading...");
+		nodeDataSummary.load(url);
+	}
+
+	function load_node_graph() {
+		const graph_node_form = $("form#graph-node-form");
+		const graph_type = $("#id_graph_type", graph_node_form).val();
+		const cmap = $("#id_cmap", graph_node_form).val();
+
+		const base_url = "{% url 'node_data_graph' node.analysis.version node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
+		const url = base_url.replace('GRAPH_TYPE', graph_type).replace('CMAP', cmap);
+		const nodeDataGraph = $("#node-data-graphs");
+		nodeDataGraph.html("Loading...");
+		nodeDataGraph.load(url);
+	}
+
+	$(document).ready(function() {
+		const tab = $("#node-editor-tabs");
+		let params = {
+			activate: function (event, ui) {
+				const active = tab.tabs('option', 'active');
+				const activeTabLinkId = $("ul>li a", tab).eq(active).attr("id");
+				switch_node_data(activeTabLinkId);
+			}
+		};
+		tab.tabs(params);
+
+		params = {
+			activate: function (event, ui) {
+				$("#node-data-summary").html("Please select configuration above and select view.");
+			}
+		};
+		$("#node-summary-tabs").tabs(params).addClass('ui-tabs-vertical ui-helper-clearfix');
+
+		$("#column-summary-button").click(load_column_summary);
+		$("#snp-matrix-button").click(load_snp_matrix_summary);
+		$("#node-graph-editor-button").click(load_node_graph);
+
+		{% block finishedloadingeditor %}
+		// Register that editor is done - override if you need to
+		finishedLoadingEditor({{ node_id }}, {{ version_id }});
+		{% endblock finishedloadingeditor %}
+
+		{% block docreadyjs %}{% endblock docreadyjs %}
+		{% block griddocreadyjs %}{% endblock griddocreadyjs %}
 	});
-}
 
+	{% block inlinejs %}{% endblock inlinejs %}
 
-function createExtraFilterChild(columnName, columnFilter) {
-	const CREATE_EXTRA_FILTER_CHILD_URL = "{% url 'create_extra_filter_child' node.id extra_filters %}";
-	$.ajax({
-        type: "POST",
-	    url: CREATE_EXTRA_FILTER_CHILD_URL,
-	    success: getAnalysisWindow().addConnectedNode,
-	});
-}
+	</script>
+	<style>
+	#locked-warning-icon {
+		width: 18px;
+		height: 18px;
+	}
 
+	{% block style %}
+	{% endblock style %}
+	</style>
+	<div id="node-editor-wrapper" node_id="{{ node.pk }}">
+		<div id="node-editor-tabs">
+			<ul>
+				<li><a id='tab-link-grid' href="#node-grid">Grid</a></li>
+				{% block node_editor_tab_links_second %}{% endblock node_editor_tab_links_second %}
 
-function load_snp_matrix_summary() {
-    const snpmatrix_form = $("form#snp-matrix-form");
-    const conversion = $("#id_conversion", snpmatrix_form).val();
-    const significant_figures = $("#id_significant_figures", snpmatrix_form).val();
-    const base_url = "{% url 'node_snp_matrix' node.pk node.version 'CONVERSION' 0 %}";
-    let url = base_url.replace('CONVERSION', conversion);
-    url = url.substr(0, url.length-1) + significant_figures; // Replace last 0
-    const nodeDataSummary = $("#node-data-summary");
-    nodeDataSummary.html("Loading...");
-	nodeDataSummary.load(url);
-}
+				{% if node.visible %}
+					<li><a id='tab-link-summary' href="#node-summary">Summary</a></li>
+					<li><a id='tab-link-doc' href="{% url 'node_doc' node.pk %}">Doc</a></li>
+					{% if graph_form %}
+					<li><a id='tab-link-graphs' href="#node-graphs">Graphs</a></li>
+					{% endif %}
+				{% else %}
+					{% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
+				{% endif %}
+				{% if node_debug_tab %}
+					<li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
+				{% endif %}
+				{% block node_editor_tab_links_end %}{% endblock node_editor_tab_links_end %}
+			</ul>
+			<div id="node-grid">
+				{% block node_filter_info %}
+					{% if extra_filters_label %}
+						<b>Filtering to:</b> <span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
+					{% endif %}
 
-function load_node_graph() {
-    const graph_node_form = $("form#graph-node-form");
-    const graph_type = $("#id_graph_type", graph_node_form).val();
-    const cmap = $("#id_cmap", graph_node_form).val();
+					{% if node.analysis.lock_input_sources and not node.has_input %}
+						<div>
+						<img id='locked-warning-icon' src="{% static 'icons/warning.png' %}" />
+						<b>Analysis locked</b> - you cannot change samples.</div>
+					{% endif %}
 
-    const base_url = "{% url 'node_data_graph' node.analysis.version node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
-    const url = base_url.replace('GRAPH_TYPE', graph_type).replace('CMAP', cmap);
-    const nodeDataGraph = $("#node-data-graphs");
-    nodeDataGraph.html("Loading...");
-	nodeDataGraph.load(url);
-}
+					<h4>
+						{{ node.get_node_class_label }}
+						<a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
+							<i title="Help docs on this node" class="fas fa-book"></i>
+						</a>
+					</h4>
 
-$(document).ready(function() {
-    const tab = $("#node-editor-tabs");
-    let params = {
-        activate: function (event, ui) {
-            const active = tab.tabs('option', 'active');
-            const activeTabLinkId = $("ul>li a", tab).eq(active).attr("id");
-            switch_node_data(activeTabLinkId);
-        }
-    };
-    tab.tabs(params);
-
-    params = {
-        activate: function (event, ui) {
-            $("#node-data-summary").html("Please select configuration above and select view.");
-        }
-    };
-    $("#node-summary-tabs").tabs(params).addClass('ui-tabs-vertical ui-helper-clearfix');
-
-	$("#column-summary-button").click(load_column_summary);
-	$("#snp-matrix-button").click(load_snp_matrix_summary);
-	$("#node-graph-editor-button").click(load_node_graph);
-
-    {% block finishedloadingeditor %}
-    // Register that editor is done - override if you need to  
-	finishedLoadingEditor({{ node_id }}, {{ version_id }});
-    {% endblock finishedloadingeditor %}
-
-    {% block docreadyjs %}{% endblock docreadyjs %}
-    {% block griddocreadyjs %}{% endblock griddocreadyjs %}
-});
-
-{% block inlinejs %}{% endblock inlinejs %}
-
-</script>
-<style>
-#locked-warning-icon {
-    width: 18px;
-    height: 18px;
-}
-
-{% block style %}
-{% endblock style %}
-</style>
-<div id="node-editor-wrapper" node_id="{{ node.pk }}">
-	<div id="node-editor-tabs">
-		<ul>
-	    	<li><a id='tab-link-grid' href="#node-grid">Grid</a></li>
-			{% block node_editor_tab_links_second %}{% endblock node_editor_tab_links_second %}
-
+				{% endblock node_filter_info %}
+				{% block content %}{% endblock content %}
+			</div>
 			{% if node.visible %}
-    	    	<li><a id='tab-link-summary' href="#node-summary">Summary</a></li>
-    	    	<li><a id='tab-link-doc' href="{% url 'node_doc' node.pk %}">Doc</a></li>
-                {% if graph_form %}
-    	    	<li><a id='tab-link-graphs' href="#node-graphs">Graphs</a></li>
-        	    {% endif %}
-            {% else %}
-                {% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
-			{% endif %}
-			{% if node_debug_tab %}
-    		    <li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
-			{% endif %}
-			{% block node_editor_tab_links_end %}{% endblock node_editor_tab_links_end %}
-	  	</ul>
-		<div id="node-grid">
-            {% block node_filter_info %}
-    			{% if extra_filters_label %}
-    				<b>Filtering to:</b> <span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
-    			{% endif %}
-
-                {% if node.analysis.lock_input_sources and not node.has_input %}
-                    <div>
-                    <img id='locked-warning-icon' src="{% static 'icons/warning.png' %}" />
-                    <b>Analysis locked</b> - you cannot change samples.</div>
-                {% endif %}
-
-                <h4>
-                    {{ node.get_node_class_label }}
-                    <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
-                        <i title="Help docs on this node" class="fas fa-book"></i>
-                    </a>
-                </h4>
-
-			{% endblock node_filter_info %}
-			{% block content %}{% endblock content %}
-		</div>
-		{% if node.visible %}
-		{% block node_editor_tabs_second %}{% endblock node_editor_tabs_second %}
-		<div id="node-summary">
-			<div id='node-summary-tabs'>
-				<ul>
-				{% block node_summary_tab_links %}{% endblock node_summary_tab_links %}				
-				<li><a href='#column-summary-editor'>Column Summary</a></li>
-				<li><a href='#snp-matrix-editor'>SNP Matrix</a></li>
-				</ul>
-				<div id='column-summary-editor'>
-					<form id='column-summary-form'>
-				        {% csrf_token %}
-				        <div>
-				        <div>
-				        <span>{{ column_summary_form.column }}</span>
-						<span><button id='column-summary-button'  class="btn btn-outline-primary" type='button'>view</button></span>
-				        </div>
-						</div>
-					</form>
-				</div>
-				<div id='snp-matrix-editor'>
-					<form id='snp-matrix-form'>
-				        {% csrf_token %}
-						<table>
-						<tr>
-						<td>{{ snp_matrix_form.conversion }}</td>
-						<td><div id='significant-figures-container'>Sig figs: {{ snp_matrix_form.significant_figures }}</div></td>
-						<td><button id='snp-matrix-button' type='button' class="btn btn-outline-primary">view</button></td>
-						</tr>
-						</table>
-					</form>
+			{% block node_editor_tabs_second %}{% endblock node_editor_tabs_second %}
+			<div id="node-summary">
+				<div id='node-summary-tabs'>
+					<ul>
+					{% block node_summary_tab_links %}{% endblock node_summary_tab_links %}
+					<li><a href='#column-summary-editor'>Column Summary</a></li>
+					<li><a href='#snp-matrix-editor'>SNP Matrix</a></li>
+					</ul>
+					<div id='column-summary-editor'>
+						<form id='column-summary-form'>
+							{% csrf_token %}
+							<div>
+							<div>
+							<span>{{ column_summary_form.column }}</span>
+							<span><button id='column-summary-button'  class="btn btn-outline-primary" type='button'>view</button></span>
+							</div>
+							</div>
+						</form>
+					</div>
+					<div id='snp-matrix-editor'>
+						<form id='snp-matrix-form'>
+							{% csrf_token %}
+							<table>
+							<tr>
+							<td>{{ snp_matrix_form.conversion }}</td>
+							<td><div id='significant-figures-container'>Sig figs: {{ snp_matrix_form.significant_figures }}</div></td>
+							<td><button id='snp-matrix-button' type='button' class="btn btn-outline-primary">view</button></td>
+							</tr>
+							</table>
+						</form>
+					</div>
 				</div>
 			</div>
+				{% if graph_form %}
+				<div id="node-graphs">
+					<form id="graph-node-form">
+						{% csrf_token %}
+						Graph: {{ graph_form.graph_type }}
+						Colormap: {{ graph_form.cmap }}
+						<button id='node-graph-editor-button' type='button' class="btn btn-outline-primary">view</button>
+					</form>
+				</div>
+				{% endif %}
+			{% else %}
+			  {% block node_editor_not_visible_tab %}{% endblock node_editor_not_visible_tab %}
+			{% endif %}
+			{% block node_editor_tabs_end %}{% endblock node_editor_tabs_end %}
 		</div>
-    		{% if graph_form %}
-    		<div id="node-graphs">
-    			<form id="graph-node-form">
-    		        {% csrf_token %}
-    				Graph: {{ graph_form.graph_type }}
-    				Colormap: {{ graph_form.cmap }} 
-    				<button id='node-graph-editor-button' type='button' class="btn btn-outline-primary">view</button>
-    			</form>
-    		</div>
-    		{% endif %}
-		{% else %}
-		  {% block node_editor_not_visible_tab %}{% endblock node_editor_not_visible_tab %}
-		{% endif %}
-		{% block node_editor_tabs_end %}{% endblock node_editor_tabs_end %}
-	</div>
 
-</div>
+	</div>
+{% endif %}

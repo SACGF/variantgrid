@@ -1,18 +1,17 @@
 {% extends "analysis/node_data/base_node_data.html" %}
 {% load js_tags %}
 
-{% block docreadyjs %}
-	const errors = {{ errors|jsonify }};
-	on_error_function(errors);
-
-    {% if node_id %}
-    const node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
-    load_node_editor(node_view_url);
-    {% endif %}
-
-{% endblock docreadyjs %}
-
 {% block content %}
+<script type="text/javascript">
+    $(document).ready(function() {
+        const errors = {{ errors|jsonify }};
+        on_error_function(errors);
+        {% if node_id %}
+        const node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
+        load_node_editor(node_view_url);
+        {% endif %}
+    });
+</script>
 <div id='dataframe-container'>
 {% load text_tags %} 
 

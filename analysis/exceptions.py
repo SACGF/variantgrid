@@ -1,4 +1,4 @@
-from rest_framework.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_404_NOT_FOUND
+from rest_framework.status import HTTP_200_OK
 
 from library.django_utils.rollbar_middleware import RollbarIgnoreException
 
@@ -9,29 +9,38 @@ class CeleryTasksObsoleteException(RollbarIgnoreException):
 
 
 class NonFatalNodeError(Exception):
-    status = HTTP_500_INTERNAL_SERVER_ERROR
+    status = HTTP_200_OK
 
 
 class NodeParentErrorsException(NonFatalNodeError):
-    pass
+
+    def __str__(self):
+        return f"The node's parents had errors"
 
 
 class NodeParentNotReadyException(NonFatalNodeError):
-    pass
+
+    def __str__(self):
+        return f"The node's parents were not ready"
 
 
 class NodeConfigurationException(NonFatalNodeError):
-    pass
+
+    def __str__(self):
+        return f"The node has bad configuration"
 
 
 class NodeOutOfDateException(NonFatalNodeError):
-    """ Node version now superseded """
-    pass
+
+    def __str__(self):
+        return f"The node was updated while loading."
 
 
 class NodeNotFoundException(NonFatalNodeError):
-    status = HTTP_404_NOT_FOUND
 
     def __init__(self, node_id):
         self.node_id = node_id
         super().__init__(f"Node {node_id} not found")
+
+    def __str__(self):
+        return f"The node was deleted while loading"

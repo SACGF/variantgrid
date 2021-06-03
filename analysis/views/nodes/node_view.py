@@ -2,6 +2,7 @@ from django import forms
 from django.http.response import JsonResponse
 from django.views.generic.edit import UpdateView
 
+from analysis.exceptions import NonFatalNodeError
 from analysis.forms import GraphTypeChoiceForm, ColumnSummaryForm, SNPMatrixForm
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisTemplateType
@@ -25,18 +26,21 @@ class NodeView(UpdateView):
                         "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters),
                         'has_write_permission': self.object.analysis.can_write(self.request.user)})
 
-        grid = VariantGrid(self.request.user, self.object, extra_filters)
-        colmodels = grid.get_colmodels()
-        columns = [data['name'] for data in colmodels]
-        graph_form = GraphTypeChoiceForm(self.object, columns)
-        if graph_form.has_graph_types:
-            context['graph_form'] = graph_form
+        try:
+            grid = VariantGrid(self.request.user, self.object, extra_filters)
+            colmodels = grid.get_colmodels()
+            columns = [data['name'] for data in colmodels]
+            graph_form = GraphTypeChoiceForm(self.object, columns)
+            if graph_form.has_graph_types:
+                context['graph_form'] = graph_form
 
-        context['column_summary_form'] = ColumnSummaryForm(colmodels)
-        context['snp_matrix_form'] = SNPMatrixForm(initial={'significant_figures': 2})
+            context['column_summary_form'] = ColumnSummaryForm(colmodels)
+            context['snp_matrix_form'] = SNPMatrixForm(initial={'significant_figures': 2})
 
-        user_settings = UserSettings.get_for_user(self.request.user)
-        context["node_debug_tab"] = user_settings.node_debug_tab
+            user_settings = UserSettings.get_for_user(self.request.user)
+            context["node_debug_tab"] = user_settings.node_debug_tab
+        except NonFatalNodeError as ne:
+            context["errors"] = [str(ne)]
         return context
 
     def _get_form_initial(self):
