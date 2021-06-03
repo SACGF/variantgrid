@@ -94,14 +94,12 @@ class VariantGrid(JqGridSQL):
 
     def _set_post_data(self, node, extra_filters):
         post_data = self.extra_config.get('postData', {})
+        post_data["node_id"] = node.pk
+        post_data["version_id"] = node.version
         custom_columns_collection = node.analysis.custom_columns_collection
         post_data['ccc_id'] = custom_columns_collection.pk
         post_data['ccc_version_id'] = custom_columns_collection.version_id
         post_data["extra_filters"] = extra_filters
-
-        node_id, version = node.get_grid_node_id_and_version()
-        post_data["node_id"] = node_id
-        post_data["version_id"] = version
 
         sample_ids = node.get_sample_ids()
         if sample_ids:

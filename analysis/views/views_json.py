@@ -11,7 +11,8 @@ from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplate
     AnalysisTemplateVersion, VariantTag
 from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion, AnalysisNodeAlleleSource
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion, AnalysisNodeAlleleSource, \
+    AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
@@ -46,13 +47,14 @@ def analysis_node_versions(request, analysis_id):
 
 
 class NodeUpdate(NodeJSONPostView):
-
-    def _get_data(self, request, *args, **kwargs):
+    def _get_node(self, request, **kwargs) -> AnalysisNode:
         node_id = kwargs["node_id"]
+        return get_node_subclass_or_non_fatal_exception(request.user, node_id, write=True)
+
+    def _get_data(self, request, node, *args, **kwargs):
         op = request.POST["op"]
         params = json.loads(request.POST['params'])
         # Load subclass, need to use OO to handle adding/deleting and save
-        node = get_node_subclass_or_non_fatal_exception(request.user, node_id, write=True)
         logging.debug("Loaded node %s version %d", node.pk, node.version)
 
         if op == "move":

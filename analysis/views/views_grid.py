@@ -1,6 +1,10 @@
+import logging
 from io import StringIO
+from urllib.parse import urlencode
+
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.http.response import Http404, StreamingHttpResponse
+from django.http.response import Http404, StreamingHttpResponse, HttpResponseRedirect
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
@@ -10,6 +14,7 @@ from vcf import Writer, Reader
 from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 
 from analysis import grids
+from analysis.models import AnalysisNode
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
@@ -21,23 +26,39 @@ from snpdb.models.models_variant import Variant
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
 class NodeGridHandler(NodeJSONGetView):
+    def _get_node(self, request, **kwargs) -> AnalysisNode:
+        return _node_from_request(request)
 
-    def _get_data(self, request):
-        grid = _variant_grid_from_request(request)
+    def _get_redirect(self, request, node):
+        """ If node can be represented by another, use that to re-use cache """
+        ret = None
+        grid_node_id, grid_node_version = node.get_grid_node_id_and_version()
+        if grid_node_id != node.pk:
+            url = reverse("node_grid_handler")
+            params = request.GET.dict()
+            params.update({"node_id": grid_node_id, "version_id": grid_node_version})
+            url += "?" + urlencode(params)
+            logging.warning(url)
+            ret = HttpResponseRedirect(url)
+        return ret
+
+    def _get_data(self, request, node, **kwargs):
+        grid = _variant_grid_from_request(request, node)
         return grid.get_data(request)
 
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
 class NodeGridConfig(NodeJSONGetView):
+    def _get_node(self, request, **kwargs) -> AnalysisNode:
+        return get_node_subclass_or_non_fatal_exception(request.user, kwargs["node_id"], version=kwargs["node_version"])
 
-    def _get_data(self, request, analysis_version, node_id, node_version, extra_filters):
-        node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=node_version)
+    def _get_data(self, request, node, **kwargs):
         errors = node.get_errors(flat=True)
 
         if errors:
             ret = {"errors": errors}
         else:
-            grid = grids.VariantGrid(request.user, node, extra_filters)
+            grid = grids.VariantGrid(request.user, node, kwargs["extra_filters"])
             ret = grid.get_config(as_json=False)
         return ret
 
@@ -69,7 +90,8 @@ def format_items_iterator(analysis, sample_ids, items):
 
 
 def node_grid_export(request):
-    grid = _variant_grid_from_request(request, sort_by_contig_and_position=True)
+    node = _node_from_request(request)
+    grid = _variant_grid_from_request(request, node, sort_by_contig_and_position=True)
 
     # TODO: Change filename to use set operation between samples
     basename = f"node_{grid.node.pk}"
@@ -94,11 +116,14 @@ def node_grid_export(request):
     raise Http404(f"unknown export type: '{export_type}'")
 
 
-def _variant_grid_from_request(request, **kwargs):
-    extra_filters = request.GET["extra_filters"]
+def _node_from_request(request) -> AnalysisNode:
     node_id = request.GET["node_id"]
     version_id = int(request.GET["version_id"])
-    node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=version_id)
+    return get_node_subclass_or_non_fatal_exception(request.user, node_id, version=version_id)
+
+
+def _variant_grid_from_request(request, node: AnalysisNode, **kwargs):
+    extra_filters = request.GET["extra_filters"]
     return grids.VariantGrid(request.user, node, extra_filters, **kwargs)
 
 

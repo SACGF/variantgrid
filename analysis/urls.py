@@ -1,7 +1,6 @@
 from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
     AnalysisNodeIssuesGrid, NodeOntologyGenesGrid
-from analysis.views import views, views_json, views_grid, \
-    views_karyomapping, views_autocomplete
+from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete
 from library.django_utils.jqgrid_view import JQGridView
 from variantgrid.perm_path import perm_path
 
