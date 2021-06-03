@@ -13,7 +13,7 @@
         let html = "<div>Node errors:</div><ul class='messages'>";
         for (let i=0 ; i<errors.length ; ++i) {
             let errorMessage = errors[i];
-            if (errorMessage.startsWith("Analysis:")) {
+            if (errorMessage && errorMessage.startsWith("Analysis:")) {
                 errorMessage += `<div><div style="margin-right: 2px" class="left">Fix this in </div> <a href="javascript:analysisSettings()"><div class="left icon16 settings-icon"></div><div class="left">Analysis settings</div></a><div class="clear"></div></div>`;
             }
             html += "<li class='error'>" + errorMessage + "</li>";
