@@ -328,13 +328,12 @@ def node_data_grid(request, analysis_version, node_id, node_version, extra_filte
     except NodeOutOfDateException:
         return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
 
-    template = 'analysis/node_data/node_data_grid.html'
     context = {"analysis_version": analysis_version,
                "node_id": node_id,
                "node_version": node_version,
                "extra_filters": extra_filters,
                "bams_dict": node.get_bams_dict()}
-    return render(request, template, context)
+    return render(request, 'analysis/node_data/node_data_grid.html', context)
 
 
 @cache_page(WEEK_SECS)
@@ -473,8 +472,8 @@ def node_load(request, node_id):
     """ loads main grid area, and triggers loading of node editor
         we can't cache this as the node version may have changed since last visit """
 
-    errors = []
     try:
+        errors = []
         node = get_node_subclass_or_non_fatal_exception(request.user, node_id)
         extra_filters = request.GET.get("extra_filters", "default")
         kwargs = {"analysis_version": node.analysis.version,
@@ -487,7 +486,10 @@ def node_load(request, node_id):
             view_name = "node_data_grid"
         else:
             view_name = "node_async_wait"
-        return HttpResponseRedirect(reverse(view_name, kwargs=kwargs))
+        url = reverse(view_name, kwargs=kwargs)
+        if node.cloned_from:
+            url += f"?cloned_from={node.cloned_from}"
+        return HttpResponseRedirect(url)
     except NonFatalNodeError as e:
         errors = [str(e)]
 

@@ -16,32 +16,31 @@ def get_analysis_or_404(user: User, analysis_id, write=False) -> Analysis:
     return analysis
 
 
+def _get_node(user: User, node_id, write=False, version=None) -> AnalysisNode:
+    node = AnalysisNode.objects.get_subclass(pk=node_id)
+    if version is not None:
+        if node.version > version:
+            raise NodeOutOfDateException(f"{node.pk}: requested: {version}, DB: {node.version}")
+    if write:
+        node.analysis.check_can_write(user)
+    else:
+        node.analysis.check_can_view(user)
+    return node
+
+
 def get_node_subclass_or_404(user: User, node_id, write=False, version=None) -> AnalysisNode:
     """ Ensures user has view permission on analysis
         If version is passed in, node is loaded, and if version in DB is after version
         throws NodeOutOfDateException """
     try:
-        node = AnalysisNode.objects.get_subclass(pk=node_id)
-        if version is not None:
-            if node.version > version:
-                raise NodeOutOfDateException(f"{node.pk}: requested: {version}, DB: {node.version}")
-        if write:
-            node.analysis.check_can_write(user)
-        else:
-            node.analysis.check_can_view(user)
-        return node
+        return _get_node(user, node_id, write=write, version=version)
     except AnalysisNode.DoesNotExist:
         msg = f"No AnalysisNode of pk={node_id}"
         raise Http404(msg)
 
 
-def get_node_subclass_or_non_fatal_exception(user: User, node_id, write=False, **kwargs):
+def get_node_subclass_or_non_fatal_exception(user: User, node_id, write=False, version=None) -> AnalysisNode:
     try:
-        node = AnalysisNode.objects.get_subclass(pk=node_id, **kwargs)
-        if write:
-            node.analysis.check_can_write(user)
-        else:
-            node.analysis.check_can_view(user)
-        return node
+        return _get_node(user, node_id, write=write, version=version)
     except AnalysisNode.DoesNotExist:  # @UndefinedVariable
         raise NodeNotFoundException(node_id)

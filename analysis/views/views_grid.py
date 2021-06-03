@@ -97,7 +97,7 @@ def node_grid_export(request):
 def _variant_grid_from_request(request, **kwargs):
     extra_filters = request.GET["extra_filters"]
     node_id = request.GET["node_id"]
-    version_id = request.GET["version_id"]
+    version_id = int(request.GET["version_id"])
     node = get_node_subclass_or_non_fatal_exception(request.user, node_id, version=version_id)
     return grids.VariantGrid(request.user, node, extra_filters, **kwargs)
 

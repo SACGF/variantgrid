@@ -614,7 +614,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return NodeStatus.is_ready(self.status)
 
     def bump_version(self):
-        if self.version:
+        if self.version > 0:
             DELETE_CACHE_TASK = "analysis.tasks.node_update_tasks.delete_old_node_versions"
             app.send_task(DELETE_CACHE_TASK, args=(self.pk, self.version))
 
@@ -791,6 +791,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         else:
             super_save(**kwargs)
 
+        # Make sure this always exists
+        NodeVersion.objects.get_or_create(node=self, version=self.version)
         # Modify our analyses last updated time
         Analysis.objects.filter(pk=self.analysis.pk).update(modified=timezone.now())
 
@@ -808,7 +810,12 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def save_clone(self):
         node_id = self.pk
-        original_node_version = NodeVersion.get(self)
+        try:
+            # Have sometimes had race condition where we try to clone a node that has been updated
+            # In that case we'll just miss out on the cache
+            original_node_version = NodeVersion.get(self)
+        except NodeVersion.DoesNotExist:
+            original_node_version = None
 
         copy = self
         # Have to set both id/pk to None when using model inheritance
@@ -913,7 +920,7 @@ class NodeVersion(models.Model):
 
     @staticmethod
     def get(node: AnalysisNode):
-        return NodeVersion.objects.get_or_create(node=node, version=node.version)[0]
+        return NodeVersion.objects.get(node=node, version=node.version)
 
     def __str__(self):
         return f"{self.node.pk} (v{self.version})"
@@ -960,10 +967,7 @@ class NodeCount(models.Model):
 
     @staticmethod
     def load_for_node_version(node_version: NodeVersion, label: str) -> 'NodeCount':
-        try:
-            return NodeCount.objects.get(node_version=node_version, label=label)
-        except IntegrityError:
-            raise NodeNotFoundException(node_version.node_id)
+        return NodeCount.objects.get(node_version=node_version, label=label)
 
     @staticmethod
     def load_for_node(node: AnalysisNode, label: str) -> 'NodeCount':
