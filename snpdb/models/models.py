@@ -456,3 +456,6 @@ class SiteMessage(models.Model):
             site_message_str = json.dumps(site_message_dict)
             cache.set(SITE_MESSAGE_KEY, site_message_str, timeout=30)
         return site_message_dict
+
+    def __str__(self):
+        return f"{self.get_log_level_display()}: {self.message}"
