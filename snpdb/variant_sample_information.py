@@ -2,7 +2,7 @@ import logging
 from collections import Counter
 from collections import defaultdict
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import Q
+from django.db.models import Q, TextField
 from lazy import lazy
 
 from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_ONTOLOGY_TERM_PATH
@@ -117,8 +117,10 @@ class VariantSampleInformation:
             ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__name"
             q_hpo = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
             q_omim = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
-            annotation_kwargs = {"patient_hpo": StringAgg(ontology_path, '|', filter=q_hpo, distinct=True),
-                                 "patient_omim": StringAgg(ontology_path, '|', filter=q_omim, distinct=True)}
+            annotation_kwargs = {"patient_hpo": StringAgg(ontology_path, '|', filter=q_hpo,
+                                                          distinct=True, output_field=TextField()),
+                                 "patient_omim": StringAgg(ontology_path, '|', filter=q_omim,
+                                                           distinct=True, output_field=TextField())}
             samples_qs = samples_qs.annotate(**annotation_kwargs)
 
             COPY_SAMPLE_FIELDS = ["id", "name", "patient", SAMPLE_ENRICHMENT_KIT_PATH]
