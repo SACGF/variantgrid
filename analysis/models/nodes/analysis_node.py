@@ -8,7 +8,7 @@ from typing import Tuple, Sequence, List, Dict, Optional
 
 from celery.canvas import Signature
 from django.core.cache import cache
-from django.db import connection, models, IntegrityError
+from django.db import connection, models
 from django.db.models import Value, IntegerField
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
@@ -21,7 +21,7 @@ from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from analysis.exceptions import NonFatalNodeError, NodeParentErrorsException, NodeConfigurationException, \
-    NodeParentNotReadyException, NodeNotFoundException
+    NodeParentNotReadyException, NodeNotFoundException, NodeOutOfDateException
 from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeErrorSource, AnalysisTemplateType
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
@@ -86,6 +86,16 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
         return AnalysisNode.objects.get_subclass(pk=self.pk)
+
+    def check_still_valid(self):
+        """ Checks that the node is still there and has the version we expect - or throw exception """
+        version_qs = AnalysisNode.objects.filter(pk=self.pk).values_list("version", flat=True)
+        if version_qs:
+            db_version = version_qs[0]
+            if db_version > self.version:
+                raise NodeOutOfDateException()
+        else:
+            raise NodeNotFoundException(self.pk)
 
     def _get_cohorts_and_sample_visibility_for_node(self) -> Tuple[Sequence[Cohort], Dict]:
         """ Visibility = can see on grid """
@@ -920,7 +930,11 @@ class NodeVersion(models.Model):
 
     @staticmethod
     def get(node: AnalysisNode):
-        return NodeVersion.objects.get(node=node, version=node.version)
+        try:
+            return NodeVersion.objects.get(node=node, version=node.version)
+        except NodeVersion.DoesNotExist:
+            node.check_still_valid()
+            raise
 
     def __str__(self):
         return f"{self.node.pk} (v{self.version})"
