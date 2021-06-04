@@ -68,7 +68,9 @@ class AnalysisNodeClassesForm(forms.Form):
         if filter_nodes:
             node_classifications.append("filter")
 
-        for classification, nodes in get_nodes_by_classification().items():
+        nodes_by_classification = get_nodes_by_classification()
+        for classification in node_classifications:
+            nodes = nodes_by_classification[classification]
             node_classes = [(node_class_name, node_class_name) for node_class_name in nodes]
             nc = sorted(node_classes, key=operator.itemgetter(0))
             choices.append((classification.title(), tuple(nc)))
