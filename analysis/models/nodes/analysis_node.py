@@ -440,8 +440,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return f"{self.get_class_name()}-{self.pk}"
 
     def get_css_classes(self):
-        """ returns list of css classes """
-        css_classes = ["window"]
+        """ returns list of css classes - set on "node > .node-overlay" on node appearance update """
+        css_classes = []
         if self.output_node:
             css_classes.append("output-node")
         if self.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.analysisvariable_set.exists():

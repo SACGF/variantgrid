@@ -318,6 +318,10 @@ ul.customicons .ui-icon {
 	background-size: 50px 60px;
 }
 
+.SampleNode {
+	width: 60px;
+	height: 60px;
+}
 
 .ZygosityNode { 
 	background-image: url(/static/images/node_icons/punnet_square_30_perc_opacity.png);

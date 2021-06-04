@@ -7,19 +7,20 @@ function getNode(nodeId) {
 	return $("#analysis-node-" + nodeId);
 }
 
-// Nodes should also create a "updateState(args)" method, this will be called after creation  
+// Nodes should have a div in them "node-overlay" that has its attributes set by nodeData.attributes
+// Nodes should also create a "updateState(args)" method, this will be called after creation
 
-function createDefaultNode(nodeData) {
-	const div = $('<div></div>', nodeData["attributes"]);
-	div.addClass("default-node-container");
-	div.append("<div class='user-tag-colored node-overlay'><span class='node-name'>" + nodeData["name"] + "</span></div>");
+function createDefaultNode() {
+	const div = $('<div/>').addClass("window default-node-container");
+	const nodeOverlay = $('<div/>').addClass("node-overlay");
+	nodeOverlay.append("<div class='user-tag-colored'><span class='node-name'></span></div>");
+	div.append(nodeOverlay);
 	div[0].updateState = function(args) { };
 	return div;
 }
 
-function createVennNode(nodeData) {
-	const div = $('<div></div>', nodeData["attributes"]);
-	div.addClass("default-node-container");
+function createVennNode() {
+	const div = $('<div/>').addClass("window default-node-container");;
 	venn2(div[0], 64, 45);
 
 	const overlayStyle = {
@@ -30,7 +31,7 @@ function createVennNode(nodeData) {
 		left: 0,
 	};
 	$('.' + VENN_TOGGLE_WIDGET_CLASS, div[0]).css(overlayStyle);
-	const span = $("<span class='node-name'>" + nodeData["name"] + "</span>");
+	const span = $("<span class='node-name'></span>");
 	span.css(overlayStyle);
 	span.css("z-index", 30);
 	div.append(span);
@@ -51,13 +52,22 @@ function createNodeFromData(nodeData) {
 	if (!factory) {
 		factory = createDefaultNode;
 	}
-	let node = factory(nodeData);
+	let node = factory();
 	let nodeColorOverlay = $("<div />").attr({class: "node-color-overlay"});
 	nodeColorOverlay.appendTo(node);
+	updateNodeFromData(node, nodeData);
 
-	node.attr("node_name", nodeData.name);
-	node.each(function() { this.updateState(nodeData['args']); });
 	return node;
+}
+
+
+function updateNodeFromData(node, nodeData) {
+	node.addClass(nodeData.node_class);
+	node.attr(nodeData.attributes);
+	let nodeOverlay = $(".node-overlay", node);
+	nodeOverlay.attr("class", nodeData.overlay_css_classes);
+	$(".node-name", node).text(nodeData.name);
+	node.each(function() { this.updateState(nodeData['args']); });
 }
 
 // Wait for previous update to come back (so we don't end up with race conditions on the server)
@@ -498,7 +508,7 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 	const COUNTER_SIZE = 20;
 	const LOCK_SIZE = 16;
 	
-	nodes_selector.filter(".outputEndpoint").each(function() {
+	nodes_selector.filter("[output_endpoint=true]").each(function() {
 		const counts_size = COUNTER_SIZE * nodeCountTypes.length;
 
 		const node_width = $(this).width();
@@ -568,7 +578,7 @@ function setupConnections(nodes_selector, readOnly) {
 		const uuid = "input-endpoint-" + $(this).attr("node_id");
 		const existingEndpoint = jsPlumb.getEndpoint(uuid);
 
-		if ($(this).hasClass("inputEndpoint")) {
+		if ($(this).attr("input_endpoint") == "true") {
 			if ($(this).hasClass("VennNode")) {
 				const topLeft = uuid + "-left";
 				const topRight = uuid + "-right";
@@ -591,7 +601,7 @@ function setupConnections(nodes_selector, readOnly) {
             }
 		}
 		
-		if ($(this).hasClass("outputEndpoint")) {
+		if ($(this).attr("output_endpoint") == "true") {
 			const e = jsPlumb.addEndpoint(this, {anchor: "BottomCenter"}, outputEndpoint);
 			if (!readOnly) {
 				add_click_overlay(e);
@@ -878,16 +888,9 @@ function update_dirty_nodes(dirty_nodes) {
 
 function updateNodeAppearance(data) {
     let nodeId = data.attributes.node_id;
-    let oldNode = getNode(nodeId);
-    let wasActive = oldNode.hasClass(ACTIVE_CLASS);
-    oldNode.remove();
-
-    const newNode = createNodeFromData(data);
-    if (wasActive) {
-    	newNode.addClass(ACTIVE_CLASS);
-	}
-    newNode.appendTo($("#analysis"));
-    setupNodes(newNode);
+    let node = getNode(nodeId);
+    updateNodeFromData(node, data);
+    setupConnections(node);
 }
 
 

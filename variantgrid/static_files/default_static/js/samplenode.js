@@ -55,14 +55,8 @@ function addDeceasedStroke(svg, sideLength) {
 }
 
 
-function createSampleNode(nodeData) {
-	const attributes = nodeData["attributes"];
-	const sideLength = SIDE_LENGTH;
-	attributes["width"] = sideLength;
-	attributes["height"] = sideLength;
-
-	const sampleNode = $('<div></div>', attributes);
-
+function createSampleNode() {
+	const sampleNode = $("<div/>").addClass("window");
 	const valign = $("<div class='node-overlay' />");
 	const overlay_style = {
 		width: '100%',
@@ -70,12 +64,12 @@ function createSampleNode(nodeData) {
 		position: 'absolute',
 		top: 0,
 		left: 0,
-		'line-height': sideLength + 'px',
+		'line-height': SIDE_LENGTH + 'px',
 		'z-index' : 30,
 	};
 	valign.css(overlay_style);
 
-	const span = $("<span class='node-name'>" + nodeData["name"] + "</span>");
+	const span = $("<span class='node-name'></span>");
 	span.css({padding: '8px', display: 'inline-block', 'vertical-align' : 'middle', 'line-height' : '1em'});
 
 	valign.append(span);

@@ -70,13 +70,7 @@ def reload_analysis_nodes(analysis_id):
 
 def get_rendering_dict(node):
     node_class = node.get_class_name()
-    css_classes = node.get_css_classes()
-    css_classes.append(node_class)
-    css_classes.append("outputEndpoint")
-
-    if node.max_inputs != 0:
-        css_classes.append("inputEndpoint")
-
+    css_classes = ["node-overlay"] + node.get_css_classes()  # Needs node-overlay to be able to find it
     node_args = node.get_rendering_args()
 
     if node.pk:
@@ -90,15 +84,17 @@ def get_rendering_dict(node):
         "node_class": node.get_node_class_label(),
         "version_id": node.version,
         "appearance_version_id": node.appearance_version,
-        "class": " ".join(css_classes),
         "id": node.get_css_id(),
         "style": style,
+        "input_endpoint": node.max_inputs != 0,
+        "output_endpoint": True,  # Can always have output
         "x": node.x,
         "y": node.y
     }
     return {
         "attributes": attributes,
         "node_class": node_class,
+        "overlay_css_classes": " ".join(css_classes),
         "name": node.name,
         "args": node_args
     }
