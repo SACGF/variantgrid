@@ -77,5 +77,9 @@ class TissueNode(AnalysisNode):
         return name
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Filter based on tissue specific expression (from Human Protein Atlas)"
+
+    @staticmethod
     def get_node_class_label():
         return "Tissue Expression"

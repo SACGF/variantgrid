@@ -235,6 +235,10 @@ class TrioNode(AbstractCohortBasedNode):
 
         return "\n".join(name_parts)
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Mother/Father/Proband - filter for recessive/dominant/denovo inheritance"
+
     def get_css_classes(self):
         css_classes = super().get_css_classes()
         if self.trio:

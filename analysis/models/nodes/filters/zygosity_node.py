@@ -73,5 +73,9 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
         return name
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Filter by sample zygosity"
+
+    @staticmethod
     def get_node_class_label():
         return "Zygosity"

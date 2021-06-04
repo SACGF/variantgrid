@@ -38,7 +38,7 @@ from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeVCFFilter, AnalysisClassification, NodeTask
 from analysis.models.nodes.node_counts import get_node_count_colors, get_node_counts_mine_and_available
-from analysis.models.nodes.node_types import NodeHelp
+from analysis.models.nodes.node_types import get_node_types_hash
 from analysis.models.nodes.sources.cohort_node import CohortNodeZygosityFiltersCollection, CohortNodeZygosityFilter
 from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
@@ -109,7 +109,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
     node_help_dict = {}
     user_settings = UserSettings.get_for_user(request.user)
     if user_settings.tool_tips:
-        node_help_dict = NodeHelp.get_node_help_dict()
+        node_help_dict = {label: subclass.get_help_text() for label, subclass in get_node_types_hash().items()}
 
     analysis_variables = [[av.node_id, av.field] for av in AnalysisVariable.objects.filter(node__analysis=analysis)]
     analysis_tags_node = TagNode.get_analysis_tags_node(analysis)

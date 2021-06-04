@@ -147,6 +147,10 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
         return "\n".join(name_parts)
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Variants from a VCF sample, usually one genotype (patient, cell or organism)"
+
     def get_gene_lists(self) -> List:
         """ Used for gene coverage """
         gene_lists = []

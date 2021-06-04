@@ -104,5 +104,9 @@ class ExpressionNode(AnalysisNode):
         return name
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Filter by genes/transcript expression values or fold change"
+
+    @staticmethod
     def get_node_class_label():
         return "Gene Expression"

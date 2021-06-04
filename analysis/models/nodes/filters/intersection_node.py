@@ -145,6 +145,10 @@ class IntersectionNode(AnalysisNode):
                 name = f"Enrichment Kit: {enrichment_kit}"
         return name
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Filter to genomic ranges including BED files or HGVS"
+
     def save(self, **kwargs):
         # HGVS name is validated in IntersectionNodeForm, and linked to a variant if one is found
         # But it's possible a variant isn't there at form save time, but will appear later

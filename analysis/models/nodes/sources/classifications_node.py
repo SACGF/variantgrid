@@ -39,6 +39,10 @@ class ClassificationsNode(AnalysisNode):
         return self.get_node_class_label()
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Variants that have been classified. Can filter by pathogenicity."
+
+    @staticmethod
     def get_node_class_label():
         return "Classifications"
 

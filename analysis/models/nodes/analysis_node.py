@@ -480,6 +480,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         raise NotImplementedError(f"Node Class: {self.get_class_name()}")
 
     @staticmethod
+    def get_help_text() -> str:
+        raise NotImplementedError()
+
+    @staticmethod
     def get_node_class_label():
         """ Used in create node dropdown """
         raise NotImplementedError()

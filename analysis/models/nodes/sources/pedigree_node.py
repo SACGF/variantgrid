@@ -71,6 +71,10 @@ class PedigreeNode(AbstractCohortBasedNode):
         return name
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Variants from a family of samples, filtered by genotype according to inheritance models"
+
+    @staticmethod
     def get_node_class_label():
         return "Pedigree"
 

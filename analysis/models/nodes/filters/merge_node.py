@@ -93,5 +93,9 @@ class MergeNode(AnalysisNode):
         return "Merge"
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Merge variants from multiple parents"
+
+    @staticmethod
     def get_node_class_label():
         return "Merge"

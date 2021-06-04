@@ -73,6 +73,10 @@ class TagNode(AnalysisNode):
 
         return description
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Filter to variants that have been tagged"
+
     def save_clone(self):
         tag_ids = self.tag_ids  # Save before clone
         copy = super().save_clone()

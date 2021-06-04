@@ -25,6 +25,10 @@ class SelectedInParentNode(AnalysisNode):
         return description
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Filter to variants which were manually selected (via checkbox) in parent node"
+
+    @staticmethod
     def get_node_class_label():
         return "Selected In Parent Filter"
 

@@ -43,6 +43,10 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         return name
 
     @staticmethod
+    def get_help_text() -> str:
+        return "All variants in the database or a gene"
+
+    @staticmethod
     def get_node_class_label():
         return "All Variants"
 

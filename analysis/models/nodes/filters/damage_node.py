@@ -175,6 +175,10 @@ class DamageNode(AnalysisNode):
                 name = f"{self.damage_predictions_min} of {len(VariantAnnotation.PATHOGENICITY_FIELDS)}"
         return name
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Impact, damage predictions, conservation and splicing filter"
+
     def get_css_classes(self):
         css_classes = super().get_css_classes()
         if self.splice_min is not None:

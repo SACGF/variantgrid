@@ -74,6 +74,10 @@ class FilterNode(AnalysisNode):
 
         return node_name
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Filter based on column values"
+
     def _get_inherited_colmodel_overrides(self):
         # Don't allow searching on inherited columns, as this causes an extra join
         extra_overrides = super()._get_inherited_colmodel_overrides()

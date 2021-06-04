@@ -6,56 +6,6 @@ from library.django_utils import bulk_insert_class_data
 
 
 def _initial_data(apps, schema_editor):
-    NODE_HELP = [
-        {'node_class_name': 'Allele Frequency',
-         'help_text': 'Variant Allele Frequency filter'},
-        {'node_class_name': 'All Variants',
-         'help_text': 'All Variants in the Database'},
-        {'node_class_name': 'Built In Filter Node',
-         'help_text': 'Built in filters used in node counts eg High or Moderate Impact / OMIM / ClinVar Pathological'},
-        {'node_class_name': 'Cohort',
-         'help_text': 'A collection of related samples, eg "control group" or "poor responders"'},
-        {'node_class_name': 'Damage Node',
-         'help_text': 'Filter to damage predictions'},
-        {'node_class_name': 'Diagnoses',
-         'help_text': 'Variants that have been classified. Can filter by pathogenicity.'},
-        {'node_class_name': 'Filter', 'help_text': 'Filter based on column values'},
-        {'node_class_name': 'Gene Expression',
-         'help_text': 'Filter by genes/transcript values or fold change'},
-        {'node_class_name': 'Gene list',
-         'help_text': 'Filter to either transcript or gene_symbol matching an uploaded list'},
-        {'node_class_name': 'Intervals intersection',
-         'help_text': 'Filter based on intersection with genomic ranges (eg .bed files)'},
-        {'node_class_name': 'Linked Analysis',
-         'help_text': 'Link results of another analysis into this analysis'},
-        {'node_class_name': 'Merge',
-         'help_text': 'Merge variants from multiple sources'},
-        {'node_class_name': 'Pedigree',
-         'help_text': 'Variants from family samples filtered by genotype according to inheritance models'},
-        {'node_class_name': 'Phenotype Node',
-         'help_text': 'Filter to gene lists based on ontology keywords'},
-        {'node_class_name': 'Population Node',
-         'help_text': 'Filter on population frequencies in public databases (gnomAD/Exac/1KG/UK10K) or number of samples in this database.'},
-        {'node_class_name': 'Project',
-         'help_text': 'An uploaded file of variants, which contains 1 or more samples.'},
-        {'node_class_name': 'Sample',
-         'help_text': 'A sample, usually one genotype (patient, cell or organism) with a set of variants.'},
-        {'node_class_name': 'Selected In Parent Filter',
-         'help_text': 'Filter to variants which were manually selected (via checkbox) in parent node'},
-        {'node_class_name': 'Tag Filter',
-         'help_text': 'Filter variants to those that have been tagged'},
-        {'node_class_name': 'Tissue Node',
-         'help_text': 'Filter based on tissue specific expression (from Human Protein Atlas)'},
-        {'node_class_name': 'Trio',
-         'help_text': 'Mother/Father/Proband - filter for recessive/dominant/denovo inheritance'},
-        {'node_class_name': 'Venn Intersection',
-         'help_text': 'A filter based on set intersections between parent nodes'},
-        {'node_class_name': 'Zygosity Filter',
-         'help_text': 'Compound HET and other Zygosity filters'}
-    ]
-
-    bulk_insert_class_data(apps, "analysis", [("NodeHelp", NODE_HELP)])
-
     NODE_GRAPH_TYPE = [
         {'name': 'Homozygosity percent',
          'required_column': 'observedvariant__zygosity',

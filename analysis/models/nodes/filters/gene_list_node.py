@@ -136,6 +136,10 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
                 name = "Exclude: " + name
         return name
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Filter to gene symbols from lists, tests or PanelApp"
+
     def save_clone(self):
         orig_custom_text_gene_list = self.custom_text_gene_list
 

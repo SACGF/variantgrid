@@ -193,6 +193,10 @@ class VennNode(AnalysisNode):
         return ""
 
     @staticmethod
+    def get_help_text() -> str:
+        return "Filter based on set intersections between 2 parent nodes"
+
+    @staticmethod
     def get_node_class_label():
         return "Venn"
 

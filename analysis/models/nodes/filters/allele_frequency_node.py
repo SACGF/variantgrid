@@ -39,6 +39,10 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
             name = self.nodeallelefrequencyfilter.get_description()
         return name
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Variant Allele Frequency filter"
+
     def save(self, **kwargs):
         inital_save = not self.pk
 

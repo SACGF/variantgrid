@@ -171,6 +171,11 @@ class PopulationNode(AnalysisNode):
             name = ''
         return name
 
+    @staticmethod
+    def get_help_text() -> str:
+        return "Filter on population frequencies in public databases (gnomAD/1KG/UK10K/TopMed) " \
+               "or number of samples in this database"
+
     def save_clone(self):
         gnomad_pops = list(self.populationnodegnomadpopulation_set.all())
         copy = super().save_clone()
