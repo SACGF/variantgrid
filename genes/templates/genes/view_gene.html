@@ -83,23 +83,29 @@
                             </tr>
                             </thead>
                             <tbody>
-                            {% for version_data in transcript_versions %}
-                                <tr>
-                                    <td>
-                                        <a class="hover-link" href="{% url 'view_transcript' version_data.0 %}">{{ version_data.0 }}</a>
-                                    </td>
-                                    {% if has_biotype %}
-                                        <td>{{ version_data.1 }}</td>
-                                    {% endif %}
-                                    {% for tv_set in version_data.2 %}
+                            {% if transcript_versions %}
+                                {% for version_data in transcript_versions %}
+                                    <tr>
                                         <td>
-                                            {% for tv in tv_set %}
-                                                <a class="d-inline-block mx-2 hover-link" href="{% url 'view_transcript_version' tv.transcript_id tv.version %}">v.{{ tv.version }}</a>
-                                            {% endfor %}
+                                            <a class="hover-link" href="{% url 'view_transcript' version_data.0 %}">{{ version_data.0 }}</a>
                                         </td>
-                                    {% endfor %}
+                                        {% if has_biotype %}
+                                            <td>{{ version_data.1 }}</td>
+                                        {% endif %}
+                                        {% for tv_set in version_data.2 %}
+                                            <td>
+                                                {% for tv in tv_set %}
+                                                    <a class="d-inline-block mx-2 hover-link" href="{% url 'view_transcript_version' tv.transcript_id tv.version %}">v.{{ tv.version }}</a>
+                                                {% endfor %}
+                                            </td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td>No transcripts.</td>
                                 </tr>
-                            {% endfor %}
+                            {% endif %}
                             </tbody>
                         </table>
                     </div>

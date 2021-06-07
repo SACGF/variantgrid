@@ -450,7 +450,10 @@ class GeneVersion(models.Model):
     @lazy
     def coordinate(self) -> str:
         """ 1-based for humans """
-        return f"{self.chrom}:{self.start + 1}-{self.end} ({self.strand})"
+        try:
+            return f"{self.chrom}:{self.start + 1}-{self.end} ({self.strand})"
+        except:
+            return ""
 
     @lazy
     def _transcript_extents(self):
