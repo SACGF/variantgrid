@@ -434,9 +434,6 @@ class AnalysisTemplateRun(TimeStampedModel):
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments
-        user_settings = UserSettings.get_for_user(user)
-        analysis.custom_columns_collection = user_settings.columns
-        analysis.default_sort_by_column = user_settings.default_sort_by_column
         analysis.save()
 
         assign_permission_to_user_and_groups(user, analysis)
