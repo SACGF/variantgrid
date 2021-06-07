@@ -31,10 +31,10 @@
     }
 
     function reloadGrid() {
-        let grid = $("#analyses_variant_tags-grid");
+        let grid = $("#tagged_variant-grid");
         grid.trigger("reloadGrid");
 
-        let grid2 = $("#analysis_tagged_variant-grid");
+        let grid2 = $("#variant_tags-grid");
         grid2.trigger("reloadGrid");
     }
 
@@ -58,7 +58,7 @@
 
     <h3>Variant Tags</h3>
 
-    <a href="{% url 'tag_settings' %}">Tag Settings</a>
+    <a class="btn btn-outline-secondary fas fa-tags" href="{% url 'tag_settings' %}">Tag Settings</a>
 
     {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
 
