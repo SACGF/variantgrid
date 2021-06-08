@@ -1958,7 +1958,7 @@ function addCustomGeneList() {
     let data = {"name": name, "gene_list_text": geneListText};
 
     $.ajax({
-        type: "GET",
+        type: "POST",
         data: data,
         url: Urls.api_text_to_gene_list(),
         success: function(data) {

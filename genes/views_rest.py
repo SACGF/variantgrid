@@ -134,10 +134,10 @@ class CreateGeneListView(APIView):
 class TextToGeneListView(APIView):
     """ Text to gene list (doesn't actually save). Used to eg check gene names """
 
-    # @method_decorator(cache_page(WEEK_SECS))
-    def get(self, request, *args, **kwargs):
-        name = self.request.query_params.get('name')
-        gene_list_text = self.request.query_params.get('gene_list_text')
+    def post(self, request, *args, **kwargs):
+        # Needed to be post as ~500 genes exceeded GET limit of ~4k
+        name = self.request.data['name']
+        gene_list_text = self.request.data['gene_list_text']
 
         gene_list = create_fake_gene_list(name=name, user=request.user)
         serializer = GeneListSerializer(gene_list, context={"request": request})
@@ -145,8 +145,9 @@ class TextToGeneListView(APIView):
 
         if gene_list_text:
             gene_matcher = GeneSymbolMatcher()
-            gene_list_gene_symbols = gene_matcher.create_gene_list_gene_symbols_from_text(gene_list, gene_list_text, save=False)
-            data["genelistgenesymbol_set"] = GeneListGeneSymbolSerializer(gene_list_gene_symbols, many=True).data  # sorted(glg_set)
+            gene_list_gene_symbols = gene_matcher.create_gene_list_gene_symbols_from_text(gene_list, gene_list_text,
+                                                                                          save=False)
+            data["genelistgenesymbol_set"] = GeneListGeneSymbolSerializer(gene_list_gene_symbols, many=True).data
         return Response(data)
 
 
