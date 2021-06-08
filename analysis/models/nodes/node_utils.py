@@ -70,7 +70,8 @@ def reload_analysis_nodes(analysis_id):
 
 def get_rendering_dict(node):
     node_class = node.get_class_name()
-    css_classes = ["node-overlay"] + node.get_css_classes()  # Needs node-overlay to be able to find it
+    # Need to add 'node-overlay' so we can find it again
+    css_classes = ["node-overlay", node_class] + node.get_css_classes()
     node_args = node.get_rendering_args()
 
     if node.pk:

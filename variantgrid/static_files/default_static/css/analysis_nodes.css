@@ -236,114 +236,137 @@ ul.customicons .ui-icon {
 }
 
 
-/* */
-.AlleleFrequencyNode { 
+/*
+	AnalysisNodes have an outer div with classes ".ClassName" and ".window" (from jsPlumb)
+	So set size off that, and then
+
+	Stacked on top of that is:
+		.node-overlay (which also has .ClassName and other classes set from node) - cleared each appearance change
+		.node-color-overlay
+		.count-overlay
+
+*/
+
+.window.AlleleFrequencyNode {
+	width: 50px;
+	height: 40px;
+}
+
+.node-overlay.AlleleFrequencyNode {
     background-image: url(/static/images/node_icons/variant_allele_frequency.png);
-    width: 50px;
-    height: 40px;
     background-size: 50px 40px;
 }
 
-
-.AllVariantsNode { 
+.node-overlay.AllVariantsNode {
     background-image: url(/static/icons/database-1-1.png);
 }
 
-.PedigreeNode { 
+.node-overlay.PedigreeNode {
 	background-image: url(/static/images/node_icons/pedigree.png);
 }
 
-.TrioNode { 
+.node-overlay.TrioNode {
     background-image: url(/static/images/node_icons/trio.png);
     background-size: 30px 25px;
     background-position: bottom;
 }
 
-.TrioNode.mother-affected { 
+.node-overlay.TrioNode.mother-affected {
     background-image: url(/static/images/node_icons/trio_mother_affected.png);
 }
 
-.TrioNode.father-affected { 
+.node-overlay.TrioNode.father-affected {
     background-image: url(/static/images/node_icons/trio_father_affected.png);
 }
 
-.TrioNode.mother-affected.father-affected { 
+.node-overlay.TrioNode.mother-affected.father-affected {
     background-image: url(/static/images/node_icons/trio_mother_affected_father_affected.png);
 }
 
-.FilterNode { 
+.node-overlay.FilterNode {
 	background-image: url(/static/images/node_icons/filter.png);
 }
 
-.IntersectionNode { 
+.node-overlay.IntersectionNode {
 	background-image: url(/static/images/node_icons/intersection.png);
 }
 
-.GeneListNode { 
+.node-overlay.GeneListNode {
 	background-image: url(/static/images/node_icons/filter_list.png);
 }
 
-.AnalysisNode { 
+.node-overlay.AnalysisNode {
 	background-image: url(/static/images/node_icons/analysis_node.png);
 }
 
-.CohortNode { 
-    width: 70px;
-    height: 70px;
+.window.CohortNode {
+	width: 70px;
+	height: 70px;
+}
+
+.node-overlay.CohortNode {
     background-size: 70px 70px;
 	background-image: url(/static/images/node_icons/cohort.png);
 }
 
-.ExpressionNode { 
+.node-overlay.ExpressionNode {
 	background-image: url(/static/images/node_icons/expression.png);
 }
 
-
-.SelectedInParentNode {
+.window.SelectedInParentNode {
 	width: 40px;
 	height: 40px;
-	background-size: 40px 40px;
+}
 
+.node-overlay.SelectedInParentNode {
+	background-size: 40px 40px;
 	background-image: url(/static/images/node_icons/checklist_icon.png);
 }
 
-.PopulationNode { 
+.node-overlay.PopulationNode {
 	background-image: url(/static/images/node_icons/population_node.png);
 }
 
-.PhenotypeNode { 
-	background-image: url(/static/images/node_icons/phenotype_node.png);
+.window.PhenotypeNode {
 	width: 50px;
 	height: 60px;
+}
+
+.node-overlay.PhenotypeNode {
+	background-image: url(/static/images/node_icons/phenotype_node.png);
 	background-size: 50px 60px;
 }
 
-.SampleNode {
+
+.window.SampleNode {
 	width: 60px;
 	height: 60px;
 }
 
-.ZygosityNode { 
-	background-image: url(/static/images/node_icons/punnet_square_30_perc_opacity.png);
+.window.ZygosityNode {
 	width: 53px;
 	height: 39px;
+}
+
+.node-overlay.ZygosityNode {
+	background-image: url(/static/images/node_icons/punnet_square_30_perc_opacity.png);
 	background-size: 53px 39px;
 }
 
-.DamageNode { 
+.node-overlay.DamageNode {
 	background-image: url(/static/images/node_icons/damage_node.png);
 }
 
-.DamageNode.EffectNodeSplicing {
+.node-overlay.DamageNode.EffectNodeSplicing {
 	background-image: url(/static/images/node_icons/effect_node_splicing.png);
 }
 
 
-.TissueNode { 
+.node-overlay.TissueNode {
 	background-image: url(/static/images/node_icons/tissue_node.jpg);
 }
 
-.ClassificationsNode { 
+.node-overlay.ClassificationsNode {
     background-image: url(/static/images/diagnose_icon.png);
 }
 
@@ -478,6 +501,10 @@ div.node-color-overlay {
 div.node-overlay {
 	color: black; 
 	pointer-events: none;
+	width: inherit;
+	height: inherit;
+	background-size: inherit;
+	background-repeat: no-repeat;
 }
 
 div.count-overlay {
