@@ -17,6 +17,10 @@
 		const options = {
 			target: "#node-editor-wrapper",
 			beforeSerialize: function () {
+			    // Disable form submit button so users can't hammer it and make multiple submissions
+			    let submitButton = $(":submit", selector);
+			    submitButton.prop("disabled", true);
+
 				// Common hidden fields
 				if (typeof getAlleleFrequencyValues !== 'undefined') {
 					const afData = getAlleleFrequencyValues();
