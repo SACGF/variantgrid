@@ -43,9 +43,13 @@ def get_nodes_by_classification() -> Dict[str, List]:
     node_types = get_node_types_hash()
     nodes = defaultdict(list)
 
-    for node_class_name, node_class in node_types.items():
+    for node_class_label, node_class in node_types.items():
         node = node_class()
         classification = node.get_node_classification()
-        nodes[classification].append(node.get_class_name())
+        data = {
+            "class_name": node.get_class_name(),
+            "class_label": node_class_label,
+        }
+        nodes[classification].append(data)
 
     return nodes

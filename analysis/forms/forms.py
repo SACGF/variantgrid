@@ -71,7 +71,7 @@ class AnalysisNodeClassesForm(forms.Form):
         nodes_by_classification = get_nodes_by_classification()
         for classification in node_classifications:
             nodes = nodes_by_classification[classification]
-            node_classes = [(node_class_name, node_class_name) for node_class_name in nodes]
+            node_classes = [(data["class_name"], data["class_label"]) for data in nodes]
             nc = sorted(node_classes, key=operator.itemgetter(0))
             choices.append((classification.title(), tuple(nc)))
 
