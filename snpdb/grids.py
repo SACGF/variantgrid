@@ -65,7 +65,7 @@ class SamplesListGrid(JqGridUserRowConfig):
               "somaliersampleextract__somalierancestry__predicted_ancestry",
               "patient__first_name", "patient__last_name", "patient__sex",
               "patient__date_of_birth", "patient__date_of_death",
-              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date", "vcf_id"]
+              "specimen__reference_id", "specimen__tissue__name", "specimen__collection_date", "vcf__id"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,
@@ -74,7 +74,7 @@ class SamplesListGrid(JqGridUserRowConfig):
                                       "url_name": "view_sample",
                                       "url_object_column": "id"}},
         'import_status': {'formatter': 'viewImportStatus'},
-        'vcf_id': {"hidden": True},
+        'vcf__id': {"hidden": True},
         "vcf__genome_build__name": {"label": "Genome Build"},
         'vcf__source': {'label': 'VCF source'},
         'vcf__name': {
@@ -82,7 +82,7 @@ class SamplesListGrid(JqGridUserRowConfig):
             "formatter": 'linkFormatter',
             'formatter_kwargs': {"icon_css_class": "vcf-icon",
                                  "url_name": "view_vcf",
-                                 "url_object_column": "vcf_id"}
+                                 "url_object_column": "vcf__id"}
         },
         "sample_gene_list_count": {'name': 'sample_gene_list_count', 'label': '# Sample GeneLists',
                                    "model_field": False, "formatter": "viewSampleGeneList", 'sorttype': 'int'},
