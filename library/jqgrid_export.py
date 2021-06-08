@@ -51,17 +51,15 @@ def grid_export_csv(basename, colmodels, items):
 
     pseudo_buffer = StashFile()
     header, labels = colmodel_header_labels(colmodels, label_overrides=label_overrides)
-    writer = csv.DictWriter(pseudo_buffer, header, dialect='excel')
+    # Don't use dictwriter as some sample names may be the same
+    writer = csv.writer(pseudo_buffer, dialect='excel')
+    writer.writerow(header)
 
     def iter_row_writer():
-        writer.writeheader()
         yield pseudo_buffer.value
         for obj in items:
-            row = {}
-            for k, value in obj.items():
-                index = labels.get(k)
-                if index:
-                    row[index] = value
+            # labels dict is in same sorted order as header
+            row = [obj.get(k) for k in labels]
             writer.writerow(row)
             yield pseudo_buffer.value
 

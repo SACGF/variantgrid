@@ -132,7 +132,7 @@ def _grid_export_vcf(filename, genome_build, colmodels, items, sample_ids, sampl
 
     info_dict = _get_colmodel_info_dict(colmodels)
     vcf_template_file = _colmodels_to_vcf_header(genome_build, info_dict, samples)
-    vcf_reader = Reader(vcf_template_file)
+    vcf_reader = Reader(vcf_template_file, strict_whitespace=True)
 
     pseudo_buffer = StashFile()
 
