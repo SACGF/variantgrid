@@ -247,6 +247,12 @@ ul.customicons .ui-icon {
 
 */
 
+.window {
+	/* 	Bootstrap sets this to be border-box but we relied on borders sticking outside the width so you can see
+		when the active node is highlighted */
+	box-sizing: unset;
+}
+
 .window.AlleleFrequencyNode {
 	width: 50px;
 	height: 40px;
