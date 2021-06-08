@@ -7,13 +7,14 @@ function getNode(nodeId) {
 	return $("#analysis-node-" + nodeId);
 }
 
-// Nodes should have a div in them "node-overlay" that has its attributes set by nodeData.attributes
+// Nodes should have a div of class "node-overlay" that has its CSS set by nodeData.overlay_css_classes
 // Nodes should also create a "updateState(args)" method, this will be called after creation
 
 function createDefaultNode() {
 	const div = $('<div/>').addClass("window default-node-container");
 	const nodeOverlay = $('<div/>').addClass("node-overlay");
 	nodeOverlay.append("<div class='user-tag-colored'><span class='node-name'></span></div>");
+	$("<div />", {class: "node-color-overlay"}).appendTo(nodeOverlay);
 	div.append(nodeOverlay);
 	div[0].updateState = function(args) { };
 	return div;
@@ -31,10 +32,14 @@ function createVennNode() {
 		left: 0,
 	};
 	$('.' + VENN_TOGGLE_WIDGET_CLASS, div[0]).css(overlayStyle);
+
+	const nodeOverlay = $('<div/>').addClass("node-overlay");
+	nodeOverlay.css(overlayStyle);
+	nodeOverlay.css("z-index", 30);
 	const span = $("<span class='node-name'></span>");
-	span.css(overlayStyle);
-	span.css("z-index", 30);
-	div.append(span);
+	nodeOverlay.append(span);
+	$("<div />", {class: "node-color-overlay"}).appendTo(nodeOverlay);
+	div.append(nodeOverlay);
 	div[0].updateState = function(args) {
 		venn_select(this, args['venn_flag']);
 	};
@@ -53,8 +58,6 @@ function createNodeFromData(nodeData) {
 		factory = createDefaultNode;
 	}
 	let node = factory();
-	let nodeColorOverlay = $("<div />").attr({class: "node-color-overlay"});
-	nodeColorOverlay.appendTo(node);
 	updateNodeFromData(node, nodeData);
 
 	return node;

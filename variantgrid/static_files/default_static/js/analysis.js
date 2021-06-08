@@ -359,7 +359,7 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
     let existingNodeContainer = $("." + NODE_CONTAINER_CLASS + "[node-id=" + nodeId + "]", avContainer);
     if (existingNodeContainer.length === 0) {
         existingNodeContainer = $("<div />").addClass("left").addClass(NODE_CONTAINER_CLASS).attr("node-id", nodeId);
-        node.addClass("variable-node");
+        $(".node-overlay", node).addClass("variable-node");
         let nodeName = $(".node-name", node).text();
         if (!nodeName) {
             nodeName = node.attr("node_class") + ": " + nodeId;
@@ -382,7 +382,7 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
                     // If empty, remove node container
                     if ($("." + ANALYSIS_VARIABLE_CLASS, existingNodeContainer).length === 0) {
                         existingNodeContainer.remove();
-                        node.removeClass("variable-node");
+                        $(".node-overlay", node).removeClass("variable-node");
                     }
                     lockNodeField(nodeId, field, false);
                 }
