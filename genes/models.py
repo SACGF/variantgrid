@@ -748,30 +748,39 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         except KeyError:
             return False
 
-    def get_differences(self, transcript):
+    def get_differences(self, transcript_version):
         """ Used to inform while HGVS may resolve differently """
         differences = {}
         FIELDS = ["transcript_id", "version", "length"]
         for f in FIELDS:
             mine = getattr(self, f)
-            other = getattr(transcript, f)
+            other = getattr(transcript_version, f)
             if mine != other:
                 differences[f] = (mine, other)
 
-        if self.data and transcript.data:
+        if self.data and transcript_version.data:
             my_chrom = self.data["chrom"]
-            other_chrom = transcript.data["chrom"]
+            other_chrom = transcript_version.data["chrom"]
             if my_chrom != other_chrom:
-                differences["contig"] = (my_chrom, other_chrom)
+                try:
+                    # Could be different but map to the same thing - try resolving it to contig name
+                    my_cleaned_chrom = self.genome_build.chrom_contig_mappings[my_chrom].name
+                    other_cleaned_chrom = transcript_version.genome_build.chrom_contig_mappings[other_chrom].name
+                    if my_cleaned_chrom != other_cleaned_chrom:
+                        differences["contig"] = (f"{my_chrom} (contig name: {my_cleaned_chrom})",
+                                                 f"{other_chrom} (contig name: {other_cleaned_chrom})")
+                except:
+                    # Can't convert - just show differences
+                    differences["contig"] = (my_chrom, other_chrom)
 
             my_exon_count = len(self.data["exons"])
-            other_exon_count = len(transcript.data["exons"])
+            other_exon_count = len(transcript_version.data["exons"])
             if my_exon_count != other_exon_count:
                 differences["exon count"] = (my_exon_count, other_exon_count)
             else:
                 exon = 1
                 my_exons = self.data["exons"]
-                other_exons = transcript.data["exons"]
+                other_exons = transcript_version.data["exons"]
                 if self.data["strand"] == "-":
                     my_exons = reversed(my_exons)
                     other_exons = reversed(other_exons)
@@ -784,7 +793,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
                     exon += 1
         else:
             my_keys = set(self.data.keys())
-            other_keys = set(transcript.data.keys())
+            other_keys = set(transcript_version.data.keys())
             if my_keys ^ other_keys:
                 differences["data"] = (my_keys, other_keys)
 
