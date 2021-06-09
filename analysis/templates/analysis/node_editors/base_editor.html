@@ -20,6 +20,7 @@
 			    // Disable form submit button so users can't hammer it and make multiple submissions
 			    let submitButton = $(":submit", selector);
 			    submitButton.prop("disabled", true);
+			    submitButton.LoadingOverlay('show');
 
 				// Common hidden fields
 				if (typeof getAlleleFrequencyValues !== 'undefined') {
