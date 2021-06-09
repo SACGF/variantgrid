@@ -110,7 +110,10 @@ $(document).ready(function() {
     addCreatePatientButton(dialog, patientSelect, sampleName);
 });
 </script>
+<!-- jqGrid is used in variants tab -->
+<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 {% endblock %}
 
 {% block submenu_page_content %}
