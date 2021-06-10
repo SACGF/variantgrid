@@ -182,9 +182,9 @@ def filter_variant_codon(qs, variant: Variant):
     return qs
 
 
-def get_transcript_and_exons(variant):
+def get_transcript_and_exons(variant) -> Dict:
     transcript_qs = variant.varianttranscriptannotation_set.filter(exon__isnull=False)
-    return {t: e for t, e in transcript_qs.values_list("transcript_id", "exon")}
+    return dict(transcript_qs.values_list("transcript_id", "exon"))
 
 
 def filter_variant_exon(qs, variant: Variant):

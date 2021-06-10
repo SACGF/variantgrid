@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import List, TypedDict, Mapping, TypeVar, Generic, Optional, Any, Union
+from typing import List, TypedDict, Mapping, TypeVar, Generic, Any
 
 import bs4
 from django.contrib.auth.models import User
@@ -15,7 +14,7 @@ from model_utils.models import TimeStampedModel
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap, classification_post_publish_signal, \
     Classification, flag_types, EvidenceKey, MultiCondition
-from classification.models.evidence_mixin import VCDbRefDict, VCStore
+from classification.models.evidence_mixin import VCDbRefDict
 from classification.regexes import DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution, FlagStatus
 from genes.hgvs import CHGVS
@@ -429,7 +428,7 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
                 return {
                     "db": ClinVarExport.CITATION_DB_MAPPING.get(citation.get("db")),
                     "id": str(citation.get("idx"))  # TODO confirm this is the kind of ID they want, not the prefixed one?
-                 }
+                }
             data["citations"] = [citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
@@ -440,7 +439,6 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
             data["modeOfInheritance"] = mode_of_inheritance.value(single=False)
         return ValidatedJson(data)
-
 
     @property
     def condition_set(self) -> ValidatedJson:
@@ -470,7 +468,6 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
         else:
             messages += ClinVarMessages.error("No standard condition terms")
         return ValidatedJson(data, messages)
-
 
     @property
     def observed_in(self) -> ValidatedJson:

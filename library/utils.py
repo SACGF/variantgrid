@@ -33,7 +33,7 @@ FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
 
 # isn't restrictive enough, but helps documention
-JSON = Union[Dict[str,Any], List[Any], int, float, str]
+JSON = Union[Dict[str, Any], List[Any], int, float, str]
 
 
 class DjangoJSONEncoder(JSONEncoder):

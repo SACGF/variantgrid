@@ -135,7 +135,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
                 transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
                 queryset = queryset.filter(varianttranscriptannotation__transcript_version=transcript_version,
                                            varianttranscriptannotation__protein_position__icontains=protein_position)
-            tag_id =  extra_filters.get("tag")
+            tag_id = extra_filters.get("tag")
             if tag_id is not None:  # "" for all tags
                 tags_qs = VariantTag.objects.all()
                 if tag_id:

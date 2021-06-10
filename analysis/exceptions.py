@@ -15,25 +15,25 @@ class NonFatalNodeError(Exception):
 class NodeParentErrorsException(NonFatalNodeError):
 
     def __str__(self):
-        return f"The node's parents had errors"
+        return "The node's parents had errors"
 
 
 class NodeParentNotReadyException(NonFatalNodeError):
 
     def __str__(self):
-        return f"The node's parents were not ready"
+        return "The node's parents were not ready"
 
 
 class NodeConfigurationException(NonFatalNodeError):
 
     def __str__(self):
-        return f"The node has bad configuration"
+        return "The node has bad configuration"
 
 
 class NodeOutOfDateException(NonFatalNodeError):
 
     def __str__(self):
-        return f"The node was updated while loading."
+        return "The node was updated while loading."
 
 
 class NodeNotFoundException(NonFatalNodeError):
@@ -43,4 +43,4 @@ class NodeNotFoundException(NonFatalNodeError):
         super().__init__(f"Node {node_id} not found")
 
     def __str__(self):
-        return f"The node was deleted while loading"
+        return "The node was deleted while loading"

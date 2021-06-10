@@ -168,8 +168,10 @@ class VennNode(AnalysisNode):
         }
         return INTERSECTIONS[self.set_operation]
 
+    def _get_node_q(self) -> Optional[Q]:
+        raise ValueError("VennNode always uses cache - this should never be called!")
+
     def _get_node_cache_q(self) -> Optional[Q]:
-        """ VennNode always uses cache - so it doesn't need to implement a _get_node_q() methods """
         if self.set_operation == SetOperations.NONE:
             return self.q_none()
 

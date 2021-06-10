@@ -46,10 +46,9 @@ class ClassificationGroup:
     def __init__(self,
                  modifications: Iterable[ClassificationModification],
                  genome_build: GenomeBuild,
-                 group_id: Optional[int] = None
-                ):
+                 group_id: Optional[int] = None):
         self.modifications = list(modifications)
-        self.modifications.sort(key=lambda cm: ClassificationGroup.sort_modifications(cm), reverse=True)
+        self.modifications.sort(key=ClassificationGroup.sort_modifications, reverse=True)
         self.group_id = group_id
         self.genome_build = genome_build
         self.clinical_significance_score = 0
@@ -141,12 +140,14 @@ class ClassificationGroup:
 
     @lazy
     def flag_types(self) -> Set[str]:
-        types: Set[str] = set()
-        for type_n_res in self.most_recent.classification.flag_collection_safe.flags(only_open=True).filter(flag_type__in=[
+        FLAG_TYPES = [
             classification_flag_types.matching_variant_flag,
             classification_flag_types.matching_variant_warning_flag,
-            classification_flag_types.transcript_version_change_flag]).values_list('flag_type', 'resolution'):
-
+            classification_flag_types.transcript_version_change_flag
+        ]
+        types: Set[str] = set()
+        flags_qs = self.most_recent.classification.flag_collection_safe.flags(only_open=True)
+        for type_n_res in flags_qs.filter(flag_type__in=FLAG_TYPES).values_list('flag_type', 'resolution'):
             types.add(type_n_res[0] + '.' + type_n_res[1])
         type_list = list(types)
         type_list.sort()
@@ -247,7 +248,7 @@ class ClassificationGroups:
 
         def condition_sorter(cm: ClassificationModification) -> Optional[str]:
             if resolved := cm.classification.condition_resolution_obj:
-                if len(resolved.terms):
+                if resolved.terms:
                     return "A" + (resolved.terms[0].name or resolved.terms[0].id).lower()
             return "Z" + (cm.get(SpecialEKeys.CONDITION) or "").lower()
 
@@ -282,11 +283,11 @@ class ClassificationGroups:
                 for _, group3 in groupby(group2, lambda cm: cm.classification.lab.name):
                     group3 = list(group3)
                     # breakup by transcript
-                    group3.sort(key=lambda cm: c_hgvs_group(cm))
-                    for _, group4 in groupby(group3, lambda cm: c_hgvs_group(cm)):
+                    group3.sort(key=c_hgvs_group)
+                    for _, group4 in groupby(group3, c_hgvs_group):
                         group4 = list(group4)
-                        group4.sort(key=lambda cm: condition_sorter(cm))
-                        for _, group5 in groupby(group4, lambda cm: condition_grouper(cm)):
+                        group4.sort(key=condition_sorter)
+                        for _, group5 in groupby(group4, condition_grouper):
                             actual_group = ClassificationGroup(modifications=group5, genome_build=genome_build, group_id=len(groups) + 1)
                             actual_group.clinical_significance_score = e_key_clin_sig.classification_sorter_value(clin_sig)
                             groups.append(actual_group)
