@@ -48,7 +48,6 @@ class ClinVarExportColumns(DatatableConfig):
             ], renderer=self.render_classification_link, client_renderer='renderId'),
 
             RichColumn('lab__name', name='Lab', orderable=True),
-            RichColumn('gene_symbol', name='Gene Symbol', orderable=True),
 
             # this busy ups the table a little too much
             # evidence_keys.get(SpecialEKeys.MODE_OF_INHERITANCE).rich_column(prefix="classification_based_on__published_evidence"),

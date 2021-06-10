@@ -534,7 +534,7 @@ class ConditionTextMatchAdmin(ModelAdminBasics):
 
 
 class ClinVarExportAdmin(ModelAdminBasics):
-    list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
+    list_display = ["pk", "lab", "allele", "created"]
     list_filter = [ClassificationLabFilter]
 
 
