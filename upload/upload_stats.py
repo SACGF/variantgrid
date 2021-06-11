@@ -78,11 +78,10 @@ def get_vcf_variant_upload_stats():
     OLD_KNOWN_VARIANTS_TASK = "ObservedVariants SQL COPY"  # from old pipeline, obsolete as of May 2018
 
     def get_totals_per_vcf(ups_name):
-        qs = VCF.objects.all()
-        qs = qs.filter(uploadedvcf__upload_pipeline__uploadstep__name=ups_name)
+        qs = VCF.objects.filter(uploadedvcf__upload_pipeline__uploadstep__name=ups_name)
         qs = qs.annotate(total_items_processed=Sum("uploadedvcf__upload_pipeline__uploadstep__items_processed"))
         totals = {}
-        for vcf_id, total_items_processed in qs.values_list("pk", "total_items_processed"):
+        for vcf_id, total_items_processed in qs.order_by("pk").values_list("pk", "total_items_processed"):
             totals[vcf_id] = total_items_processed
 
         return totals
