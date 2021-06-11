@@ -270,8 +270,7 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
                 cve = ClinVarExport(
                     allele=allele,
                     lab=cm.classification.lab,
-                    transcript=lab_transcript.split("*", maxsplit=1)[1],
-                    gene_symbol=gs
+                    transcript=lab_transcript.split("*", maxsplit=1)[1]
                 )
                 cve.update_with(cm)
                 cve.save()
