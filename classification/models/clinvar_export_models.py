@@ -18,7 +18,6 @@ from classification.models.evidence_mixin import VCDbRefDict
 from classification.regexes import DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution, FlagStatus
 from genes.hgvs import CHGVS
-from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import Allele, Lab, GenomeBuild
@@ -187,7 +186,6 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     classification_based_on = models.ForeignKey(ClassificationModification, on_delete=PROTECT)
     transcript = models.TextField()
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=PROTECT)
 
     review_date = models.DateTimeField(null=True, blank=True)
     review_status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.PENDING)
@@ -265,8 +263,6 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
                     updated_count += 1
             else:
                 c_parts = ClinVarExport.chgvs_for(cm)
-                # TODO put some safety around this?
-                gs: GeneSymbol = GeneSymbol.objects.get(pk=c_parts.gene)
                 cve = ClinVarExport(
                     allele=allele,
                     lab=cm.classification.lab,
