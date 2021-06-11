@@ -71,6 +71,7 @@ def _one_off_fix_lowercase_gene_symbols(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('classification', '0015_auto_20210108_1435'),
         ('genes', '0027_one_off_fix_panel_app_gene_list_permissions'),
     ]
 

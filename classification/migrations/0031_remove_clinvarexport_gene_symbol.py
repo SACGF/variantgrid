@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('classification', '0030_clinvar_mappings'),
+        ('genes', '0028_one_off_fix_lowercase_gene_symbols'),  # This script needs clinvarexport.gene_symbol
     ]
 
     operations = [
