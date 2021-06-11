@@ -1,2 +1,0 @@
-CREATE DATABASE vg_test;
-GRANT ALL PRIVILEGES ON DATABASE vg_test to snpdb;
