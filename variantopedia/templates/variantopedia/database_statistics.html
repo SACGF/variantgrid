@@ -21,12 +21,32 @@
         ];
 
         const layout = {
-            title: "Total Variants",
+            title: "Total Variants / samples",
             xaxis: {title: "Samples"},
             yaxis: {title: "Variants"}
         };
 
         Plotly.newPlot('variant-totals-graph', data, layout);
+    }
+
+    function plotVariantGenotypesGraph(variantStats) {
+        const x = variantStats["cumulative_genotypes"];
+
+        const data = [
+            {
+                x: x,
+                y: variantStats["cumulative_variants"],
+                type: 'line'
+            },
+        ];
+
+        const layout = {
+            title: "Total Variants / genotypes",
+            xaxis: {title: "Genotypes"},
+            yaxis: {title: "Variants"}
+        };
+
+        Plotly.newPlot('variant-genotypes-graph', data, layout);
     }
 
     function plotVariantPercentKnownGraph(variantStats) {
@@ -53,6 +73,7 @@
         const variantStats = {{ variant_stats | jsonify }};
         {% if num_samples %}
         plotVariantTotalsGraph(variantStats);
+        plotVariantGenotypesGraph(variantStats);
         plotVariantPercentKnownGraph(variantStats);
         {% endif %}
     });
@@ -76,6 +97,7 @@
 		</table>		
 
 		<div id='variant-totals-graph'></div>
+		<div id='variant-genotypes-graph'></div>
         <div id='variant-percent-known-graph'></div>
 	</div>
 

@@ -90,18 +90,23 @@ def get_vcf_variant_upload_stats():
 
     unknown = get_totals_per_vcf(UploadStep.CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME)
     total = get_totals_per_vcf(UploadStep.PROCESS_VCF_TASK_NAME)
-    # TODO: Handle new known/unknown
+    old_genotypes = get_totals_per_vcf("ObservedVariants SQL COPY")  # from old pipeline, obsolete as of May 2018
+    new_genotypes = get_totals_per_vcf("CohortGenotypeCollection SQL COPY")
 
     data = {"num_samples": samples_per_vcf,
             "total": total,
-            "unknown": unknown}
+            "unknown": unknown,
+            "old_genotypes": old_genotypes,  # This copied each genotype individually
+            "new_genotypes": new_genotypes}  # This has 1 genotype per variant - needs to be multiplied by samples
 
     df = pd.DataFrame(data=data)
     df = df.replace(np.NaN, 0)
 
+    df["total_genotypes"] = df["old_genotypes"] + df["new_genotypes"] * df["num_samples"]
     df["unknown"] = df["unknown"] / 2  # We create ref and alt for unknowns
     df["cumulative_samples"] = np.cumsum(df["num_samples"])
-    df["cumulative_variants"] = np.cumsum(df["unknown"])
+    df["cumulative_variants"] = np.cumsum(df["total"])
+    df["cumulative_genotypes"] = np.cumsum(df["total_genotypes"])
     known = df["total"] - df["unknown"]
     df["percent_known"] = 100.0 * known / df["total"]
 
