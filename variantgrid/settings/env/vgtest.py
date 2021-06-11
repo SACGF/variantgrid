@@ -12,7 +12,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 # import all the base settings #
 SITE_ID = 3  # vg.com
 
-WEB_HOSTNAME = '144.6.229.160'
+WEB_HOSTNAME = 'test.variantgrid.com'
 WEB_IP = '144.6.229.160'
 
 DEBUG = False
