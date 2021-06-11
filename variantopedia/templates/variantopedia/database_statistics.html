@@ -10,41 +10,47 @@
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
     function plotVariantTotalsGraph(variantStats) {
-        var x = variantStats["cumulative_samples"];
+        const x = variantStats["cumulative_samples"];
 
-        var data = [
-          { x: x,
-            y: variantStats["total_variants"],
-            type: 'line'
-          },
+        const data = [
+            {
+                x: x,
+                y: variantStats["cumulative_variants"],
+                type: 'line'
+            },
         ];
 
-        var layout = {  title: "Total Variants",
-                        xaxis: {title: "Samples"},
-                        yaxis: {title: "Variants"}};
+        const layout = {
+            title: "Total Variants",
+            xaxis: {title: "Samples"},
+            yaxis: {title: "Variants"}
+        };
 
         Plotly.newPlot('variant-totals-graph', data, layout);
     }
 
     function plotVariantPercentKnownGraph(variantStats) {
-        var x = variantStats["cumulative_samples"];
+        const x = variantStats["cumulative_samples"];
 
-        var data = [
-          { x: x,
-            y: variantStats["percent_known"],
-            type: 'line'
-          },
+        const data = [
+            {
+                x: x,
+                y: variantStats["percent_known"],
+                type: 'line'
+            },
         ];
 
-        var layout = {  title: "Percent of imported variants already seen.",
-                        xaxis: {title: "Samples"},
-                        yaxis: {title: "Variants"}};
+        const layout = {
+            title: "Percent of imported variants already seen.",
+            xaxis: {title: "Samples"},
+            yaxis: {title: "Variants"}
+        };
 
         Plotly.newPlot('variant-percent-known-graph', data, layout);
     }
 
     $(document).ready(() => {
-        var variantStats = {{ variant_stats | jsonify }};
+        const variantStats = {{ variant_stats | jsonify }};
         {% if num_samples %}
         plotVariantTotalsGraph(variantStats);
         plotVariantPercentKnownGraph(variantStats);

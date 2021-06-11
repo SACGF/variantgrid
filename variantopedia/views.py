@@ -337,7 +337,7 @@ def database_statistics(request):
 
     vcf_variant_stats_df = get_vcf_variant_upload_stats()
     variant_stats = {}
-    for col in ["cumulative_samples", "total_variants", "percent_known"]:
+    for col in ["cumulative_samples", "cumulative_variants", "percent_known"]:
         variant_stats[col] = vcf_variant_stats_df[col].tolist()
 
     context = {"max_variant_id": max_variant_id,

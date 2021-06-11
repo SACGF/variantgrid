@@ -54,7 +54,7 @@ class ScheduleMultiFileOutputTasksTask(ImportVCFStepTask):
         for input_filename, items_to_process in upload_step.get_multi_input_files_and_records():
             sort_order += 1
             child_step = UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
-                                                   name="Process VCF File",
+                                                   name=UploadStep.PROCESS_VCF_TASK_NAME,
                                                    sort_order=sort_order,
                                                    task_type=UploadStepTaskType.CELERY,
                                                    pipeline_stage=VCFPipelineStage.DATA_INSERTION,

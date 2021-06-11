@@ -75,8 +75,6 @@ def get_upload_stats_from_durations(step_name_durations):
 def get_vcf_variant_upload_stats():
     """ df index of vcf_ids, cols = [cumulative_samples, total_variants, percent_known] """
 
-    OLD_KNOWN_VARIANTS_TASK = "ObservedVariants SQL COPY"  # from old pipeline, obsolete as of May 2018
-
     def get_totals_per_vcf(ups_name):
         qs = VCF.objects.filter(uploadedvcf__upload_pipeline__uploadstep__name=ups_name)
         qs = qs.annotate(total_items_processed=Sum("uploadedvcf__upload_pipeline__uploadstep__items_processed"))
@@ -91,19 +89,21 @@ def get_vcf_variant_upload_stats():
         samples_per_vcf[pk] = num_samples
 
     unknown = get_totals_per_vcf(UploadStep.CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME)
-    known = get_totals_per_vcf(OLD_KNOWN_VARIANTS_TASK)
+    total = get_totals_per_vcf(UploadStep.PROCESS_VCF_TASK_NAME)
     # TODO: Handle new known/unknown
 
     data = {"num_samples": samples_per_vcf,
-            "known": known,
+            "total": total,
             "unknown": unknown}
 
     df = pd.DataFrame(data=data)
     df = df.replace(np.NaN, 0)
 
+    df["unknown"] = df["unknown"] / 2  # We create ref and alt for unknowns
     df["cumulative_samples"] = np.cumsum(df["num_samples"])
-    df["total_variants"] = np.cumsum(df["unknown"])
-    df["percent_known"] = 100.0 * df["known"] / (df["unknown"] + df["known"])
+    df["cumulative_variants"] = np.cumsum(df["unknown"])
+    known = df["total"] - df["unknown"]
+    df["percent_known"] = 100.0 * known / df["total"]
 
     return df
 

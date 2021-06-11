@@ -253,6 +253,7 @@ class UploadStep(models.Model):
     """ This is only used for VCF multi-stage imports """
     CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME = "Create Unknown Loci and Variants"
     PREPROCESS_VCF_NAME = "Preprocess VCF"
+    PROCESS_VCF_TASK_NAME = "Process VCF File"
 
     name = models.TextField()
     upload_pipeline = models.ForeignKey(UploadPipeline, on_delete=CASCADE)
