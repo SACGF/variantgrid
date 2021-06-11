@@ -15,7 +15,9 @@ def _citext_message(apps, schema_editor):
     print("--------")
     print("CITextExtension() should enable it for the specific VG database if extension is installed")
     print("--------")
-
+    print("Install in Postgresql template1 database, to apply for all newly created databases (eg unit test DB)")
+    print("echo 'CREATE EXTENSION IF NOT EXISTS citext;' | psql -d template1")
+    print("--------")
 
 class Migration(migrations.Migration):
 
