@@ -21,6 +21,11 @@ class CHGVSDiffTests(TestCase):
         cd = diff('NM_000071.2(CBS):c.919G>A', 'NM_000071.2(BOO):c.919G>A')
         self.assertEqual(cd, CHGVSDiff.DIFF_GENE)
 
+    def test_gene_case_change(self):
+        # only case of gene changes, shouldn't count
+        cd = diff('NM_001031726.3(C19ORF12):c.335G>A', 'NM_001031726.3(C19orf12):c.335G>A')
+        self.assertEqual(cd, CHGVSDiff.SAME)
+
     def test_transcript_change(self):
         cd = diff('NM_000099.2(CBS):c.919G>A', 'NM_000071.2(CBS):c.919G>A')
         self.assertEqual(cd, CHGVSDiff.DIFF_TRANSCRIPT_ID)

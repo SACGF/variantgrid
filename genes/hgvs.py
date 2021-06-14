@@ -59,6 +59,7 @@ def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> List[st
 
 _P_DOT_PARTS = re.compile("^([A-Z*]{1,3})([0-9]+)([A-Z*]{1,3}|=)(.*?)$", re.IGNORECASE)
 
+
 @dataclass(repr=False, eq=False, frozen=True)
 class PHGVS:
 
@@ -283,8 +284,9 @@ class CHGVS:
         elif my_tran.version is not None and o_tran.version is not None and my_tran.version != o_tran.version:
             cdiff = cdiff | CHGVSDiff.DIFF_TRANSCRIPT_VER
 
-        if self.gene != other.gene and (self.gene and other.gene):
-            cdiff = cdiff | CHGVSDiff.DIFF_GENE
+        if self.gene and other.gene:
+            if self.gene.lower() != other.gene.lower():
+                cdiff = cdiff | CHGVSDiff.DIFF_GENE
 
         def trailing_okay(trail_1, trail_2):
             if trail_1 == trail_2:
