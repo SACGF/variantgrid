@@ -726,3 +726,11 @@ ul.compact {
   99% {transform:scale(0);}
   100% {transform:scale(0); display: none;}
 }
+
+.site-message.border.severity-W {
+  border: 2px solid #FEBC00 !important;
+}
+
+.site-message.border.severity-E {
+  border: 2px solid #dc3545 !important;
+}
