@@ -491,8 +491,6 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                 hgvs_string = fixed_hgvs
                 search_messages.append(f"Warning: swapped gene/transcript, ie '{search_string}' => '{hgvs_string}'")
             variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
-        except Contig.ContigNotInBuildError:
-            return None  # g.HGVS from another genome build
         except (InvalidHGVSName, NotImplementedError) as original_error:
             original_hgvs_string = hgvs_string
             try:
@@ -537,8 +535,11 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             results = [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_messages)]
             results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
             return results
+
     except MissingTranscript:
         pass
+    except Contig.ContigNotInBuildError:
+        pass  # g.HGVS from another genome build - can't fix just ignore
 
 
 def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, messages: List[str]) -> VARIANT_SEARCH_RESULTS:
