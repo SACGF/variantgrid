@@ -7,6 +7,7 @@
 {% load ui_help %}
 {% load english_tags %}
 {% load jqgrid_tags %}
+{% load js_tags %}
 {% load seqauto_graph_tags %}
 {% load static %}
 {% block title %}Server Status{% endblock %}
@@ -70,6 +71,30 @@
                 {% if not disk_free.messages %}Unknown{% endif %}
             </div>
         {% endlabelled %}
+
+        {% if queries %}
+            <h4>Queries</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>pid</th>
+                        <th>Duration</th>
+                        <th>Query</th>
+                        <th>State</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for query in queries %}
+                        <tr>
+                            <td>{{ query.pid }}</td>
+                            <td>{{ query.duration | duration }}</td>
+                            <td>{{ query.query }}</td>
+                            <td>{{ query.state }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
 
         {% if celery_workers %}
             <h4>Celery Workers</h4>

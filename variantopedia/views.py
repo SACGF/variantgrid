@@ -3,14 +3,16 @@ import logging
 import operator
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import timedelta
 from functools import reduce
 from random import randint
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.db import connection
 from django.db.models import Q
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -319,6 +321,7 @@ def server_status(request):
     total_counts = get_total_counts(request.user)
 
     context = {"celery_workers": celery_workers,
+               "queries": long_running_sql(),
                "can_access_reference": can_access_reference,
                "redis_status": redis_status,
                "redis_message": redis_message,
@@ -328,6 +331,42 @@ def server_status(request):
                "dashboard_notices": dashboard_notices,
                "total_counts": total_counts}
     return render(request, "variantopedia/server_status.html", context)
+
+
+@dataclass
+class RunningQuery:
+    pid: int
+    duration: Any  # is actually a Duration
+    query: str
+    state: str
+
+
+def long_running_sql():
+    seconds = 2
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+              pid,
+              now() - pg_stat_activity.query_start AS duration,
+              query,
+              state
+            FROM pg_stat_activity
+            WHERE (now() - pg_stat_activity.query_start) > interval %s
+            ORDER BY now() - pg_stat_activity.query_start desc
+            """,
+            [f"{seconds} seconds"]
+        )
+
+        def to_obj(row) -> RunningQuery:
+            return RunningQuery(
+                pid=row[0],
+                duration=row[1],
+                query=row[2],
+                state=row[3]
+            )
+
+        return [to_obj(result) for result in cursor.fetchall()]
 
 
 def database_statistics(request):
