@@ -179,7 +179,7 @@ This template is deprecated and only used for analysis until we can transfer it 
 
                 <li><a target="_blank" href="{{ help_url }}">help</a></li>
                     {% if user_feedback_enabled %}
-                    <li><a class="menu-suggestion" href="javascript:suggestionDialog('{{ user.username }}')"><img style='position:absolute;top:7px' width="20px" height="20px" src="{% static 'icons/flags/lightbulb.svg' %}" title="Suggestion / Bug Report"></img></a></li>
+                    <li><a class="menu-suggestion" title="Suggestion / Bug Report" href="javascript:suggestionDialog('{{ user.username }}')"><i class="fas fa-bug mt-1"></i></a></li>
                     {% endif %}
     			</ul>
     			
