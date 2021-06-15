@@ -45,6 +45,8 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                 variant_string = variant_string[:-REMOVE_LENGTH].strip()
 
             variant_tuple = Variant.get_tuple_from_string(variant_string, genome_build=genome_build)
+            if variant_tuple is None:
+                raise ValueError(f"Could not convert '{variant_string}'")
             variant_tuples.append(variant_tuple)
             node_id = None
             if "node__id" in row:
