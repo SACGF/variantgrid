@@ -398,7 +398,9 @@ def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing
             raise ValueError(msg) from e
 
         name = os.path.basename(sequencing_run_dir)
+        date = SequencingRun.get_date_from_name(name)
         sequencing_run = SequencingRun.objects.create(name=name,
+                                                      date=date,
                                                       sequencer=sequencer,
                                                       path=sequencing_run_dir,
                                                       experiment=experiment,

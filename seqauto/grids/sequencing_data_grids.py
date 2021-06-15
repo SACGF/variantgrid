@@ -41,7 +41,7 @@ class ExperimentsListGrid(JqGridUserRowConfig):
 class SequencingRunListGrid(JqGridUserRowConfig):
     model = SequencingRun
     caption = 'SequencingRuns'
-    fields = ["name", "is_valid", "sequencer__sequencer_model__model", "sequencer__name",
+    fields = ["date", "name", "is_valid", "sequencer__sequencer_model__model", "sequencer__name",
               "experiment__name", "enrichment_kit__name", "enrichment_kit__version",
               "gold_standard", "legacy", "hidden", "bad", "path"]
     colmodel_overrides = {
@@ -86,13 +86,15 @@ class SequencingRunListGrid(JqGridUserRowConfig):
         queryset = queryset.annotate(**annotate)
         field_names = self.get_field_names() + list(annotate.keys())
         self.queryset = queryset.values(*field_names)
-        self.extra_config.update({'sortname': 'name',
+        self.extra_config.update({'sortname': 'date',
                                   'sortorder': 'desc'})
 
     def get_colmodels(self, *args, **kwargs):
         colmodels = super().get_colmodels(*args, **kwargs)
-        extra = {'index': 'sample_count', 'name': 'sample_count', 'label': 'Sample Count', 'sorttype': 'int', 'width': 20}
-        colmodels = colmodels[:1] + [extra] + colmodels[1:]
+        extra = {'index': 'sample_count', 'name': 'sample_count',
+                 'label': 'Sample Count', 'sorttype': 'int', 'width': 20}
+        insert_pos = 2
+        colmodels = colmodels[:insert_pos] + [extra] + colmodels[insert_pos:]
         vcf_extra = [
             {'index': 'vcf_ids', 'name': 'vcf_ids', 'label': 'VCF', 'formatter': 'formatSequencingRunVCF',
              'sorttype': 'int', 'width': 80},

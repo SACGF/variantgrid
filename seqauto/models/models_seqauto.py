@@ -173,6 +173,7 @@ class SeqAutoMessage(TimeStampedModel):
 class SequencingRun(SeqAutoRecord):
     """ Represents a flowcell (or other technology with multiple sequencing samples) """
     name = models.TextField(primary_key=True)
+    date = models.DateField(null=True)  # Eg from the sequencing name - used to sort
     sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE)
     gold_standard = models.BooleanField(default=False)
     bad = models.BooleanField(default=False)
@@ -236,6 +237,15 @@ class SequencingRun(SeqAutoRecord):
         if m := re.search(SEQUENCING_RUN_REGEX, modified_sequencing_run):
             original_sequencing_run = m.group(0)
         return original_sequencing_run
+
+    @staticmethod
+    def get_date_from_name(name) -> Optional[datetime.date]:
+        date = None
+        if m := re.match(".*_?([12]\d{5})_", name):
+            date_str = m.group(1)
+            dt = datetime.strptime(date_str, "%y%m%d")
+            date = make_aware(dt).date()
+        return date
 
     def get_params(self):
         """ This allows chaining down names etc - in case a level changes it, will cascade down """
