@@ -353,8 +353,9 @@ class RunningQuery:
 
 
 def long_running_sql():
-    seconds = 2
+    seconds = 30
     with connection.cursor() as cursor:
+        db_name = connection.settings_dict['NAME']
         cursor.execute(
             """
             SELECT
@@ -364,9 +365,10 @@ def long_running_sql():
               state
             FROM pg_stat_activity
             WHERE (now() - pg_stat_activity.query_start) > interval %s
+            AND datname = %s
             ORDER BY now() - pg_stat_activity.query_start desc;
             """,
-            [f"{seconds} seconds"]
+            [f"{seconds} seconds", db_name]
         )
 
         def to_obj(row) -> RunningQuery:
