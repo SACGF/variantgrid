@@ -223,7 +223,18 @@ def notify_server_status():
 @require_superuser
 def server_status(request):
     if request.method == "POST":
-        notify_server_status()
+        action = request.POST.get('action')
+        if action == 'test-slack':
+            notify_server_status()
+        elif action == 'kill-pid':
+            pid = int(request.POST.get('pid'))
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_terminate_backend(%s)", [pid])
+                terminated = cursor.fetchone()[0]
+                messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
+        else:
+            print(f"Unrecognised action {action}")
+        # TODO should redirect to read-only version of the page
 
     celery_workers = {}
     if settings.CELERY_ENABLED:
@@ -353,7 +364,7 @@ def long_running_sql():
               state
             FROM pg_stat_activity
             WHERE (now() - pg_stat_activity.query_start) > interval %s
-            ORDER BY now() - pg_stat_activity.query_start desc
+            ORDER BY now() - pg_stat_activity.query_start desc;
             """,
             [f"{seconds} seconds"]
         )

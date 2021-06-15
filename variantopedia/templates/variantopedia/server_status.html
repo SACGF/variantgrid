@@ -17,6 +17,14 @@
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     {% endif %}
+    <script>
+    function killPid(pid) {
+        if (window.confirm(`Are you sure you wish to cancel query ID ${pid}?`)) {
+            $('#kill-query-pid').val(pid);
+            $('#kill-query').submit();
+        }
+    }
+    </script>
     <style type="text/css">
         div#reference-check {
             margin: 20px 0px 20px 0px;
@@ -73,6 +81,12 @@
         {% endlabelled %}
 
         {% if queries %}
+            <form method="POST" id="kill-query">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="kill-pid" />
+            <input type="hidden" name="pid" id="kill-query-pid" value="" />
+            </form>
+
             <h4>Queries</h4>
             <table class="table">
                 <thead>
@@ -86,7 +100,7 @@
                 <tbody>
                     {% for query in queries %}
                         <tr>
-                            <td>{{ query.pid }}</td>
+                            <td><a onclick="killPid({{ query.pid }})" class="hover-delete">{{ query.pid }}</a></td>
                             <td>{{ query.duration | duration }}</td>
                             <td>{{ query.query }}</td>
                             <td>{{ query.state }}</td>
@@ -257,6 +271,7 @@
         <div class="row mt-4"></div>
         <form method="POST">
             {% csrf_token %}
+            <input type="hidden" name="action" value="test-slack" />
             <div class="btn-toolbar mt-4">
                 {% if url_name_visible.view_upload_stats %}
                     <a href="{% url 'view_upload_stats' %}" class="btn btn-outline-primary">Upload Stats</a>

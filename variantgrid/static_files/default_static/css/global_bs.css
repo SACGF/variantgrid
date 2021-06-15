@@ -477,6 +477,23 @@ div.background-image {
   text-display: underline;
 }
 
+.hover-delete {
+  color: #bb4444 !important;
+  text-decoration: none;
+  position: relative;
+}
+.hover-delete:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+.hover-delete:hover::before {
+  z-index: 100;
+  position: absolute;
+  left: -16px;
+  content: "";
+  font-family: "FontAwesome";
+}
+
 .readonly {
   color: #444444;
   border: 1px solid #dddddd;
