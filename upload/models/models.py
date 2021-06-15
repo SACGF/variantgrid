@@ -52,6 +52,12 @@ class UploadedFile(TimeStampedModel):
             return os.path.exists(self.get_filename())
         return False
 
+    @property
+    def size(self) -> int:
+        if self.import_source == ImportSource.WEB_UPLOAD:
+            return self.uploaded_file.size
+        return os.stat(self.get_filename()).st_size
+
     def check_can_view(self, user):
         if not (user.is_superuser or self.user == user):
             msg = f"You do not have permission to access UploadedFile pk={self.pk}"

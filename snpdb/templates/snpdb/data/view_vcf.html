@@ -342,7 +342,7 @@ $(document).ready(function() {
             {% if vcf.uploadedvcf.uploaded_file.exists %}
                 <tr>
                 <th>Download</th>
-                <td><div class="left margin-r-5"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Uploaded VCF</a> ({{ vcf.uploadedvcf.uploaded_file.uploaded_file.size|filesizeformat }})</div>
+                <td><div class="left margin-r-5"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Uploaded VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
                     <!-- <div class="left margin-r-5"><a href=""><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF</a></div> -->
                 </td>
                 </tr>
