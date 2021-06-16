@@ -99,6 +99,8 @@ class CohortMixin:
         return cohort, q
 
     def get_allele_frequency_q_list(self):
+        """ Anything that subclasses this (eg TrioNode/PedigreeNode) must also implement
+            self.get_samples() and reduce to what is used there so filter is only applied on those samples """
         try:
             naff = self.nodeallelefrequencyfilter
             if not naff.nodeallelefrequencyrange_set.exists():
@@ -107,10 +109,9 @@ class CohortMixin:
             return []
 
         filters = []
-        cohort = self._get_cohort()
         cgc = self.cohort_genotype_collection
 
-        for sample in cohort.get_samples():
+        for sample in self.get_samples():
             # Indexes are handled by cohortgenotype (sub cohorts etc)
             array_index = cgc.get_array_index_for_sample_id(sample.pk)
             # https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
