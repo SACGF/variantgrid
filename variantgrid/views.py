@@ -89,7 +89,11 @@ def version(request):
             if git.hash != deployment_git_hash:
                 deployment_git_link = f"{git.site}/compare/{deployment_git_hash}...{git.hash}"
             else:
-                deployment_git_link = f"{git.site}/commit/{git.hash}"
+                # note: the links are for what's different between the current version and a previous deploy
+                # if the hashes are the same, it's the same deploy - so only showing the changes in the most recent
+                # commit is misleading
+                # deployment_git_link = f"{git.site}/commit/{git.hash}"
+                pass
 
         deployments.append({
             "git_hash": deployment.git_hash,
