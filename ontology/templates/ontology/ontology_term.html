@@ -40,16 +40,19 @@
                     {% labelled label="Last imported" %}Import {{ term.from_import.id }} - {{ term.from_import.filename }} @ {% timestamp term.from_import.processed_date %}{% endlabelled %}
                 {% endif %}
 
-                <hr/>
-                {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
-                    {% if not parent_relationships %}-{% endif %}
-                    {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
-                    {% for relationship in parent_relationships %}
-                        <div class="mt-2">
-                            {% ontology_relationship relationship term %}
-                        </div>
-                    {% endfor %}
-                {% endlabelled %}
+
+                {% if parent_relationships is not None %}
+                    <hr/>
+                    {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
+                        {% if not parent_relationships %}-{% endif %}
+                        {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
+                        {% for relationship in parent_relationships %}
+                            <div class="mt-2">
+                                {% ontology_relationship relationship term %}
+                            </div>
+                        {% endfor %}
+                    {% endlabelled %}
+                {% endif %}
 
                 {% if gene_relationships is not None %}
                     <hr/>
@@ -87,17 +90,18 @@
                     {% endfor %}
                 {% endlabelled %}
 
-                <hr/>
-
-                {% labelled label='<i class="fas fa-sitemap"></i> Child Terms' %}
-                    {% if not child_relationships %}-{% endif %}
-                    {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
-                    {% for relationship in child_relationships %}
-                        <div class="mt-2">
-                            {% ontology_relationship relationship term %}
-                        </div>
-                    {% endfor %}
-                {% endlabelled %}
+                {% if child_relationships is not None %}
+                    <hr/>
+                    {% labelled label='<i class="fas fa-sitemap"></i> Child Terms' %}
+                        {% if not child_relationships %}-{% endif %}
+                        {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
+                        {% for relationship in child_relationships %}
+                            <div class="mt-2">
+                                {% ontology_relationship relationship term %}
+                            </div>
+                        {% endfor %}
+                    {% endlabelled %}
+                {% endif %}
 
             </div>
         </div>

@@ -16,7 +16,8 @@ class OntologyTermView(TemplateView):
         term = OntologyTerm.get_or_stub(term_id)
         if not term.is_stub:
             gene_relationships = None
-            if term.ontology_service != OntologyService.HGNC:
+            is_gene = term.ontology_service == OntologyService.HGNC
+            if not is_gene:
                 gene_relationships = LimitedCollection(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC), 250)
 
             all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
@@ -35,9 +36,9 @@ class OntologyTermView(TemplateView):
             return {
                 "term": term,
                 "gene_relationships": gene_relationships,
-                "parent_relationships": LimitedCollection(parent_relationships, 250),
+                "parent_relationships": LimitedCollection(parent_relationships, 250) if not is_gene else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
-                "child_relationships": LimitedCollection(child_relationships, 250)
+                "child_relationships": LimitedCollection(child_relationships, 250) if not is_gene else None
             }
         messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")
         return {"term": term}
