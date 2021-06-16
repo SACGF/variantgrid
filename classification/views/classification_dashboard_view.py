@@ -40,7 +40,6 @@ def dashboard(request: HttpRequest) -> Response:
     withdrawn = FlagCollection.filter_for_open_flags(qs=vcqs_user.filter(withdrawn=True), flag_types=[
         classification_flag_types.classification_withdrawn
     ])
-    print(list(variant_matching))
 
     issue_counts = {
         "classifications": {
