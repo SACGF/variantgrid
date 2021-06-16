@@ -31,7 +31,7 @@
                 <tbody>
                     {% for deployment in deployment_history %}
                         <tr>
-                            <td>{{ deployment.created }}</td>
+                            <td>{% if deployment.created %}{{ deployment.created }}{% else %}In Progress{% endif %}</td>
                             <td>{% if deployment.git_link %}
                                 <a href="{{ deployment.git_link }}" class="hover-link external-link" target="_blank" title="Show differences between this deployment and current version" data-toggle="tooltip">{{ deployment.git_hash }}</a>
                                 {% else %}{{ deployment.git_hash }}

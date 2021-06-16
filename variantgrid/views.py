@@ -82,7 +82,19 @@ def version(request):
     git = Git(settings.BASE_DIR)
 
     deployments = list()
+    is_first = True
     for deployment in Deployment.objects.order_by('-created').all()[0:10]:
+        if is_first:
+            if deployment.git_hash != git.hash:
+                # git hash doesn't match most recent deploy
+                # inject one to highlight that
+                deployments.append({
+                   "git_hash": git.hash,
+                   "created": None,
+                   "git_link": None
+                })
+        is_first = False
+
         deployment_git_hash = deployment.git_hash
         deployment_git_link = None
         if git.site and git.hash and deployment_git_hash:
