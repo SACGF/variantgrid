@@ -85,8 +85,11 @@ def version(request):
     for deployment in Deployment.objects.order_by('-created').all()[0:10]:
         deployment_git_hash = deployment.git_hash
         deployment_git_link = None
-        if git.site and git.hash and deployment_git_hash and git.hash != deployment_git_hash:
-            deployment_git_link = f"{git.site}/compare/{deployment_git_hash}...{git.hash}"
+        if git.site and git.hash and deployment_git_hash:
+            if git.hash != deployment_git_hash:
+                deployment_git_link = f"{git.site}/compare/{deployment_git_hash}...{git.hash}"
+            else:
+                deployment_git_link = f"{git.site}/commit/{git.hash}"
 
         deployments.append({
             "git_hash": deployment.git_hash,
