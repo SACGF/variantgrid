@@ -11,7 +11,7 @@ from lazy import lazy
 from flags.models import FlagCollection, FlagStatus
 from genes.models import Gene, Transcript, TranscriptVersion, GeneSymbol
 from ontology.models import OntologyTerm
-from snpdb.models import UserSettings, GenomeBuild, Allele, Variant
+from snpdb.models import UserSettings, GenomeBuild, Allele, Variant, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
 from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap, ConditionResolvedDict
@@ -188,6 +188,11 @@ class ClassificationDatatableConfig(DatatableConfig):
             user=self.user,
             published=True,
             exclude_withdrawn=exclude_withdrawn)
+
+        # filtering to your labs only is done on the
+        if my_labs := self.get_query_param('my_labs'):
+            if my_labs == "true":
+                initial_qs = initial_qs.filter(classification__lab__in=Lab.valid_labs_qs(user=self.user, admin_check=True))
 
         # Make an annotated column c_hgvs which is the first non null value of
         # user's normalised preference (e.g. 37), the alternative normalised (e.g. 38) the imported c.hgvs

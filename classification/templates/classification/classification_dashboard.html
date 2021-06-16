@@ -13,18 +13,23 @@
     <script>
     function classificationDiscordant(data) {
         data.flags = JSON.stringify(['classification_discordant']);
+        data.my_labs = "true";
     }
     function classificationMatchingVariant(data) {
         data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
+        data.my_labs = "true";
     }
     function classificationComments(data) {
         data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
+        data.my_labs = "true";
     }
     function classificationUnshared(data) {
         data.flags = JSON.stringify(['classification_unshared']);
+        data.my_labs = "true";
     }
     function classificationWithdrawn(data) {
         data.flags = JSON.stringify(['classification_withdrawn']);
+        data.my_labs = "true";
     }
 
     $(document).ready(() => {

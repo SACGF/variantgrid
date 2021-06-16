@@ -7,6 +7,7 @@ from termsandconditions.decorators import terms_required
 from classification.models import classification_flag_types
 from flags.models import FlagCollection
 from snpdb.forms import LabSelectForm
+from snpdb.models import Lab
 from snpdb.models.models_genome import GenomeBuild
 from classification.models.classification import Classification, \
     ClassificationModification
@@ -16,29 +17,13 @@ from classification.views.classification_export_flags import ExportFormatterFlag
 
 @terms_required
 def dashboard(request: HttpRequest) -> Response:
-    """
-    function classificationDiscordant(data) {
-        data.flags = JSON.stringify(['classification_discordant']);
-    }
-    function classificationMatchingVariant(data) {
-        data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
-    }
-    function classificationComments(data) {
-        data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
-    }
-    function classificationUnshared(data) {
-        data.flags = JSON.stringify(['classification_unshared']);
-    }
-    function classificationWithdrawn(data) {
-        data.flags = JSON.stringify(['classification_withdrawn']);
-    }
-    """
-
     classification_counts = dict()
-    vcqs_user = Classification.filter_for_user(request.user)
+    vcqs_user = Classification.filter_for_user(request.user).filter(lab__in=Lab.valid_labs_qs(request.user, admin_check=True))
     vcqs = vcqs_user.filter(withdrawn=False)
 
-    discordant = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.discordant])
+    discordant = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
+        classification_flag_types.discordant
+    ])
     variant_matching = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
         classification_flag_types.matching_variant_flag,
         classification_flag_types.matching_variant_warning_flag,
@@ -55,6 +40,7 @@ def dashboard(request: HttpRequest) -> Response:
     withdrawn = FlagCollection.filter_for_open_flags(qs=vcqs_user.filter(withdrawn=True), flag_types=[
         classification_flag_types.classification_withdrawn
     ])
+    print(list(variant_matching))
 
     issue_counts = {
         "classifications": {
