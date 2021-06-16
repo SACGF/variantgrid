@@ -42,7 +42,7 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         cohort = self._get_cohort()
         cgc = cohort.cohort_genotype_collection
 
-        array_indicies = [cgc.get_array_index_for_sample_id(sample_id) for sample_id in cohort.get_sample_ids()]
+        array_indicies = [cgc.get_array_index_for_sample_id(sample_id) for sample_id in self.get_sample_ids()]
         for field, cg_path, q_op in self.COHORT_GENOTYPE_FIELD_MAPPINGS:
             value = getattr(self, field)
             if value:
