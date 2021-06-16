@@ -6,71 +6,92 @@
 {% load datatable_tags %}
 {% load ui_help %}
 {% load ui_menu_bars %}
-
+{% load ui_tabs_builder %}
 {% block title %}Classification Issues{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
-<script>
-    let mode = 'all';
-    function classificationFilter(data, type) {
-        data.issues = mode;
-        data.lab = blankToNull($('#id_lab').val());
+    <script>
+    function classificationDiscordant(data) {
+        data.flags = JSON.stringify(['classification_discordant']);
     }
-    function modeHighlight() {
-        $('.issue-select').css('font-weight', 'normal');
-        $(`.issue-select[name=${mode}]`).css('font-weight', 'bold');
+    function classificationMatchingVariant(data) {
+        data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
     }
-</script>
-{% endblock %}
-{% block jsdocumentready %}
-    $('#id_lab').change(function() {
-        $('#vc-datatable').DataTable().ajax.reload();
-    });
+    function classificationComments(data) {
+        data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
+    }
+    function classificationUnshared(data) {
+        data.flags = JSON.stringify(['classification_unshared']);
+    }
+    function classificationWithdrawn(data) {
+        data.flags = JSON.stringify(['classification_withdrawn']);
+    }
 
-    $('.issue-select').click(function() {
-        mode = $(this).attr('name');
-        modeHighlight();
-        $('#vc-datatable').DataTable().ajax.reload();
-    });
-    modeHighlight();
+    $(document).ready(() => {
+        EKeys.load().then(() => {
+            $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
+                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+            });
 
-    EKeys.load().then(() => {
-    {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %}
+            {% datatable_definition table_config=datatable_config data='classificationDiscordant' table_id='classifications-discordant' url='classification_datatables' %}
+            {% datatable_definition table_config=datatable_config data='classificationMatchingVariant' table_id='classifications-matching' url='classification_datatables' %}
+            {% datatable_definition table_config=datatable_config data='classificationComments' table_id='classifications-comment' url='classification_datatables' %}
+            {% datatable_definition table_config=datatable_config data='classificationUnshared' table_id='classifications-unshared' url='classification_datatables' %}
+            {% datatable_definition table_config=datatable_config data='classificationWithdrawn' table_id='classifications-withdrawn' url='classification_datatables' %}
+
+            $('.dataTable').on('draw.dt', () => {
+                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+            });
+        });
     });
-    let vcDatatable = $('#vc-datatable');
-    vcDatatable.on('draw.dt', () => {
-        Flags.instance.init({userId: '{{user.id}}'});
-    });
+    </script>
 {% endblock %}
 
 {% block content %}
-    <div class="container" id="dashboard-links">
-        {% page_help page_id='classification/issues_help' title='Classification Issues' %}
-
-        Show records that :
-        <a class="hover-link issue-select" name='all'>Have any issue</a> |
-        <a class="hover-link issue-select" name='discussion'>Require discussion</a> |
-        <a class="hover-link issue-select" name='data'>Require a data fix</a> |
-        <a class="hover-link issue-select" name='withdrawn'>Have been withdrawn</a>
-        <br/><br/>
-        <a class="hover-link download-link" href="{% url 'classification_dashboard_download' %}">Click here to download all issues requiring action</a>
-        <br/>
-
+    <div class="container-table" id="dashboard-links">
+        {% page_help_embedded page_id='classification/issues_help' title='Classification Issues' %}
+            <p>
+                This page will list all classifications belonging to your lab/s that have flags raised against them.<br/>
+                Each classification flag indicates that there is an action that needs to be performed against the classification.<br/>
+                Clicking on each flag will give you instructions on what needs to be done to resolve it.
+            </p>
+            <p>
+                Flags range from issues with variant matching, to discordances or suggestions.<br/>
+            </p>
+        {% end_page_help_embedded %}
         <p>For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
-            {% if user.is_superuser %}
-            <div class="admin-only row">
-                <div class="col-6">
-                    {% crispy lab_form form_helper.horizontal_no_labels %}
-                </div>
-                <div class="col-6">
-                    Email preview:
-                    <a href="{% url 'summary_email_html' %}" class="hover-link">HTML</a>,
-                    <a href="{% url 'summary_email_text' %}" class="hover-link">TEXT</a>
-                </div>
-            </div>
-            {% endif %}
-    </div>
-    <div class="container-table">
-        {% datatable datatable_config 'vc-datatable' class_name='classification-table sticky-header' %}
+        {% if user.is_superuser %}
+        <div class="admin-only my-4">
+            Email preview:
+            <a href="{% url 'summary_email_html' %}" class="hover-link">HTML</a>,
+            <a href="{% url 'summary_email_text' %}" class="hover-link">TEXT</a>
+        </div>
+        {% endif %}
+        <a class="btn btn-outline-primary" href="{% url 'classification_dashboard_download' %}"><i class="fas fa-file-csv"></i> Download all issues requiring action</a>
+
+        <div class="mt-4">
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Discordance" badge=counts.classifications.discordant %}
+                {% datatable table_config=datatable_config table_id='classifications-discordant' class_name='sticky-header classification-table' %}
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=counts.classifications.comments %}
+                {% datatable table_config=datatable_config table_id='classifications-comment' class_name='sticky-header classification-table' %}
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=counts.classifications.variant_matching %}
+                {% datatable table_config=datatable_config table_id='classifications-matching' class_name='sticky-header classification-table' %}
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=counts.classifications.unshared %}
+                {% datatable table_config=datatable_config table_id='classifications-unshared' class_name='sticky-header classification-table' %}
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=counts.classifications.withdrawn %}
+                {% datatable table_config=datatable_config table_id='classifications-withdrawn' class_name='sticky-header classification-table' %}
+            {% end_ui_register_tab_embedded %}
+
+
+            {% ui_render_tabs tab_set="classification_issues" %}
+        </div>
     </div>
 {% endblock %}

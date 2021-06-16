@@ -47,8 +47,24 @@ class ClassificationGroup:
                  modifications: Iterable[ClassificationModification],
                  genome_build: GenomeBuild,
                  group_id: Optional[int] = None):
-        self.modifications = list(modifications)
-        self.modifications.sort(key=ClassificationGroup.sort_modifications, reverse=True)
+
+        # filter out modifications that share the same (non None) patient id
+        # as in we don't want to show multiple records for the same patient
+        modification_list = list(modifications)
+        modification_list.sort(key=ClassificationGroup.sort_modifications, reverse=True)
+        modification_result = list()
+        seen_patient_ids = set()
+        self.excluded_record_count = 0
+
+        for modification in modification_list:
+            if patient_id := modification.get(SpecialEKeys.PATIENT_ID):
+                if patient_id in seen_patient_ids:
+                    self.excluded_record_count += 1
+                    continue
+                seen_patient_ids.add(patient_id)
+            modification_result.append(modification)
+        self.modifications = modification_result
+
         self.group_id = group_id
         self.genome_build = genome_build
         self.clinical_significance_score = 0

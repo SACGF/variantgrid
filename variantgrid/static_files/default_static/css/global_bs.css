@@ -675,7 +675,6 @@ ul.compact li:before {
     display: none;
   }
 }
-
 .site-message.border.severity-W {
   border: 2px solid #FEBC00 !important;
 }
@@ -683,6 +682,5 @@ ul.compact li:before {
 .site-message.border.severity-E {
   border: 2px solid #dc3545 !important;
 }
-
 
 /*# sourceMappingURL=global_bs.css.map */

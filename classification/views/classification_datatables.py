@@ -180,9 +180,9 @@ class ClassificationDatatableConfig(DatatableConfig):
     def get_initial_queryset(self):
 
         exclude_withdrawn = True
-        issues_type = self.get_query_param("issues")
-        if issues_type == 'withdrawn':
-            exclude_withdrawn = False
+        if flags := self.get_query_json("flags"):
+            if "classification_withdrawn" in flags:
+                exclude_withdrawn = False
 
         initial_qs = ClassificationModification.latest_for_user(
             user=self.user,
