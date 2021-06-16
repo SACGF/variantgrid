@@ -17,7 +17,7 @@ class OntologyTermView(TemplateView):
         if not term.is_stub:
             gene_relationships = None
             if term.ontology_service != OntologyService.HGNC:
-                gene_relationships = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
+                gene_relationships = LimitedCollection(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC), 250)
 
             all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
             regular_relationships = list()
@@ -34,7 +34,7 @@ class OntologyTermView(TemplateView):
 
             return {
                 "term": term,
-                "gene_relationships": LimitedCollection(gene_relationships, 250),
+                "gene_relationships": gene_relationships,
                 "parent_relationships": LimitedCollection(parent_relationships, 250),
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
                 "child_relationships": LimitedCollection(child_relationships, 250)
