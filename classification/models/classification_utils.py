@@ -10,7 +10,7 @@ from classification.enums import SpecialEKeys
 from classification.models.evidence_mixin import VCPatch, VCStore
 from flags.models import FlagCollection
 from genes.models import GeneSymbol, Gene, Transcript
-from snpdb.models import VariantCoordinate, Allele
+from snpdb.models import VariantCoordinate, Allele, Lab
 
 
 class ValidationMerger:
@@ -265,7 +265,7 @@ class UserClassificationStats:
 
         return FlagCollection.filter_for_open_flags(
             Classification.filter_for_user(user=self.user)
-        ).order_by('-created').exclude(withdrawn=True).count()
+        ).filter(lab__in=Lab.valid_labs_qs(self.user, admin_check=True)).order_by('-created').exclude(withdrawn=True).count()
 
 
 def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
