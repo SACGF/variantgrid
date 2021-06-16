@@ -34,6 +34,7 @@ def _update_gene_relations(gene_symbol: str):
             ontology_builder.ensure_old(max_age=timedelta(days=settings.PANEL_APP_CACHE_DAYS))
 
             PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
+            MONDO_RE = re.compile("MONDO:([0-9]+)")
 
             results = get_panel_app_results_by_gene_symbol_json(server=panel_app, gene_symbol=gene_symbol)
             response_hash = md5sum_str(str(results))
@@ -45,20 +46,26 @@ def _update_gene_relations(gene_symbol: str):
                     if "Expert Review Green" in evidence:  # only look at green panels
                         phenotype_row: str
                         for phenotype_row in panel_app_result.get("phenotypes", []):
-                            # TODO look for terms other than OMIM in case panel app switches
-                            for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
-                                omim_int = int(omim_match[1])  # not always a valid id
-                                omim_id = OntologyService.index_to_id(OntologyService.OMIM, omim_int)
-                                if omim_term := OntologyTerm.objects.filter(id=omim_id).first():
+
+                            def add_term_if_valid(match_id: str, ontology: OntologyService):
+                                nonlocal ontology_builder
+                                nonlocal hgnc_term
+                                full_id = OntologyService.index_to_id(ontology, int(match_id))
+                                if term := OntologyTerm.objects.filter(id=full_id).first():
                                     ontology_builder.add_ontology_relation(
-                                        source_term_id=omim_term.id,
+                                        source_term_id=term.id,
                                         dest_term_id=hgnc_term.id,
                                         relation=OntologyRelation.PANEL_APP_AU,
                                         extra={
                                             "phenotype_row": phenotype_row,
                                             "evidence": evidence
-                                        }
-                                    )
+                                        })
+
+                            for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
+                                add_term_if_valid(omim_match[1], OntologyService.OMIM)
+
+                            for mondo_match in MONDO_RE.finditer(phenotype_row):
+                                add_term_if_valid(mondo_match[1], OntologyService.MONDO)
 
             ontology_builder.complete()
 
