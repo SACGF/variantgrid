@@ -89,9 +89,9 @@ def version(request):
                 # git hash doesn't match most recent deploy
                 # inject one to highlight that
                 deployments.append({
-                   "git_hash": git.hash,
-                   "created": None,
-                   "git_link": None
+                    "git_hash": git.hash,
+                    "created": None,
+                    "git_link": None,
                 })
         is_first = False
 

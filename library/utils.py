@@ -33,7 +33,7 @@ FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
 
 # isn't restrictive enough, but helps documention
-JSON = Union[Dict[str,Any], List[Any], int, float, str, bool]
+JSON = Union[Dict[str, Any], List[Any], int, float, str, bool]
 
 
 class DjangoJSONEncoder(JSONEncoder):
@@ -421,9 +421,7 @@ def group_by_key(qs: Iterable, key: attrgetter) -> Iterator[Tuple[Any, List]]:
 
 # note this tags expected in a single line of text
 # don't catch too many tags in case you get some false positives
-EXPECTED_HTML_TAGS_SINGLE_LINE = set([
-    'div', 'b', 'i', 'u', 'strong', 'em'
-])
+EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em'}
 
 
 def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
