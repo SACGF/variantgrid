@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import uuid
 from subprocess import CalledProcessError
 from typing import List, Iterable
@@ -7,6 +8,8 @@ from typing import List, Iterable
 from django.conf import settings
 from django.db import models
 from django.db.models import CASCADE, Q
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
@@ -87,6 +90,14 @@ class SomalierVCFExtract(AbstractSomalierModel):
         return self.vcf.sample_set.filter(no_dna_control=False).order_by("pk")
 
 
+@receiver(pre_delete, sender=SomalierVCFExtract)
+def somalier_vcf_extract_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    somalier_dir = instance.get_somalier_dir()
+    if os.path.exists(somalier_dir):
+        logging.info("Deleting %s - removing dir: %s", instance, somalier_dir)
+        shutil.rmtree(somalier_dir)
+
+
 class SomalierSampleExtract(models.Model):
     vcf_extract = models.ForeignKey(SomalierVCFExtract, on_delete=CASCADE)
     sample = models.OneToOneField(Sample, on_delete=CASCADE)
@@ -114,6 +125,14 @@ class SomalierAncestryRun(AbstractSomalierModel):
         return self.media_url(os.path.join(report_dir, "somalier-ancestry.somalier-ancestry.html"))
 
 
+@receiver(pre_delete, sender=SomalierAncestryRun)
+def somalier_ancestry_run_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    report_dir = instance.get_report_dir()
+    if os.path.exists(report_dir):
+        logging.info("Deleting %s - removing dir: %s", instance, report_dir)
+        shutil.rmtree(report_dir)
+
+
 class SomalierAncestry(TimeStampedModel):
     ancestry_run = models.ForeignKey(SomalierAncestryRun, on_delete=CASCADE)
     sample_extract = models.OneToOneField(SomalierSampleExtract, on_delete=CASCADE)
@@ -136,10 +155,13 @@ class SomalierRelate(AbstractSomalierModel):
         """ Sample IDs have to match samples provided in get_samples() """
         write_unrelated_ped(filename, [AbstractSomalierModel.sample_name(s) for s in self.get_samples()])
 
+    def get_related_dir(self) -> str:
+        cfg = SomalierConfig()
+        return os.path.join(cfg.related_dir(self.uuid))
+
     @property
     def url(self):
-        cfg = SomalierConfig()
-        return self.media_url(os.path.join(cfg.related_dir(self.uuid), "somalier.html"))
+        return self.media_url(self.get_related_dir(), "somalier.html")
 
 
 class SomalierCohortRelate(SomalierRelate):
@@ -165,6 +187,15 @@ class SomalierTrioRelate(SomalierRelate):
             proband_sex = patient.sex
         write_trio_ped(filename, proband, proband_sex,
                        father, self.trio.father_affected, mother, self.trio.mother_affected)
+
+
+@receiver(pre_delete, sender=SomalierCohortRelate)
+@receiver(pre_delete, sender=SomalierTrioRelate)
+def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    related_dir = instance.get_related_dir()
+    if os.path.exists(related_dir):
+        logging.info("Deleting %s - removing dir: %s", instance, related_dir)
+        shutil.rmtree(related_dir)
 
 
 class SomalierAllSamplesRelate(SomalierRelate):

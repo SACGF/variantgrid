@@ -8,6 +8,7 @@ from django.conf import settings
 
 import celery
 import pandas as pd
+from django.db import IntegrityError
 
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.log_utils import log_traceback, get_traceback
@@ -163,8 +164,12 @@ def somalier_all_samples():
             sample_a_id = AbstractSomalierModel.sample_name_to_id(row_data.pop("#sample_a"))
             sample_b_id = AbstractSomalierModel.sample_name_to_id(row_data.pop("sample_b"))
 
-            SomalierRelatePairs.objects.update_or_create(sample_a_id=sample_a_id, sample_b_id=sample_b_id,
-                                                         defaults=row_data)
+            try:
+                SomalierRelatePairs.objects.update_or_create(sample_a_id=sample_a_id, sample_b_id=sample_b_id,
+                                                             defaults=row_data)
+            except IntegrityError:
+                pass  # Sample was deleted - just don't store
+
         all_samples.status = ProcessingStatus.SUCCESS
     except Exception as e:
         tb = get_traceback()
