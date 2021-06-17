@@ -5,6 +5,7 @@ from django.views.generic import TemplateView
 
 from library.utils import LimitedCollection
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation
+from ontology.panel_app_ontology import update_gene_relations
 
 
 class OntologyTermView(TemplateView):
@@ -17,7 +18,9 @@ class OntologyTermView(TemplateView):
         if not term.is_stub:
             gene_relationships = None
             is_gene = term.ontology_service == OntologyService.HGNC
-            if not is_gene:
+            if is_gene:
+                update_gene_relations(term.name)
+            else:
                 gene_relationships = LimitedCollection(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC), 250)
 
             all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
