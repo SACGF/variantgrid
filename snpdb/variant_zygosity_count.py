@@ -109,7 +109,7 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
         if operation == '+':
             vzcv, created = VariantZygosityCountForVCF.objects.get_or_create(collection=collection, vcf=vcf)
             if created:
-                if vzcv.deleted is None:
+                if vzcv.deleted is not None:
                     logging.warning("VCF pk=%d, collection=%s (Add) existing non-deleted VariantZygosityCountForVCF. Skipping",
                                     vcf.pk, collection.name)
                     return
