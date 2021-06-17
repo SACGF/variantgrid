@@ -35,6 +35,20 @@ ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 
 ROLLBAR['enabled'] = False
 
+INTERNAL_IPS = [
+    '127.0.0.1',
+    '0.0.0.0',
+    'localhost'
+]
+
+INSTALLED_APPS += [
+    'debug_toolbar'
+]
+
+MIDDLEWARE += (
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+)
+
 """
 AUTHENTICATION_BACKENDS = (
     'auth.backend.VariantGridOIDCAuthenticationBackend',

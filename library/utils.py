@@ -3,7 +3,8 @@ import io
 import operator
 import math
 from collections import defaultdict
-from datetime import date, datetime
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from operator import attrgetter
 from urllib.parse import urlparse
 
@@ -601,16 +602,29 @@ class ArrayLength(models.Func):
     function = 'CARDINALITY'
 
 
+@dataclass(frozen=True)
+class DebugTime:
+    description: str
+    duration: timedelta
+
+    def __str__(self):
+        return f"{self.description}: {self.duration}"
+
+
 class DebugTimer:
 
     def __init__(self):
         self.start = datetime.now()
+        self.times: List[DebugTime] = list()
 
     def tick(self, description: str):
         now = datetime.now()
         duration = now - self.start
-        print(f"{description} {duration}")
+        self.times.append(DebugTime(description, duration))
         self.start = now
+
+    def __str__(self):
+        return "\n".join((str(debug_time) for debug_time in self.times))
 
 
 class LimitedCollection:

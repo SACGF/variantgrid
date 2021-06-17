@@ -1,6 +1,7 @@
 import csv
 import io
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Dict, List, Set, Any, Tuple, Iterable
 
 from django.conf import settings
@@ -9,31 +10,58 @@ from django.utils.timezone import now
 from pytz import timezone
 
 from annotation.citations import get_citations, CitationDetails
+from annotation.models import CitationSource, Citation
 from annotation.views import simple_citation_html
 from library.django_utils import get_url_from_view_path
 from classification.enums.classification_enums import SpecialEKeys
-from classification.models import EvidenceKey, ClassificationGroups
+from classification.models import EvidenceKey, ClassificationGroups, ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_export_utils import ExportFormatter, \
     AlleleGroup, ConflictStrategy
 from snpdb.models import Lab
 
 
+@dataclass(frozen=True, eq=True)
+class CitationStub:
+    source: str
+    idx: str
+
+    def __lt__(self, other):
+        if self.source < other.source:
+            return True
+        if self.source == other.source:
+            return self.citation_id.rjust(10, '0') < other.citation_id.rjust(10, '0')
+        return False
+
+
 class CitationCounter:
 
     def __init__(self):
-        self.all_citations: Dict[CitationDetails, Set[Any]] = defaultdict(set)
+        # self.all_citations: Dict[CitationDetails, Set[Any]] = defaultdict(set)
+        self.all_citations: Dict[CitationStub, Set[Lab]] = defaultdict(set)
 
-    def reference_citation(self, citation: CitationDetails, reference: Any):
-        self.all_citations[citation].add(reference)
+    def reference_citations(self, cm: ClassificationModification):
+        for db_ref in cm.db_refs:
+            db = db_ref.get('db')
+            if source := CitationSource.CODES.get(db):
+                idx = db_ref.get('idx')
+                stub = CitationStub(source=source, idx=idx)
+                self.all_citations[stub].add(cm.classification.lab.name)
 
     def ordered_references(self) -> Iterable[Tuple[CitationDetails, List[Any]]]:
-        citation_list = list(self.all_citations.keys())
-        citation_list.sort()
-        for citation in citation_list:
-            labs = list(self.all_citations[citation])
-            labs.sort()
-            yield citation, labs
+        citations: List[Citation] = list()
+        for stub in list(self.all_citations.keys()):
+            # TODO do this in bulk
+            citation, _ = Citation.objects.get_or_create(citation_source=stub.source, citation_id=stub.idx)
+            citations.append(citation)
+
+        details = get_citations(citations)
+
+        for citation_detail in details:
+            stub = CitationStub(CitationSource.CODES.get(citation_detail.source), citation_detail.citation_id)
+            references = list(self.all_citations[stub])
+            references.sort()
+            yield citation_detail, references
 
 
 class ExportFormatterMVL(ExportFormatter):
@@ -131,8 +159,7 @@ class ExportFormatterMVL(ExportFormatter):
             groups_html = render_to_string('classification/classification_groups_mvl.html', {"groups": groups}).replace('\n', '').strip()
             citation_counter = CitationCounter()
             for group in groups:
-                for citation in get_citations(group.most_recent.citations):
-                    citation_counter.reference_citation(citation, group.lab)
+                citation_counter.reference_citations(group.most_recent)
 
             if has_diff_chgvs:
                 warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')

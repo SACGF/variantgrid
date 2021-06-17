@@ -20,7 +20,7 @@ from flags.models.models import Flag
 from genes.hgvs import CHGVS
 from library.guardian_utils import bot_group
 from library.log_utils import log_traceback, report_exc_info, report_message, NotificationBuilder
-from library.utils import delimited_row
+from library.utils import delimited_row, DebugTimer
 from snpdb.models import Contig
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_genome import GenomeBuild, GenomeBuildContig
@@ -255,6 +255,9 @@ class BaseExportFormatter:
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
         raise NotImplementedError("export_raw has not been implemented")
 
+    def benchmark(self, row_limit: int = 100) -> DebugTimer:
+        raise NotImplementedError("benchmark has not been implemented")
+
 
 class ExportFormatter(BaseExportFormatter):
     """
@@ -455,7 +458,7 @@ class ExportFormatter(BaseExportFormatter):
         process_allele_group(allele_group)
 
         contig_order: Dict[int, int] = dict()
-        for cbc in GenomeBuildContig.objects.filter(genome_build=self.genome_build).order_by('order'):
+        for cbc in GenomeBuildContig.objects.filter(genome_build=self.genome_build).select_related('contig').order_by('order'):
             contig = cbc.contig
             contig_order[contig.id] = len(contig_order)
 
@@ -584,3 +587,28 @@ class ExportFormatter(BaseExportFormatter):
         if as_attachment:
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
         return response
+
+    def benchmark(self, row_limit=100) -> DebugTimer:
+
+        timer = DebugTimer()
+        self.prepare_groups()
+        timer.tick("Prepare Groups")
+
+        header = self.header()
+        timer.tick("Header")
+
+        allele_groups = list()
+        for count, allele_group in enumerate(self.row_iterator()):
+            allele_groups.append(allele_group)
+            if row_limit >= 100:
+                break
+        timer.tick(f"Made {len(allele_groups)} allele groups")
+
+        for allele_group in allele_groups:
+            self.row(allele_group)
+        timer.tick(f"Converted {len(allele_groups)} to rows")
+
+        footer = self.footer()
+        timer.tick("Footer")
+
+        return timer
