@@ -335,7 +335,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @lazy
     def condition_resolution_obj(self) -> Optional[ConditionResolved]:
         if cr_dict := self.condition_resolution_dict:
-            terms = [OntologyTerm.get_or_stub(term.get("term_id")) for term in cr_dict.get("resolved_terms")]
+            terms = [OntologyTerm.get_or_stub_cached(term.get("term_id")) for term in cr_dict.get("resolved_terms")]
             join = None
             if len(terms) > 1:
                 from classification.models import MultiCondition

@@ -11,6 +11,7 @@ from lazy import lazy
 from model_utils.models import TimeStampedModel, now
 
 from genes.models import GeneSymbol
+from library.cache import timed_cache
 from library.log_utils import report_exc_info
 from library.utils import Constant
 
@@ -249,6 +250,14 @@ class OntologyTerm(TimeStampedModel):
             return term
 
         raise ValueError(f"Cannot find HGNC for {gene_symbol}")
+
+    @staticmethod
+    @timed_cache(size_limit=30, ttl=60)
+    def get_or_stub_cached(id_str: str) -> 'OntologyTerm':
+        """
+        Call this when you're in a context that's not currently loading OntologyTerms into the database
+        """
+        return OntologyTerm.get_or_stub(id_str)
 
     @staticmethod
     def get_or_stub(id_str: str) -> 'OntologyTerm':

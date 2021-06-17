@@ -390,12 +390,23 @@ class ExportFormatter(BaseExportFormatter):
         else:
             return True
 
+    @lazy
+    def matching_flags(self):
+        return set(Flag.objects.filter(
+            flag_type__in=[classification_flag_types.matching_variant_warning_flag,
+                          classification_flag_types.transcript_version_change_flag],
+            resolution__status=FlagStatus.OPEN
+        ).values_list('collection_id', flat=True).distinct())
+
     def passes_flag_check(self, vcm: ClassificationModification) -> bool:
+        outstanding_warning = vcm.classification.flag_collection_id in self.matching_flags
+        """
         outstanding_warning = Flag.objects.filter(
             collection_id=vcm.classification.flag_collection_id,
             flag_type__in=[classification_flag_types.matching_variant_warning_flag, classification_flag_types.transcript_version_change_flag],
             resolution__status=FlagStatus.OPEN
         ).exists()
+        """
         if outstanding_warning:
             self.record_errors(vcm.id, 'Requires confirmation of variant match')
             return False
@@ -522,13 +533,25 @@ class ExportFormatter(BaseExportFormatter):
     def filename(self) -> str:
         return 'classifications.txt'
 
+    @lazy
+    def discordant_collections(self):
+        return set(
+            Flag.objects.filter(
+                flag_type=classification_flag_types.discordant,
+                resolution__status=FlagStatus.OPEN
+            ).values_list('collection_id', flat=True).distinct()
+        )
+
     def is_discordant(self, vc: Classification):
-        if vc.flag_collection_id:
+        if flag_collection_id := vc.flag_collection_id:
+            return flag_collection_id in self.discordant_collections
+            """
             return Flag.objects.filter(
-                collection=vc.flag_collection_id,
+                collection=flag_collection_id,
                 flag_type=classification_flag_types.discordant,
                 resolution__status=FlagStatus.OPEN
             ).exists()
+            """
         return False
 
     def report_stats(self, row_count: int):

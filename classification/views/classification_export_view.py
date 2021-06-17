@@ -248,7 +248,7 @@ class ClassificationApiExportView(APIView):
                 qs = qs.exclude(published_evidence__c_hgvs__value__startswith='ENS')
 
         formatter: BaseExportFormatter
-        qs = qs.select_related('classification', 'classification__lab')
+        qs = qs.select_related('classification', 'classification__lab', 'classification__clinical_context')
 
         formatter_kwargs = {
             "genome_build": genome_build,
