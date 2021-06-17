@@ -183,9 +183,10 @@ class AlleleGroup:
     Also contains a "target_variant" from the desired genome_build
     """
 
-    def __init__(self, source: 'ExportFormatter', allele_id: int, genome_build: GenomeBuild):
+    def __init__(self, source: 'ExportFormatter', allele_id: int, allele_flag_collection_id: int, genome_build: GenomeBuild):
         self.source = source
         self.allele_id = allele_id
+        self.allele_flag_collection_id = allele_flag_collection_id
         self.target_variant = None
         self.genome_build = genome_build
         self.variant_ids = list()
@@ -345,9 +346,26 @@ class ExportFormatter(BaseExportFormatter):
             message = self.error_message_ids[vcm.id]
             yield vcm, message
 
+    @lazy
+    def allele_37_not_38_transcripts(self) -> Dict[int, Set[str]]:
+        qs = Flag.objects.filter(
+            flag_type=allele_flag_types.allele_37_not_38,
+            resolution__status=FlagStatus.OPEN
+        ).values_list('collection_id', 'data')
+
+        transcripts: Dict[int, Set[str]] = defaultdict(set)
+        for collection_id, data in qs:
+            if data:
+                if transcript := data.get('transcript'):
+                    transcripts[collection_id].add(transcript)
+        return transcripts
+
+
     def filter_mismatched_transcripts(self, allele_group: AlleleGroup):
-        flag_collection_id = Allele.objects.filter(pk=allele_group.allele_id).values_list('flag_collection_id',
-                                                                                          flat=True).first()
+        #flag_collection_id = Allele.objects.filter(pk=allele_group.allele_id).values_list('flag_collection_id',
+        #                                                                                  flat=True).first()
+        flag_collection_id = allele_group.allele_flag_collection_id
+        """
         transcripts: Set[str] = set()
         if flag_collection_id:
             outstanding_mismatches = Flag.objects.filter(
@@ -360,10 +378,11 @@ class ExportFormatter(BaseExportFormatter):
                 transcript = (outstanding_mismatch.data or {}).get('transcript')
                 if transcript:
                     transcripts.add(transcript)
-
-        if transcripts:
-            failed_ids = [vcm.id for vcm in allele_group.filter_out_transcripts(transcripts)]
-            self.record_errors(failed_ids, f'transcript across genome builds requires confirmation')
+        """
+        if flag_collection_id:
+            if transcripts := self.allele_37_not_38_transcripts.get(flag_collection_id):
+                failed_ids = [vcm.id for vcm in allele_group.filter_out_transcripts(transcripts)]
+                self.record_errors(failed_ids, f'transcript across genome builds requires confirmation')
 
     def passes_since_check(self, ag: AlleleGroup) -> bool:
         if self.since:
@@ -391,7 +410,7 @@ class ExportFormatter(BaseExportFormatter):
             return True
 
     @lazy
-    def matching_flags(self):
+    def classification_warning_flags(self):
         return set(Flag.objects.filter(
             flag_type__in=[classification_flag_types.matching_variant_warning_flag,
                           classification_flag_types.transcript_version_change_flag],
@@ -399,7 +418,7 @@ class ExportFormatter(BaseExportFormatter):
         ).values_list('collection_id', flat=True).distinct())
 
     def passes_flag_check(self, vcm: ClassificationModification) -> bool:
-        outstanding_warning = vcm.classification.flag_collection_id in self.matching_flags
+        outstanding_warning = vcm.classification.flag_collection_id in self.classification_warning_flags
         """
         outstanding_warning = Flag.objects.filter(
             collection_id=vcm.classification.flag_collection_id,
@@ -441,7 +460,7 @@ class ExportFormatter(BaseExportFormatter):
         all_variants = self.qs.values_list('classification__variant', flat=True).distinct()
         all_alleles = VariantAllele.objects.filter(variant__in=all_variants).values_list('allele', flat=True)
         all_variant_alleles = VariantAllele.objects.filter(allele__in=all_alleles).order_by('allele_id')\
-            .select_related('genome_build', 'variant', 'variant__locus', 'variant__locus__contig')
+            .select_related('genome_build', 'variant', 'variant__locus', 'variant__locus__contig', 'allele')
 
         allele_group = None
         allele_warning_variant_ids = set()
@@ -457,7 +476,7 @@ class ExportFormatter(BaseExportFormatter):
             # Allele has changed, start a new group
             if not allele_group or allele_group.allele_id != va.allele_id:
                 process_allele_group(allele_group)
-                allele_group = AlleleGroup(source=self, allele_id=va.allele_id, genome_build=self.genome_build)
+                allele_group = AlleleGroup(source=self, allele_id=va.allele_id, allele_flag_collection_id=va.allele.flag_collection_id, genome_build=self.genome_build)
 
             if va.genome_build.is_equivalent(self.genome_build):
                 variant = va.variant
@@ -623,7 +642,7 @@ class ExportFormatter(BaseExportFormatter):
         allele_groups = list()
         for index, allele_group in enumerate(self.row_iterator()):
             allele_groups.append(allele_group)
-            if index >= row_limit:
+            if index-1 >= row_limit:
                 break
         timer.tick(f"Made {len(allele_groups)} allele groups")
 
