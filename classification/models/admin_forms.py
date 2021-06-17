@@ -496,14 +496,6 @@ class ConditionTextAdmin(ModelAdminBasics):
     actions = [auto_match, clear]
 
 
-class ConditionTextMatchAdmin(ModelAdminBasics):
-    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "created", "last_edited_by"]
-
-
-class ClinVarExportAdmin(ModelAdminBasics):
-    list_display = ["pk", "lab", "allele", "transcript", "gene_symbol", "created"]
-
-
 class ConditionTextMatchUserFilter(admin.SimpleListFilter):
     list_per_page = 200
     title = 'User Filter'
