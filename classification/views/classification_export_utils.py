@@ -621,9 +621,9 @@ class ExportFormatter(BaseExportFormatter):
         timer.tick("Header")
 
         allele_groups = list()
-        for count, allele_group in enumerate(self.row_iterator()):
+        for index, allele_group in enumerate(self.row_iterator()):
             allele_groups.append(allele_group)
-            if row_limit >= 100:
+            if index >= row_limit:
                 break
         timer.tick(f"Made {len(allele_groups)} allele groups")
 
