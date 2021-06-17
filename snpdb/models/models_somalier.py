@@ -157,11 +157,11 @@ class SomalierRelate(AbstractSomalierModel):
 
     def get_related_dir(self) -> str:
         cfg = SomalierConfig()
-        return os.path.join(cfg.related_dir(self.uuid))
+        return cfg.related_dir(self.uuid)
 
     @property
     def url(self):
-        return self.media_url(self.get_related_dir(), "somalier.html")
+        return self.media_url(os.path.join(self.get_related_dir(), "somalier.html"))
 
 
 class SomalierCohortRelate(SomalierRelate):
