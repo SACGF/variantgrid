@@ -14,6 +14,7 @@ class SearchTypes:
     LOCUS = "Locus"
     PATIENT = "Patient"
     SAMPLE = "Sample"
+    VCF = "VCF"
     SEQUENCING_RUN = 'SequencingRun'
     TRANSCRIPT = "Transcript"
     UNKNOWN = "No known format"

@@ -26,7 +26,7 @@ from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
-    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab
+    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
 from classification.models.classification import ClassificationModification, Classification, \
@@ -250,6 +250,7 @@ class Searcher:
         """
         HAS_ALPHA_PATTERN = r"[a-zA-Z]"
         NO_WHITESPACE = r"^\S+$"
+        NOT_WHITESPACE = "\S+"
         HGVS_UNCLEANED_PATTERN = r"[cnmg].*\d+"  # Bare bones match - may be able to fix it...
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
 
@@ -258,7 +259,8 @@ class Searcher:
             (SearchTypes.HGVS, HGVS_UNCLEANED_PATTERN, search_hgvs),
             (SearchTypes.LOCUS, LOCUS_PATTERN, search_locus),
             (SearchTypes.LOCUS, LOCUS_NO_REF_PATTERN, search_locus),
-            (SearchTypes.SAMPLE, HAS_ALPHA_PATTERN, search_sample),
+            (SearchTypes.SAMPLE, NOT_WHITESPACE, search_sample),
+            (SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
             (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
             (SearchTypes.CLINGEN_ALLELE_ID, r"^CA", search_clingen_allele),
             (SearchTypes.VARIANT, VARIANT_VCF_PATTERN, search_variant_vcf),
@@ -577,6 +579,10 @@ def search_locus(search_string: str, genome_build: GenomeBuild, variant_qs: Quer
 def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
     return Sample.filter_for_user(user).filter(name__icontains=search_string,
                                                vcf__genome_build=genome_build)
+
+
+def search_vcf(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+    return VCF.filter_for_user(user).filter(name__icontains=search_string, genome_build=genome_build)
 
 
 def search_variant_match(m: Match, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
