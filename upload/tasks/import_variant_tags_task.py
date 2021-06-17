@@ -6,12 +6,13 @@ from django.contrib.auth.models import User
 from django.utils.timezone import make_aware
 
 from analysis.models import VariantTagsImport, ImportedVariantTag, VariantTag, TagLocation
+from library.pandas_utils import df_nan_to_none
 from library.vcf_utils import write_vcf_from_tuples
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAlleleCollectionSource, VariantAllele, \
     VariantAlleleCollectionRecord
-from upload.models import UploadedVariantTags, UploadStep
+from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
@@ -25,6 +26,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         uploaded_file = upload_pipeline.uploaded_file
 
         df = pd.read_csv(upload_step.input_filename)
+        df = df_nan_to_none(df)
         NEW_CLASSIFICATION = "New Classification"
         REMOVE_LENGTH = len(NEW_CLASSIFICATION)
 
@@ -33,6 +35,15 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         if len(view_genome_builds) != 1:
             raise ValueError(f"Expected 'view_genome_build' column to have 1 unique value, was: {view_genome_builds}")
         genome_build = GenomeBuild.get_name_or_alias(view_genome_builds.pop())
+
+        try:
+            # We may be reloading - find previous and delete
+            uploaded_variant_tags = UploadedVariantTags.objects.get(uploaded_file=uploaded_file)
+            uploaded_variant_tags.variant_tags_import.delete()
+            uploaded_variant_tags.delete()
+        except UploadedVariantTags.DoesNotExist:
+            pass  # Ok to create new ones
+
         # Create VariantTagsImport - everything hangs off this
         variant_tags_import = VariantTagsImport.objects.create(user=uploaded_file.user, genome_build=genome_build)
         UploadedVariantTags.objects.create(uploaded_file=uploaded_file, variant_tags_import=variant_tags_import)
@@ -99,9 +110,14 @@ class VariantTagsInsertTask(ImportVCFStepTask):
                 tag_cache[tag.pk] = tag
 
             variant_tuple = Variant.get_tuple_from_string(ivt.variant_string, genome_build=genome_build)
-            variant = Variant.get_from_tuple(variant_tuple, genome_build)
+            try:
+                variant = Variant.get_from_tuple(variant_tuple, genome_build)
+            except Variant.DoesNotExist:
+                # Must have been normalized
+                variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
+                                                                                       *variant_tuple)
 
-            # We're not going to link anaysis/nodes - as probably don't match up across systems
+            # We're not going to link analysis/nodes - as probably don't match up across systems
             analysis = None
             node = None
 

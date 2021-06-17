@@ -8,7 +8,7 @@ from upload.import_task_factories.abstract_vcf_import_task_factory import Abstra
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import UploadedFileTypes, UploadedBed, UploadedExpressionFile, \
     UploadedGeneList, UploadedPatientRecords, UploadedPedFile, UploadedVCF, \
-    UploadedGeneCoverage, UploadStep, UploadedVariantTags, UploadStepTaskType
+    UploadedGeneCoverage, UploadStep, UploadStepTaskType
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_expression_task import ImportExpressionTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
@@ -239,7 +239,7 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
         return ['csv']
 
     def get_data_classes(self):
-        return [UploadedVariantTags]
+        return [UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
         df = pd.read_csv(filename, nrows=1)  # Just need header

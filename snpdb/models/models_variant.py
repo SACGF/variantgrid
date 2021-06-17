@@ -161,7 +161,7 @@ class Allele(FlagsMixin, models.Model):
                 self.save()
 
             if other_fc := other_allele.flag_collection:
-                other_fc.flag_set.update(collection=self.flag_collection)
+                other_fc.flag_set.update(collection=self.flag_collection_safe)
                 other_fc.flagwatch_set.update(flag_collection=self.flag_collection)
                 existing_fc_cc_names = self.flag_collection.clinicalcontext_set.values_list("name", flat=True)
                 other_fc.clinicalcontext_set.exclude(name__in=existing_fc_cc_names).update(flag_collection=self.flag_collection)
@@ -488,7 +488,7 @@ class VariantAllele(TimeStampedModel):
     def canonical_c_hgvs(self):
         return self.variant.get_canonical_c_hgvs(self.genome_build)
 
-    def needs_clinvar_call(self):
+    def needs_clingen_call(self):
         return settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None and self.error is None
 
     def __str__(self):

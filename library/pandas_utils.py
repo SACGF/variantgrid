@@ -5,13 +5,10 @@ import numpy as np
 import pandas as pd
 
 
-def get_columns_percent_dataframe(df, **kwargs):
+def get_columns_percent_dataframe(df: pd.DataFrame, totals_column=None, percent_names=True) -> pd.DataFrame:
     """ @param totals_column: (default = use sum of columns)
         @param percent_names: Rename names from 'col' => 'col %'
     Return a dataframe as a percentage of totals_column if provided, or sum of columns """
-
-    totals_column = kwargs.get("totals_column")
-    percent_names = kwargs.get("percent_names", True)
 
     percent_df = pd.DataFrame(index=df.index)
     columns = df.columns
@@ -31,19 +28,19 @@ def get_columns_percent_dataframe(df, **kwargs):
     return percent_df
 
 
-def get_rows_percent_dataframe(df):
+def get_rows_percent_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """ Return a dataframe as a percentage of sum of rows """
     row_sums = df.sum(axis=0)
-    return 100.0 * df / row_sums
+    return df.multiply(100.0) / row_sums
 
 
-def get_total_percent_dataframe(df):
+def get_total_percent_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """ Return a dataframe as a percentage of sum of rows """
     total = df.sum(axis=0).sum()
-    return 100.0 * df / total
+    return df.multiply(100.0) / total
 
 
-def df_handle_below_minimum_floats(df):
+def df_handle_below_minimum_floats(df: pd.DataFrame) -> pd.DataFrame:
 
     def handle_if_below_min(series):
         if series.dtype == 'd':
@@ -61,15 +58,15 @@ def nan_to_none(val):
     return val
 
 
-def df_nan_to_none(df):
+def df_nan_to_none(df: pd.DataFrame) -> pd.DataFrame:
     return df.where((pd.notnull(df)), None)
 
 
-def df_replace_nan(df, nan_replace=''):
+def df_replace_nan(df: pd.DataFrame, nan_replace='') -> pd.DataFrame:
     return df.where((pd.notnull(df)), nan_replace)
 
 
-def read_csv_skip_header(fle, header='#', **kwargs):
+def read_csv_skip_header(fle, header='#', **kwargs) -> pd.DataFrame:
     if os.stat(fle).st_size == 0:
         raise ValueError("File is empty")
     with open(fle) as f:

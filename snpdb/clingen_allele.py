@@ -203,7 +203,7 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant) 
 
     try:
         va = VariantAllele.objects.get(variant=variant, genome_build=genome_build)
-        if va.needs_clinvar_call():
+        if va.needs_clingen_call():
             va = variant_allele_clingen(genome_build, variant, existing_variant_allele=va)
 
     except VariantAllele.DoesNotExist:

@@ -626,17 +626,14 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     modified_normalised_variants = variant.modifiedimportedvariant_set.all().filter(old_variant__isnull=False)
     modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
 
-    try:
-        variant_allele = variant.variantallele_set.get(genome_build=genome_build)
+    variant_allele_data = None
+    # We don't really handle very rare case with having multiple VariantAlleles for a variant
+    if variant_allele := variant.variantallele_set.filter(genome_build=genome_build).first():
         # If we require a ClinGen call (eg have Allele but no ClinGen, and settings say we can get it then don't
         # provide the data so we will do an async call)
-        if not variant_allele.needs_clinvar_call():
+        if not variant_allele.needs_clingen_call():
             logging.info("Skipping as we need clinvar call")
             variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
-        else:
-            variant_allele_data = None
-    except VariantAllele.DoesNotExist:
-        variant_allele_data = None
 
     variant_tags = []
     for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):

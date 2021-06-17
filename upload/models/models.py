@@ -577,6 +577,11 @@ class ModifiedImportedVariant(models.Model):
                                old_variant_formatted=old_variant)
 
     @classmethod
+    def get_variant_for_unnormalized_variant(cls, upload_pipeline, chrom, position, ref, alt) -> Variant:
+        miv = cls.get_upload_pipeline_unnormalized_variant(upload_pipeline, chrom, position, ref, alt)
+        return miv.variant
+
+    @classmethod
     def get_variants_for_unnormalized_variant(cls, chrom, position, ref, alt) -> QuerySet:
         old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, alt)
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted=old_variant).distinct()
