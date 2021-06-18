@@ -18,7 +18,11 @@ from classification.views.classification_export_flags import ExportFormatterFlag
 @terms_required
 def dashboard(request: HttpRequest) -> Response:
     classification_counts = dict()
-    vcqs_user = Classification.filter_for_user(request.user).filter(lab__in=Lab.valid_labs_qs(request.user, admin_check=True))
+
+    labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
+    labs.sort()
+
+    vcqs_user = Classification.filter_for_user(request.user).filter(lab__in=labs)
     vcqs = vcqs_user.filter(withdrawn=False)
 
     discordant = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
@@ -53,6 +57,7 @@ def dashboard(request: HttpRequest) -> Response:
 
     context = {
         "datatable_config": ClassificationDatatableConfig(request),
+        "labs": labs,
         "counts": issue_counts
     }
 

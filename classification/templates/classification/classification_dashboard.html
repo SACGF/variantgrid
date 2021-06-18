@@ -2,9 +2,11 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load js_tags %}
+{% load english_tags %}
 {% load compress %}
 {% load datatable_tags %}
 {% load ui_help %}
+{% load ui_utils %}
 {% load ui_menu_bars %}
 {% load ui_tabs_builder %}
 {% block title %}Classification Issues{% endblock %}
@@ -64,7 +66,6 @@
                 Flags range from issues with variant matching, to discordances or suggestions.<br/>
             </p>
         {% end_page_help_embedded %}
-        <p>For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
         {% if user.is_superuser %}
         <div class="admin-only my-4">
             Email preview:
@@ -72,6 +73,9 @@
             <a href="{% url 'summary_email_text' %}" class="hover-link">TEXT</a>
         </div>
         {% endif %}
+
+        <p>For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
+        {% labelled label="Showing issues for your labs" %}{% for lab in labs %}{% if not forloop.first %}<br/>{% endif %}{{ lab }}{% endfor %}{% endlabelled %}
         <a class="btn btn-outline-primary" href="{% url 'classification_dashboard_download' %}"><i class="fas fa-file-csv"></i> Download all issues requiring action</a>
 
         <div class="mt-4">

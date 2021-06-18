@@ -237,6 +237,11 @@ class Lab(models.Model):
     email = models.TextField(blank=True)
     slack_webhook = models.TextField(blank=True)
 
+    def __lt__(self, other):
+        if self.organization != other.organization:
+            return self.organization.name < other.organization.name
+        return self.name < other.name
+
     def send_notification(self,
                           message: str,
                           blocks: Optional[Dict] = None,
