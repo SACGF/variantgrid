@@ -43,7 +43,10 @@ class ExportFormatterJSON(ExportFormatter):
         if self.is_discordant(vcm.classification):
             json_values['discordant'] = True
         if withdrawn:
-            json_values['delete'] = True
+            json_values = {
+                "id": json_values["id"],
+                "delete": True
+            }
 
         json_str = json.dumps(json_values)
 
@@ -61,6 +64,10 @@ class ExportFormatterJSON(ExportFormatter):
         for vcm in group.withdrawn:
             row_str += self.to_row(vcm, withdrawn=True)
         return row_str
+
+    @property
+    def supports_fully_withdrawn(self) -> bool:
+        return True
 
     def content_type(self) -> str:
         return 'application/json'
