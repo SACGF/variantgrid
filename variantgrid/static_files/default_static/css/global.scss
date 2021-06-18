@@ -477,6 +477,10 @@ fieldset {
     }
 }
 
+fieldset.form-fields.small legend {
+    width: auto; // was 100% - cutting off top border
+}
+
 label[for] {
     cursor: pointer;
 }

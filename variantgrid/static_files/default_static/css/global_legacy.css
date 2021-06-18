@@ -172,7 +172,7 @@ form label {
   font-weight: bold;
 }
 
-input[type=checkbox], input[type=radio] {
+input[type='checkbox'], input[type='radio'] {
   cursor: pointer;
 }
 
@@ -381,7 +381,7 @@ fieldset legend {
   color: #334466;
 }
 
-.horizontal-fields input[type=text], .horizontal-fields input[type=password], .horizontal-fields input[type=email], .horizontal-fields input[type=number], .horizontal-fields input:not([type]), .horizontal-fields textarea, fieldset.form-fields input[type=text], fieldset.form-fields input[type=password], fieldset.form-fields input[type=email], fieldset.form-fields input[type=number], fieldset.form-fields input:not([type]), fieldset.form-fields textarea {
+.horizontal-fields input[type='text'], .horizontal-fields input[type='password'], .horizontal-fields input[type='email'], .horizontal-fields input[type='number'], .horizontal-fields input:not([type]), .horizontal-fields textarea, fieldset.form-fields input[type='text'], fieldset.form-fields input[type='password'], fieldset.form-fields input[type='email'], fieldset.form-fields input[type='number'], fieldset.form-fields input:not([type]), fieldset.form-fields textarea {
   min-width: 300px;
   border-radius: 4px;
   border: 1px solid #dddddd;
@@ -394,6 +394,10 @@ fieldset legend {
 .horizontal-fields select, fieldset.form-fields select {
   min-width: 307px;
   height: 28px;
+}
+
+fieldset.form-fields.small legend {
+  width: auto;
 }
 
 label[for] {
@@ -533,7 +537,7 @@ li.error {
   border: 0px !important;
 }
 .grid-link .no-entry {
-  opacity: 0.1;
+  opacity: .1;
 }
 
 #node-data-container a.grid-link {
@@ -1048,7 +1052,7 @@ div#content {
 
 .gnomad-flag-label {
   display: inline;
-  padding: 0.2em 0.6em 0.3em;
+  padding: .2em .6em .3em;
   font-size: 75%;
   font-weight: bold;
   line-height: 1;
@@ -1056,7 +1060,7 @@ div#content {
   text-align: center;
   white-space: nowrap;
   vertical-align: baseline;
-  border-radius: 0.25em;
+  border-radius: .25em;
   background-color: #5cb85c;
 }
 
@@ -1246,7 +1250,7 @@ a.clinical-context {
 }
 
 .sequencer-name-text {
-  font-size: 0.6em;
+  font-size: .6em;
 }
 
 .color-box {
@@ -1314,7 +1318,7 @@ a.clinical-context {
   margin-bottom: 0;
 }
 .citation .loading {
-  opacity: 1;
+  opacity: 1.0;
 }
 .citation.failed {
   background-color: #ffcccc;
