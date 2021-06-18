@@ -71,7 +71,10 @@
 	const NODE_HELP = {{ node_help | jsonify }};
 	ANALYSIS_SETTINGS = {{ analysis_settings | jsonify }};
 
-    let panelResizeTimeout;
+	// Panel resize timeouts function added in analysis.js
+    // We reset the timeout, so only save after a period of inactivity
+	var panelResizeTimeout;
+	var panelResizeUpdateDelay = 150;
 	messagePoller = new AnalysisMessagePoller(Urls.nodes_status(ANALYSIS_ID));
 
 	var secondWindow; // set to window in dual screen mode
@@ -110,7 +113,14 @@
 	$(document).ready(function() {
         let showAnalysisVariables = Boolean("{{ analysis.template_type|default_if_none:'' }}");
         let initialAnalysisPanelWidth = {{ analysis.analysis_panel_fraction }} * window.innerWidth;
+        // Ensure whatever fraction was saved, that analysis and grid/editor are min of 200 each
+        if (initialAnalysisPanelWidth < 200) {
+            initialAnalysisPanelWidth = 200;
+        }
         let initialGridAndEditorWidth = window.innerWidth - initialAnalysisPanelWidth;
+        if (initialGridAndEditorWidth < 200) {
+            initialGridAndEditorWidth = 200;
+        }
         // noinspection JSAnnotator
         const nodeDataArray = {% render_nodes_array nodes %};
         // noinspection JSAnnotator

@@ -106,9 +106,10 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
         },
         center: centerLayoutParams,
         east: { onresize: resizeGrid,
-                minSize: 200,
                 triggerEventsOnLoad: true,
                 size: initialGridAndEditorWidth,
+                // Setting minSize in this pane cases 'InternalError: too much recursion' with sizeMidPanes
+                // So we'll just reset min size upon loading each time
         }
     });
     $('div#analysis-and-toolbar-container').layout({
