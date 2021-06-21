@@ -4,9 +4,7 @@ import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta
 from functools import reduce
-from random import randint
 from typing import Optional, Dict, Any
 
 from django.conf import settings
@@ -17,25 +15,21 @@ from django.db.models import Q
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
-from django.utils import timezone
-from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
-from analysis.models.nodes.analysis_node import Analysis
 from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from eventlog.models import Event, create_event
+from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import require_superuser, highest_pk, get_url_from_view_path, get_field_counts
+from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
-from library.guardian_utils import admin_bot, bot_group
-from library.log_utils import report_exc_info, log_traceback, NotificationBuilder
-from library.utils import count, pretty_label
+from library.guardian_utils import admin_bot
+from library.log_utils import report_exc_info, log_traceback
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -44,21 +38,21 @@ from snpdb.clingen_allele import link_allele_to_existing_variants
 from snpdb.forms import TagForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, VariantAllele, \
+from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, \
     AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_user_settings import UserSettings, UserPageAck
+from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
-from variantgrid.perm_path import get_visible_url_names
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
 from variantopedia.search import search_data, SearchResults
-
+from variantopedia.server_status import get_dashboard_notices
+from variantopedia.tasks.server_status_tasks import notify_server_status
 
 def variants(request):
     context = {}
@@ -72,58 +66,7 @@ def get_total_counts(user: User) -> Dict[str, int]:
     }
 
 
-def get_dashboard_notices(user: User, days_ago: Optional[int]) -> dict:
-    """ returns {} if nothing to show """
-    MAX_PAST_DAYS = 30
 
-    start_time = 0
-    notice_header = ""
-
-    if days_ago:
-        # if days ago was passed in, don't update upa
-        days_ago = min(days_ago, MAX_PAST_DAYS)
-        start_time = timezone.now() - timedelta(days=days_ago)
-        notice_header = f"Since the last {days_ago} day{'s' if days_ago > 1 else ''}"
-    else:
-        upa, created = UserPageAck.objects.get_or_create(user=user, page_id="server_status")
-        if created:
-            if user.last_login:
-                start_time = user.last_login
-                notice_header = f"Since last login ({timesince(start_time)} ago)"
-        else:
-            start_time = upa.modified
-            notice_header = f"Since last visit to this page ({timesince(start_time)} ago)"
-            upa.save()  # Update last modified timestamp
-
-        max_days_ago = timezone.now() - timedelta(days=MAX_PAST_DAYS)
-        if max_days_ago > start_time:
-            start_time = max_days_ago
-            notice_header = f"Since the last {MAX_PAST_DAYS} days"
-
-    if user.is_superuser:
-        events = Event.objects.filter(date__gte=start_time, severity=LogLevel.ERROR)
-    else:
-        events = Event.objects.none()
-
-    active_users = list(User.objects.filter(pk__in=Event.objects.filter(date__gte=start_time).exclude(user__groups=bot_group()).values_list('user', flat=True).distinct()).order_by('username').values_list('username', flat=True))
-
-    vcfs = VCF.filter_for_user(user, True).filter(date__gte=start_time)
-    analyses = Analysis.filter_for_user(user)
-    analyses_created = analyses.filter(created__gte=start_time)
-    analyses_modified = analyses.filter(created__lt=start_time, modified__gte=start_time)
-    classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
-    new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
-
-    return {
-        "active_users": active_users,
-        "notice_header": notice_header,
-        "events": events,
-        "classifications_of_interest": classifications_of_interest,
-        "classifications_created": new_classification_count,
-        "vcfs": vcfs,
-        "analyses_created": analyses_created,
-        "analyses_modified": analyses_modified,
-    }
 
 
 def strip_celery_from_keys(celery_state):
@@ -158,74 +101,12 @@ def dashboard(request):
     return render(request, "variantopedia/dashboard.html", context)
 
 
-def notify_server_status():
-    dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
-    url = get_url_from_view_path(reverse('server_status')) + '?days=1'
-
-    emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
-    nb = NotificationBuilder(message="Health Check", emoji=emoji)
-    nb.add_header("Health Check")
-    nb.add_markdown(f"URL : <{url}|{url}>")
-    nb.add_markdown("*Disk usage*")
-    disk_usage = list()
-    for _, message in get_disk_messages(info_messages=True):
-        disk_usage.append(f":floppy_disk: {message}")
-    nb.add_markdown("\n".join(disk_usage), indented=True)
-    nb.add_markdown("*In the last 24 hours*")
-
-    keys = set(dashboard_notices.keys())
-    keys.discard('events')
-    keys.discard('notice_header')
-    visible_urls = get_visible_url_names()
-    if not visible_urls.get('analyses'):
-        for exclude_key in ['vcfs', 'analyses_created', 'analyses_modified']:
-            keys.discard(exclude_key)
-    sorted_keys = sorted(list(keys))
-
-    lines = list()
-
-    for key in sorted_keys:
-        values = dashboard_notices.get(key)
-        count_display = count(values)
-
-        display_individuals = False
-        emoji = ":blue_book:"
-        if 'analyses' in key:
-            emoji = ":orange_book:"
-        elif 'vcf' in key:
-            emoji = ":green_book:"
-        elif 'active_users' in key:
-            if count_display == 0:
-                emoji = ":ghost:"
-            else:
-                emojis = [":nerd_face:", ":thinking_face:", ":face_with_monocle:", ":face_with_cowboy_hat:"]
-                emoji = emojis[randint(0, len(emojis) - 1)]
-                display_individuals = True
-
-        if count_display:
-            count_display = f"*{count_display}*"
-
-        line = f"{emoji} {count_display} : {pretty_label(key)}"
-        if display_individuals:
-            line = f"{line} : {', '.join(str(value) for value in values)}"
-
-        lines.append(line)
-    nb.add_markdown("\n".join(lines), indented=True)
-    nb.add_markdown("*In Total*")
-    nb.add_markdown(
-        f":people_holding_hands: {Classification.dashboard_total_shared_classifications():,} : Classifications Shared" +
-        f"\n:cry: {Classification.dashboard_total_unshared_classifications():,} : Classifications Un-Shared",
-        indented=True
-    )
-    nb.send()
-
-
 @require_superuser
 def server_status(request):
     if request.method == "POST":
         action = request.POST.get('action')
         if action == 'test-slack':
-            notify_server_status()
+            notify_server_status.apply_async()
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
             with connection.cursor() as cursor:

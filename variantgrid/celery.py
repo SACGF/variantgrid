@@ -55,10 +55,17 @@ if SAPATH_ENABLED:
             'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
         }
 
-app.conf.beat_schedule['variant-validation'] = {
-    'task': 'snpdb.tasks.validation_task.validate_variant_data',
+app.conf.beat_schedule['notify-server-status'] = {
+    'task': 'variantopedia.tasks.server_status_tasks.notify_server_status',
     'schedule': crontab(hour=19, minute=0),
 }
+
+if settings.ALLELE_VALIDATION:
+    app.conf.beat_schedule['allele-validation'] = {
+        'task': 'snpdb.tasks.validation_task.validate_alleles',
+        'schedule': crontab(hour=19, minute=30),
+    }
+
 
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:
