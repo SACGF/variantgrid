@@ -33,7 +33,7 @@ def queryset_to_sql(queryset, pretty=False):
 
 def get_select_from_where_parts_str(sql_str):
     from_pos = sql_str.find("FROM")
-    where_pos = sql_str.find("WHERE")
+    where_pos = sql_str.find("WHERE", from_pos)  # Where must be after from to allow filtered aggregates
     if where_pos < 0:
         where_pos = len(sql_str)
 
