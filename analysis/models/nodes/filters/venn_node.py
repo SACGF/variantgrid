@@ -226,9 +226,12 @@ class VennNodeCache(models.Model):
 
 @receiver(post_delete, sender=VennNodeCache)
 def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    if instance.variant_collection:
-        instance.variant_collection.delete_related_objects()
-        instance.variant_collection.delete()
+    try:
+        if instance.variant_collection:
+            instance.variant_collection.delete_related_objects()
+            instance.variant_collection.delete()
+    except VariantCollection.DoesNotExist:
+        pass  # OK as deleted elsewhere (eg version was bumped and old ones cleaned up)
 
 
 @celery.task
