@@ -40,7 +40,7 @@ if settings.SYNC_DETAILS and settings.SYNC_DETAILS["enabled"]:
     }
 
 # TODO - move this into settings???
-if settings.SEQAUTO_ENABLED and settings.UPLOAD_ENABLED:
+if all([settings.SEQAUTO_ENABLED, settings.SEQAUTO_SCAN_DISKS, settings.UPLOAD_ENABLED]):
     app.conf.beat_schedule['seqauto-nightly-scan'] = {
         'task': 'seqauto.tasks.scan_run_jobs.scan_run_jobs',
         'schedule': HOUR_SECS * 2,

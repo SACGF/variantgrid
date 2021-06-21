@@ -2,6 +2,7 @@ import os
 from variantgrid.settings.components.default_settings import BASE_DIR, MANAGE_COMMAND, PRIVATE_DATA_ROOT
 
 SEQAUTO_ENABLED = False
+SEQAUTO_SCAN_DISKS = True
 SEQAUTO_ALLOW_NON_STAFF_MANUAL_RUN = True
 SEQAUTO_DIR = os.path.join(BASE_DIR, "seqauto")
 SEQAUTO_SCRIPTS_DIR = os.path.join(SEQAUTO_DIR, "scripts", "test")
