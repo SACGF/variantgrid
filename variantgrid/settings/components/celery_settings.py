@@ -127,7 +127,7 @@ CELERY_IMPORTS = (
     'snpdb.tasks.vcf_bed_file_task',
     'snpdb.tasks.validation_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',
-    'sync.tasks.sync_tasks'
+    'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',
     'upload.tasks.import_expression_task',
     'upload.tasks.import_gene_coverage_task',
