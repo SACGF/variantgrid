@@ -2,7 +2,7 @@ from typing import List
 
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import CASCADE, SET_NULL
+from django.db.models import CASCADE, SET_NULL, PROTECT
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.models_analysis import Analysis
@@ -36,7 +36,7 @@ class ImportedVariantTag(models.Model):
 class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     """ A tag in an analysis. Has create create/delete signal handlers:
         @see analysis.signals.signal_handlers._update_analysis_on_variant_tag_change """
-    variant = models.ForeignKey(Variant, on_delete=CASCADE)
+    variant = models.ForeignKey(Variant, on_delete=PROTECT)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     analysis = models.ForeignKey(Analysis, null=True, on_delete=SET_NULL)

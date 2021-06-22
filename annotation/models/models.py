@@ -106,7 +106,7 @@ class ClinVar(models.Model):
                             1024: 'other'}
 
     version = models.ForeignKey(ClinVarVersion, on_delete=CASCADE)
-    variant = models.ForeignKey(Variant, on_delete=CASCADE)
+    variant = models.ForeignKey(Variant, on_delete=PROTECT)
     clinvar_variation_id = models.IntegerField()
     clinvar_allele_id = models.IntegerField()
     clinvar_preferred_disease_name = models.TextField(null=True, blank=True)
