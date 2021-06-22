@@ -110,8 +110,12 @@ def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
         if gatk_commandline := reader.metadata.get("GATKCommandLine"):
             variant_caller = "GATK"
             for commandline in gatk_commandline:
+                if caller_id := commandline.get("ID"):
+                    if caller_id == 'HaplotypeCaller':
+                        caller_id = "GATK"  # Just stay with GATK
+                    variant_caller = caller_id
+
                 if version := commandline.get("Version"):
                     version = version.replace('"', "")  # Strip quotes
-                break
 
     return variant_caller, version
