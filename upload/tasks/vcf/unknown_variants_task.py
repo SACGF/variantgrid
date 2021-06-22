@@ -66,9 +66,7 @@ class BulkUnknownVariantInserter:
         if alt == ref:
             alt = Variant.REFERENCE_ALT
 
-        # Always insert a reference with every non-ref alt variant
-        for alt in {alt, Variant.REFERENCE_ALT}:
-            self.variant_pk_lookup.add(chrom, position, ref, alt)
+        self.variant_pk_lookup.add(chrom, position, ref, alt)
         self.batch_process_check()
 
     def finish(self):
