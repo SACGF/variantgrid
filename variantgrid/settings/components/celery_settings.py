@@ -113,6 +113,8 @@ CELERY_IMPORTS = (
     'annotation.tasks.calculate_sample_stats',
     'annotation.tasks.cohort_sample_gene_damage_counts',
     'annotation.tasks.import_clinvar_vcf_task',
+    'classification.tasks.classification_import_process_variants_task',
+    'classification.tasks.classification_import_task',
     'genes.tasks.gene_coverage_tasks',
     'pedigree.models',
     'seqauto.tasks.gold_summary_tasks',
@@ -125,6 +127,7 @@ CELERY_IMPORTS = (
     'snpdb.tasks.vcf_bed_file_task',
     'snpdb.tasks.validation_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',
+    'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',
     'upload.tasks.import_expression_task',
     'upload.tasks.import_gene_coverage_task',
@@ -138,9 +141,7 @@ CELERY_IMPORTS = (
     'upload.tasks.vcf.import_vcf_step_task',
     'upload.tasks.vcf.import_vcf_tasks',
     'upload.tasks.vcf.unknown_variants_task',
-    'classification.tasks.classification_import_process_variants_task',
-    'classification.tasks.classification_import_task',
-    'sync.tasks.sync_tasks'
+    'variantopedia.tasks.server_status_tasks',
 )
 
 CELERY_ALWAYS_EAGER = False  # True to execute in http server process (or Eclipse)

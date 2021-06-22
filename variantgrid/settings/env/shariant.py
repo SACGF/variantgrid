@@ -25,6 +25,7 @@ KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 # import all the base settings #
 SITE_ID = 5  # shariant.org.au
 
+ALLELE_VALIDATION = True
 INBOX_ENABLED = False
 DISCORDANCE_ENABLED = True
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'

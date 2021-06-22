@@ -44,6 +44,9 @@ MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
 # Need 5x as many as largest cohort for CohortNode zygosity query
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 
+# Nightly task to fix missing GRCh37/38 representations
+ALLELE_VALIDATION = False
+
 # if None, discordance emails wont be sent
 DISCORDANCE_EMAIL = None
 ACCOUNTS_EMAIL = None
