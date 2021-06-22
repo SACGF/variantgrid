@@ -143,9 +143,9 @@ def get_item(dictionary, key):
 
 @register.filter
 def format_preference(value):
-    if value == True:
+    if value is True:
         return 'Yes'
-    elif value == False:
+    elif value is False:
         return 'No'
     else:
         return value
