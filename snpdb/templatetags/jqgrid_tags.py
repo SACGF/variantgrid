@@ -68,10 +68,12 @@ def user_data_grid_filter(context, grid_id_suffix, caption, group_data=True, inc
     user = context["user"]
     user_grid_config = UserGridConfig.get(user, caption)
 
-    return {'group_data': group_data,
-            'incomplete_data': incomplete_data,
-            'hidden_data': hidden_data,
-            'filter_name_choices': filter_name_choices,
-            'caption': caption,
-            'grid_id': get_grid_id(grid_id_suffix),
-            'user_grid_config': user_grid_config}
+    return {
+        'group_data': group_data,
+        'incomplete_data': incomplete_data,
+        'hidden_data': hidden_data,
+        'filter_name_choices': filter_name_choices,
+        'caption': caption,
+        'grid_id': get_grid_id(grid_id_suffix),
+        'user_grid_config': user_grid_config
+    }

@@ -64,8 +64,7 @@ class SequencingRunListGrid(JqGridUserRowConfig):
         queryset = self.model.objects.all()
 
         if extra_filters:
-            enrichment_kit_id = extra_filters.get("enrichment_kit_id")
-            if enrichment_kit_id:
+            if enrichment_kit_id := extra_filters.get("enrichment_kit_id"):
                 queryset = queryset.filter(enrichment_kit_id=enrichment_kit_id)
 
         user_grid_config = UserGridConfig.get(user, self.caption)

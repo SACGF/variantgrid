@@ -13,7 +13,7 @@ from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import calculate_age
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_alias_and_select_columns
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
-    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig
+    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
 
 
@@ -40,10 +40,20 @@ class VCFListGrid(JqGridUserRowConfig):
         'uploadedvcf__vcf_importer__version': {"label": 'VCF Importer Version', "hide_non_admin": True},
     }
 
-    def __init__(self, user):
+    def __init__(self, user, **kwargs):
+        extra_filters = kwargs.get("extra_filters")
         super().__init__(user)
         user_grid_config = UserGridConfig.get(user, self.caption)
         queryset = VCF.filter_for_user(user, group_data=user_grid_config.show_group_data)
+
+        # Set via vcf_grid_filter_tags
+        if extra_filters:
+            if project := extra_filters.get("project"):
+                queryset = queryset.filter(project=project)
+            if genome_build_name := extra_filters.get("genome_build_name"):
+                genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+                queryset = queryset.filter(genome_build=genome_build)
+
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
         self.extra_config.update({'shrinkToFit': False,
                                   'sortname': 'id',
@@ -59,7 +69,7 @@ class SamplesListGrid(JqGridUserRowConfig):
     model = Sample
     caption = 'Samples'
     fields = ["id", "name", "het_hom_count", "vcf__date", "import_status", "vcf__genome_build__name", "variants_type",
-              "vcf__user__username", "vcf__source", "vcf__name", "vcf__uploadedvcf__uploaded_file__import_source",
+              "vcf__user__username", "vcf__source", "vcf__name", "vcf__project__name", "vcf__uploadedvcf__uploaded_file__import_source",
               "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
@@ -84,6 +94,7 @@ class SamplesListGrid(JqGridUserRowConfig):
                                  "url_name": "view_vcf",
                                  "url_object_column": "vcf__id"}
         },
+        "vcf__project__name": {'label': "Project"},
         "sample_gene_list_count": {'name': 'sample_gene_list_count', 'label': '# Sample GeneLists',
                                    "model_field": False, "formatter": "viewSampleGeneList", 'sorttype': 'int'},
         'activesamplegenelist__id': {'hidden': True},
@@ -100,11 +111,20 @@ class SamplesListGrid(JqGridUserRowConfig):
         "specimen__reference_id": {'label': 'Specimen'}
     }
 
-    def __init__(self, user):
+    def __init__(self, user, **kwargs):
+        extra_filters = kwargs.get("extra_filters")
         super().__init__(user)
 
         user_grid_config = UserGridConfig.get(user, self.caption)
         queryset = Sample.filter_for_user(user, group_data=user_grid_config.show_group_data)
+
+        # Set via vcf_grid_filter_tags
+        if extra_filters:
+            if project := extra_filters.get("project"):
+                queryset = queryset.filter(vcf__project=project)
+            if genome_build_name := extra_filters.get("genome_build_name"):
+                genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+                queryset = queryset.filter(vcf__genome_build=genome_build)
 
         # If you don't have permission to view a patient - blank it out
         # If you have read only and

@@ -99,6 +99,7 @@ urlpatterns = [
     perm_path('autocomplete/Cohort/', views_autocomplete.CohortAutocompleteView.as_view(), name='cohort_autocomplete'),
     perm_path('autocomplete/CustomColumn/', views_autocomplete.CustomColumnAutocompleteView.as_view(), name='custom_column_autocomplete'),
     perm_path('autocomplete/GenomicIntervalsCollection/', views_autocomplete.GenomicIntervalsCollectionAutocompleteView.as_view(), name='genomic_intervals_collection_autocomplete'),
+    perm_path('autocomplete/Project/', views_autocomplete.ProjectAutocompleteView.as_view(), name='project_autocomplete'),
     perm_path('autocomplete/Sample/', views_autocomplete.SampleAutocompleteView.as_view(), name='sample_autocomplete'),
     perm_path('autocomplete/Tag/', views_autocomplete.TagAutocompleteView.as_view(), name='tag_autocomplete'),
     perm_path('autocomplete/Trio/', views_autocomplete.TrioAutocompleteView.as_view(), name='trio_autocomplete'),

@@ -10,7 +10,7 @@ from django.views.decorators.vary import vary_on_cookie
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 from snpdb.models import VCF, Sample, Cohort, CustomColumnsCollection, CustomColumn, Tag, Trio, \
-    Lab, GenomicIntervalsCollection, GenomeBuild, ImportStatus
+    Lab, GenomicIntervalsCollection, GenomeBuild, ImportStatus, Project
 
 
 class GenomeBuildAutocompleteView(AutocompleteView, ABC):
@@ -54,6 +54,14 @@ class LabAutocompleteView(AutocompleteView):
 
     def get_result_label(self, obj):
         return f'{obj.organization.name} - {obj.name}'
+
+
+@method_decorator([cache_page(MINUTE_SECS)], name='get')  # Doesn't need to vary_on_cookie as no permissions on Proj
+class ProjectAutocompleteView(AutocompleteView):
+    fields = ['name']
+
+    def get_user_queryset(self, user):
+        return Project.objects.all()
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')

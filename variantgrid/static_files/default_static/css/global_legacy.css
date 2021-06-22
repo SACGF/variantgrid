@@ -396,7 +396,7 @@ fieldset legend {
   height: 28px;
 }
 
-fieldset.form-fields.small legend {
+fieldset.form-fields legend {
   width: auto;
 }
 

@@ -1,9 +1,5 @@
-<style>
-#delete-vcf-container {
-	display: none;
-	padding: 5px;
-}
-</style>
+{% load jqgrid_tags %}
+{% load vcf_grid_filter_tags %}
 <script>
 $(document).ready(function() {
     $('#id_vcf').change(function() {
@@ -13,21 +9,21 @@ $(document).ready(function() {
         }
     });
 });
-
 </script>
 
 <form id="vcf-form">
     {% csrf_token %}
     <div class="horizontal-fields">
-    {{ form.as_p }}
-    {{ form.media }}
+        <p>
+            <label>Jump to VCF</label>
+            <span>{{ form.vcf }} {{ form.media }}</span>
+        </p>
     </div>
+    {% vcf_grid_filter 'vcf' %}
 </form>
 
 
 <div>
-{% load jqgrid_tags %}
 {% user_data_grid_filter 'vcf' 'VCFs' %}
-
-{% jqgrid 'vcfs_grid' 'vcf' search=False delete=True template_name='snpdb/grids/vcfs_grid.html' %}
+{% jqgrid 'vcfs_grid' 'vcf' search=False delete=True template_name='snpdb/grids/vcfs_grid.html' init_func='vcfInitFunc' %}
 </div>

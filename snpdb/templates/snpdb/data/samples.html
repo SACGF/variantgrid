@@ -1,48 +1,7 @@
 {% load static %}
-<style>
-#delete-samples-container {
-	display: none;
-	padding: 5px;
-}
-
-.others-public-data {
-	background-color: #bfccd8
-}
-
-.my-public-data {
-	background-color: #daffdd;
-}
-
-.color-box {
-	width: 30px;
-	height: 30px;
-	border: 1px solid black;
-} 
-</style>
+{% load vcf_grid_filter_tags %}
+{% load jqgrid_tags %}
 <script>
-
-function deleteSelectedRows() {
-	let rowIds = [];
-
-	$("input.sample-select").each(function() {
-		if ($(this).is(":checked")) {
-            const rowId = $(this).attr("sample_id");
-            rowIds.push(rowId);
-		}
-	});
-
-	$("#samples-grid").jqGrid('delGridRow', rowIds);
-
-}
-
-function selectCheckBox() {
-	$("#delete-samples-container").slideDown();
-}
-
-function samples_grid_complete() {
-	$("input.sample-select").click(selectCheckBox);
-}
-
 $(document).ready(function() {
 	$('#id_sample').change(function() {
 		let sampleId = $(this).val();
@@ -58,17 +17,14 @@ $(document).ready(function() {
 <form id="sample-form" action="" method="post">
     {% csrf_token %}
     <div class="horizontal-fields">
-        {{ form.as_p }}
-        {{ form.media }}
+        <p>
+            <label>Jump to Sample</label>
+            <span>{{ form.sample }} {{ form.media }}</span>
+        </p>
     </div>
+    {% vcf_grid_filter 'samples' %}
 </form>
 
-{% load jqgrid_tags %}
-
 {% user_data_grid_filter 'samples' 'Samples' %}
-
-<div id="delete-samples-container">
-	<a href="javascript:deleteSelectedRows()">Delete Selected Samples</a>
-</div>
-{% jqgrid 'samples_grid' 'samples' search=False delete=True download_grid_json_as_csv=True template_name='snpdb/grids/samples_grid.html' grid_complete='samples_grid_complete' %}
+{% jqgrid 'samples_grid' 'samples' search=False delete=True download_grid_json_as_csv=True template_name='snpdb/grids/samples_grid.html' init_func='vcfInitFunc' %}
 </div>

@@ -50,7 +50,7 @@ from snpdb import forms
 from snpdb.bam_file_path import get_example_replacements
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
-    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
+    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm, ProjectChoiceForm
 from snpdb.graphs import graphcache
 from snpdb.graphs.allele_frequency_graph import AlleleFrequencyHistogramGraph
 from snpdb.graphs.chromosome_density_graph import SampleChromosomeDensityGraph
@@ -406,7 +406,9 @@ def cached_generated_file_delete(request):
 
 
 def vcfs(request):
-    context = {"form": VCFChoiceForm()}
+    context = {
+        "form": VCFChoiceForm(),
+    }
     return render(request, 'snpdb/data/vcfs.html', context=context)
 
 
@@ -421,8 +423,10 @@ def samples(request):
     else:
         group_info = ''
 
-    context = {"form": SampleChoiceForm(),
-               "group_info": group_info}
+    context = {
+        "form": SampleChoiceForm(),
+        "group_info": group_info,
+    }
     return render(request, 'snpdb/data/samples.html', context=context)
 
 

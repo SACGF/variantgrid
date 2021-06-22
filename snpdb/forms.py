@@ -19,7 +19,7 @@ from library.guardian_utils import DjangoPermission
 from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection
+    OrganizationUserSettingsOverride, CustomColumnsCollection, Project
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
@@ -273,6 +273,12 @@ class SampleForm(forms.ModelForm, ROFormMixin):
                 self.add_error('specimen', msg)
                 self.add_error('patient', msg)
         return cleaned_data
+
+
+class ProjectChoiceForm(forms.Form):
+    project = forms.ModelChoiceField(queryset=Project.objects.all(),
+                                     widget=autocomplete.ModelSelect2(url='project_autocomplete',
+                                                                      attrs={'data-placeholder': 'Project...'}))
 
 
 class SampleChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):

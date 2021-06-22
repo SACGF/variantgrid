@@ -1,0 +1,130 @@
+{% load ui_utils %}
+<div class="vcf-grid-filter-tags-{{ grid_id }}">
+    <style>
+    fieldset.grid-filter-container {
+        margin-left: 0px;
+        min-width: 700px;
+        max-width: 700px;
+    }
+
+    .genome-build-radio label {
+        white-space: nowrap;
+    }
+
+    #vcf-grid-filter {
+        margin-left: 5px;
+    }
+
+    </style>
+    <script>
+        var ignoreFilterGrid = false;
+        var vcfGridParams = {};
+        var tagContainer = $(".vcf-grid-filter-tags-{{ grid_id }}");
+
+        function vcfShowAll() {
+            let grid = $("#{{ grid_id }}");
+            ignoreFilterGrid = true;
+            $("input:radio[name=genome_build_filter]:first", tagContainer).click();  // reset radio to "All"
+            vcfClearAutoCompletes();
+            ignoreFilterGrid = false;
+            vcfGridParams = {};
+            filterGrid(grid);
+        }
+
+        function vcfClearAutoCompletes() {
+            $("select[data-autocomplete-light-function=select2]", tagContainer).each(function() {
+                clearAutocompleteChoice(this);
+            });
+        }
+
+        // This is called when refreshing the grid
+        function vcfGetExtraFilters() {
+            let extraFilters = '';
+            if (!$.isEmptyObject(vcfGridParams)) {
+                extraFilters = JSON.stringify(vcfGridParams);
+            }
+            return extraFilters;
+        }
+
+        function vcfInitFunc(grid, pagerId) {
+            grid[0].p.postData["extra_filters"] = vcfGetExtraFilters;
+        }
+
+        function filterGrid(grid) {
+            if (ignoreFilterGrid) {
+                return;
+            }
+
+            const descriptionContainer = $("#vcf-grid-filter-description", tagContainer);
+            if (!$.isEmptyObject(vcfGridParams)) {
+                const descriptions = [];
+                let genomeBuildName = vcfGridParams["genome_build_name"];
+                if (genomeBuildName) {
+                    descriptions.push("Genome Build = " + genomeBuildName);
+                }
+
+                let project = vcfGridParams["project"];
+                if (project) {
+                    descriptions.push("Project = " + project);
+                }
+                if (descriptions) {
+                    $("#vcf-grid-filter", tagContainer).html(descriptions.join(", "));
+                    descriptionContainer.show();
+                }
+            } else {
+                descriptionContainer.hide();
+            }
+
+            grid.trigger("reloadGrid");
+        }
+
+
+    $(document).ready(function() {
+        let grid = $("#{{ grid_id }}");
+        console.log("doc ready - GRID: ")
+        console.log(grid);
+
+        $('#id_project_{{ grid_id }}', tagContainer).change(function() {
+            vcfGridParams["project"] = $(this).val();
+            filterGrid(grid);
+        });
+
+        $("input[name=genome_build_filter]", tagContainer).change(function() {
+            let genomeBuildName = $(this).val();
+            if (genomeBuildName) {
+                vcfGridParams["genome_build_name"] = genomeBuildName;
+            } else {
+                delete vcfGridParams["genome_build_name"];
+            }
+            filterGrid(grid);
+        });
+
+        $("#vcf-grid-filter-description", tagContainer).hide();
+    });
+
+    </script>
+    <fieldset class="form-fields grid-filter-container">
+        <legend>Filter Grid</legend>
+        <div class="pair">
+            {% labelled label="Genome Build" %}
+            <div class="btn-group btn-group-toggle genome-build-radio" data-toggle="buttons">
+                <label class="btn btn-outline-primary active">
+                    <input class="table-filter" type="radio" name="genome_build_filter" value="" autocomplete="off" checked> All
+                </label>
+                {% for genome_build in genome_builds %}
+                    <label class="btn btn-outline-primary">
+                        <input class="table-filter" type="radio" name="genome_build_filter" value="{{ genome_build.name }}" autocomplete="off"> {{ genome_build.name }}
+                    </label>
+                {% endfor %}
+            </div>
+            {% endlabelled %}
+            {% labelled label="Project" %}
+            {{ project_form.project }}
+            {% endlabelled %}
+        </div>
+
+        <div id='vcf-grid-filter-description'>
+            Filtering to <span id='vcf-grid-filter'></span>. <a href='javascript:vcfShowAll()'>Show All</a>
+        </div>
+    </fieldset>
+</div>

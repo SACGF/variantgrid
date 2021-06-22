@@ -40,8 +40,9 @@
         {% ui_register_tab tab_set="data-tabs" label="VCF" url="vcfs" url_check=True %}
         {% ui_register_tab tab_set="data-tabs" label="Bed Files" url="bed_files" url_check=True %}
         {% ui_register_tab tab_set="data-tabs" label="Pedigree .ped Files" url="ped_files" url_check=True %}
+        {% comment %}
         {% ui_register_tab tab_set="data-tabs" label="Gene Expression" url="expression_files" url_check=True %}
-
+        {% endcomment %}
         {% ui_render_tabs tab_set="data-tabs" css="container-table" %}
     </div>
 {% endblock %}
