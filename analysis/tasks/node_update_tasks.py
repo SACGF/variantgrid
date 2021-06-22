@@ -151,7 +151,7 @@ def wait_for_node(node_id):
 
     #logging.info("wait_for_node: %s", node_id)
     try:
-        TIME_BETWEEN_CHECKS = [1, 1, 2, 5, 60, MINUTE_SECS * 5]
+        TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
         total_time = 0
         for sleep_time in TIME_BETWEEN_CHECKS:
 
