@@ -376,6 +376,10 @@ ul.customicons .ui-icon {
     background-image: url(/static/images/diagnose_icon.png);
 }
 
+/* Analysis grid create gene list child icon */
+.grid-link-icon.GeneListNode {
+    background-image: url(/static/images/node_icons/filter_list.png);
+}
 
 #analysis-toolbar {
 	vertical-align: middle;
