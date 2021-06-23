@@ -51,12 +51,12 @@ class Command(BaseCommand):
                 variants_deleted = unused_variants_qs._raw_delete(unused_variants_qs.db)
                 print(f"{variants_deleted=}")
                 vzc_qs = VariantZygosityCount.objects.filter(variant_id__gt=start, variant_id__lt=end)
-                vzc_qs.exclude(variant__in=variants_in_range_qs)
+                vzc_qs = vzc_qs.exclude(variant__in=variants_in_range_qs)
                 zygosity_count_deleted = vzc_qs._raw_delete(vzc_qs.db)
                 print(f"{zygosity_count_deleted=}")
 
                 va_qs = VariantAnnotation.objects.filter(variant_id__gt=start, variant_id__lt=end)
-                va_qs.exclude(variant__in=variants_in_range_qs)
+                va_qs = va_qs.exclude(variant__in=variants_in_range_qs)
                 annotation_deleted = va_qs._raw_delete(va_qs.db)
                 print(f"{annotation_deleted=}")
                 total_deleted += variants_deleted
