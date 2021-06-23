@@ -2,8 +2,8 @@ from django.core.management.base import BaseCommand
 import logging
 import numpy as np
 
-from annotation.models import VariantAnnotationVersion, AnnotationRangeLock
-from snpdb.models import GenomeBuild, Variant
+from annotation.models import VariantAnnotationVersion, AnnotationRangeLock, VariantAnnotation
+from snpdb.models import GenomeBuild, Variant, VariantZygosityCount
 
 
 class Command(BaseCommand):
@@ -38,20 +38,28 @@ class Command(BaseCommand):
                 end = linspace[s+1]
                 print(f"{start} - {end} ({end-start})")
                 # Skip the range lock min/max variant as that's protected so can't delete anyway
-                qs = Variant.objects.filter(pk__gt=start, pk__lt=end)
-                qs = qs.filter(classification__isnull=True,
-                               clinvar__isnull=True,
-                               varianttag__isnull=True,
-                               variantallele__isnull=True,
-                               cohortgenotype__isnull=True,
-                               variantcollectionrecord__isnull=True,
-                               # Avoid deleting those that are are within range in another build
-                               min_variant__isnull=True,
-                               max_variant__isnull=True)
-                _, details = qs.delete()
-                num_deleted = details.get('snpdb.Variant', 0)
-                print(details)
-                total_deleted += num_deleted
+                # Also need to avoid deleting those that are are within range in another build
+                variants_in_range_qs = Variant.objects.filter(pk__gt=start, pk__lt=end)
+                unused_variants_qs = variants_in_range_qs.filter(classification__isnull=True,
+                                                                 clinvar__isnull=True,
+                                                                 varianttag__isnull=True,
+                                                                 variantallele__isnull=True,
+                                                                 cohortgenotype__isnull=True,
+                                                                 variantcollectionrecord__isnull=True,
+                                                                 min_variant__isnull=True,
+                                                                 max_variant__isnull=True)
+                variants_deleted = unused_variants_qs._raw_delete(unused_variants_qs.db)
+                print(f"{variants_deleted=}")
+                vzc_qs = VariantZygosityCount.objects.filter(variant_id__gt=start, variant_id__lt=end)
+                vzc_qs.exclude(variant__in=variants_in_range_qs)
+                zygosity_count_deleted = vzc_qs._raw_delete(vzc_qs.db)
+                print(f"{zygosity_count_deleted=}")
+
+                va_qs = VariantAnnotation.objects.filter(variant_id__gt=start, variant_id__lt=end)
+                va_qs.exclude(variant__in=variants_in_range_qs)
+                annotation_deleted = va_qs._raw_delete(va_qs.db)
+                print(f"{annotation_deleted=}")
+                total_deleted += variants_deleted
 
         print(f"Total deleted: {total_deleted}")
         print("You should probably run:")
