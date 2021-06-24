@@ -19,6 +19,8 @@ class ExportFormatterFlags(ExportFormatter):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # For issues, don't care if we don't have a representation
+        self.qs = self.raw_qs
 
     def header(self) -> str:
         # hard-code columns that aren't in evidence
