@@ -314,27 +314,27 @@ def view_classification_diff(request):
     elif request.GET.get('clinical_context'):
         cc = ClinicalContext.objects.get(pk=request.GET.get('clinical_context'))
         records = cc.classification_modifications
-        records.sort(key=lambda cm: cm.curated_date_check)
+        records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
     elif request.GET.get('variant_compare'):
         ref = ClassificationRef.init_from_str(user=request.user, id_str=request.GET.get('variant_compare'))
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
         # filter out variant we're comparing with, make it last in calculation
         latest_others_for_variant = [vcm for vcm in compare_all if vcm.classification.id != ref.record.id]
-        latest_others_for_variant.sort(key=lambda cm:cm.curated_date_check)
+        latest_others_for_variant.sort(key=lambda cm:cm.curated_date_check, reverse=True)
         compare_all = [ref.modification] + latest_others_for_variant
         records = compare_all
 
     elif request.GET.get('variant'):
         variant_id = int(request.GET.get('variant'))
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Variant.objects.get(pk=variant_id).allele, published=True)
-        compare_all.sort(key=lambda cm: cm.curated_date_check)
+        compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         records = compare_all
 
     elif request.GET.get('allele'):
         allele_id = int(request.GET.get('allele'))
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True)
-        compare_all.sort(key=lambda cm: cm.curated_date_check)
+        compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         records = compare_all
 
     elif cids := request.GET.get('cids'):
