@@ -17,10 +17,12 @@ class ExportFormatterFlags(ExportFormatter):
 
     CODE_SUBSTITUTE = {'mandatory': 'Missing value'}
 
+    @property
+    def filter_out_not_lifted_over_to_desired(self) -> bool:
+        return False
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # For issues, don't care if we don't have a representation
-        self.qs = self.raw_qs
 
     def header(self) -> str:
         # hard-code columns that aren't in evidence

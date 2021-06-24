@@ -268,6 +268,10 @@ class ExportFormatter(BaseExportFormatter):
     def version(self):
         return '1.0'
 
+    @property
+    def filter_out_not_lifted_over_to_desired(self) -> bool:
+        return True
+
     def __init__(self, genome_build: GenomeBuild, qs: QuerySet, user: User = None, since: datetime = None, optimize_since: bool = True):
         self.genome_build = genome_build
         self.used_contigs: Set[Contig] = set()
@@ -295,8 +299,11 @@ class ExportFormatter(BaseExportFormatter):
                     qs = qs.filter(classification__variant__in=all_variants)
 
         self.raw_qs = qs
-        self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
-
+        if self.filter_out_not_lifted_over_to_desired:
+            self.record_errors(qs.filter(**{f'{self.preferred_chgvs_column}__isnull': True}), f"No {genome_build} representation")
+            self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
+        else:
+            self.qs = qs
         super().__init__()
 
     @property
