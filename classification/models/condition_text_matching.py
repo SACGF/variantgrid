@@ -296,7 +296,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         if not gene_symbol:
             report_message("Classification has blank or unrecognised gene symbol, cannot link it to condition text", extra_data={
-                "target": gene_str,
+                "target": gene_str or "<blank>",
                 "classification_id": classification.id,
                 "gene_symbol": gene_str
             })

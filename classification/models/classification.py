@@ -22,7 +22,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
 import logging
 import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple
 import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
@@ -256,12 +256,6 @@ class ClassificationOutstandingIssues:
 
     def __str__(self):
         return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
-
-
-@dataclass
-class CuratedDate:
-    date: datetime
-    is_curated: bool
 
 
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
@@ -2132,22 +2126,11 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     @property
     def curated_date(self) -> datetime:
-        return self.curated_date_check.date
+        return CuratedDate(self).date
 
-    @property
-    def curated_date_check(self) -> CuratedDate:
-        """
-        @return a datetime and a bool indicating if True, value came from curated, if False came from classification created
-        """
-        tzinfo = pytz.timezone(settings.TIME_ZONE)
-        try:
-            curated_date_value = Classification.to_date(self.get(SpecialEKeys.CURATION_DATE))
-            if curated_date_value:
-                return CuratedDate(curated_date_value.astimezone(tzinfo), True)
-        except:
-            pass  # could not parse date
-        # if we don't have a curation date, use created date
-        return CuratedDate(self.classification.created.astimezone(tzinfo), False)
+    @lazy
+    def curated_date_check(self) -> 'CuratedDate':
+        return CuratedDate(self)
 
     @staticmethod
     def optimize_for_report(qs: QuerySet) -> QuerySet:
@@ -2421,7 +2404,7 @@ class ClassificationConsensus:
                 variants = allele.variants
             vcms = list(ClassificationModification.latest_for_user(user=user, variant=variants, published=True).all())
             if vcms:
-                vcms.sort(key=lambda vcm: vcm.curated_date)
+                vcms.sort(key=lambda vcm: vcm.curated_date_check)
                 self.vcm = vcms[-1]
 
     @property
@@ -2448,3 +2431,101 @@ class ClassificationConsensus:
 
         patch: Dict[str, Dict[str, Any]] = nest_dict(consensus)
         return patch
+
+
+@dataclass
+class ClassificationDateType:
+    date: datetime
+    name: Optional[str] = None
+
+
+class CuratedDate:
+    """
+    CuratedDate is a bit misleading, keeps the most relevant filled in date for a classification.
+    Also allows two classification modifications can be compared, and always having a winner
+    (subsequent less important dates are fallen back to if other dates are equal)
+    """
+
+    def __init__(self, modification: ClassificationModification):
+        self._modification = modification
+
+    @lazy
+    def timezone(self):
+        return pytz.timezone(settings.TIME_ZONE)
+
+    def convert_date(self, evidence_key):
+        if date_str := self._modification.get(evidence_key):
+            try:
+                return Classification.to_date(date_str).astimezone(self.timezone)
+            except:
+                pass
+        return None
+
+    @lazy
+    def curated_date(self) -> Optional[datetime]:
+        return self.convert_date(SpecialEKeys.CURATION_DATE)
+
+    @lazy
+    def sample_date(self) -> Optional[datetime]:
+        return self.convert_date(SpecialEKeys.SAMPLE_DATE)
+
+    @lazy
+    def curated_verified_date(self) -> Optional[datetime]:
+        return self.convert_date(SpecialEKeys.CURATION_VERIFIED_DATE)
+
+    @lazy
+    def created_date(self) -> datetime:
+        return self._modification.classification.created.astimezone(self.timezone)
+
+    @lazy
+    def epoch(self):
+        return datetime.utcfromtimestamp(0).astimezone(self.timezone)
+
+    @lazy
+    def relevant_date(self) -> ClassificationDateType:
+        """
+        Return the most relevant date (for reporting) along with a name for the date if it isn't the Sample Date
+        """
+        if date := self.curated_date:
+            return ClassificationDateType(date)  # don't provide label for curated as it's the default
+        elif date := self.curated_verified_date:
+            return ClassificationDateType(date, "Verified")
+        elif date := self.sample_date:
+            return ClassificationDateType(date, "Sample Date")
+        return ClassificationDateType(self.created_date, "Created")
+
+    @property
+    def name(self) -> str:
+        return self.relevant_date.name
+
+    @property
+    def date(self) -> datetime:
+        return self.relevant_date.date
+
+    def __lt__(self, other: 'CuratedDate') -> bool:
+        epoch = self.epoch
+
+        def direction(date_1, date_2):
+            nonlocal epoch
+            date_1 = date_1 or epoch
+            date_2 = date_2 or epoch
+
+            if date_1 == date_2:
+                return 0
+            elif date_1 < date_2:
+                return -1
+            else:
+                return 1
+
+        if diff := direction(self.curated_date, other.curated_date):
+            return diff < 0
+        if diff := direction(self.curated_verified_date, other.curated_verified_date):
+            return diff < 0
+        if diff := direction(self.sample_date, other.sample_date):
+            return diff < 0
+        if diff := direction(self.created_date, other.created_date):
+            return diff < 0
+
+        # should not happen as two records should never have the same created date
+        # but just in case
+        return self._modification.classification_id < other._modification.classification_id

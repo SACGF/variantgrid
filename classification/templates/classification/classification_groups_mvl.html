@@ -21,7 +21,7 @@
             <td style='padding:8px'>{% for condition in group.conditions %}<div>{% condition condition %}</div>{% empty %}-{% endfor %}</td>
             <td style='padding:8px'>{{ group.zygosities | ekey:'zygosity' }}</td>
             <td style='font-family:monospace;padding:8px'>{% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}{{ acmg }}{% empty %}-{% endfor %}</td>
-            <td style='font-family:monospace;padding:8px'><div style='white-space: nowrap'>{{ group.most_recent_curated.date | date:'Y-m-d' }}</div></td>
+            <td style='font-family:monospace;padding:8px'><div style='white-space: nowrap'>{% with curated_date=group.most_recent_curated %}{% if curated_date.name %}{{ curated_date.name }} {% endif %}{{ curated_date.date | date:'Y-m-d' }}{% endwith %}</div></td>
         </tr>
     {% endfor %}
     </tbody>

@@ -85,7 +85,7 @@ class ClassificationGroup:
     @staticmethod
     def sort_modifications(mod1: ClassificationModification):
         curated_date = mod1.curated_date_check
-        return [not mod1.classification.withdrawn, curated_date.is_curated, curated_date.date]
+        return [not mod1.classification.withdrawn, curated_date]
 
     @property
     def most_recent(self) -> ClassificationModification:

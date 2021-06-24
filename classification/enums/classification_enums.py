@@ -21,6 +21,8 @@ class SpecialEKeys:
     CONDITION = 'condition'
     CLINICAL_SIGNIFICANCE = 'clinical_significance'
     CURATION_DATE = 'curation_date'
+    CURATION_VERIFIED_DATE = 'curation_verified_date'
+    SAMPLE_DATE = 'sample_date'
 
     # POPULATED
     # Note: Some fields not here are populated - those with variantgrid_column
