@@ -48,7 +48,7 @@ from classification.models.evidence_mixin import EvidenceMixin, VCPatch
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification_utils import \
     ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta
-from classification.regexes import db_ref_regexes, DbRegexes
+from annotation.regexes import db_ref_regexes, DbRegexes
 
 ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 

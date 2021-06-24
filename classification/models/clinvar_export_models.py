@@ -15,7 +15,7 @@ from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap, classification_post_publish_signal, \
     Classification, flag_types, EvidenceKey, MultiCondition
 from classification.models.evidence_mixin import VCDbRefDict
-from classification.regexes import DbRegexes
+from annotation.regexes import DbRegexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution, FlagStatus
 from genes.hgvs import CHGVS
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin

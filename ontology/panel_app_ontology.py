@@ -1,16 +1,19 @@
 import re
 from datetime import timedelta
-
 from django.conf import settings
 from typing import Union
-
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
 from library.cache import timed_cache
-from library.log_utils import report_exc_info
+from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
-from ontology.models import OntologyService, OntologyTerm, OntologyRelation, OntologyImportSource
+from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
+
+
+# increment if you change the logic of parsing ontology terms from PanelApp
+# which will then effectively nullify the cache so the new logic is run
+PANEL_APP_API_PROCESSOR_VERSION = 4
 
 
 def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
@@ -29,12 +32,11 @@ def _update_gene_relations(gene_symbol: str):
         hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
         panel_app = PanelAppServer.australia_instance()
         filename = panel_app.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
-        ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol), import_source=OntologyImportSource.PANEL_APP_AU, processor_version=3)
+        ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol),
+                                           import_source=OntologyImportSource.PANEL_APP_AU,
+                                           processor_version=PANEL_APP_API_PROCESSOR_VERSION)
         try:
             ontology_builder.ensure_old(max_age=timedelta(days=settings.PANEL_APP_CACHE_DAYS))
-
-            PANEL_APP_OMIM = re.compile(r"([0-9]{5,})")
-            MONDO_RE = re.compile("MONDO:([0-9]+)")
 
             results = get_panel_app_results_by_gene_symbol_json(server=panel_app, gene_symbol=gene_symbol)
             response_hash = md5sum_str(str(results))
@@ -47,10 +49,9 @@ def _update_gene_relations(gene_symbol: str):
                         phenotype_row: str
                         for phenotype_row in panel_app_result.get("phenotypes", []):
 
-                            def add_term_if_valid(match_id: str, ontology: OntologyService):
+                            def add_term_if_valid(full_id: str):
                                 nonlocal ontology_builder
                                 nonlocal hgnc_term
-                                full_id = OntologyService.index_to_id(ontology, int(match_id))
                                 if term := OntologyTerm.objects.filter(id=full_id).first():
                                     ontology_builder.add_ontology_relation(
                                         source_term_id=term.id,
@@ -60,12 +61,13 @@ def _update_gene_relations(gene_symbol: str):
                                             "phenotype_row": phenotype_row,
                                             "evidence": evidence
                                         })
+                                else:
+                                    report_message("Found invalid ontology term from PanelApp", level="error", extra_data={term: full_id})
 
-                            for omim_match in PANEL_APP_OMIM.finditer(phenotype_row):
-                                add_term_if_valid(omim_match[1], OntologyService.OMIM)
-
-                            for mondo_match in MONDO_RE.finditer(phenotype_row):
-                                add_term_if_valid(mondo_match[1], OntologyService.MONDO)
+                            from annotation.regexes import db_ref_regexes, DbRegexes
+                            for result in db_ref_regexes.search(phenotype_row, default_regex=DbRegexes.OMIM):
+                                if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
+                                    add_term_if_valid(result.id_fixed)
 
             ontology_builder.complete()
 

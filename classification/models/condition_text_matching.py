@@ -18,7 +18,7 @@ from model_utils.models import TimeStampedModel
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
     flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolvedTermDict
-from classification.regexes import db_ref_regexes
+from annotation.regexes import db_ref_regexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin

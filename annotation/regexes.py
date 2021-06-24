@@ -56,6 +56,13 @@ class DbRefRegex:
             id_str = id_str.rjust(self.expected_length, '0')
         return id_str
 
+    def __eq__(self, other):
+        # db should be unique in DbRefRegex
+        return self.db == other.db
+
+    def __hash__(self):
+        return hash(self.db)
+
 
 class DbRegexes:
     CLINGEN = DbRefRegex(db="ClinGen", prefixes="CA", link="http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=CA${1}", match_type=MatchType.SIMPLE_NUMBERS)

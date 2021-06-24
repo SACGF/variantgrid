@@ -6,7 +6,7 @@ import requests
 from django.urls import reverse
 from lazy import lazy
 
-from classification.regexes import db_ref_regexes
+from annotation.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake
