@@ -300,7 +300,8 @@ class ExportFormatter(BaseExportFormatter):
 
         self.raw_qs = qs
         if self.filter_out_not_lifted_over_to_desired:
-            self.record_errors(qs.filter(**{f'{self.preferred_chgvs_column}__isnull': True}), f"No {genome_build} representation")
+            # CSV file does this elsewhere
+            # self.record_errors(qs.filter(**{f'{self.preferred_chgvs_column}__isnull': True}), f"No {genome_build} representation")
             self.qs = qs.filter(**{f'{self.preferred_chgvs_column}__isnull': False})
         else:
             self.qs = qs
