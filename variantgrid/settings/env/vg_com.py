@@ -62,4 +62,4 @@ _VG_COM_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/variantgrid
 if os.path.exists(_VG_COM_TEMPLATES_DIR):
     TEMPLATES[0]["DIRS"].insert(0, _VG_COM_TEMPLATES_DIR)
 
-UPLOAD_ENABLED = False
+UPLOAD_ENABLED = True
