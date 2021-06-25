@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from shlex import shlex
+from typing import Dict
 
 from django.conf import settings
 
@@ -10,9 +11,13 @@ from annotation.fake_annotation import get_fake_vep_version
 from annotation.models.models import ColumnVEPField
 from annotation.models.models_enums import VEPPlugin, VEPCustom
 from genes.models_enums import AnnotationConsortium
-from library.file_utils import get_extension_without_gzip, mk_path_for_file
+from library.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
 from library.utils import get_single_element, execute_cmd
 from snpdb.models.models_genome import GenomeBuild
+
+
+class VEPVersionMismatchError(ValueError):
+    pass
 
 
 class VEPConfig:
@@ -181,19 +186,15 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
     return get_vep_version_from_vcf(output_filename)
 
 
-def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
-    vep_config = VEPConfig(genome_build)
-    if settings.ANNOTATION_VEP_FAKE_VERSION:
-        return get_fake_vep_version(genome_build, vep_config.annotation_consortium)
-
-    vep_version_dict = get_vep_version(genome_build, vep_config.annotation_consortium)
-
+def vep_dict_to_variant_annotation_version_kwargs(vep_version_dict: Dict) -> Dict:
     def vep_int_version(vep_string_version):
         m = re.match(r"v(\d+)", vep_string_version)
-        return m.group(1)
+        return int(m.group(1))
 
     FIELD_CONVERSION = {
         "vep": vep_int_version,
+        "cosmic": int,
+        "dbsnp": int,
     }
 
     FIELD_LOOKUP = {
@@ -215,15 +216,26 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
         'sift': 'sift',
     }
 
-    kwargs = {"genome_build": genome_build}
+    kwargs = {}
     for json_field, python_field in FIELD_LOOKUP.items():
         value = vep_version_dict.get(json_field)
         converter = FIELD_CONVERSION.get(python_field)
         if converter:
             value = converter(value)
         kwargs[python_field] = value
+    return kwargs
+
+
+def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
+    vep_config = VEPConfig(genome_build)
+    if settings.ANNOTATION_VEP_FAKE_VERSION:
+        return get_fake_vep_version(genome_build, vep_config.annotation_consortium)
+
+    vep_version_dict = get_vep_version(genome_build, vep_config.annotation_consortium)
+    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_version_dict)
 
     vc = VEPConfig(genome_build)
+    kwargs["genome_build"] = genome_build
     kwargs["annotation_consortium"] = vc.annotation_consortium
     distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
     if distance is None:
@@ -247,7 +259,7 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
 def get_vep_version_from_vcf(output_filename):
     VEP_VERSIONS_LINE_START = "##VEP"
 
-    with gzip.open(output_filename, "rt") as f:
+    with open_handle_gzip(output_filename, "rt") as f:
         for line in f:
             if line.startswith("#"):
                 if line.startswith(VEP_VERSIONS_LINE_START):
@@ -274,3 +286,15 @@ def vep_parse_version_line(line):
     except:
         logging.error("vep_parse_version_line - couldn't parse '%s'", line)
         raise
+
+
+def vep_check_version_match(variant_annotation_version, filename: str):
+    """ Load VEP VCF, check VEP= line and make sure that values match expected VariantAnnotationVersion """
+    vep_dict = get_vep_version_from_vcf(filename)
+    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_dict)
+    for k, v in kwargs.items():
+        version_value = getattr(variant_annotation_version, k)
+        if version_value != v:
+            msg = f"Annotation/VCF out of sync! Version '{variant_annotation_version}' and VCF '{filename}' differ, " \
+                  f"KEY: '{k}' annotation: '{version_value}', vcf: '{v}'"
+            raise VEPVersionMismatchError(msg)

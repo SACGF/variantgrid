@@ -8,9 +8,10 @@ from annotation.annotation_versions import get_variant_annotation_version, \
     get_annotation_range_lock_and_unannotated_count
 from annotation.models import VariantAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import AnnotationRun
+from annotation.models.models import AnnotationRun, VariantAnnotationVersion
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import vep_parse_version_line
+from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
+    vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
@@ -31,25 +32,44 @@ class TestAnnotationVCF(TestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.variant_annotation_versions_by_build = {}
 
-        grch37 = GenomeBuild.get_name_or_alias('GRCh37')
-        grch38 = GenomeBuild.get_name_or_alias('GRCh38')
+        VCFS = {
+            "GRCh37": cls.TEST_ANNOTATION_VCF_GRCH37,
+            "GRCh38": cls.TEST_ANNOTATION_VCF_GRCH38,
+        }
 
-        # Clear any previous annotations
-        for genome_build in [grch37, grch38]:
-            vav = get_variant_annotation_version(genome_build)
-            print("Truncating!")
-            vav.truncate_related_objects()
+        for genome_build_name, vcf in VCFS.items():
+            genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
 
-        slowly_create_loci_and_variants_for_vcf(grch37, TestAnnotationVCF.TEST_ANNOTATION_VCF_GRCH37, get_variant_id_from_info=True)
-        slowly_create_loci_and_variants_for_vcf(grch38, TestAnnotationVCF.TEST_ANNOTATION_VCF_GRCH38, get_variant_id_from_info=True)
+            vep_dict = get_vep_version_from_vcf(vcf)
+            kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_dict)
+            kwargs["genome_build"] = genome_build
+            vav, created = VariantAnnotationVersion.objects.get_or_create(**kwargs)
+            if not created:
+                print("Truncating!")
+                vav.truncate_related_objects()
+            cls.variant_annotation_versions_by_build[genome_build_name] = vav
 
-    def setUp(self):
-        print("setUp: Run once for every test method to setup clean data.")
+            slowly_create_loci_and_variants_for_vcf(genome_build, vcf, get_variant_id_from_info=True)
+
+    def test_version_mismatch(self):
+        genome_build = GenomeBuild.get_name_or_alias('GRCh37')
+        vav = get_variant_annotation_version(genome_build)  # Will be fake due to ANNOTATION_VEP_FAKE_VERSION
+        annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
+        annotation_range_lock.save()
+        annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
+                                                      vcf_annotated_filename=TestAnnotationVCF.TEST_ANNOTATION_VCF_GRCH38)
+        try:
+            import_vcf_annotations(annotation_run, delete_temp_files=False)
+            self.assertTrue(False, "Should never reach here")
+        except VEPVersionMismatchError:
+            self.assertTrue(True, "Exception was thrown")
+
 
     def test_import_variant_annotations_grch37(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh37')
-        vav = get_variant_annotation_version(genome_build)
+        vav = self.variant_annotation_versions_by_build[genome_build.name]
 
         print("Variants: ", Variant.objects.all().count())
         print("VariantAnnotation: ", VariantAnnotation.objects.all().count())
@@ -80,7 +100,7 @@ class TestAnnotationVCF(TestCase):
 
     def test_import_variant_annotations_grch38(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh38')
-        vav = get_variant_annotation_version(genome_build)
+        vav = self.variant_annotation_versions_by_build[genome_build.name]
 
         print("Variants: ", Variant.objects.all().count())
         print("VariantAnnotation: ", VariantAnnotation.objects.all().count())
