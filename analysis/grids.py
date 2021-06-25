@@ -360,10 +360,11 @@ class AnalysesGrid(JqGridUserRowConfig):
 class AnalysisTemplatesGrid(JqGridUserRowConfig):
     model = AnalysisTemplate
     caption = 'Analysis Templates'
-    fields = ["analysis__id", "name", "created", "modified",
+    fields = ["id", "analysis__id", "name", "created", "modified",
               "analysis__genome_build__name", "analysis__description", "user__username"]
 
     colmodel_overrides = {
+        "id": {"hidden": True},  # Need an ID row so we can delete
         'analysis__id': {'formatter': 'analysisLink',
                          'formatter_kwargs': {"icon_css_class": "analysis-icon",
                                               "url_name": "analysis"}},
