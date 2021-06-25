@@ -2438,6 +2438,9 @@ class ClassificationDateType:
     date: datetime
     name: Optional[str] = None
 
+    @property
+    def is_fallback(self) -> bool:
+        return self.name == "Created"
 
 class CuratedDate:
     """
@@ -2504,6 +2507,20 @@ class CuratedDate:
 
     def __lt__(self, other: 'CuratedDate') -> bool:
         epoch = self.epoch
+
+        my_relevant_date = self.relevant_date
+        other_relevant_date = other.relevant_date
+
+        # fallback dates (e.g. Created) are seen as before all other dates
+        # can almost think of it as null... but not 100% null
+        if my_relevant_date.is_fallback != other_relevant_date.is_fallback:
+            return my_relevant_date.is_fallback
+
+        # both dates aren't fallback (or both are) if they're diff return the earliest
+        if my_relevant_date.date != other_relevant_date.date:
+            return my_relevant_date.date < other_relevant_date.date
+
+        # Most relevant dates are the same, now go down the chain until we find a difference
 
         def direction(date_1, date_2):
             nonlocal epoch

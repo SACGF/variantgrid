@@ -69,6 +69,13 @@ class ClassificationGroup:
         self.genome_build = genome_build
         self.clinical_significance_score = 0
 
+        self.sort_order = 0  # override this once we've sorted all classifications together
+        # for the sake of a JavaScript sort
+
+    @property
+    def sort_order_str(self) -> str:
+        return str(self.sort_order).rjust(5, "0")
+
     @property
     def allele(self) -> Optional[Allele]:
         if variant := self.most_recent.classification.variant:
@@ -308,6 +315,12 @@ class ClassificationGroups:
                             actual_group.clinical_significance_score = e_key_clin_sig.classification_sorter_value(clin_sig)
                             groups.append(actual_group)
         self.groups = groups
+        self.groups.sort(key=lambda cg:cg.most_recent_curated)
+        next_sort_order = 1
+        for group in self.groups:
+            group.sort_order = next_sort_order
+            next_sort_order += 1
+        self.groups.reverse()  # default store records as most recent to least recent
 
     def __iter__(self):
         return iter(self.groups)
@@ -320,6 +333,9 @@ class ClassificationGroups:
 
     @property
     def modifications(self) -> Iterable[ClassificationModification]:
+        """
+        Returns all classifications contained in this group, not just the latest
+        """
         for group in self.groups:
             for record in group.modifications:
                 yield record

@@ -68,6 +68,8 @@ def classification_groups(
         "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN
     }
     ordered_classifications = list(groups.modifications)
+    # classifications are sorted by group, display them so they're sorted by date
+    ordered_classifications.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
     if show_diffs:
         if 1 < len(groups) <= 20 and len(groups) != len(ordered_classifications):

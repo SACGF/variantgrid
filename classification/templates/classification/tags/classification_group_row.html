@@ -60,7 +60,7 @@
         {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records within this row<br/>Only showing latest" data-toggle="tooltip"></i>{% endif %}
     </td>
     {% with curated_date=group.most_recent_curated %}
-    <td style="width:100px" data-order="{{ curated_date.date.timestamp }}">
+    <td style="width:100px" data-order="{{ group.sort_order }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
             {% if curated_date.name %}{{ curated_date.name }}<br/>{% endif %}{% timestamp curated_date.date.timestamp time_ago=True %}
         </a><br/>
