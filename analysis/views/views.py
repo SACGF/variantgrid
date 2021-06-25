@@ -705,7 +705,7 @@ def analysis_settings_template_run_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
 
     node_variables = defaultdict(list)
-    for node in analysis.analysisnode_set.filter(analysisvariable__isnull=False).order_by("y"):
+    for node in analysis.analysisnode_set.filter(analysisvariable__isnull=False).distinct().order_by("y"):
         for av in node.analysisvariable_set.all().order_by("field"):
             node_variables[node].append(av)
 
