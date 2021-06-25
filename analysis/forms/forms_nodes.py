@@ -567,7 +567,7 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
 
     class Meta:
         model = SampleNode
-        exclude = list(ANALYSIS_NODE_FIELDS) + ["sample_gene_list", "has_gene_coverage"]
+        exclude = list(ANALYSIS_NODE_FIELDS) + ["has_gene_coverage"]
         widgets = {
             "sample": autocomplete.ModelSelect2(url='sample_autocomplete',
                                                 attrs={'data-placeholder': 'Sample...'}),
