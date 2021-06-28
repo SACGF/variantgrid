@@ -315,7 +315,7 @@ class ClassificationGroups:
                             actual_group.clinical_significance_score = e_key_clin_sig.classification_sorter_value(clin_sig)
                             groups.append(actual_group)
         self.groups = groups
-        self.groups.sort(key=lambda cg:cg.most_recent_curated)
+        self.groups.sort(key=lambda cg: cg.most_recent_curated)
         next_sort_order = 1
         for group in self.groups:
             group.sort_order = next_sort_order

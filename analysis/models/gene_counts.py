@@ -1,13 +1,10 @@
 from django.db import models
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE
-from django.db.utils import IntegrityError
 
-from analysis.exceptions import NodeNotFoundException
 from analysis.models.nodes.analysis_node import NodeVersion
 from annotation.models.models import VariantAnnotation
 from genes.models import Gene
-from library.django_utils import thread_safe_unique_together_get_or_create
 
 
 # TODO: Refactor classes below into using annotation.gene_counts

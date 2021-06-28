@@ -66,9 +66,6 @@ def get_total_counts(user: User) -> Dict[str, int]:
     }
 
 
-
-
-
 def strip_celery_from_keys(celery_state):
     worker_status = {}
     if celery_state:

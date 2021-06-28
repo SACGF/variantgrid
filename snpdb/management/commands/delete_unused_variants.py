@@ -65,4 +65,3 @@ class Command(BaseCommand):
         print("You should probably run:")
         print("python3.8 manage.py load_variants_hash_in_redis --clear")
         # Convert any ref=alt sequences into alt='='
-

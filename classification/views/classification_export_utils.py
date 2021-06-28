@@ -368,7 +368,6 @@ class ExportFormatter(BaseExportFormatter):
                     transcripts[collection_id].add(transcript)
         return transcripts
 
-
     def filter_mismatched_transcripts(self, allele_group: AlleleGroup):
         #flag_collection_id = Allele.objects.filter(pk=allele_group.allele_id).values_list('flag_collection_id',
         #                                                                                  flat=True).first()

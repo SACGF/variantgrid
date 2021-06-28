@@ -66,7 +66,6 @@ class TestAnnotationVCF(TestCase):
         except VEPVersionMismatchError:
             self.assertTrue(True, "Exception was thrown")
 
-
     def test_import_variant_annotations_grch37(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh37')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
