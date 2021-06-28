@@ -379,7 +379,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     @lazy
     def node_version(self):
-        return thread_safe_unique_together_get_or_create(NodeVersion, node=self, version=self.version)[0]
+        return NodeVersion.get(self)
 
     @lazy
     def node_cache(self) -> Optional['NodeCache']:
@@ -1002,10 +1002,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
 
     @staticmethod
     def get_counts_for_node(node, variant_column, extra_filters):
-        node_version, _ = thread_safe_unique_together_get_or_create(NodeVersion,
-                                                                    node=node,
-                                                                    version=node.version)
-
+        node_version = NodeVersion.get(node)
         ncscc, created = NodeColumnSummaryCacheCollection.objects.get_or_create(node_version=node_version,
                                                                                 variant_column=variant_column,
                                                                                 extra_filters=extra_filters)
