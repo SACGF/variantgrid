@@ -36,7 +36,7 @@ class ClassificationTestCaseModifications(TestCase):
                 lab=lab,
                 lab_record_id=None,
                 data={
-                    SpecialEKeys.C_HGVS: {'value': 'g.301A>C'},
+                    SpecialEKeys.C_HGVS: {'value': 'c.301A>C'},
                     SpecialEKeys.G_HGVS: {'value': '5678'},
                     'foo': {'value': 'bar'}
                 },
@@ -44,31 +44,35 @@ class ClassificationTestCaseModifications(TestCase):
                 source=SubmissionSource.API,
                 make_fields_immutable=False)
 
+            c_hgvs = vc.evidence.get(SpecialEKeys.C_HGVS)
+            self.assertEqual(c_hgvs.get('immutable'), 'variantgrid')
+
             # Added validation message to C_HGVS
             # have't changed G_HGVS at all but still want it to become immutable
             patch_immutable = {
-                SpecialEKeys.C_HGVS: {'validation': [{'code': 'normalising', 'severity': 'info', 'message': 'Normalising'}]},
-                SpecialEKeys.G_HGVS: {}
+                SpecialEKeys.C_HGVS: None,
+                SpecialEKeys.G_HGVS: {'note': 'bar'}
             }
 
             vc.patch_value(
                 patch=patch_immutable,
                 clear_all_fields=False,
                 user=admin_bot(),
-                source=SubmissionSource.VARIANT_GRID,
+                source=SubmissionSource.API,
                 leave_existing_values=False,
                 save=True,
                 make_patch_fields_immutable=True
             )
-            c_hgvs = vc.evidence.get(SpecialEKeys.C_HGVS)
-            self.assertEqual(c_hgvs.get('value'), 'g.301A>C')
-            #At time cant test this as a process is adding extra validation
-            #self.assertEqual(len(c_hgvs.get('validation', [])), 1)
-            self.assertEqual(c_hgvs.get('immutable'), SubmissionSource.VARIANT_GRID)
-
-            g_hgvs = vc.evidence.get(SpecialEKeys.G_HGVS)
+            g_hgvs = vc.evidence.get(SpecialEKeys.G_HGVS) or {}
             self.assertEqual(g_hgvs.get('value'), "5678")
+            self.assertEqual(g_hgvs.get('note'), "bar")
             self.assertEqual(g_hgvs.get('immutable'), SubmissionSource.VARIANT_GRID)
+
+            c_hgvs = vc.evidence.get(SpecialEKeys.C_HGVS) or {}
+            self.assertEqual(c_hgvs.get('value'), 'c.301A>C')
+            # At time cant test this as a process is adding extra validation
+            # self.assertEqual(len(c_hgvs.get('validation', [])), 1)
+            self.assertEqual(c_hgvs.get('immutable'), SubmissionSource.VARIANT_GRID)
 
             foo_val = vc.evidence.get('foo')
             self.assertEqual(foo_val.get('value'), 'bar')

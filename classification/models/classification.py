@@ -1381,12 +1381,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     warnings.append(
                         {'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key +
                                                                      ' from ' + str(existing.value) + ' to blank'})
+                    patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
                     patched.wipe(WipeMode.SET_NONE)
             else:
                 patched.raw = cell.diff(dest=existing, ignore_if_omitted={'immutable'})
-                if patched.value is not None and not source.can_edit(existing_immutability):
-                    message = f'Cannot change immutable value for {key} from {existing.value} to {patched.value}'
+                if ('value' in patched or 'explain' in patched) and not source.can_edit(existing_immutability):
+                    message = f'Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}'
                     warnings.append({'key': key, 'code': 'immutable', 'message': message})
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:

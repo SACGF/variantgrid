@@ -610,6 +610,9 @@ class VCDataCell:
         return self.e_key == other.e_key and \
             self.raw == other.raw
 
+    def __contains__(self, item):
+        return item in self._my_data
+
     def diff(self, dest: Optional['VCDataCell'], ignore_if_omitted: Optional[Set[str]] = None) -> Dict[str, Any]:
         """
         Given two dictionaries, returns only the entries that have changed
