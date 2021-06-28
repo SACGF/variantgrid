@@ -59,7 +59,7 @@
 </table>
 <script>$(document).ready(() => {
     var table = $('#{{ table_id }}').DataTable({
-        order: [[ 1, "asc" ]],
+        order: [[ 1, "asc" ], [6, "desc"]],
         pageLength: 50,
         responsive: {
             details: {
