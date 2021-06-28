@@ -16,13 +16,7 @@ class NodeGenesCountCollection(models.Model):
 
     @staticmethod
     def get_or_create_gene_counts_qs_for_node(node, queryset):
-        try:
-            node_version, _ = thread_safe_unique_together_get_or_create(NodeVersion,
-                                                                        node=node,
-                                                                        version=node.version)
-        except IntegrityError:
-            raise NodeNotFoundException(node.pk)
-
+        node_version = NodeVersion.get(node)
         ncscc, created = NodeGenesCountCollection.objects.get_or_create(node_version=node_version)
         if created:
             queryset = queryset.filter(**{VariantAnnotation.GENE_COLUMN + "__isnull": False})
