@@ -48,7 +48,9 @@ class BulkInserter:
         """
         if transcript:
             if not Classification.is_supported_transcript(transcript):
-                report_message(message="Unsupported transcript type imported - will not attempt variant match", extra_data={"transcript": transcript})
+                report_message(message="Unsupported transcript type imported - will not attempt variant match", extra_data={
+                    "target": transcript
+                })
                 return None
 
         if existing := self._import_for_genome_build.get(genome_build):
