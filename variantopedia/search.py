@@ -500,7 +500,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                 variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
                 if search_string != hgvs_string:
                     search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
-            except InvalidHGVSName:
+            except (InvalidHGVSName, NotImplementedError):
                 if classify:
                     search_message = f"Error reading HGVS: '{original_error}'"
                     return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
