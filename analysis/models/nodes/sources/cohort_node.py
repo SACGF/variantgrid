@@ -282,6 +282,22 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
         return super().save(**kwargs)
 
+    def save_clone(self):
+        filter_collections = list(self.cohortnodezygosityfilterscollection_set.all())
+
+        copy = super().save_clone()
+        for fc in filter_collections:
+            zf_list = list(fc.cohortnodezygosityfilter_set.all())
+            fc.pk = None
+            fc.cohort_node = copy
+            fc.save()
+            for zf in zf_list:
+                zf.pk = None
+                zf.collection = fc
+                zf.save()
+
+        return copy
+
     def __str__(self):
         if self.cohort:
             name = self.cohort.name

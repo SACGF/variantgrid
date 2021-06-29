@@ -19,7 +19,7 @@ from library.log_utils import log_traceback
 
 
 @celery.task
-def create_and_launch_analysis_tasks(analysis_id):
+def create_and_launch_analysis_tasks(analysis_id, run_async=True):
     """ This is run in a single worker queue so that we avoid race conditions"""
     try:
         tasks = _get_analysis_update_tasks(analysis_id)
@@ -28,7 +28,7 @@ def create_and_launch_analysis_tasks(analysis_id):
         raise
 
     for t in tasks:
-        execute_task(t, run_async=True)
+        execute_task(t, run_async=run_async)
 
 
 def _get_analysis_update_tasks(analysis_id) -> List:

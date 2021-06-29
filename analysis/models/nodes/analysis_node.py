@@ -7,6 +7,7 @@ from time import time
 from typing import Tuple, Sequence, List, Dict, Optional
 
 from celery.canvas import Signature
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection, models
 from django.db.models import Value, IntegerField
@@ -340,10 +341,14 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             @see https://docs.djangoproject.com/en/2/topics/db/queries/#spanning-multi-valued-relationships
         """
+
         # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = f"{self.pk}_{self.version}_get_q_cache_{disable_cache}"
-        q = cache.get(cache_key)
+        q: Optional[Q] = None
+        if settings.ANALYSIS_NODE_CACHE_Q:  # Disable for unit tests
+            q = cache.get(cache_key)
+
         if q is None:
             if disable_cache is False:
                 if cache_q := self._get_node_cache_q():
