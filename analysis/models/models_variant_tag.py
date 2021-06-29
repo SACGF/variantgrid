@@ -86,7 +86,10 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
             va_kwargs["variant__in"] = variant_qs
 
         va_qs = VariantAllele.objects.filter(**va_kwargs)
-        return VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True))
+        # Restrict VariantAlleles to this build, so we don't get 2x results with MT (which share contigs across builds)
+        # So the same variant has 2x variant alleles
+        return VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True),
+                                         variant__variantallele__genome_build=genome_build)
 
     @staticmethod
     def variants_for_build(genome_build, tags_qs, tag_ids: List[str]):
