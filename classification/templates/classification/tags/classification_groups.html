@@ -46,6 +46,7 @@
             <th><span class="text-secondary">Latest</span><br/>ACMG</th>
             <th><span class="text-secondary">Latest</span><br/>Curated</th>
             <th><span class="text-secondary">Latest</span> Imported as</th>
+            <th>Sort Column (hidden)</th>
             <th>Allele</th>
             <th>Gene Symbol</th>
             <th>Records</th>
@@ -59,7 +60,10 @@
 </table>
 <script>$(document).ready(() => {
     var table = $('#{{ table_id }}').DataTable({
-        order: [[ 1, "asc" ], [6, "desc"]],
+        order: [1, "asc"],
+        "orderFixed": {
+            post: [7, "desc"]
+        },
         pageLength: 50,
         responsive: {
             details: {
@@ -72,17 +76,18 @@
             }
         },
         columns: [
-            {'className': 'dt-id toggle-link'}, // ID
+            {className: 'dt-id toggle-link'}, // ID
             {}, // HGVS
             {}, // Clinical Sig
             {}, // Conditions
             {}, // Zygosities
             {}, // ACMG
             {}, // last record
-            {'className': 'none'}, // imported c.hgvs
-            {'className': 'none'}, // allele
-            {'className': 'none'}, // gene link
-            {'className': 'none'}, // record sub-table
+            {visible: false}, // sorting column
+            {className: 'none'}, // imported c.hgvs
+            {className: 'none'}, // allele
+            {className: 'none'}, // gene link
+            {className: 'none'}, // record sub-table
         ]
     });
     table.on('responsive-display', (e, datatable, row, showHide, update) => {

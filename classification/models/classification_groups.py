@@ -73,7 +73,7 @@ class ClassificationGroup:
         # for the sake of a JavaScript sort
 
     @property
-    def sort_order_str(self) -> str:
+    def date_sort_order_str(self) -> str:
         return str(self.sort_order).rjust(5, "0")
 
     @property
