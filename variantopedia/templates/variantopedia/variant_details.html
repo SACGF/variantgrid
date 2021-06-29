@@ -343,7 +343,7 @@ function variantDetailsTagClickHandler() {
 }
 
 
-function addVariantTag(variantTagData) {
+function variantDetailsAddVariantTag(variantTagData) {
     const tag = variantTagData.tag;
     // console.log("addVariantTag:");
     // console.log(variantTagData);
@@ -372,7 +372,7 @@ function addVariantTag(variantTagData) {
     }
 }
 
-function showTagAutocomplete() {
+function variantDetailsShowTagAutocomplete() {
     const showTagButton = $("#show-tag-autocomplete");
     const tagForm = $("#variant-tag-form");
     const variantTagUrl = Urls.set_variant_tag('V');
@@ -388,7 +388,7 @@ function showTagAutocomplete() {
             const successFunc = function (data) {
                 // We can return success but with empty data if it's a dupe (so don't add)
                 if (!$.isEmptyObject(data)) {
-                    addVariantTag(data);
+                    variantDetailsAddVariantTag(data);
                 }
                 showTagButton.show();
                 tagForm.hide();
@@ -413,7 +413,7 @@ $(document).ready(function() {
     {% if variant_tags %}
         const variantTags = {{ variant_tags|safe }};
         for (let i=0 ; i<variantTags.length ; ++i) {
-            addVariantTag(variantTags[i]);
+            variantDetailsAddVariantTag(variantTags[i]);
         }
         $("table#tags-table").show();
     {% endif %}
@@ -518,7 +518,6 @@ function applyVariantValues() {
     </div>
 
     {% if url_name_visible.variant_tags %}
-        {% comment %}Not actually annotations but always linked with them{% endcomment %}
     <div class="container mt-4">
         <h4>Tags</h4>
         <table id='tags-table' class="table hidden">
@@ -526,9 +525,11 @@ function applyVariantValues() {
                 <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th><th>Time Ago</th>
             </thead>
         </table>
+        {% if view_variant %}
+        {% comment %} Disable creating tags when loading via analysis grid. {% endcomment %}
         <div class="d-flex">
             <div>
-                <a href="javascript:showTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button d-inline-block"></div>&nbsp;Add Tag</a>
+                <a href="javascript:variantDetailsShowTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button d-inline-block"></div>&nbsp;Add Tag</a>
             </div>
             <form id="variant-tag-form" class="hidden flex-row flex-grow">
                 {% csrf_token %}
@@ -536,6 +537,9 @@ function applyVariantValues() {
                 {{ tag_form.media }}
             </form>
         </div>
+        {% else %}
+            Please create new tags in the grid, not on this page.
+        {% endif %}
     </div>
     {% endif %}
 
