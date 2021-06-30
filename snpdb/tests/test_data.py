@@ -2,13 +2,14 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from snpdb.models import CohortGenotypeCollection, Trio, CohortSample, ImportStatus, Sample, VCF, GenomeBuild, Cohort, \
-    assign_permission_to_user_and_groups
+    assign_permission_to_user_and_groups, VCFFilter
 
 
 def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
     vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genome_build=genome_build,
                              import_status=ImportStatus.SUCCESS,
                              user=user, date=timezone.now())
+    VCFFilter.objects.create(vcf=vcf, filter_code="X", filter_id='YOUSHALLNOTPASS', description="fdas")
     sample = Sample.objects.create(name="sample1", vcf=vcf, import_status=ImportStatus.SUCCESS)
     assign_permission_to_user_and_groups(user, vcf)
     assign_permission_to_user_and_groups(user, sample)
