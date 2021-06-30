@@ -656,10 +656,14 @@ def search_classification(search_string: str, user: User, **kwargs) -> Iterable[
             q_lab_record = Q(classification__lab_record_id=lab_record_id)
             filters.append(q_lab_name & q_lab_record)
     q_vcm = reduce(operator.or_, filters)
-    vcm_qs = ClassificationModification.filter_for_user(user)
-    vcm_ids = vcm_qs.filter(q_vcm, is_last_published=True).values('classification')
+    vcm_qs = ClassificationModification.filter_for_user(user).filter(is_last_published=True)
+    vcm_ids = vcm_qs.filter(q_vcm).values('classification')
+
+    # check for source ID but only for labs that the user belongs to
+    vcm_source_ids = vcm_qs.filter(classification__lab__in=Lab.valid_labs_qs(user, admin_check=True)).filter(published_evidence__source_id__value=search_string).values('classification')
+
     # convert from modifications back to Classification so absolute_url returns the editable link
-    return Classification.objects.filter(pk__in=vcm_ids)
+    return Classification.objects.filter(Q(pk__in=vcm_ids) | Q(pk__in=vcm_source_ids))
 
 
 def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
