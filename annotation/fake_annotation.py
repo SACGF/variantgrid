@@ -37,11 +37,6 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium):
 
 
 def get_fake_annotation_version(genome_build: GenomeBuild):
-    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL)
-    variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
-    create_ontology_test_data()
-    last_ontology_import = OntologyImport.objects.last()
-
     gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
                                                                         annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                         filename="fake")[0]
@@ -51,6 +46,13 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                           defaults={
                                                                               "gene_annotation_import": gene_annotation_import,
                                                                           })[0]
+
+    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL)
+    vav_kwargs["gene_annotation_release"] = gene_annotation_release
+    variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
+    create_ontology_test_data()
+    last_ontology_import = OntologyImport.objects.last()
+
     gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
                                                                           last_ontology_import=last_ontology_import,
                                                                           gnomad_import_date=timezone.now())[0]

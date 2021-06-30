@@ -1,9 +1,11 @@
-from genes.models import GeneSymbol, Transcript, Gene, GeneAnnotationImport, GeneVersion, TranscriptVersion
+from genes.models import GeneSymbol, Transcript, Gene, GeneAnnotationImport, GeneVersion, TranscriptVersion, \
+    GeneAnnotationRelease, ReleaseGeneSymbol, ReleaseGeneSymbolGene
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
 
-def create_fake_transcript_version(genome_build: GenomeBuild) -> TranscriptVersion:
+def create_fake_transcript_version(genome_build: GenomeBuild,
+                                   release: GeneAnnotationRelease = None) -> TranscriptVersion:
     runx1_symbol = GeneSymbol.objects.get_or_create(symbol='RUNX1')[0]
     transcript, _ = Transcript.objects.get_or_create(identifier="ENST00000300305",
                                                      annotation_consortium=AnnotationConsortium.ENSEMBL)
@@ -22,4 +24,9 @@ def create_fake_transcript_version(genome_build: GenomeBuild) -> TranscriptVersi
     transcript_version, _ = TranscriptVersion.objects.get_or_create(transcript=transcript, gene_version=gene_version,
                                                                     version=7, genome_build=genome_build,
                                                                     import_source=import_source, data=data)
+
+    if release:
+        release_symbol = ReleaseGeneSymbol.objects.create(release=release, gene_symbol=runx1_symbol)
+        ReleaseGeneSymbolGene.objects.create(release_gene_symbol=release_symbol, gene=gene)
+
     return transcript_version

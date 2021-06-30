@@ -10,6 +10,7 @@ from snpdb.models import Sample
 
 
 class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
+    """ AF is stored on NodeAlleleFrequencyFilter so can reuse code for all nodes that have AF filters """
     sample = models.ForeignKey(Sample, null=True, on_delete=SET_NULL)
 
     def _get_configuration_errors(self) -> List:
