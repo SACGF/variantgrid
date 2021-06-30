@@ -527,7 +527,9 @@ function formatClinGenAlleleId(cellValue) {
 
 function unitAsPercentFormatter(unitValue) {
     let percentValue = "";
-    if (unitValue) {
+    // Allele Frequency missing data passed as "." to match VCF
+    // Shows falsey values (eg 0.0) or '.' as blank
+    if (unitValue && unitValue !== ".") {
         let percent = (100.0 * unitValue).toPrecision(3);
         percentValue = percent + "%";
     }
