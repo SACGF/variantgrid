@@ -10,8 +10,10 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
+from django.db.models import TextField
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
-from django.db.models.expressions import RawSQL
+from django.db.models.expressions import RawSQL, OuterRef, Value, Subquery
+from django.db.models.functions import LPad, Cast, Concat
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
 import django.dispatch
@@ -1918,6 +1920,19 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                              allele__in=vc_qs.values_list("variant__variantallele__allele"))
         variant_ids = va_qs.values_list("variant_id", flat=True)
         return Q(id__in=list(variant_ids))  # List is much faster than inner query...
+
+    @staticmethod
+    def annotate_with_variant_sort(classifications_qs, genome_build: GenomeBuild, name="variant_sort"):
+        """ Annotate Classification queryset you can use to order by genome build position """
+
+        variant_qs = Variant.objects.filter(variantallele__allele=OuterRef("variant__variantallele__allele"),
+                                            variantallele__genome_build=genome_build).annotate(
+            padded_contig=LPad("locus__contig__name", 2, Value("0")),
+            padded_position=LPad(Cast("locus__position", output_field=TextField()), 9, Value("0")),
+            variant_sort=Concat("padded_contig", "padded_position"),
+        )
+
+        return classifications_qs.annotate(**{name: Subquery(variant_qs[:1].values_list("variant_sort"))})
 
     def get_other_classifications_summary_for_variant(self, user: User) -> str:
         other_classifications_summary = None
