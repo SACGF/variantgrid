@@ -8,7 +8,10 @@
     }
     .large-change .key-change {
         display: inline-block;
-        margin-bottom: 4px;
+        margin-bottom: 8px;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+        text-decoration-color: #cccccc;
     }
 </style>
 <table id="classification-activity" class="table">
@@ -47,7 +50,7 @@
             </td>
             <td>
                 {% for data_change in change_group.changes %}
-                    <div class="change {% if data_change.is_large %}large-change{% else %}mini-change{% endif %}">
+                    <div class="change {% if data_change.is_large and not change_group.ignore_before %}large-change{% else %}mini-change{% endif %}">
                         <span class="key-change"><span class="key">{{ data_change.key }}</span>.{{ data_change.attribute }}:</span>
                         {% if not change_group.ignore_before %}
                             {% if data_change.is_large %}<br/>{% else %}&#160;{% endif %}
