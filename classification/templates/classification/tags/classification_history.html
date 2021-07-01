@@ -2,7 +2,13 @@
 {% load user_tags %}
 <style>
     .change + .large-change, .large-change + .mini-change {
-        margin-top: 10px;
+        margin-top: 5px;
+        padding-top: 5px;
+        border-top: 1px dashed #cccccc;
+    }
+    .large-change .key-change {
+        display: inline-block;
+        margin-bottom: 4px;
     }
 </style>
 <table id="classification-activity" class="table">
@@ -46,10 +52,10 @@
                         {% if not change_group.ignore_before %}
                             {% if data_change.is_large %}<br/>{% else %}&#160;{% endif %}
                             {{ data_change.before | format_value }}
-                            {% if data_change.is_large %}<br/><span class="change-arrow">&#160;->&#160;</span><br/>
-                            {% else %}<span class="change-arrow">&#160;->&#160;</span>{% endif %}
+                            {% if data_change.is_large %}<br/><i class="fas fa-arrow-down text-secondary my-2"></i><br/>
+                            {% else %}<i class="fas fa-arrow-right text-secondary mx-2"></i>{% endif %}
                         {% else %}
-                            <span class="change-arrow">&#160;=&#160;</span>
+                            <span class="change-arrow"><i class="fas fa-arrow-right mx-2 text-secondary"></i></span>
                         {% endif %}
                         {% if data_change.resolution %}<span class="resolution">{{ data_change.resolution.label }}</span> {{ data_change.after }}
                         {% else %}{{ data_change.after | format_value }}{% endif %}

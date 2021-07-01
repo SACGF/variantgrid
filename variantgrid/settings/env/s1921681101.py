@@ -42,11 +42,11 @@ INTERNAL_IPS = [
 ]
 
 INSTALLED_APPS += [
-    'debug_toolbar'
+    # 'debug_toolbar'
 ]
 
 MIDDLEWARE += (
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
+    # 'debug_toolbar.middleware.DebugToolbarMiddleware',
 )
 
 """

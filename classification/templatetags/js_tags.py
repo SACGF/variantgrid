@@ -67,7 +67,7 @@ def limit_length(text, limit=100):
 @register.filter(is_safe=True)
 def format_value(val):
     if val is None:
-        return mark_safe('<span class="none">None</span>')
+        return mark_safe('<span class="no-value">None</span>')
     if val == "":
         return mark_safe('<span class="none">""</span>')
     if isinstance(val, dict) or isinstance(val, list):
@@ -78,8 +78,9 @@ def format_value(val):
     elif isinstance(val, int):
         return mark_safe(f'<span class="number">{val}</span>')
     else:
-        val = str(val)
-    return mark_safe(f'<span>{escape(val)}</span>')
+        val = escape(val)
+        val = val.replace("\n", "<br/>")
+        return mark_safe(val)
 
 
 @register.filter()

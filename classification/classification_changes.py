@@ -27,11 +27,12 @@ class ClassificationChange:
 
     @property
     def is_large(self):
-        if isinstance(self.before, str) and len(self.before) > 50:
+        if isinstance(self.before, str) and (len(self.before) > 50 or '\n' in self.before):
             return True
-        if isinstance(self.after, str) and len(self.after) > 50:
+        if isinstance(self.after, str) and (len(self.after) > 50 or '\n' in self.after):
             return True
         return False
+
 
 @total_ordering
 class ClassificationChanges:
@@ -110,7 +111,7 @@ class ClassificationChanges:
             source=vcm.source)
 
     @staticmethod
-    def list_changes(classification: Optional[Classification] = None, latest_date: Optional[datetime] = None, limit=200) -> List['ClassificationChanges']:
+    def list_changes(classification: Optional[Classification] = None, latest_date: Optional[datetime] = None, limit=100) -> List['ClassificationChanges']:
         if not latest_date:
             latest_date = now()
 
