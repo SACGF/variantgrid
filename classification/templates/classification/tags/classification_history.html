@@ -1,5 +1,10 @@
 {% load js_tags %}
 {% load user_tags %}
+<style>
+    .change + .large-change, .large-change + .mini-change {
+        margin-top: 10px;
+    }
+</style>
 <table id="classification-activity" class="table">
     <thead>
         <tr>
@@ -36,10 +41,13 @@
             </td>
             <td>
                 {% for data_change in change_group.changes %}
-                    <div class="mini-change">
-                        <span class="key-change"><span class="key">{{ data_change.key }}</span>.{{ data_change.attribute }}</span>
-                        {% if not change_group.ignore_before %}&#160;{{ data_change.before | format_value }}
-                            <span class="change-arrow">&#160;->&#160;</span>
+                    <div class="change {% if data_change.is_large %}large-change{% else %}mini-change{% endif %}">
+                        <span class="key-change"><span class="key">{{ data_change.key }}</span>.{{ data_change.attribute }}:</span>
+                        {% if not change_group.ignore_before %}
+                            {% if data_change.is_large %}<br/>{% else %}&#160;{% endif %}
+                            {{ data_change.before | format_value }}
+                            {% if data_change.is_large %}<br/><span class="change-arrow">&#160;->&#160;</span><br/>
+                            {% else %}<span class="change-arrow">&#160;->&#160;</span>{% endif %}
                         {% else %}
                             <span class="change-arrow">&#160;=&#160;</span>
                         {% endif %}

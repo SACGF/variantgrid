@@ -25,6 +25,13 @@ class ClassificationChange:
     def __str__(self):
         return f'{self.key}.{self.attribute}'
 
+    @property
+    def is_large(self):
+        if isinstance(self.before, str) and len(self.before) > 50:
+            return True
+        if isinstance(self.after, str) and len(self.after) > 50:
+            return True
+        return False
 
 @total_ordering
 class ClassificationChanges:

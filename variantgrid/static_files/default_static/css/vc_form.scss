@@ -107,6 +107,11 @@ table.diff {
                 top: 0.4rem;
             }
         }
+        tr.textarea {
+            td {
+                white-space: pre-wrap;
+            }
+        }
     }
 }
 

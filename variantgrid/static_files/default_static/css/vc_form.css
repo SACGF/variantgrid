@@ -102,6 +102,9 @@ table.diff tbody tr .explain-icon {
   right: 0px;
   top: 0.4rem;
 }
+table.diff tbody tr.textarea td {
+  white-space: pre-wrap;
+}
 
 .share-dialog .share-level-selection {
   margin-top: 4px;
