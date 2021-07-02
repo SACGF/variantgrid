@@ -17,6 +17,10 @@ class VariantTagsImport(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
+    def __str__(self):
+        num_tags = self.importedvarianttag_set.count()
+        return f"{num_tags} tags ({self.genome_build}) by {self.user} on {self.created}"
+
 
 class ImportedVariantTag(models.Model):
     """ Contains all data as not everything will match etc """
@@ -86,10 +90,9 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
             va_kwargs["variant__in"] = variant_qs
 
         va_qs = VariantAllele.objects.filter(**va_kwargs)
-        # Restrict VariantAlleles to this build, so we don't get 2x results with MT (which share contigs across builds)
-        # So the same variant has 2x variant alleles
-        return VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True),
-                                         variant__variantallele__genome_build=genome_build)
+        # Do distinct as we used to get 2x results with MT (which share contigs across builds)
+        tags_qs = VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True))
+        return tags_qs.distinct()
 
     @staticmethod
     def variants_for_build(genome_build, tags_qs, tag_ids: List[str]):
