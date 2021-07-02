@@ -114,7 +114,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         impact_high_or_mod = impact in {PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE}
 
         stats_list = [stats_per_sample]
-        if filters:
+        if not filters:
             stats_list.append(stats_passing_filters_per_sample)
 
         if vep_skipped:
