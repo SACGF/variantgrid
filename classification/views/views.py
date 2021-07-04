@@ -333,7 +333,7 @@ def view_classification_diff(request):
 
     elif request.GET.get('allele'):
         allele_id = int(request.GET.get('allele'))
-        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True)
+        compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
         compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         records = compare_all
 
