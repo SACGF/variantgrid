@@ -1,0 +1,21 @@
+[Unit]
+Description=VG Celery Beat Service
+After=network.target
+
+[Service]
+Type=forking
+User=variantgrid
+ExecStartPre=/bin/mkdir -p /var/log/variantgrid
+Restart=always
+EnvironmentFile=/mnt/variantgrid/config/celery/celeryd_beat.env
+WorkingDirectory=/mnt/variantgrid
+ExecStart=/bin/sh -c '${CELERY_BIN} beat \
+  -A ${CELERY_APP} --pidfile=${CELERYD_PID_FILE} \
+  --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'
+ExecStop=/bin/kill -s TERM $MAINPID
+RuntimeDirectory=celeryd_beat
+RuntimeDirectoryMode=0750
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
