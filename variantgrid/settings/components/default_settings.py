@@ -445,6 +445,8 @@ SLACK = {
     'enabled': get_secret('SLACK.enabled'),
     'admin_callback_url': get_secret('SLACK.admin_callback_url')
 }
+# if true, automated health checks will post to Slack if enabled
+HEALTH_CHECK_ENABLED = True
 
 SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback

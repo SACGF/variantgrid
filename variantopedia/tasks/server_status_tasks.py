@@ -1,6 +1,7 @@
 from random import randint
 
 import celery
+from django.conf import settings
 from django.urls import reverse
 
 from classification.models import Classification
@@ -15,6 +16,9 @@ from variantopedia.server_status import get_dashboard_notices
 
 @celery.task
 def notify_server_status():
+    if not settings.HEALTH_CHECK_ENABLED:
+        return
+
     dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
     url = get_url_from_view_path(reverse('server_status')) + '?days=1'
 
