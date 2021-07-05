@@ -154,4 +154,3 @@ class TestCloneAnalysisNodes(TestCase):
         self._set_af_for_node(trio_node)
         self._set_vcf_filter_for_node(trio_node, self.trio.cohort.vcf)
         self._test_clone_node(trio_node)
-
