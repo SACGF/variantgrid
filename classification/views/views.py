@@ -651,7 +651,7 @@ def clin_sig_change_data(request):
     def yield_data():
 
         genome_build = GenomeBuildManager.get_current_genome_build()
-        yield delimited_row(['date', 'org', 'lab', f'c.hgvs {genome_build}', 'url', 'from', 'to', 'status', 'comments', 'post discordance'])
+        yield delimited_row(['classification first submitted', 'date changed', 'org', 'lab', f'c.hgvs {genome_build}', 'url', 'from', 'to', 'status', 'comments', 'discordance(s)','other labs for allele at time'], '\t')
 
         flag_changed_re = re.compile(r"^Classification (has )?changed from (?P<from>.*?) to (?P<to>.*?)$")
         de_number_re = re.compile(r"(.*?) [(].*?[)]")
@@ -665,31 +665,19 @@ def clin_sig_change_data(request):
 
         all_flags_qs = Flag.objects.filter(flag_type=classification_flag_types.significance_change)
         flag: Flag
-        for flag in all_flags_qs:
+        for flag in all_flags_qs.order_by('-created'):
             flag_comment: FlagComment
             cs_from: str = 'ERROR'
             cs_to: str = 'ERROR'
             comments: List[str] = list()
             resolution: Optional[str] = 'In Progress'
-            c_hgvs: Optional[str] = 'ERROR'
-            org: Optional[str] = 'ERROR'
-            lab: Optional[str] = 'ERROR'
+            c_hgvs: Optional[str] = 'CANT RESOLVE'
+            org: Optional[str] = 'Record has been deleted'
+            lab: Optional[str] = ''
             url: Optional[str] = ''
+            classification_created: datetime
             date_raised: datetime = flag.created
-            has_discordance = False
-            caused_discordance = False
-
-            last_comment: FlagComment
-            for index, flag_comment in enumerate(flag.flagcomment_set.order_by('-created')):
-                last_comment = flag_comment
-                if text := flag_comment.text:
-                    if match := flag_changed_re.match(text):
-                        cs_from = de_number(match.group('from'))
-                        cs_to = de_number(match.group('to'))
-                    else:
-                        comments.append(text)
-            if last_comment:
-                resolution = last_comment.resolution.label
+            discordance_dates: List[datetime] = list()
 
             flag_collection = flag.collection
             if source := flag_collection.source_object:
@@ -698,20 +686,51 @@ def clin_sig_change_data(request):
                     org = source.lab.organization.name
                     lab = source.lab.name
                     url = get_url_from_view_path(source.get_absolute_url())
+                    classification_created = source.created
 
                     # get earliest discordance
                     first_discordance: Flag
-                    for discordance in Flag.objects.filter(collection=source.flag_collection_safe, flag_type=classification_flag_types.discordant).order_by('created'):
+                    for discordance in Flag.objects.filter(collection=source.flag_collection_safe,
+                                                           flag_type=classification_flag_types.discordant).order_by(
+                            'created'):
                         discordance_date = discordance.created
-                        time_diff = discordance_date - date_raised
-                        if time_diff.total_seconds() < 10:
-                            caused_discordance = True
-                            break
+                        discordance_dates.append(discordance_date)
 
-            yield delimited_row([date_raised.strftime('%Y-%m-%d'), org, lab, c_hgvs, url, cs_from, cs_to, resolution, '\n'.join(comments), 'True' if has_discordance and not caused_discordance else 'False'])
+                    if allele := source.variant.allele:
+                        other_labs = set()
+                        cl: Classification
+                        for cl in Classification.objects.filter(variant__in=allele.variants):
+                            if cl.lab != source.lab and cl.created < flag.created:
+                                other_labs.add(cl.lab)
 
-    response = StreamingHttpResponse(yield_data(), content_type='text/csv')
+                else:
+                    continue
+            else:
+                # the classification has been deleted
+                continue
+
+            for index, flag_comment in enumerate(flag.flagcomment_set.order_by('created')):
+                last_comment = flag_comment
+                if text := flag_comment.text:
+                    if index == 0:
+                        if match := flag_changed_re.match(text):
+                            cs_from = de_number(match.group('from'))
+                            cs_to = de_number(match.group('to'))
+                        else:
+                            print(text)
+                    else:
+                        comments.append(text)
+                if flag_comment and flag_comment.resolution:
+                    resolution = flag_comment.resolution.label
+
+            other_lab_list = list(other_labs)
+            other_lab_list.sort()
+            other_lab_str = ", ".join(other_lab.name for other_lab in other_lab_list)
+            discordance_date_str = " ".join([discordance_date.strftime('%Y-%m-%d %H:%M:%S') for dd in discordance_dates])
+            yield delimited_row([classification_created.strftime('%Y-%m-%d %H:%M:%S'), date_raised.strftime('%Y-%m-%d %H:%M:%S'), org, lab, c_hgvs, url, cs_from, cs_to, resolution, '\n'.join(comments), discordance_date_str, other_lab_str], '\t')
+
+    response = StreamingHttpResponse(yield_data(), content_type='text/tsv')
     # modified_str = now().strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
     # response['Last-Modified'] = modified_str
-    response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.csv"'
+    response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
     return response
