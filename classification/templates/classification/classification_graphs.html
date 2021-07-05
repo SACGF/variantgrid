@@ -17,10 +17,6 @@
             margin-left: 12px;
         }
 
-        #classification-stats-links {
-            margin: 10px 0px 10px 0px;
-        }
-
     </style>
     <script>
         var PATHOGENIC_COLORS = [   '#777777', // other
@@ -114,8 +110,9 @@
         </div>
 
         {% if user.is_superuser %}
-        <div id="classification-stats-links">
-            <a class="admin-only" href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a>
+        <div class="my-2">
+            <a class="download-link admin-only d-inline-block my-1" href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a><br/>
+            <a class="download-link admin-only d-inline-block my-1" href="{% url 'clinical_significance_change_data' %}">Clinical significance change data</a>
         </div>
         {% endif %}
 

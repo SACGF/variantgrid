@@ -95,6 +95,7 @@ urlpatterns = [
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),
     perm_path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
+    perm_path('clinical_significance_change_data', views.clin_sig_change_data, name='clinical_significance_change_data'),
     perm_path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
 ]
 

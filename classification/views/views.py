@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import rest_framework
+import re
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Layout, Field, Submit
 from django.conf import settings
@@ -8,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 from django.forms import formset_factory
+from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -19,19 +21,23 @@ from jfu.http import upload_receive, UploadResponse, JFUResponse
 import json
 import mimetypes
 from requests.models import Response
-from typing import Optional
+from typing import Optional, List
 
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import get_kind_and_transcript_accession_from_invalid_hgvs
+from library.django_utils import require_superuser, get_url_from_view_path
 from library.file_utils import rm_if_exists
 from library.guardian_utils import is_superuser
 from library.log_utils import log_traceback, report_event
+from library.utils import delimited_row
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Allele, Lab
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal
@@ -637,3 +643,75 @@ def lab_gene_classification_counts(request):
                "gene_list_categories_whitelist": gene_list_categories_whitelist,
                "default_enrichment_kits": []}
     return render(request, 'classification/lab_gene_classification_counts.html', context)
+
+
+@require_superuser
+def clin_sig_change_data(request):
+
+    def yield_data():
+
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        yield delimited_row(['date', 'org', 'lab', f'c.hgvs {genome_build}', 'url', 'from', 'to', 'status', 'comments', 'post discordance'])
+
+        flag_changed_re = re.compile(r"^Classification (has )?changed from (?P<from>.*?) to (?P<to>.*?)$")
+        de_number_re = re.compile(r"(.*?) [(].*?[)]")
+
+        def de_number(clin_sig: str) -> str:
+            if clin_sig:
+                clin_sig = clin_sig.strip()
+                if match := de_number_re.match(clin_sig):
+                    return match.group(1)
+                return clin_sig
+
+        all_flags_qs = Flag.objects.filter(flag_type=classification_flag_types.significance_change)
+        flag: Flag
+        for flag in all_flags_qs:
+            flag_comment: FlagComment
+            cs_from: str = 'ERROR'
+            cs_to: str = 'ERROR'
+            comments: List[str] = list()
+            resolution: Optional[str] = 'In Progress'
+            c_hgvs: Optional[str] = 'ERROR'
+            org: Optional[str] = 'ERROR'
+            lab: Optional[str] = 'ERROR'
+            url: Optional[str] = ''
+            date_raised: datetime = flag.created
+            has_discordance = False
+            caused_discordance = False
+
+            last_comment: FlagComment
+            for index, flag_comment in enumerate(flag.flagcomment_set.order_by('-created')):
+                last_comment = flag_comment
+                if text := flag_comment.text:
+                    if match := flag_changed_re.match(text):
+                        cs_from = de_number(match.group('from'))
+                        cs_to = de_number(match.group('to'))
+                    else:
+                        comments.append(text)
+            if last_comment:
+                resolution = last_comment.resolution.label
+
+            flag_collection = flag.collection
+            if source := flag_collection.source_object:
+                if isinstance(source, Classification):
+                    c_hgvs = source.get_c_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())
+                    org = source.lab.organization.name
+                    lab = source.lab.name
+                    url = get_url_from_view_path(source.get_absolute_url())
+
+                    # get earliest discordance
+                    first_discordance: Flag
+                    for discordance in Flag.objects.filter(collection=source.flag_collection_safe, flag_type=classification_flag_types.discordant).order_by('created'):
+                        discordance_date = discordance.created
+                        time_diff = discordance_date - date_raised
+                        if time_diff.total_seconds() < 10:
+                            caused_discordance = True
+                            break
+
+            yield delimited_row([date_raised.strftime('%Y-%m-%d'), org, lab, c_hgvs, url, cs_from, cs_to, resolution, '\n'.join(comments), 'True' if has_discordance and not caused_discordance else 'False'])
+
+    response = StreamingHttpResponse(yield_data(), content_type='text/csv')
+    # modified_str = now().strftime("%a, %d %b %Y %H:%M:%S GMT")  # e.g. 'Wed, 21 Oct 2015 07:28:00 GMT'
+    # response['Last-Modified'] = modified_str
+    response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.csv"'
+    return response
