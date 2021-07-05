@@ -3,6 +3,8 @@ from typing import List
 from django.contrib import messages
 from django.views.generic import TemplateView
 
+from annotation.models import patients_qs_for_ontology_term
+from classification.views.classification_datatables import ClassificationDatatableConfig
 from library.utils import LimitedCollection
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation
 from ontology.panel_app_ontology import update_gene_relations
@@ -36,12 +38,15 @@ class OntologyTermView(TemplateView):
                 else:
                     regular_relationships.append(relationship)
 
+            patients_qs = patients_qs_for_ontology_term(self.request.user, term)
             return {
                 "term": term,
                 "gene_relationships": gene_relationships,
                 "parent_relationships": LimitedCollection(parent_relationships, 250) if not is_gene else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
-                "child_relationships": LimitedCollection(child_relationships, 250) if not is_gene else None
+                "child_relationships": LimitedCollection(child_relationships, 250) if not is_gene else None,
+                "datatable_config": ClassificationDatatableConfig(self.request),
+                "patients_qs": patients_qs,
             }
         messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")
         return {"term": term}

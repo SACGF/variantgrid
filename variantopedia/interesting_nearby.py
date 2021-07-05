@@ -5,11 +5,9 @@ from functools import reduce
 from typing import Dict
 
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.db.models import Count, Sum, Q
 
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version, \
-    get_variant_queryset_for_annotation_version
+from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.enums import ClinicalSignificance
 from classification.models import Classification
 from snpdb.models import Variant
@@ -76,15 +74,16 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
     return {f"{region}_summary": interesting_summary(qs, **kwargs) for region, qs in nearby_qs.items()}
 
 
-def interesting_summary(qs, user, genome_build, total=True, clinical_significance=False):
+def interesting_summary(qs, user, genome_build, total=True, clinvar=True, clinical_significance=False):
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
     # print(counts)
     summary = None
     if num_variants := counts['total']:
         classification_types = {
             "Classifications": "classification",
-            "ClinVar": "clinvar",
         }
+        if clinvar:
+            classification_types["ClinVar"] = "clinvar"
 
         summaries = []
         for label, classification in classification_types.items():
@@ -220,11 +219,3 @@ def filter_variant_domain(qs, variant: Variant):
     else:
         qs = qs.none()
     return qs
-
-
-def variant_interesting_summary(user: User, variant: Variant, genome_build, clinical_significance=False) -> str:
-    """ Could use this for search summary? """
-    qs = get_variant_queryset_for_latest_annotation_version(genome_build)
-    qs = qs.filter(pk=variant.pk)
-
-    return interesting_summary(qs, user, genome_build, total=False, clinical_significance=clinical_significance)

@@ -145,3 +145,7 @@ class PatientTextPhenotype(models.Model):
 
     def __str__(self):
         return f"{self.patient}: {self.phenotype_description}"
+
+
+def patients_qs_for_ontology_term(user, ontology_term):
+    return Patient.filter_for_user(user).filter(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term}).order_by("id")

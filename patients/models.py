@@ -128,6 +128,10 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
 
     @property
+    def code(self):
+        return self.external_pk or f"Patient:{self.pk}"
+
+    @property
     def name(self):
         return patient_name(self.first_name, self.last_name)
 

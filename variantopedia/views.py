@@ -382,7 +382,7 @@ def search(request):
                "search_results": search_results,
                "external_codes": external_codes,
                "variant_vcf_db_prefix": settings.VARIANT_VCF_DB_PREFIX,
-               "variant_summary": settings.SEARCH_VARIANT_SHOW_SUMMARY}
+               "search_summary": settings.SEARCH_SUMMARY}
     return render(request, "variantopedia/search.html", context)
 
 

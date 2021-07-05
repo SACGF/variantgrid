@@ -207,7 +207,8 @@ USER_SETTINGS_SHOW_GROUPS = False
 USER_SETTINGS_SHOW_BUILDS = False
 
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = True
-SEARCH_VARIANT_SHOW_SUMMARY = False  # If you want to use this for Shariant we need to scrub all but classifications
+SEARCH_SUMMARY = True  # Little tips that show up on search
+SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = False
 
 UNSHARED_FLAG_ENABLED = True
 VIEW_GENE_SHOW_HOTSPOT_GRAPH = False

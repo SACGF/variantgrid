@@ -20,7 +20,7 @@ from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene,
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
@@ -279,7 +279,8 @@ class Searcher:
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
             (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org),
-            (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology)
+            (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology),
+            (SearchTypes.ONTOLOGY, HAS_ALPHA_PATTERN, search_ontology_name)
         ]
 
         exclude_search_types = set()
@@ -442,8 +443,17 @@ def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbo
 def search_ontology(search_string: str, **kwargs) -> Optional[SearchResult]:
     try:
         return [SearchResult(OntologyTerm.get_or_stub(search_string))]
-    except:
+    except ValueError:
         return []
+
+
+def search_ontology_name(search_string: str, **kwargs) -> Iterable[OntologyTerm]:
+    # We don't want to stop "jump to gene symbol" from working, so skip ontology if a gene symbol
+    # It's not enough to exclude HGNC as MONDO has gene names as well
+    if GeneSymbol.objects.filter(symbol=search_string).exists():
+        return []
+
+    return OntologyTerm.objects.exclude(ontology_service=OntologyService.HGNC).filter(name__icontains=search_string)
 
 
 def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:

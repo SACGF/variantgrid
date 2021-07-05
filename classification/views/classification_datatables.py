@@ -362,6 +362,9 @@ class ClassificationDatatableConfig(DatatableConfig):
         if analysis_id := self.get_query_json("analysis_id"):
             filters.append(Q(classification__analysisclassification__analysis_id=analysis_id))
 
+        if term_id := self.get_query_param("ontology_term_id"):
+            filters.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+
         if filters:
             q = reduce(operator.and_, filters)
             qs = qs.filter(q)

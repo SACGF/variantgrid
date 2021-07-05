@@ -2,11 +2,32 @@
 {% load ui_utils %}
 {% load ui_menu_bars %}
 {% load ontology_tags %}
-{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% load datatable_tags %}
 {% load js_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
 {% load ui_tabs_builder %}
 {% block title %}{{ term.id }}{% endblock title %}
 {% block content %}
+    <script>
+        function classificationFilter(data, type) {
+            data.ontology_term_id = "{{ term.id }}";
+            return data;
+        }
+
+        $(document).ready(function() {
+            let tableDom = $('#vc-datatable');
+            if (tableDom.length) {
+                EKeys.load().then(() => {
+                    {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
+                    let vcDatatable = $('#vc-datatable');
+                    vcDatatable.on('draw.dt', () => {
+                        Flags.instance.init({userId: '{{user.id}}'});
+                    });
+                });
+            }
+        });
+    </script>
+
     <div class="container">
         <div class="card">
             <div class="card-header">{{ term.id }}</div>
@@ -44,66 +65,121 @@
                 {% if parent_relationships is not None %}
                     <hr/>
                     {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
-                        {% if not parent_relationships %}-{% endif %}
-                        {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
-                        {% for relationship in parent_relationships %}
-                            <div class="mt-2">
-                                {% ontology_relationship relationship term %}
+                        {% if parent_relationships %}
+                            <a class='hover-link' data-toggle="collapse" href="#parent-relationships">Toggle parent relationships</a>
+                            <div id="parent-relationships" class="collapse">
+                                {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
+                                {% for relationship in parent_relationships %}
+                                    <div class="mt-2">
+                                        {% ontology_relationship relationship term %}
+                                    </div>
+                                {% endfor %}
                             </div>
-                        {% endfor %}
+                        {% else %}
+                            -
+                        {% endif %}
                     {% endlabelled %}
                 {% endif %}
 
                 {% if gene_relationships is not None %}
                     <hr/>
                     {% labelled label="<i class='fas fa-dna'></i> Gene Relationships" %}
-                        <p class="text-muted">Note that Panel App relationships are only retrieved as needed, and might not be represented
-                        here yet.</p>
-                        {% if gene_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ gene_relationships.limit_str }}<br/>{% endif %}
-                        {% if not gene_relationships %}-{% endif %}
-                        {% for snake in gene_relationships %}
-                            <div class="mt-2">
-                            <span class="text-muted text-monospace">{{ term.id }}</span>
-                            {% for step in snake.show_steps %}
-                                <div class="text-center d-inline-block mx-2 hover-detail"
-                                     title="Import {{ step.relation.from_import.import_source }}"
-                                    data-content="Last imported: {{ step.relation.from_import.processed_date }}<br/>
-                                    Context: {{ step.relation.from_import.context }}</br>
-                                    Filename: {{ step.relation.from_import.filename }}">&nbsp
-                                    {{ step.relation.relation_display }}
-                                </div>
-                                {% ontology_term step.dest_term %} &nbsp;
-                            {% endfor %}
+                        {% if gene_relationships %}
+                            <a class='hover-link' data-toggle="collapse" href="#gene-relationships">Toggle gene relationships</a>
+                            <div id="gene-relationships" class="collapse">
+                                <p class="text-muted">Note that Panel App relationships are only retrieved as needed, and might not be represented
+                                here yet.</p>
+
+                                {% if gene_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ gene_relationships.limit_str }}<br/>{% endif %}
+                                {% for snake in gene_relationships %}
+                                    <div class="mt-2">
+                                    <span class="text-muted text-monospace">{{ term.id }}</span>
+                                    {% for step in snake.show_steps %}
+                                        <div class="text-center d-inline-block mx-2 hover-detail"
+                                             title="Import {{ step.relation.from_import.import_source }}"
+                                            data-content="Last imported: {{ step.relation.from_import.processed_date }}<br/>
+                                            Context: {{ step.relation.from_import.context }}</br>
+                                            Filename: {{ step.relation.from_import.filename }}">&nbsp
+                                            {{ step.relation.relation_display }}
+                                        </div>
+                                        {% ontology_term step.dest_term %} &nbsp;
+                                    {% endfor %}
+                                    </div>
+                                {% endfor %}
                             </div>
-                        {% endfor %}
+                        {% else %}
+                            -
+                        {% endif %}
                     {% endlabelled %}
                 {% endif %}
                 <hr/>
 
                 {% labelled label="Direct Relationships" %}
-                    {% if not regular_relationships %}-{% endif %}
-                    {% if regular_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ regular_relationships.limit_str }}<br/>{% endif %}
-                    {% for relationship in regular_relationships %}
-                        <div class="mt-2">
-                            {% ontology_relationship relationship term %}
+                    {% if regular_relationships %}
+                        <a class='hover-link' data-toggle="collapse" href="#regular-relationships">Toggle direct relationships</a>
+                        <div id="regular-relationships" class="collapse">
+                            {% if regular_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ regular_relationships.limit_str }}<br/>{% endif %}
+                            {% for relationship in regular_relationships %}
+                                <div class="mt-2">
+                                    {% ontology_relationship relationship term %}
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% endfor %}
+                    {% else %}
+                        -
+                    {% endif %}
                 {% endlabelled %}
 
                 {% if child_relationships is not None %}
                     <hr/>
                     {% labelled label='<i class="fas fa-sitemap"></i> Child Terms' %}
-                        {% if not child_relationships %}-{% endif %}
-                        {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
-                        {% for relationship in child_relationships %}
-                            <div class="mt-2">
-                                {% ontology_relationship relationship term %}
+                        {% if child_relationships %}
+                            <a class='hover-link' data-toggle="collapse" href="#child-relationships">Toggle child relationships</a>
+                            <div id="child-relationships" class="collapse">
+                                {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
+                                {% for relationship in child_relationships %}
+                                    <div class="mt-2">
+                                        {% ontology_relationship relationship term %}
+                                    </div>
+                                {% endfor %}
                             </div>
-                        {% endfor %}
+                        {% else %}
+                            -
+                        {% endif %}
                     {% endlabelled %}
                 {% endif %}
 
             </div>
         </div>
     </div>
+
+    <div class="container-table mt-4">
+        <h4>Classifications</h4>
+        {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
+    </div>
+
+    {% if patients_qs.exists %}
+        <div class="container-table mt-4">
+            <h4>Patients</h4>
+            <table class="table">
+                <tr>
+                    <th>Code</th>
+                    <th>Family Code</th>
+                    <th>Samples</th>
+                </tr>
+                {% for patient in patients_qs %}
+                    <tr>
+                        <td><a href="{% url 'view_patient' patient.pk %}">{{ patient.code }}</a></td>
+                        <td>{{ patient.family_code|default_if_none:"-" }}</td>
+                        <td>
+                            {% for sample in patient.sample_set.all %}
+                                <a href="{% url 'view_sample' sample.pk %}">{{ sample }}</a>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+    {% endif %}
+
 {% endblock %}
