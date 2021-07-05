@@ -250,7 +250,7 @@ class Searcher:
         """
         HAS_ALPHA_PATTERN = r"[a-zA-Z]"
         NO_WHITESPACE = r"^\S+$"
-        NOT_WHITESPACE = "\S+"
+        NOT_WHITESPACE = r"\S+"
         HGVS_UNCLEANED_PATTERN = r"[cnmg].*\d+"  # Bare bones match - may be able to fix it...
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
 

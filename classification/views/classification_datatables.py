@@ -14,7 +14,7 @@ from ontology.models import OntologyTerm
 from snpdb.models import UserSettings, GenomeBuild, Allele, Variant, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
-from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap, ConditionResolvedDict
+from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
 ALLELE_SOMATIC_VALUES = ['somatic', 'likely_somatic']

@@ -46,13 +46,13 @@ class ClassificationTestCaseUtils(TestCase):
         and that malformed keys are normalised
         :return:
         """
-        input = {
+        patch_input = {
             "a": None,
             "x": {"value": None},
             "weird  *  key": {'value': 3, 'explain': 'it is weird'},
             17: True
         }
-        output = EvidenceMixin.to_patch(input)
+        output = EvidenceMixin.to_patch(patch_input)
         expected = {
             'a': None,
             'x': {'value': None},

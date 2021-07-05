@@ -241,7 +241,7 @@ class SequencingRun(SeqAutoRecord):
     @staticmethod
     def get_date_from_name(name) -> Optional[datetime.date]:
         date = None
-        if m := re.match(".*_?([12]\d{5})_", name):
+        if m := re.match(r".*_?([12]\d{5})_", name):
             date_str = m.group(1)
             dt = datetime.strptime(date_str, "%y%m%d")
             date = make_aware(dt).date()
@@ -722,7 +722,8 @@ class BamFile(SeqAutoRecord):
         except KeyError as ke:
             if "enrichment_kit" in ke.args:
                 logging.error("'enrichment_kit' not set, this is usually done via signal handlers in a custom app")
-            logging.error(f"{unaligned_reads} missing: {', '.join(ke.args)}. params={params}")
+            missing = ', '.join(ke.args)
+            logging.error("%s missing: %s. params=%s", unaligned_reads, missing, params)
             raise
         return os.path.abspath(filename)
 

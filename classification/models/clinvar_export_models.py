@@ -390,7 +390,7 @@ class ClinVarExport(TimeStampedModel, GuardianPermissionsMixin):
             else:
                 return ValidatedJson(None, ClinVarMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
         except:
-            return ValidatedJson(None, ClinVarMessages.error(f"Could not determine genome build of submission"))
+            return ValidatedJson(None, ClinVarMessages.error("Could not determine genome build of submission"))
 
     @property
     def json_record_status(self) -> ValidatedJson:

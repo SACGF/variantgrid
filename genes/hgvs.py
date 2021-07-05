@@ -120,8 +120,7 @@ class PHGVS:
     def full_p_hgvs(self) -> str:
         if self.transcript:
             return f"{self.transcript}:{self.p_dot}"
-        else:
-            return self.p_dot
+        return self.p_dot
 
     def __str__(self):
         return self.full_p_hgvs
@@ -130,13 +129,11 @@ class PHGVS:
     def p_dot(self) -> str:
         if self.intron:
             return "p.?"
-        elif self.aa_from:
+        if self.aa_from:
             if self.is_confirmed:
                 return f"p.{self.aa_from}{self.codon}{self.aa_to}{self.extra}"
-            else:
-                return f"p.({self.aa_from}{self.codon}{self.aa_to}{self.extra})"
-        else:
-            return self.fallback
+            return f"p.({self.aa_from}{self.codon}{self.aa_to}{self.extra})"
+        return self.fallback
 
     def __eq__(self, other):
         return self.full_p_hgvs == other.full_p_hgvs

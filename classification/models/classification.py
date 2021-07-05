@@ -1926,7 +1926,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """ Annotate Classification queryset you can use to order by genome build position """
 
         variant_qs = Variant.objects.filter(variantallele__allele=OuterRef("variant__variantallele__allele"),
-                                            variantallele__genome_build=genome_build).annotate(
+                                            variantallele__genome_build=genome_build)
+        variant_qs = variant_qs.annotate(
             padded_contig=LPad("locus__contig__name", 2, Value("0")),
             padded_position=LPad(Cast("locus__position", output_field=TextField()), 9, Value("0")),
             variant_sort=Concat("padded_contig", "padded_position"),
