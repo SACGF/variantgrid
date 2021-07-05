@@ -8,4 +8,4 @@ service celeryd_web_workers restart
 service celeryd_variant_id_single_worker restart 
 service celeryd_scheduling_single_worker restart
 service celeryd_seqauto_single_worker restart
-#service celeryd_beat restart
+service celeryd_beat restart
