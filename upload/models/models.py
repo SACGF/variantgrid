@@ -557,13 +557,32 @@ class ModifiedImportedVariant(models.Model):
 
     @staticmethod
     def format_old_variant(old_variant: str, genome_build: GenomeBuild) -> List[str]:
-        """ We need consistent formatting so we can retrieve it easily. May return multiple values """
+        """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
+            May return multiple values """
         formatted_old_variants = []
-        for ov in old_variant.split(","):
+        for ov in ModifiedImportedVariant._split_old_variant(old_variant):
             variant_tuple = Variant.get_tuple_from_string(ov, genome_build,
                                                           regex_pattern=ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN)
             formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_tuple(*variant_tuple))
         return formatted_old_variants
+
+    @staticmethod
+    def _split_old_variant(old_variant) -> List[str]:
+        """ VT decompose writes OLD_VARIANT as comma separated, but if not decomposed (eg someone uploads already
+            normalized) could be multi-alt that looks like 5:132240059:CT/CTT/T """
+        old_variants = []
+        for ov in old_variant.split(","):
+            locus, *alts = ov.split("/")
+            num_alts = len(alts)
+            if num_alts == 1:
+                # Quick most common path - no need to pull apart and re-assemble
+                old_variants.append(ov)
+            elif num_alts >= 2:
+                for alt in alts:
+                    old_variants.append(f"{locus}/{alt}")
+            else:
+                raise ValueError(f"Badly formatted INFO - 'OLD_VARIANT': '{ov}'")
+        return old_variants
 
     @staticmethod
     def get_old_variant_from_tuple(chrom, position, ref, alt) -> str:

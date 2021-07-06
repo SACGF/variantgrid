@@ -20,3 +20,14 @@ class TestModifiedImportedVariant(TestCase):
         OLD_VARIANT_MULTI = "19:536068:G/GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG,NC_000019.9:536046:C/CCCGGGGCGCTGGGAGCCTCACGTCCTCGTCCTTCCGGGAC"
         old_variant_formatted = ModifiedImportedVariant.format_old_variant(OLD_VARIANT_MULTI, grch37)
         self.assertEqual(len(old_variant_formatted), 2)
+
+    def test_format_old_variant_non_decomposed_multi(self):
+        """ People may upload a VCF which has already been normalized by VT (but not decomposed) so had the INFO
+            already set. As it's normalized already VT won't replace it, thus we'll get a multi but with slashes
+            not comma separated """
+        grch37 = GenomeBuild.get_name_or_alias('GRCh37')
+        OLD_VARIANT_MULTI = "5:132240059:CT/CTT/T"  # Already set
+        old_variant_formatted = ModifiedImportedVariant.format_old_variant(OLD_VARIANT_MULTI, grch37)
+        self.assertEqual(len(old_variant_formatted), 2)
+
+
