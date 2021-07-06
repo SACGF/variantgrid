@@ -1677,7 +1677,8 @@ const VCForm = (function() {
 
         evidenceWeights: function(strs) {
             let weights = [];
-            for (let strength of Object.keys(EKey.critValues)) {
+            let critValuesExtra = Object.assign({"BM": "Benign Moderate"}, EKey.critValues);
+            for (let strength of Object.keys(critValuesExtra)) {
                 if (!this.hasStrength(strength)) {
                     continue;
                 }
@@ -1700,14 +1701,22 @@ const VCForm = (function() {
             let BA = getStr('BA');
             let BS = getStr('BS');
             let BP = getStr('BP');
+            let BM = getStr('BM'); // note this isn't standard, so can't calculate anything with it
 
             let result = {
                 P: null,
                 LP: null,
                 B: null,
                 LB: null,
-                US: null
+                US: null,
+                X: null
             };
+
+            // can't do ACMG calculation with Benign Moderate, non standard strength
+            if (BM) {
+                result.X = 1;
+                return result;
+            }
 
             if ((PVS || PS || PM || PP) && (BA || BS || BP)) {
                 result.US = 2;
@@ -1779,7 +1788,8 @@ const VCForm = (function() {
             LP: 'Likely pathogenic',
             B: 'Benign',
             LB: 'Likely benign',
-            US: 'Uncertain significance'
+            US: 'Uncertain significance',
+            X: 'Custom assertion method used (includes non-standard Benign Moderate)'
         },
         roman: ['-','i','ii','iii','iv','v','vi'],
 
@@ -1791,7 +1801,10 @@ const VCForm = (function() {
                     row.text(`Custom assertion method used.`);
                 } else {
                     row.text('Calculation: ' + this.classificationLabels[classification]);
-                    let noteLabel = '(' + this.roman[note] + ')';
+                    let noteLabel = '';
+                    if (classification !== 'X') {
+                        noteLabel = '(' + this.roman[note] + ')';
+                    }
                     let calculation = $('<span>', {text: ' ' + noteLabel, title: `See ${row.text()} ${noteLabel} in ACMG Standards and Guidelines Table 5. Rules for combining criteria to classify sequence variants`}).appendTo(row);
                 }
                 return row;
@@ -1799,7 +1812,7 @@ const VCForm = (function() {
 
             let dom = $('<div>', {class:'calculated-result m-2'});
             for (let key of Object.keys(result)) {
-                var value = result[key];
+                let value = result[key];
                 if (value) {
                     dom.append(footnote(key, value));
                 }

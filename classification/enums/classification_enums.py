@@ -351,6 +351,7 @@ class CriteriaEvaluation:
 
     BENIGN_STANDALONE = 'BA'
     BENIGN_STRONG = 'BS'
+    BENIGN_MODERATE = 'BM'  # Not a standard ACMG Strength
     BENIGN_SUPPORTING = 'BP'
     NEUTRAL = 'N'
     PATHOGENIC_SUPPORTING = 'PP'
@@ -359,9 +360,10 @@ class CriteriaEvaluation:
     PATHOGENIC_VERY_STRONG = 'PVS'
 
     CHOICES = (
-        (BENIGN_STRONG, 'Benign Strong'),
-        (BENIGN_SUPPORTING, 'Benign Supporting'),
         (BENIGN_STANDALONE, 'Benign Standalone'),
+        (BENIGN_STRONG, 'Benign Strong'),
+        (BENIGN_MODERATE, 'Benign Moderate'),
+        (BENIGN_SUPPORTING, 'Benign Supporting'),
         (NEUTRAL, 'Neutral'),
         (PATHOGENIC_SUPPORTING, 'Pathogenic Supporting'),
         (PATHOGENIC_MODERATE, 'Pathogenic Moderate'),
@@ -382,6 +384,7 @@ class CriteriaEvaluation:
         {'key': NEUTRAL, 'label': 'Neutral', 'index': 10},
         {'key': BENIGN_STANDALONE, 'label': 'Benign Standalone', 'index': 2},
         {'key': BENIGN_STRONG, 'label': 'Benign Strong', 'index': 3},
+        {'key': BENIGN_MODERATE, 'label': 'Benign Moderate', 'index': 9},  # NOT a STANDARD ACMG STRENGTH
         {'key': BENIGN_SUPPORTING, 'label': 'Benign Supporting', 'index': 4},
     ]
 
