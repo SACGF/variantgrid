@@ -228,7 +228,6 @@ def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uplo
         klass = BulkGenotypeVCFProcessor
     else:
         klass = BulkNoGenotypeVCFProcessor
-    print(f"{uploaded_vcf.vcf} has {uploaded_vcf.vcf.genotype_samples} genotype samples, klass: {klass}")
     return klass(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info)
 
 
