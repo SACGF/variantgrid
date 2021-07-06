@@ -1284,7 +1284,6 @@ let Flags = (function () {
                     changes = true;
                 }
 
-                console.log(entry);
                 this.collections.upsert({
                     id: id,
                     dom: data.dom,
