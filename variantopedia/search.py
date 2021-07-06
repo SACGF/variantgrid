@@ -39,6 +39,7 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
 HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":(c|g|p)\..*\d+")
 ONTOLOGY_PATTERN = re.compile(r"\w+:\s*.*")
+MAX_RESULTS_PER_TYPE = 50
 
 class AbstractMetaVariant:
 
@@ -199,7 +200,7 @@ class SearchResult:
 
 class SearchResults:
 
-    def __init__(self, genome_build_preferred: GenomeBuild):
+    def __init__(self, genome_build_preferred: Optional[GenomeBuild] = None):
         self.genome_build_preferred = genome_build_preferred
         self.results: List[SearchResult] = []
         self.search_types: Set[str] = set()
@@ -363,6 +364,11 @@ class Searcher:
                                                      variant_qs=variant_qs,
                                                      classify=self.classify)
                     if build_results is not None:
+                        result_count = len(build_results)
+                        if len(build_results) > MAX_RESULTS_PER_TYPE:
+                            results.append_error((search_type, f"Found {result_count:,} matches, limiting to {MAX_RESULTS_PER_TYPE}", genome_build))
+                            build_results = build_results[0:MAX_RESULTS_PER_TYPE]
+
                         for sr in build_results:
                             if not isinstance(sr, SearchResult):
                                 sr = SearchResult(record=sr)
@@ -453,7 +459,7 @@ def search_ontology_name(search_string: str, **kwargs) -> Iterable[OntologyTerm]
     if GeneSymbol.objects.filter(symbol=search_string).exists():
         return []
 
-    return OntologyTerm.objects.exclude(ontology_service=OntologyService.HGNC).filter(name__icontains=search_string)
+    return OntologyTerm.objects.exclude(ontology_service=OntologyService.HGNC).filter(name__icontains=search_string).order_by('ontology_service', 'name', 'index')
 
 
 def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:

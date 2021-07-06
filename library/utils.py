@@ -647,7 +647,7 @@ class LimitedCollection:
         return len(self.data) != self.true_count
 
     def __len__(self):
-        return self.limit
+        return self.true_count
 
     def __iter__(self):
         return iter(self.data)

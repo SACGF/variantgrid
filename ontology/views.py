@@ -41,6 +41,8 @@ class OntologyTermView(TemplateView):
             patients_qs = patients_qs_for_ontology_term(self.request.user, term)
             return {
                 "term": term,
+                # gene relationships can be double counted which is a bit misleading
+                "relationship_count": len(gene_relationships) + len(all_relationships),
                 "gene_relationships": gene_relationships,
                 "parent_relationships": LimitedCollection(parent_relationships, 250) if not is_gene else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
@@ -48,5 +50,6 @@ class OntologyTermView(TemplateView):
                 "datatable_config": ClassificationDatatableConfig(self.request),
                 "patients_qs": patients_qs,
             }
+
         messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")
         return {"term": term}

@@ -363,7 +363,10 @@ def search(request):
             # Attempt to give hints on why nothing was found
             if search_results.search_errors:
                 for search_type, e, genome_build in search_results.search_errors:
-                    messages.add_message(request, messages.ERROR, f"{search_type}: {e} ({genome_build})")
+                    if genome_build:
+                        messages.add_message(request, messages.ERROR, f"{search_type}: {e} ({genome_build})")
+                    else:
+                        messages.add_message(request, messages.ERROR, f"{search_type}: {e}")
 
         except Exception as e:
             report_exc_info(extra_data={
