@@ -84,7 +84,6 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         "locus__ref__length",
         "alt__length",
         samples_zygosity_column,
-        filters_column,
         "variantannotation__dbsnp_rs_id",
         "variantannotation__impact",
         "variantannotation__transcript_id",
@@ -92,6 +91,9 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         "variantannotation__vep_skipped_reason",
         "clinvar__highest_pathogenicity",
     ]
+
+    if vcf.has_filters:
+        columns.append(filters_column)
 
     values_queryset = qs.values(*columns)
     cohort_samples = list(vcf.cohort.get_cohort_samples())
@@ -103,7 +105,6 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         ref_len = vals["locus__ref__length"]
         alt_len = vals["alt__length"]
         samples_zygosity = vals[samples_zygosity_column]
-        filters = vals[filters_column]
         dbsnp = vals["variantannotation__dbsnp_rs_id"]
         impact = vals["variantannotation__impact"]
         transcript = vals["variantannotation__transcript_id"]
@@ -114,8 +115,11 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         impact_high_or_mod = impact in {PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE}
 
         stats_list = [stats_per_sample]
-        if not filters:
-            stats_list.append(stats_passing_filters_per_sample)
+
+        if vcf.has_filters:
+            filters = vals[filters_column]
+            if not filters:
+                stats_list.append(stats_passing_filters_per_sample)
 
         if vep_skipped:
             vep_skipped_count += 1
