@@ -146,34 +146,36 @@
         </div>
     </div>
 
-    <div class="container-table mt-4">
-        <h4>Classifications</h4>
-        Filtering on records with resolved conditions to <b>{{ term }}</b>
-        {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
-    </div>
-
-    {% if patients_qs.exists %}
+    {% if is_ontology %}
         <div class="container-table mt-4">
-            <h4>Patients</h4>
-            <table class="table">
-                <tr>
-                    <th>Code</th>
-                    <th>Family Code</th>
-                    <th>Samples</th>
-                </tr>
-                {% for patient in patients_qs %}
-                    <tr>
-                        <td><a href="{% url 'view_patient' patient.pk %}">{{ patient.code }}</a></td>
-                        <td>{{ patient.family_code|default_if_none:"-" }}</td>
-                        <td>
-                            {% for sample in patient.sample_set.all %}
-                                <a href="{% url 'view_sample' sample.pk %}">{{ sample }}</a>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </table>
+            <h4>Classifications</h4>
+            Filtering on records with resolved conditions to <b>{{ term }}</b>
+            {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
         </div>
+
+        {% if patients_qs.exists %}
+            <div class="container-table mt-4">
+                <h4>Patients</h4>
+                <table class="table">
+                    <tr>
+                        <th>Code</th>
+                        <th>Family Code</th>
+                        <th>Samples</th>
+                    </tr>
+                    {% for patient in patients_qs %}
+                        <tr>
+                            <td><a href="{% url 'view_patient' patient.pk %}">{{ patient.code }}</a></td>
+                            <td>{{ patient.family_code|default_if_none:"-" }}</td>
+                            <td>
+                                {% for sample in patient.sample_set.all %}
+                                    <a href="{% url 'view_sample' sample.pk %}">{{ sample }}</a>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        {% endif %}
     {% endif %}
 
 {% endblock %}
