@@ -459,7 +459,15 @@ def search_ontology_name(search_string: str, **kwargs) -> Iterable[OntologyTerm]
     if GeneSymbol.objects.filter(symbol=search_string).exists():
         return []
 
-    return OntologyTerm.objects.exclude(ontology_service=OntologyService.HGNC).filter(name__icontains=search_string).order_by('ontology_service', 'name', 'index')
+    qs = OntologyTerm.objects.exclude(ontology_service=OntologyService.HGNC).\
+        filter(name__icontains=search_string).\
+        order_by('ontology_service', 'name', 'index')
+
+    # unless we're specifically searching for obselete, filter them out
+    if 'obsolete' not in search_string:
+        qs = qs.exclude(name__icontains='obsolete')
+    
+    return qs
 
 
 def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
