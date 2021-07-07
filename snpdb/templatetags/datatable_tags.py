@@ -19,6 +19,8 @@ def datatable_definition(
         data: str = None,
         hide_filter_count: bool = False,
         responsive: Union[bool, str] = False):
+    if not isinstance(table_config, DatatableConfig):
+        raise ValueError(f"Expected DatatableConfig but got '{table_config}'")
     sort_order = None
     default_sort_order_column = table_config.default_sort_order_column
     try:
