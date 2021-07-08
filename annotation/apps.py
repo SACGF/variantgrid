@@ -7,10 +7,12 @@ class AnnotationConfig(AppConfig):
     name = 'annotation'
 
     def ready(self):
+        # pylint: disable=import-outside-toplevel
         from Bio import Entrez
         from django.conf import settings
         from annotation.models import CachedWebResource
         from annotation.signals import clingen_post_save_handler
+        # pylint: enable=import-outside-toplevel
 
         # Entrez wants both email and API key
         if entrez_api_key := getattr(settings, "ANNOTATION_ENTREZ_API_KEY", None):

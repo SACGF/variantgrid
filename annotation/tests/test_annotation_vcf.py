@@ -60,11 +60,9 @@ class TestAnnotationVCF(TestCase):
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
                                                       vcf_annotated_filename=TestAnnotationVCF.TEST_ANNOTATION_VCF_GRCH38)
-        try:
+
+        with self.assertRaises(VEPVersionMismatchError):
             import_vcf_annotations(annotation_run, delete_temp_files=False)
-            self.assertTrue(False, "Should never reach here")
-        except VEPVersionMismatchError:
-            self.assertTrue(True, "Exception was thrown")
 
     def test_import_variant_annotations_grch37(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh37')

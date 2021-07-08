@@ -29,5 +29,3 @@ class TestModifiedImportedVariant(TestCase):
         OLD_VARIANT_MULTI = "5:132240059:CT/CTT/T"  # Already set
         old_variant_formatted = ModifiedImportedVariant.format_old_variant(OLD_VARIANT_MULTI, grch37)
         self.assertEqual(len(old_variant_formatted), 2)
-
-
