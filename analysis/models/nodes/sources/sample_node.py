@@ -200,6 +200,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             errors.append("No sample selected.")
         else:
             errors.extend(self._get_genome_build_errors("sample", self.sample.genome_build))
+        if self.restrict_to_qc_gene_list and self.sample_gene_list is None:
+            errors.append("Restricted to Sample Gene List, but none specified!")
         return errors
 
     def get_rendering_args(self):

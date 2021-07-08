@@ -382,6 +382,10 @@ def analysis_template_save(request, pk):
     analysis_snapshot.template_type = AnalysisTemplateType.SNAPSHOT
     analysis_snapshot.save()
 
+    sample_gene_list = analysis_snapshot.analysisnode_set.filter(analysisvariable__field='sample_gene_list',
+                                                                 analysisvariable__class_name='genes.SampleGeneList')
+    requires_sample_gene_list = sample_gene_list.exists()
+
     data = analysis_template.analysistemplateversion_set.all().aggregate(max_version=Max("version"))
     current_max_version = data.get("max_version") or 0
     version = current_max_version + 1
@@ -389,5 +393,6 @@ def analysis_template_save(request, pk):
                                            version=version,
                                            analysis_name_template=analysis_name_template,
                                            analysis_snapshot=analysis_snapshot,
-                                           active=True)
+                                           active=True,
+                                           requires_sample_gene_list=requires_sample_gene_list)
     return JsonResponse({"version": version})
