@@ -60,6 +60,7 @@ class NodeUpdate(NodeJSONPostView):
         if op == "move":
             node.x = params['x']
             node.y = params['y']
+            node.save()
         elif op == "update_connection":
             parent_id = params["parent_id"]
             parent = get_node_subclass_or_non_fatal_exception(request.user, parent_id, write=True)
@@ -72,11 +73,11 @@ class NodeUpdate(NodeJSONPostView):
                     kwargs["side"] = side
 
                 node.add_parent(parent, **kwargs)
+            node.save()
+            update_analysis(node.analysis_id)
         else:
             raise ValueError(f"Unknown operation '{op}'")
 
-        node.save()
-        update_analysis(node.analysis_id)
         return {}
 
 
