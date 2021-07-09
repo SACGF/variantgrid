@@ -349,6 +349,7 @@ class CriteriaEvaluation:
     NOT_MET = CRITERIA_NOT_MET
     NOT_APPLICABLE = CRITERIA_NOT_APPLICABLE
 
+    BENIGN_UNSPECIFIED = 'B?'
     BENIGN_STANDALONE = 'BA'
     BENIGN_STRONG = 'BS'
     BENIGN_MODERATE = 'BM'  # Not a standard ACMG Strength
@@ -358,22 +359,25 @@ class CriteriaEvaluation:
     PATHOGENIC_MODERATE = 'PM'
     PATHOGENIC_STRONG = 'PS'
     PATHOGENIC_VERY_STRONG = 'PVS'
+    PATHOGENIC_UNSPECIFIED = 'P?'
 
     CHOICES = (
         (BENIGN_STANDALONE, 'Benign Standalone'),
         (BENIGN_STRONG, 'Benign Strong'),
         (BENIGN_MODERATE, 'Benign Moderate'),
         (BENIGN_SUPPORTING, 'Benign Supporting'),
+        (BENIGN_UNSPECIFIED, 'Benign Unspecified Strength'),
         (NEUTRAL, 'Neutral'),
         (PATHOGENIC_SUPPORTING, 'Pathogenic Supporting'),
         (PATHOGENIC_MODERATE, 'Pathogenic Moderate'),
         (PATHOGENIC_STRONG, 'Pathogenic Strong'),
-        (PATHOGENIC_VERY_STRONG, "Pathogenic Very Strong")
+        (PATHOGENIC_VERY_STRONG, "Pathogenic Very Strong"),
+        (PATHOGENIC_UNSPECIFIED, 'Pathogenic Unspecified Strength'),
     )
 
     # Neutral, Not Met, Not Applicable don't count
-    ALL_STRENGTHS = [BENIGN_STANDALONE, BENIGN_STRONG, BENIGN_SUPPORTING,
-                     PATHOGENIC_SUPPORTING, PATHOGENIC_MODERATE, PATHOGENIC_STRONG, PATHOGENIC_VERY_STRONG]
+    ALL_STRENGTHS = [BENIGN_STANDALONE, BENIGN_STRONG, BENIGN_SUPPORTING, BENIGN_UNSPECIFIED,
+                     PATHOGENIC_SUPPORTING, PATHOGENIC_MODERATE, PATHOGENIC_STRONG, PATHOGENIC_VERY_STRONG, PATHOGENIC_UNSPECIFIED]
 
     ####
     # used for drop downs
@@ -386,6 +390,7 @@ class CriteriaEvaluation:
         {'key': BENIGN_STRONG, 'label': 'Benign Strong', 'index': 3},
         {'key': BENIGN_MODERATE, 'label': 'Benign Moderate', 'index': 9},  # NOT a STANDARD ACMG STRENGTH
         {'key': BENIGN_SUPPORTING, 'label': 'Benign Supporting', 'index': 4},
+        {'key': BENIGN_UNSPECIFIED, 'label': 'Benign Unspecified Strength', 'index': 11},
     ]
 
     NEUTRAL_OPTIONS = [
@@ -401,7 +406,8 @@ class CriteriaEvaluation:
         {'key': PATHOGENIC_SUPPORTING, 'label': 'Pathogenic Supporting', 'index': 5},
         {'key': PATHOGENIC_MODERATE, 'label': 'Pathogenic Moderate', 'index': 6},
         {'key': PATHOGENIC_STRONG, 'label': 'Pathogenic Strong', 'index': 7},
-        {'key': PATHOGENIC_VERY_STRONG, 'label': 'Pathogenic Very Strong', 'index': 8}
+        {'key': PATHOGENIC_VERY_STRONG, 'label': 'Pathogenic Very Strong', 'index': 8},
+        {'key': PATHOGENIC_UNSPECIFIED, 'label': 'Benign Unspecified Strength', 'index': 11},
     ]
 
     @staticmethod

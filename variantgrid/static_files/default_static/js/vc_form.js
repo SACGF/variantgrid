@@ -1701,7 +1701,9 @@ const VCForm = (function() {
             let BA = getStr('BA');
             let BS = getStr('BS');
             let BP = getStr('BP');
-            let BM = getStr('BM'); // note this isn't standard, so can't calculate anything with it
+            let BM = getStr('BM'); // note this aren't standard, so can't calculate anything with it
+            let BX = getStr('B?');
+            let PX = getStr('P?');
 
             let result = {
                 P: null,
@@ -1713,7 +1715,7 @@ const VCForm = (function() {
             };
 
             // can't do ACMG calculation with Benign Moderate, non standard strength
-            if (BM) {
+            if (BM || BX || PX) {
                 result.X = 1;
                 return result;
             }
@@ -1789,7 +1791,7 @@ const VCForm = (function() {
             B: 'Benign',
             LB: 'Likely benign',
             US: 'Uncertain significance',
-            X: 'Custom assertion method used (includes non-standard Benign Moderate)'
+            X: 'Custom assertion method used (includes non-standard strength)'
         },
         roman: ['-','i','ii','iii','iv','v','vi'],
 
