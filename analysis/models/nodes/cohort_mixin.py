@@ -24,6 +24,14 @@ class CohortMixin:
             vcf = cohort.get_vcf()
         return vcf
 
+    def _get_cache_key(self) -> str:
+        """ Use cohort genotype in the key, as that can change if a VCF is reloaded """
+        cache_key = super()._get_cache_key()
+        cgc_id = 0
+        if cgc := self.cohort_genotype_collection:
+            cgc_id = cgc.pk
+        return "_".join((cache_key, str(cgc_id)))
+
     @property
     def cohort_genotype_collection(self):
         cohort = self._get_cohort()
