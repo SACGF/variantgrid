@@ -743,12 +743,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         start = time()
         self._load()  # Do before counts in case it affects anything
         status, count = self.node_counts()
-        logging.debug("node_counts returned (%s, %d)", status, count)
-
-        self.status = status
-        self.count = count
-        self.load_seconds = time() - start
-        self.save()  # Will re-calculate shadow colors etc based on status
+        load_seconds = time() - start
+        self.update(status=status, count=count, load_seconds=load_seconds)
 
     def add_parent(self, parent, *args, **kwargs):
         if not parent.visible:
@@ -772,7 +768,17 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def handle_ancestor_input_samples_changed(self):
         pass
 
+    def update(self, **kwargs):
+        """ Updates Node if self.version matches DB - otherwise throws NodeOutOfDateException """
+        self_qs = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
+        logging.warning(f"Updating node w/kwargs={kwargs}")
+        updated = self_qs.update(**kwargs)
+        if not updated:
+            raise NodeOutOfDateException()
+
     def save(self, **kwargs):
+        """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
+            instead use update() method above """
         # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
         super_save = super().save
 
@@ -816,10 +822,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         Analysis.objects.filter(pk=self.analysis.pk).update(modified=timezone.now())
 
     def set_node_task_and_status(self, celery_task, status):
-        qs = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
         cursor = connection.cursor()
         db_pid = cursor.db.connection.get_backend_pid()
-        qs.update(status=status)
+        self.update(status=status)
 
         NodeTask.objects.filter(node=self, version=self.version).update(celery_task=celery_task, db_pid=db_pid)
 
