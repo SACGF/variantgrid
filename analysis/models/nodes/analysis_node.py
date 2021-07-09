@@ -771,7 +771,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def update(self, **kwargs):
         """ Updates Node if self.version matches DB - otherwise throws NodeOutOfDateException """
         self_qs = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
-        logging.warning(f"Updating node w/kwargs={kwargs}")
         updated = self_qs.update(**kwargs)
         if not updated:
             raise NodeOutOfDateException()
