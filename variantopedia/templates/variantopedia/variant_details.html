@@ -342,7 +342,12 @@ function variantDetailsTagClickHandler() {
     deleteItemClickHandler(variantTag, innerSpan, removeClickHandler);
 }
 
+/*
+    Variant Tagging
 
+    NOTE: variant_details.html can be loaded via analysis, which also includes 'analysis.js' so the tagging functions
+    below have to be unique from existing JS functions to not cause any issues
+*/
 function variantDetailsAddVariantTag(variantTagData) {
     const tag = variantTagData.tag;
     // console.log("addVariantTag:");
