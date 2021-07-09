@@ -22,6 +22,8 @@ AWS_DEFAULT_ACL = None
 
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 
+HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m788641874-4c58c98a716180f36670e551a0bd03fff47abfea'
+
 # import all the base settings #
 SITE_ID = 5  # shariant.org.au
 
