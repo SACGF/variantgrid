@@ -13,6 +13,7 @@ class ClinGenAllele(TimeStampedModel):
     id = models.IntegerField(primary_key=True)
     api_response = models.JSONField(null=False)  # returned
 
+    CLINGEN_ALLELE_SERVER_ERROR_TYPE = "ServerError"  # Set fake API response of errorType to indicate server error
     CLINGEN_ALLELE_URL_PATTERN = re.compile(r"http.*/allele/CA(\d+)$")
     CLINGEN_ALLELE_CODE_PATTERN = re.compile(r"^CA(\d+)")
     CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE = 10000
