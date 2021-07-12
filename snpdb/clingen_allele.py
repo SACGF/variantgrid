@@ -32,7 +32,30 @@ from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAll
 from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGenAlleleExternalRecordType
 
 
-class ClinGenAlleleAPIException(Exception):
+class ClinGenAlleleRegistryException(Exception):
+    pass
+
+
+class ClinGenAlleleServerException(ClinGenAlleleRegistryException):
+    """ Could not contact server """
+    def __init__(self, response: requests.Response):
+        method = response.request.method
+        msg = f"Error contacting ClinGen Allele Registry. Method: '{method}', Response: {response.status_code}"
+        super().__init__(msg)
+        self.response = response
+
+    def get_fake_api_response(self):
+        msg = self.args[0]
+        api_response = {
+            'message': msg,
+            'errorType': ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE,
+            'description': f'Error connecting to server: {self.response.reason}'
+        }
+        return api_response
+
+
+class ClinGenAlleleAPIException(ClinGenAlleleRegistryException):
+    """ API returned response, but was an error """
 
     @staticmethod
     def from_api_response(api_response):
@@ -41,6 +64,12 @@ class ClinGenAlleleAPIException(Exception):
         input_line = api_response['inputLine']
         message = f"ClinGeneAllele API Error: {error_type} ({description}) for input '{input_line}'"
         return ClinGenAlleleAPIException(message)
+
+
+def _check_response(response: requests.Response):
+    """ Throws Exception if response status code is not 200 OK """
+    if response.status_code != 200:
+        raise ClinGenAlleleServerException(response)
 
 
 # throw exceptions in case of errors
@@ -52,10 +81,9 @@ def clingen_allele_registry_put(url, data, login, password):
     token = hashlib.sha1((url + identity + gbTime).encode('utf-8')).hexdigest()
     request = url + '&gbLogin=' + login + '&gbTime=' + gbTime + '&gbToken=' + token
     # send request & parse response
-    res = requests.put(request, data=data)
-    if res.status_code != 200:
-        raise Exception(f"Error for PUT requests: {res}")
-    return res.json()
+    response = requests.put(request, data=data)
+    _check_response(response)
+    return response.json()
 
 
 def clingen_allele_get_id_url(code):
@@ -63,10 +91,9 @@ def clingen_allele_get_id_url(code):
 
 
 def clingen_allele_url_get(url):
-    res = requests.get(url)
-    if res.status_code != 200:
-        raise Exception(f"Error for GET requests: {res}")
-    return res.json()
+    response = requests.get(url)
+    _check_response(response)
+    return response.json()
 
 
 def clingen_hgvs_put_iter(hgvs_iter):
@@ -228,11 +255,19 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None) 
         msg = f"Representation has size {ca_rep_size} which exceeds ClinGen max of {max_size}"
         raise ClinGenAlleleAPIException(msg)
 
-    api_response = get_single_element(list(clingen_hgvs_put([g_hgvs])))
+    api_error = None
+    try:
+        api_response = get_single_element(list(clingen_hgvs_put([g_hgvs])))
+        if "errorType" in api_response:
+            api_error = api_response
+    except ClinGenAlleleServerException as cgse:
+        api_error = cgse.get_fake_api_response()
+        api_error['inputLine'] = g_hgvs
+
     va: VariantAllele
-    if "errorType" in api_response:
+    if api_error:
         if existing_variant_allele:
-            existing_variant_allele.error = api_response
+            existing_variant_allele.error = api_error
             existing_variant_allele.save()
             va = existing_variant_allele
         else:
@@ -241,7 +276,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None) 
                                               genome_build=genome_build,
                                               allele=allele,
                                               origin=AlleleOrigin.variant_origin(variant, genome_build),
-                                              error=api_response)
+                                              error=api_error)
 
     else:
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
