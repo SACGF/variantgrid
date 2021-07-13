@@ -214,7 +214,7 @@ class LabUser:
         return self.user == other.user
 
 
-class ClinVarKey:
+class ClinVarKey(TimeStampedModel):
     name = models.TextField(primary_key=True)
     # TODO key, other details
 

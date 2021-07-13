@@ -1,4 +1,4 @@
-from typing import Dict, List, Iterable, Optional, Set
+from typing import Dict, List, Iterable, Optional, Set, TypeVar, Generic, Callable
 
 from cyvcf2.cyvcf2 import defaultdict
 from lazy import lazy
@@ -10,14 +10,16 @@ from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.models import Allele, ClinVarKey
 
 
+CandidateType = TypeVar("CandidateType")
 
-class ConditionGroup:
 
-    def __init__(self, conditions: ConditionResolved, candidate: ClassificationModification):
+class ConditionGroup(Generic[CandidateType]):
+
+    def __init__(self, conditions: ConditionResolved, candidate: CandidateType):
         self.conditions = conditions
         if len(self.conditions.terms) == 0:
             raise ValueError("ConditionGroup requires at least one term in conditions, got zero")
-        self.candidate: ClassificationModification = candidate
+        self.candidate: CandidateType = candidate
 
     @property
     def is_multi_condition(self) -> bool:
@@ -53,19 +55,14 @@ class ConditionGroup:
         # terms cant be converted to MONDO, just return False
         return False
 
-    @staticmethod
-    def best_candidate(cm1: ClassificationModification, cm2: ClassificationModification) -> ClassificationModification:
-        if cm1.curated_date_check > cm2.curated_date_check:
-            return cm1
-        return cm2
 
+class ConditionGrouper(Generic[CandidateType]):
 
-class ConditionGrouper:
+    def __init__(self, candidate_compare: Callable[[CandidateType, CandidateType], CandidateType]):
+        self.condition_groups: List[ConditionGroup[CandidateType]] = list()
+        self.candidate_compare = candidate_compare
 
-    def __init__(self):
-        self.condition_groups: List[ConditionGroup] = list()
-
-    def add_group(self, new_condition_group: ConditionGroup):
+    def add_group(self, new_condition_group: ConditionGroup[CandidateType]):
         """
         We only want one ConditionGroup per condition, and in the cases where two conditions have a descendant relationship
         with each other, we only want one of them too.
@@ -81,10 +78,13 @@ class ConditionGrouper:
             if winning_condition:
                 new_condition_group = ConditionGroup(
                     conditions=winning_condition,
-                    candidate=ConditionGroup.best_candidate(new_condition_group.candidate, existing.candidate))
+                    candidate=self.best_candidate(new_condition_group.candidate, existing.candidate))
             else:
                 resolved_groups.append(existing)
         resolved_groups.append(new_condition_group)
+
+    def best_candidate(self, c1: CandidateType, c2: CandidateType) -> CandidateType:
+        return self.candidate_compare(c1, c2)
 
 
 class ClinvarExportPrepareClinVarAllele:
@@ -99,7 +99,12 @@ class ClinvarExportPrepareClinVarAllele:
 
     @lazy
     def new_groups(self) -> List[ConditionGroup]:
-        grouper = ConditionGrouper()
+        def best_classification_candidate(c1: ClassificationModification, c2: ClassificationModification):
+            if c1.curated_date_check > c2.curated_date_check:
+                return c1
+            return c2
+
+        grouper: ConditionGrouper[ClassificationModification] = ConditionGrouper(best_classification_candidate)
         for classification in self.candidates:
             group = ConditionGroup(conditions=classification.classification.condition_resolution, candidate=classification)
             grouper.add_group(group)

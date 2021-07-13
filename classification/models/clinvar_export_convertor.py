@@ -1,5 +1,4 @@
 from typing import List, Any, Mapping, TypedDict
-
 import bs4
 from lazy import lazy
 
@@ -225,7 +224,7 @@ class ClinVarExportConverter:
         if citations := self.citation_refs:
             def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
                 citation: ClinVarCitation = {
-                    "db": ClinVarExport.CITATION_DB_MAPPING.get(citation.get("db")),
+                    "db": ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db")),
                     "id": str(citation.get("idx"))  # TODO confirm this is the kind of ID they want, not the prefixed one?
                 }
                 return citation

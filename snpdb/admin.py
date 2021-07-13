@@ -7,7 +7,6 @@ from django.http import HttpResponse
 from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
 
-from classification.models.clinvar_export_models import ClinVarExport
 from snpdb import models
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele
@@ -128,10 +127,7 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
 
     def prepare_clinvar(self, request, queryset):
         allele: Allele
-        for allele in queryset:
-            updated = ClinVarExport.sync_allele(allele=allele)
-            self.message_user(request, message=f'Changes to ClinvarExports for allele {allele.id} - {updated}',
-                              level=messages.INFO)
+        self.message_user(request, message="Not re-implemented yet", level=messages.ERROR)
 
     prepare_clinvar.short_description = 'ClinVar Export Prepare'
 

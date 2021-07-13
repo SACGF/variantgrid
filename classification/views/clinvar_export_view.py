@@ -1,11 +1,9 @@
 from typing import Dict, Any
 
 from django.shortcuts import render
-from guardian.shortcuts import get_objects_for_user
-from gunicorn.config import User
 from htmlmin.decorators import not_minified_response
 
-from classification.models import ClinVarExport, EvidenceKeyMap, ConditionTextMatch, ClassificationModification
+from classification.models import EvidenceKeyMap, ClinVarCandidate
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
 
@@ -37,6 +35,7 @@ class ClinVarExportColumns(DatatableConfig):
         evidence_keys = EvidenceKeyMap.cached()
 
         self.rich_columns = [
+            # FIXME this is all based on the previous stuff
             RichColumn(key="classification_based_on__created", label='ClinVar Variant', orderable=True,
                        sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
                 "id",
@@ -58,7 +57,8 @@ class ClinVarExportColumns(DatatableConfig):
         ]
 
     def get_initial_queryset(self):
-        return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
+        return ClinVarCandidate.objects.none()
+        # return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
 
 
 def clinvar_exports_view(request):
@@ -69,6 +69,9 @@ def clinvar_exports_view(request):
 
 @not_minified_response
 def clinvar_export_review_view(request, pk):
+    return {}
+    # FIXME
+    """
     user: User = request.user
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
     condition_text_match = ConditionTextMatch.objects.filter(classification=clinvar_export.classification_based_on.classification).first()
@@ -79,3 +82,4 @@ def clinvar_export_review_view(request, pk):
         'condition_text_match': condition_text_match,
         'cm': cm
     })
+    """

@@ -7,10 +7,10 @@ from django.db.models.query import QuerySet
 from django.template import Library
 from typing import Union, Optional, Iterable
 from django.utils.safestring import mark_safe
-
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups
-from genes.hgvs import CHGVS, PHGVS
+from classification.models.evidence_mixin import VCDbRefDict
+from genes.hgvs import CHGVS
 from snpdb.models import VariantAllele
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
@@ -18,7 +18,7 @@ from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS, VCDbRefDict, ConditionTextMatch, ConditionResolved
+from classification.models import BestHGVS, ConditionTextMatch, ConditionResolved
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, DiscordanceReportClassification
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap

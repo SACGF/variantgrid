@@ -216,7 +216,7 @@ class ConditionResolvedDict(TypedDict, total=False):
 @dataclass(frozen=True)
 class ConditionResolved:
     terms: List[OntologyTerm]
-    join: Optional[Any]
+    join: Optional[Any] = None
     plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
     @staticmethod
@@ -240,8 +240,8 @@ class ConditionResolved:
 
     def as_json_minimal(self) -> Optional[Dict]:
         # note, doesn't provide display_text or sort_text
-        terms: List[ConditionResolvedTermDict]
-        if terms := self.terms:
+        terms: List[ConditionResolvedTermDict] = list()
+        if self.terms:
             terms = [ConditionResolved.term_to_dict(term) for term in self.terms]
         if join := self.join:
             # FIXME test that it's the string version that you're storing
@@ -250,7 +250,7 @@ class ConditionResolved:
             return {"terms": terms}
 
     @lazy
-    def join_text(self) -> str:
+    def join_text(self) -> Optional[str]:
         if join := self.join:
             try:
                 from classification.models import MultiCondition
