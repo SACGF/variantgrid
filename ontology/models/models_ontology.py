@@ -443,6 +443,40 @@ class OntologySnake:
     def leaf_relationship(self) -> OntologyTermRelation:
         return self.paths[-1]
 
+    @staticmethod
+    def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> List['OntologySnake']:
+        if ancestor == descendant:
+            return OntologySnake(source_term=ancestor, leaf_term=descendant)
+
+        seen: Set[OntologyTerm] = {descendant, }
+        new_snakes: List[OntologySnake] = list([OntologySnake(source_term=descendant)])
+        valid_snakes: List[OntologySnake] = list()
+        level = 1
+        while new_snakes:
+            snakes_by_leaf: Dict[OntologyTerm, OntologySnake] = dict()
+            for snake in new_snakes:
+                snakes_by_leaf[snake.leaf_term] = snake
+
+            new_snakes: List[OntologySnake] = list()
+            for relationship in OntologyTermRelation.objects\
+                    .filter(source_term__in=snakes_by_leaf.keys(), relation=OntologyRelation.IS_A)\
+                    .exclude(dest_term__in=seen)\
+                    .select_related("source_term", "dest_term"):
+                snake = snakes_by_leaf[relationship.source_term]
+                new_snake = snake.snake_step(relationship)
+                leaf_term = new_snake.leaf_term
+                seen.add(new_snake.leaf_term)
+                if leaf_term == ancestor:
+                    valid_snakes.append(snake)
+                else:
+                    new_snakes.append(new_snake)
+            if valid_snakes:
+                return valid_snakes
+            if level >= max_levels:
+                return None
+        return None
+
+
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
     def snake_from(term: OntologyTerm, to_ontology: OntologyService, max_depth: int = 1) -> 'OntologySnakes':

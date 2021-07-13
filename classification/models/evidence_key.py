@@ -10,7 +10,7 @@ from lazy import lazy
 from classification.enums import CriteriaEvaluation, SubmissionSource
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
-from classification.json_serialize import strip_json
+from classification.json_utils import strip_json
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
 from library.utils import empty_to_none

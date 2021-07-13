@@ -214,6 +214,11 @@ class LabUser:
         return self.user == other.user
 
 
+class ClinVarKey:
+    name = models.TextField(primary_key=True)
+    # TODO key, other details
+
+
 class Lab(models.Model):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, eg Shariant
@@ -224,6 +229,8 @@ class Lab(models.Model):
     css_class = models.TextField(blank=True)
     lat = models.FloatField(null=True, blank=True)
     long = models.FloatField(null=True, blank=True)
+
+    clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=SET_NULL)
 
     group_name = models.TextField(blank=True, null=True, unique=True)
     classification_config = models.JSONField(null=True, blank=True)

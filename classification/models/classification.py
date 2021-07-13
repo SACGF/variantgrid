@@ -203,7 +203,7 @@ class ConditionResolvedTermDict(TypedDict):
     name: str
 
 
-class ConditionResolvedDict(TypedDict):
+class ConditionResolvedDict(TypedDict, total=False):
     """
     Structure of data used to cached resolved condition text again a classification
     """
@@ -213,14 +213,44 @@ class ConditionResolvedDict(TypedDict):
     resolved_join: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class ConditionResolved:
     terms: List[OntologyTerm]
     join: Optional[Any]
     plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
+    @staticmethod
+    def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
+        terms = [OntologyTerm.get_or_stub_cached(term.get("term_id")) for term in condition_dict.get("resolved_terms")]
+        join = None
+        if len(terms) > 1:
+            from classification.models import MultiCondition
+            join = MultiCondition(condition_dict.get("resolved_join"))
+
+        terms.sort()
+        return ConditionResolved(terms=terms, join=join)
+
+    @staticmethod
+    def term_to_dict(term: OntologyTerm) -> ConditionResolvedTermDict:
+        term_dict: ConditionResolvedTermDict = {
+            "id": term.id,
+            "name": term.name
+        }
+        return term_dict
+
+    def as_json_minimal(self) -> Optional[Dict]:
+        # note, doesn't provide display_text or sort_text
+        terms: List[ConditionResolvedTermDict]
+        if terms := self.terms:
+            terms = [ConditionResolved.term_to_dict(term) for term in self.terms]
+        if join := self.join:
+            # FIXME test that it's the string version that you're storing
+            return {"terms": terms, "resolved_join": join.value}
+        else:
+            return {"terms": terms}
+
     @lazy
-    def join_text(self):
+    def join_text(self) -> str:
         if join := self.join:
             try:
                 from classification.models import MultiCondition
@@ -229,7 +259,13 @@ class ConditionResolved:
                 pass
         return None
 
-    def __lt__(self, other):
+    def __eq__(self, other: 'ConditionResolved') -> bool:
+        if self.terms:
+            return self.terms == other.terms and self.join == other.join
+        else:
+            return self.plain_text == other.plain_text
+
+    def __lt__(self, other: 'ConditionResolved') -> bool:
         self_terms = self.terms or list()
         other_terms = other.terms or list()
         if len(self_terms) != len(other_terms):
@@ -331,12 +367,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @lazy
     def condition_resolution_obj(self) -> Optional[ConditionResolved]:
         if cr_dict := self.condition_resolution_dict:
-            terms = [OntologyTerm.get_or_stub_cached(term.get("term_id")) for term in cr_dict.get("resolved_terms")]
-            join = None
-            if len(terms) > 1:
-                from classification.models import MultiCondition
-                join = MultiCondition(cr_dict.get("resolved_join"))
-            return ConditionResolved(terms=terms, join=join)
+            return ConditionResolved.from_dict(cr_dict)
+        return None
 
     class Meta:
         unique_together = ('lab', 'lab_record_id')
