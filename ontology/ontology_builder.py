@@ -154,7 +154,7 @@ class OntologyBuilder:
     def add_term(self,
                  term_id: str,
                  name: str,
-                 definition: Optional[str],
+                 definition: Optional[str] = None,
                  extra: Optional[Dict] = None,
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True):

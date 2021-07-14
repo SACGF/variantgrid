@@ -1,149 +1,70 @@
-from typing import Dict, List, Iterable, Optional, Set, TypeVar, Generic, Callable
-
+from typing import Dict, List, Optional, Set
 from cyvcf2.cyvcf2 import defaultdict
-from lazy import lazy
-
 from classification.enums import ShareLevel
 from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarCandidate, \
     ConditionResolved
-from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
+from classification.models.abstract_utils import ConditionGroupPrepareMerger
 from snpdb.models import Allele, ClinVarKey
 
 
-CandidateType = TypeVar("CandidateType")
+class ClassificationModificationCandidate:
+
+    def __init__(self,
+                 modification: ClassificationModification,
+                 condition_umbrella: Optional[ConditionResolved] = None,
+                 failed_candidates: Optional[Set[ClassificationModification]] = None):
+        self.modification = modification
+        self.condition_umbrella: ConditionResolved = condition_umbrella or modification.classification.condition_resolution_obj
+        self.failed_candidates: Set[ClassificationModification] = failed_candidates or set()
+
+        if self.condition_umbrella is None or not bool(self.condition_umbrella.terms):
+            raise ValueError("Candidate must have a resolved condition associated with it")
 
 
-class ConditionGroup(Generic[CandidateType]):
+class ClinVarnGroupPrepareMerger(ConditionGroupPrepareMerger[ClinVarCandidate, ClassificationModificationCandidate]):
 
-    def __init__(self, conditions: ConditionResolved, candidate: CandidateType):
-        self.conditions = conditions
-        if len(self.conditions.terms) == 0:
-            raise ValueError("ConditionGroup requires at least one term in conditions, got zero")
-        self.candidate: CandidateType = candidate
-
-    @property
-    def is_multi_condition(self) -> bool:
-        return len(self.conditions.terms) > 1
-
-    @property
-    def term(self) -> OntologyTerm:
-        return self.conditions.terms[0]
-
-    @lazy
-    def mondo_term(self) -> Optional[OntologyTerm]:
-        if self.is_multi_condition:
-            return None
-        else:
-            return OntologyTermRelation.as_mondo(self.term)
-
-    def is_descendant_or_equal_of(self, other: 'ConditionGroup') -> bool:
-        if self.is_multi_condition or other.is_multi_condition:
-            # when looking at multiple conditions, do not attempt merging unless we're the exact same
-            if self.conditions.terms == other.conditions.terms and \
-                    self.conditions.join == other.conditions.join:
-                return True
-            else:
-                return False
-        if self.term == other.term:
-            return True
-
-        if other_mondo := other.mondo_term:
-            if self_mondo := self.mondo_term:
-                descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo, ancestor=other_mondo)
-                return bool(descendant_relationships)
-
-        # terms cant be converted to MONDO, just return False
-        return False
-
-
-class ConditionGrouper(Generic[CandidateType]):
-
-    def __init__(self, candidate_compare: Callable[[CandidateType, CandidateType], CandidateType]):
-        self.condition_groups: List[ConditionGroup[CandidateType]] = list()
-        self.candidate_compare = candidate_compare
-
-    def add_group(self, new_condition_group: ConditionGroup[CandidateType]):
-        """
-        We only want one ConditionGroup per condition, and in the cases where two conditions have a descendant relationship
-        with each other, we only want one of them too.
-        Store against the most general condition, so the order of add_group shouldn't matter
-        """
-        resolved_groups: List[ConditionGroup] = list()
-        for existing in self.condition_groups:
-            winning_condition: Optional[ConditionResolved] = None
-            if existing.is_descendant_or_equal_of(new_condition_group):
-                winning_condition = new_condition_group.conditions
-            elif new_condition_group.is_descendant_or_equal_of(existing):
-                winning_condition = existing.conditions
-            if winning_condition:
-                new_condition_group = ConditionGroup(
-                    conditions=winning_condition,
-                    candidate=self.best_candidate(new_condition_group.candidate, existing.candidate))
-            else:
-                resolved_groups.append(existing)
-        resolved_groups.append(new_condition_group)
-
-    def best_candidate(self, c1: CandidateType, c2: CandidateType) -> CandidateType:
-        return self.candidate_compare(c1, c2)
-
-
-class ClinvarExportPrepareClinVarAllele:
-
-    def __init__(self, clinvar_allele: ClinVarAllele, candidates: List[ClassificationModification]):
+    def __init__(self, clinvar_allele: ClinVarAllele):
         self.clinvar_allele = clinvar_allele
-        self.candidates = candidates
+        super().__init__()
 
-    @lazy
-    def existing(self) -> Iterable[ClinVarCandidate]:
-        return list(ClinVarCandidate.objects.filter(clinvar_allele=self.clinvar_allele))
+    def established_candidates(self) -> Set[ClinVarCandidate]:
+        return set(ClinVarCandidate.objects.filter(clinvar_allele=self.clinvar_allele))
 
-    @lazy
-    def new_groups(self) -> List[ConditionGroup]:
-        def best_classification_candidate(c1: ClassificationModification, c2: ClassificationModification):
-            if c1.curated_date_check > c2.curated_date_check:
-                return c1
-            return c2
+    def establish_new_candidate(self, new_candidate: ClassificationModificationCandidate) -> ClinVarCandidate:
+        return ClinVarCandidate.new_candidate(clinvar_allele=self.clinvar_allele, condition=new_candidate.condition_umbrella,
+                                              candidate=new_candidate.modification)
 
-        grouper: ConditionGrouper[ClassificationModification] = ConditionGrouper(best_classification_candidate)
-        for classification in self.candidates:
-            group = ConditionGroup(conditions=classification.classification.condition_resolution, candidate=classification)
-            grouper.add_group(group)
-        new_groups = grouper.condition_groups
-        new_groups.sort(key=lambda x: x.candidate.id)  # sort the groups by the classification just so we have consistent ordering
-        return new_groups
+    def combine_candidates_if_possible(self, candidate_1: ClassificationModificationCandidate, candidate_2: ClassificationModificationCandidate) -> Optional[ClassificationModificationCandidate]:
+        if general_condition := ConditionResolved.more_general_term_if_related(candidate_1.condition_umbrella, candidate_2.condition_umbrella):
+            mod_1 = candidate_1.modification
+            mod_2 = candidate_2.modification
+            failed_candidates = candidate_1.failed_candidates.union(candidate_2.failed_candidates)
 
-    def consolidate(self):
-        # now to migrate classifications to new versions, create new candidates, mark old candidates as empty
-        pending_existing: Set[ClinVarCandidate] = set(self.existing)
-
-        new_group: ConditionGroup
-        for new_group in self.new_groups:
-            existing: ClinVarCandidate
-            for existing in pending_existing:
-                existing_group = ConditionGroup(existing.condition_resolved, existing.classification_based_on)
-                if new_group.is_descendant_or_equal_of(existing_group):
-                    # found a link for this existing record
-                    pending_existing.remove(existing)
-
-                    # merge these groups
-                    if new_group.candidate == existing.classification_based_on:
-                        # no change, this is still the best candidate for the condition, update condition if we need to though
-                        if new_group.conditions != existing.condition_resolved:
-                            existing.condition_resolved = new_group.conditions
-                            existing.save()
-                            break
-                    else:
-                        # classification modification has changed (could be whole new classification or just more up to date version
-                        # of the same one)
-                        existing.condition_resolved = new_group.conditions
-                        existing.set_new_candidate(new_group.candidate)
-                        break
+            best_modification: ClassificationModification
+            # we want the biggest date
+            if mod_1.curated_date_check < mod_2.curated_date_check:
+                best_modification = mod_2
+                failed_candidates.add(mod_1)
             else:
-                # no existing candidate was found, make a new candidate
-                ClinVarCandidate(clinvar_allele=self.clinvar_allele, condition=new_group.conditions.as_json_minimal(), classification_based_on=new_group.candidate).save()
+                best_modification = mod_1
+                failed_candidates.add(mod_2)
+            return ClassificationModificationCandidate(modification=best_modification, condition_umbrella=general_condition, failed_candidates=failed_candidates)
+        else:
+            # these candidates aren't compatible, keep them separate
+            return None
 
-        for orphaned in pending_existing:
-            orphaned.set_new_candidate(None)
+    def merge_into_established_if_possible(self, established: ClinVarCandidate, new_candidate: ClassificationModificationCandidate) -> bool:
+        """
+        Maps an existing group to a condition group
+        """
+        if new_candidate.condition_umbrella.is_same_or_more_specific(established.condition_resolved):
+            #  can merge, so lets do it
+            # no need to update condition in an hour
+            # established.condition_resolved = new_candidate.condition_umbrella
+            #  TODO, include (or print) debug info about other candidates
+            established.update_candidate(new_candidate.modification)
+            return True
+        return False
 
 
 class ClinvarExportPrepare:
@@ -169,4 +90,7 @@ class ClinvarExportPrepare:
 
         for clinvar_key, classifications in clinvar_keys_to_classification.items():
             clinvar_allele, _ = ClinVarAllele.objects.get_or_create(clinvar_key=clinvar_key, allele=self.allele)
-            ClinvarExportPrepareClinVarAllele(clinvar_allele, classifications).consolidate()
+            cp = ClinVarnGroupPrepareMerger(clinvar_allele)
+            for mod in classifications:
+                cp.add_new_candidate(ClassificationModificationCandidate(mod))
+            cp.consolidate()

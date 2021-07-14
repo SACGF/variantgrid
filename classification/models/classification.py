@@ -37,7 +37,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation, OntologyService
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
@@ -229,6 +229,60 @@ class ConditionResolved:
 
         terms.sort()
         return ConditionResolved(terms=terms, join=join)
+
+    @property
+    def is_multi_condition(self) -> bool:
+        return len(self.terms) > 1
+
+    @property
+    def single_term(self) -> Optional[OntologyTerm]:
+        """
+        Only call if not is_multi_condition
+        """
+        return self.terms[0] if len(self.terms) == 1 else None
+
+    @lazy
+    def mondo_term(self) -> Optional[OntologyTerm]:
+        if term := self.single_term:
+            return OntologyTermRelation.as_mondo(term)
+        else:
+            return None
+
+    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+        if self.is_multi_condition or other.is_multi_condition:
+            # when looking at multiple conditions, do not attempt merging unless we're the exact same
+            if self.terms == other.terms and \
+                    self.join == other.join:
+                return True
+            else:
+                return False
+        elif self.single_term == other.single_term:
+            return True
+        else:
+            if other_mondo := other.mondo_term:
+                if self_mondo := self.mondo_term:
+                    descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo, ancestor=other_mondo)
+                    return bool(descendant_relationships)
+
+            # terms cant be converted to MONDO and not exact match, just return False
+            return False
+
+    @staticmethod
+    def more_general_term_if_related(resolved_1: 'ConditionResolved', resolved_2: 'ConditionResolved') -> Optional['ConditionResolved']:
+        more_general: Optional[ConditionResolved] = None
+        if resolved_1.is_same_or_more_specific(resolved_2):
+            more_general = resolved_2
+        elif resolved_2.is_same_or_more_specific(resolved_1):
+            more_general = resolved_1
+
+        if more_general:
+            # if presented with different types, and we can switch over to MONDO, do so
+            if not more_general.is_multi_condition and resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
+                if mondo_term := more_general.mondo_term:
+                    more_general = ConditionResolved(terms=[mondo_term])
+            return more_general
+
+        return None
 
     @staticmethod
     def term_to_dict(term: OntologyTerm) -> ConditionResolvedTermDict:

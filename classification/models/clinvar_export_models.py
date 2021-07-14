@@ -36,10 +36,16 @@ class ClinVarCandidate(TimeStampedModel):
         self.condition = new_condition.as_json_minimal()
         self.cached_condition = new_condition
 
-    def set_new_candidate(self, new_classification_based_on: Optional[ClassificationModification]):
+    def update_candidate(self, new_classification_based_on: Optional[ClassificationModification]):
         self.classification_based_on = new_classification_based_on
         # FIXME, check to see if we changed since last submission
         self.save()
+
+    @staticmethod
+    def new_candidate(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]):
+        cc = ClinVarCandidate(clinvar_allele=clinvar_allele, condition=condition.as_json_minimal())
+        cc.set_new_candidate(candidate)
+
 
     @property
     def content_current(self) -> Optional[ValidatedJson]:

@@ -439,6 +439,13 @@ class OntologySnake:
             steps.append(OntologySnakeStep(relation=path, dest_term=node))
         return steps
 
+    def __str__(self):
+        text = f"{self.source_term}"
+        for step in self.show_steps():
+            forwards = step.relation.dest_term == step.dest_term
+            text += f" {'<' if not forwards else ''}-{step.relation.relation}-{'>' if forwards else ''} {step.dest_term}"
+        return text
+
     @property
     def leaf_relationship(self) -> OntologyTermRelation:
         return self.paths[-1]
@@ -448,11 +455,15 @@ class OntologySnake:
         if ancestor == descendant:
             return OntologySnake(source_term=ancestor, leaf_term=descendant)
 
+        if descendant.ontology_service != ancestor.ontology_service:
+            raise ValueError(f"Can only check for ancestry within the same ontology service, not {descendant.ontology_service} vs {ancestor.ontology_service}")
+
         seen: Set[OntologyTerm] = {descendant, }
         new_snakes: List[OntologySnake] = list([OntologySnake(source_term=descendant)])
         valid_snakes: List[OntologySnake] = list()
-        level = 1
+        level = 0
         while new_snakes:
+            level += 1
             snakes_by_leaf: Dict[OntologyTerm, OntologySnake] = dict()
             for snake in new_snakes:
                 snakes_by_leaf[snake.leaf_term] = snake
@@ -467,14 +478,14 @@ class OntologySnake:
                 leaf_term = new_snake.leaf_term
                 seen.add(new_snake.leaf_term)
                 if leaf_term == ancestor:
-                    valid_snakes.append(snake)
+                    valid_snakes.append(new_snake)
                 else:
                     new_snakes.append(new_snake)
             if valid_snakes:
                 return valid_snakes
             if level >= max_levels:
-                return None
-        return None
+                return list()
+        return list()
 
 
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
