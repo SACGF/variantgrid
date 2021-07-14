@@ -469,8 +469,7 @@ class BackendVCF(models.Model):
             return self.vcf_file
         if self.combo_vcf:
             return self.combo_vcf
-        msg = f"{self} has both vcf_file and combo_vcf set"
-        raise ValueError(msg)
+        raise ValueError(f"{self} has neither 'vcf_file' or 'combo_vcf' set")
 
     @property
     def sample_sheet(self):
