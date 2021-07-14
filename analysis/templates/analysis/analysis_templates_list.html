@@ -12,7 +12,7 @@
     </div>
 
     <p>
-    {%  if analysis_template.analysistemplateversion_set.exists %}
+    {%  if analysis_template_versions.exists %}
         <h4>Historical versions:</h4>
 
         <table class="table">
@@ -25,7 +25,7 @@
                 <th>Requires Somatic</th>
                 <th>Requires Sample Gene List</th>
             </tr>
-        {% for atv in analysis_template.analysistemplateversion_set.all %}
+        {% for atv in analysis_template_versions %}
             <tr>
                 <td>
                     <a href="{% url 'analysis' atv.analysis_snapshot.pk %}">v.{{ atv.version }}</a>
