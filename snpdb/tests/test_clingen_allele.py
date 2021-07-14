@@ -32,7 +32,6 @@ class ClinGenAlleleTestCase(TestCase):
 
     def test_fail_then_retry_success(self):
         variant_allele = self._get_variant_allele_failed_clingen()
-        print(f"{variant_allele=}")
         self.assertIsNone(variant_allele.allele.clingen_allele, "Allele.clingen_allele not set after API failure")
         # Attempt to retry this time with success
         clingen_api_success = MockClinGenAlleleRegistryAPI()
