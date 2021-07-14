@@ -3,7 +3,7 @@ from cyvcf2.cyvcf2 import defaultdict
 from classification.enums import ShareLevel
 from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarCandidate, \
     ConditionResolved
-from classification.models.abstract_utils import ConditionGroupPrepareMerger
+from classification.models.abstract_utils import ConsolidatingMerger
 from snpdb.models import Allele, ClinVarKey
 
 
@@ -21,13 +21,13 @@ class ClassificationModificationCandidate:
             raise ValueError("Candidate must have a resolved condition associated with it")
 
 
-class ClinVarnGroupPrepareMerger(ConditionGroupPrepareMerger[ClinVarCandidate, ClassificationModificationCandidate]):
+class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarCandidate, ClassificationModificationCandidate]):
 
     def __init__(self, clinvar_allele: ClinVarAllele):
         self.clinvar_allele = clinvar_allele
         super().__init__()
 
-    def established_candidates(self) -> Set[ClinVarCandidate]:
+    def established(self) -> Set[ClinVarCandidate]:
         return set(ClinVarCandidate.objects.filter(clinvar_allele=self.clinvar_allele))
 
     def establish_new_candidate(self, new_candidate: ClassificationModificationCandidate) -> ClinVarCandidate:
@@ -90,7 +90,7 @@ class ClinvarExportPrepare:
 
         for clinvar_key, classifications in clinvar_keys_to_classification.items():
             clinvar_allele, _ = ClinVarAllele.objects.get_or_create(clinvar_key=clinvar_key, allele=self.allele)
-            cp = ClinVarnGroupPrepareMerger(clinvar_allele)
+            cp = ClinVarConsolidatingMerger(clinvar_allele)
             for mod in classifications:
                 cp.add_new_candidate(ClassificationModificationCandidate(mod))
             cp.consolidate()

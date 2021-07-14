@@ -3,7 +3,7 @@ from typing import List, Set, Optional
 from unittest import TestCase
 
 from classification.models import ConditionResolved
-from classification.models.clinvar_export_prepare import ConditionGroupPrepareMerger
+from classification.models.clinvar_export_prepare import ConsolidatingMerger
 from classification.tests.data_utils import ConditionMock
 from ontology.models import OntologyTerm
 
@@ -34,7 +34,7 @@ class MockCandidate:
         return False
 
 
-class ConditionGroupPrepareMergerTest(ConditionGroupPrepareMerger[MockEstablished, MockCandidate]):
+class ConditionGroupPrepareMergerTest(ConsolidatingMerger[MockEstablished, MockCandidate]):
 
     def __init__(self, established_candidates: Set[MockEstablished]):
         super().__init__()
@@ -42,7 +42,7 @@ class ConditionGroupPrepareMergerTest(ConditionGroupPrepareMerger[MockEstablishe
         self._new_established: List[MockEstablished] = list()
         self.next_id = 100
 
-    def established_candidates(self) -> Set[MockEstablished]:
+    def established(self) -> Set[MockEstablished]:
         return set(self._established_candidates)
 
     def establish_new_candidate(self, new_candidate: MockCandidate) -> MockEstablished:

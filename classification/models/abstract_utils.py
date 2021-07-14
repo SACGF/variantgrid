@@ -4,16 +4,16 @@ from typing import TypeVar, Generic, List, Optional, Set
 
 
 CandidateType = TypeVar("CandidateType")
-EstablishedCandidateType = TypeVar('EstablishedCandidateType', bound=Hashable)
+EstablishedType = TypeVar("EstablishedType", bound=Hashable)
 
 
-class ConditionGroupPrepareMerger(Generic[EstablishedCandidateType, CandidateType]):
+class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
 
     def __init__(self):
         self.collapsed_new_candidates: List[CandidateType] = list()
 
     @abstractmethod
-    def established_candidates(self) -> Set[EstablishedCandidateType]:
+    def established(self) -> Set[EstablishedType]:
         """
         Groups already associated with this bit of data that need to be migrated with the data from new_groups
         """
@@ -21,10 +21,13 @@ class ConditionGroupPrepareMerger(Generic[EstablishedCandidateType, CandidateTyp
 
     @abstractmethod
     def combine_candidates_if_possible(self, candidate_1: CandidateType, candidate_2: CandidateType) -> Optional[CandidateType]:
+        """
+        @returns returns the combined candidate IF the candidates can be consolidated into one, otherwise returns None
+        """
         pass
 
     @abstractmethod
-    def merge_into_established_if_possible(self, established: EstablishedCandidateType, new_candidate: CandidateType) -> bool:
+    def merge_into_established_if_possible(self, established: EstablishedType, new_candidate: CandidateType) -> bool:
         """
         Maps an existing group to a condition group
         """
@@ -33,7 +36,7 @@ class ConditionGroupPrepareMerger(Generic[EstablishedCandidateType, CandidateTyp
     @abstractmethod
     def establish_new_candidate(self, new_candidate: CandidateType):
         """
-        A new group has been found that doesn't match up to an existing
+        A candidate (that doesn't match any existing established data) to be established
         """
         pass
 
@@ -56,8 +59,12 @@ class ConditionGroupPrepareMerger(Generic[EstablishedCandidateType, CandidateTyp
         self.collapsed_new_candidates = resulting_candidates
 
     def consolidate(self):
+        """
+        This method does the work of taking the established data and merging them with the new data
+        """
+
         # now to migrate classifications to new versions, create new candidates, mark old candidates as empty
-        pending_existing = self.established_candidates()
+        pending_existing = self.established()
 
         for new_group in self.collapsed_new_candidates:
             for existing in pending_existing:
