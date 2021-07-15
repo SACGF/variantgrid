@@ -526,9 +526,13 @@ class ConditionTextMatchAdmin(ModelAdminBasics):
     search_fields = ('id', 'condition_text__normalized_text', 'gene_symbol__symbol', 'classification__id', 'condition_xrefs')
 
 
-class ClinVarExportAdmin(ModelAdminBasics):
-    list_display = ["pk", "lab", "allele", "created"]
-    list_filter = [ClassificationLabFilter]
+class ClinVarExportRecordAdmin(ModelAdminBasics):
+    list_display = ["pk", "clinvar_allele", "classification_based_on", "condition", "snv", "created", "modified"]
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super(ClinVarExportRecordAdmin, self).get_form(request, obj, widgets={
+            'snv': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
 
 
 class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):

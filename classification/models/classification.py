@@ -219,6 +219,13 @@ class ConditionResolved:
     join: Optional[Any] = None
     plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
+    @property
+    def summary(self) -> str:
+        text = ", ".join([term.id for term in self.terms])
+        if join := self.join:
+            text = f"{text} {join}"
+        return text
+
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
         terms = [OntologyTerm.get_or_stub_cached(term.get("term_id")) for term in condition_dict.get("resolved_terms")]
@@ -287,7 +294,7 @@ class ConditionResolved:
     @staticmethod
     def term_to_dict(term: OntologyTerm) -> ConditionResolvedTermDict:
         term_dict: ConditionResolvedTermDict = {
-            "id": term.id,
+            "term_id": term.id,
             "name": term.name
         }
         return term_dict
@@ -299,9 +306,9 @@ class ConditionResolved:
             terms = [ConditionResolved.term_to_dict(term) for term in self.terms]
         if join := self.join:
             # FIXME test that it's the string version that you're storing
-            return {"terms": terms, "resolved_join": join.value}
+            return {"resolved_terms": terms, "resolved_join": join.value}
         else:
-            return {"terms": terms}
+            return {"resolved_terms": terms}
 
     @lazy
     def join_text(self) -> Optional[str]:
@@ -1234,7 +1241,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             save=True,
             revalidate_all=True
         )
-        # migration fixes are so established at this point, no need to re-run them
+        # migration fixes are so retrieve_established at this point, no need to re-run them
         # self.fix_migration_stuff(user)
 
         classification_revalidate_signal.send(sender=Classification, classification=self)

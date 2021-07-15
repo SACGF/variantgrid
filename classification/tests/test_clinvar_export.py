@@ -42,7 +42,7 @@ class ConditionGroupPrepareMergerTest(ConsolidatingMerger[MockEstablished, MockC
         self._new_established: List[MockEstablished] = list()
         self.next_id = 100
 
-    def established(self) -> Set[MockEstablished]:
+    def retrieve_established(self) -> Set[MockEstablished]:
         return set(self._established_candidates)
 
     def establish_new_candidate(self, new_candidate: MockCandidate) -> MockEstablished:
@@ -61,7 +61,7 @@ class ConditionGroupPrepareMergerTest(ConsolidatingMerger[MockEstablished, MockC
         else:
             return None
 
-    def merge_into_established_if_possible(self, established: MockEstablished, new_candidate: MockCandidate) -> bool:
+    def merge_into_established_if_possible(self, established: MockEstablished, new_candidate: Optional[MockCandidate]) -> bool:
         if new_candidate is None:
             established.candidate = None
             return True
@@ -118,7 +118,7 @@ class TestClinVarExportModels(TestCase):
         condition_num_grouper.add_new_candidate(group_lung)
         self.assertEqual(len(condition_num_grouper.collapsed_new_candidates), 2)
 
-        # no established groups, so we should now have 2 established groups
+        # no retrieve_established groups, so we should now have 2 retrieve_established groups
         condition_num_grouper.consolidate()
         new_groups = condition_num_grouper._new_established
         self.assertEqual(len(new_groups), 2)

@@ -3,7 +3,7 @@ from typing import Dict, Any
 from django.shortcuts import render
 from htmlmin.decorators import not_minified_response
 
-from classification.models import EvidenceKeyMap, ClinVarCandidate
+from classification.models import EvidenceKeyMap, ClinVarExportRecord
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
 
@@ -57,7 +57,7 @@ class ClinVarExportColumns(DatatableConfig):
         ]
 
     def get_initial_queryset(self):
-        return ClinVarCandidate.objects.none()
+        return ClinVarExportRecord.objects.none()
         # return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
 
 

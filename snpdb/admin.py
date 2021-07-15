@@ -6,7 +6,6 @@ from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse
 from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
-
 from snpdb import models
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele
@@ -126,8 +125,14 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
     liftover.short_description = 'Liftover'
 
     def prepare_clinvar(self, request, queryset):
+
+        from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
         allele: Allele
-        self.message_user(request, message="Not re-implemented yet", level=messages.ERROR)
+        for allele in queryset:
+            export_prepare = ClinvarAlleleExportPrepare(allele)
+            report = export_prepare.update_export_records()
+            for message in report:
+                self.message_user(request, message=f"Allele ({allele}) - {message}", level=messages.INFO)
 
     prepare_clinvar.short_description = 'ClinVar Export Prepare'
 
@@ -164,8 +169,19 @@ class UserPageAck(ModelAdminBasics):
     list_display = ('user', 'page_id')
 
 
+class ClinVarKeyAdmin(ModelAdminBasics):
+    list_display = ('id', 'created', 'modified')
+
+    def get_form(self, request, obj=None, **kwargs):
+
+        return super(ClinVarKeyAdmin, self).get_form(request, obj, widgets={
+            'id': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
+
+
 admin.site.register(models.Allele, AlleleAdmin)
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
+admin.site.register(models.ClinVarKey, ClinVarKeyAdmin)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
 admin.site.register(models.CohortSample, ModelAdminBasics)

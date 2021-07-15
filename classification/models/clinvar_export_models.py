@@ -8,17 +8,26 @@ from snpdb.models import ClinVarKey, Allele
 
 
 class ClinVarAllele(TimeStampedModel):
+    class Meta:
+        verbose_name = "ClinVar allele"
+
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
 
+    def __str__(self):
+        return f"{self.allele} {self.clinvar_key}"
 
-class ClinVarCandidate(TimeStampedModel):
+
+class ClinVarExportRecord(TimeStampedModel):
+    class Meta:
+        verbose_name = "ClinVar export record"
+
     clinvar_allele = models.ForeignKey(ClinVarAllele, null=True, blank=True, on_delete=models.CASCADE)
     condition = models.JSONField()
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     snv = models.TextField(null=True, blank=True)  # if not set yet
 
-    content_last_submitted = models.JSONField()
+    content_last_submitted = models.JSONField(null=True, blank=True)
 
     def __init__(self, *args, **kwargs):
         super(TimeStampedModel, self).__init__(*args, **kwargs)
@@ -26,7 +35,6 @@ class ClinVarCandidate(TimeStampedModel):
 
     @property
     def condition_resolved(self) -> ConditionResolved:
-        # warning, will be incorrect if you manually change condition
         if not self.cached_condition:
             self.cached_condition = ConditionResolved.from_dict(self.condition)
         return self.cached_condition
@@ -36,16 +44,15 @@ class ClinVarCandidate(TimeStampedModel):
         self.condition = new_condition.as_json_minimal()
         self.cached_condition = new_condition
 
-    def update_candidate(self, new_classification_based_on: Optional[ClassificationModification]):
+    def update_classification(self, new_classification_based_on: Optional[ClassificationModification]):
         self.classification_based_on = new_classification_based_on
         # FIXME, check to see if we changed since last submission
         self.save()
 
     @staticmethod
-    def new_candidate(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]):
-        cc = ClinVarCandidate(clinvar_allele=clinvar_allele, condition=condition.as_json_minimal())
-        cc.set_new_candidate(candidate)
-
+    def new_condition(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]):
+        cc = ClinVarExportRecord(clinvar_allele=clinvar_allele, condition=condition.as_json_minimal())
+        cc.update_classification(candidate)
 
     @property
     def content_current(self) -> Optional[ValidatedJson]:
@@ -66,8 +73,11 @@ class ClinVarStatus(models.TextChoices):
     IN_ERROR = "E"
 
 
-class ClinVarSubmission(TimeStampedModel):
-    clinvar_candidate = models.ForeignKey(ClinVarCandidate, on_delete=models.PROTECT)  # if there's been an actual submission, don't allow deletes
+class ClinVarExportRecordSubmission(TimeStampedModel):
+    class Meta:
+        verbose_name = "ClinVar export record submission"
+
+    clinvar_candidate = models.ForeignKey(ClinVarExportRecord, on_delete=models.PROTECT)  # if there's been an actual submission, don't allow deletes
     status = models.CharField(max_length=1, choices=ClinVarStatus.choices)
     submitted_json = models.JSONField()
 

@@ -215,9 +215,14 @@ class LabUser:
 
 
 class ClinVarKey(TimeStampedModel):
-    name = models.TextField(primary_key=True)
+    class Meta:
+        verbose_name = "ClinVar key"
+
+    id = models.TextField(primary_key=True)
     # TODO key, other details
 
+    def __str__(self):
+        return f"ClinVarKey ({self.id})"
 
 class Lab(models.Model):
     name = models.TextField()

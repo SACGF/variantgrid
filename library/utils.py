@@ -17,7 +17,7 @@ from django.db import models
 from enum import Enum
 from itertools import islice
 from json.encoder import JSONEncoder
-from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union
+from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable
 import hashlib
 import importlib
 import json
@@ -706,3 +706,22 @@ class LazyAttribute:
             lazy_att = LazyAttribute(obj, attribute)
             context[attribute] = SimpleLazyObject(lazy_att.eval)
         return context
+
+
+P = TypeVar('P')
+
+
+def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P], List[P]]:
+    """
+    :param iterable An iterable bunch of data to be split into two
+    :param filter A filter to run over each element of iterable, to put it into a pass or fail list
+    :returns two lists, the first being elements that passed the filter, the second being ones that failed
+    """
+    passes: List[P] = list()
+    fails: List[P] = list()
+    for element in iterable:
+        if filter(element):
+            passes.append(element)
+        else:
+            fails.append(element)
+    return passes, fails

@@ -1,6 +1,5 @@
 from django.contrib import admin
 from unidecode import unidecode
-
 from snpdb.models import Organization, Lab
 import re
 
@@ -25,7 +24,7 @@ class LabAdmin(admin.ModelAdmin):
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
-        ('Submissions', {'fields': ('classification_config', 'upload_location', 'external')})
+        ('Submissions', {'fields': ('classification_config', 'upload_location', 'external', 'clinvar_key')})
     )
 
     def get_form(self, request, obj=None, **kwargs):

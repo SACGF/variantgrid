@@ -13,7 +13,7 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
         self.collapsed_new_candidates: List[CandidateType] = list()
 
     @abstractmethod
-    def established(self) -> Set[EstablishedType]:
+    def retrieve_established(self) -> Set[EstablishedType]:
         """
         Groups already associated with this bit of data that need to be migrated with the data from new_groups
         """
@@ -27,7 +27,7 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
         pass
 
     @abstractmethod
-    def merge_into_established_if_possible(self, established: EstablishedType, new_candidate: CandidateType) -> bool:
+    def merge_into_established_if_possible(self, established: EstablishedType, new_candidate: Optional[CandidateType]) -> bool:
         """
         Maps an existing group to a condition group
         """
@@ -36,7 +36,7 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
     @abstractmethod
     def establish_new_candidate(self, new_candidate: CandidateType):
         """
-        A candidate (that doesn't match any existing established data) to be established
+        A candidate (that doesn't match any existing retrieve_established data) to be retrieve_established
         """
         pass
 
@@ -60,11 +60,11 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
 
     def consolidate(self):
         """
-        This method does the work of taking the established data and merging them with the new data
+        This method does the work of taking the retrieve_established data and merging them with the new data
         """
 
         # now to migrate classifications to new versions, create new candidates, mark old candidates as empty
-        pending_existing = self.established()
+        pending_existing = self.retrieve_established()
 
         for new_group in self.collapsed_new_candidates:
             for existing in pending_existing:
