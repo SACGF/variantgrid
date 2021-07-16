@@ -70,7 +70,7 @@ class ClinVarExportRecord(TimeStampedModel):
 
     def update_classification(self, new_classification_based_on: Optional[ClassificationModification]):
         if self.classification_based_on != new_classification_based_on:
-            lazy.invalidate(self, 'content_current')
+            lazy.invalidate(self, 'submission_body_current')
             self.classification_based_on = new_classification_based_on
             self.status = self.calculate_status()
             # FIXME, check to see if we changed since last submission
@@ -90,7 +90,7 @@ class ClinVarExportRecord(TimeStampedModel):
         from classification.models.clinvar_export_convertor import ClinVarExportConverter
         return ClinVarExportConverter(clinvar_export_record=self).as_json
 
-    def submission_current(self) -> ValidatedJson:
+    def submission_full_current(self) -> ValidatedJson:
         """
         Returns the data that should be directly copied into a ClinVarBatch
         """

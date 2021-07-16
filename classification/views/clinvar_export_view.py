@@ -1,18 +1,20 @@
 from typing import Dict, Any
 
+from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
-from gunicorn.config import User
 from htmlmin.decorators import not_minified_response
 
-from classification.models import EvidenceKeyMap, ClinVarExportRecord, ClinVarAllele
+from classification.models import ClinVarExportRecord, ClinVarAllele
 from library.cache import timed_cache
 from snpdb.models import Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
+
 @timed_cache(size_limit=30, ttl=60)
 def allele_for(allele_id: int):
     return Allele.objects.select_related('clingen_allele').get(pk=allele_id)
+
 
 class ClinVarExportRecordColumns(DatatableConfig):
 
@@ -23,7 +25,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
         link_id = f"{c_id}.{created.timestamp()}"
 
         genome_build = row["classification_based_on__published_evidence__genome_build__value"]
-        c_hgvs = None
+        c_hgvs: str
         if "h37" in genome_build:
             c_hgvs = row["classification_based_on__classification__chgvs_grch37"]
         else:
@@ -44,21 +46,19 @@ class ClinVarExportRecordColumns(DatatableConfig):
     def __init__(self, request):
         super().__init__(request)
 
-        evidence_keys = EvidenceKeyMap.cached()
-
         self.rich_columns = [
             # FIXME this is all based on the previous stuff
             RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key"),
             RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="Allele"),
             RichColumn(key="classification_based_on__created", label='ClinVar Variant', orderable=True,
                        sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
-                "id",
-                "classification_based_on__created",
-                "classification_based_on__classification_id",
-                "classification_based_on__published_evidence__genome_build__value",
-                "classification_based_on__classification__chgvs_grch37",
-                "classification_based_on__classification__chgvs_grch38",
-            ], renderer=self.render_classification_link, client_renderer='renderId'),
+                        "id",
+                        "classification_based_on__created",
+                        "classification_based_on__classification_id",
+                        "classification_based_on__published_evidence__genome_build__value",
+                        "classification_based_on__classification__chgvs_grch37",
+                        "classification_based_on__classification__chgvs_grch38",
+                        ], renderer=self.render_classification_link, client_renderer='renderId'),
             RichColumn("condition", name="Condition", client_renderer='VCTable.condition'),
 
             # RichColumn('lab__name', name='Lab', orderable=True),

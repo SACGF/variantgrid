@@ -63,8 +63,10 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExportRecord, Classi
         if new_candidate := new_candidate:
             if new_candidate.condition_umbrella.is_same_or_more_specific(established.condition_resolved):
                 if established.classification_based_on == new_candidate.modification:
-                    # no change
-                    pass
+                    # no change, but still return True to indicate we've found a match
+                    self.log.append(
+                        f"No change to existing export record for {established.condition_resolved.summary} : {new_candidate.modification.id_str}")
+                    return True
                 else:
                     #  can merge, so lets do it
                     # no need to update condition in an hour
@@ -76,6 +78,7 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExportRecord, Classi
                     return True
         else:
             if established.classification_based_on is None:
+                self.log.append(f"No change to existing export record for {established.condition_resolved.summary} : None")
                 # no change
                 pass
             else:

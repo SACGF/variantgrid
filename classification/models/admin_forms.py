@@ -527,7 +527,7 @@ class ConditionTextMatchAdmin(ModelAdminBasics):
 
 
 class ClinVarExportRecordAdmin(ModelAdminBasics):
-    list_display = ["pk", "clinvar_allele", "classification_based_on", "condition", "scv", "created", "modified"]
+    list_display = ["pk", "clinvar_allele", "status", "classification_based_on", "condition", "scv", "created", "modified"]
 
     def get_form(self, request, obj=None, **kwargs):
         return super(ClinVarExportRecordAdmin, self).get_form(request, obj, widgets={
