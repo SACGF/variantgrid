@@ -1,11 +1,12 @@
 import collections
 import json
+import copy
 
 
 # A little hack that will make call 'to_json' on any non json serializable class
 # So you can implement to_json to become json serializable
 from dataclasses import dataclass, field
-from typing import Union, Dict, Any, List, Generic, TypeVar
+from typing import Union, Dict, Any, List, Generic, TypeVar, Iterator
 
 from lazy import lazy
 
@@ -57,6 +58,11 @@ class JsonMessage:
     text: str
 
     @property
+    def is_error(self) -> bool:
+        # TODO get rid of all these hardcoded strings
+        return self.severity == "error"
+
+    @property
     def bs(self) -> str:
         if self.severity == "error":
             return "danger"
@@ -92,7 +98,7 @@ class JsonMessages:
     def __bool__(self):
         return bool(self.messages)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[JsonMessage]:
         return iter(self.messages)
 
 
@@ -108,21 +114,24 @@ class ClinVarSubmissionNotes:
         self.errors.append(text)
 
 
-JsonType = TypeVar('JsonType')
-
-
-class ValidatedJson(Generic[JsonType]):
+class ValidatedJson():
     """
     ValidatedJson can have a base bit of JSON that's either pure JSON, or other ValidatedJson
     Allowing validation messages to be associated with the parts that caused the problems
     """
 
-    def __init__(self, json_data: JsonType, messages: JsonMessages = JSON_MESSAGES_EMPTY):
+    def __init__(self, json_data: JsonDataType, messages: JsonMessages = JSON_MESSAGES_EMPTY):
         self.json_data = json_data
         self.messages = messages
 
-    def to_json(self) -> JsonType:
+    def to_json(self) -> JsonDataType:
         return self.json_data
+
+    def pure_json(self) -> JsonDataType:
+        """
+        returns dicts, lists, str, int, etc not combined with
+        """
+        return json.loads(json.dumps(self))
 
     @staticmethod
     def _traverse_messages(json_data) -> JsonMessages:
@@ -138,6 +147,13 @@ class ValidatedJson(Generic[JsonType]):
             messages += ValidatedJson._traverse_messages(json_data.json_data)
         return messages
 
+    def __setitem__(self, key, value):
+        lazy.invalidate(self, 'all_messages')
+        self.json_data[key] = value
+
+    def __getitem__(self, item):
+        return self.json_data[item]
+
     @lazy
     def all_messages(self) -> JsonMessages:
         """
@@ -145,6 +161,14 @@ class ValidatedJson(Generic[JsonType]):
         Where the "messages" property will only pertain to this level
         """
         return ValidatedJson._traverse_messages(self)
+
+    @property
+    def has_errors(self) -> bool:
+        return any(message.is_error for message in self.all_messages)
+
+    def __copy__(self):
+        # messages don't need deeop copy as they're immutable, data does though
+        return ValidatedJson(json_data=copy.deepcopy(self.json_data), messages=self.messages)
 
     def __bool__(self):
         return bool(self.json_data) or bool(self.messages)

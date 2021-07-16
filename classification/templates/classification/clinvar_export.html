@@ -80,61 +80,37 @@
         <div class="card mb-4">
             <div class="card-header">Summary</div>
             <div class="card-body">
-                {% labelled label="Genome Build" %}{{ clinvar_export.genome_build }}{% endlabelled %}
-                {% labelled label="c.hgvs" %}{{ clinvar_export.c_hgvs }}{% endlabelled %}
-                {% labelled label="Source Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
-                {% labelled label="Curated" %}{{ clinvar_export.curated_date }}{% endlabelled %}
-                {% labelled label="Clinical Significance" %}{{ clinvar_export.clinical_significance }}{% endlabelled %}
+                {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
+                {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
+                {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
+                {% labelled label="Current Candidate Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
+                {% labelled label="SNC" %}<span class="no-value">Not yet assigned</span>{% endlabelled %}
+                {% comment %}
                 {% labelled label="Submit" %}
                     <div class="btn-group btn-group-toggle" data-toggle="buttons">
                         <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="true" {% if not clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Under Review</label>
                         <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="false" {% if clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Auto-Submit When Ready</label>
                     </div>
                 {% endlabelled %}
+                {% endcomment %}
             </div>
+            {% comment %}
             <div class="card-footer">
                 <btn class="btn btn-primary" data-toggle="modal" data-target="#saveModal">Save</btn>
             </div>
+            {% endcomment %}
         </div>
         {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
-            {% labelled label="Allele Origin" %}{{ clinvar_export.allele_origin }}{% endlabelled %}
-            {% labelled label="Affected Status" %}{{ clinvar_export.affected_status }}{% endlabelled %}
-            {% comment %}TODO format intepretations summary with new lines{% endcomment %}
-            {% labelled label="Interpretation Summary" class="formatted-text"%}<div class="formatted-text">{{ clinvar_export.interpretation_summary }}</div>{% endlabelled %}
-            {% labelled label="Mode of Inheritance" %}{{ clinvar_export.mode_of_inheritance }}{% endlabelled %}
-            {% labelled label="Assertion Method" %}{{ clinvar_export.assertion_method }}{% endlabelled %}
-            {% labelled label="Condition Text" %}{{ clinvar_export.condition }}{% endlabelled %}
-            {% labelled label="Condition Terms" %}
-                {% with condition=cm.classification.condition_resolution_obj %}
-                    {% if condition %}
-                        {% condition condition %}
-                    {% else %}
-                        <span class="text-danger">No condition matching found for this classification</span>
-                    {% endif %}
-                    {% if ondition_text_match.condition_text %}
-                    <a class="btn btn-outline-primary ml-2" target="_blank" href="{% url 'condition_matching' pk=condition_text_match.condition_text.pk %}"><i class="fas fa-edit"></i></a>
-                    {% else %}
-                    ERROR: Not linked to a Condition Text Match
-                    {% endif %}
-                {% endwith %}
-                {% endlabelled %}
-            {% labelled label="Citations" %}
-                <div class="pills">
-                {% for ref_data in clinvar_export.citation_refs %}
-                    {% db_ref data=ref_data %}
-                {% endfor %}
-                </div>
-            {% endlabelled %}
             <h4>Export Preview</h4>
             <p class="text-muted">This is how the data will be submitted to ClinVar</p>
-            {% with json_messages=clinvar_export.as_json.all_messages %}
+            {% with json_messages=clinvar_export.submission.all_messages %}
                 <ul class="list-group mb-4">
                     {% for message in json_messages %}
                         <li class="list-group-item list-group-item-{{ message.bs }}">{{ message.severity | severity_icon }} {{ message.text }}</li>
                     {% endfor %}
                 </ul>
             {% endwith %}
-            <div class="code formatted-text" id="submission_json">{{ clinvar_export.as_json | jsonify_pretty }}</div>
+            <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission.to_json | jsonify_pretty }}</div>
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab_embedded label="Submission History" tab_set="clinvar_tabs" %}

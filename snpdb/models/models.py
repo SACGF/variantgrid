@@ -219,10 +219,13 @@ class ClinVarKey(TimeStampedModel):
         verbose_name = "ClinVar key"
 
     id = models.TextField(primary_key=True)
+    api_key = models.TextField(null=True, blank=True)
+    behalf_org_id = models.TextField(null=False, blank=True, default='')  # maybe this should be the id?
     # TODO key, other details
 
     def __str__(self):
         return f"ClinVarKey ({self.id})"
+
 
 class Lab(models.Model):
     name = models.TextField()

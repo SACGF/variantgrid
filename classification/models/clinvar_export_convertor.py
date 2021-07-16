@@ -6,7 +6,7 @@ from annotation.regexes import DbRegexes
 from classification.enums import SpecialEKeys
 from classification.json_utils import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition
+    MultiCondition, ClinVarExportRecord
 from classification.models.evidence_mixin import VCDbRefDict
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import GenomeBuild
@@ -84,8 +84,12 @@ class ClinVarExportConverter:
         DbRegexes.NCBIBookShelf.db: "BookShelf"  # TODO confirm this is correct mapping
     }
 
-    def __init__(self, classification_based_on: ClassificationModification):
-        self.classification_based_on = classification_based_on
+    def __init__(self, clinvar_export_record: ClinVarExportRecord):
+        self.clinvar_export_record = clinvar_export_record
+
+    @property
+    def classification_based_on(self) -> ClassificationModification:
+        return self.clinvar_export_record.classification_based_on
 
     # convenience method for forms
     def evidence_key(self, key: str):
@@ -173,16 +177,27 @@ class ClinVarExportConverter:
     @lazy
     def as_json(self) -> ValidatedJson:
         data = dict()
-        data["assertionCriteria"] = self.json_assertion_criteria
-        data["clinicalSignificance"] = self.json_clinical_significance
-        data["conditionSet"] = self.condition_set
-        data["localId"] = ValidatedJson("TODO", JsonMessages.error("ADMIN: localID & lockKey are under development"))
-        data["observedIn"] = self.observed_in
-        data["recordStatus"] = self.json_record_status
-        data["releaseStatus"] = "public"
-        data["variantSet"] = self.variant_set
+        if self.classification_based_on is None:
+            return ValidatedJson(None, JsonMessages.error("No classification is currently associated with this allele and condition"))
+        else:
+            data["assertionCriteria"] = self.json_assertion_criteria
+            data["clinicalSignificance"] = self.json_clinical_significance
+            data["conditionSet"] = self.condition_set
+            allele_id = self.clinvar_export_record.clinvar_allele.allele_id
+            local_id = f"allele_{allele_id}"
+            # Important, using the umbrella term as it doesn't change
+            condition = self.clinvar_export_record.condition_resolved
+            term_ids = "_".join([term.id for term in condition.terms])
+            if join := condition.join_text:
+                term_ids = f"{term_ids}_{join}"
 
-        return ValidatedJson(data)
+            data["localID"] = local_id
+            data["localKey"] = f"{local_id}_{term_ids}"
+            data["observedIn"] = self.observed_in
+            data["releaseStatus"] = "public"
+            data["variantSet"] = self.variant_set
+
+            return ValidatedJson(data)
 
     @property
     def variant_set(self) -> ValidatedJson:
@@ -196,10 +211,6 @@ class ClinVarExportConverter:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property
-    def json_record_status(self) -> ValidatedJson:
-        return ValidatedJson("novel", JsonMessages.warning("ADMIN: Defaulting status to novel, need to store if previously submitted"))
-
-    @property
     def json_assertion_criteria(self) -> ValidatedJson:
         data = dict()
         acmg_citation = {
@@ -209,12 +220,13 @@ class ClinVarExportConverter:
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
         if assertion_criteria == "acmg":
             data["citation"] = acmg_citation
+            data["method"] = EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value(assertion_criteria)
+        elif assertion_criteria is None:
+            data["citation"] = ValidatedJson(None, JsonMessages.error("No value for required field \"Assertion method\""))
+            data["method"] = None
         else:
-            data["citation"] = ValidatedJson(acmg_citation, JsonMessages.warning(f"AssertionMethod value \"{assertion_criteria}\", providing default ACMG as citation"))
-        if method := EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value(assertion_criteria):
-            data["method"] = method
-        else:
-            data["method"] = ValidatedJson(None, JsonMessages.error("No value provided for Assertion Method"))
+            data["citation"] = ValidatedJson(acmg_citation, JsonMessages.warning(f"ADMIN: AssertionMethod value \"{assertion_criteria}\" can't provide citation for it yet"))
+            data["method"] = None
 
         return ValidatedJson(data)
 
@@ -275,7 +287,7 @@ class ClinVarExportConverter:
         if allele_origin := self.clinvar_value(SpecialEKeys.ALLELE_ORIGIN).value(single=True, optional=True):
             data["allele_origin"] = allele_origin
         else:
-            data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"AlleleOrigin\" to germline as no value provided"))
+            data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided"))
         data["collectionMethod"] = "curation"  # TODO confirm hardcoded of curation
         # numberOfIndividuals do we do anything with this?
         return ValidatedJson(data)
