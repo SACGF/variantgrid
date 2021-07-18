@@ -103,14 +103,14 @@
         {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
             <h4>Export Preview</h4>
             <p class="text-muted">This is how the data will be submitted to ClinVar</p>
-            {% with json_messages=clinvar_export.submission.all_messages %}
+            {% with json_messages=clinvar_export.submission_full_current.all_messages %}
                 <ul class="list-group mb-4">
                     {% for message in json_messages %}
                         <li class="list-group-item list-group-item-{{ message.bs }}">{{ message.severity | severity_icon }} {{ message.text }}</li>
                     {% endfor %}
                 </ul>
             {% endwith %}
-            <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission.to_json | jsonify_pretty }}</div>
+            <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission_full_current.to_json | jsonify_pretty }}</div>
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab_embedded label="Submission History" tab_set="clinvar_tabs" %}
