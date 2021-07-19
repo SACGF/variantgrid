@@ -18,6 +18,7 @@ import sys
 from typing import List, Optional, Tuple
 
 from pyhgvs import HGVSName
+from pyhgvs.utils import make_transcript
 
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
 from library.log_utils import report_exc_info
@@ -378,22 +379,50 @@ class HGVSMatcher:
             hgvs_name = hgvs_name.replace(":m.", ":g.")
         return mitochondria, hgvs_name
 
+    def get_transcript_version_and_pyhgvs_transcript(self, transcript_name):
+        transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
+                                                                      best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
+        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
+        # so replace it with the DB records
+        transcript_version.data["gene_name"] = transcript_version.gene_version.gene_symbol_id
+        return transcript_version, make_transcript(transcript_version.data)
+
     def get_pyhgvs_transcript(self, transcript_name):
-        """ PyHGVS transcript """
-        return TranscriptVersion.get_refgene(self.genome_build, transcript_name,
-                                             best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
+        return self.get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
 
     def get_variant_tuple(self, hgvs_name: str) -> VariantCoordinate:
         """ VariantCoordinate.chrom = Contig name """
         mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
+        transcript_version = None
+        pyhgvs_transcript = None
+
+        def get_transcript(transcript_name):
+            """ So we can capture transcript_version and use it for validation later """
+            nonlocal transcript_version
+            nonlocal pyhgvs_transcript
+            transcript_version, pyhgvs_transcript = self.get_transcript_version_and_pyhgvs_transcript(transcript_name)
+            return pyhgvs_transcript
+
         variant_tuple = pyhgvs.parse_hgvs_name(lookup_hgvs_name, self.genome_build.genome_fasta.fasta,
-                                               get_transcript=self.get_pyhgvs_transcript,
+                                               get_transcript=get_transcript,
                                                indels_start_with_same_base=False)
         (chrom, position, ref, alt) = variant_tuple
         contig = self.genome_build.chrom_contig_mappings[chrom]
         if mitochondria and contig != mitochondria:
             reason = f"chrom: {chrom} ({contig}/{contig.get_molecule_type_display()}) is not mitochondrial!"
             raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
+
+        # @see https://varnomen.hgvs.org/bg-material/numbering/
+        # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
+        # reference sequence using the reference sequence
+        if transcript_version:
+            # Only check SNVs so we don't run into normalization problems
+            if len(ref) == len(alt) == 1:
+                tv_start = transcript_version.data["start"]
+                tv_end = transcript_version.data["end"]
+                if not (tv_start <= position <= tv_end):
+                    reason = f"Outside boundaries of transcript {transcript_version}: {transcript_version.coordinates}"
+                    raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
 
         chrom = contig.name
         ref = ref.upper()
@@ -522,6 +551,19 @@ class HGVSMatcher:
     def clean_hgvs(cls, hgvs_name):
         cleaned_hgvs = hgvs_name.replace(" ", "")  # No whitespace in HGVS
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
+        # Lowercase mutation types, eg NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
+        # case insensitive
+        MUTATION_TYPES = ["ins", "del", "dup", "inv"]  # Will also handle delins and del...ins
+        for mt in MUTATION_TYPES:
+            cleaned_hgvs = cleaned_hgvs.replace(mt.upper(), mt)
+
+        # Handle unbalanced brackets or >1 of each type
+        open_bracket = cleaned_hgvs.count("(")
+        close_bracket = cleaned_hgvs.count(")")
+        if open_bracket - close_bracket or open_bracket > 1 or close_bracket > 1:
+            # Best bet is to just strip all of them
+            cleaned_hgvs = cleaned_hgvs.replace("(", "").replace(")", "")
+
         cleaned_hgvs = cls.TRANSCRIPT_NO_UNDERSCORE.sub(cls.TRANSCRIPT_UNDERSCORE_REPLACE, cleaned_hgvs)
         cleaned_hgvs = cls.HGVS_SLOPPY_PATTERN.sub(cls.HGVS_SLOPPY_REPLACE, cleaned_hgvs)
         return cleaned_hgvs
@@ -549,6 +591,14 @@ class HGVSMatcher:
         # if GeneSymbol.objects.filter(pk=hgvs.gene).exists():
         #    pass  # TODO: Need to work out canonical for gene
         return None  # No fix
+
+    @classmethod
+    def get_gene_symbol_if_no_transcript(cls, hgvs_name) -> Optional[GeneSymbol]:
+        """ If HGVS uses gene symbol instead of transcript, return symbol """
+        hgvs = HGVSName(hgvs_name)
+        if hgvs.transcript:
+            return None  # only return symbol if transcript is not used
+        return GeneSymbol.objects.filter(pk=hgvs.gene).first()
 
 
 def get_hgvs_variant_tuple(hgvs_name: str, genome_build: GenomeBuild) -> VariantCoordinate:

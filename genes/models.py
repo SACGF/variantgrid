@@ -30,7 +30,6 @@ from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
-from pyhgvs.utils import make_transcript
 
 from genes.annotation_consortium_api import transcript_exists
 from genes.gene_coverage import load_gene_coverage_df
@@ -669,11 +668,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         raise BadTranscript(f"The transcript '{accession}' does not exist in the {genome_build} {annotation_consortium} database.")
 
     @staticmethod
-    def get_refgene(genome_build: GenomeBuild, transcript_name, best_attempt=True):
-        """ Return a pyhgvs RefGene object
-        @param best_attempt if we don't have the exact version specified in transcript_name, grab the closest
-        one that is larger (or the largest one if we don't have any larger than the requested)
-        """
+    def get_transcript_version(genome_build: GenomeBuild, transcript_name, best_attempt=True) -> Optional['TranscriptVersion']:
+        """ @param best_attempt if we don't have the exact version specified in transcript_name, grab the closest
+            one that is larger (or the largest one if we don't have any larger than the requested) """
         transcript_version = None
         transcript_versions_qs = TranscriptVersion.objects.filter(genome_build=genome_build)
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_name)
@@ -708,10 +705,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             raise MissingTranscript(f"Transcript for '{transcript_name}' (build: {genome_build}),"
                                     f" but did not have complete data {data_str}")
 
-        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
-        # so replace it with the DB records
-        transcript_version.data["gene_name"] = transcript_version.gene_version.gene_symbol_id
-        return make_transcript(transcript_version.data)
+        return transcript_version
 
     @property
     def length(self) -> Optional[int]:

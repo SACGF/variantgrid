@@ -1,6 +1,8 @@
 import operator
 import re
+from collections import defaultdict
 from functools import reduce
+from itertools import zip_longest
 from typing import Set, Iterable, Union, Optional, Match, List, Any
 
 from django.conf import settings
@@ -10,13 +12,14 @@ from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from lazy import lazy
-from pyhgvs import InvalidHGVSName
+from pyhgvs import InvalidHGVSName, HGVSName
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from annotation.models.models import AnnotationVersion
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
+from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias, \
+    BadTranscript
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
@@ -41,10 +44,14 @@ HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":(c|g|p)\..*\d+")
 ONTOLOGY_PATTERN = re.compile(r"\w+:\s*.*")
 MAX_RESULTS_PER_TYPE = 50
 
+
 class AbstractMetaVariant:
 
     def is_valid_for_user(self, user: User) -> bool:
         return True
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
 
 class CreateManualVariant(AbstractMetaVariant):
@@ -66,6 +73,9 @@ class CreateManualVariant(AbstractMetaVariant):
     def __str__(self):
         return "Click to create and annotate this variant"
 
+    def __hash__(self):
+        return hash((self.__class__, self.genome_build, self.variant_string))
+
 
 class ClassifyVariant(AbstractMetaVariant):
 
@@ -84,6 +94,9 @@ class ClassifyVariant(AbstractMetaVariant):
 
     def __str__(self):
         return f"Click to classify '{self.variant}'"
+
+    def __hash__(self):
+        return hash((self.__class__, self.variant, self.transcript_id))
 
 
 class ClassifyNoVariantHGVS(AbstractMetaVariant):
@@ -106,6 +119,9 @@ class ClassifyNoVariantHGVS(AbstractMetaVariant):
     def __str__(self):
         return f"Click to classify from unvalidated HGVS: '{self.hgvs_string}'"
 
+    def __hash__(self):
+        return hash((self.__class__, self.genome_build, self.hgvs_string))
+
 
 def search_data(user: User, search_string: str, classify: bool) -> 'SearchResults':
     """ build_results:  list of (search_type, result, genome_build)
@@ -124,7 +140,8 @@ class SearchResult:
                  genome_builds: Optional[Set[GenomeBuild]] = None,
                  annotation_consortia: Optional[str] = None,
                  message: Optional[Union[str, List[str]]] = None,
-                 is_debug_data: bool = False):
+                 is_debug_data: bool = False,
+                 initial_score: int = 0):
         self.record = record
         self.genome_build = None  # Set as we display search results for each build
         self.genome_builds = genome_builds
@@ -137,6 +154,7 @@ class SearchResult:
 
         self.messages: Optional[List[str]] = message
         self.is_debug_data = is_debug_data
+        self.initial_score = initial_score
         self.search_type: Optional[str] = None
 
         self.is_preferred_build: Optional[bool] = None
@@ -172,13 +190,14 @@ class SearchResult:
         if self.is_debug_data:
             return 0
 
-        score = 0
+        score = self.initial_score
         if self.is_preferred_build:
-            score += 4
+            score += 256
+        if not isinstance(self.record, AbstractMetaVariant):
+            score += 128  # Advantage existing data
         if self.is_preferred_annotation:
-            score += 2
-        if not self.messages:
-            score += 1
+            score += 64
+        score -= len(self.messages)
         return score
 
     def __lt__(self, other):
@@ -463,7 +482,7 @@ def search_ontology_name(search_string: str, **kwargs) -> Iterable[OntologyTerm]
         filter(name__icontains=search_string).\
         order_by('ontology_service', 'name', 'index')
 
-    # unless we're specifically searching for obselete, filter them out
+    # unless we're specifically searching for obsolete, filter them out
     if 'obsolete' not in search_string:
         qs = qs.exclude(name__icontains='obsolete')
     
@@ -505,26 +524,84 @@ def search_transcript(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
     return []
 
 
+def _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
+                                   hgvs_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet) -> VARIANT_SEARCH_RESULTS:
+    results = []
+    # May have used gene symbol instead
+    if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+        search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
+        # Group results + hgvs by result.record hashcode
+        results_by_record = defaultdict(list)
+        transcript_accessions_by_record = defaultdict(list)
+        allele = HGVSName(hgvs_string).format(use_gene=False)
+        for gene in gene_symbol.genes:
+            tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
+            latest_tv_qs = tv_qs.order_by("transcript_id", "-version").distinct("transcript_id")
+            for transcript_version in latest_tv_qs:
+                transcript_hgvs = f"{transcript_version.accession}:{allele}"
+                try:
+                    for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
+                        result.annotation_consortia = gene.annotation_consortium
+                        results_by_record[result.record].append(result)
+                        transcript_accessions_by_record[result.record].append(transcript_version.accession)
+                except:
+                    pass  # Just swallow all these errors
+
+        for record, results_for_record in results_by_record.items():
+            unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
+            result_message = f"Results for: {', '.join(transcript_accessions_by_record[record])}"
+            unique_messages[result_message] = True
+            # Go through messages for each result together, so they stay in same order
+            for messages in zip_longest(*[r.messages for r in results_for_record]):
+                for m in messages:
+                    if m:
+                        unique_messages[m] = True
+
+            # We want to bring our build's annotation consortium to front, so set to our build's AC if multiple
+            most_relevant_annotation_consortia = None
+            for r in results_for_record:
+                if r.annotation_consortia:
+                    if not (most_relevant_annotation_consortia and most_relevant_annotation_consortia == genome_build.annotation_consortium):
+                        most_relevant_annotation_consortia = r.annotation_consortia
+            messages = list(unique_messages.keys())
+            # All weights should be the same, just take 1st
+            initial_score = results_for_record[0].initial_score
+            results.append(SearchResult(record, message=messages, initial_score=initial_score,
+                                        annotation_consortia=most_relevant_annotation_consortia))
+    return results
+
+
 def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
     hgvs_matcher = HGVSMatcher(genome_build)
     classify = kwargs.get("classify")
     try:
         # can add on search_message to objects to (stop auto-jump and show message)
         search_messages = []
+        initial_score = 0
         hgvs_string = search_string
         try:
             if fixed_hgvs := HGVSMatcher.fix_swapped_gene_transcript(hgvs_string):
                 hgvs_string = fixed_hgvs
                 search_messages.append(f"Warning: swapped gene/transcript, ie '{search_string}' => '{hgvs_string}'")
             variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
-        except (InvalidHGVSName, NotImplementedError) as original_error:
+        except BadTranscript:
+            if results := _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
+                                                         hgvs_string, user, genome_build, variant_qs):
+                return results
+            raise
+        except (ValueError, NotImplementedError) as original_error:  # InvalidHGVSName is subclass of ValueError
             original_hgvs_string = hgvs_string
             try:
                 hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
-                variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
                 if search_string != hgvs_string:
                     search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
-            except (InvalidHGVSName, NotImplementedError):
+                variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
+            except BadTranscript:
+                if results := _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
+                                                             hgvs_string, user, genome_build, variant_qs):
+                    return results
+                raise
+            except (ValueError, NotImplementedError):
                 if classify:
                     search_message = f"Error reading HGVS: '{original_error}'"
                     return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
@@ -541,6 +618,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             if len(ref) > 20:
                 ref = f"{Sequence.abbreviate(ref)} ({len(ref)} bases)"
             search_messages.append(f"Warning: Using reference '{ref}' from our build: {build_and_patch}")
+            initial_score -= 1
 
         original_tv, used_tv = hgvs_matcher.get_original_and_used_transcript_versions(hgvs_string)
         if original_tv != used_tv:
@@ -552,13 +630,15 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             results = get_results_from_variant_tuples(variant_qs, variant_tuple)
             variant = results.get()
             if classify:
-                return [SearchResult(ClassifyVariant(variant, transcript_id), message=search_messages)]
-            return [SearchResult(variant, message=search_messages)]
+                return [SearchResult(ClassifyVariant(variant, transcript_id),
+                                     message=search_messages, initial_score=initial_score)]
+            return [SearchResult(variant, message=search_messages, initial_score=initial_score)]
         except Variant.DoesNotExist:
             variant_string = Variant.format_tuple(*variant_tuple)
             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
             search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
-            results = [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_messages)]
+            results = [SearchResult(CreateManualVariant(genome_build, variant_string),
+                                    message=search_messages, initial_score=initial_score)]
             results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
             return results
 
