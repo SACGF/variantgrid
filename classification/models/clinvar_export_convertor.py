@@ -6,7 +6,7 @@ from annotation.regexes import DbRegexes
 from classification.enums import SpecialEKeys
 from classification.json_utils import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition, ClinVarExportRecord
+    MultiCondition, ClinVarExport
 from classification.models.evidence_mixin import VCDbRefDict
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import GenomeBuild
@@ -84,7 +84,7 @@ class ClinVarExportConverter:
         DbRegexes.NCBIBookShelf.db: "BookShelf"  # TODO confirm this is correct mapping
     }
 
-    def __init__(self, clinvar_export_record: ClinVarExportRecord):
+    def __init__(self, clinvar_export_record: ClinVarExport):
         self.clinvar_export_record = clinvar_export_record
 
     @property
@@ -184,12 +184,13 @@ class ClinVarExportConverter:
             data["clinicalSignificance"] = self.json_clinical_significance
             data["conditionSet"] = self.condition_set
             allele_id = self.clinvar_export_record.clinvar_allele.allele_id
-            local_id = f"allele_{allele_id}"
+            local_id = f"ALLELE_{allele_id}"
             # Important, using the umbrella term as it doesn't change
             condition = self.clinvar_export_record.condition_resolved
-            term_ids = "_".join([term.id for term in condition.terms])
-            if join := condition.join_text:
-                term_ids = f"{term_ids}_{join}"
+            term_ids = "_".join([term.id.replace(":", "_") for term in condition.terms])
+            if join := condition.join:
+                join = MultiCondition(join)
+                term_ids = f"{term_ids}_{join.value}"
 
             data["localID"] = local_id
             data["localKey"] = f"{local_id}_{term_ids}"

@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Set
 from cyvcf2.cyvcf2 import defaultdict
 from classification.enums import ShareLevel
-from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarExportRecord, \
+from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarExport, \
     ConditionResolved
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import segment
@@ -22,20 +22,20 @@ class ClassificationModificationCandidate:
             raise ValueError("Candidate must have a resolved condition associated with it")
 
 
-class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExportRecord, ClassificationModificationCandidate]):
+class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, ClassificationModificationCandidate]):
 
     def __init__(self, clinvar_allele: ClinVarAllele):
         self.clinvar_allele = clinvar_allele
         self.log: List[str] = []
         super().__init__()
 
-    def retrieve_established(self) -> Set[ClinVarExportRecord]:
-        return set(ClinVarExportRecord.objects.filter(clinvar_allele=self.clinvar_allele))
+    def retrieve_established(self) -> Set[ClinVarExport]:
+        return set(ClinVarExport.objects.filter(clinvar_allele=self.clinvar_allele))
 
-    def establish_new_candidate(self, new_candidate: ClassificationModificationCandidate) -> ClinVarExportRecord:
+    def establish_new_candidate(self, new_candidate: ClassificationModificationCandidate) -> ClinVarExport:
         self.log.append(f"Created export record for {new_candidate.condition_umbrella.summary} : {new_candidate.modification.id_str}")
-        return ClinVarExportRecord.new_condition(clinvar_allele=self.clinvar_allele, condition=new_candidate.condition_umbrella,
-                                                 candidate=new_candidate.modification)
+        return ClinVarExport.new_condition(clinvar_allele=self.clinvar_allele, condition=new_candidate.condition_umbrella,
+                                           candidate=new_candidate.modification)
 
     def combine_candidates_if_possible(self, candidate_1: ClassificationModificationCandidate, candidate_2: ClassificationModificationCandidate) -> Optional[ClassificationModificationCandidate]:
         if general_condition := ConditionResolved.more_general_term_if_related(candidate_1.condition_umbrella, candidate_2.condition_umbrella):
@@ -56,7 +56,7 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExportRecord, Classi
             # these candidates aren't compatible, keep them separate
             return None
 
-    def merge_into_established_if_possible(self, established: ClinVarExportRecord, new_candidate: Optional[ClassificationModificationCandidate]) -> bool:
+    def merge_into_established_if_possible(self, established: ClinVarExport, new_candidate: Optional[ClassificationModificationCandidate]) -> bool:
         """
         Maps an existing group to a condition group
         """

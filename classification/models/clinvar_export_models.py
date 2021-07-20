@@ -1,4 +1,3 @@
-import typing
 from typing import Optional, List
 
 from django.contrib.auth.models import User
@@ -39,9 +38,9 @@ class ClinVarStatus(models.TextChoices):
     IN_ERROR = "E"
 
 
-class ClinVarExportRecord(TimeStampedModel):
+class ClinVarExport(TimeStampedModel):
     class Meta:
-        verbose_name = "ClinVar export record"
+        verbose_name = "ClinVar export"
 
     clinvar_allele = models.ForeignKey(ClinVarAllele, null=True, blank=True, on_delete=models.CASCADE)
     condition = models.JSONField()
@@ -73,8 +72,8 @@ class ClinVarExportRecord(TimeStampedModel):
             self.save()
 
     @staticmethod
-    def new_condition(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]) -> 'ClinVarExportRecord':
-        cc = ClinVarExportRecord(clinvar_allele=clinvar_allele, condition=condition.as_json_minimal())
+    def new_condition(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]) -> 'ClinVarExport':
+        cc = ClinVarExport(clinvar_allele=clinvar_allele, condition=condition.as_json_minimal())
         cc.update_classification(candidate)
         return cc
 
@@ -100,7 +99,7 @@ class ClinVarExportRecord(TimeStampedModel):
         return content
 
     def submission_body_previous(self) -> Optional[JsonObjType]:
-        if last_submission := self.clinvarexportrecordsubmission_set.order_by('-created').first():
+        if last_submission := self.clinvarexportsubmission_set.order_by('-created').first():
             return last_submission.submission_body
         return None
 
@@ -119,16 +118,9 @@ class ClinVarExportRecord(TimeStampedModel):
                 return ClinVarStatus.NEW_SUBMISSION
 
 
-class ClinVarSubmissionBatchBuilder:
-
-    def __init__(self, clinvar_key: ClinVarKey):
-        self.clinvar_key = clinvar_key
-        self.json = list()
-
-
-class ClinVarSubmissionBatch(TimeStampedModel):
+class ClinVarExportSubmissionBatch(TimeStampedModel):
     class Meta:
-        verbose_name = "ClinVar submission batch"
+        verbose_name = "ClinVar Export submission batch"
 
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.PROTECT)
     submission_version = models.IntegerField()
@@ -137,47 +129,56 @@ class ClinVarSubmissionBatch(TimeStampedModel):
     def to_json(self) -> JsonObjType:
         return {
             "behalfOrgId": self.clinvar_key.behalf_org_id,
-            "clinVarSubmissions": [submission.submission_full for submission in self.clinvarexportrecordsubmission_set.order_by('created')],
+            "clinVarSubmissions": [submission.submission_full for submission in self.clinvarexportsubmission_set.order_by('created')],
             "submissionName": f"submission_{self.id}"
         }
 
     @staticmethod
-    def create_batches(self, qs: QuerySet) -> List['ClinVarSubmissionBatch']:
-        all_batches: List[ClinVarSubmissionBatch] = list()
+    def create_batches(qs: QuerySet) -> List['ClinVarExportSubmissionBatch']:
+        all_batches: List[ClinVarExportSubmissionBatch] = list()
 
-        current_batch: Optional[ClinVarSubmissionBatch] = None
+        current_batch: Optional[ClinVarExportSubmissionBatch] = None
         current_batch_size = 0
 
         qs = qs.order_by('clinvar_allele__clinvar_key')
         qs = qs.filter(status__in=[ClinVarStatus.NEW_SUBMISSION, ClinVarStatus.CHANGES_PENDING])
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')
-        record: ClinVarExportRecord
+        record: ClinVarExport
         for record in qs:
-            if current_batch_size == 0 or current_batch_size == 10000 or current_batch.clinvar_key != record.clinvar_allele.clinvar_key:
-                current_batch = ClinVarSubmissionBatch(clinvar_key=record.clinvar_allele.clinvar_key, submission_version=1)
-                current_batch_size = 0
-                all_batches.append(current_batch)
-
             full_current = record.submission_full_current
-            if not full_current.has_errors:
-                ClinVarExportRecordSubmission.objects.create(
-                    clinvar_candidate=record,
+            if not full_current.has_errors:  # should never have errors as we're filtering on new submission changes pending
+
+                if current_batch_size == 0 or current_batch_size == 10000 or current_batch.clinvar_key != record.clinvar_allele.clinvar_key:
+                    #if current_batch is not None:
+                    #    current_batch.refresh_from_db()
+
+                    current_batch = ClinVarExportSubmissionBatch(clinvar_key=record.clinvar_allele.clinvar_key,
+                                                                 submission_version=1)
+                    current_batch.save()
+                    current_batch_size = 0
+                    all_batches.append(current_batch)
+
+                ClinVarExportSubmission(
+                    clinvar_export=record,
                     classification_based_on=record.classification_based_on,
                     submission_batch=current_batch,
                     submission_full=full_current.pure_json(),
                     submission_body=record.submission_body_current.pure_json(),
                     submission_version=1
-                )
+                ).save()
+                record.status = ClinVarStatus.UP_TO_DATE
+                record.save()
+
         return all_batches
 
 
-class ClinVarExportRecordSubmission(TimeStampedModel):
+class ClinVarExportSubmission(TimeStampedModel):
     class Meta:
-        verbose_name = "ClinVar export record submission"
+        verbose_name = "ClinVar export submission"
 
-    clinvar_candidate = models.ForeignKey(ClinVarExportRecord, on_delete=models.PROTECT)  # if there's been an actual submission, don't allow deletes
+    clinvar_export = models.ForeignKey(ClinVarExport, on_delete=models.PROTECT)  # if there's been an actual submission, don't allow deletes
     classification_based_on = models.ForeignKey(ClassificationModification, on_delete=models.PROTECT)
-    submission_batch = models.ForeignKey(ClinVarSubmissionBatch, null=True, blank=True, on_delete=models.SET_NULL)
+    submission_batch = models.ForeignKey(ClinVarExportSubmissionBatch, null=True, blank=True, on_delete=models.SET_NULL)
     submission_full = models.JSONField()  # the full data included in the batch submission
 
     submission_body = models.JSONField()  # used to see if there are any changes since last submission (other than going from novel to update)

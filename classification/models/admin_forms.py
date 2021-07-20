@@ -2,6 +2,8 @@ import json
 
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
+from django.db.models import QuerySet
+from django.http import HttpResponse
 from django.utils import timezone
 from django_admin_json_editor.admin import JSONEditorWidget
 
@@ -10,7 +12,8 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import get_
 from classification.classification_import import process_classification_import
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, ConditionText, \
-    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification, send_discordance_notification
+    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification, send_discordance_notification, \
+    ClinVarExportSubmissionBatch, ClinVarExport
 from classification.models.classification import Classification, ClassificationImport
 from library.guardian_utils import admin_bot
 from snpdb.admin import ModelAdminBasics
@@ -526,14 +529,59 @@ class ConditionTextMatchAdmin(ModelAdminBasics):
     search_fields = ('id', 'condition_text__normalized_text', 'gene_symbol__symbol', 'classification__id', 'condition_xrefs')
 
 
-class ClinVarExportRecordAdmin(ModelAdminBasics):
+class ClinVarExportAdmin(ModelAdminBasics):
     list_display = ["pk", "clinvar_allele", "status", "classification_based_on", "condition", "scv", "created", "modified"]
 
     def get_form(self, request, obj=None, **kwargs):
-        return super(ClinVarExportRecordAdmin, self).get_form(request, obj, widgets={
+        return super(ClinVarExportAdmin, self).get_form(request, obj, widgets={
             'snv': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
+    def add_to_batch(self, request, queryset):
+        batches = ClinVarExportSubmissionBatch.create_batches(queryset)
+        if batches:
+            for batch in ClinVarExportSubmissionBatch.create_batches(queryset):
+                messages.add_message(request, level=messages.INFO, message=f"Submission Batch for {batch.clinvar_key} created with {batch.clinvarexportsubmission_set.count()} submissions")
+        else:
+            messages.add_message(request, level=messages.WARNING, message="No records in pending non-errored state to add to a new batch")
+    add_to_batch.short_description = "Add to ClinVar Submission Batch"
+
+    def force_recalc_status(self, request, queryset):
+        export: ClinVarExport
+        for export in queryset:
+            new_status = export.calculate_status()
+            if export.status != new_status:
+                export.status = new_status
+                export.save()
+
+    force_recalc_status.short_description = "Re-calculate status"
+
+    actions = ["export_as_csv", force_recalc_status, add_to_batch]
+
+
+class ClinVarExportSubmissionBatchAdmin(ModelAdminBasics):
+    list_display = ["pk", "clinvar_key", "created", "modified", "record_count"]
+
+    def record_count(self, obj: ClinVarExportSubmissionBatch):
+        return obj.clinvarexportsubmission_set.count()
+
+    def download_json(self, request, queryset: QuerySet):
+        if queryset.count() != 1:
+            messages.add_message(request, level=messages.ERROR, message="Can only download one batch at a time")
+            return
+
+        batch: ClinVarExportSubmissionBatch = queryset.first()
+
+        batch_json = batch.to_json()
+        batch_json_str = json.dumps(batch_json)
+
+        response = HttpResponse(batch_json_str, content_type='application/json')
+        response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{batch.pk}.json'
+        return response
+
+    download_json.short_description = "Download JSON"
+
+    actions = ["export_as_csv", download_json]
 
 class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
     title = "Labs Involved"

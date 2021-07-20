@@ -28,7 +28,7 @@ class AdminExportCsvMixin:
             writer.writerow([getattr(obj, field) for field in field_names])
         return response
 
-    export_as_csv.short_description = "Export Selected"
+    export_as_csv.short_description = "Export Selected as CSV"
 
     def _is_readonly(self, f) -> bool:
         if not f.editable:

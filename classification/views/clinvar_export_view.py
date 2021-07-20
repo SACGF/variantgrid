@@ -5,7 +5,7 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
 from htmlmin.decorators import not_minified_response
 
-from classification.models import ClinVarExportRecord, ClinVarAllele
+from classification.models import ClinVarExport, ClinVarAllele
 from library.cache import timed_cache
 from snpdb.models import Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
@@ -72,7 +72,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
         ]
 
     def get_initial_queryset(self):
-        return ClinVarExportRecord.objects.filter(clinvar_allele__clinvar_key__in=ClinVarAllele.clinvar_keys_for_user(self.user))
+        return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=ClinVarAllele.clinvar_keys_for_user(self.user))
         # return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
 
 
@@ -84,7 +84,7 @@ def clinvar_exports_view(request):
 
 @not_minified_response
 def clinvar_export_review_view(request, pk):
-    clinvar_export: ClinVarExportRecord = ClinVarExportRecord.objects.get(pk=pk)  # fixme get or 404
+    clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
 
     user: User = request.user
     if not user.is_superuser:
