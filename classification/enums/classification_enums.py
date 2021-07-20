@@ -407,7 +407,7 @@ class CriteriaEvaluation:
         {'key': PATHOGENIC_MODERATE, 'label': 'Pathogenic Moderate', 'index': 6},
         {'key': PATHOGENIC_STRONG, 'label': 'Pathogenic Strong', 'index': 7},
         {'key': PATHOGENIC_VERY_STRONG, 'label': 'Pathogenic Very Strong', 'index': 8},
-        {'key': PATHOGENIC_UNSPECIFIED, 'label': 'Benign Unspecified Strength', 'index': 11},
+        {'key': PATHOGENIC_UNSPECIFIED, 'label': 'Pathogenic Unspecified Strength', 'index': 11},
     ]
 
     @staticmethod
