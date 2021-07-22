@@ -111,7 +111,7 @@ class ClassificationChanges:
             source=vcm.source)
 
     @staticmethod
-    def list_changes(classification: Optional[Classification] = None, latest_date: Optional[datetime] = None, limit=50) -> List['ClassificationChanges']:
+    def list_changes(classification: Optional[Classification] = None, latest_date: Optional[datetime] = None, limit=100) -> List['ClassificationChanges']:
         if not latest_date:
             latest_date = now()
 
