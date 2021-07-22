@@ -72,6 +72,8 @@ SOMALIER["admin_only"] = True
 # SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
 
 USE_OIDC = False
+VARIANT_PK_HASH_USE_REDIS = True
+
 
 if _SAPATHOLOGY_MODE:
     SEQAUTO_ENABLED = True

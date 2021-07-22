@@ -25,7 +25,7 @@ class AbstractBulkVCFProcessor:
         self.variant_hashes = []
         self.modified_imported_variant_hashes = []
         self.modified_imported_variants = []
-        self.variant_pk_lookup = VariantPKLookup(upload_step.genome_build)
+        self.variant_pk_lookup = VariantPKLookup.factory(upload_step.genome_build)
 
     @property
     def genome_build(self):

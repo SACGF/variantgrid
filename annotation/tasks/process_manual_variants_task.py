@@ -39,7 +39,7 @@ class ManualVariantsPostInsertTask(ImportVCFStepTask):
         items_processed = 0
         mvec = upload_step.uploaded_file.uploadedmanualvariantentrycollection.collection
         logging.info("ManualVariantsPostInsertTask: mvec_id = %s", mvec)
-        variant_pk_lookup = VariantPKLookup(mvec.genome_build)
+        variant_pk_lookup = VariantPKLookup.factory(mvec.genome_build)
         variant_tuple_by_hash = {}
         mvec_id_by_variant_hash = {}
 

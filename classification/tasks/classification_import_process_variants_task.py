@@ -40,7 +40,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
     def link_inserted_variants(genome_build: GenomeBuild,
                                classification_import: ClassificationImport,
                                upload_step: UploadStep):
-        variant_pk_lookup = VariantPKLookup(genome_build)
+        variant_pk_lookup = VariantPKLookup.factory(genome_build)
         variant_tuples_by_hash = {}
         classifications_by_hash = {}
 

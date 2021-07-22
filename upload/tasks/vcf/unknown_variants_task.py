@@ -42,7 +42,7 @@ class BulkUnknownVariantInserter:
         self.unknown_variants_batch_id = 0
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.child_futures = []
-        self.variant_pk_lookup = VariantPKLookup(upload_step.genome_build)
+        self.variant_pk_lookup = VariantPKLookup.factory(upload_step.genome_build)
         # Settings
         self.store_gvcf_non_var_blocks = settings.VCF_IMPORT_STORE_GVCF_NON_VAR_BLOCKS
         self.num_skipped_gvcf_non_var_blocks = 0
@@ -82,13 +82,13 @@ class BulkUnknownVariantInserter:
 
     def batch_process_check(self, insert_all=False):
         if insert_all:
-            minimum_redis_pipeline_size = 0
+            minimum_pipeline_size = 0
             minimum_unknown_insert_size = 0
         else:
-            minimum_redis_pipeline_size = settings.REDIS_PIPELINE_SIZE
+            minimum_pipeline_size = settings.REDIS_PIPELINE_SIZE
             minimum_unknown_insert_size = settings.SQL_BATCH_INSERT_SIZE
 
-        self.variant_pk_lookup.batch_check(minimum_redis_pipeline_size)
+        self.variant_pk_lookup.batch_check(minimum_pipeline_size)
 
         # Unknown variants
         num_unknown_variants = len(self.variant_pk_lookup.unknown_variant_coordinates)
@@ -157,7 +157,7 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
         working_dir = os.path.join(pipeline_processing_dir, "unknown_variants", name_from_filename(input_filename))
         mk_path(working_dir)
 
-        variant_pk_lookup = VariantPKLookup(upload_step.genome_build, working_dir=working_dir)
+        variant_pk_lookup = VariantPKLookup.factory(upload_step.genome_build, working_dir=working_dir)
 
         with open(input_filename) as f:
             items_processed = 0
