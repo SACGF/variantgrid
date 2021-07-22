@@ -52,9 +52,8 @@ class Allele(FlagsMixin, models.Model):
 
     @lazy
     def clingen_error(self):
-        va = self.variantallele_set.filter(error__isnull=False).first()
         error = None
-        if va:
+        if va := self.variantallele_set.filter(error__isnull=False).first():
             error = va.error
         return error
 
@@ -489,7 +488,12 @@ class VariantAllele(TimeStampedModel):
         return self.variant.get_canonical_c_hgvs(self.genome_build)
 
     def needs_clingen_call(self):
-        return settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None and self.error is None
+        if settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None:
+            if self.error:
+                # Retry if server was down
+                return self.error.get("errorType") == ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE
+            return True
+        return False
 
     def __str__(self):
         return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.conversion_tool})"

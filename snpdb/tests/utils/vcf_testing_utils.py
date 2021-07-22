@@ -3,8 +3,18 @@ import vcf
 from snpdb.models import Locus, Variant, Sequence
 
 
+def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build) -> Variant:
+    """ For test only - doesn't use Redis """
+    contig = genome_build.contigs.get(name=chrom)
+    ref_seq, _ = Sequence.objects.get_or_create(seq=ref.upper(), length=1)
+    alt_seq, _ = Sequence.objects.get_or_create(seq=alt.upper(), length=1)
+    locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
+    variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq)
+    return variant
+
+
 def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_variant_id_from_info=False):
-    """ This is very slow - only use for tests """
+    """ For tests - doesn't use Redis """
 
     pk_by_seq = Sequence.get_pk_by_seq()
     for v in vcf.Reader(filename=vcf_filename):

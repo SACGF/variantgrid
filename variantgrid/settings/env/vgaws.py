@@ -12,7 +12,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 # import all the base settings #
 SITE_ID = 3  # vg.com
 
-WEB_HOSTNAME = 'variantgrid.com'
+WEB_HOSTNAME = 'aws.variantgrid.com'
 WEB_IP = '130.56.244.155'
 
 DEBUG = False
@@ -54,12 +54,5 @@ URLS_NAME_REGISTER.update({"sequencing_data": False})
 
 SOMALIER["enabled"] = True
 SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
-
-_VG_COM_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "variantgrid_com_static")
-STATICFILES_DIRS = (_VG_COM_STATIC_FILES_DIR,) + STATICFILES_DIRS
-
-_VG_COM_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/variantgrid_com_templates")
-if os.path.exists(_VG_COM_TEMPLATES_DIR):
-    TEMPLATES[0]["DIRS"].insert(0, _VG_COM_TEMPLATES_DIR)
 
 UPLOAD_ENABLED = True
