@@ -62,5 +62,3 @@ class TestAnnotationVCF(TestCase):
 
         with self.assertRaises(InvalidHGVSName):
             matcher.get_variant_tuple("ENST00000300305.3:c.9999A>T")
-
-
