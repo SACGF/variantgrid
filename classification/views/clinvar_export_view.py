@@ -85,14 +85,22 @@ def clinvar_exports_view(request):
 @not_minified_response
 def clinvar_export_review_view(request, pk):
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
-
-    user: User = request.user
-    if not user.is_superuser:
-        allowed_clinvar_keys = ClinVarAllele.clinvar_keys_for_user(user)
-        if not allowed_clinvar_keys.filter(pk=clinvar_export.clinvar_allele.clinvar_key).exists():
-            raise PermissionDenied("User does not belong to a lab that uses the submission key")
+    clinvar_export.check_user_can_access(request.user)
 
     return render(request, 'classification/clinvar_export.html', context={
         "clinvar_export": clinvar_export,
         "cm": clinvar_export.classification_based_on
+    })
+
+
+@not_minified_response
+def clinvar_export_history_view(request, pk):
+    clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
+    clinvar_export.check_user_can_access(request.user)
+
+    history = clinvar_export.clinvarexportsubmission_set.order_by('-created')
+
+    return render(request, 'classification/clinvar_export_history.html', context={
+        'clinvar_export': clinvar_export,
+        'history': history
     })

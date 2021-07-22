@@ -113,9 +113,7 @@
             <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission_full_current.to_json | jsonify_pretty }}</div>
         {% end_ui_register_tab_embedded %}
 
-        {% ui_register_tab_embedded label="Submission History" tab_set="clinvar_tabs" %}
-            Submission is not yet implemented.
-        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab label="Submission History" tab_set="clinvar_tabs" url="clinvar_export_history" param=clinvar_export.pk %}
 
         {% ui_render_tabs tab_set="clinvar_tabs" %}
     </div>

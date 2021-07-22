@@ -106,8 +106,12 @@ function setupAjaxTabs(element) {
                 if (status === "error") {
                     // still set data so we can see the error
                     tabContent.html(data);
+
                     // console.log(data);
                     // tabContent.html($("<div>", {class: "alert alert-danger", text: `Error loading tab ${status}`}));
+                } else {
+                    // is this best done with event listeners, rather than specifically on ajax?
+                    convertTimestamps();
                 }
             });
         }

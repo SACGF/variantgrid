@@ -5,6 +5,8 @@ from django.db import models
 from django.db.models import QuerySet
 from lazy import lazy
 from model_utils.models import TimeStampedModel
+from rest_framework.exceptions import PermissionDenied
+
 from classification.json_utils import ValidatedJson, JsonObjType
 from classification.models import ClassificationModification, ConditionResolved
 from snpdb.models import ClinVarKey, Allele, Lab
@@ -47,6 +49,12 @@ class ClinVarExport(TimeStampedModel):
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(null=True, blank=True)  # if not set yet
     status = models.CharField(max_length=1, choices=ClinVarStatus.choices, default=ClinVarStatus.NEW_SUBMISSION)
+
+    def check_user_can_access(self, user: User):
+        if not user.is_superuser:
+            allowed_clinvar_keys = ClinVarAllele.clinvar_keys_for_user(user)
+            if not allowed_clinvar_keys.filter(pk=self.clinvar_allele.clinvar_key).exists():
+                raise PermissionDenied("User does not belong to a lab that uses the submission key")
 
     def __init__(self, *args, **kwargs):
         super(TimeStampedModel, self).__init__(*args, **kwargs)
@@ -125,6 +133,9 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.PROTECT)
     submission_version = models.IntegerField()
     pass  # TODO add a bunch more fields when we know what they are
+
+    def __str__(self):
+        return f"ClinVar Submission Batch : {self.id}"
 
     def to_json(self) -> JsonObjType:
         return {

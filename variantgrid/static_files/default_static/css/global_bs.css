@@ -593,6 +593,11 @@ table.as_table td {
   background-color: #eee;
 }
 
+.code.card-body {
+  border: none;
+  border-radius: 0;
+}
+
 ul.compact {
   margin: 0;
   padding-left: 10px;

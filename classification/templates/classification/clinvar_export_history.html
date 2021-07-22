@@ -1,0 +1,15 @@
+{% load js_tags %}
+{% if history %}
+    {% for history_entry in history %}
+        <div class="card mb-4">
+            <div class="card-header">{% timestamp history_entry.created time_ago=True %}</div>
+            <div class="card-body code formatted-text">{{ history_entry.submission_full | jsonify_pretty }}</div>
+            <div class="card-footer">{{ history_entry.submission_batch }}</div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="no-value">No submission for this record yet</div>
+{% endif %}
+<script>
+
+</script>

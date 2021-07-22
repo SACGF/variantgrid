@@ -660,6 +660,10 @@ table.as_table {
     padding: 2px;
     background-color: #eee;
 }
+.code.card-body {
+  border: none;
+  border-radius: 0;
+}
 
 ul.compact {
   margin: 0;

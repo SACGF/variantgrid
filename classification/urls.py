@@ -8,7 +8,7 @@ from classification.views.condition_match_test_view import condition_match_test_
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.clinvar_export_view import clinvar_exports_view, \
-    clinvar_export_review_view, ClinVarExportRecordColumns
+    clinvar_export_review_view, ClinVarExportRecordColumns, clinvar_export_history_view
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns
@@ -50,6 +50,7 @@ urlpatterns = [
     perm_path('clinvar_export', clinvar_exports_view, name='clinvar_exports'),
     perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=ClinVarExportRecordColumns), name='clinvar_exports_datatables'),
     perm_path('clinvar_export/<int:pk>', clinvar_export_review_view, name='clinvar_export'),
+    perm_path('clinvar_export/<int:pk>/history', clinvar_export_history_view, name='clinvar_export_history'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     perm_path('condition_matching/datatable', DatabasetableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
