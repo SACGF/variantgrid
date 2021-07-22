@@ -197,7 +197,8 @@ class SearchResult:
             score += 128  # Advantage existing data
         if self.is_preferred_annotation:
             score += 64
-        score -= len(self.messages)
+        if self.messages:
+            score -= len(self.messages)
         return score
 
     def __lt__(self, other):
