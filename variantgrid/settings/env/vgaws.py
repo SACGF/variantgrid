@@ -52,6 +52,9 @@ PEDIGREE_MADELINE2_COMMAND = "madeline2"
 # Lock down menu - hide some VariantGrid urls / menu
 URLS_NAME_REGISTER.update({"sequencing_data": False})
 
+RECAPTCHA_PUBLIC_KEY = get_secret('RECAPTCHA.public_key')
+RECAPTCHA_PRIVATE_KEY = get_secret('RECAPTCHA.private_key')
+
 SOMALIER["enabled"] = True
 SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
 

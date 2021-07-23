@@ -57,6 +57,10 @@ _default_settings = {
         "login": "",
         "password": ""
     },
+    "RECAPTCHA": {
+        "public_key": None,
+        "private_key": None,
+    },
     "ROLLBAR": {
         "access_token": "",
         "client_access_token": ""

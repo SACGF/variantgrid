@@ -714,6 +714,9 @@ PUBLIC_PATHS = [
     r'^/classification/api/.*'  # REST framework used by command line tools
 ]
 
+# Both need to be set to enable - and use get_secret in server settings files to keep out of source control
+RECAPTCHA_PUBLIC_KEY = None  # get_secret('RECAPTCHA.public_key')
+RECAPTCHA_PRIVATE_KEY = None  # get_secret('RECAPTCHA.private_key')
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 
