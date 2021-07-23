@@ -124,7 +124,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
         model = Lab
         # fields = '__all__'
         exclude = ("classification_config", "css_class")
-        read_only = ("name", "external", "group_name", "organization", "upload_location")
+        read_only = ("name", "external", "group_name", "organization", "upload_location", "clinvar_key")
         widgets = {
             "name": TextInput(),
             "city": TextInput(),
@@ -140,7 +140,8 @@ class LabForm(forms.ModelForm, ROFormMixin):
         help_texts = {
             "email": "Lab wide email for discordance and general communications.",
             "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
-            "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI"
+            "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",
+            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit."
         }
 
 
