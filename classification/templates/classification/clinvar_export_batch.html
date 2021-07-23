@@ -16,6 +16,7 @@
         <h4>ClinVar Export Batch</h4>
         {% labelled label="ClinVar Key" %}{{ batch.clinvar_key }}{% endlabelled %}
         {% labelled label="Created" %}{% timestamp batch.created %}{% endlabelled %}
+        {% labelled label="Status" %}{{ batch.get_status_display }}{% endlabelled %}
         {% labelled label="Record Count" %}{{ submissions.count }}{% endlabelled %}
         {% labelled label="Preview" %}
             <a href="{% url 'clinvar_export_batch_download' batch.pk %}" class="download-link">Download JSON Submission</a>

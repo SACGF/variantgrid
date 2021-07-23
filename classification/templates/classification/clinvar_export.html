@@ -32,14 +32,6 @@
                     {% labelled label="SCV" %}
                         <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
                     {% endlabelled %}
-                    {% comment %}
-                    {% labelled label="Submit" %}
-                        <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                            <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="true" {% if not clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Under Review</label>
-                            <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="false" {% if clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Auto-Submit When Ready</label>
-                        </div>
-                    {% endlabelled %}
-                    {% endcomment %}
                 </div>
                 <div class="card-footer">
                     <input type="submit" class="btn btn-primary" value="Save" />
