@@ -1,15 +1,14 @@
 from typing import Optional, List
 
-from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import QuerySet
+from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel
-from rest_framework.exceptions import PermissionDenied
 
 from classification.json_utils import ValidatedJson, JsonObjType
 from classification.models import ClassificationModification, ConditionResolved
-from snpdb.models import ClinVarKey, Allele, Lab
+from snpdb.models import ClinVarKey, Allele
 import copy
 
 
@@ -23,21 +22,12 @@ class ClinVarAllele(TimeStampedModel):
     def __str__(self):
         return f"{self.allele} {self.clinvar_key}"
 
-    @staticmethod
-    def clinvar_keys_for_user(user: User) -> QuerySet:
-        """
-        Ideally this would be on ClinVarKey but can't be due to ordering
-        """
-        if user.is_superuser:
-            return ClinVarKey.objects.all()
-        return ClinVarKey.objects.filter(pk__in=Lab.valid_labs_qs(user).filter(clinvar_key__isnull=False).select_related('clinvar_key'))
-
 
 class ClinVarStatus(models.TextChoices):
-    NEW_SUBMISSION = "N"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
-    CHANGES_PENDING = "C"
-    UP_TO_DATE = "D"
-    IN_ERROR = "E"
+    NEW_SUBMISSION = "N", "New Submission"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
+    CHANGES_PENDING = "C", "Changes Pending"
+    UP_TO_DATE = "D", "Up to Date"
+    IN_ERROR = "E", "Error"
 
 
 class ClinVarExport(TimeStampedModel):
@@ -49,12 +39,6 @@ class ClinVarExport(TimeStampedModel):
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(null=True, blank=True)  # if not set yet
     status = models.CharField(max_length=1, choices=ClinVarStatus.choices, default=ClinVarStatus.NEW_SUBMISSION)
-
-    def check_user_can_access(self, user: User):
-        if not user.is_superuser:
-            allowed_clinvar_keys = ClinVarAllele.clinvar_keys_for_user(user)
-            if not allowed_clinvar_keys.filter(pk=self.clinvar_allele.clinvar_key).exists():
-                raise PermissionDenied("User does not belong to a lab that uses the submission key")
 
     def __init__(self, *args, **kwargs):
         super(TimeStampedModel, self).__init__(*args, **kwargs)
@@ -134,6 +118,9 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
     submission_version = models.IntegerField()
     pass  # TODO add a bunch more fields when we know what they are
 
+    def get_absolute_url(self):
+        return reverse('clinvar_export_batch', kwargs={'pk': self.pk})
+
     def __str__(self):
         return f"ClinVar Submission Batch : {self.id}"
 
@@ -189,7 +176,7 @@ class ClinVarExportSubmission(TimeStampedModel):
 
     clinvar_export = models.ForeignKey(ClinVarExport, on_delete=models.PROTECT)  # if there's been an actual submission, don't allow deletes
     classification_based_on = models.ForeignKey(ClassificationModification, on_delete=models.PROTECT)
-    submission_batch = models.ForeignKey(ClinVarExportSubmissionBatch, null=True, blank=True, on_delete=models.SET_NULL)
+    submission_batch = models.ForeignKey(ClinVarExportSubmissionBatch, on_delete=models.CASCADE)
     submission_full = models.JSONField()  # the full data included in the batch submission
 
     submission_body = models.JSONField()  # used to see if there are any changes since last submission (other than going from novel to update)

@@ -1,14 +1,14 @@
 from typing import Dict, Any
 
-from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
 from django.shortcuts import render
 from htmlmin.decorators import not_minified_response
 
-from classification.models import ClinVarExport, ClinVarAllele
+from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarStatus
 from library.cache import timed_cache
-from snpdb.models import Allele
+from snpdb.models import Allele, ClinVarKey
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
+import json
 
 
 @timed_cache(size_limit=30, ttl=60)
@@ -43,6 +43,9 @@ class ClinVarExportRecordColumns(DatatableConfig):
         allele = allele_for(allele_id)
         return str(allele)
 
+    def render_status(self, row: Dict[str, Any]):
+        return ClinVarStatus(row['status']).label
+
     def __init__(self, request):
         super().__init__(request)
 
@@ -50,6 +53,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
             # FIXME this is all based on the previous stuff
             RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key"),
             RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="Allele"),
+            RichColumn("status", renderer=self.render_status),
             RichColumn(key="classification_based_on__created", label='ClinVar Variant', orderable=True,
                        sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
                         "id",
@@ -72,7 +76,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
         ]
 
     def get_initial_queryset(self):
-        return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=ClinVarAllele.clinvar_keys_for_user(self.user))
+        return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=ClinVarKey.clinvar_keys_for_user(self.user))
         # return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
 
 
@@ -85,7 +89,7 @@ def clinvar_exports_view(request):
 @not_minified_response
 def clinvar_export_review_view(request, pk):
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
-    clinvar_export.check_user_can_access(request.user)
+    clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     return render(request, 'classification/clinvar_export.html', context={
         "clinvar_export": clinvar_export,
@@ -96,7 +100,7 @@ def clinvar_export_review_view(request, pk):
 @not_minified_response
 def clinvar_export_history_view(request, pk):
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
-    clinvar_export.check_user_can_access(request.user)
+    clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     history = clinvar_export.clinvarexportsubmission_set.order_by('-created')
 
@@ -104,3 +108,25 @@ def clinvar_export_history_view(request, pk):
         'clinvar_export': clinvar_export,
         'history': history
     })
+
+
+def clinvar_export_batch_view(request, pk):
+    clinvar_export_batch: ClinVarExportSubmissionBatch = ClinVarExportSubmissionBatch.objects.get(pk=pk)
+    clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
+
+    return render(request, 'classification/clinvar_export_batch.html', context={
+        'batch': clinvar_export_batch,
+        'submissions': clinvar_export_batch.clinvarexportsubmission_set.order_by('created')
+    })
+
+
+def clinvar_export_batch_download(request, pk):
+    clinvar_export_batch: ClinVarExportSubmissionBatch = ClinVarExportSubmissionBatch.objects.get(pk=pk)
+    clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
+
+    # code duplicated from admin, but don't feel this should go into models
+    batch_json = clinvar_export_batch.to_json()
+    batch_json_str = json.dumps(batch_json)
+    response = HttpResponse(batch_json_str, content_type='application/json')
+    response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{clinvar_export_batch.pk}.json'
+    return response

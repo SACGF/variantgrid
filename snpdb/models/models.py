@@ -226,6 +226,26 @@ class ClinVarKey(TimeStampedModel):
     def __str__(self):
         return f"ClinVarKey ({self.id})"
 
+    @staticmethod
+    def clinvar_keys_for_user(user: User) -> QuerySet:
+        """
+        Ideally this would be on ClinVarKey but can't be due to ordering
+        """
+        if user.is_superuser:
+            return ClinVarKey.objects.all()
+        return ClinVarKey.objects.filter(pk__in=Lab.valid_labs_qs(user).filter(clinvar_key__isnull=False).select_related('clinvar_key'))
+
+    def check_user_can_access(self, user: User) -> None:
+        """
+        :throw PermissionDenied if user is not associated to ClinVarKey
+        """
+
+        def check_user_can_access(self, user: User):
+            if not user.is_superuser:
+                allowed_clinvar_keys = ClinVarKey.clinvar_keys_for_user(user)
+                if not allowed_clinvar_keys.filter(pk=self).exists():
+                    raise PermissionDenied("User does not belong to a lab that uses the submission key")
+
 
 class Lab(models.Model):
     name = models.TextField()

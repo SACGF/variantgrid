@@ -4,7 +4,9 @@
         <div class="card mb-4">
             <div class="card-header">{% timestamp history_entry.created time_ago=True %}</div>
             <div class="card-body code formatted-text">{{ history_entry.submission_full | jsonify_pretty }}</div>
-            <div class="card-footer">{{ history_entry.submission_batch }}</div>
+            <div class="card-footer">{% if history_entry.submission_batch %}
+                <a href="{% url 'clinvar_export_batch' history_entry.submission_batch.pk %}">{{ history_entry.submission_batch }}</a>
+            {% endif %}</div>
         </div>
     {% endfor %}
 {% else %}

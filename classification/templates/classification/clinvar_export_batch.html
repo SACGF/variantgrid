@@ -1,0 +1,25 @@
+{% extends "uicore/page/base.html" %}
+{% load datatable_tags %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load english_tags %}
+{% load js_tags %}
+{% block title %}ClinVar Export Batch{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+
+    <div class="container">
+        <h4>ClinVar Export Batch</h4>
+        {% labelled label="ClinVar Key" %}{{ batch.clinvar_key }}{% endlabelled %}
+        {% labelled label="Created" %}{% timestamp batch.created %}{% endlabelled %}
+        {% labelled label="Record Count" %}{{ submissions.count }}{% endlabelled %}
+        {% labelled label="Preview" %}
+            <a href="{% url 'clinvar_export_batch_download' batch.pk %}" class="download-link">Download JSON Submission</a>
+        {% endlabelled %}
+    </div>
+
+{% endblock %}

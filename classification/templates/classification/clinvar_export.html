@@ -10,34 +10,7 @@
 {% load js_tags %}
 {% block title %}Clinvar Export{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
-{% block head %}
-    <style>
-        .term-cell {
-            width: 200px;
-        }
-        .relevance-cell {
-            width: 250px;
-        }
-        .relevance-cell div + div {
-            margin-top: 0.5rem;
-        }
-        .description-cell {
-            white-space: pre-line;
-            overflow-wrap: break-word;
-        }
-        /* need to do this for checkboxes inside tabs */
-        td {
-            position: relative;
-        }
-    </style>
-{% endblock %}
 {% block content %}
-    <form method="POST" id="clinvar_form">
-        {% csrf_token %}
-        <input type="hidden" name="terms" />
-        <input type="hidden" name="multimode" />
-        <input type="hidden" name="apply" />
-    </form>
     <div class="container">
         <a href="{% url 'clinvar_exports' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all ClinVar Exports</a>
         <h3>ClinVar Export</h3>
