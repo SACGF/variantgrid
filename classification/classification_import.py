@@ -40,7 +40,7 @@ def process_classification_import(classification_import: ClassificationImport, i
         Batch variant classification submissions are broken up into 1 ClassificationImport per GenomeBuild """
 
     from classification.models import Classification
-    variant_pk_lookup = VariantPKLookup(classification_import.genome_build)
+    variant_pk_lookup = VariantPKLookup.factory(classification_import.genome_build)
     variant_tuples_by_hash = {}
     classifications_by_hash = {}
 

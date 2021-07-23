@@ -52,7 +52,7 @@ class BulkClinVarInserter:
         self.upload_step = upload_step
         self.items_processed = 0
         self.batch_id = 0
-        self.variant_pk_lookup = VariantPKLookup(clinvar_version.genome_build)
+        self.variant_pk_lookup = VariantPKLookup.factory(clinvar_version.genome_build)
         review_status_vcf_mappings_dict = dict(ClinVarReviewStatus.VCF_MAPPINGS)
         self.field_formatters = {
             "clinvar_review_status": lambda x: review_status_vcf_mappings_dict[x]

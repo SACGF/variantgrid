@@ -167,7 +167,6 @@ class MockClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
                 raise ValueError(f"MockClinGenAlleleRegistryAPI: unknown HGVS: '{line}'")
         return clingen_records
 
-
     @classmethod
     def get_code(cls, code):
         return cls.CANONICAL_ALLELES[code]

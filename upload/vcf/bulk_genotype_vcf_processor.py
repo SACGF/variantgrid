@@ -39,8 +39,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v13. Support CLCAD2 from CLC workbench
     # v14. Use AF from VCF if provided. Support for sample level filters (FT)
     # v15. Any genotype as '.' -> unknown zygosity
-    # v16. Don't insert a reference variant for each unknown ALT (only if provided)
-    VCF_IMPORTER_VERSION = 15  # Change this if you make a major change to the code.
+    # v16. Don't insert a reference variant for each unknown ALT (only if provided) - version never deployed
+    # v17. Use refactored RedisVariantPKLookup
+    VCF_IMPORTER_VERSION = 17  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called

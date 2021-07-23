@@ -486,7 +486,7 @@ def search_ontology_name(search_string: str, **kwargs) -> Iterable[OntologyTerm]
     # unless we're specifically searching for obsolete, filter them out
     if 'obsolete' not in search_string:
         qs = qs.exclude(name__icontains='obsolete')
-    
+
     return qs
 
 

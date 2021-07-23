@@ -43,7 +43,7 @@ from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMerge
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
-from snpdb.variant_pk_lookup import VariantPKLookup
+from snpdb.variant_pk_lookup import RedisVariantPKLookup, VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
@@ -53,6 +53,7 @@ from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries
 from variantopedia.search import search_data, SearchResults
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status
+
 
 def variants(request):
     context = {}
@@ -153,8 +154,12 @@ def server_status(request):
         can_access_reference = False
 
     try:
-        variant_pk_lookup = VariantPKLookup()
-        if variant_pk_lookup.redis_check:
+        variant_pk_lookup = VariantPKLookup.factory()
+        redis_check = getattr(variant_pk_lookup, "redis_check", None)
+        if redis_check is None:
+            redis_status = None
+            redis_message = None
+        elif redis_check:
             redis_status = "info"
             redis_message = "OK"
         else:
