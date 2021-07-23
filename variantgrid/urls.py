@@ -18,6 +18,7 @@ APPS_WITH_URLS = ["analysis", "annotation", "eventlog",
 
 urlpatterns = [
     path('', views.index),
+    path('accounts/', include('registration.backends.default.urls')),
     path('admin/', admin.site.urls),
     path('authenticated', views.authenticated, name='authenticated'),
     path('messages/', include('django_messages.urls')),
@@ -29,11 +30,6 @@ urlpatterns = [
     path('__debug__/', include(debug_toolbar.urls)),
     url('avatar/', include('avatar.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-if settings.RECAPTCHA_PUBLIC_KEY and settings.RECAPTCHA_PRIVATE_KEY:
-    urlpatterns.append(path('accounts/', include('captcha.backends.default.urls')))
-else:
-    urlpatterns.append(    path('accounts/', include('registration.backends.default.urls')))
 
 if settings.USE_OIDC:
     urlpatterns += [
