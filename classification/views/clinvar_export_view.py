@@ -1,11 +1,13 @@
 from typing import Dict, Any
 
+from django.contrib import messages
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from htmlmin.decorators import not_minified_response
 
 from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarStatus
 from library.cache import timed_cache
+from library.django_utils import add_save_message
 from snpdb.models import Allele, ClinVarKey
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 import json
@@ -90,6 +92,12 @@ def clinvar_exports_view(request):
 def clinvar_export_review_view(request, pk):
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
+
+    if request.method == "POST":
+        clinvar_export.scv = request.POST.get("scv") or None
+        clinvar_export.save()
+        add_save_message(request, valid=True, name="ClinVarExport")
+        return redirect(clinvar_export)
 
     return render(request, 'classification/clinvar_export.html', context={
         "clinvar_export": clinvar_export,

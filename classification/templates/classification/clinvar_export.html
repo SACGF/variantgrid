@@ -20,59 +20,32 @@
             </p>
         {% end_page_help_embedded %}
 
-        <div class="modal fade" id="saveModal" tabindex="-1" aria-labelledby="saveModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="saveModalLabel">Save</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                  <span aria-hidden="true">&times;</span>
-                </button>
-              </div>
-              <div class="modal-body">
-                Apply condition terms to:
-
-                  <div class="list-group mt-2">
-                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="record" class="mr-2" checked>To this record only</label>
-                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="gene_symbol" class="mr-2">As default for records with condition text "<span class="text-muted">{{ clinvar_export.condition_text_normal }}</span>" and Gene {{ clinvar_export.gene_symbol }}
-                      <div class="text-muted">{% count same_text_gene_vcs singular="1 other existing ClinVar Export" plural="other existing ClinVar Exports" %}</div>
-                      </label>
-                      <label class="list-group-item list-group-item-action"><input type="radio" name="applyLevel" value="text" class="mr-2">As default for records with condition text "<span class="text-muted">{{ clinvar_export.condition_text_normal }}</span>"
-                      <div class="text-muted">{% count same_text_vcs singular="1 other existing ClinVar Export" plural="other existing ClinVar Exports" %}</div>
-                      </label>
-                  </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="submit()">Apply Changes</button>
-              </div>
+        <form method="post">
+            {% csrf_token %}
+            <div class="card mb-4">
+                <div class="card-header">Summary</div>
+                <div class="card-body">
+                    {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
+                    {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
+                    {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
+                    {% labelled label="Current Candidate Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
+                    {% labelled label="SCV" %}
+                        <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
+                    {% endlabelled %}
+                    {% comment %}
+                    {% labelled label="Submit" %}
+                        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                            <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="true" {% if not clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Under Review</label>
+                            <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="false" {% if clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Auto-Submit When Ready</label>
+                        </div>
+                    {% endlabelled %}
+                    {% endcomment %}
+                </div>
+                <div class="card-footer">
+                    <input type="submit" class="btn btn-primary" value="Save" />
+                </div>
             </div>
-          </div>
-        </div>
-
-        <div class="card mb-4">
-            <div class="card-header">Summary</div>
-            <div class="card-body">
-                {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
-                {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
-                {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
-                {% labelled label="Current Candidate Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
-                {% labelled label="SNC" %}<span class="no-value">Not yet assigned</span>{% endlabelled %}
-                {% comment %}
-                {% labelled label="Submit" %}
-                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                        <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="true" {% if not clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Under Review</label>
-                        <label class="btn btn-outline-secondary"><input type="radio" name="submit_when_possible" value="false" {% if clinvar_export.submit_when_possible %}checked="checked"{% endif %}>Auto-Submit When Ready</label>
-                    </div>
-                {% endlabelled %}
-                {% endcomment %}
-            </div>
-            {% comment %}
-            <div class="card-footer">
-                <btn class="btn btn-primary" data-toggle="modal" data-target="#saveModal">Save</btn>
-            </div>
-            {% endcomment %}
-        </div>
+        </form>
         {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
             <h4>Export Preview</h4>
             <p class="text-muted">This is how the data will be submitted to ClinVar</p>

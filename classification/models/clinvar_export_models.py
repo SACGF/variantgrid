@@ -40,20 +40,24 @@ class ClinVarExport(TimeStampedModel):
     scv = models.TextField(null=True, blank=True)  # if not set yet
     status = models.CharField(max_length=1, choices=ClinVarStatus.choices, default=ClinVarStatus.NEW_SUBMISSION)
 
+    def get_absolute_url(self):
+        return reverse('clinvar_export', kwargs={'pk': self.pk})
+
     def __init__(self, *args, **kwargs):
         super(TimeStampedModel, self).__init__(*args, **kwargs)
-        self.cached_condition: Optional[ConditionResolved] = None
+
+    @lazy
+    def _condition_resolved(self) -> ConditionResolved:
+        return ConditionResolved.from_dict(self.condition)
 
     @property
     def condition_resolved(self) -> ConditionResolved:
-        if not self.cached_condition:
-            self.cached_condition = ConditionResolved.from_dict(self.condition)
-        return self.cached_condition
+        return ConditionResolved.from_dict(self.condition)
 
     @condition_resolved.setter
     def condition_resolved(self, new_condition: ConditionResolved):
         self.condition = new_condition.as_json_minimal()
-        self.cached_condition = new_condition
+        lazy.invalidate(self, '_condition_resolved')
 
     def update_classification(self, new_classification_based_on: Optional[ClassificationModification]):
         if self.classification_based_on != new_classification_based_on:
