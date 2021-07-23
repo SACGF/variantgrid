@@ -51,10 +51,10 @@ class ClinVarExportRecordColumns(DatatableConfig):
 
         self.rich_columns = [
             # FIXME this is all based on the previous stuff
-            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key"),
-            RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="Allele"),
-            RichColumn("status", renderer=self.render_status),
-            RichColumn(key="classification_based_on__created", label='ClinVar Variant', orderable=True,
+            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True),
+            RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="Allele", orderable=True),
+            RichColumn("status", renderer=self.render_status, orderable=True),
+            RichColumn(key="classification_based_on__created", label='ClinVar Variant',
                        sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
                         "id",
                         "classification_based_on__created",
