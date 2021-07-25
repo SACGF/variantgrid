@@ -9,6 +9,7 @@ from model_utils.models import TimeStampedModel
 from classification.json_utils import ValidatedJson, JsonObjType
 from classification.models import ClassificationModification, ConditionResolved
 from snpdb.models import ClinVarKey, Allele
+from django.utils.timezone import now
 import copy
 
 
@@ -19,11 +20,16 @@ class ClinVarAllele(TimeStampedModel):
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
 
+    classifications_missing_condition = models.IntegerField(default=0)
+    submissions_valid = models.IntegerField(default=0)
+    submissions_invalid = models.IntegerField(default=0)
+    last_evaluated = models.DateTimeField(default=now)
+
     def __str__(self):
         return f"{self.allele} {self.clinvar_key}"
 
 
-class ClinVarStatus(models.TextChoices):
+class ClinVarExportStatus(models.TextChoices):
     NEW_SUBMISSION = "N", "New Submission"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
     CHANGES_PENDING = "C", "Changes Pending"
     UP_TO_DATE = "D", "Up to Date"
@@ -38,7 +44,7 @@ class ClinVarExport(TimeStampedModel):
     condition = models.JSONField()
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(null=True, blank=True)  # if not set yet
-    status = models.CharField(max_length=1, choices=ClinVarStatus.choices, default=ClinVarStatus.NEW_SUBMISSION)
+    status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
 
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'pk': self.pk})
@@ -100,19 +106,19 @@ class ClinVarExport(TimeStampedModel):
             return last_submission.submission_body
         return None
 
-    def calculate_status(self) -> ClinVarStatus:
+    def calculate_status(self) -> ClinVarExportStatus:
         current_body = self.submission_body_current
         if current_body.has_errors:
-            return ClinVarStatus.IN_ERROR
+            return ClinVarExportStatus.IN_ERROR
         else:
             if previous_submission := self.submission_body_previous():
                 if previous_submission != self.submission_body_current.pure_json():
-                    return ClinVarStatus.CHANGES_PENDING
+                    return ClinVarExportStatus.CHANGES_PENDING
                 else:
-                    return ClinVarStatus.UP_TO_DATE
+                    return ClinVarExportStatus.UP_TO_DATE
             else:
                 # no previous submission
-                return ClinVarStatus.NEW_SUBMISSION
+                return ClinVarExportStatus.NEW_SUBMISSION
 
 
 class ClinVarExportSubmissionbatchStatus(models.TextChoices):
@@ -153,7 +159,7 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
         current_batch_size = 0
 
         qs = qs.order_by('clinvar_allele__clinvar_key')
-        qs = qs.filter(status__in=[ClinVarStatus.NEW_SUBMISSION, ClinVarStatus.CHANGES_PENDING])
+        qs = qs.filter(status__in=[ClinVarExportStatus.NEW_SUBMISSION, ClinVarExportStatus.CHANGES_PENDING])
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')
         record: ClinVarExport
         for record in qs:
@@ -178,7 +184,7 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
                     submission_body=record.submission_body_current.pure_json(),
                     submission_version=1
                 ).save()
-                record.status = ClinVarStatus.UP_TO_DATE
+                record.status = ClinVarExportStatus.UP_TO_DATE
                 record.save()
 
         return all_batches

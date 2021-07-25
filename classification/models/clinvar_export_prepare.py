@@ -1,8 +1,10 @@
 from typing import Dict, List, Optional, Set
 from cyvcf2.cyvcf2 import defaultdict
+from django.utils.timezone import now
+
 from classification.enums import ShareLevel
 from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarExport, \
-    ConditionResolved
+    ConditionResolved, ClinVarExportStatus
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import segment
 from snpdb.models import Allele, ClinVarKey
@@ -130,6 +132,17 @@ class ClinvarAlleleExportPrepare:
             for mod in classifications:
                 cp.add_new_candidate(ClassificationModificationCandidate(mod))
             cp.consolidate()
+
+            total = clinvar_allele.clinvarexport_set.count()
+            in_error = clinvar_allele.clinvarexport_set.filter(status=ClinVarExportStatus.IN_ERROR).count()
+            valid = total - in_error
+
+            clinvar_allele.classifications_missing_condition = len(classifications_no_conditions)
+            clinvar_allele.submissions_valid = valid
+            clinvar_allele.submissions_invalid = in_error
+            clinvar_allele.last_evaluated = now()
+            clinvar_allele.save()
+
             log = cp.log
             log = [f"{clinvar_key} : {entry}" for entry in log]
             combined_log += log

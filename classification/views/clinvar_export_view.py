@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from htmlmin.decorators import not_minified_response
 
-from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarStatus
+from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportStatus
 from library.cache import timed_cache
 from library.django_utils import add_save_message
 from snpdb.models import Allele, ClinVarKey
@@ -16,6 +16,36 @@ import json
 @timed_cache(size_limit=30, ttl=60)
 def allele_for(allele_id: int):
     return Allele.objects.select_related('clingen_allele').get(pk=allele_id)
+
+
+class ClinVarAlleleColumns(DatatableConfig):
+
+    """
+        allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
+    clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
+
+    classifications_missing_condition = models.IntegerField(default=0)
+    submissions_valid = models.IntegerField(default=0)
+    submissions_invalid = models.IntegerField(default=0)
+    last_evaluated = models.DateTimeField(default=now)
+    """
+
+    def render_allele(self, row: Dict[str, Any]):
+        allele_id = row.get('allele_id')
+        allele = allele_for(allele_id)
+        return str(allele)
+
+    def __init__(self, request):
+        super().__init__(request)
+
+        self.rich_columns = [
+            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True),
+            RichColumn("allele", orderable=True),
+            RichColumn("last_evaluated", orderable=True),
+            RichColumn("submissions_valid", orderable=True),
+            RichColumn("classifications_missing_condition", orderable=True),
+            RichColumn("submissions_invalid", orderable=True)
+        ]
 
 
 class ClinVarExportRecordColumns(DatatableConfig):
@@ -46,7 +76,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
         return str(allele)
 
     def render_status(self, row: Dict[str, Any]):
-        return ClinVarStatus(row['status']).label
+        return ClinVarExportStatus(row['status']).label
 
     def __init__(self, request):
         super().__init__(request)
