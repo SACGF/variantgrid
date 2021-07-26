@@ -50,7 +50,7 @@ class ClinVarExport(TimeStampedModel):
         return reverse('clinvar_export', kwargs={'pk': self.pk})
 
     def __init__(self, *args, **kwargs):
-        super(TimeStampedModel, self).__init__(*args, **kwargs)
+        super(self).__init__(*args, **kwargs)
 
     @lazy
     def _condition_resolved(self) -> ConditionResolved:

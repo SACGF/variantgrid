@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional, Set
-from cyvcf2.cyvcf2 import defaultdict
+from collections import defaultdict
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel

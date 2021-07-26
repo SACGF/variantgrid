@@ -134,4 +134,3 @@ class TestClinVarExportModels(TestCase):
         self.assertIsNone(established.candidate)
 
         # TODO test merging and non merging
-
