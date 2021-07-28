@@ -107,13 +107,16 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                 for i, (z, ad, dp, af) in enumerate(zip(samples_zygosity, allele_depth, read_depth, allele_frequency)):
                     if sample_whitelist[i]:
                         sample_zygosity_count[i][z] += 1
-                        gt = Zygosity.get_genotype(z)
-                        if vcf.allele_frequency_percent:
-                            ref_depth = round(dp * (100 - af) / 100)
+                        if z == Zygosity.UNKNOWN_ZYGOSITY:
+                            sample = "./."
                         else:
-                            ref_depth = round(dp * (1 - af))
-                        ad = f"{ref_depth},{ad}"
-                        sample = ":".join((str(s) for s in (gt, ad, dp)))
+                            gt = Zygosity.get_genotype(z)
+                            if vcf.allele_frequency_percent:
+                                ref_depth = round(dp * (100 - af) / 100)
+                            else:
+                                ref_depth = round(dp * (1 - af))
+                            ad = f"{ref_depth},{ad}"
+                            sample = ":".join((str(s) for s in (gt, ad, dp)))
                         samples_list.append(sample)
 
                 row = [chrom, str(position), str(pk), ref, alt or ref, '.', '.', '.', vcf_format] + samples_list

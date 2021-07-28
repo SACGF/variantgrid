@@ -66,11 +66,11 @@ def _write_somalier_vcf(cfg: SomalierConfig, processing_dir, vcf_extract: Somali
     exported_vcf_filename = os.path.join(processing_dir, f"vcf_{vcf.pk}.vcf.bgz")
     sample_zygosity_count = vcf_export_to_file(vcf, exported_vcf_filename, original_qs=sites_qs,
                                                sample_name_func=AbstractSomalierModel.sample_name)
+    ZYG_LOOKUP = {"ref_count": Zygosity.HOM_REF,
+                  "het_count": Zygosity.HET,
+                  "hom_count": Zygosity.HOM_ALT,
+                  "unk_count": Zygosity.UNKNOWN_ZYGOSITY}
     for sample, zy in sample_zygosity_count.items():
-        ZYG_LOOKUP = {"ref_count": Zygosity.HOM_REF,
-                      "het_count": Zygosity.HET,
-                      "hom_count": Zygosity.HOM_ALT,
-                      "unk_count": Zygosity.UNKNOWN_ZYGOSITY}
         zyg_kwargs = {k: zy[v] for k, v in ZYG_LOOKUP.items()}
         SomalierSampleExtract.objects.create(vcf_extract=vcf_extract, sample=sample, **zyg_kwargs)
 
