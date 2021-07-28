@@ -151,6 +151,17 @@ class SomalierRelate(AbstractSomalierModel):
     class Meta:
         abstract = True
 
+    def get_samples(self) -> Iterable[Sample]:
+        return []
+
+    def is_joint_called_vcf(self) -> bool:
+        samples_qs = self.get_samples()
+        num_vcfs = samples_qs.order_by("vcf").distinct("vcf").count()
+        return num_vcfs == 1
+
+    def has_ped_file(self) -> bool:
+        return False
+
     def write_ped_file(self, filename):
         """ Sample IDs have to match samples provided in get_samples() """
         write_unrelated_ped(filename, [AbstractSomalierModel.sample_name(s) for s in self.get_samples()])
@@ -177,6 +188,9 @@ class SomalierTrioRelate(SomalierRelate):
 
     def get_samples(self) -> Iterable[Sample]:
         return self.trio.get_samples()
+
+    def has_ped_file(self) -> bool:
+        return True
 
     def write_ped_file(self, filename):
         proband = AbstractSomalierModel.sample_name(self.trio.proband.sample)
