@@ -127,7 +127,7 @@ def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
         somalier_relate.write_ped_file(ped_filename)
         command += ["--ped", ped_filename]
 
-    command += [somalier_relate.get_sample_somalier_filenames()]
+    command += somalier_relate.get_sample_somalier_filenames()
 
     somalier_relate_dir = Path(cfg.related_dir(somalier_relate.uuid))
     somalier_relate_dir.mkdir(parents=True, exist_ok=True)
