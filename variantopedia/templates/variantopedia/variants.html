@@ -82,13 +82,13 @@
         }
 
         $(document).ready(() => {
+            jQuery.extend($.fn.fmatter, {
+                'detailsLink' : detailsLink,
+            });
 
             $("#filter-button").click(function() {
                 updateMinCount();
             })
-        });
-        jQuery.extend($.fn.fmatter, {
-            'detailsLink' : detailsLink,
         });
     </script>
     <style>

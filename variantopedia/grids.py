@@ -33,7 +33,10 @@ class VariantWikiGrid(JqGridUserRowConfig):
 class AllVariantsGrid(AbstractVariantGrid):
     caption = 'All Variants'
     fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
-    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'}}
+    colmodel_overrides = {
+        'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
+        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
+    }
 
     def __init__(self, user, **kwargs):
         user_settings = UserSettings.get_for_user(user)
