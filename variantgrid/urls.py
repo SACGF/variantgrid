@@ -31,7 +31,7 @@ urlpatterns = [
 
 
 if getattr(settings, "REGISTRATION_OPEN", False):
-    registration_include = include('registration.backends.one_step.urls')
+    registration_include = include('registration.backends.simple.urls')
 else:
     registration_include = include('registration.backends.default.urls')
 urlpatterns += [path('accounts/', registration_include)]
