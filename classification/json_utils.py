@@ -6,7 +6,7 @@ import copy
 # A little hack that will make call 'to_json' on any non json serializable class
 # So you can implement to_json to become json serializable
 from dataclasses import dataclass, field
-from typing import Union, Dict, Any, List, Generic, TypeVar, Iterator
+from typing import Union, Dict, Any, List, Iterator
 
 from lazy import lazy
 
@@ -66,9 +66,9 @@ class JsonMessage:
     def bs(self) -> str:
         if self.severity == "error":
             return "danger"
-        elif self.severity == "warning":
+        if self.severity == "warning":
             return "warning"
-        elif self.severity == "info":
+        if self.severity == "info":
             return "info"
         return "info"
 

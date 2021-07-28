@@ -111,7 +111,7 @@ class ClinvarAlleleExportPrepare:
                     return True
             return False
 
-        classifications_condition, classifications_no_conditions = segment(all_classifications, lambda c: has_condition(c))
+        classifications_condition, classifications_no_conditions = segment(all_classifications, has_condition)
 
         clinvar_keys_to_classification: Dict[ClinVarKey, List[ClassificationModification]] = defaultdict(list)
         for classification in classifications_condition:

@@ -43,7 +43,7 @@ from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMerge
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
-from snpdb.variant_pk_lookup import RedisVariantPKLookup, VariantPKLookup
+from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app

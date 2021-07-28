@@ -573,7 +573,7 @@ class HGVSMatcher:
         """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' - returns nothing if swap wasn't ok """
         hgvs = HGVSName(hgvs_name)
         if hgvs.transcript:
-            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(hgvs.transcript)
+            transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(hgvs.transcript)
             if Transcript.objects.filter(pk=transcript_id).exists():
                 return  # Normal transcript
 
