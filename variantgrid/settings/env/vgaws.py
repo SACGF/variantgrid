@@ -54,6 +54,7 @@ URLS_NAME_REGISTER.update({"sequencing_data": False})
 
 RECAPTCHA_PUBLIC_KEY = get_secret('RECAPTCHA.public_key')
 RECAPTCHA_PRIVATE_KEY = get_secret('RECAPTCHA.private_key')
+REGISTRATION_OPEN = True
 
 SOMALIER["enabled"] = True
 SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
