@@ -719,6 +719,9 @@ PUBLIC_PATHS = [
 RECAPTCHA_PUBLIC_KEY = ""  # get_secret('RECAPTCHA.public_key')
 RECAPTCHA_PRIVATE_KEY = ""  # get_secret('RECAPTCHA.private_key')
 
+# Need to set this if using ReCaptcha
+# ACCOUNT_SIGNUP_FORM_CLASS = 'snpdb.forms.ReCaptchaSignupForm'
+
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 
 

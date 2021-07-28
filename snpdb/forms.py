@@ -1,5 +1,6 @@
 import collections
 
+from captcha.fields import ReCaptchaField
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Layout, Submit, Field
 from dal import autocomplete, forward
@@ -518,3 +519,7 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
             instance.save()
 
         return instance
+
+
+class ReCaptchaSignupForm(forms.Form):
+    captcha = ReCaptchaField()
