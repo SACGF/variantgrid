@@ -412,7 +412,7 @@ SITE_NAME = "VariantGrid"
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = False  # set True to only find classified variants
 SEARCH_SUMMARY = True
 SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = True
-SILENCED_SYSTEM_CHECKS = ['models.E006']
+SILENCED_SYSTEM_CHECKS = ['models.E006']  # 'captcha.recaptcha_test_key_error']
 SITE_ID = 2
 SITE_MESSAGE = None  # displayed at the top of all logged-in pages
 
@@ -718,6 +718,7 @@ PUBLIC_PATHS = [
 # Both need to be set to enable - and use get_secret in server settings files to keep out of source control
 RECAPTCHA_PUBLIC_KEY = ""  # get_secret('RECAPTCHA.public_key')
 RECAPTCHA_PRIVATE_KEY = ""  # get_secret('RECAPTCHA.private_key')
+REGISTRATION_FORM = "variantgrid.forms.ReCaptchaSignupForm"
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 

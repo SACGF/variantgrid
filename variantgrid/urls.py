@@ -6,10 +6,8 @@ from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
 import debug_toolbar
-from registration.views import RegistrationView
 
 from variantgrid import views
-from variantgrid.forms import ReCaptchaSignupForm
 
 admin.autodiscover()
 
@@ -31,13 +29,6 @@ urlpatterns = [
     path('__debug__/', include(debug_toolbar.urls)),
     url('avatar/', include('avatar.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-if settings.RECAPTCHA_PUBLIC_KEY and settings.RECAPTCHA_PRIVATE_KEY:
-    # Add in front
-    urlpatterns = [
-        path('accounts/register/', RegistrationView.as_view(form_class=ReCaptchaSignupForm),
-             name='registration_register'),
-    ] + urlpatterns
 
 
 if settings.USE_OIDC:
