@@ -116,12 +116,21 @@ def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
     somalier_bin = cfg.get_annotation("command")
     processing_dir = get_import_processing_dir(somalier_relate.pk, "somalier_relate")
 
-    ped_filename = os.path.join(processing_dir, "temp.ped")
-    somalier_relate.write_ped_file(ped_filename)
+    command = [somalier_bin, "relate"]
+    if not somalier_relate.is_joint_called_vcf():
+        # Somalier --unknown    set unknown genotypes to hom-ref.
+        # it is often preferable to use this with VCF samples that were not jointly called
+        command += ["--unknown"]
+
+    if somalier_relate.has_ped_file():
+        ped_filename = os.path.join(processing_dir, "temp.ped")
+        somalier_relate.write_ped_file(ped_filename)
+        command += ["--ped", ped_filename]
+
+    command += [somalier_relate.get_sample_somalier_filenames()]
+
     somalier_relate_dir = Path(cfg.related_dir(somalier_relate.uuid))
     somalier_relate_dir.mkdir(parents=True, exist_ok=True)
-
-    command = [somalier_bin, "relate", "--ped", ped_filename] + somalier_relate.get_sample_somalier_filenames()
     somalier_relate.execute(command, cwd=somalier_relate_dir)
 
     shutil.rmtree(processing_dir)
