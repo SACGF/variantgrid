@@ -559,6 +559,10 @@ class ClinVarExportAdmin(ModelAdminBasics):
     actions = ["export_as_csv", force_recalc_status, add_to_batch]
 
 
+class ClinVarAlleleAdmin(ModelAdminBasics):
+    list_display = ["pk", "clinvar_key", "allele", "classifications_missing_condition", "submissions_valid", "submissions_invalid", "last_evaluated"]
+
+
 class ClinVarExportSubmissionBatchAdmin(ModelAdminBasics):
     list_display = ["pk", "clinvar_key", "created", "modified", "record_count"]
 

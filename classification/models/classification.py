@@ -37,7 +37,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text
-from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation, OntologyService
+from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
@@ -258,11 +258,7 @@ class ConditionResolved:
     def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
         if self.is_multi_condition or other.is_multi_condition:
             # when looking at multiple conditions, do not attempt merging unless we're the exact same
-            if self.terms == other.terms and \
-                    self.join == other.join:
-                return True
-            else:
-                return False
+            return self.terms == other.terms and self.join == other.join
         elif self.single_term == other.single_term:
             return True
         else:

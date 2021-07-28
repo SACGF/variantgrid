@@ -487,7 +487,6 @@ class OntologySnake:
                 return list()
         return list()
 
-
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
     def snake_from(term: OntologyTerm, to_ontology: OntologyService, max_depth: int = 1) -> 'OntologySnakes':

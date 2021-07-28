@@ -226,7 +226,7 @@ class ClinVarExportConverter:
             data["citation"] = ValidatedJson(None, JsonMessages.error("No value for required field \"Assertion method\""))
             data["method"] = None
         else:
-            data["citation"] = ValidatedJson(acmg_citation, JsonMessages.warning(f"ADMIN: AssertionMethod value \"{assertion_criteria}\" can't provide citation for it yet"))
+            data["citation"] = ValidatedJson(acmg_citation, JsonMessages.error(f"ADMIN: AssertionMethod value \"{assertion_criteria}\" can't provide citation for it yet"))
             data["method"] = None
 
         return ValidatedJson(data)

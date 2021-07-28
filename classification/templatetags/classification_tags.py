@@ -83,7 +83,7 @@ def classification_groups(
         for cm in ordered_classifications:
             all_clinical_groupings.add(cm.classification.clinical_context)
         clinical_grouping_list = list(all_clinical_groupings)
-        clinical_grouping_list.sort(key=lambda cg:(not cg.is_default, cg.name))
+        clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
         context["clinical_contexts"] = clinical_grouping_list
 
     return context

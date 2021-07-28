@@ -52,7 +52,7 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
             genes_with_compound_het_qs = gene_counts_qs.filter(count__gte=2).values('gene_id')
             q_list.append(Q(**{VariantAnnotation.GENE_COLUMN + "__in": genes_with_compound_het_qs}))
 
-        node_q = reduce(operator.and_, q_list)
+        node_q: Q = reduce(operator.and_, q_list)
         if self.exclude:
             node_q = ~node_q
         return node_q

@@ -1,6 +1,5 @@
 from abc import abstractmethod
-from collections import Hashable
-from typing import TypeVar, Generic, List, Optional, Set
+from typing import TypeVar, Generic, List, Optional, Set, Hashable
 
 
 CandidateType = TypeVar("CandidateType")

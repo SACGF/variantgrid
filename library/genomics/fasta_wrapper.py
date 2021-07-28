@@ -1,4 +1,4 @@
-from pysam import FastaFile  # @UnresolvedImport
+from pysam.libcfaidx import FastaFile
 
 
 class FastaFileContigWrapper:

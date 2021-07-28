@@ -52,6 +52,9 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 
 PEDIGREE_MADELINE2_COMMAND = "madeline2"
 
+RECAPTCHA_PUBLIC_KEY = get_secret('RECAPTCHA.public_key')
+RECAPTCHA_PRIVATE_KEY = get_secret('RECAPTCHA.private_key')
+
 #UPLOAD_ENABLED = False
 
 # Lock down menu - hide some VariantGrid urls / menu

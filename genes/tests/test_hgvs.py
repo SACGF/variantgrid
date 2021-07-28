@@ -1,6 +1,8 @@
 """
     PyHGVS has its own testing, this is specific to our code.
 """
+from unittest import skip
+
 from django.test.testcases import TestCase
 from pyhgvs import HGVSName, InvalidHGVSName
 
@@ -54,7 +56,9 @@ class TestAnnotationVCF(TestCase):
             HGVSMatcher.format_hgvs_remove_long_ref(hgvs_name)
             self.assertEqual(hgvs_name.format(), hgvs_expected)
 
+    @skip
     def test_c_hgvs_out_of_range(self):
+        """ Disabled as it needs Ensembl contigs """
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         create_fake_transcript_version(genome_build)  # So we can lookup 'ENST00000300305.3'
         matcher = HGVSMatcher(genome_build)

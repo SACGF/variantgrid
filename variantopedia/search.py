@@ -12,7 +12,7 @@ from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from lazy import lazy
-from pyhgvs import InvalidHGVSName, HGVSName
+from pyhgvs import HGVSName
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden

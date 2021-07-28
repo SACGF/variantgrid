@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from django.contrib import admin
 
-from classification.models import ConditionText, ConditionTextMatch, ClinVarExport, ClinVarExportSubmissionBatch
+from classification.models import ConditionText, ConditionTextMatch, ClinVarExport, ClinVarExportSubmissionBatch, \
+    ClinVarAllele
 from classification.models import EvidenceKey, ClassificationReportTemplate
 from classification.models.admin_forms import ClinicalContextAdmin, DiscordanceReportAdmin, ConditionTextMatchAdmin, \
     EvidenceKeyAdmin, ConditionTextAdmin, ClassificationReportTemplateAdmin, ClassificationAdmin, \
-    ClinVarExportAdmin, ClinVarExportSubmissionBatchAdmin
+    ClinVarExportAdmin, ClinVarExportSubmissionBatchAdmin, ClinVarAlleleAdmin
 from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReportClassification, DiscordanceReport
@@ -15,6 +16,7 @@ from snpdb.admin import ModelAdminBasics
 
 admin.site.register(EvidenceKey, EvidenceKeyAdmin)
 admin.site.register(Classification, ClassificationAdmin)
+admin.site.register(ClinVarAllele, ClinVarAlleleAdmin)
 admin.site.register(ClinVarExport, ClinVarExportAdmin)
 admin.site.register(ClinVarExportSubmissionBatch, ClinVarExportSubmissionBatchAdmin)
 admin.site.register(ConditionText, ConditionTextAdmin)

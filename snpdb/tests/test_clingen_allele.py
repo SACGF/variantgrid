@@ -2,7 +2,7 @@ from django.test import TestCase
 
 from snpdb.clingen_allele import ClinGenAlleleServerException, get_clingen_allele, \
     ClinGenAlleleAPIException, get_clingen_allele_for_variant, variant_allele_clingen
-from snpdb.models import Sequence, GenomeBuild, Variant, Locus
+from snpdb.models import GenomeBuild
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI, MockServerErrorClinGenAlleleRegistryAPI
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
