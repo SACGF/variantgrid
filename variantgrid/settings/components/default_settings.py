@@ -744,7 +744,7 @@ SOMALIER = {
     "relatedness": {
         "min_relatedness": 0.1,
         "min_shared_hets": 1000,
-        "min_shared_hom_alts": 1000,
+        "min_shared_hom_alts": 200,
     }
 }
 
