@@ -17,7 +17,6 @@ APPS_WITH_URLS = ["analysis", "annotation", "eventlog",
 
 urlpatterns = [
     path('', views.index),
-    path('accounts/', include('registration.backends.default.urls')),
     path('admin/', admin.site.urls),
     path('authenticated', views.authenticated, name='authenticated'),
     path('messages/', include('django_messages.urls')),
@@ -29,6 +28,13 @@ urlpatterns = [
     path('__debug__/', include(debug_toolbar.urls)),
     url('avatar/', include('avatar.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+if getattr(settings, "REGISTRATION_OPEN", False):
+    registration_include = include('registration.backends.one_step.urls')
+else:
+    registration_include = include('registration.backends.default.urls')
+urlpatterns += [path('accounts/', registration_include)]
 
 
 if settings.USE_OIDC:
