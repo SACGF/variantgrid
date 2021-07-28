@@ -35,7 +35,7 @@ urlpatterns = [
 if settings.RECAPTCHA_PUBLIC_KEY and settings.RECAPTCHA_PRIVATE_KEY:
     # Add in front
     urlpatterns = [
-        path('accounts/register', RegistrationView.as_view(form_class=ReCaptchaSignupForm),
+        path('accounts/register/', RegistrationView.as_view(form_class=ReCaptchaSignupForm),
              name='registration_register'),
     ] + urlpatterns
 
