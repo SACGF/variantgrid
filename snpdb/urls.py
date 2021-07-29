@@ -71,7 +71,8 @@ urlpatterns = [
 
     perm_path('user/<pk>', views.view_user, name='view_user'),
     perm_path('lab/<pk>', views.view_lab, name='view_lab'),
-    perm_path('organization/<pk>', views.view_organization, name='view_organization'),
+    perm_path('clinvar_key/<str:pk>', views.view_clinvar_key, name='clinvar_key'),
+    perm_path('organization/<int:pk>', views.view_organization, name='view_organization'),
     perm_path('help_static_page/<path:page_name>', views.help_static_page, name='help_static_page'),
     perm_path('genomic_intervals_graph/<int:genomic_intervals_collection_id>', views.genomic_intervals_graph, name='genomic_intervals_graph'),
     perm_path('chrom_density_graph/<int:sample_id>/<slug:cmap>', views.chrom_density_graph, name='chrom_density_graph'),

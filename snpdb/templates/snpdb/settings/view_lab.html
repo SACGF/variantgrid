@@ -90,15 +90,24 @@
                 {% ui_register_tab label="Node Counts" url="lab_settings_node_counts_tab" param=lab.pk tab_set="lab_tabs" url_check=True %}
             {% endif %}
         {% endif %}
+        {% if clinvar_export_enabled %}
+            {% if lab.clinvar_key %}
+                {% ui_register_tab tab_set="lab_tabs" url='clinvar_key' param=lab.clinvar_key.pk label="ClinVar" %}
+            {% else %}
+                {% ui_register_tab_embedded tab_set="lab_tabs" label="ClinVar" %}
+                    ClinVar is not configured for this lab. Contact a site administrator if you'd like to change that.
+                {% end_ui_register_tab_embedded %}
+            {% endif %}
+        {% endif %}
         {% if user.is_superuser %}
-        {% ui_register_tab_embedded label="Debug" tab_set="lab_tabs" %}
-            <form method="post" action="{{ form_url }}">
-                {% csrf_token %}
-                <div class="btn-toolbar">
-                    <input type="submit" class="btn btn-primary" name="debug_method" value="Test Slack" />
-                </div>
-            </form>
-        {% end_ui_register_tab_embedded %}
+            {% ui_register_tab_embedded label="Debug" tab_set="lab_tabs" %}
+                <form method="post" action="{{ form_url }}">
+                    {% csrf_token %}
+                    <div class="btn-toolbar">
+                        <input type="submit" class="btn btn-primary" name="debug_method" value="Test Slack" />
+                    </div>
+                </form>
+            {% end_ui_register_tab_embedded %}
         {% endif %}
 
         {% ui_render_tabs tab_set="lab_tabs" %}

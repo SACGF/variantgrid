@@ -45,3 +45,4 @@ SITE_NAME = "Shariant"
 VARIANT_VCF_DB_PREFIX = "stv"
 
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
+CLINVAR_EXPORT_ENABLED = True

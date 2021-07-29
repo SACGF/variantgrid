@@ -63,7 +63,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
@@ -708,8 +708,16 @@ def view_lab(request, pk):
         'override_source': override_source,
         'override_values': override_values,
         'has_write_permission': has_write_permission,
+        'clinvar_export_enabled': settings.CLINVAR_EXPORT_ENABLED
     }
     return render(request, 'snpdb/settings/view_lab.html', context)
+
+
+def view_clinvar_key(request, pk: str):
+    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
+    clinvar_key.check_user_can_access(request.user)
+
+    return render(request, 'snpdb/settings/clinvar_key.html', {'clinvar_key': clinvar_key})
 
 
 def view_organization(request, pk):

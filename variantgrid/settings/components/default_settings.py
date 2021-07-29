@@ -823,6 +823,8 @@ AWS_SES_ACCESS_KEY_ID = None
 AWS_SES_SECRET_ACCESS_KEY = None
 AWS_SES_REGION = None
 
+CLINVAR_EXPORT_ENABLED = False
+
 # Command line tool to unzip and cat a file to stdout
 # for macOS need to set this to gzcat as the default zcat has short-comings
 BASH_ZCAT = 'zcat'

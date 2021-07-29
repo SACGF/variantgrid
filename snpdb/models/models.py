@@ -247,6 +247,16 @@ class ClinVarKey(TimeStampedModel):
                     raise PermissionDenied("User does not belong to a lab that uses the submission key")
 
 
+class ClinVarKeyAssertionMethod(TimeStampedModel):
+    class Meta:
+        verbose_name = "ClinVar key assertion method"
+        unique_together = ['clinvar_key', 'assertion_method']
+
+    clinvar_key = models.ForeignKey(ClinVarKey, on_delete=CASCADE)
+    assertion_method = models.TextField(blank=True, default='')
+    clinvar_json = models.JSONField()
+
+
 class Lab(models.Model):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, eg Shariant

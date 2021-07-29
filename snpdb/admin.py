@@ -179,9 +179,14 @@ class ClinVarKeyAdmin(ModelAdminBasics):
         }, **kwargs)
 
 
+class ClinVarKeyAssertionMethodAdmin(admin.ModelAdmin):
+    pass
+
+
 admin.site.register(models.Allele, AlleleAdmin)
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.ClinVarKey, ClinVarKeyAdmin)
+admin.site.register(models.ClinVarKeyAssertionMethod, ClinVarKeyAssertionMethodAdmin)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
 admin.site.register(models.CohortSample, ModelAdminBasics)
