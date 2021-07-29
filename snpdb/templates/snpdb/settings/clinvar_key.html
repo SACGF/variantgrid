@@ -1,14 +1,8 @@
 {% load js_tags %}
 {% load ui_utils %}
+<h4>CLinVar Key</h4>
 {% labelled label="ClinVar Key Name" %}{{ clinvar_key.id }}{% endlabelled %}
 {% labelled label="ClinVar API Key" %}****{% endlabelled %}
 {% labelled label="On Behalf of Org ID" %}{{ clinvar_key.behalf_org_id }}{% endlabelled %}
-
-<h4>Assertion Methods</h4>
-{% for method_key in clinvar_key.clinvarkeyassertionmethod_set.all %}
-    {% labelled label_css='code' label=method_key.assertion_method %}
-        <div class="code">{{  method_key.clinvar_json | jsonify_pretty }}</div>
-    {% endlabelled %}
-    {% empty %}
-    No Assertion Methods have been assigned to this ClinVar Key, will only work with defaults
-{% endfor %}
+{% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
+{% labelled label="Assert Method Configuration" %}{{ clinvar_key.assertion_method_lookup }}{% endlabelled %}

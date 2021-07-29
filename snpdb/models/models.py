@@ -14,7 +14,7 @@ from django.contrib.auth.models import User, Group
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import QuerySet, TextChoices
 from django.db.models.aggregates import Count
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
@@ -214,6 +214,15 @@ class LabUser:
         return self.user == other.user
 
 
+class ClinVarAssertionMethods(TextChoices):
+    # "yes", "no", "unknown", "not provided", "not applicable"
+    yes = "yes"
+    no = "no"
+    unknown = "unknown"
+    not_provided = "not provided"
+    not_applicable = "not applicable"
+
+
 class ClinVarKey(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar key"
@@ -222,6 +231,8 @@ class ClinVarKey(TimeStampedModel):
     api_key = models.TextField(null=True, blank=True)
     behalf_org_id = models.TextField(null=False, blank=True, default='')  # maybe this should be the id?
     # TODO key, other details
+    default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
+    assertion_method_lookup = models.JSONField(null=False, default=dict)
 
     def __str__(self):
         return f"ClinVarKey ({self.id})"
@@ -245,16 +256,6 @@ class ClinVarKey(TimeStampedModel):
                 allowed_clinvar_keys = ClinVarKey.clinvar_keys_for_user(user)
                 if not allowed_clinvar_keys.filter(pk=self).exists():
                     raise PermissionDenied("User does not belong to a lab that uses the submission key")
-
-
-class ClinVarKeyAssertionMethod(TimeStampedModel):
-    class Meta:
-        verbose_name = "ClinVar key assertion method"
-        unique_together = ['clinvar_key', 'assertion_method']
-
-    clinvar_key = models.ForeignKey(ClinVarKey, on_delete=CASCADE)
-    assertion_method = models.TextField(blank=True, default='')
-    clinvar_json = models.JSONField()
 
 
 class Lab(models.Model):
