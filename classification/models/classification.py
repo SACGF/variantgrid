@@ -418,6 +418,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return 'not-matched'
 
     @property
+    def condition_text_record(self) -> 'ConditionText':
+        from classification.models import ConditionTextMatch
+        if ctm := self.conditiontextmatch:
+            return ctm.condition_text
+        return None
+
+    @property
     def condition_resolution_dict(self) -> Optional[ConditionResolvedDict]:
         return self.condition_resolution
 

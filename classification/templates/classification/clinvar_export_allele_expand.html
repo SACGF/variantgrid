@@ -7,5 +7,12 @@
 {% labelled label=submission.friendly_submission_status_str %}<a href="{% url 'clinvar_export' submission.id %}">ClinVar Submission</a> : {% condition submission.condition_resolved %}{% endlabelled %}
 {% endfor %}
 {% for missing_condition in missing_conditions %}
-{% labelled label="Missing Standard Condition" %}{% classification_quick missing_condition %} : {{ missing_condition.condition_text }} (TODO link to condition text matching){% endlabelled %}
+    {% labelled label="Missing Standard Condition" %}
+        {% with condition_text_record=missing_condition.classification.condition_text_record %}
+            {% if condition_text_record %}
+            <a href="{% url 'condition_matching' condition_text_record.id %}">Condition Text : {{ missing_condition.condition_text }}</a>
+            {% endif %}
+        {% endwith %}
+        {% classification_quick missing_condition%}
+    {% endlabelled %}
 {% endfor %}
