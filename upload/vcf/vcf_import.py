@@ -191,6 +191,7 @@ def configure_vcf_from_header(vcf, vcf_reader):
         vcf.allele_frequency_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_ALLELE_FREQUENCY_FIELD)
         vcf.sample_filters_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_SAMPLE_FILTERS_FIELD)
 
+    vcf.allele_frequency_percent = False  # Explicitly set for when reloading old VCFs
     vcf.save()
 
     no_dna_control_sample_pattern = None

@@ -37,7 +37,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v11. ?
     # v12. Ensure missing data in FreeBayes is -1 not -2147483648 (CyVCF2 returns this from format)
     # v13. Support CLCAD2 from CLC workbench
-    # v14. Use AF from VCF if provided. Support for sample level filters (FT)
+    # v14. AF in unit not percent. Use AF from VCF if provided. Support for sample level filters (FT)
     # v15. Any genotype as '.' -> unknown zygosity
     # v16. Don't insert a reference variant for each unknown ALT (only if provided) - version never deployed
     # v17. Use refactored RedisVariantPKLookup
