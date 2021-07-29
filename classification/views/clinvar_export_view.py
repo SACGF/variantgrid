@@ -41,10 +41,10 @@ class ClinVarExportAlleleColumns(DatatableConfig):
 
         self.expand_client_renderer = "TableFormat.expandAjax.bind(null, 'clinvar_export_alleles_datatable_expand', 'id')";
         self.rich_columns = [
-            RichColumn("clinvar_key", name="ClinVar Key", orderable=True),
-            RichColumn("id", visible=False),
+            RichColumn("id", label="ID", orderable=True),
+            RichColumn("clinvar_key", label="ClinVar Key", orderable=True),
             RichColumn("allele", renderer=self.render_allele, orderable=True),
-            RichColumn("last_evaluated", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn("last_evaluated", client_renderer='TableFormat.timeAgo', orderable=True),
             RichColumn("submissions_valid", client_renderer='TableFormat.severeNumber.bind(null, "success")', label="Submissions Valid", orderable=True),
             RichColumn("submissions_invalid", client_renderer='TableFormat.severeNumber.bind(null, "danger")', label="Submission w Errors", orderable=True),
             RichColumn("classifications_missing_condition", client_renderer='TableFormat.severeNumber.bind(null, "danger")', label="Classifications w/out Standard Condition", orderable=True),
@@ -132,7 +132,11 @@ def clinvar_export_allele_datatable_expand_view(request, pk: int):
     labs = clinvar_allele.clinvar_key.lab_set.all()
     missing_conditions = ClassificationModification.latest_for_user(user=request.user, allele=clinvar_allele.allele, published=True, shared_only=True).filter(classification__condition_resolution__isnull=True)
 
-    return render(request, 'classification/clinvar_export_allele_expand.html', {"submissions": submissions, "missing_conditions": missing_conditions})
+    return render(request, 'classification/clinvar_export_allele_expand.html', {
+        "allele": clinvar_allele.allele,
+        "submissions": submissions,
+        "missing_conditions": missing_conditions
+    })
 
 
 def clinvar_exports_view(request):

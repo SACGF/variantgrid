@@ -580,6 +580,16 @@ TableFormat.timestamp = (data, type, row) => {
         return '';
     }
 };
+TableFormat.timeAgo = (data, type, row) => {
+    if (data) {
+        return $('<data>', {class:'convert-timestamp time-ago', 'data-timestamp':data, text:data}).prop('outerHTML');
+
+        let timestampStr = convertTimestamp(data);
+        return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
+    } else {
+        return '';
+    }
+}
 TableFormat.choices = (choices, data, type, row) => {
     return $('<span>', {class:`val-${data}`, text:choices[data] || data}).prop('outerHTML');
 };

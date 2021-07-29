@@ -1,9 +1,11 @@
 {% load ui_utils %}
 {% load js_tags %}
 {% load classification_tags %}
+<div class="text-info mt-2 mb-4">Row numbers were up to date per Last Evaluated, showing up to date rows below</div>
+{% labelled label="Allele "%}<a href="{% url 'view_allele' allele.id %}">{{ allele }}</a>{% endlabelled %}
 {% for submission in submissions %}
-{% labelled label=submission.get_status_display %}<a href="{% url 'clinvar_export' submission.id %}">ClinVar Submission</a> {% condition submission.condition_resolved %}{% endlabelled %}
+{% labelled label=submission.friendly_submission_status_str %}<a href="{% url 'clinvar_export' submission.id %}">ClinVar Submission</a> : {% condition submission.condition_resolved %}{% endlabelled %}
 {% endfor %}
 {% for missing_condition in missing_conditions %}
-{% labelled label="Missing Standard Condition" %}{% classification_quick missing_condition %} {{ missing_condition.condition_text }}{% endlabelled %}
+{% labelled label="Missing Standard Condition" %}{% classification_quick missing_condition %} : {{ missing_condition.condition_text }} (TODO link to condition text matching){% endlabelled %}
 {% endfor %}

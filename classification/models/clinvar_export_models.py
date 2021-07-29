@@ -49,6 +49,16 @@ class ClinVarExport(TimeStampedModel):
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'pk': self.pk})
 
+    def friendly_submission_status_str(self):
+        if self.status == ClinVarExportStatus.NEW_SUBMISSION:
+            return "New Submission"
+        elif self.status == ClinVarExportStatus.CHANGES_PENDING:
+            return "Valid (with changes pending)"
+        elif self.status == ClinVarExportStatus.UP_TO_DATE:
+            return "Valid (and up to date)"
+        else:
+            return "Submission has Errors"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
