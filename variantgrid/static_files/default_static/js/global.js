@@ -685,28 +685,32 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
     }
 };
 TableFormat.expandAjax = function ajaxBlock(url, param, data) {
-    let data_id = data[param];
-    let ajax_id = `ajax_${data_id}`
-    let reverseUrl = Urls[url];
-    if (param) {
-        reverseUrl = reverseUrl(data_id)
+    if (data) {
+        let data_id = data[param];
+        let ajax_id = `ajax_${data_id}`
+        let reverseUrl = Urls[url];
+        if (param) {
+            reverseUrl = reverseUrl(data_id)
+        }
+        window.setTimeout(() => {
+            let ajaxDom = $(`#${ajax_id}`);
+            $.ajax({
+                type: "GET",
+                url: reverseUrl,
+                success: (results) => {
+                    ajaxDom.LoadingOverlay('hide');
+                    ajaxDom.html(results);
+                },
+                error: (call, status, text) => {
+                    ajaxDom.LoadingOverlay('hide');
+                    ajaxDom.html("Error Loading Data");
+                }
+            });
+        }, 0);
+        return `<div id="${ajax_id}">Loading</div>`;
+    } else {
+        return '';
     }
-    window.setTimeout(() => {
-        let ajaxDom = $(`#${ajax_id}`);
-        $.ajax({
-            type: "GET",
-            url: reverseUrl,
-            success: (results) => {
-                ajaxDom.LoadingOverlay('hide');
-                ajaxDom.html(results);
-            },
-            error: (call, status, text) => {
-                ajaxDom.LoadingOverlay('hide');
-                ajaxDom.html("Error Loading Data");
-            }
-        });
-    },0);
-    return `<div id="${ajax_id}">Loading</div>`;
 };
 
 // Dialogs
