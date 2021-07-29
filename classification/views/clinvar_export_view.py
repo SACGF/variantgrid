@@ -5,7 +5,8 @@ from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from htmlmin.decorators import not_minified_response
 
-from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportStatus
+from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportStatus, ClinVarAllele, \
+    ClassificationModification
 from library.cache import timed_cache
 from library.django_utils import add_save_message
 from snpdb.models import Allele, ClinVarKey
@@ -18,34 +19,39 @@ def allele_for(allele_id: int):
     return Allele.objects.select_related('clingen_allele').get(pk=allele_id)
 
 
-class ClinVarAlleleColumns(DatatableConfig):
+class ClinVarExportAlleleColumns(DatatableConfig):
 
     """
         allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
 
-    classifications_missing_condition = models.IntegerField(default=0)
+    classificatiocns_missing_condition = models.IntegerField(default=0)
     submissions_valid = models.IntegerField(default=0)
     submissions_invalid = models.IntegerField(default=0)
     last_evaluated = models.DateTimeField(default=now)
     """
 
     def render_allele(self, row: Dict[str, Any]):
-        allele_id = row.get('allele_id')
+        allele_id = row.get('allele')
         allele = allele_for(allele_id)
         return str(allele)
 
     def __init__(self, request):
         super().__init__(request)
 
+        self.expand_client_renderer = "TableFormat.expandAjax.bind(null, 'clinvar_export_alleles_datatable_expand', 'id')";
         self.rich_columns = [
-            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True),
-            RichColumn("allele", orderable=True),
-            RichColumn("last_evaluated", orderable=True),
-            RichColumn("submissions_valid", orderable=True),
-            RichColumn("classifications_missing_condition", orderable=True),
-            RichColumn("submissions_invalid", orderable=True)
+            RichColumn("clinvar_key", name="ClinVar Key", orderable=True),
+            RichColumn("id", visible=False),
+            RichColumn("allele", renderer=self.render_allele, orderable=True),
+            RichColumn("last_evaluated", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn("submissions_valid", client_renderer='TableFormat.severeNumber.bind(null, "success")', label="Submissions Valid", orderable=True),
+            RichColumn("submissions_invalid", client_renderer='TableFormat.severeNumber.bind(null, "danger")', label="Submission w Errors", orderable=True),
+            RichColumn("classifications_missing_condition", client_renderer='TableFormat.severeNumber.bind(null, "danger")', label="Classifications w/out Standard Condition", orderable=True),
         ]
+
+    def get_initial_queryset(self):
+        return ClinVarAllele.objects.filter(clinvar_key__in=ClinVarKey.clinvar_keys_for_user(self.user))
 
 
 class ClinVarExportRecordColumns(DatatableConfig):
@@ -110,6 +116,23 @@ class ClinVarExportRecordColumns(DatatableConfig):
     def get_initial_queryset(self):
         return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=ClinVarKey.clinvar_keys_for_user(self.user))
         # return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
+
+
+def clinvar_export_alleles_view(request):
+    return render(request, 'classification/clinvar_export_alleles.html', context={
+        'datatable_config': ClinVarExportAlleleColumns(request)
+    })
+
+
+def clinvar_export_allele_datatable_expand_view(request, pk: int):
+    clinvar_allele: ClinVarAllele = ClinVarAllele.objects.get(pk=pk)
+    clinvar_allele.clinvar_key.check_user_can_access(request.user)
+
+    submissions = ClinVarExport.objects.filter(clinvar_allele=clinvar_allele).order_by('status')
+    labs = clinvar_allele.clinvar_key.lab_set.all()
+    missing_conditions = ClassificationModification.latest_for_user(user=request.user, allele=clinvar_allele.allele, published=True, shared_only=True).filter(classification__condition_resolution__isnull=True)
+
+    return render(request, 'classification/clinvar_export_allele_expand.html', {"submissions": submissions, "missing_conditions": missing_conditions})
 
 
 def clinvar_exports_view(request):

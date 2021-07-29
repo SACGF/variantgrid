@@ -99,6 +99,12 @@ class ClassificationDatatableConfig(DatatableConfig):
                 orderable=True,
                 renderer=self.classification_id,
                 client_renderer='VCTable.identifier',
+                extra_columns=[
+                    'classification__id',
+                    'classification__lab__name',
+                    'classification__lab_record_id',
+                    'classification__share_level'
+                ]
             ),
             RichColumn(
                 key='published_evidence__gene_symbol__value',
@@ -114,7 +120,15 @@ class ClassificationDatatableConfig(DatatableConfig):
                 label=f'HGVS ({user_settings.default_genome_build.name})',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.c_hgvs',
-                orderable=True
+                orderable=True,
+                extra_columns=[
+                    "classification__chgvs_grch37",
+                    "classification__chgvs_grch38",
+                    'published_evidence__c_hgvs__value',
+                    'published_evidence__p_hgvs__value',
+                    'published_evidence__genome_build__value',
+                    'classification__variant_id',
+                ]
             ),
             RichColumn(
                 key='published_evidence__clinical_significance__value',
@@ -163,18 +177,6 @@ class ClassificationDatatableConfig(DatatableConfig):
                 label='Flags',
                 client_renderer='TableFormat.flags'
             )
-        ]
-        self.extra_columns = [
-            "classification__chgvs_grch37",
-            "classification__chgvs_grch38",
-            'published_evidence__c_hgvs__value',
-            'published_evidence__p_hgvs__value',
-            'published_evidence__genome_build__value',
-            'classification__variant_id',
-            'classification__id',
-            'classification__lab__name',
-            'classification__lab_record_id',
-            'classification__share_level'
         ]
 
     def get_initial_queryset(self):

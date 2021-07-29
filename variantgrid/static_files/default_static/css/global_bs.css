@@ -99,6 +99,10 @@ table.dataTable td.dataTables_empty {
   padding-bottom: 12px;
 }
 
+table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
+  cursor: pointer;
+}
+
 .variant-coordinate {
   word-break: break-all;
 }
@@ -277,9 +281,10 @@ a {
   content: "";
   opacity: 0.6;
   margin-right: 4px;
+  width: 12px;
 }
 
-.toggle-link[aria-expanded=true]:before, tr.parent .toggle-link:before {
+.toggle-link[aria-expanded=true]:before, tr.parent .toggle-link:before, .toggle-link[aria-expanded=true]:before, tr.shown .toggle-link:before {
   content: "";
 }
 

@@ -107,6 +107,9 @@ urlpatterns = [
     perm_path('autocomplete/Username/', views_autocomplete.UsernameAutocompleteView.as_view(), name='username_autocomplete'),
     perm_path('autocomplete/Lab/', views_autocomplete.LabAutocompleteView.as_view(), name='lab_autocomplete'),
     perm_path('autocomplete/VCF/', views_autocomplete.VCFAutocompleteView.as_view(), name='vcf_autocomplete'),
+
+    # Debug dev help
+    perm_path('ajax_hello_world/<str:data>', views.ajax_hello_world, name='ajax_hello_world'),
 ]
 
 rest_urlpatterns = [

@@ -46,6 +46,9 @@ urlpatterns = [
     perm_path('classification_grid/export/', views.export_classifications_grid, name='export_classifications_grid'),
     perm_path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
 
+    perm_path('clinvar_export_allele', clinvar_export_view.clinvar_export_alleles_view, name='clinvar_export_alleles'),
+    perm_path('clinvar_export_allele/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportAlleleColumns), name='clinvar_export_alleles_datatables'),
+    perm_path('clinvar_export_allele/datatable/detail/<int:pk>', clinvar_export_view.clinvar_export_allele_datatable_expand_view, name='clinvar_export_alleles_datatable_expand'),
     perm_path('clinvar_export', clinvar_export_view.clinvar_exports_view, name='clinvar_exports'),
     perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportRecordColumns), name='clinvar_exports_datatables'),
     perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review_view, name='clinvar_export'),

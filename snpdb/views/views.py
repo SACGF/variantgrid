@@ -1206,6 +1206,10 @@ def help_static_page(request, page_name):
     return render(request, 'snpdb/help/help_static_page.html', context)
 
 
+def ajax_hello_world(request, data:str):
+    return render(request, 'snpdb/ajax_hello_world.html', {'data': data})
+
+
 def staff_only(request):
     return render(request, 'snpdb/staff_only.html')
 

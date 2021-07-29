@@ -19,69 +19,7 @@
             let elem = $('<a/>', {href: `/classification/clinvar_export/${id}`, html: content, class:'id-link'});
             return elem.prop('outerHTML');
         };
-
-        function ontologyList(data, type, row) {
-            let ontos = data.aliases;
-            if (ontos) {
-                let dom = $('<div>');
-
-                if (ontos.length >= 2) {
-                    console.log(data);
-                    let join_mode = data.condition_multi_operation;
-                    switch (data.condition_multi_operation) {
-                        case 'U':
-                            join_mode = "Uncertain: ";
-                            break;
-                        case 'C':
-                            join_mode = "Co-occurring: ";
-                            break;
-                        case 'N':
-                            join_mode = "Multi-Term Operation Required: ";
-                            break;
-                    }
-                    $('<span>', {text: join_mode}).appendTo(dom);
-                }
-
-                for (let onto of ontos) {
-                    let ontology_id = onto.id;
-                    let ontology_name = onto.name || "?";
-                    let href = onto.url;
-                    if (href) {
-                        $('<a>', {
-                            class: 'hover-link external-link',
-                            target: '_blank',
-                            text: ontology_id,
-                            href: href,
-                            title: ontology_name,
-                            'data-toggle': 'tooltip'
-                        }).appendTo(dom);
-                    } else {
-                        $('<span>', {
-                            class: 'hover-detail',
-                            target: '_blank',
-                            text: ontology_id,
-                            title: ontology_name,
-                            'data-toggle': 'tooltip'
-                        }).appendTo(dom);
-                    }
-                }
-                return dom.prop('outerHTML');
-            } else {
-                return '';
-            }
-        }
     </script>
-    <style>
-        a.id-link {
-            display: inline-block;
-        }
-        .dt-Requires-Input {
-            text-align: center;
-        }
-        .dt-Auto-submit-Enabled {
-            text-align: center;
-        }
-    </style>
 {% endblock head %}
 {% block content %}
     <div class="container">

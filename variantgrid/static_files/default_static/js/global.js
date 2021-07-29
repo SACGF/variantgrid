@@ -44,6 +44,8 @@ function setupTooltips() {
             $(node).click(function(e) {
                 $(this).tooltip('hide');
             });
+        } else if (node.hasClass('convert-timestamp')) {
+            convertTimestampDom($(node));
         }
         for (let child of node.children()) {
             checkNode($(child));
@@ -75,7 +77,6 @@ function setupAjaxBlocks() {
                 child.find('.convert-timestamp').each((index, elem) => {
                     convertTimestampDom(elem);
                 });
-                convertTimestamps();
             },
             error: (call, status, text) => {
                 $(child).LoadingOverlay('hide');
@@ -109,9 +110,6 @@ function setupAjaxTabs(element) {
 
                     // console.log(data);
                     // tabContent.html($("<div>", {class: "alert alert-danger", text: `Error loading tab ${status}`}));
-                } else {
-                    // is this best done with event listeners, rather than specifically on ajax?
-                    convertTimestamps();
                 }
             });
         }
@@ -576,7 +574,7 @@ let TableFormat = (function() {
 })();
 TableFormat.timestamp = (data, type, row) => {
     if (data) {
-        timestampStr = convertTimestamp(data);
+        let timestampStr = convertTimestamp(data);
         return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
     } else {
         return '';
@@ -668,7 +666,38 @@ TableFormat.boolean = function(style, data, type, columns) {
         return data ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="far fa-circle"></i>';
     }
     return null;
-}
+};
+TableFormat.severeNumber = function(severity, data, type, columns) {
+    if (data === 0) {
+        return '<span class="no-value mono font-weight-bold">0</span>';
+    } else {
+        return `<span class="mono font-weight-bold text-${severity}">${data}</span>`;
+    }
+};
+TableFormat.expandAjax = function ajaxBlock(url, param, data) {
+    let data_id = data[param];
+    let ajax_id = `ajax_${data_id}`
+    let reverseUrl = Urls[url];
+    if (param) {
+        reverseUrl = reverseUrl(data_id)
+    }
+    window.setTimeout(() => {
+        let ajaxDom = $(`#${ajax_id}`);
+        $.ajax({
+            type: "GET",
+            url: reverseUrl,
+            success: (results) => {
+                ajaxDom.LoadingOverlay('hide');
+                ajaxDom.html(results);
+            },
+            error: (call, status, text) => {
+                ajaxDom.LoadingOverlay('hide');
+                ajaxDom.html("Error Loading Data");
+            }
+        });
+    },0);
+    return `<div id="${ajax_id}">Loading</div>`;
+};
 
 // Dialogs
 function createModalShell(id, title) {
@@ -806,7 +835,9 @@ function severityIcon(severity) {
     let first = severity.toUpperCase()[0];
     switch (first) {
         case 'C': return $('<i class="fas fa-bomb text-danger"></i>'); // critical
-        case 'E': return $('<i class="fas fa-exclamation-circle text-danger"></i>'); // error
+        case 'E':  // error
+        case 'D':  // danger (BootStrap)
+            return $('<i class="fas fa-exclamation-circle text-danger"></i>'); // error
         case 'W': return $('<i class="fas fa-exclamation-triangle text-warning"></i>'); // warning
         case 'I': return $('<i class="fas fa-info-circle text-info"></i>'); // info
         case 'S': return $('<i class="fas fa-check-circle text-success"></i>'); // success

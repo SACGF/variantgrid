@@ -1,11 +1,12 @@
 {% load js_tags %}
+
 $(document).ready(function() {
     let tableId = '{{table_id}}';
     let tableDom = $(`#${tableId}`);
     let lengthKey = `datatable_length_${tableId}`;
     lengthValue = parseInt(localStorage.getItem(lengthKey)) || 10;
 
-    tableDom.DataTable({
+    let datatable = tableDom.DataTable({
         {% if responsive %}
         responsive: {
             details: {
@@ -33,16 +34,38 @@ $(document).ready(function() {
             {% if data %}data: {{ data | safe }},{% endif %}
         },
         bFilter: false,
-        columnDefs: [
-            {% for rc in rich_columns %}{
+        columnDefs: [{% for rc in rich_columns %}
+            {
             {% if rc.client_renderer %}render: {{rc.client_renderer | safe }}, {% endif %}
             data: '{{ rc.name }}',
             orderable: {% if rc.orderable %}true{%else%}false{%endif%},
-            className: '{{ rc.css_classes }}',
+            className: '{{ rc.css_classes }}{% if forloop.first and expand_client_renderer %} toggle-link{% endif %}',
+            visible: {{ rc.visible | jsonify }},
             targets: {{ forloop.counter0 }}
-    },{% endfor %}
-        ]
+            },
+        {% endfor %}]
     });
+    {% if expand_client_renderer %}
+    tableDom.on('click', 'tr', function() {
+        let tr = $(this); //.closest('tr');
+        let row = datatable.row( tr );
+        if ( row.child.isShown() ) {
+            // This row is already open - close it
+            row.child.hide();
+            tr.removeClass('shown');
+        } else {
+            // Open this row
+            let childHtml = {{ expand_client_renderer | safe }}(row.data());
+            if (!tr.hasClass('loaded')) {
+                row.child( childHtml ).show();
+            } else {
+                row.child.show();
+            }
+            tr.addClass('shown');
+            tr.addClass('loaded');
+        }
+    });
+    {% endif %}
     tableDom.on( 'error.dt', function ( e, settings, techNote, message ) {
         Rollbar.warning("DataTables error " + message);
         console.log( 'An error has been reported by DataTables: ', message );

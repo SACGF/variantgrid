@@ -3,12 +3,13 @@ import enum
 import itertools
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable
 
 from django.db.models import QuerySet
 from kombu.utils import json
 from lazy import lazy
 
+from classification.json_utils import JsonDataType
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
 from snpdb.views.datatable_mixins import JSONResponseView
@@ -41,9 +42,10 @@ class RichColumn:
                  label: str = None,
                  orderable: bool = False,
                  enabled: bool = True,
-                 renderer=None,
+                 renderer: Optional[Callable[[Dict[str, Any]], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
                  client_renderer: Optional[str] = None,
+                 visible: bool = True,
                  detail: bool = False,
                  css_class: str = None,
                  extra_columns: Optional[List[str]] = None):
@@ -57,6 +59,7 @@ class RichColumn:
         :param renderer: Optional server renderer for the value
         :param default_sort: If this column should be the default sort order, provide ascending or descending here
         :param client_renderer: JavaScript function to render the client
+        :param visible: If false column would be hidden (useful for sending data we don't want to display)
         :param detail: If True, the column will be shown in the expand section of the table only (requires responsive)
         :param css_class: css class to apply to the column
         :param extra_columns: other columns that need to be selected out for the server renderer
@@ -81,6 +84,7 @@ class RichColumn:
         self.default_sort = default_sort
         self.enabled = enabled
         self.detail = detail
+        self.visible = visible
         self.css_class = css_class
         self.extra_columns = extra_columns
 
@@ -92,7 +96,7 @@ class RichColumn:
             'dt-' + self.name.replace(' ', '-')
         ] if css is not None]).strip()
 
-    def sort_key(self, key: str, desc: bool) -> List[str]:
+    def sort_key(self, key: str, desc: bool) -> str:
         if key.startswith('-'):
             if desc:
                 key = key[1:]
@@ -118,6 +122,7 @@ class RichColumn:
             return self.name == other.name
         return False
 
+
 class DatatableConfig:
     """
     This class both determines how the client side table should be defined (via tags)
@@ -128,13 +133,11 @@ class DatatableConfig:
     """
 
     rich_columns: List[RichColumn]  # columns for display
-
-    # DEPRECATED use extra_columns in the individual columns instead
-    extra_columns: List[str] = []  # bonus columns to retrieve from the database
+    expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
 
     def value_columns(self) -> List[str]:
         column_names = list(itertools.chain(*[rc.value_columns for rc in self.rich_columns if rc.enabled]))
-        all_columns = list(set(column_names + self.extra_columns))
+        all_columns = list(set(column_names))
         return all_columns
 
     def __init__(self, request):
@@ -143,7 +146,7 @@ class DatatableConfig:
 
     @lazy
     def default_sort_order_column(self) -> RichColumn:
-        rcs = [rc for rc in self.enabled_columns if rc.default_sort]
+        rcs = [rc for rc in self.enabled_columns if rc.default_sort and rc.visible]
         return rcs[0] if rcs else self.enabled_columns[0]
 
     def column_index(self, rc: RichColumn) -> int:
@@ -193,7 +196,7 @@ class DatatableConfig:
     def ordering(self, qs: QuerySet) -> QuerySet:
         """ Get parameters from the request and prepare order by clause
         """
-        #'order[0][column]': ['0'], 'order[0][dir]': ['asc']
+        #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
 
         sort_by_list = list()
         sorted_set = set()
@@ -225,6 +228,7 @@ class DatatableConfig:
         """
         pass
 
+
 class DatatableMixin(object):
     """ JSON data for datatables """
     config: DatatableConfig
@@ -247,7 +251,7 @@ class DatatableMixin(object):
     def initialize(self, *args, **kwargs):
         pass
         # can we set config here? how do we get request back out?
-        #if not self.config:
+        # if not self.config:
         #    raise ValueError('DatatableMixin must set self.config in initialize')
 
     @staticmethod
