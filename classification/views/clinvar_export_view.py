@@ -131,11 +131,13 @@ def clinvar_export_allele_datatable_expand_view(request, pk: int):
     submissions = ClinVarExport.objects.filter(clinvar_allele=clinvar_allele).order_by('status')
     labs = clinvar_allele.clinvar_key.lab_set.all()
     missing_conditions = ClassificationModification.latest_for_user(user=request.user, allele=clinvar_allele.allele, published=True, shared_only=True).filter(classification__condition_resolution__isnull=True, classification__lab__in=labs)
+    reduced_missing_conditions = clinvar_allele.classifications_missing_condition - len(missing_conditions)
 
     return render(request, 'classification/clinvar_export_allele_expand.html', {
         "allele": clinvar_allele.allele,
         "submissions": submissions,
-        "missing_conditions": missing_conditions
+        "missing_conditions": missing_conditions,
+        "reduced_missing_conditions": reduced_missing_conditions
     })
 
 

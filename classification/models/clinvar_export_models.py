@@ -45,6 +45,9 @@ class ClinVarExport(TimeStampedModel):
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(null=True, blank=True)  # if not set yet
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
+    # cache the submission body
+    last_evaluated = models.DateTimeField(default=now)
+    submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'pk': self.pk})
@@ -79,9 +82,7 @@ class ClinVarExport(TimeStampedModel):
         if self.classification_based_on != new_classification_based_on:
             lazy.invalidate(self, 'submission_body_current')
             self.classification_based_on = new_classification_based_on
-            self.status = self.calculate_status()
-            # FIXME, check to see if we changed since last submission
-            self.save()
+            self.update()
 
     @staticmethod
     def new_condition(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]) -> 'ClinVarExport':
@@ -90,19 +91,16 @@ class ClinVarExport(TimeStampedModel):
         return cc
 
     @lazy
-    def submission_body_current(self) -> ValidatedJson:
-        """
-        Returns the body of the submission, which wont change by going from novel -> update
-        """
-        from classification.models.clinvar_export_convertor import ClinVarExportConverter
-        return ClinVarExportConverter(clinvar_export_record=self).as_json
+    def submission_body(self) -> ValidatedJson:
+        return ValidatedJson.deserialize(self.submission_body_validated)
 
     @property
-    def submission_full_current(self) -> ValidatedJson:
+    def submission_full(self) -> ValidatedJson:
         """
         Returns the data that should be directly copied into a ClinVarBatch
         """
-        content = copy.deepcopy(self.submission_body_current)
+        content = copy.deepcopy(self.submission_body)
+        # ValidatedJson is meant to be immutable, but will make an exception here
         if scv := self.scv:
             content["recordStatus"] = "update"
             content["clinvarAccession"] = scv
@@ -112,23 +110,35 @@ class ClinVarExport(TimeStampedModel):
 
     def submission_body_previous(self) -> Optional[JsonObjType]:
         # ignore rejected submissions
-        if last_submission := self.clinvarexportsubmission_set.exclude(status=ClinVarExportSubmissionbatchStatus.REJECTED).order_by('-created').first():
+        for last_submission in self.clinvarexportsubmission_set.order_by('-created'):
+            if last_submission.submission_batch.status == ClinVarExportSubmissionbatchStatus.REJECTED:
+                continue
             return last_submission.submission_body
         return None
 
-    def calculate_status(self) -> ClinVarExportStatus:
-        current_body = self.submission_body_current
-        if current_body.has_errors:
-            return ClinVarExportStatus.IN_ERROR
+    def update(self):
+        """
+        Uses the linked data to newly generate JSON
+        Will not update the classification used, update_classification should generally be called externally
+        """
+        from classification.models.clinvar_export_convertor import ClinVarExportConverter
+        current_validated_json_body: ValidatedJson = ClinVarExportConverter(clinvar_export_record=self).as_json
+        self.submission_body_validated = current_validated_json_body.serialize()
+        lazy.invalidate(self, 'submission_body')
+
+        status: ClinVarExportStatus
+        if current_validated_json_body.has_errors:
+            status = ClinVarExportStatus.IN_ERROR
         else:
             if previous_submission := self.submission_body_previous():
-                if previous_submission != self.submission_body_current.pure_json():
-                    return ClinVarExportStatus.CHANGES_PENDING
+                if previous_submission != current_validated_json_body.pure_json():
+                    status = ClinVarExportStatus.CHANGES_PENDING
                 else:
-                    return ClinVarExportStatus.UP_TO_DATE
+                    status = ClinVarExportStatus.UP_TO_DATE
             else:
-                # no previous submission
-                return ClinVarExportStatus.NEW_SUBMISSION
+                status = ClinVarExportStatus.NEW_SUBMISSION
+        self.status = status
+        self.save()
 
 
 class ClinVarExportSubmissionbatchStatus(models.TextChoices):
@@ -173,11 +183,11 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')
         record: ClinVarExport
         for record in qs:
-            full_current = record.submission_full_current
+            full_current = record.submission_full
             if not full_current.has_errors:  # should never have errors as we're filtering on new submission changes pending
 
                 if current_batch_size == 0 or current_batch_size == 10000 or current_batch.clinvar_key != record.clinvar_allele.clinvar_key:
-                    #if current_batch is not None:
+                    # if current_batch is not None:
                     #    current_batch.refresh_from_db()
 
                     current_batch = ClinVarExportSubmissionBatch(clinvar_key=record.clinvar_allele.clinvar_key,
@@ -191,7 +201,7 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
                     classification_based_on=record.classification_based_on,
                     submission_batch=current_batch,
                     submission_full=full_current.pure_json(),
-                    submission_body=record.submission_body_current.pure_json(),
+                    submission_body=record.submission_body.pure_json(),
                     submission_version=1
                 ).save()
                 record.status = ClinVarExportStatus.UP_TO_DATE

@@ -12,7 +12,6 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
     <div class="container">
-        <a href="{% url 'clinvar_exports' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all ClinVar Exports</a>
         <h3>ClinVar Export</h3>
         {% page_help_embedded title='ClinVar Export' %}
             <p>
@@ -27,28 +26,35 @@
                 <div class="card-body">
                     {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
                     {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
+                    {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
                     {% labelled label="Current Candidate Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
+                    {% if clinvar_export.classification_based_on %}
+                        {% labelled label="Classification Version as of" %}{% timestamp clinvar_export.classification_based_on.created time_ago=True %}{% endlabelled %}
+                    {% endif %}
                     {% labelled label="SCV" %}
-                        <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
+                        <div class="input-group">
+                            <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
+                            <div class="input-group-append">
+                                <input type="submit" class="btn btn-primary" value="Save" />
+                            </div>
+                        </div>
                     {% endlabelled %}
-                </div>
-                <div class="card-footer">
-                    <input type="submit" class="btn btn-primary" value="Save" />
+                    {% labelled label="Status" %}{{ clinvar_export.get_status_display }}{% endlabelled %}
                 </div>
             </div>
         </form>
         {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
             <h4>Export Preview</h4>
             <p class="text-muted">This is how the data will be submitted to ClinVar</p>
-            {% with json_messages=clinvar_export.submission_full_current.all_messages %}
+            {% with json_messages=clinvar_export.submission_full.all_messages %}
                 <ul class="list-group mb-4">
                     {% for message in json_messages %}
                         <li class="list-group-item list-group-item-{{ message.bs }}">{{ message.severity | severity_icon }} {{ message.text }}</li>
                     {% endfor %}
                 </ul>
             {% endwith %}
-            <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission_full_current.to_json | jsonify_pretty }}</div>
+            <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission_full.to_json | jsonify_pretty }}</div>
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab label="Submission History" tab_set="clinvar_tabs" url="clinvar_export_history" param=clinvar_export.pk %}

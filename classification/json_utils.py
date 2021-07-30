@@ -72,6 +72,12 @@ class JsonMessage:
             return "info"
         return "info"
 
+    def to_json(self):
+        return {"severity": self.severity, "text": self.text}
+
+    @staticmethod
+    def deserialize(json_data: JsonDataType):
+        return JsonMessage(severity=json_data.get("severity"), text=json_data.get("text"))
 
 @dataclass(frozen=True)
 class JsonMessages:
@@ -101,6 +107,12 @@ class JsonMessages:
     def __iter__(self) -> Iterator[JsonMessage]:
         return iter(self.messages)
 
+    def to_json(self):
+        return self.messages
+
+    @staticmethod
+    def deserialize(json_data: JsonDataType):
+        return JsonMessages(messages=[JsonMessage.deserialize(row) for row in json_data])
 
 JSON_MESSAGES_EMPTY = JsonMessages()
 
@@ -114,18 +126,58 @@ class ClinVarSubmissionNotes:
         self.errors.append(text)
 
 
+@dataclass(frozen=True)
 class ValidatedJson():
     """
     ValidatedJson can have a base bit of JSON that's either pure JSON, or other ValidatedJson
     Allowing validation messages to be associated with the parts that caused the problems
     """
-
-    def __init__(self, json_data: JsonDataType, messages: JsonMessages = JSON_MESSAGES_EMPTY):
-        self.json_data = json_data
-        self.messages = messages
+    json_data: JsonDataType
+    messages: JsonMessages = JSON_MESSAGES_EMPTY
 
     def to_json(self) -> JsonDataType:
         return self.json_data
+
+    @staticmethod
+    def _serialize(obj) -> JsonDataType:
+        if isinstance(obj, ValidatedJson):
+            return {
+                "*validated_json$": True,
+                "messages": obj.messages,
+                "wrap": ValidatedJson._serialize(obj.json_data)
+            }
+        elif isinstance(obj, list):
+            return [ValidatedJson._serialize(entry) for entry in obj]
+        elif isinstance(obj, dict):
+            return {key: ValidatedJson._serialize(value) for (key, value) in obj.items()}
+        else:
+            # primitive
+            return obj
+
+    def serialize(self) -> JsonDataType:
+        return json.loads(json.dumps(ValidatedJson._serialize(self)))
+
+    @staticmethod
+    def _deserialize(json_thing: JsonDataType) -> Union[JsonDataType, 'ValidatedJson']:
+        if isinstance(json_thing, dict):
+            if "*validated_json$" in json_thing:
+                return ValidatedJson(json_data=ValidatedJson._deserialize(json_thing.get('wrap')),
+                                     messages=JsonMessages.deserialize(json_thing.get('messages')))
+            else:
+                return {key: ValidatedJson._deserialize(value) for (key, value) in json_thing.items()}
+        elif isinstance(json_thing, list):
+            return [ValidatedJson._deserialize(entry) for entry in json_thing]
+        else:
+            # primitive
+            return json_thing
+
+    @staticmethod
+    def deserialize(json_thing: JsonDataType) -> 'ValidatedJson':
+        dser = ValidatedJson._deserialize(json_thing)
+        if isinstance(dser, ValidatedJson):
+            return dser
+        else:
+            return ValidatedJson(json_thing)
 
     def pure_json(self) -> JsonDataType:
         """

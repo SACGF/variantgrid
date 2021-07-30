@@ -13,6 +13,7 @@ from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import GenomeBuild, ClinVarKey
 import re
 
+
 class ClinVarEvidenceKey:
     """
     Handles the basic mapping for evidence keys to ClinVar
@@ -218,11 +219,9 @@ class ClinVarExportConverter:
 
     @property
     def json_assertion_criteria(self) -> Union[dict, ValidatedJson]:
-        data = dict()
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
 
         assertion_method_lookups = self.clinvar_key.assertion_method_lookup
-        matched_data: Optional[Dict] = None
 
         if assertion_criteria == "acmg":
             return {
@@ -234,15 +233,15 @@ class ClinVarExportConverter:
             }
         else:
             for key, criteria in assertion_method_lookups.items():
-                if not assertion_criteria and not criteria:
-                    return ValidatedJson(criteria, JsonMessages.info(f"Using config for blank assertion method \"{key}\""))
+                if not assertion_criteria:
+                    if not criteria:
+                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for blank assertion method \"{key}\""))
                 else:
                     expr = re.compile(key, RegexFlag.IGNORECASE)
                     if expr.match(assertion_criteria):
                         return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\""))
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
-
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:
@@ -297,9 +296,9 @@ class ClinVarExportConverter:
     @property
     def observed_in(self) -> ValidatedJson:
         data = dict()
-        affectedStatusValue = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS)
-        if affectedStatusValue:
-            data["affectedStatus"] = affectedStatusValue.value(single=True)
+        affected_status_value = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS)
+        if affected_status_value:
+            data["affectedStatus"] = affected_status_value.value(single=True)
         elif default_affected_status := self.clinvar_key.default_affected_status:
             data["affectedStatus"] = ValidatedJson(default_affected_status, JsonMessages.info("Using configured default for affected status"))
         else:
