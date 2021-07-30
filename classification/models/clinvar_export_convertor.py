@@ -1,4 +1,5 @@
-from typing import List, Any, Mapping, TypedDict
+from re import RegexFlag
+from typing import List, Any, Mapping, TypedDict, Optional, Dict, Union
 import bs4
 from lazy import lazy
 
@@ -9,8 +10,8 @@ from classification.models import ClassificationModification, EvidenceKeyMap, Ev
     MultiCondition, ClinVarExport
 from classification.models.evidence_mixin import VCDbRefDict
 from ontology.models import OntologyTerm, OntologyService
-from snpdb.models import GenomeBuild
-
+from snpdb.models import GenomeBuild, ClinVarKey
+import re
 
 class ClinVarEvidenceKey:
     """
@@ -86,6 +87,10 @@ class ClinVarExportConverter:
 
     def __init__(self, clinvar_export_record: ClinVarExport):
         self.clinvar_export_record = clinvar_export_record
+
+    @lazy
+    def clinvar_key(self) -> ClinVarKey:
+        return self.clinvar_export_record.clinvar_allele.clinvar_key
 
     @property
     def classification_based_on(self) -> ClassificationModification:
@@ -212,24 +217,32 @@ class ClinVarExportConverter:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property
-    def json_assertion_criteria(self) -> ValidatedJson:
+    def json_assertion_criteria(self) -> Union[dict, ValidatedJson]:
         data = dict()
-        acmg_citation = {
-            "db": "PubMed",
-            "id": "PubMed:25741868"
-        }
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
-        if assertion_criteria == "acmg":
-            data["citation"] = acmg_citation
-            data["method"] = EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value(assertion_criteria)
-        elif assertion_criteria is None:
-            data["citation"] = ValidatedJson(None, JsonMessages.error("No value for required field \"Assertion method\""))
-            data["method"] = None
-        else:
-            data["citation"] = ValidatedJson(acmg_citation, JsonMessages.error(f"ADMIN: AssertionMethod value \"{assertion_criteria}\" can't provide citation for it yet"))
-            data["method"] = None
 
-        return ValidatedJson(data)
+        assertion_method_lookups = self.clinvar_key.assertion_method_lookup
+        matched_data: Optional[Dict] = None
+
+        if assertion_criteria == "acmg":
+            return {
+                "citation": {
+                    "db": "PubMed",
+                    "id": "PubMed:25741868"
+                },
+                "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value(assertion_criteria)
+            }
+        else:
+            for key, criteria in assertion_method_lookups.items():
+                if not assertion_criteria and not criteria:
+                    return ValidatedJson(criteria, JsonMessages.info(f"Using config for blank assertion method \"{key}\""))
+                else:
+                    expr = re.compile(key, RegexFlag.IGNORECASE)
+                    if expr.match(assertion_criteria):
+                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\""))
+            else:
+                return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
+
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:
@@ -284,7 +297,13 @@ class ClinVarExportConverter:
     @property
     def observed_in(self) -> ValidatedJson:
         data = dict()
-        data["affectedStatus"] = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS).value(single=True)
+        affectedStatusValue = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS)
+        if affectedStatusValue:
+            data["affectedStatus"] = affectedStatusValue.value(single=True)
+        elif default_affected_status := self.clinvar_key.default_affected_status:
+            data["affectedStatus"] = ValidatedJson(default_affected_status, JsonMessages.info("Using configured default for affected status"))
+        else:
+            data["affectedStatus"] = ValidatedJson(None, JsonMessages.error("Affected status not provided and no default config provided"))
         if allele_origin := self.clinvar_value(SpecialEKeys.ALLELE_ORIGIN).value(single=True, optional=True):
             data["allele_origin"] = allele_origin
         else:

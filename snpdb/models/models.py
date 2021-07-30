@@ -6,13 +6,14 @@ etc and things that don't fit anywhere else.
 'snpdb' was the highly unoriginal name I used before 'VariantGrid'
 """
 import json
+import re
 from functools import total_ordering
 from datetime import datetime
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.aggregates import Count
@@ -236,6 +237,18 @@ class ClinVarKey(TimeStampedModel):
 
     def __str__(self):
         return f"ClinVarKey ({self.id})"
+
+    def clean(self):
+        #  validate assertion method lookup
+        if not isinstance(self.assertion_method_lookup, dict):
+            raise ValidationError({'assertion_method_lookup': ValidationError("Must be a dictionary of regular expression keys to {citation: db, id or url} and {method: str}")})
+        for key, assertion_dict in self.assertion_method_lookup.items():
+            try:
+                re.compile(key)
+            except:
+                raise ValidationError({'assertion_method_lookup': ValidationError(f'%s is not a valid regular expression', params={'key': key})})
+            if not isinstance(assertion_dict, dict) or 'citation' not in assertion_dict or 'method' not in assertion_dict:
+                raise ValidationError({'assertion_method_lookup': ValidationError('%s must have value for citation (db,id or url) and method', params={'key': key})})
 
     @staticmethod
     def clinvar_keys_for_user(user: User) -> QuerySet:
