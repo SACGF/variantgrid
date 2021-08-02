@@ -27,7 +27,6 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.views.clinvar_export_view import ClinVarExportRecordColumns
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm

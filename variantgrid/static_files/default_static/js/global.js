@@ -686,11 +686,18 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
 };
 TableFormat.expandAjax = function ajaxBlock(url, param, data) {
     if (data) {
-        let data_id = data[param];
-        let ajax_id = `ajax_${data_id}`
+        let dataId = data[param];
+        let ajax_id = `ajax_${dataId}`
         let reverseUrl = Urls[url];
+        if (!reverseUrl) {
+            return `<i class="fas fa-bomb text-danger"></i> URL not configured for "${url} : Developer may need to run<br/>
+            <div class="code">manage.py collectstatic_js_reverse</div>`;
+        }
+        if (!dataId) {
+            return `<i class="fas fa-bomb text-danger"></i> No value for "${param}" in this row : Developer, is ${param} a column in this table, visible or otherwise?`;
+        }
         if (param) {
-            reverseUrl = reverseUrl(data_id)
+            reverseUrl = reverseUrl(dataId)
         }
         window.setTimeout(() => {
             let ajaxDom = $(`#${ajax_id}`);

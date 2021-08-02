@@ -11,13 +11,8 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <script>
-        function submissionsValid(data) {
+        function records(data) {
             data.clinvar_key = {{ clinvar_key.pk | jsonify }};
-            data.status = "N,C,D";
-        }
-        function submissionsError(data) {
-            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
-            data.status = "E";
         }
         function batches(data) {
             data.clinvar_key = {{ clinvar_key.pk | jsonify }};
@@ -30,8 +25,7 @@
             return elem.prop('outerHTML');
         };
         $(document).ready(() => {
-            {% datatable_definition table_config=export_columns data='submissionsValid' table_id='submissions-valid' url='clinvar_exports_datatables' %}
-            {% datatable_definition table_config=export_columns data='submissionsError' table_id='submissions-error' url='clinvar_exports_datatables' %}
+            {% datatable_definition table_config=export_columns data='records' table_id='records' url='clinvar_exports_datatables' %}
             {% datatable_definition table_config=export_batch_columns data='batches' table_id='batches' url='clinvar_export_batch_datatables' %}
         });
     </script>
@@ -70,16 +64,21 @@
 
         <div data-toggle="ajax" href="{% url 'clinvar_key' clinvar_key.pk %}">Loading</div>
         <h4>Records</h4>
-        {% labelled label="Shared classifications w/out standard condition" %}
-            <a href="{% url 'condition_matchings' %}">{{ missing_condition_count }}</a>
-        {% endlabelled %}
+        {% if missing_condition_count %}
+            {% labelled label="Classifications w/out standard condition" %}
+                <a href="{% url 'condition_matchings' %}">
+                    {{ 'warning' | severity_icon }}
+                    {{ missing_condition_count }}</a>
+            {% endlabelled %}
+        {% else %}
+            {% labelled label="Classifications w/out standard condition" %}
+                {{ 'success' | severity_icon }} All shared classifications have a standard condition
+            {% endlabelled %}
+        {% endif %}
         <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
 
-        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Valid" badge=count_valid badge_status='success' %}
-            {% datatable table_config=export_columns table_id='submissions-valid' class_name='sticky-header clinvar-export-table' %}
-        {% end_ui_register_tab_embedded %}
-        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="In Error" badge=count_error %}
-            {% datatable table_config=export_columns table_id='submissions-error' class_name='sticky-header clinvar-export-table' %}
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Records" badge=count_records badge_status='success' %}
+            {% datatable table_config=export_columns table_id='records' class_name='sticky-header clinvar-export-table' %}
         {% end_ui_register_tab_embedded %}
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Export Batches" badge=count_batch badge_status='success' %}
             {% datatable table_config=export_batch_columns table_id='batches' class_name='sticky-header clinvar-export-batches-table' %}

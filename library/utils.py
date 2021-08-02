@@ -428,7 +428,7 @@ EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em'}
 def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
     """
     Given some text, and an expected whitelist of tags, will convert the text from possible HTML content to plain text.
-    Converts things like &#039; to ' and will strip out execpted tags, if a tag is found that's not in the whitelist
+    Converts things like &#039; to ' and will strip out expected tags, if a tag is found that's not in the whitelist
     the text will be returned untouched. This is to avoid treating text like "Patient had ouchies <painful>" as HTML
     :param text: Text that may contain HTML elements
     :param whitelist: HTML tags that we expect and want stripped out
@@ -443,6 +443,15 @@ def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
     for tag in bs.find_all():
         if tag.name.lower() not in whitelist:
             return text
+    return bs.get_text()
+
+
+def html_to_text(html: str) -> Optional[str]:
+    if not html:
+        return None
+    if html.startswith('http'):
+        html = f'<div>{html}</div>'
+    bs = BeautifulSoup(html, features="html.parser")
     return bs.get_text()
 
 

@@ -6,11 +6,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from htmlmin.decorators import not_minified_response
 
-from classification.enums import ShareLevel
+from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportStatus, ClinVarAllele, \
     ClassificationModification, ClinVarExportSubmissionbatchStatus, Classification
 from library.cache import timed_cache
 from library.django_utils import add_save_message
+from library.utils import html_to_text
 from snpdb.models import Allele, ClinVarKey, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 import json
@@ -138,8 +139,10 @@ class ClinVarExportRecordColumns(DatatableConfig):
     def __init__(self, request):
         super().__init__(request)
 
+        self.expand_client_renderer = "TableFormat.expandAjax.bind(null, 'clinvar_export_detail', 'id')";
         self.rich_columns = [
             # TODO, toggle enabled on screens where it makes sense
+            RichColumn("id", orderable=True),
             RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
             RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="allele", label="Allele", orderable=True),
             RichColumn("status", renderer=self.render_status, orderable=True),
@@ -287,7 +290,22 @@ def clinvar_export_summary(request, pk: Optional[str] = None):
         'missing_condition_count': missing_condition.count(),
         'export_columns': export_columns,
         'export_batch_columns': export_batch_columns,
-        'count_valid': export_columns.get_initial_query_params(clinvar_key=pk, status="N,C,D").count(),
-        'count_error': export_columns.get_initial_query_params(clinvar_key=pk, status="E").count(),
+        'count_records': export_columns.get_initial_query_params(clinvar_key=pk).count(),
         'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=pk).count()
+    })
+
+
+def clinvar_export_expand(request, pk: Optional[str] = None):
+    clinvar_export = get_object_or_404(ClinVarExport, pk=pk)
+    clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
+
+    interpretation_summary: Optional[str] = None
+    if cm := clinvar_export.classification_based_on:
+        if interpret_summary_html := clinvar_export.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
+            interpretation_summary = html_to_text(interpret_summary_html)
+
+    return render(request, 'classification/clinvar_export_expand.html', {
+        'clinvar_export': clinvar_export,
+        'classification': clinvar_export.classification_based_on,
+        'interpretation_summary': interpretation_summary
     })

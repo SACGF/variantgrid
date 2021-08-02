@@ -51,10 +51,11 @@ urlpatterns = [
     perm_path('clinvar_export_allele/datatable/detail/<int:pk>', clinvar_export_view.clinvar_export_allele_datatable_expand_view, name='clinvar_export_alleles_datatable_expand'),
     perm_path('clinvar_export', clinvar_export_view.clinvar_exports_view, name='clinvar_exports'),
     perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportRecordColumns), name='clinvar_exports_datatables'),
+    perm_path('clinvar_export/<int:pk>/detail', clinvar_export_view.clinvar_export_expand, name='clinvar_export_detail'),
     perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review_view, name='clinvar_export'),
     perm_path('clinvar_export/<int:pk>/history', clinvar_export_view.clinvar_export_history_view, name='clinvar_export_history'),
     perm_path('clinvar_export_batch/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportBatchColumns), name='clinvar_export_batch_datatables'),
-    perm_path('clinvar_export_batch/datatable/detail/<int:pk>', clinvar_export_view.clinvar_export_batches_datatable_expand, name='clinvar_export_batches_datatable_expand'),
+    perm_path('clinvar_export_batch/<int:pk>/detail', clinvar_export_view.clinvar_export_batches_datatable_expand, name='clinvar_export_batches_datatable_expand'),
     perm_path('clinvar_export_batch/<int:pk>', clinvar_export_view.clinvar_export_batch_view, name='clinvar_export_batch'),
     perm_path('clinvar_export_batch/<int:pk>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
