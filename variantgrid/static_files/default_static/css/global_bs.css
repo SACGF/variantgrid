@@ -95,8 +95,20 @@ table.dataTable tr.child td.child fieldset.form-fields > * > *:nth-child(2) {
 
 table.dataTable td.dataTables_empty {
   font-size: 16px;
-  padding-top: 12px;
+  padding-top: 22px;
   padding-bottom: 12px;
+  color: #BBBBBB !important;
+  font-style: italic;
+}
+table.dataTable td.dataTables_empty:before {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  font-family: "FontAwesome";
+  content: "";
+  opacity: 0.4;
+  margin-right: 8px;
 }
 
 table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
