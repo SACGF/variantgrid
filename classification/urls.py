@@ -98,6 +98,9 @@ urlpatterns = [
     perm_path('hgvs_issues/allele/datatable', DatabasetableView.as_view(column_class=AlleleColumns), name='allele_datatable'),
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
 
+    perm_path('clivnar_export_summary', views.clinvar_export_summary, name='clinvar_key_summary'),
+    perm_path('clinvar_export_summary/<str:pk>', views.clinvar_export_summary, name='clinvar_key_summary'),
+
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),
     perm_path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     perm_path('clinical_significance_change_data', views.clin_sig_change_data, name='clinical_significance_change_data'),

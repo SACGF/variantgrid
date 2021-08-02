@@ -17,7 +17,8 @@ register = template.Library()
 
 def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
     if isinstance(json_me, str):
-        return json_me
+        json_me = json_me.replace('"', '\"')
+        return mark_safe(f"\"{json_me}\"")
     elif isinstance(json_me, bool):
         if json_me:
             return mark_safe('true')

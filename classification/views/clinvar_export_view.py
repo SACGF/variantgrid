@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from django.contrib import messages
 from django.http import HttpResponse
@@ -15,7 +15,7 @@ import json
 
 
 @timed_cache(size_limit=30, ttl=60)
-def allele_for(allele_id: int):
+def allele_for(allele_id: int) -> Allele:
     return Allele.objects.select_related('clingen_allele').get(pk=allele_id)
 
 
@@ -31,10 +31,10 @@ class ClinVarExportAlleleColumns(DatatableConfig):
     last_evaluated = models.DateTimeField(default=now)
     """
 
-    def render_allele(self, row: Dict[str, Any]):
+    def render_allele(self, row: Dict[str, Any]) -> str:
         allele_id = row.get('allele')
         allele = allele_for(allele_id)
-        return str(allele)
+        return f"{allele:CA}"
 
     def __init__(self, request):
         super().__init__(request)
@@ -76,10 +76,10 @@ class ClinVarExportRecordColumns(DatatableConfig):
             "cm_id": link_id
         }
 
-    def render_allele(self, row: Dict[str, Any]):
+    def render_allele(self, row: Dict[str, Any]) -> str:
         allele_id = row.get('clinvar_allele__allele_id')
         allele = allele_for(allele_id)
-        return str(allele)
+        return f"{allele:CA}"
 
     def render_status(self, row: Dict[str, Any]):
         return ClinVarExportStatus(row['status']).label
@@ -88,11 +88,11 @@ class ClinVarExportRecordColumns(DatatableConfig):
         super().__init__(request)
 
         self.rich_columns = [
-            # FIXME this is all based on the previous stuff
-            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True),
-            RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="Allele", orderable=True),
+            # TODO, toggle enabled on screens where it makes sense
+            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
+            RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="allele", label="Allele", orderable=True),
             RichColumn("status", renderer=self.render_status, orderable=True),
-            RichColumn(key="classification_based_on__created", label='ClinVar Variant',
+            RichColumn(key="classification_based_on__created", name="classification", label='ClinVar Variant',
                        sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
                         "id",
                         "classification_based_on__created",
@@ -101,7 +101,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
                         "classification_based_on__classification__chgvs_grch37",
                         "classification_based_on__classification__chgvs_grch38",
                         ], renderer=self.render_classification_link, client_renderer='renderId'),
-            RichColumn("condition", name="Condition", client_renderer='VCTable.condition'),
+            RichColumn("condition", name="condition", client_renderer='VCTable.condition'),
 
             # RichColumn('lab__name', name='Lab', orderable=True),
 
@@ -113,9 +113,23 @@ class ClinVarExportRecordColumns(DatatableConfig):
             # RichColumn('submit_when_possible', name='Auto-Submit Enabled', orderable=True, client_renderer='TableFormat.boolean.bind(null, "standard")')
         ]
 
+    def get_initial_query_params(self, clinvar_key: Optional[str] = None, status: Optional[str] = None):
+        clinvar_keys = ClinVarKey.clinvar_keys_for_user(self.user)
+        if clinvar_key:
+            clinvar_keys = clinvar_keys.filter(pk=clinvar_key)
+
+        cve = ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=clinvar_keys)
+        if status:
+            statuses = status.split(',')
+            cve = cve.filter(status__in=statuses)
+
+        return cve
+
     def get_initial_queryset(self):
-        return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=ClinVarKey.clinvar_keys_for_user(self.user))
-        # return get_objects_for_user(self.user, ClinVarExport.get_read_perm(), klass=ClinVarExport, accept_global_perms=True)
+        return self.get_initial_query_params(
+            clinvar_key=self.get_query_param('clinvar_key'),
+            status=self.get_query_param('status')
+        )
 
 
 def clinvar_export_alleles_view(request):

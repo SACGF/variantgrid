@@ -27,6 +27,7 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.views.clinvar_export_view import ClinVarExportRecordColumns
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
@@ -38,18 +39,18 @@ from library.log_utils import log_traceback, report_event
 from library.utils import delimited_row
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Variant, UserSettings, Sample, Allele, Lab
+from snpdb.models import Variant, UserSettings, Sample, Allele, Lab, ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
     create_classification_for_sample_and_variant_objects, generate_auto_populate_data
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys
+from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel
 from classification.forms import EvidenceKeyForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict
+    ConditionResolvedDict, ClinVarExportStatus
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -734,3 +735,27 @@ def clin_sig_change_data(request):
     # response['Last-Modified'] = modified_str
     response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
     return response
+
+
+def clinvar_export_summary(request, pk: Optional[str] = None):
+    clinvar_key: ClinVarKey
+    if not pk:
+        clinvar_key = ClinVarKey.clinvar_keys_for_user(request.user).first()
+        return redirect(reverse('clinvar_key_summary', kwargs={'pk':clinvar_key.pk}))
+
+    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
+    clinvar_key.check_user_can_access(request.user)
+
+    labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
+    missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
+    datatable_config = ClinVarExportRecordColumns(request)
+
+    return render(request, 'classification/clinvar_key_summary.html', {
+        'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
+        'clinvar_key': clinvar_key,
+        'labs': labs,
+        'missing_condition_count': missing_condition.count(),
+        'datatable_config': datatable_config,
+        'count_valid': datatable_config.get_initial_query_params(clinvar_key=pk, status="N,C,D").count(),
+        'count_error': datatable_config.get_initial_query_params(clinvar_key=pk, status="E").count()
+    })

@@ -1,8 +1,11 @@
 {% load js_tags %}
 {% load ui_utils %}
-<h4>CLinVar Key</h4>
+<h4>ClinVar Key</h4>
 {% labelled label="ClinVar Key Name" %}{{ clinvar_key.id }}{% endlabelled %}
-{% labelled label="ClinVar API Key" %}****{% endlabelled %}
 {% labelled label="On Behalf of Org ID" %}{{ clinvar_key.behalf_org_id }}{% endlabelled %}
-{% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
-{% labelled label="Assert Method Configuration" %}{{ clinvar_key.assertion_method_lookup }}{% endlabelled %}
+{% labelled label="Configuration" %}<a href="#clinvar-key-config" class='toggle-link' data-toggle="collapse">Toggle Display</a>{% endlabelled %}
+<div id="clinvar-key-config" class="collapse">
+    {% labelled label="ClinVar API Key" %}{% if clinvar_key.api_key %}****{% else %}Submitting using {{ site_name }} key{% endif %}{% endlabelled %}
+    {% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
+    {% labelled label="Assert Method Configuration" %}<div class="code">{{ clinvar_key.assertion_method_lookup | jsonify_pretty }}</div>{% endlabelled %}
+</div>

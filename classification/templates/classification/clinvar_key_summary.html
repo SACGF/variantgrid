@@ -1,0 +1,75 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load classification_tags %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
+{% load datatable_tags %}
+{% block title %}Clinical Key Summary{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <script>
+        function submissionsValid(data) {
+            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
+            data.status = "N,C,D";
+        }
+        function submissionsError(data) {
+            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
+            data.status = "E";
+        }
+        function renderId(data, type, row) {
+            // TODO geneate urls
+            let content = [$('<span/>', {text:data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
+            let id = data.id;
+            let elem = $('<a/>', {href: `/classification/clinvar_export/${id}`, html: content, class:'id-link'});
+            return elem.prop('outerHTML');
+        };
+        $(document).ready(() => {
+            {% datatable_definition table_config=datatable_config data='submissionsValid' table_id='submissions-valid' url='clinvar_exports_datatables' %}
+            {% datatable_definition table_config=datatable_config data='submissionsError' table_id='submissions-error' url='clinvar_exports_datatables' %}
+        });
+    </script>
+    <style>
+        .clinvar-export-table .dt-status {
+            width: 10%;
+        }
+        .clinvar-export-table .dt-allele {
+            width: 10%;
+        }
+        .clinvar-export-table .dt-classification {
+            width: 40%;
+        }
+    </style>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        {% if all_keys.count > 1 %}
+            <h4>Available ClinVar Keys</h4>
+            <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
+                {% for key in all_keys %}<a type="button" href="{% url 'clinvar_key_summary' key.pk %}" class="btn {% if key.pk == clinvar_key.pk %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ key.pk }}</a>{% endfor %}
+            </div>
+        {% endif %}
+
+        <div data-toggle="ajax" href="{% url 'clinvar_key' clinvar_key.pk %}">Loading</div>
+        <h4>Records</h4>
+        {% labelled label="Used by labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
+        {% labelled label="Shared classifications w/out standard condition" %}
+            <a href="{% url 'condition_matchings' %}">{{ missing_condition_count }}</a>
+        {% endlabelled %}
+        <div class="text-info">Important: the status of ClinVar exports is cached, recent changes may not be reflected yet</div>
+
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Valid" badge=count_valid %}
+            {% datatable table_config=datatable_config table_id='submissions-valid' class_name='sticky-header clinvar-export-table' %}
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="In Error" badge=count_error %}
+            {% datatable table_config=datatable_config table_id='submissions-error' class_name='sticky-header clinvar-export-table' %}
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Export Batches" %}
+            ClinVar Export Batches info will go here
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_render_tabs tab_set='clinvar_tabs' %}
+    </div>
+{% endblock content %}
