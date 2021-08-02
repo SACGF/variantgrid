@@ -2,14 +2,16 @@ from typing import Dict, Any, Optional
 
 from django.contrib import messages
 from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from htmlmin.decorators import not_minified_response
 
+from classification.enums import ShareLevel
 from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportStatus, ClinVarAllele, \
-    ClassificationModification
+    ClassificationModification, ClinVarExportSubmissionbatchStatus, Classification
 from library.cache import timed_cache
 from library.django_utils import add_save_message
-from snpdb.models import Allele, ClinVarKey
+from snpdb.models import Allele, ClinVarKey, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 import json
 
@@ -54,6 +56,55 @@ class ClinVarExportAlleleColumns(DatatableConfig):
         return ClinVarAllele.objects.filter(clinvar_key__in=ClinVarKey.clinvar_keys_for_user(self.user))
 
 
+class ClinVarExportBatchColumns(DatatableConfig):
+
+    def render_status(self, row: Dict[str, Any]):
+        return ClinVarExportSubmissionbatchStatus(row['status']).label
+
+    def __init__(self, request):
+        super().__init__(request)
+
+        """
+        clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.PROTECT)
+        submission_version = models.IntegerField()
+        status = models.CharField(max_length=1, choices=ClinVarExportSubmissionbatchStatus.choices, default=ClinVarExportSubmissionbatchStatus.AWAITING_UPLOAD)
+        submitted_json = models.JSONField(null=True, blank=True)  # leave this as blank until we've actually uploaded data
+        response_json = models.JSONField(null=True, blank=True)  # what did ClinVar return
+        """
+
+        self.expand_client_renderer = "TableFormat.expandAjax.bind(null, 'clinvar_export_batches_datatable_expand', 'id')";
+        self.rich_columns = [
+            # TODO, toggle enabled on screens where it makes sense
+            RichColumn("id", orderable=True),
+            RichColumn("clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
+            RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn("status", renderer=self.render_status, orderable=True)
+        ]
+
+    def get_initial_query_params(self, clinvar_key: Optional[str] = None):
+        clinvar_keys = ClinVarKey.clinvar_keys_for_user(self.user)
+        if clinvar_key:
+            clinvar_keys = clinvar_keys.filter(pk=clinvar_key)
+        cve = ClinVarExportSubmissionBatch.objects.filter(clinvar_key__in=clinvar_keys)
+        return cve
+
+    def get_initial_queryset(self):
+        return self.get_initial_query_params(
+            clinvar_key=self.get_query_param('clinvar_key')
+        )
+
+
+def clinvar_export_batches_datatable_expand(request, pk: int):
+    clinvar_export_batch: ClinVarExportSubmissionBatch = ClinVarExportSubmissionBatch.objects.get(pk=pk)
+    clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
+    submissions = clinvar_export_batch.clinvarexportsubmission_set.order_by('created')
+
+    return render(request, 'classification/clinvar_export_batch_expand.html', {
+        "batch": clinvar_export_batch,
+        "submissions": submissions
+    })
+
+
 class ClinVarExportRecordColumns(DatatableConfig):
 
     def render_classification_link(self, row: Dict[str, Any]):
@@ -92,6 +143,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
             RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
             RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="allele", label="Allele", orderable=True),
             RichColumn("status", renderer=self.render_status, orderable=True),
+            RichColumn("scv", label="SCV", orderable=True),
             RichColumn(key="classification_based_on__created", name="classification", label='ClinVar Variant',
                        sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
                         "id",
@@ -211,3 +263,31 @@ def clinvar_export_batch_download(request, pk):
     response = HttpResponse(batch_json_str, content_type='application/json')
     response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{clinvar_export_batch.pk}.json'
     return response
+
+
+def clinvar_export_summary(request, pk: Optional[str] = None):
+    clinvar_key: ClinVarKey
+    if not pk:
+        clinvar_key = ClinVarKey.clinvar_keys_for_user(request.user).first()
+        return redirect(reverse('clinvar_key_summary', kwargs={'pk':clinvar_key.pk}))
+
+    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
+    clinvar_key.check_user_can_access(request.user)
+
+    labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
+    missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
+
+    export_columns = ClinVarExportRecordColumns(request)
+    export_batch_columns = ClinVarExportBatchColumns(request)
+
+    return render(request, 'classification/clinvar_key_summary.html', {
+        'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
+        'clinvar_key': clinvar_key,
+        'labs': labs,
+        'missing_condition_count': missing_condition.count(),
+        'export_columns': export_columns,
+        'export_batch_columns': export_batch_columns,
+        'count_valid': export_columns.get_initial_query_params(clinvar_key=pk, status="N,C,D").count(),
+        'count_error': export_columns.get_initial_query_params(clinvar_key=pk, status="E").count(),
+        'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=pk).count()
+    })

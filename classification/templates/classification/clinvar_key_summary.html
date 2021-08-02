@@ -19,6 +19,9 @@
             data.clinvar_key = {{ clinvar_key.pk | jsonify }};
             data.status = "E";
         }
+        function batches(data) {
+            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
+        }
         function renderId(data, type, row) {
             // TODO geneate urls
             let content = [$('<span/>', {text:data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
@@ -27,8 +30,9 @@
             return elem.prop('outerHTML');
         };
         $(document).ready(() => {
-            {% datatable_definition table_config=datatable_config data='submissionsValid' table_id='submissions-valid' url='clinvar_exports_datatables' %}
-            {% datatable_definition table_config=datatable_config data='submissionsError' table_id='submissions-error' url='clinvar_exports_datatables' %}
+            {% datatable_definition table_config=export_columns data='submissionsValid' table_id='submissions-valid' url='clinvar_exports_datatables' %}
+            {% datatable_definition table_config=export_columns data='submissionsError' table_id='submissions-error' url='clinvar_exports_datatables' %}
+            {% datatable_definition table_config=export_batch_columns data='batches' table_id='batches' url='clinvar_export_batch_datatables' %}
         });
     </script>
     <style>
@@ -38,8 +42,20 @@
         .clinvar-export-table .dt-allele {
             width: 10%;
         }
+        .clivnar-export-table .dt-scv {
+            width: 10%;
+        }
         .clinvar-export-table .dt-classification {
-            width: 40%;
+            width: 30%;
+        }
+        .clinvar-export-table .dt-condition {
+            width: 30%;
+        }
+        .clivnar-export-batches-table .dt-created {
+            width: 50%;
+        }
+        .clivnar-export-batches-table .dt-status {
+            width: 50%;
         }
     </style>
 {% endblock head %}
@@ -54,20 +70,19 @@
 
         <div data-toggle="ajax" href="{% url 'clinvar_key' clinvar_key.pk %}">Loading</div>
         <h4>Records</h4>
-        {% labelled label="Used by labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
         {% labelled label="Shared classifications w/out standard condition" %}
             <a href="{% url 'condition_matchings' %}">{{ missing_condition_count }}</a>
         {% endlabelled %}
-        <div class="text-info">Important: the status of ClinVar exports is cached, recent changes may not be reflected yet</div>
+        <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
 
-        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Valid" badge=count_valid %}
-            {% datatable table_config=datatable_config table_id='submissions-valid' class_name='sticky-header clinvar-export-table' %}
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Valid" badge=count_valid badge_status='success' %}
+            {% datatable table_config=export_columns table_id='submissions-valid' class_name='sticky-header clinvar-export-table' %}
         {% end_ui_register_tab_embedded %}
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="In Error" badge=count_error %}
-            {% datatable table_config=datatable_config table_id='submissions-error' class_name='sticky-header clinvar-export-table' %}
+            {% datatable table_config=export_columns table_id='submissions-error' class_name='sticky-header clinvar-export-table' %}
         {% end_ui_register_tab_embedded %}
-        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Export Batches" %}
-            ClinVar Export Batches info will go here
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Export Batches" badge=count_batch badge_status='success' %}
+            {% datatable table_config=export_batch_columns table_id='batches' class_name='sticky-header clinvar-export-batches-table' %}
         {% end_ui_register_tab_embedded %}
 
         {% ui_render_tabs tab_set='clinvar_tabs' %}

@@ -15,6 +15,7 @@ class TabBuilderTab:
     tab_id: str
     label: str
     badge: Optional[int] = None
+    badge_status: Optional[str] = None
     url: Optional[str] = None
     resolved_url: Optional[str] = None
     param: Any = None
@@ -51,8 +52,17 @@ class TabBuilder:
 
 
 @register.simple_tag(takes_context=True)
-def ui_register_tab(context, tab_set: str, label: str, url: str = None, param: Any = None,
-                    url_check=False, badge: Optional[int] = None, active=False):
+def ui_register_tab(
+        context,
+        tab_set: str,
+        label: str,
+        url: str = None,
+        param: Any = None,
+        url_check=False,
+        badge: Optional[int] = None,
+        badge_status: Optional[str] = None,
+        active=False):
+
     if url_check:
         if not context["url_name_visible"].get(url):
             return ""
@@ -67,7 +77,7 @@ def ui_register_tab(context, tab_set: str, label: str, url: str = None, param: A
     if active:
         builder.active_tab = tab_number
     builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
-                                      tab_id=url, label=label, badge=badge, url=url, param=param))
+                                      tab_id=url, label=label, badge=badge, badge_status=badge_status, url=url, param=param))
     return ""
 
 
@@ -102,7 +112,13 @@ def ui_register_tab_embedded(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_ui_register_tab_embedded',))
     parser.delete_first_token()
-    return LocalTabContent(nodelist, tab_set=kwargs.get('tab_set'), label=kwargs.get('label'), badge=kwargs.get('badge'))
+    return LocalTabContent(
+        nodelist,
+        tab_set=kwargs.get('tab_set'),
+        label=kwargs.get('label'),
+        badge=kwargs.get('badge'),
+        badge_status=kwargs.get('badge_status')
+    )
 
 
 class LocalTabContent(template.Node):
@@ -110,16 +126,19 @@ class LocalTabContent(template.Node):
                  nodelist,
                  tab_set: FilterExpression,
                  label: FilterExpression,
-                 badge: FilterExpression):
+                 badge: FilterExpression,
+                 badge_status: FilterExpression):
         self.nodelist = nodelist
         self.tab_set = tab_set
         self.label = label
         self.badge = badge
+        self.badge_status = badge_status
 
     def render(self, context):
         tab_set = TagUtils.value_str(context, self.tab_set)
         label = TagUtils.value_str(context, self.label)
         badge = TagUtils.value_int(context, self.badge)
+        badge_status = TagUtils.value_str(context, self.badge_status)
         if not tab_set:
             raise ValueError("UI Tab requires a value for 'tab_set'")
         if not label:
@@ -138,8 +157,8 @@ class LocalTabContent(template.Node):
         content: str = self.nodelist.render(context)
         if content.startswith('/'):
             builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
-                                              tab_id=tab_id, label=label, badge=badge, resolved_url=content))
+                                              tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, resolved_url=content))
         else:
             builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
-                                              tab_id=tab_id, label=label, badge=badge, content=content))
+                                              tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, content=content))
         return ""

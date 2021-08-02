@@ -264,6 +264,31 @@ def danger_badge(count: Optional[int]) -> str:
 
 
 @register.filter()
+def badge(count: Optional[int], status: Optional[str] = None) -> str:
+    if count is None:
+        return ""
+    if status is None:
+        status = "danger"
+
+    render_status = status
+    if count == 0:
+        if status == 'danger':
+            render_status = 'success'
+        elif status == 'success':
+            render_status = 'secondary'
+    return SafeString(f' <span class="d-inline-block ml-1 badge badge-{render_status}">{count}</span>')
+
+
+@register.filter()
+def success_badge(count: Optional[int]) -> str:
+    if count is None:
+        return ""
+    if count == 0:
+        return SafeString(' <span class="d-inline-block ml-1 badge badge-secondary">0</span>')
+    return SafeString(f' <span class="d-inline-block ml-1 badge badge-success">{count}</span>')
+
+
+@register.filter()
 def checked(test: bool) -> str:
     if test:
         return SafeString('checked="checked"')

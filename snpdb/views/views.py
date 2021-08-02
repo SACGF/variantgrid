@@ -717,7 +717,10 @@ def view_clinvar_key(request, pk: str):
     clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
     clinvar_key.check_user_can_access(request.user)
 
-    return render(request, 'snpdb/settings/clinvar_key.html', {'clinvar_key': clinvar_key})
+    return render(request, 'snpdb/settings/clinvar_key.html', {
+        'clinvar_key': clinvar_key,
+        'labs': Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
+    })
 
 
 def view_organization(request, pk):

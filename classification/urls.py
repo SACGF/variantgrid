@@ -53,6 +53,8 @@ urlpatterns = [
     perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportRecordColumns), name='clinvar_exports_datatables'),
     perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review_view, name='clinvar_export'),
     perm_path('clinvar_export/<int:pk>/history', clinvar_export_view.clinvar_export_history_view, name='clinvar_export_history'),
+    perm_path('clinvar_export_batch/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportBatchColumns), name='clinvar_export_batch_datatables'),
+    perm_path('clinvar_export_batch/datatable/detail/<int:pk>', clinvar_export_view.clinvar_export_batches_datatable_expand, name='clinvar_export_batches_datatable_expand'),
     perm_path('clinvar_export_batch/<int:pk>', clinvar_export_view.clinvar_export_batch_view, name='clinvar_export_batch'),
     perm_path('clinvar_export_batch/<int:pk>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
@@ -98,8 +100,8 @@ urlpatterns = [
     perm_path('hgvs_issues/allele/datatable', DatabasetableView.as_view(column_class=AlleleColumns), name='allele_datatable'),
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
 
-    perm_path('clivnar_export_summary', views.clinvar_export_summary, name='clinvar_key_summary'),
-    perm_path('clinvar_export_summary/<str:pk>', views.clinvar_export_summary, name='clinvar_key_summary'),
+    perm_path('clivnar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
+    perm_path('clinvar_export_summary/<str:pk>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),
     perm_path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),

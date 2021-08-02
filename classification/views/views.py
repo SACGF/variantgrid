@@ -735,27 +735,3 @@ def clin_sig_change_data(request):
     # response['Last-Modified'] = modified_str
     response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
     return response
-
-
-def clinvar_export_summary(request, pk: Optional[str] = None):
-    clinvar_key: ClinVarKey
-    if not pk:
-        clinvar_key = ClinVarKey.clinvar_keys_for_user(request.user).first()
-        return redirect(reverse('clinvar_key_summary', kwargs={'pk':clinvar_key.pk}))
-
-    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
-    clinvar_key.check_user_can_access(request.user)
-
-    labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
-    datatable_config = ClinVarExportRecordColumns(request)
-
-    return render(request, 'classification/clinvar_key_summary.html', {
-        'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
-        'clinvar_key': clinvar_key,
-        'labs': labs,
-        'missing_condition_count': missing_condition.count(),
-        'datatable_config': datatable_config,
-        'count_valid': datatable_config.get_initial_query_params(clinvar_key=pk, status="N,C,D").count(),
-        'count_error': datatable_config.get_initial_query_params(clinvar_key=pk, status="E").count()
-    })
