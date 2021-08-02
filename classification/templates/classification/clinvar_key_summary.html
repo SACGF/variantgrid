@@ -17,6 +17,21 @@
         function batches(data) {
             data.clinvar_key = {{ clinvar_key.pk | jsonify }};
         }
+        function renderReleaseStatus(data, type, row) {
+            if (data === 'R') {
+                let dom = severityIcon('success');
+                dom.attr('title', 'Release when ready');
+                dom.attr('data-toggle', 'tooltip');
+                return dom.prop('outerHTML');
+            } else if (data === 'H') {
+                let dom = severityIcon('warning');
+                dom.attr('title', 'On hold');
+                dom.attr('data-toggle', 'tooltip');
+                return dom.prop('outerHTML');
+            } else {
+                return data;
+            }
+        }
         function renderId(data, type, row) {
             // TODO geneate urls
             let content = [$('<span/>', {text:data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
@@ -39,11 +54,15 @@
         .clivnar-export-table .dt-scv {
             width: 10%;
         }
+        .clinvar-export-table td.dt-release_status {
+            width: 10%;
+            text-align: center;
+        }
         .clinvar-export-table .dt-classification {
-            width: 30%;
+            width: 25%;
         }
         .clinvar-export-table .dt-condition {
-            width: 30%;
+            width: 25%;
         }
         .clivnar-export-batches-table .dt-created {
             width: 50%;
