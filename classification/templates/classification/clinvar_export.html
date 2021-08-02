@@ -36,12 +36,18 @@
                     {% labelled label="SCV" %}
                         <div class="input-group">
                             <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
-                            <div class="input-group-append">
-                                <input type="submit" class="btn btn-primary" value="Save" />
-                            </div>
                         </div>
                     {% endlabelled %}
+                    {% labelled label="Release Status" %}
+                        <select name="release_status" class="form-control">
+                            <option value="R">Release When Ready</option>
+                            <option value="H" {% if clinvar_export.release_status == 'H' %}selected{% endif %}>On Hold</option>
+                        </select>
+                    {% endlabelled %}
                     {% labelled label="Status" %}{{ clinvar_export.get_status_display }}{% endlabelled %}
+                </div>
+                <div class="card-footer">
+                    <input type="submit" class="btn btn-primary" value="Save" />
                 </div>
             </div>
         </form>

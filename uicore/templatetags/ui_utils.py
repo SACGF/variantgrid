@@ -211,8 +211,9 @@ class LabelledValueTag(template.Node):
 
         div_id = ""
         for_id = ""
-        if give_div_id:
-            div_id = f"id=\"{complete_id}\""
+        if complete_id:
+            if give_div_id:
+                div_id = f"id=\"{complete_id}\""
             for_id = f"for=\"{complete_id}\""
 
         if output in ("", "None"):

@@ -36,6 +36,11 @@ class ClinVarExportStatus(models.TextChoices):
     IN_ERROR = "E", "Error"
 
 
+class ClinVarReleaseStatus(models.TextChoices):
+    WHEN_READY = "R", "Release When Ready"
+    ON_HOLD = "H", "On Hold"
+
+
 class ClinVarExport(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar export"
@@ -45,7 +50,7 @@ class ClinVarExport(TimeStampedModel):
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(null=True, blank=True)  # if not set yet
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
-    # cache the submission body
+    release_status = models.CharField(max_length=1, choices=ClinVarReleaseStatus.choices, default=ClinVarReleaseStatus.WHEN_READY)
     last_evaluated = models.DateTimeField(default=now)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
