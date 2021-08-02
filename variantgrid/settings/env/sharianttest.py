@@ -15,7 +15,7 @@ SITE_ID = 6
 
 URLS_NAME_REGISTER.update({
     "condition_aliases": False,
-    "clinvar_export_alleles": True
+    "clinvar_key_summary": True
 })
 
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
