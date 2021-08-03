@@ -60,7 +60,16 @@ function enhanceAndMonitor() {
         {test: `.select2-selection__clear`, func: null},
 
         // load ajax blocks as soon as we see them
-        {test: '[data-toggle="ajax"]', func: (node) => {loadAjaxBlock($(node));}},
+        {test: '[data-toggle="ajax"]', func: (node) => {loadAjaxBlock(node);}},
+
+        {test: '[data-toggle="ajax-modal"]', func: (node) => {
+            console.log("FOUND AJAX MODAL");
+            node.click(function() {
+                console.log("CLIKCED AJAX MODAL");
+                loadAjaxModal($(this));
+                return false;
+            });
+        }},
 
         // setup popovers
         {test: '[data-content]', func: (node) => {node.addClass('hover-detail'); node.popover(popoverOpts);}},
@@ -187,6 +196,23 @@ function enhanceAndMonitor() {
         });
     });
     observer.observe($('body')[0], { attributes: false, childList: true, subtree: true });
+}
+
+function loadAjaxModal(linkDom) {
+    let url = linkDom.attr('href');
+    let useId = url.replace('/', '_');
+    let modalContent = createModalShell(useId, linkDom.attr('data-title') || 'Dialog');
+    let body = modalContent.find('.modal-body');
+    modalContent.find('.modal-footer').remove();
+    let content = $('<div>').appendTo(body);
+    let modalDialog = modalContent.modal({focus:true, show:false});
+    loadAjaxBlock(content, url);
+
+    modalContent.on('hidden.bs.modal', function() {
+        modalContent.modal('dispose');
+        modalContent.remove();
+    });
+    modalDialog.modal('show');
 }
 
 function loadAjaxBlock(dom, url) {
