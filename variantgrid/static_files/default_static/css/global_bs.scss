@@ -559,7 +559,7 @@ div.background-image {
     text-decoration: none;
     cursor: help;
 }
-.hover-link, nav ol.breadcrumb .breadcrumb-item a {
+.hover-link, nav ol.breadcrumb .breadcrumb-item a, .modal-link, .download-link, .mail-link {
 	color: #44a;
     text-decoration: none;
 	cursor: pointer;

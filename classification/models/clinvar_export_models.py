@@ -115,7 +115,7 @@ class ClinVarExport(TimeStampedModel):
 
     @property
     def last_submission(self) -> Optional['ClinVarExportSubmissionBatch']:
-        return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportSubmissionbatchStatus.REJECTED).order_by('-created').first()
+        return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportSubmissionBatchStatus.REJECTED).order_by('-created').first()
 
     def submission_body_previous(self) -> Optional[JsonObjType]:
         # ignore rejected submissions
@@ -148,7 +148,7 @@ class ClinVarExport(TimeStampedModel):
         self.save()
 
 
-class ClinVarExportSubmissionbatchStatus(models.TextChoices):
+class ClinVarExportSubmissionBatchStatus(models.TextChoices):
     AWAITING_UPLOAD = "W", "Awaiting Upload"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
     UPLOADING = "U", "Uploading"
     SUBMITTED = "S", "Submitted"
@@ -161,7 +161,7 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
 
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.PROTECT)
     submission_version = models.IntegerField()
-    status = models.CharField(max_length=1, choices=ClinVarExportSubmissionbatchStatus.choices, default=ClinVarExportSubmissionbatchStatus.AWAITING_UPLOAD)
+    status = models.CharField(max_length=1, choices=ClinVarExportSubmissionBatchStatus.choices, default=ClinVarExportSubmissionBatchStatus.AWAITING_UPLOAD)
     submitted_json = models.JSONField(null=True, blank=True)  # leave this as blank until we've actually uploaded data
     response_json = models.JSONField(null=True, blank=True)  # what did ClinVar return
 
