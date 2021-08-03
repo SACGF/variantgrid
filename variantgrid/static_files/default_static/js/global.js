@@ -198,7 +198,7 @@ function enhanceAndMonitor() {
 }
 
 function loadAjaxModal(linkDom) {
-    let url = linkDom.attr('href') || linkDom.attr('data-href');
+    let url = linkDom.attr('data-href') || linkDom.attr('href');
     let useId = url.replace('/', '_');
     let modalContent = createModalShell(useId, linkDom.attr('data-title') || linkDom.text());
     let body = modalContent.find('.modal-body');
