@@ -41,7 +41,7 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
         if self.modified_imported_variants:
             self.process_modified_imported_variants(variant_ids_by_hash)
 
-        self.set_max_variant(variant_ids)
+        self.set_max_variant(self.variant_hashes, variant_ids)
         self.variant_hashes = []
 
     def batch_process_check(self, minimum_insert_size=None):

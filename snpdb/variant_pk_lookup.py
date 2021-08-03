@@ -62,6 +62,10 @@ class VariantPKLookup(abc.ABC):
                         raise ValueError(f"Loci hash {loci_hash} had no PK in DB!")
         return loci_ids
 
+    @abc.abstractmethod
+    def filter_non_reference(self, variant_hashes, variant_ids) -> List:
+        pass
+
     def get_variant_coordinate_hash(self, chrom, position, ref, alt):
         """ For VCF records (needs GenomeBuild supplied) """
         if self.chrom_contig_id_mappings is None:
@@ -226,6 +230,9 @@ class RedisVariantPKLookup(VariantPKLookup):
         super()._insert_new_variants(new_variant_rows)
         self._update_variants_hash()  # Read in new variants
 
+    def filter_non_reference(self, variant_hashes, variant_ids) -> List:
+        return [vh_vi[1] for vh_vi in zip(variant_hashes, variant_ids) if vh_vi[0].endswith("_")]
+
     def _redis_sanity_check(self) -> bool:
         """ Check that the first and last Variant is stored in Redis, throws exception on error
                 Returns whether it was able to perform a check or not """
@@ -371,6 +378,10 @@ class RedisVariantPKLookup(VariantPKLookup):
 
 
 class DBVariantPKLookup(VariantPKLookup):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reference_seq_id = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT)[0].pk
+
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id
 
@@ -413,3 +424,6 @@ class DBVariantPKLookup(VariantPKLookup):
             return qs.annotate(**annotate_kwargs)
 
         return self._get_ids_for_hashes(loci_hashes, get_queryset)
+
+    def filter_non_reference(self, variant_hashes, variant_ids) -> List:
+        return [vh_vi[1] for vh_vi in zip(variant_hashes, variant_ids) if vh_vi[0][3] != self.reference_seq_id]

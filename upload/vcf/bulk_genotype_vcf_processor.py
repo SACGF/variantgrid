@@ -336,24 +336,13 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         if self.variant_hashes and len(self.variant_hashes) >= minimum_insert_size:
             variant_ids = self.variant_pk_lookup.get_variant_ids(self.variant_hashes)
-            self.set_max_variant(variant_ids)
+            self.set_max_variant(self.variant_hashes, variant_ids)
 
             if self.modified_imported_variants:
                 variant_ids_by_hash = dict(zip(self.variant_hashes, variant_ids))
                 self.process_modified_imported_variants(variant_ids_by_hash)
 
             self.process_cohort_genotypes(variant_ids)
-
-    def set_max_variant(self, variant_ids):
-        """ Keep track of max - this has to be a variant (not reference) - as only variants are annotated """
-
-        alt_variant_ids = (vh_vi[1] for vh_vi in filter(lambda x: not x[0].endswith("_"), zip(self.variant_hashes, variant_ids)))
-        try:
-            # If all references could raise exception on empty sequence
-            max_returned_variant_id = max(map(int, alt_variant_ids))
-            self.max_variant_id = max(self.max_variant_id, max_returned_variant_id)
-        except:
-            pass  # Ok to just not set it
 
     def process_cohort_genotypes(self, variant_ids):
         cohort_genotypes = []
