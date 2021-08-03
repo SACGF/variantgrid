@@ -45,8 +45,18 @@ class VariantPKLookup(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
+    def _get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
         pass
+
+    def get_variant_ids(self, variant_hashes: Iterable, validate_not_null=True) -> List[str]:
+        variant_ids = self._get_variant_ids(variant_hashes)
+        if validate_not_null:
+            if not all(variant_ids):  # Quick test if ok
+                # Slowly find the first bad record
+                for variant_hash, pk in zip(variant_hashes, variant_ids):
+                    if not pk:
+                        raise ValueError(f"Variant hash {variant_hash} had no PK in DB!")
+        return variant_ids
 
     @abc.abstractmethod
     def _get_loci_ids(self, loci_hashes: Iterable) -> List[str]:
@@ -175,7 +185,7 @@ class VariantPKLookup(abc.ABC):
 
         loci_ids = self.get_loci_ids(loci_parts_by_hash)  # Validates all are not null
         locus_pk_by_hash = dict(zip(loci_parts_by_hash, loci_ids))
-        variant_ids = self.get_variant_ids(locus_hash_and_alt_id_by_variant_hash)  # unknowns will be None
+        variant_ids = self.get_variant_ids(locus_hash_and_alt_id_by_variant_hash, validate_not_null=False)  # unknowns will be None
         unknown_variants = []
         for variant_hash, variant_pk in zip(locus_hash_and_alt_id_by_variant_hash, variant_ids):
             if variant_pk is None:
@@ -216,7 +226,7 @@ class RedisVariantPKLookup(VariantPKLookup):
     def _get_locus_hash(self, contig_id, position, ref_id):
         return '_'.join((str(contig_id), str(position), str(ref_id)))
 
-    def get_variant_ids(self, variant_hashes: Iterable) -> List[int]:
+    def _get_variant_ids(self, variant_hashes: Iterable) -> List[int]:
         return self.redis.mget(variant_hashes)
 
     def _get_loci_ids(self, loci_hashes: Iterable) -> List[str]:
@@ -401,7 +411,7 @@ class DBVariantPKLookup(VariantPKLookup):
 
         return [contig_hashes[h[0]].get("_".join([str(s) for s in h[1:]])) for h in hashes]
 
-    def get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
+    def _get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
         annotate_kwargs = {
             "hash": Concat("locus__position", Value("_"), "locus__ref_id", Value("_"), "alt_id",
                            output_field=TextField())
