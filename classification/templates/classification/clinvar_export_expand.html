@@ -3,7 +3,7 @@
 {% load classification_tags %}
 {% with batch=clinvar_export.last_submission.submission_batch %}
     {% labelled label="Last Batch" %}{% if batch %}
-        ID {{ batch.pk }} : {{ batch.get_status_display }} : {% timestamp batch.modified %}
+        <a href="{% url 'clinvar_export_batches_datatable_expand' batch.pk %}" data-toggle="ajax-modal">ID {{ batch.pk }}</a> : {{ batch.get_status_display }} : {% timestamp batch.modified %}
     {% endif %}{% endlabelled %}
 {% endwith %}
 {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}

@@ -5,7 +5,7 @@
             <div class="card-header">{% timestamp history_entry.created time_ago=True %}</div>
             <div class="card-body code formatted-text">{{ history_entry.submission_full | jsonify_pretty }}</div>
             <div class="card-footer">{% if history_entry.submission_batch %}
-                <a href="{% url 'clinvar_export_batch' history_entry.submission_batch.pk %}">{{ history_entry.submission_batch }}</a>
+                <a data-href="{% url 'clinvar_export_batches_datatable_expand' history_entry.submission_batch.pk %}" data-toggle="ajax-modal">{{ history_entry.submission_batch }}</a>
             {% endif %}</div>
         </div>
     {% endfor %}
