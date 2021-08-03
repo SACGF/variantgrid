@@ -63,9 +63,8 @@ function enhanceAndMonitor() {
         {test: '[data-toggle="ajax"]', func: (node) => {loadAjaxBlock(node);}},
 
         {test: '[data-toggle="ajax-modal"]', func: (node) => {
-            console.log("FOUND AJAX MODAL");
+            node.addClass('modal-link');
             node.click(function() {
-                console.log("CLIKCED AJAX MODAL");
                 loadAjaxModal($(this));
                 return false;
             });
@@ -199,9 +198,9 @@ function enhanceAndMonitor() {
 }
 
 function loadAjaxModal(linkDom) {
-    let url = linkDom.attr('href');
+    let url = linkDom.attr('href') || linkDom.attr('data-href');
     let useId = url.replace('/', '_');
-    let modalContent = createModalShell(useId, linkDom.attr('data-title') || 'Dialog');
+    let modalContent = createModalShell(useId, linkDom.attr('data-title') || linkDom.text());
     let body = modalContent.find('.modal-body');
     modalContent.find('.modal-footer').remove();
     let content = $('<div>').appendTo(body);
