@@ -18,12 +18,6 @@
             data.clinvar_key = {{ clinvar_key.pk | jsonify }};
         }
         function renderStatus(data, type, row) {
-            /*
-            NEW_SUBMISSION = "N", "New Submission"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
-            CHANGES_PENDING = "C", "Changes Pending"
-            UP_TO_DATE = "D", "Up to Date"
-            IN_ERROR = "E", "Error"
-             */
             let dom = null;
             if (data === 'D') {
                 dom = severityIcon('success');
@@ -43,7 +37,6 @@
             if (dom.attr('title')) {
                 dom.attr('data-toggle', 'tooltip');
             }
-
             return dom.prop('outerHTML');
         }
         function renderReleaseStatus(data, type, row) {
@@ -72,10 +65,10 @@
             }
         }
         function renderId(data, type, row) {
-            // TODO geneate urls
             let content = [$('<span/>', {text:data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
-            let id = data.id;
-            let elem = $('<a/>', {href: `/classification/clinvar_export/${id}`, html: content, class:'id-link'});
+            // let id = data.id;
+            // let elem = $('<a/>', {href: `/classification/clinvar_export/${id}`, html: content, class:'id-link'});
+            let elem = $('<span>', {html: content});
             return elem.prop('outerHTML');
         };
         $(document).ready(() => {
@@ -116,7 +109,6 @@
 {% block content %}
     <div class="container">
         {% if all_keys.count > 1 %}
-            <h4>Available ClinVar Keys</h4>
             <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
                 {% for key in all_keys %}<a type="button" href="{% url 'clinvar_key_summary' key.pk %}" class="btn {% if key.pk == clinvar_key.pk %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ key.pk }}</a>{% endfor %}
             </div>
@@ -126,7 +118,7 @@
         <h4>Records</h4>
         {% if missing_condition_count %}
             {% labelled label="Classifications w/out standard condition" %}
-                <a href="{% url 'condition_matchings' %}">
+                <a href="{% url 'condition_matchings' %}" title="Only classifications with standard conditions can be submitted to ClinVar">
                     {{ 'warning' | severity_icon }}
                     {{ missing_condition_count }}</a>
             {% endlabelled %}

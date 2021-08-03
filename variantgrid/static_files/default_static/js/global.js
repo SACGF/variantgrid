@@ -719,6 +719,40 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
         return `<span class="mono font-weight-bold text-${severity}">${data}</span>`;
     }
 };
+TableFormat.hgvs = function(data, type, columns) {
+    let genomeBuild = data.genomeBuild;
+    let transcript = data.transcript;
+    let geneSymbol = data.geneSymbol;
+    let variant = data.variant;
+    // also turn into a link
+    let dom = $('<div>');
+    if (genomeBuild) {
+        dom.append($('<div>', {text: genomeBuild, class:'text-info'}));
+        // <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="display:inline-block;word-break: break-all">{{ c_hgvs.raw_c }}</span>
+    }
+
+    let cDom = $('<span>', {style:'white-space:nowrap'});
+    if (transcript && variant) {
+        cDom.append($('<span>', {text: transcript}));
+        if (geneSymbol) {
+            cDom.append("(");
+            cDom.append($('<span>', {class: 'text-secondary', style: 'letter-spacing: 0.5px', text: geneSymbol}));
+            cDom.append(")");
+        }
+        cDom.append(":");
+        // used to be display:inline-block; but that doesn't underline
+        cDom.append($('<span>', {style: 'word-break:break-all', text: variant}));
+    } else {
+        cDom.append(data.full);
+    }
+    let variantId = data.variantId;
+    if (variantId) {
+        cDom = $('<a>', {href: Urls.view_allele_from_variant(variantId), class:'hover-link', html: cDom});
+    }
+    dom.append(cDom);
+
+    return dom.prop('outerHTML');
+};
 TableFormat.expandAjax = function ajaxBlock(url, param, data) {
     if (data) {
         let dataId = data[param];

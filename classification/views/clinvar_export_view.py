@@ -9,6 +9,7 @@ from htmlmin.decorators import not_minified_response
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportStatus, ClinVarAllele, \
     ClassificationModification, ClinVarExportSubmissionbatchStatus, Classification, ClinVarReleaseStatus
+from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message
 from library.utils import html_to_text
@@ -108,30 +109,28 @@ def clinvar_export_batches_datatable_expand(request, pk: int):
 
 class ClinVarExportRecordColumns(DatatableConfig):
 
-    def render_classification_link(self, row: Dict[str, Any]):
-        created = row["classification_based_on__created"]
-        c_id = row["classification_based_on__classification_id"]
+    def render_c_hgvs(self, row: Dict[str, Any]):
+        if row["classification_based_on__classification__variant"]:
+            genome_build = row["classification_based_on__published_evidence__genome_build__value"]
+            c_hgvs_str: str
+            if "h37" in genome_build:
+                c_hgvs_str = row["classification_based_on__classification__chgvs_grch37"]
+            else:
+                c_hgvs_str = row["classification_based_on__classification__chgvs_grch38"]
 
-        link_id = f"{c_id}.{created.timestamp()}"
-
-        genome_build = row["classification_based_on__published_evidence__genome_build__value"]
-        c_hgvs: str
-        if "h37" in genome_build:
-            c_hgvs = row["classification_based_on__classification__chgvs_grch37"]
+            c_hgvs = CHGVS(c_hgvs_str)
+            if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
+                return {
+                    "genomeBuild": genome_build,
+                    "transcript": c_hgvs.transcript,
+                    "geneSymbol": c_hgvs.gene_symbol,
+                    "variant": c_hgvs.raw_c,
+                    "variantId": row["classification_based_on__classification__variant"]
+                }
+            else:
+                return {"full": c_hgvs_str}
         else:
-            c_hgvs = row["classification_based_on__classification__chgvs_grch38"]
-
-        return {
-            "id": row["id"],
-            "genome_build": genome_build,
-            "c_hgvs": c_hgvs,
-            "cm_id": link_id
-        }
-
-    def render_allele(self, row: Dict[str, Any]) -> str:
-        allele_id = row.get('clinvar_allele__allele_id')
-        allele = allele_for(allele_id)
-        return f"{allele:CA}"
+            return None
 
     def __init__(self, request):
         super().__init__(request)
@@ -141,20 +140,17 @@ class ClinVarExportRecordColumns(DatatableConfig):
             # TODO, toggle enabled on screens where it makes sense
             RichColumn("id", orderable=True),
             RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
-            RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="allele", label="Allele", orderable=True),
+            RichColumn(name="c_hgvs", label='c.hgvs',
+                       sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
+                    "classification_based_on__classification__variant",
+                    "classification_based_on__published_evidence__genome_build__value",
+                    "classification_based_on__classification__chgvs_grch37",
+                    "classification_based_on__classification__chgvs_grch38",
+                ], renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs'),
+            RichColumn("condition", name="condition", client_renderer='VCTable.condition'),
             RichColumn("status", label="Sync Status", client_renderer='renderStatus', orderable=True),
             RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True),
             RichColumn("scv", label="SCV", orderable=True),
-            RichColumn(key="classification_based_on__created", name="classification", label='ClinVar Variant',
-                       sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
-                        "id",
-                        "classification_based_on__created",
-                        "classification_based_on__classification_id",
-                        "classification_based_on__published_evidence__genome_build__value",
-                        "classification_based_on__classification__chgvs_grch37",
-                        "classification_based_on__classification__chgvs_grch38",
-                        ], renderer=self.render_classification_link, client_renderer='renderId'),
-            RichColumn("condition", name="condition", client_renderer='VCTable.condition'),
 
             # RichColumn('lab__name', name='Lab', orderable=True),
 
