@@ -317,8 +317,10 @@ class ConditionResolved:
         return None
 
     def __eq__(self, other: 'ConditionResolved') -> bool:
-        if self.terms:
-            return self.terms == other.terms and self.join == other.join
+        if (s_terms := self.terms) and (o_terms := other.terms):
+            return s_terms == o_terms and self.join == other.join
+        elif self.terms or other.terms:
+            return False
         else:
             return self.plain_text == other.plain_text
 

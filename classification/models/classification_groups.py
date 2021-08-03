@@ -276,7 +276,7 @@ class ClassificationGroups:
             return "Z" + (cm.get(SpecialEKeys.CONDITION) or "").lower()
 
         def condition_grouper(cm: ClassificationModification) -> Any:
-            return cm.classification.condition_resolution_obj
+            return cm.classification.condition_resolution_obj is not None, cm.classification.condition_resolution_obj
 
         cached_chgvs: Dict[int, CHGVS] = dict()
 
