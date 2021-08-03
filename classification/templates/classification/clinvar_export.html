@@ -27,12 +27,13 @@
                     {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
                     {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
                     {% labelled label="c.hgvs" %}{% c_hgvs clinvar_export.classification_based_on %}{% endlabelled %}
-                    {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
+                    {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
                     {% labelled label="Current Candidate Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
                     {% if clinvar_export.classification_based_on %}
                         {% labelled label="Classification Version as of" %}{% timestamp clinvar_export.classification_based_on.created time_ago=True %}{% endlabelled %}
                     {% endif %}
+                    {% labelled label="Sync Status" %}{{ clinvar_export.get_status_display }}{% endlabelled %}
                     {% labelled label="SCV" %}
                         <div class="input-group">
                             <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
@@ -44,7 +45,6 @@
                             <option value="H" {% if clinvar_export.release_status == 'H' %}selected{% endif %}>On Hold</option>
                         </select>
                     {% endlabelled %}
-                    {% labelled label="Status" %}{{ clinvar_export.get_status_display }}{% endlabelled %}
                 </div>
                 <div class="card-footer">
                     <input type="submit" class="btn btn-primary" value="Save" />

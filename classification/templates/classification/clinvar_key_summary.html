@@ -17,17 +17,56 @@
         function batches(data) {
             data.clinvar_key = {{ clinvar_key.pk | jsonify }};
         }
+        function renderStatus(data, type, row) {
+            /*
+            NEW_SUBMISSION = "N", "New Submission"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
+            CHANGES_PENDING = "C", "Changes Pending"
+            UP_TO_DATE = "D", "Up to Date"
+            IN_ERROR = "E", "Error"
+             */
+            let dom = null;
+            if (data === 'D') {
+                dom = severityIcon('success');
+                dom.attr('title', 'Up to date');
+            } else if (data === 'E') {
+                dom = severityIcon('error');
+                dom.attr('title', 'Missing data, unable to submit');
+            } else if (data === 'N') {
+                dom = $('<i class="fas fa-cloud-upload-alt text-success"></i>')
+                dom.attr('title', 'New submission');
+            } else if (data == 'C') {
+                dom = $('<i class="fas fa-cloud-upload-alt text-primary"></i>')
+                dom.attr('title', 'Changes to existing ClinVar record pending');
+            } else {
+                dom = $('<span>', {text: data});
+            }
+            if (dom.attr('title')) {
+                dom.attr('data-toggle', 'tooltip');
+            }
+
+            return dom.prop('outerHTML');
+        }
         function renderReleaseStatus(data, type, row) {
+            let dom = null;
             if (data === 'R') {
-                let dom = severityIcon('success');
+                dom = severityIcon('success');
                 dom.attr('title', 'Release when ready');
                 dom.attr('data-toggle', 'tooltip');
-                return dom.prop('outerHTML');
             } else if (data === 'H') {
-                let dom = severityIcon('warning');
+                dom = $('<i class="fas fa-clock"></i>');
                 dom.attr('title', 'On hold');
                 dom.attr('data-toggle', 'tooltip');
-                return dom.prop('outerHTML');
+            } else {
+                dom = $('<span>', {text: data});
+            }
+            if (row.status === "E") {
+                dom.css('opacity', 0.4);
+            }
+            return dom.prop('outerHTML');
+        }
+        function renderSCV(data, type, row) {
+            if (!data) {
+                return $('<span>', {text: '-', class:'no-value'}).prop('outerHTML');
             } else {
                 return data;
             }
@@ -45,18 +84,20 @@
         });
     </script>
     <style>
-        .clinvar-export-table .dt-status {
-            width: 10%;
-        }
         .clinvar-export-table .dt-allele {
             width: 10%;
         }
         .clivnar-export-table .dt-scv {
             width: 10%;
         }
-        .clinvar-export-table td.dt-release_status {
+        .clinvar-export-table td.dt-release_status, .clinvar-export-table td.dt-status {
             width: 10%;
             text-align: center;
+            position: relative;
+        }
+        .clinvar-export-table td.dt-release_status i, .clinvar-export-table td.dt-status i {
+            position: relative;
+            left: -10px;
         }
         .clinvar-export-table .dt-classification {
             width: 25%;

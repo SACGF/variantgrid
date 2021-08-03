@@ -14,7 +14,6 @@
     }
 
     $(document).ready(function() {
-        fixLinks();
         Flags.instance.init({userId: '{{user.id}}', filter:'#allele-card'});
 
         EKeys.load().then(eKeys => {

@@ -133,9 +133,6 @@ class ClinVarExportRecordColumns(DatatableConfig):
         allele = allele_for(allele_id)
         return f"{allele:CA}"
 
-    def render_status(self, row: Dict[str, Any]):
-        return ClinVarExportStatus(row['status']).label
-
     def __init__(self, request):
         super().__init__(request)
 
@@ -145,7 +142,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
             RichColumn("id", orderable=True),
             RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
             RichColumn("clinvar_allele__allele_id", renderer=self.render_allele, name="allele", label="Allele", orderable=True),
-            RichColumn("status", label="Record Status", renderer=self.render_status, orderable=True),
+            RichColumn("status", label="Sync Status", client_renderer='renderStatus', orderable=True),
             RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True),
             RichColumn("scv", label="SCV", orderable=True),
             RichColumn(key="classification_based_on__created", name="classification", label='ClinVar Variant',

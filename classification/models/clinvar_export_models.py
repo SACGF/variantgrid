@@ -113,11 +113,13 @@ class ClinVarExport(TimeStampedModel):
             content["recordStatus"] = "novel"
         return content
 
+    @property
+    def last_submission(self) -> Optional['ClinVarExportSubmissionBatch']:
+        return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportSubmissionbatchStatus.REJECTED).order_by('-created').first()
+
     def submission_body_previous(self) -> Optional[JsonObjType]:
         # ignore rejected submissions
-        for last_submission in self.clinvarexportsubmission_set.order_by('-created'):
-            if last_submission.submission_batch.status == ClinVarExportSubmissionbatchStatus.REJECTED:
-                continue
+        if last_submission := self.last_submission:
             return last_submission.submission_body
         return None
 
