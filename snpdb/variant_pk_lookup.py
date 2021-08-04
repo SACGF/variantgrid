@@ -104,7 +104,7 @@ class VariantPKLookup(abc.ABC):
         # during final finish call of batch_process_check(insert_all=True)
         num_variant_hashes = len(self.variant_hashes)
         if num_variant_hashes and num_variant_hashes >= minimum_pipeline_size:
-            variant_ids = self.get_variant_ids(self.variant_hashes)
+            variant_ids = self.get_variant_ids(self.variant_hashes, validate_not_null=False)
             for variant_hash, variant_id, variant_coordinate in zip(self.variant_hashes, variant_ids,
                                                                     self.variant_coordinates):
                 if variant_id:
@@ -185,7 +185,7 @@ class VariantPKLookup(abc.ABC):
 
         loci_ids = self.get_loci_ids(loci_parts_by_hash)  # Validates all are not null
         locus_pk_by_hash = dict(zip(loci_parts_by_hash, loci_ids))
-        variant_ids = self.get_variant_ids(locus_hash_and_alt_id_by_variant_hash, validate_not_null=False)  # unknowns will be None
+        variant_ids = self.get_variant_ids(locus_hash_and_alt_id_by_variant_hash, validate_not_null=False)
         unknown_variants = []
         for variant_hash, variant_pk in zip(locus_hash_and_alt_id_by_variant_hash, variant_ids):
             if variant_pk is None:

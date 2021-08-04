@@ -54,10 +54,11 @@ class BulkUnknownVariantInserter:
             raise ValueError(msg)
 
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
+        # This has been decomposed (only be 1 alt per line)
         chrom = columns[0]
         position = columns[1]
-        ref = columns[3]
-        alt = columns[4]
+        ref = columns[3].strip().upper()
+        alt = columns[4].strip().upper()
         if self.store_gvcf_non_var_blocks is False:
             if alt == "<NON_REF>":
                 self.num_skipped_gvcf_non_var_blocks += 1
