@@ -130,6 +130,7 @@
         <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
 
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Records" badge=count_records badge_status='success' %}
+            <a class="download-link" href="" onclick="alert('not implemented yet.')">Download</a>
             {% datatable table_config=export_columns table_id='records' class_name='sticky-header clinvar-export-table' %}
         {% end_ui_register_tab_embedded %}
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Export Batches" badge=count_batch badge_status='success' %}

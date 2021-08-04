@@ -2,10 +2,12 @@
 import enum
 import itertools
 import logging
+import operator
 from datetime import datetime
-from typing import List, Dict, Optional, Any, Callable
+from functools import reduce
+from typing import List, Dict, Optional, Any, Callable, Union
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from kombu.utils import json
 from lazy import lazy
 
@@ -39,6 +41,7 @@ class RichColumn:
                  key: Optional[str] = None,
                  name: str = None,
                  sort_keys: List[str] = None,
+                 search: Optional[Union[bool, List[str]]] = None,
                  label: str = None,
                  orderable: bool = False,
                  enabled: bool = True,
@@ -53,6 +56,7 @@ class RichColumn:
         :param key: A column name to be retrieved and returned and sorted on
         :param name: A name to be shared between both client and server for this value
         :param sort_keys: If provided, use this array to order_by when ordering by this column
+        :param search: If true and search_box_enabled, sort the key
         :param label: The label of the column
         :param orderable: Can this column be sorted on
         :param enabled: Is this column enabled for this environment/user
@@ -66,6 +70,14 @@ class RichColumn:
         """
         self.key = key
         self.sort_keys = sort_keys
+        self.search = list()
+        if (search is None or search is True) and key:
+            self.search = [key]
+        elif search is True and not key:
+            raise ValueError("Cannot have search = True if no key provided, provide list of searchable columns instead")
+        elif search:
+            self.search = search
+
         if orderable and not self.key and not self.sort_keys:
             raise ValueError("Cannot create an 'orderable' RichColumn without key or sort_keys")
         self.name = name or key
@@ -115,6 +127,8 @@ class RichColumn:
             columns.append(key)
         if self.extra_columns:
             columns += self.extra_columns
+        if self.search:
+            columns += self.search
         return columns
 
     def __eq__(self, other):
@@ -132,6 +146,7 @@ class DatatableConfig:
     as the ability to initate this with just a request comes in handy
     """
 
+    search_box_enabled: bool = False
     rich_columns: List[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
 
@@ -159,6 +174,19 @@ class DatatableConfig:
     def get_initial_queryset(self):
         raise NotImplementedError("Need to provide a model or implement get_initial_queryset!")
 
+    def power_search(self, qs: QuerySet, search_string: str) -> QuerySet:
+        search_cols = set()
+        rich_col: RichColumn
+        for rich_col in self.enabled_columns:  # TODO do we want to check not enabled columns too?
+            search_cols = search_cols.union(rich_col.search)
+
+        filters: List[Q] = list()
+        for search_col in search_cols:
+            filters.append( Q(**{f'{search_col}__icontains': search_string}) )
+        or_filter = reduce(operator.or_, filters)
+        qs = qs.filter(or_filter)
+        return qs
+
     def filter_queryset(self, qs: QuerySet) -> QuerySet:
         """
         Override to apply extra GET/POST params to filter what data is returned
@@ -166,6 +194,10 @@ class DatatableConfig:
         :return: A filtered QuerySet
         """
         return qs
+
+    @staticmethod
+    def _row_expand_ajax(expand_view: str, id_field: str = 'id') -> str:
+        return f"TableFormat.expandAjax.bind(null, '{expand_view}', '{id_field}')"
 
     @lazy
     def _querydict(self):
@@ -261,8 +293,7 @@ class DatatableMixin(object):
         return value
 
     def render_column(self, row: Dict, column: RichColumn):
-        """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type
-        """
+        """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type """
         if column.renderer:
             return column.renderer(row)
         if column.extra_columns:
@@ -306,7 +337,10 @@ class DatatableMixin(object):
     def filter_queryset(self, qs):
         qs = self.config.filter_queryset(qs)
         if qs is not None:
+            if (search_text := self.get_query_param('search[value]')) and (search_text := search_text.strip()):
+                qs = self.config.power_search(qs, search_text)
             return qs
+
         raise NotImplementedError("filter_queryset returned None")
 
     def prepare_results(self, qs: QuerySet):

@@ -19,7 +19,7 @@ $(document).ready(function() {
         processing: true,
         serverSide: true,
         pageLength: lengthValue,
-        dom: '<"top">rt<"bottom"ilp><"clear">',
+        dom: '<"top">{% if search_box_enabled %}f{% endif %}rt<"bottom"ilp><"clear">',
         {% if sort_order %}
         order: {{ sort_order | jsonify }},
         {% endif %}
@@ -33,7 +33,7 @@ $(document).ready(function() {
             type: 'POST',
             {% if data %}data: {{ data | safe }},{% endif %}
         },
-        bFilter: false,
+        bFilter: {{ search_box_enabled | jsonify }},
         columnDefs: [{% for rc in rich_columns %}
             {
             {% if rc.client_renderer %}render: {{rc.client_renderer | safe }}, {% endif %}

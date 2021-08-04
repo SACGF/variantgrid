@@ -1,19 +1,15 @@
 from typing import Dict, Any, Optional
-
-from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from htmlmin.decorators import not_minified_response
 
 from classification.enums import ShareLevel, SpecialEKeys
-from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportStatus, ClinVarAllele, \
-    ClassificationModification, ClinVarExportSubmissionBatchStatus, Classification, ClinVarReleaseStatus
+from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportSubmissionBatchStatus, Classification, ClinVarReleaseStatus
 from genes.hgvs import CHGVS
-from library.cache import timed_cache
 from library.django_utils import add_save_message
 from library.utils import html_to_text
-from snpdb.models import Allele, ClinVarKey, Lab
+from snpdb.models import ClinVarKey, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 import json
 
@@ -26,17 +22,8 @@ class ClinVarExportBatchColumns(DatatableConfig):
     def __init__(self, request):
         super().__init__(request)
 
-        """
-        clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.PROTECT)
-        submission_version = models.IntegerField()
-        status = models.CharField(max_length=1, choices=ClinVarExportSubmissionbatchStatus.choices, default=ClinVarExportSubmissionbatchStatus.AWAITING_UPLOAD)
-        submitted_json = models.JSONField(null=True, blank=True)  # leave this as blank until we've actually uploaded data
-        response_json = models.JSONField(null=True, blank=True)  # what did ClinVar return
-        """
-
-        self.expand_client_renderer = "TableFormat.expandAjax.bind(null, 'clinvar_export_batch_detail', 'id')";
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail');
         self.rich_columns = [
-            # TODO, toggle enabled on screens where it makes sense
             RichColumn("id", orderable=True),
             RichColumn("clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
             RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True),
@@ -85,7 +72,8 @@ class ClinVarExportRecordColumns(DatatableConfig):
                     "transcript": c_hgvs.transcript,
                     "geneSymbol": c_hgvs.gene_symbol,
                     "variant": c_hgvs.raw_c,
-                    "variantId": row["classification_based_on__classification__variant"]
+                    # below row makes this link to the variant, but probably not desired action
+                    # "variantId": row["classification_based_on__classification__variant"]
                 }
             else:
                 return {"full": c_hgvs_str}
@@ -95,20 +83,28 @@ class ClinVarExportRecordColumns(DatatableConfig):
     def __init__(self, request):
         super().__init__(request)
 
-        self.expand_client_renderer = "TableFormat.expandAjax.bind(null, 'clinvar_export_detail', 'id')";
+        self.search_box_enabled = True
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
             RichColumn("id", orderable=True),
-            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
+            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False, search=False),
             RichColumn(name="c_hgvs", label='c.hgvs',
-                       sort_keys=["classification_based_on__classification__chgvs_grch38"], extra_columns=[
-                    "classification_based_on__classification__variant",
-                    "classification_based_on__published_evidence__genome_build__value",
-                    "classification_based_on__classification__chgvs_grch37",
-                    "classification_based_on__classification__chgvs_grch38",
-                ], renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs'),
-            RichColumn("condition", name="condition", client_renderer='VCTable.condition'),
-            RichColumn("status", label="Sync Status", client_renderer='renderStatus', orderable=True),
-            RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True),
+                        sort_keys=["classification_based_on__classification__chgvs_grch38"],
+                        extra_columns=[
+                            "classification_based_on__classification__variant",
+                            "classification_based_on__published_evidence__genome_build__value",
+                            "classification_based_on__classification__chgvs_grch37",
+                            "classification_based_on__classification__chgvs_grch38",
+                        ],
+                        renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
+                        search=["classification_based_on__classification__chgvs_grch37",
+                               "classification_based_on__classification__chgvs_grch38"
+                        ]
+            ),
+            # TODO store plain text condition so we can search it and sort it
+            RichColumn("condition", name="condition", client_renderer='VCTable.condition', search=False),
+            RichColumn("status", label="Sync Status", client_renderer='renderStatus', orderable=True, search=False),
+            RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True, search=False),
             RichColumn("scv", label="SCV", orderable=True),
         ]
 
