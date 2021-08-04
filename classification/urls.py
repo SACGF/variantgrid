@@ -48,7 +48,7 @@ urlpatterns = [
 
     perm_path('clivnar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
     perm_path('clinvar_export_summary/<str:pk>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
-    perm_path('clinvar_export', clinvar_export_view.clinvar_exports_view, name='clinvar_exports'),
+    perm_path('clinvar_export_summary/<str:clinvar_key>/download', clinvar_export_view.clinvar_export_download, name='clinvar_key_summary_export_download'),
     perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportRecordColumns), name='clinvar_exports_datatables'),
     perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review, name='clinvar_export'),
     perm_path('clinvar_export/<int:pk>/detail', clinvar_export_view.clinvar_export_detail, name='clinvar_export_detail'),
