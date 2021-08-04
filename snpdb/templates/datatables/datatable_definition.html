@@ -46,25 +46,36 @@ $(document).ready(function() {
         {% endfor %}]
     });
     {% if expand_client_renderer %}
-    tableDom.on('click', 'tr', function() {
-        let tr = $(this); //.closest('tr');
-        let row = datatable.row( tr );
-        if ( row.child.isShown() ) {
-            // This row is already open - close it
-            row.child.hide();
-            tr.removeClass('shown');
-        } else {
-            // Open this row
-            let childHtml = {{ expand_client_renderer | safe }}(row.data());
-            if (!tr.hasClass('loaded')) {
-                row.child( childHtml ).show();
+        let expandedTr = null;
+        let expandedRow = null;
+        tableDom.on('click', 'tr', function() {
+            let tr = $(this); //.closest('tr');
+            let row = datatable.row( tr );
+            if ( row.child.isShown() ) {
+                // This row is already open - close it
+                row.child.hide();
+                tr.removeClass('shown');
+
+                expandedRow = null;
+                expandedTr = null;
             } else {
-                row.child.show();
+                // Open this row
+                let childHtml = {{ expand_client_renderer | safe }}(row.data());
+                if (!tr.hasClass('loaded')) {
+                    row.child( childHtml ).show();
+                } else {
+                    row.child.show();
+                }
+                tr.addClass('shown');
+                tr.addClass('loaded');
+                if (expandedRow && expandedTr) {
+                    expandedRow.child.hide();
+                    expandedTr.removeClass('shown');
+                }
+                expandedRow = row;
+                expandedTr = tr;
             }
-            tr.addClass('shown');
-            tr.addClass('loaded');
-        }
-    });
+        });
     {% endif %}
     tableDom.on( 'error.dt', function ( e, settings, techNote, message ) {
         Rollbar.warning("DataTables error " + message);
