@@ -85,7 +85,7 @@ class ClinVarExport(TimeStampedModel):
 
     def update_classification(self, new_classification_based_on: Optional[ClassificationModification]):
         if self.classification_based_on != new_classification_based_on:
-            lazy.invalidate(self, 'submission_body_current')
+            lazy.invalidate(self, 'submission_body')
             self.classification_based_on = new_classification_based_on
             self.update()
 

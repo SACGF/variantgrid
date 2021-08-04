@@ -241,13 +241,13 @@ class ClinVarKey(TimeStampedModel):
     def clean(self):
         #  validate assertion method lookup
         if not isinstance(self.assertion_method_lookup, dict):
-            raise ValidationError({'assertion_method_lookup': ValidationError("Must be a dictionary of regular expression keys to {citation: db, id or url} and {method: str}")})
+            raise ValidationError({'assertion_method_lookup': ValidationError("Must be a dictionary of regular expression keys to \"acmg\" or {citation: db, id or url} and {method: str}")})
         for key, assertion_dict in self.assertion_method_lookup.items():
             try:
                 re.compile(key)
             except:
                 raise ValidationError({'assertion_method_lookup': ValidationError(f'%s is not a valid regular expression', params={'key': key})})
-            if not isinstance(assertion_dict, dict) or 'citation' not in assertion_dict or 'method' not in assertion_dict:
+            if assertion_dict != "acmg" and (not isinstance(assertion_dict, dict) or 'citation' not in assertion_dict or 'method' not in assertion_dict):
                 raise ValidationError({'assertion_method_lookup': ValidationError('%s must have value for citation (db,id or url) and method', params={'key': key})})
 
     @staticmethod

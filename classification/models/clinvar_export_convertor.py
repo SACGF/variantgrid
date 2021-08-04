@@ -12,6 +12,7 @@ from classification.models.evidence_mixin import VCDbRefDict
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import GenomeBuild, ClinVarKey
 import re
+import json
 
 
 class ClinVarEvidenceKey:
@@ -222,24 +223,29 @@ class ClinVarExportConverter:
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
 
         assertion_method_lookups = self.clinvar_key.assertion_method_lookup
+        acmg_criteria = {
+            "citation": {
+                "db": "PubMed",
+                "id": "PubMed:25741868"
+            },
+            "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value("acmg")
+        }
 
         if assertion_criteria == "acmg":
-            return {
-                "citation": {
-                    "db": "PubMed",
-                    "id": "PubMed:25741868"
-                },
-                "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value(assertion_criteria)
-            }
+            return acmg_criteria
         else:
             for key, criteria in assertion_method_lookups.items():
+                raw_criteria = criteria
+                if criteria == "acmg":
+                    criteria = acmg_criteria
+
                 if not assertion_criteria:
-                    if not criteria:
-                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for blank assertion method \"{key}\""))
+                    if not criteria or re.compile(key, RegexFlag.IGNORECASE).match(""):
+                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
                 else:
                     expr = re.compile(key, RegexFlag.IGNORECASE)
                     if expr.match(assertion_criteria):
-                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\""))
+                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
 
