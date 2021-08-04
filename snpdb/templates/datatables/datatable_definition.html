@@ -19,7 +19,7 @@ $(document).ready(function() {
         processing: true,
         serverSide: true,
         pageLength: lengthValue,
-        dom: '<"top">{% if search_box_enabled %}f{% endif %}rt<"bottom"ilp><"clear">',
+        dom: '<"top"><"toolbar"<"custom">{% if search_box_enabled %}f>{% endif %}rt<"bottom"ilp><"clear">',
         {% if sort_order %}
         order: {{ sort_order | jsonify }},
         {% endif %}
@@ -73,4 +73,8 @@ $(document).ready(function() {
     $(`select[name=${tableId}_length]`).change(function() {
         localStorage.setItem(lengthKey, $(this).val());
     });
+    // move any externally defined toolbar elements onto it
+
+    $(`[data-toolbar="#${tableId}"]`).detach().appendTo($(`#${tableId}`).closest('.dataTables_wrapper').find('.toolbar .custom'));
+
 });

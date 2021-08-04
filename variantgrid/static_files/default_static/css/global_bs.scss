@@ -142,6 +142,13 @@ table.dataTable td.dataTables_empty {
 table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
     cursor:pointer;
 }
+.dataTables_wrapper .toolbar {
+    display: flex;
+    align-items: baseline;
+    .custom {
+        flex-grow: 1;
+    }
+}
 
 .variant-coordinate {
     word-break: break-all;
