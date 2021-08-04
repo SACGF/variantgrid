@@ -30,6 +30,13 @@ def server_side_format_clingen_allele(row, field):
     return ca_id
 
 
+def server_side_format_exon_and_intron(row, field):
+    """ MS Excel will turn '8/11' into a date :( """
+    if val := row[field]:
+        val = val.replace("/", " of ")
+    return val
+
+
 class VariantGrid(JqGridSQL):
     model = AnalysisNode.model
     caption = 'VariantGrid'
@@ -48,6 +55,8 @@ class VariantGrid(JqGridSQL):
         'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
         'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60, 'formatter': 'omimLink'},
         'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
+        'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
+        'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
         # Unit -> Percent
         'variantannotation__af_1kg': {'formatter': 'unitAsPercentFormatter'},
         'variantannotation__af_uk10k': {'formatter': 'unitAsPercentFormatter'},
