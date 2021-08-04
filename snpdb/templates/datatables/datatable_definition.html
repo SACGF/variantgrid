@@ -50,6 +50,10 @@ $(document).ready(function() {
         let expandedRow = null;
         tableDom.on('click', 'tr', function() {
             let tr = $(this); //.closest('tr');
+            if (!tr.hasClass('odd') && !tr.hasClass('even')) {
+                // not a regular row
+                return;
+            }
             let row = datatable.row( tr );
             if ( row.child.isShown() ) {
                 // This row is already open - close it
@@ -60,8 +64,8 @@ $(document).ready(function() {
                 expandedTr = null;
             } else {
                 // Open this row
-                let childHtml = {{ expand_client_renderer | safe }}(row.data());
                 if (!tr.hasClass('loaded')) {
+                    let childHtml = {{ expand_client_renderer | safe }}(row.data());
                     row.child( childHtml ).show();
                 } else {
                     row.child.show();
