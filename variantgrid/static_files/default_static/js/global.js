@@ -56,6 +56,7 @@ function enhanceAndMonitor() {
     // done like this so can respond to dynamically added elements through ajax or complicated js
     let processors = [
         // these elements don't like being screwed with
+        // by providing no function it means anything tht is one of these will be skipped
         {test: `[role="gridcell"]`, func: null},
         {test: `.select2-selection__clear`, func: null},
 
@@ -177,11 +178,28 @@ function enhanceAndMonitor() {
         }
     }
 
+    let badElementTests = [];
+    for (let processor of processors) {
+        if (!processor.func) {
+            badElementTests.push(processor.test);
+        }
+    }
+
     // update the initial state
     for (let processor of processors) {
         if (processor.func) {
             $(processor.test).each((index, node) => {
-                processor.func($(node));
+                node = $(node);
+                let isGood = true;
+                for (let badTest in badElementTests) {
+                    if (node.is(badTest)) {
+                        isGood = false;
+                        break;
+                    }
+                }
+                if (isGood) {
+                    processor.func($(node));
+                }
             });
         }
     }
@@ -753,37 +771,33 @@ TableFormat.hgvs = function(data, type, columns) {
 
     return dom.prop('outerHTML');
 };
-TableFormat.expandAjax = function ajaxBlock(url, param, data) {
+TableFormat.expandAjax = function(url, param, expectedHeight, data) {
     if (data) {
         let dataId = data[param];
+        if (!dataId) {
+            return `<i class="fas fa-bomb text-danger"></i> No value for "${param}" in this ${JSON.stringify(data)} : Developer, is ${param} a column in this table, visible or otherwise?`;
+        }
         let ajaxId = `ajax_${dataId}`
         let reverseUrl = Urls[url];
         if (!reverseUrl) {
             return `<i class="fas fa-bomb text-danger"></i> URL not configured for "${url} : Developer may need to run<br/>
             <div class="code">manage.py collectstatic_js_reverse</div>`;
         }
-        if (!dataId) {
-            return `<i class="fas fa-bomb text-danger"></i> No value for "${param}" in this row : Developer, is ${param} a column in this table, visible or otherwise?`;
-        }
         if (param) {
             reverseUrl = reverseUrl(dataId)
         }
         window.setTimeout(() => {
+            // element doesn't exist yet, have to wait until after it's created to ajax it
             let ajaxDom = $(`#${ajaxId}`);
-            $.ajax({
-                type: "GET",
-                url: reverseUrl,
-                success: (results) => {
-                    ajaxDom.LoadingOverlay('hide');
-                    ajaxDom.html(results);
-                },
-                error: (call, status, text) => {
-                    ajaxDom.LoadingOverlay('hide');
-                    ajaxDom.html("Error Loading Data");
-                }
-            });
-        }, 0);
-        return `<div id="${ajaxId}">Loading</div>`;
+            loadAjaxBlock(ajaxDom, reverseUrl);
+        },0);
+
+        if (!expectedHeight) {
+            expectedHeight = "100px";
+        }
+        return `<div id="${ajaxId}">
+            <div style="text-align: center;color: #888; min-height:${expectedHeight}">Loading...</div>
+        </div>`;
     } else {
         return '';
     }

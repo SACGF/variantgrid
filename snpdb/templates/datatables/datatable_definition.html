@@ -63,6 +63,14 @@ $(document).ready(function() {
                 expandedRow = null;
                 expandedTr = null;
             } else {
+                // Close previous row (if there is one)
+                if (expandedRow && expandedTr) {
+                    expandedRow.child.hide();
+                    expandedTr.removeClass('shown');
+                }
+                expandedRow = row;
+                expandedTr = tr;
+
                 // Open this row
                 if (!tr.hasClass('loaded')) {
                     let childHtml = {{ expand_client_renderer | safe }}(row.data());
@@ -72,12 +80,6 @@ $(document).ready(function() {
                 }
                 tr.addClass('shown');
                 tr.addClass('loaded');
-                if (expandedRow && expandedTr) {
-                    expandedRow.child.hide();
-                    expandedTr.removeClass('shown');
-                }
-                expandedRow = row;
-                expandedTr = tr;
             }
         });
     {% endif %}

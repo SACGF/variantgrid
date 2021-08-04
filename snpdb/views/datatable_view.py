@@ -196,8 +196,9 @@ class DatatableConfig:
         return qs
 
     @staticmethod
-    def _row_expand_ajax(expand_view: str, id_field: str = 'id') -> str:
-        return f"TableFormat.expandAjax.bind(null, '{expand_view}', '{id_field}')"
+    def _row_expand_ajax(expand_view: str, id_field: str = 'id', expected_height: Optional[int] = None) -> str:
+        expected_height_str = f"{expected_height if expected_height else 100}px"
+        return f"TableFormat.expandAjax.bind(null, '{expand_view}', '{id_field}', '{expected_height_str}')"
 
     @lazy
     def _querydict(self):
