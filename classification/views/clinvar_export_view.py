@@ -14,7 +14,7 @@ from genes.hgvs import CHGVS
 from library.django_utils import add_save_message, get_url_from_view_path
 from library.utils import html_to_text, delimited_row
 from snpdb.models import ClinVarKey, Lab
-from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import json
 
 
@@ -28,7 +28,7 @@ class ClinVarExportBatchColumns(DatatableConfig):
 
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail')
         self.rich_columns = [
-            RichColumn("id", orderable=True),
+            RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
             RichColumn("clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
             RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn("status", renderer=self.render_status, orderable=True)
@@ -90,7 +90,7 @@ class ClinVarExportRecordColumns(DatatableConfig):
         self.search_box_enabled = True
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
-            RichColumn("id", orderable=True),
+            RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
             RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False, search=False),
             RichColumn(name="c_hgvs", label='c.hgvs',
                     sort_keys=["classification_based_on__classification__chgvs_grch38"],
