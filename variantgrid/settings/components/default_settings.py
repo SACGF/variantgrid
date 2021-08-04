@@ -295,6 +295,10 @@ VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
 VCF_IMPORT_STORE_GVCF_NON_VAR_BLOCKS = False
 VCF_IMPORT_VT_COMMAND = "vt"  # Needs to be installed and in path
+VCF_IMPORT_SKIP_RECORD_REGEX = {
+    "CNV": "<CNV>",
+    "Fusion": "VARTYPE=fusion",
+}
 
 COMPANY = None  # Used for gene list categories
 
