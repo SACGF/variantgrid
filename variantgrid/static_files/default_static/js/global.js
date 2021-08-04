@@ -793,7 +793,8 @@ TableFormat.expandAjax = function(url, param, expectedHeight, data) {
         },0);
 
         if (!expectedHeight) {
-            expectedHeight = "100px";
+            // put a small div in the row to show that we're thinking
+            expectedHeight = "50px";
         }
         return `<div id="${ajaxId}">
             <div style="text-align: center;color: #888; min-height:${expectedHeight}">Loading...</div>
