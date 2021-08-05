@@ -43,7 +43,6 @@ from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMerge
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
-from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
@@ -153,22 +152,6 @@ def server_status(request):
     except (KeyError, FileNotFoundError):
         can_access_reference = False
 
-    try:
-        variant_pk_lookup = VariantPKLookup.factory()
-        redis_check = getattr(variant_pk_lookup, "redis_check", None)
-        if redis_check is None:
-            redis_status = None
-            redis_message = None
-        elif redis_check:
-            redis_status = "info"
-            redis_message = "OK"
-        else:
-            redis_status = "warning"
-            redis_message = "Inserts running - unable to check"
-    except ValueError as ve:
-        redis_status = "danger"
-        redis_message = str(ve)
-
     # Variant Annotation - incredibly quick check
     highest_variant_annotated = {}
     try:
@@ -214,16 +197,16 @@ def server_status(request):
     dashboard_notices = get_dashboard_notices(request.user, days_ago)
     total_counts = get_total_counts(request.user)
 
-    context = {"celery_workers": celery_workers,
-               "queries": long_running_sql(),
-               "can_access_reference": can_access_reference,
-               "redis_status": redis_status,
-               "redis_message": redis_message,
-               "disk_free": disk_free,
-               "highest_variant_annotated": highest_variant_annotated,
-               "sample_enrichment_kits_df": sample_enrichment_kits_df,
-               "dashboard_notices": dashboard_notices,
-               "total_counts": total_counts}
+    context = {
+        "celery_workers": celery_workers,
+        "queries": long_running_sql(),
+        "can_access_reference": can_access_reference,
+        "disk_free": disk_free,
+        "highest_variant_annotated": highest_variant_annotated,
+        "sample_enrichment_kits_df": sample_enrichment_kits_df,
+        "dashboard_notices": dashboard_notices,
+        "total_counts": total_counts,
+    }
     return render(request, "variantopedia/server_status.html", context)
 
 

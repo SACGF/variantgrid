@@ -14,7 +14,7 @@ from variantgrid.celery import app
 
 class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
     """ This is run after the VCF import data insertion stage.
-        Variants will be in database, and redis at this stage
+        Variants will be in database, at this stage
 
         BulkMinimalVCFProcessor will have inserted ModifiedImportedVariant if
         any were normalised during import process """
@@ -65,14 +65,14 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
             try:
                 validation_message = None
                 if variant_pk is None:
-                    # Not in Redis - could have been normalised during import
+                    # Not inserted - was normalised during import
                     try:
                         miv = ModifiedImportedVariant.get_upload_pipeline_unnormalized_variant(upload_step.upload_pipeline, *variant_tuple)
-                        variant_id = miv.variant.pk
+                        variant_pk = miv.variant.pk
                         validation_message = f"{miv.old_variant} was normalized to {miv.variant}"
                     except ModifiedImportedVariant.DoesNotExist:
                         variant_str = " ".join(map(str, variant_tuple))
-                        validation_message = f"Variant '{variant_str}' for classification {classification.pk} was not inserted/in Redis!"
+                        validation_message = f"Variant '{variant_str}' for classification {classification.pk} not inserted!"
 
                 variant = None
                 if variant_pk:

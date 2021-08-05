@@ -34,10 +34,6 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
 
     def batch_handle_variant_ids(self, variant_ids):
         variant_ids_by_hash = dict(zip(self.variant_hashes, variant_ids))
-        for vh, pk in variant_ids_by_hash.items():
-            if pk is None:
-                raise ValueError(f"Variant hash: '{vh}' not in Redis!")
-
         if self.modified_imported_variants:
             self.process_modified_imported_variants(variant_ids_by_hash)
 
@@ -54,5 +50,4 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
 
     def finish(self):
         """ This is called at the very end so we can collect any remaining items to process """
-
         self.batch_process_check(0)  # Insert anything that is there

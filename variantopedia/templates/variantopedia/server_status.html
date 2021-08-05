@@ -69,9 +69,6 @@
         </div>
         {% endif %}
 
-        {% if redis_status %}
-        {% labelled id="redis" label="Redis" %}<div class="alert alert-{{ redis_status }}">{{  redis_message }}</div>{% endlabelled %}
-        {% endif %}
         {% labelled id="highest_variant" label="Highest Variant Annotated w/latest" %}<div class="alert alert-{{ highest_variant_annotated.status }}">{{  highest_variant_annotated.message }}</div>{% endlabelled %}
         {% labelled id="low_disk" label="Disk Free" %}
             <div class="alert alert-{{ disk_free.status }}">

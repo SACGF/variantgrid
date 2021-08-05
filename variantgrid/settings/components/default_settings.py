@@ -31,7 +31,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(SETTINGS_DIR))
 PRIVATE_DATA_ROOT = os.path.join(BASE_DIR, "data")
 UPLOAD_RELATIVE_PATH = "data/uploads"  # Needed for FileSystemStorage
 UPLOAD_DIR = os.path.join(BASE_DIR, UPLOAD_RELATIVE_PATH)
-UPLOAD_ENABLED = True  # This disables uploading files or creating variants (used eg if Redis is out of sync)
+UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg if out of disk)
 
 # Absolute filesystem path to the directory that will hold GLOBALLY VISIBLE user-uploaded files.
 # Example: "/var/www/example.com/media/"
@@ -408,7 +408,6 @@ INITIAL_USER_DATA_PREFIX_KWARGS = {}  # Create UserDataPrefix object to setup IG
 
 USER_SETTINGS_SHOW_GROUPS = True
 
-REDIS_PIPELINE_SIZE = 100000
 SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
@@ -804,7 +803,6 @@ VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
-VARIANT_PK_HASH_USE_REDIS = False
 
 VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH = False
 VIEW_GENE_SHOW_HOTSPOT_GRAPH = True
