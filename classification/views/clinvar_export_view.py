@@ -58,7 +58,7 @@ def clinvar_export_batch_detail(request, pk: int):
     })
 
 
-class ClinVarExportRecordColumns(DatatableConfig):
+class ClinVarExportColumns(DatatableConfig):
 
     def render_c_hgvs(self, row: Dict[str, Any]):
         if row["classification_based_on__classification__variant"]:
@@ -107,7 +107,12 @@ class ClinVarExportRecordColumns(DatatableConfig):
                     ]
             ),
             # TODO store plain text condition so we can search it and sort it
-            RichColumn("condition", name="condition", client_renderer='VCTable.condition', search=False),
+            RichColumn("condition",
+                       name="condition",
+                       client_renderer='VCTable.condition',
+                       search=["condition__display_text"],
+                       sort_keys=["condition__sort_text"]
+            ),
             RichColumn("status", label="Sync Status", client_renderer='renderStatus', orderable=True, search=False),
             RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True, search=False),
             RichColumn("scv", label="SCV", orderable=True),
@@ -218,7 +223,7 @@ def clinvar_export_summary(request, pk: Optional[str] = None):
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
     missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
 
-    export_columns = ClinVarExportRecordColumns(request)
+    export_columns = ClinVarExportColumns(request)
     export_batch_columns = ClinVarExportBatchColumns(request)
 
     return render(request, 'classification/clinvar_key_summary.html', {

@@ -43,7 +43,7 @@ class RichColumn:
                  sort_keys: List[str] = None,
                  search: Optional[Union[bool, List[str]]] = None,
                  label: str = None,
-                 orderable: bool = False,
+                 orderable: bool = None,
                  enabled: bool = True,
                  renderer: Optional[Callable[[Dict[str, Any]], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
@@ -70,6 +70,8 @@ class RichColumn:
         """
         self.key = key
         self.sort_keys = sort_keys
+        if orderable is None:
+            orderable = bool(sort_keys)
         self.search = list()
         if (search is None or search is True) and key:
             self.search = [key]

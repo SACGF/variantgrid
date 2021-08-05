@@ -80,7 +80,7 @@ class ClinVarExport(TimeStampedModel):
 
     @condition_resolved.setter
     def condition_resolved(self, new_condition: ConditionResolved):
-        self.condition = new_condition.as_json_minimal()
+        self.condition = new_condition.to_json()
         lazy.invalidate(self, '_condition_resolved')
 
     def update_classification(self, new_classification_based_on: Optional[ClassificationModification]):
@@ -91,7 +91,7 @@ class ClinVarExport(TimeStampedModel):
 
     @staticmethod
     def new_condition(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]) -> 'ClinVarExport':
-        cc = ClinVarExport(clinvar_allele=clinvar_allele, condition=condition.as_json_minimal())
+        cc = ClinVarExport(clinvar_allele=clinvar_allele, condition=condition.to_json())
         cc.update_classification(candidate)
         return cc
 
@@ -159,7 +159,7 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar Export submission batch"
 
-    clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.PROTECT)
+    clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.CASCADE)
     submission_version = models.IntegerField()
     status = models.CharField(max_length=1, choices=ClinVarExportSubmissionBatchStatus.choices, default=ClinVarExportSubmissionBatchStatus.AWAITING_UPLOAD)
     submitted_json = models.JSONField(null=True, blank=True)  # leave this as blank until we've actually uploaded data
@@ -221,7 +221,7 @@ class ClinVarExportSubmission(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar export submission"
 
-    clinvar_export = models.ForeignKey(ClinVarExport, on_delete=models.PROTECT)  # if there's been an actual submission, don't allow deletes
+    clinvar_export = models.ForeignKey(ClinVarExport, on_delete=models.CASCADE)  # if there's been an actual submission, don't allow deletes
     classification_based_on = models.ForeignKey(ClassificationModification, on_delete=models.PROTECT)
     submission_batch = models.ForeignKey(ClinVarExportSubmissionBatch, on_delete=models.CASCADE)
     submission_full = models.JSONField()  # the full data included in the batch submission

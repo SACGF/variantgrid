@@ -216,7 +216,7 @@ class ConditionResolvedDict(TypedDict, total=False):
 @dataclass(frozen=True)
 class ConditionResolved:
     terms: List[OntologyTerm]
-    join: Optional[Any] = None
+    join: Optional['MultiCondition'] = None
     plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
     @property
@@ -295,16 +295,39 @@ class ConditionResolved:
         }
         return term_dict
 
-    def as_json_minimal(self) -> Optional[Dict]:
-        # note, doesn't provide display_text or sort_text
-        terms: List[ConditionResolvedTermDict] = list()
+    def to_json(self) -> ConditionResolvedDict:
+        jsoned: ConditionResolvedDict
         if self.terms:
-            terms = [ConditionResolved.term_to_dict(term) for term in self.terms]
-        if join := self.join:
-            # FIXME test that it's the string version that you're storing
-            return {"resolved_terms": terms, "resolved_join": join.value}
+            from classification.models import MultiCondition
+
+            def format_term(term: OntologyTerm) -> str:
+                if name := term.name:
+                    return f"{term.id} {term.name}"
+                return term.id
+
+            terms = self.terms
+            text = ", ".join([format_term(term) for term in terms])
+            sort_text = ", ".join([term.name for term in terms]).lower()
+            join: Optional[MultiCondition] = None
+            if len(terms) > 1:
+                join = self.join or MultiCondition.NOT_DECIDED
+                text = f"{text}; {self.join.label}"
+
+            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in self.terms]
+
+            jsoned = {
+                "resolved_terms": resolved_term_dicts,
+                "resolved_join": join,
+                "display_text": text,
+                "sort_text": sort_text
+            }
+            return jsoned
         else:
-            return {"resolved_terms": terms}
+            jsoned = {
+                "display_text": self.plain_text,
+                "sort_text": self.plain_text
+            }
+        return jsoned
 
     @lazy
     def join_text(self) -> Optional[str]:
