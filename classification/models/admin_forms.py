@@ -538,9 +538,9 @@ class ClinVarExportAdmin(ModelAdminBasics):
         }, **kwargs)
 
     def add_to_batch(self, request, queryset):
-        batches = ClinVarExportSubmissionBatch.create_batches(queryset)
+        batches = ClinVarExportSubmissionBatch.create_batches(queryset, force_update=True)
         if batches:
-            for batch in ClinVarExportSubmissionBatch.create_batches(queryset):
+            for batch in batches:
                 messages.add_message(request, level=messages.INFO, message=f"Submission Batch for {batch.clinvar_key} created with {batch.clinvarexportsubmission_set.count()} submissions")
         else:
             messages.add_message(request, level=messages.WARNING, message="No records in pending non-errored state to add to a new batch")

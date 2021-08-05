@@ -179,17 +179,24 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
         }
 
     @staticmethod
-    def create_batches(qs: QuerySet) -> List['ClinVarExportSubmissionBatch']:
+    def create_batches(qs: QuerySet, force_update: bool = False) -> List['ClinVarExportSubmissionBatch']:
         all_batches: List[ClinVarExportSubmissionBatch] = list()
 
         current_batch: Optional[ClinVarExportSubmissionBatch] = None
         current_batch_size = 0
 
         qs = qs.order_by('clinvar_allele__clinvar_key')
-        qs = qs.filter(status__in=[ClinVarExportStatus.NEW_SUBMISSION, ClinVarExportStatus.CHANGES_PENDING])
+        if not force_update:
+            qs = qs.filter(status__in=[ClinVarExportStatus.NEW_SUBMISSION, ClinVarExportStatus.CHANGES_PENDING])
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')
         record: ClinVarExport
         for record in qs:
+            if force_update:
+                record.update()
+                # only have to do a check if we're not previously doing the filter
+                if record.status in {ClinVarExportStatus.UP_TO_DATE, ClinVarExportStatus.IN_ERROR}:
+                    continue
+
             full_current = record.submission_full
             if not full_current.has_errors:  # should never have errors as we're filtering on new submission changes pending
 
@@ -211,6 +218,7 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
                     submission_body=record.submission_body.pure_json(),
                     submission_version=1
                 ).save()
+                current_batch_size += 1
                 record.status = ClinVarExportStatus.UP_TO_DATE
                 record.save()
 
