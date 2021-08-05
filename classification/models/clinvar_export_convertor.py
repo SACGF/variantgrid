@@ -1,5 +1,5 @@
 from re import RegexFlag
-from typing import List, Any, Mapping, TypedDict, Optional, Dict, Union
+from typing import List, Any, Mapping, TypedDict, Union
 import bs4
 from lazy import lazy
 

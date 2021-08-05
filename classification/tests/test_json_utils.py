@@ -9,11 +9,11 @@ class JsonUtilTests(TestCase):
         original = ValidatedJson({
             "normal": 3,
             "validated": ValidatedJson(
-                 [
-                     1,
-                     ValidatedJson(2, JsonMessages.info("This is the number 2"))
-                 ]
-            , JsonMessages.info("This is a list of numbers"))
+                [
+                    1,
+                    ValidatedJson(2, JsonMessages.info("This is the number 2"))
+                ]
+                , JsonMessages.info("This is a list of numbers"))
         })
         serialized = original.serialize()
         print(json.dumps(serialized))

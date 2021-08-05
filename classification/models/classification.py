@@ -444,7 +444,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def condition_text_record(self) -> 'ConditionText':
-        from classification.models import ConditionTextMatch
         if ctm := self.conditiontextmatch:
             return ctm.condition_text
         return None

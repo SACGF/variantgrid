@@ -17,7 +17,7 @@ from model_utils.models import TimeStampedModel
 
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
-    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolvedTermDict, ConditionResolved
+    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved
 from annotation.regexes import db_ref_regexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
@@ -384,7 +384,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         """
         if terms := self.condition_xref_terms:
 
-            condition_resolved_obj = ConditionResolved(terms = _sort_terms(terms), join=None if len(terms) <= 1 else MultiCondition(self.condition_multi_operation))
+            condition_resolved_obj = ConditionResolved(terms=_sort_terms(terms), join=None if len(terms) <= 1 else MultiCondition(self.condition_multi_operation))
             return condition_resolved_obj.to_json()
 
         return None
