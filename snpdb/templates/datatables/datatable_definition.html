@@ -1,5 +1,5 @@
 {% load js_tags %}
-
+{% comment %}Convert this all to a pure JavaScript function that takes a dictionary input{% endcomment %}
 $(document).ready(function() {
     let tableId = '{{table_id}}';
     let tableDom = $(`#${tableId}`);
@@ -48,6 +48,7 @@ $(document).ready(function() {
     {% if expand_client_renderer %}
         let expandedTr = null;
         let expandedRow = null;
+        let hoverTimeout = null;
         tableDom.on('click', 'tr', function() {
             let tr = $(this); //.closest('tr');
             if (!tr.hasClass('odd') && !tr.hasClass('even')) {
@@ -71,16 +72,37 @@ $(document).ready(function() {
                 expandedRow = row;
                 expandedTr = tr;
 
-                // Open this row
                 if (!tr.hasClass('loaded')) {
+                    // loading hasn't started yet, load the row
                     let childHtml = {{ expand_client_renderer | safe }}(row.data());
-                    row.child( childHtml ).show();
-                } else {
-                    row.child.show();
+                    row.child( childHtml );
+                    tr.addClass('loaded');
                 }
+                // show the row
+                row.child.show();
                 tr.addClass('shown');
-                tr.addClass('loaded');
             }
+        });
+        // PRE-FETCH data
+        // if hovering over a single row for 500ms, pre-fetch the client data ready to display
+        tableDom.on('mouseenter', 'tr', function() {
+            let tr = $(this);
+            if (!tr.hasClass('odd') && !tr.hasClass('even') || tr.hasClass('loaded')) {
+                return; // either not an odd or even row, or already
+            }
+            window.clearTimeout(hoverTimeout);
+            hoverTimeout = window.setTimeout(() => {
+                if (!tr.hasClass('loaded')) { // could have been clicked on
+                    let row = datatable.row( tr );
+                    let childHtml = {{ expand_client_renderer | safe }}(row.data());
+                    row.child( childHtml );
+                    tr.addClass('loaded');
+                    tr.addClass('pre-fetched'); // in case we ever want to do stats on it
+                }
+            }, 500);
+        });
+        tableDom.on('mouseleave', 'tr', function() {
+            window.clearTimeout(hoverTimeout);
         });
     {% endif %}
     tableDom.on( 'error.dt', function ( e, settings, techNote, message ) {
@@ -93,5 +115,4 @@ $(document).ready(function() {
     // move any externally defined toolbar elements onto it
 
     $(`[data-toolbar="#${tableId}"]`).detach().appendTo($(`#${tableId}`).closest('.dataTables_wrapper').find('.toolbar .custom'));
-
 });

@@ -786,19 +786,20 @@ TableFormat.expandAjax = function(url, param, expectedHeight, data) {
         if (param) {
             reverseUrl = reverseUrl(dataId)
         }
-        window.setTimeout(() => {
-            // element doesn't exist yet, have to wait until after it's created to ajax it
-            let ajaxDom = $(`#${ajaxId}`);
-            loadAjaxBlock(ajaxDom, reverseUrl);
-        },0);
+
+        let ajaxDom =
+            $('<div>', {html:[
+                $('<div>', {style:`text-align: center;color: #888; min-height:${expectedHeight}`, text:'Loading...'})
+            ]});
+
+        loadAjaxBlock(ajaxDom, reverseUrl);
 
         if (!expectedHeight) {
             // put a small div in the row to show that we're thinking
             expectedHeight = "50px";
         }
-        return `<div id="${ajaxId}">
-            <div style="text-align: center;color: #888; min-height:${expectedHeight}">Loading...</div>
-        </div>`;
+        // fixme make m proper jquery
+        return ajaxDom;
     } else {
         return '';
     }
