@@ -36,8 +36,6 @@
 
 	$(document).ready(function() {
         ANALYSIS_SETTINGS = {{ new_analysis_settings|jsonify }};
-		//$("#analysis-tabs").tabs();
-        setupAjaxTabs($("#analysis-tabs"));
 
         $('button#close-analysis-settings').click(function() {
             $("#analysis-settings-container").parent().empty();            
