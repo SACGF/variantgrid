@@ -1,7 +1,7 @@
 from typing import Optional, List
 
-from django.db import models
-from django.db.models import QuerySet
+from django.db import models, transaction
+from django.db.models import QuerySet, TextChoices
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel
@@ -13,7 +13,16 @@ from django.utils.timezone import now
 import copy
 
 
+CLINVAR_EXPORT_CONVERSION_VERSION = 2
+
+# CLINVAR ALLELE
+
 class ClinVarAllele(TimeStampedModel):
+    """
+    Wraps an Allele with a ClinVarKey to make it easier to keep track of our submissions
+    (Provides a little bit of bloat, but does give us allele level data)
+    """
+
     class Meta:
         verbose_name = "ClinVar allele"
 
@@ -30,6 +39,12 @@ class ClinVarAllele(TimeStampedModel):
 
 
 class ClinVarExportStatus(models.TextChoices):
+    """
+    The status of an Export as compared to the last batch.
+    Note doesn't involve itself in the status as data progresses
+    TODO review this
+    """
+
     NEW_SUBMISSION = "N", "New Submission"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
     CHANGES_PENDING = "C", "Changes Pending"
     UP_TO_DATE = "D", "Up to Date"
@@ -37,6 +52,9 @@ class ClinVarExportStatus(models.TextChoices):
 
 
 class ClinVarReleaseStatus(models.TextChoices):
+    """
+    As determined by the user currently
+    """
     WHEN_READY = "R", "Release When Ready"
     ON_HOLD = "H", "On Hold"
 
@@ -54,6 +72,8 @@ class ClinVarExport(TimeStampedModel):
     last_evaluated = models.DateTimeField(default=now)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
+    processed_json = models.JSONField(null=True, blank=True)
+
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'pk': self.pk})
 
@@ -69,6 +89,18 @@ class ClinVarExport(TimeStampedModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def get_from_identifiers(identifier: JsonObjType) -> 'ClinVarExport':
+        """
+        e.g.
+        "identifiers": {
+            "localID": "adefc5ed-7d59-4119-8b3d-07dcdc504c09",
+            "localKey": "adefc5ed-7d59-4119-8b3d-07dcdc504c09",
+            "clinvarLocalKey": "adefc5ed-7d59-4119-8b3d-07dcdc504c09"
+          },
+        """
+        raise NotImplementedError("Have not implemented get_from_identifier")
 
     @lazy
     def _condition_resolved(self) -> ConditionResolved:
@@ -114,8 +146,8 @@ class ClinVarExport(TimeStampedModel):
         return content
 
     @property
-    def last_submission(self) -> Optional['ClinVarExportSubmissionBatch']:
-        return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportSubmissionBatchStatus.REJECTED).order_by('-created').first()
+    def last_submission(self) -> Optional['ClinVarExportSubmission']:
+        return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportBatchStatus.REJECTED).order_by('-created').first()
 
     def submission_body_previous(self) -> Optional[JsonObjType]:
         # ignore rejected submissions
@@ -129,6 +161,7 @@ class ClinVarExport(TimeStampedModel):
         Will not update the classification used, update_classification should generally be called externally
         """
         from classification.models.clinvar_export_convertor import ClinVarExportConverter
+
         current_validated_json_body: ValidatedJson = ClinVarExportConverter(clinvar_export_record=self).as_json
         self.submission_body_validated = current_validated_json_body.serialize()
         lazy.invalidate(self, 'submission_body')
@@ -148,22 +181,25 @@ class ClinVarExport(TimeStampedModel):
         self.save()
 
 
-class ClinVarExportSubmissionBatchStatus(models.TextChoices):
+class ClinVarExportBatchStatus(models.TextChoices):
+    """
+    Overall status of a submission batch, talking to ClinVar takes a few steps
+    """
     AWAITING_UPLOAD = "W", "Awaiting Upload"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
-    UPLOADING = "U", "Uploading"
+    UPLOADING = "P", "Processing"
     SUBMITTED = "S", "Submitted"
     REJECTED = "R", "Rejected"
 
 
-class ClinVarExportSubmissionBatch(TimeStampedModel):
+class ClinVarExportBatch(TimeStampedModel):
     class Meta:
-        verbose_name = "ClinVar Export submission batch"
+        verbose_name = "ClinVar Export batch"
 
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.CASCADE)
     submission_version = models.IntegerField()
-    status = models.CharField(max_length=1, choices=ClinVarExportSubmissionBatchStatus.choices, default=ClinVarExportSubmissionBatchStatus.AWAITING_UPLOAD)
-    submitted_json = models.JSONField(null=True, blank=True)  # leave this as blank until we've actually uploaded data
-    response_json = models.JSONField(null=True, blank=True)  # what did ClinVar return
+    status = models.CharField(max_length=1, choices=ClinVarExportBatchStatus.choices, default=ClinVarExportBatchStatus.AWAITING_UPLOAD)
+    submission_identifier = models.TextField(null=True, blank=True)
+    file_url = models.TextField(null=True, blank=True)
 
     def get_absolute_url(self):
         return reverse('clinvar_export_batch', kwargs={'pk': self.pk})
@@ -173,16 +209,34 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
 
     def to_json(self) -> JsonObjType:
         return {
-            "behalfOrgId": self.clinvar_key.behalf_org_id,
-            "clinVarSubmissions": [submission.submission_full for submission in self.clinvarexportsubmission_set.order_by('created')],
-            "submissionName": f"submission_{self.id}"
+            "actions": [{
+                "type": "AddData",
+                "targetDb": "clinvar",
+                "data": {
+                    "content": {
+                        "behalfOrgID": self.clinvar_key.behalf_org_id or "testorg",
+                        "clinvarSubmission": [submission.submission_full for submission in
+                                               self.clinvarexportsubmission_set.order_by('created')],
+                        "submissionName": f"submission_{self.id}"
+                    }
+                }
+            }]
         }
 
-    @staticmethod
-    def create_batches(qs: QuerySet, force_update: bool = False) -> List['ClinVarExportSubmissionBatch']:
-        all_batches: List[ClinVarExportSubmissionBatch] = list()
+    @transaction.atomic()
+    def reject(self):
+        self.status = ClinVarExportBatchStatus.REJECTED
+        self.save()
+        exports = self.clinvarexportsubmission_set.values_list('clinvar_export', flat=True).distinct()
+        for export in ClinVarExport.objects.filter(pk__in=exports):
+            export.update()
 
-        current_batch: Optional[ClinVarExportSubmissionBatch] = None
+    @staticmethod
+    @transaction.atomic()
+    def create_batches(qs: QuerySet, force_update: bool = False) -> List['ClinVarExportBatch']:
+        all_batches: List[ClinVarExportBatch] = list()
+
+        current_batch: Optional[ClinVarExportBatch] = None
         current_batch_size = 0
 
         qs = qs.order_by('clinvar_allele__clinvar_key')
@@ -204,8 +258,8 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
                     # if current_batch is not None:
                     #    current_batch.refresh_from_db()
 
-                    current_batch = ClinVarExportSubmissionBatch(clinvar_key=record.clinvar_allele.clinvar_key,
-                                                                 submission_version=1)
+                    current_batch = ClinVarExportBatch(clinvar_key=record.clinvar_allele.clinvar_key,
+                                                       submission_version=CLINVAR_EXPORT_CONVERSION_VERSION)
                     current_batch.save()
                     current_batch_size = 0
                     all_batches.append(current_batch)
@@ -216,7 +270,7 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
                     submission_batch=current_batch,
                     submission_full=full_current.pure_json(),
                     submission_body=record.submission_body.pure_json(),
-                    submission_version=1
+                    submission_version=CLINVAR_EXPORT_CONVERSION_VERSION
                 ).save()
                 current_batch_size += 1
                 record.status = ClinVarExportStatus.UP_TO_DATE
@@ -225,20 +279,55 @@ class ClinVarExportSubmissionBatch(TimeStampedModel):
         return all_batches
 
 
+class ClinVarExportSubmissionStatus(TextChoices):
+    WAITING = "W", "Waiting"
+    SUCCESS = "S", "Success"
+    ERROR = "E", "Error"
+
+
 class ClinVarExportSubmission(TimeStampedModel):
+    """
+    Represents the content of a single ClinVarExport at a given point in time (within a submission batch)
+    """
+
     class Meta:
         verbose_name = "ClinVar export submission"
 
     clinvar_export = models.ForeignKey(ClinVarExport, on_delete=models.CASCADE)  # if there's been an actual submission, don't allow deletes
     classification_based_on = models.ForeignKey(ClassificationModification, on_delete=models.PROTECT)
-    submission_batch = models.ForeignKey(ClinVarExportSubmissionBatch, on_delete=models.CASCADE)
+    submission_batch = models.ForeignKey(ClinVarExportBatch, on_delete=models.CASCADE)
     submission_full = models.JSONField()  # the full data included in the batch submission
 
     submission_body = models.JSONField()  # used to see if there are any changes since last submission (other than going from novel to update)
     submission_version = models.IntegerField()
 
+    # individual record failure, batch can be in error too
+    status = models.CharField(max_length=1, choices=ClinVarExportSubmissionStatus.choices, default=ClinVarExportSubmissionStatus.WAITING)
+    response_json = models.JSONField(null=True, blank=True)
+
+
+class ClinVarExportRequestType(TextChoices):
+    INITIAL_SUBMISSION = "S", "Initial Submission"
+    POLLING_SUBMISSION = "P", "Polling"
+    RESPONSE_FILES = "F", "Response Files"
+
+
+class ClinVarExportRequest(TimeStampedModel):
+    """
+    Represents a single request we sent to ClinVar
+    """
+    submission_batch = models.ForeignKey(ClinVarExportBatch, on_delete=models.CASCADE)
+    request_type = models.CharField(max_length=1, choices=ClinVarExportRequestType.choices)
+    url = models.TextField()
+    request_json = models.JSONField(null=True, blank=True)  # some requests
+    response_status_code = models.IntegerField()
+    response_json = models.JSONField(null=True, blank=True)
+    handled = models.BooleanField(default=False)
+
 
 """
+# OLD CODE for syncing submissions to Exports
+
 @receiver(post_save, sender=ClinVarExport)
 def set_condition_alias_permissions(sender, created: bool, instance: ClinVarExport, **kwargs):  # pylint: disable=unused-argument
     if created:

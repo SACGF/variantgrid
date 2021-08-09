@@ -8,7 +8,7 @@ from pytz import timezone
 from htmlmin.decorators import not_minified_response
 
 from classification.enums import ShareLevel, SpecialEKeys
-from classification.models import ClinVarExport, ClinVarExportSubmissionBatch, ClinVarExportSubmissionBatchStatus, \
+from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     Classification, ClinVarReleaseStatus, EvidenceKeyMap
 from genes.hgvs import CHGVS
 from library.django_utils import add_save_message, get_url_from_view_path
@@ -21,7 +21,7 @@ import json
 class ClinVarExportBatchColumns(DatatableConfig):
 
     def render_status(self, row: Dict[str, Any]):
-        return ClinVarExportSubmissionBatchStatus(row['status']).label
+        return ClinVarExportBatchStatus(row['status']).label
 
     def __init__(self, request):
         super().__init__(request)
@@ -38,7 +38,7 @@ class ClinVarExportBatchColumns(DatatableConfig):
         clinvar_keys = ClinVarKey.clinvar_keys_for_user(self.user)
         if clinvar_key:
             clinvar_keys = clinvar_keys.filter(pk=clinvar_key)
-        cve = ClinVarExportSubmissionBatch.objects.filter(clinvar_key__in=clinvar_keys)
+        cve = ClinVarExportBatch.objects.filter(clinvar_key__in=clinvar_keys)
         return cve
 
     def get_initial_queryset(self):
@@ -48,7 +48,7 @@ class ClinVarExportBatchColumns(DatatableConfig):
 
 
 def clinvar_export_batch_detail(request, pk: int):
-    clinvar_export_batch: ClinVarExportSubmissionBatch = ClinVarExportSubmissionBatch.objects.get(pk=pk)
+    clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=pk)
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
     submissions = clinvar_export_batch.clinvarexportsubmission_set.order_by('created')
 
@@ -200,7 +200,7 @@ def clinvar_export_download(request, clinvar_key: str):
 
 
 def clinvar_export_batch_download(request, pk):
-    clinvar_export_batch: ClinVarExportSubmissionBatch = ClinVarExportSubmissionBatch.objects.get(pk=pk)
+    clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=pk)
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
 
     # code duplicated from admin, but don't feel this should go into models

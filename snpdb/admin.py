@@ -129,7 +129,7 @@ class AlleleAdmin(admin.ModelAdmin, AdminExportCsvMixin):
         from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
         allele: Allele
         for allele in queryset:
-            export_prepare = ClinvarAlleleExportPrepare(allele)
+            export_prepare = ClinvarAlleleExportPrepare(allele=allele)
             report = export_prepare.update_export_records()
             for message in report:
                 self.message_user(request, message=f"Allele ({allele}) - {message}", level=messages.INFO)

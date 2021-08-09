@@ -212,7 +212,9 @@ class ClinVarExportConverter:
         try:
             genome_build = self.classification_based_on.get_genome_build()
             if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
-                return ValidatedJson({"hgvs": c_hgvs})
+                json_data = {"variant": [{"hgvs": c_hgvs}]}
+                # TODO add Ensembl rejection
+                return ValidatedJson(json_data)
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
         except:
@@ -259,7 +261,7 @@ class ClinVarExportConverter:
                     "id": str(citation.get("idx"))  # TODO confirm this is the kind of ID they want, not the prefixed one?
                 }
                 return citation
-            data["citations"] = [citation_to_json(citation) for citation in citations]
+            data["citation"] = [citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
             data["comment"] = interpret
@@ -267,7 +269,7 @@ class ClinVarExportConverter:
             # FIXME also check validation date?
             data["dateLastEvaluated"] = date_last_evaluated
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
-            data["modeOfInheritance"] = mode_of_inheritance.value(single=False)
+            data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
         return ValidatedJson(data)
 
     @property
@@ -301,6 +303,8 @@ class ClinVarExportConverter:
 
     @property
     def observed_in(self) -> ValidatedJson:
+        # can return array, but we only have one
+        # (though
         data = dict()
         affected_status_value = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS)
         if affected_status_value:
@@ -315,4 +319,4 @@ class ClinVarExportConverter:
             data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided"))
         data["collectionMethod"] = "curation"  # TODO confirm hardcoded of curation
         # numberOfIndividuals do we do anything with this?
-        return ValidatedJson(data)
+        return ValidatedJson([data])

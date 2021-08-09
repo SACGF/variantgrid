@@ -17,6 +17,7 @@ AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
 
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
+CLINVAR_EXPORT = get_clinvar_export_secrets()
 
 SYNC_DETAILS = get_shariant_sync_secrets()
 VARIANT_CLASSIFICATION_NEW_GROUPING = True

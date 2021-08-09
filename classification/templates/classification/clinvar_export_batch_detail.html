@@ -1,4 +1,4 @@
 {% load ui_utils %}
 {% labelled label="Submission Content" %}<a class="download-link" href="{% url 'clinvar_export_batch_download' batch.pk %}">Download</a>{% endlabelled %}
 {% labelled label="Records in Submission" %}{{ submissions.count }}{% endlabelled %}
-{% labelled label="Response" %}<div class="code">TODO</div>{% endlabelled %}
+{% labelled label="Status" %}{{ batch.get_status_display }}{% endlabelled %}

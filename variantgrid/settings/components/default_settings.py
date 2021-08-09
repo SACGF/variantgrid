@@ -825,7 +825,8 @@ AWS_SES_ACCESS_KEY_ID = None
 AWS_SES_SECRET_ACCESS_KEY = None
 AWS_SES_REGION = None
 
-CLINVAR_EXPORT_ENABLED = False
+CLINVAR_EXPORT = None
+
 
 # Command line tool to unzip and cat a file to stdout
 # for macOS need to set this to gzcat as the default zcat has short-comings
@@ -845,6 +846,10 @@ MESSAGE_TAGS = {
     messages.WARNING: 'alert-warning',
     messages.ERROR: 'alert-danger',
 }
+
+
+def get_clinvar_export_secrets() -> dict:
+    return get_secrets("CLINVAR_EXPORT", ["enabled", "api_key"])
 
 
 def get_keycloak_sync_secrets() -> dict:

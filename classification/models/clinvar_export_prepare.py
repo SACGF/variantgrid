@@ -4,7 +4,7 @@ from django.utils.timezone import now
 
 from classification.enums import ShareLevel
 from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarExport, \
-    ConditionResolved, ClinVarExportStatus
+    ConditionResolved, ClinVarExportStatus, CLINVAR_EXPORT_CONVERSION_VERSION
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import segment
 from snpdb.models import Allele, ClinVarKey

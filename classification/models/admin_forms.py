@@ -13,8 +13,9 @@ from classification.classification_import import process_classification_import
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, ConditionText, \
     ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification, send_discordance_notification, \
-    ClinVarExportSubmissionBatch, ClinVarExport
+    ClinVarExportBatch, ClinVarExport, EvidenceKeyMap, ClinVarExportBatchStatus, ClinVarExportRequest
 from classification.models.classification import Classification, ClassificationImport
+from classification.models.clinvar_export_sync import clinvar_export_config, ClinVarRequestException
 from library.guardian_utils import admin_bot
 from snpdb.admin import ModelAdminBasics
 from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
@@ -538,7 +539,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
         }, **kwargs)
 
     def add_to_batch(self, request, queryset):
-        batches = ClinVarExportSubmissionBatch.create_batches(queryset, force_update=True)
+        batches = ClinVarExportBatch.create_batches(queryset, force_update=True)
         if batches:
             for batch in batches:
                 messages.add_message(request, level=messages.INFO, message=f"Submission Batch for {batch.clinvar_key} created with {batch.clinvarexportsubmission_set.count()} submissions")
@@ -563,10 +564,22 @@ class ClinVarAlleleAdmin(ModelAdminBasics):
     list_display = ["pk", "clinvar_key", "allele", "classifications_missing_condition", "submissions_valid", "submissions_invalid", "last_evaluated"]
 
 
-class ClinVarExportSubmissionBatchAdmin(ModelAdminBasics):
-    list_display = ["pk", "clinvar_key", "created", "modified", "record_count"]
+class ClinVarExportRequest(admin.TabularInline):
+    model = ClinVarExportRequest
 
-    def record_count(self, obj: ClinVarExportSubmissionBatch):
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class ClinVarExportBatchAdmin(ModelAdminBasics):
+    model = ClinVarExportBatch
+    list_display = ["pk", "clinvar_key", "created", "modified", "record_count", "status"]
+    inlines = [ClinVarExportRequest,]
+
+    def record_count(self, obj: ClinVarExportBatch):
         return obj.clinvarexportsubmission_set.count()
 
     def download_json(self, request, queryset: QuerySet):
@@ -574,7 +587,7 @@ class ClinVarExportSubmissionBatchAdmin(ModelAdminBasics):
             messages.add_message(request, level=messages.ERROR, message="Can only download one batch at a time")
             return
 
-        batch: ClinVarExportSubmissionBatch = queryset.first()
+        batch: ClinVarExportBatch = queryset.first()
 
         batch_json = batch.to_json()
         batch_json_str = json.dumps(batch_json)
@@ -583,9 +596,25 @@ class ClinVarExportSubmissionBatchAdmin(ModelAdminBasics):
         response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{batch.pk}.json'
         return response
 
-    download_json.short_description = "Download JSON"
+    def next_action(self, request, queryset: QuerySet):
+        queryset = queryset.filter(status__in = (
+            ClinVarExportBatchStatus.UPLOADING,
+            ClinVarExportBatchStatus.AWAITING_UPLOAD
+        ))
+        if not queryset:
+            messages.add_message(request, level=messages.ERROR, message="No selected records in status of Uploading or Awaiting Upload")
+        else:
+            for batch in queryset:
+                try:
+                    clinvar_export_config.next_request(batch)
+                    messages.add_message(request, level=messages.SUCCESS, message=f"Batch {batch.pk} - updated")
+                except ClinVarRequestException as clinvar_except:
+                    messages.add_message(request, level=messages.ERROR, message=f"Batch {batch.pk} - {clinvar_except}")
 
-    actions = ["export_as_csv", download_json]
+    next_action.short_description = "Next Action"
+    download_json.short_description = "Download JSON"
+    actions = ["export_as_csv", download_json, next_action]
+
 
 class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
     title = "Labs Involved"
@@ -610,7 +639,7 @@ class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
 
 
 class DiscordanceReportAdmin(ModelAdminBasics):
-    list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "labs"]
+    list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "clinical_sigs", "labs"]
     list_filter = [DiscordanceReportAdminLabFilter]
 
     def send_notification(self, request, queryset):
@@ -625,6 +654,17 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def allele(self, obj: DiscordanceReport):
         cc = obj.clinical_context
         return str(cc.allele)
+
+    def clinical_sigs(self, obj: DiscordanceReport):
+        clinical_sigs = set()
+        for dr in DiscordanceReportClassification.objects.filter(report=obj):
+            clinical_sigs.add(dr.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+
+        e_key_cs = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        sorter = e_key_cs.classification_sorter_value
+        sorted_list = sorted(clinical_sigs, key=lambda x: (sorter(x), x))
+        pretty = [e_key_cs.pretty_value(cs) for cs in sorted_list]
+        return pretty
 
     def days_open(self, obj: DiscordanceReport):
         closed = obj.report_completed_date
