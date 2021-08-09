@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Set
 
 from django.db import models
 from django.db.models import Q
@@ -16,7 +16,7 @@ from genes.models import GeneList, CustomTextGeneList, SampleGeneList, \
     ActiveSampleGeneList, PanelAppPanelLocalCacheGeneList, PanelAppPanel
 from genes.panel_app import get_local_cache_gene_list
 from pathtests.models import PathologyTestVersion
-from snpdb.models import Sample
+from snpdb.models import Sample, Contig
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -65,6 +65,16 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         if self.exclude:
             q_gl = ~q_gl
         return q_gl
+
+    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+        if self.exclude:
+            return None  # No way to know
+
+        genes_ids_qs = GeneList.get_gene_ids_for_gene_lists(self.analysis.gene_annotation_release,
+                                                            self.get_gene_lists())
+        contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
+                                          transcriptversion__gene_version__gene__in=genes_ids_qs)
+        return set(contig_qs.distinct())
 
     def _get_method_summary(self):
         text = ''

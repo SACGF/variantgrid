@@ -42,7 +42,7 @@ from library.log_utils import log_traceback
 from library.utils import empty_dict
 from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genome import GenomeBuild, Contig
 from upload.vcf.sql_copy_files import write_sql_copy_csv, gene_coverage_canonical_transcript_sql_copy_csv, \
     gene_coverage_sql_copy_csv, GENE_COVERAGE_HEADER
 
@@ -550,6 +550,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     version = models.IntegerField()
     gene_version = models.ForeignKey(GeneVersion, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    contig = models.ForeignKey(Contig, null=True, on_delete=CASCADE)  # Optimisation to restrict Variant queries
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=empty_dict)  # for pyHGVS

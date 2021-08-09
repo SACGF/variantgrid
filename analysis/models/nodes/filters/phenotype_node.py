@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Set
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -9,9 +9,9 @@ import operator
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
-from genes.models import GeneSymbol
 from ontology.models import OntologySnake
 from patients.models import Patient
+from snpdb.models import Contig
 
 
 class PhenotypeNode(AnalysisNode):
@@ -84,14 +84,14 @@ class PhenotypeNode(AnalysisNode):
             ontology_term_ids = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
         return ontology_term_ids
 
-    def get_gene_qs(self):
+    def _get_genes(self):
         gene_symbols_qs = self.get_gene_symbols_qs()
-        return self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
+        qs = self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
+        return list(qs)
 
     def _get_node_q(self) -> Optional[Q]:
         qs_filters = []
-        gene_qs = self.get_gene_qs()
-        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs))
+        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(self._get_genes()))
 
         text_phenotypes = (self.text_phenotype or '').split()
         if text_phenotypes:
@@ -117,10 +117,16 @@ class PhenotypeNode(AnalysisNode):
             q = None
         return q
 
+    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+        genes = self._get_genes()
+        contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
+                                          transcriptversion__gene_version__gene__in=genes)
+        node_contigs = set(contig_qs.distinct())
+        return node_contigs
+
     def _get_method_summary(self):
         if self.modifies_parents():
-            genes_symbols_qs = GeneSymbol.objects.filter(geneversion__gene__in=self.get_gene_qs())
-            genes_symbols = ','.join(genes_symbols_qs.values_list("pk", flat=True))
+            genes_symbols = ','.join(self.get_gene_symbols_qs().values_list("pk", flat=True))
             method_summary = f"Filtering to {genes_symbols} genes"
         else:
             method_summary = 'No filters applied as no human_phenotype_ontology selected.'
@@ -167,8 +173,7 @@ class PhenotypeNode(AnalysisNode):
                 else:
                     name = ','.join(short_descriptions)
 
-                num_genes = self.get_gene_qs().count()
-                if num_genes:
+                if num_genes := self.get_gene_symbols_qs().count():
                     name += f" ({num_genes} genes)"
         return name
 
