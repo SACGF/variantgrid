@@ -1,136 +1,144 @@
-from dataclasses import dataclass
-from typing import List, Set, Optional
-from unittest import TestCase
+from typing import Optional
+from unittest import mock
 
-from classification.models import ConditionResolved
-from classification.models.clinvar_export_prepare import ConsolidatingMerger
-from classification.tests.data_utils import ConditionMock
-from ontology.models import OntologyTerm
+from django.test import TestCase, override_settings
 
-
-@dataclass
-class MockEstablished:
-    unique_id: int
-    condition: ConditionResolved
-    candidate: Optional[int]
-
-    def __eq__(self, other):
-        if isinstance(other, MockEstablished):
-            return self.condition == other.condition and self.candidate == other.candidate and self.unique_id == other.unique_id
-        return False
-
-    def __hash__(self):
-        return hash(self.unique_id)
+from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
+from classification.json_utils import JsonObjType
+from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
+    ClinVarExportRequestType, ClinVarExportRequest
+from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
+from classification.models.clinvar_export_sync import clinvar_export_config, ClinVarResponseOutcome
+from classification.models.tests.test_utils import ClassificationTestUtils
+from library.guardian_utils import admin_bot
+from snpdb.models import GenomeBuild, ClinVarKey
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
 
 
-@dataclass
-class MockCandidate:
-    condition: ConditionResolved
-    candidate: int
 
-    def __eq__(self, other):
-        if isinstance(other, MockCandidate):
-            return self.condition == other.condition and self.candidate == other.candidate
-        return False
+def mock_send_data(
+        batch: ClinVarExportBatch,
+        request_type: ClinVarExportRequestType,
+        url: str,
+        json_data: Optional[JsonObjType] = None):
 
-
-class ConditionGroupPrepareMergerTest(ConsolidatingMerger[MockEstablished, MockCandidate]):
-
-    def __init__(self, established_candidates: Set[MockEstablished]):
-        super().__init__()
-        self._established_candidates = established_candidates
-        self._new_established: List[MockEstablished] = list()
-        self.next_id = 100
-
-    def retrieve_established(self) -> Set[MockEstablished]:
-        return set(self._established_candidates)
-
-    def establish_new_candidate(self, new_candidate: MockCandidate) -> MockEstablished:
-        me = MockEstablished(unique_id=self.next_id, condition=new_candidate.condition, candidate=new_candidate.candidate)
-        self.next_id += 1
-        self._new_established.append(me)
-        return me
-
-    def combine_candidates_if_possible(
-            self,
-            candidate_1: MockCandidate,
-            candidate_2: MockCandidate) -> Optional[MockCandidate]:
-        if general_condition := ConditionResolved.more_general_term_if_related(candidate_1.condition,
-                                                                               candidate_2.condition):
-            return MockCandidate(condition=general_condition, candidate=max(candidate_1.candidate, candidate_2.candidate))
-        else:
-            return None
-
-    def merge_into_established_if_possible(self, established: MockEstablished, new_candidate: Optional[MockCandidate]) -> bool:
-        if new_candidate is None:
-            established.candidate = None
-            return True
-        elif new_candidate.condition.is_same_or_more_specific(established.condition):
-            established.candidate = new_candidate.candidate
-            return True
-        else:
-            return False
-
-
-class TestClinVarExportModels(TestCase):
-
-    def setUp(self):
-        ConditionMock.setUp()
-
-    def test_grouping(self):
-        # m_disease = OntologyTerm.get_or_stub(ConditionMock.MONDO_DISEASE_OR_DISORDER)
-        # m_digit = OntologyTerm.get_or_stub(ConditionMock.MONDO_DIGIT_ISSUE)
-        m_toe = OntologyTerm.get_or_stub(ConditionMock.MONDO_TOE_ISSUE)
-        m_big_toe = OntologyTerm.get_or_stub(ConditionMock.MONDO_BIG_TOE_BROKEN)
-        m_bad_lung = OntologyTerm.get_or_stub(ConditionMock.MONDO_BAD_LUNG)
-        m_bad_heart = OntologyTerm.get_or_stub(ConditionMock.MONDO_BAD_HEART)
-
-        simple_big_toe = ConditionResolved(terms=[m_big_toe])
-        simple_toe = ConditionResolved(terms=[m_toe])
-        simple_bad_lung = ConditionResolved(terms=[m_bad_lung])
-        simple_bad_heart = ConditionResolved(terms=[m_bad_heart])
-        # simple_o_big_toe = ConditionResolved(terms=[o_big_toe])
-
-        group_toe = MockCandidate(
-            condition=simple_toe,
-            candidate=1
+    if request_type == ClinVarExportRequestType.INITIAL_SUBMISSION:
+        return ClinVarExportRequest.objects.create(
+            submission_batch=batch,
+            request_type=request_type,
+            request_json=json_data,
+            url=url,
+            response_status_code=200,
+            response_json={
+                "actions": [{
+                    "id": "SUB999999-1",
+                    "responses": [],
+                    "status": "submitted",
+                    "targetDb": "clinvar",
+                    "updated": "2021-03-19T17:24:24.384085Z"
+                }]
+            }
         )
-        group_big_toe = MockCandidate(
-            condition=simple_big_toe,
-            candidate=2
-        )
-        group_lung = MockCandidate(
-            condition=simple_bad_lung,
-            candidate=3
+    if request_type == ClinVarExportRequestType.POLLING_SUBMISSION:
+        return ClinVarExportRequest.objects.create(
+            submission_batch=batch,
+            request_type=request_type,
+            request_json=json_data,
+            url=url,
+            response_status_code=200,
+            response_json={
+                "actions": [
+                    {
+                        "id": "SUB999999-1",
+                        "responses": [
+                            {
+                                "files": [],
+                                "message": None,
+                                "objects": [
+                                    {
+                                        "accession": None,
+                                        "content": {
+                                            "clinvarProcessingStatus": "In processing",
+                                            "clinvarReleaseStatus": "Not released"
+                                        },
+                                        "targetDb": "clinvar"
+                                    }
+                                ],
+                                "status": "processing"
+                            }
+                        ],
+                        "status": "processing",
+                        "targetDb": "clinvar",
+                        "updated": "2021-03-19T12:33:09.243072Z"
+                    }
+                ]
+            }
         )
 
-        # test all new groups
-        established = MockEstablished(unique_id=1, condition=simple_bad_heart, candidate=7)
-        condition_num_grouper = ConditionGroupPrepareMergerTest(established_candidates={established, })
 
-        # these two groups should merge
-        condition_num_grouper.add_new_candidate(group_toe)
-        self.assertEqual(len(condition_num_grouper.collapsed_new_candidates), 1)
-        condition_num_grouper.add_new_candidate(group_big_toe)
-        self.assertEqual(len(condition_num_grouper.collapsed_new_candidates), 1)
+class TestClinVarExport(TestCase):
 
-        # this group shouldn't merge
-        condition_num_grouper.add_new_candidate(group_lung)
-        self.assertEqual(len(condition_num_grouper.collapsed_new_candidates), 2)
+    @mock.patch('classification.models.clinvar_export_sync.ClinVarExportConfig._send_data', side_effect=mock_send_data)
+    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False, CLINVAR_EXPORT={"enabled": True, "api_key": "ABC123"})
+    def test_clinvar_setup(self, mocked_send_data):
 
-        # no retrieve_established groups, so we should now have 2 retrieve_established groups
-        condition_num_grouper.consolidate()
-        new_groups = condition_num_grouper._new_established
-        self.assertEqual(len(new_groups), 2)
-        # takes the more general term from group_toe,
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        variant = slowly_create_test_variant("3", 128198980, 'A', 'T', grch37)
+        allele = create_mock_allele(variant, grch37)
 
-        self.assertEqual(new_groups[0].condition, simple_toe)
-        self.assertEqual(new_groups[0].candidate, 2)
+        ClassificationTestUtils.setUp()
+        lab, user = ClassificationTestUtils.lab_and_user()
 
-        self.assertEqual(new_groups[1].condition, simple_bad_lung)
-        self.assertEqual(new_groups[1].candidate, 3)
+        clinvar_key = ClinVarKey.objects.create(id="test_c_key")
+        lab.clinvar_key = clinvar_key
+        lab.save()
 
-        # no new candidate for bad lung, candidate value should be updated to 0
-        self.assertIsNone(established.candidate)
+        c = Classification.create(
+            user=user,
+            lab=lab,
+            lab_record_id=None,
+            data={
+                SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(MADEUP):c.1913G>A'},
+                SpecialEKeys.INTERPRETATION_SUMMARY: {'value': 'I have an interpretation summary'},
+                SpecialEKeys.ASSERTION_METHOD: {'value': 'acmg'},
+                SpecialEKeys.MODE_OF_INHERITANCE: {'value': ['autosomal_dominant']},
+                SpecialEKeys.AFFECTED_STATUS: {'value': 'yes'},
+                SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                SpecialEKeys.GENOME_BUILD: {'value': 'GRCh37'}
+            },
+            save=True,
+            source=SubmissionSource.API,
+            make_fields_immutable=False)
 
-        # TODO test merging and non merging
+        c.publish_latest(user=admin_bot(), share_level=ShareLevel.PUBLIC)
+
+        c.variant = variant
+        c.chgvs_grch37 = "NM_000001.2(MADEUP):c.1913G>A"
+        c.chgvs_grch37_full = "NM_000001.2(MADEUP):c.1913G>A"
+        c.condition_resolution = {"sort_text": "ataxia-telangiectasia with generalized skin pigmentation and early death",
+                                  "display_text": "MONDO:0008841 ataxia-telangiectasia with generalized skin pigmentation and early death",
+                                  "resolved_join": None,
+                                  "resolved_terms": [{"name":"ataxia-telangiectasia with generalized skin pigmentation and early death","term_id": "MONDO:0008841"}]}
+        c.save()
+
+        export_prepare = ClinvarAlleleExportPrepare(allele=allele)
+        report = export_prepare.update_export_records()
+        for report_line in report:
+            print(report_line)
+
+        clinvar_export: ClinVarExport = ClinVarExport.objects.first()
+        print(clinvar_export.submission_body_validated)
+        self.assertIsNotNone(clinvar_export)
+        self.assertEqual(clinvar_export.status, ClinVarExportStatus.NEW_SUBMISSION)
+
+        batches = ClinVarExportBatch.create_batches(ClinVarExport.objects.all(), force_update=True)
+        self.assertEqual(len(batches), 1)
+
+        batch = batches[0]
+        _, outcome = clinvar_export_config.next_request(batch)
+        self.assertEqual(outcome, ClinVarResponseOutcome.ASK_AGAIN_LATER)
+        self.assertEqual(batch.submission_identifier, "SUB999999-1")
+
+        # next response is set to be "processing"
+        _, outcome = clinvar_export_config.next_request(batch)
+        self.assertEqual(outcome, ClinVarResponseOutcome.ASK_AGAIN_LATER)

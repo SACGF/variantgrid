@@ -1,9 +1,10 @@
 from enum import Enum, auto
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Tuple
 
 import requests
 from django.conf import settings
 from django.db import transaction
+from lazy import lazy
 from requests import Response
 
 from classification.json_utils import JsonObjType
@@ -66,16 +67,17 @@ class ClinVarResponseOutcome(Enum):
 
 class ClinVarExportConfig:
 
-    def __init__(self):
-        self.config: _ClinVarExportConfigDic = settings.CLINVAR_EXPORT or {"enabled": False, "api_key": None}
+    @lazy
+    def _config(self) -> _ClinVarExportConfigDic:
+        return settings.CLINVAR_EXPORT or {"enabled": False, "api_key": None}
 
     @property
     def is_enabled(self) -> bool:
-        return self.config.get('enabled')
+        return self._config.get('enabled')
 
     @property
     def api_key(self) -> Optional[str]:
-        return self.config.get('api_key')
+        return self._config.get('api_key')
 
     def _send_data(self,
                    batch: ClinVarExportBatch,
@@ -109,7 +111,7 @@ class ClinVarExportConfig:
             response_status_code=response.status_code
         )
 
-    def next_request(self, batch: ClinVarExportBatch) -> ClinVarExportRequest:
+    def next_request(self, batch: ClinVarExportBatch) -> Tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
         clinvar_request: ClinVarExportRequest
         if not batch.submission_identifier:
             clinvar_request = self._send_data(
@@ -128,26 +130,30 @@ class ClinVarExportConfig:
                 request_type=ClinVarExportRequestType.RESPONSE_FILES,
                 url=batch.file_url)
 
-        self.handle_request_response(clinvar_request)
-        return clinvar_request
+        handle_outcome = self.handle_request_response(clinvar_request)
+        return clinvar_request, handle_outcome
 
-    def _handle_initial_submission(self, clinvar_request: ClinVarExportRequest):
+    def _handle_initial_submission(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
 
         if clinvar_request.response_status_code in {200, 201} and \
                 (response_json := clinvar_request.response_json) and \
-                (submission_identifier := response_json.get('id')):
+                (actions := response_json.get('actions')) and \
+                (submission_identifier := actions[0].get('id')):
             clinvar_request.submission_batch.submission_identifier = submission_identifier
+            return ClinVarResponseOutcome.ASK_AGAIN_LATER
 
         elif clinvar_request.response_status_code == 204:
             # means it's just test? not really sure what the best thing to do about this is
             # clinvar_request.submission_batch.status = ClinVarExportBatchStatus.REJECTED
-            pass
+            return ClinVarResponseOutcome.COMPLETE
+        else:
+            raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find actions[0].id submission ID")
 
-    def _handle_polling(self, clinvar_request: ClinVarExportRequest):
+    def _handle_polling(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         if (response_json := clinvar_request.response_json) and (actions := response_json.get("actions")):
             for action_json in actions:
                 for response_json in action_json.get("responses"):
-                    status = response_json.get_status()
+                    status = response_json.get('status')
                     if status == "processing":
                         return ClinVarResponseOutcome.ASK_AGAIN_LATER
                     elif files := response_json.get("files"):
@@ -206,7 +212,7 @@ class ClinVarExportConfig:
             return ClinVarResponseOutcome.COMPLETE
 
 
-    def handle_request_response(self, clinvar_request: ClinVarExportRequest):
+    def handle_request_response(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         if clinvar_request.handled:
             raise ValueError("ClinVarExport has already been handled")
         try:
@@ -218,20 +224,20 @@ class ClinVarExportConfig:
                 submission_batch.save()
             raise
 
-        self._handle_request_response_extra(clinvar_request)
+        return self._handle_request_response_extra(clinvar_request)
 
 
     @transaction.atomic()
-    def _handle_request_response_extra(self, clinvar_request: ClinVarExportRequest):
+    def _handle_request_response_extra(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         try:
             if clinvar_request.request_type == ClinVarExportRequestType.INITIAL_SUBMISSION:
-                self._handle_initial_submission(clinvar_request)
+                return self._handle_initial_submission(clinvar_request)
 
             elif clinvar_request.request_type == ClinVarExportRequestType.POLLING_SUBMISSION:
-                self._handle_polling(clinvar_request)
+                return self._handle_polling(clinvar_request)
 
             elif clinvar_request.request_type == ClinVarExportRequestType.RESPONSE_FILES:
-                self._handle_response_file(clinvar_request)
+                return self._handle_response_file(clinvar_request)
         finally:
             clinvar_request.handled = True
             clinvar_request.save()

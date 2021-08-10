@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Iterable
 
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
@@ -205,6 +205,9 @@ class ClinVarExportBatch(TimeStampedModel):
                 }
             }]
         }
+
+    def requests(self) -> Iterable['ClinVarExportRequest']:
+        return self.clinvarexportrequest_set.order_by('created')
 
     @transaction.atomic()
     def reject(self):

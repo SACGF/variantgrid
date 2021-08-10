@@ -1,4 +1,30 @@
 {% load ui_utils %}
+{% load js_tags %}
 {% labelled label="Submission Content" %}<a class="download-link" href="{% url 'clinvar_export_batch_download' batch.pk %}">Download</a>{% endlabelled %}
 {% labelled label="Records in Submission" %}{{ submissions.count }}{% endlabelled %}
 {% labelled label="Status" %}{{ batch.get_status_display }}{% endlabelled %}
+
+<h4>Requests</h4>
+{% for clinvar_request in batch.requests %}
+    <div class="card mt-4">
+        <div class="card-header">
+            ClinVar Request ({{ clinvar_request.pk }})
+        </div>
+        <div class="card-body">
+            {% labelled label="Type" %}{{ clinvar_request.get_request_type_display }}{% endlabelled %}
+            {% labelled label="URL" %}{{ clinvar_request.url }}{% endlabelled %}
+            {% labelled label="Status Code" %}{{ clinvar_request.response_status_code }}{% endlabelled %}
+            {% labelled label="JSON" %}
+                <a href="#creq-{{clinvar_request.pk}}" data-toggle="collapse" class="toggle-link">Toggle</a>
+                <div id="creq-{{clinvar_request.pk}}" class="collapse">
+                    <b class="mt-2">Request</b>
+                    <div class="code">{{ clinvar_request.request_json | jsonify_pretty }}</div>
+                    <b class="mt-2">Response</b>
+                    <div class="code">{{ clinvar_request.response_json | jsonify_pretty }}</div>
+                </div>
+            {% endlabelled %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="no-value">No requests have been sent yet.</div>
+{% endfor %}

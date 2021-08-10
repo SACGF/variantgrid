@@ -1,9 +1,10 @@
 import vcf
 
-from snpdb.models import Locus, Variant, Sequence
+from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantAllele, AlleleOrigin, \
+    AlleleConversionTool
 
 
-def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build) -> Variant:
+def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:
     """ For test only - doesn't use VariantPKLookup """
     contig = genome_build.contigs.get(name=chrom)
     ref_seq, _ = Sequence.objects.get_or_create(seq=ref.upper(), length=1)
@@ -11,6 +12,18 @@ def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, ge
     locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
     variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq)
     return variant
+
+
+def create_mock_allele(variant: Variant, genome_build: GenomeBuild):
+    allele = Allele.objects.create()
+    VariantAllele.objects.create(
+        variant=variant,
+        genome_build=genome_build,
+        allele=allele,
+        origin=AlleleOrigin.IMPORTED_TO_DATABASE,
+        conversion_tool=AlleleConversionTool.DBSNP
+    )
+    return allele
 
 
 def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_variant_id_from_info=False):

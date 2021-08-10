@@ -146,11 +146,14 @@ class ValidatedJson():
     @staticmethod
     def _serialize(obj) -> JsonDataType:
         if isinstance(obj, ValidatedJson):
-            return {
-                "*validated_json$": True,
-                "messages": obj.messages,
-                "wrap": ValidatedJson._serialize(obj.json_data)
-            }
+            if obj.messages:
+                return {
+                    "*validated_json$": True,
+                    "messages": obj.messages,
+                    "wrap": ValidatedJson._serialize(obj.json_data)
+                }
+            else:
+                return ValidatedJson._serialize(obj.json_data)
         elif isinstance(obj, list):
             return [ValidatedJson._serialize(entry) for entry in obj]
         elif isinstance(obj, dict):
