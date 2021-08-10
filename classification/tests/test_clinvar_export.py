@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
 from classification.json_utils import JsonObjType
 from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
-    ClinVarExportRequestType, ClinVarExportRequest
+    ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus
 from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_config, ClinVarResponseOutcome
 from classification.models.tests.test_utils import ClassificationTestUtils
@@ -22,30 +22,23 @@ def mock_send_data(
         url: str,
         json_data: Optional[JsonObjType] = None):
 
+    response_code = 200
+    response_json = None
+
     if request_type == ClinVarExportRequestType.INITIAL_SUBMISSION:
-        return ClinVarExportRequest.objects.create(
-            submission_batch=batch,
-            request_type=request_type,
-            request_json=json_data,
-            url=url,
-            response_status_code=200,
-            response_json={
-                "actions": [{
-                    "id": "SUB999999-1",
-                    "responses": [],
-                    "status": "submitted",
-                    "targetDb": "clinvar",
-                    "updated": "2021-03-19T17:24:24.384085Z"
-                }]
-            }
-        )
+        response_json={
+            "actions": [{
+                "id": "SUB999999-1",
+                "responses": [],
+                "status": "submitted",
+                "targetDb": "clinvar",
+                "updated": "2021-03-19T17:24:24.384085Z"
+            }]
+        }
     if request_type == ClinVarExportRequestType.POLLING_SUBMISSION:
-        return ClinVarExportRequest.objects.create(
-            submission_batch=batch,
-            request_type=request_type,
-            request_json=json_data,
-            url=url,
-            response_status_code=200,
+
+        poll_count = batch.clinvarexportrequest_set.filter(request_type=ClinVarExportRequestType.POLLING_SUBMISSION).count()
+        if poll_count == 0:
             response_json={
                 "actions": [
                     {
@@ -73,7 +66,64 @@ def mock_send_data(
                     }
                 ]
             }
-        )
+        else:
+            response_json={
+                "actions": [
+                    {
+                        "id": "SUB999999-1",
+                        "responses": [
+                            {
+                                "status": "processed",
+                                "message": {
+                                    "errorCode": None,
+                                    "severity": "info",
+                                    "text": "Your ClinVar submission processing status is \"Success\". Please find the details in the file referenced by actions[0].responses[0].files[0].url."
+                                },
+                                "files": [
+                                    {
+                                        "url": "https://dsubmit.ncbi.nlm.nih.gov/api/2.0/files/xxxxxxxx/sub999999-summary-report.json/?format=attachment"
+                                    }
+                                ],
+                                "objects": []
+                            }
+                        ],
+                        "status": "processed",
+                        "targetDb": "clinvar",
+                        "updated": "2021-03-24T04:22:04.101297Z"
+                    }
+                ]
+            }
+    elif request_type == ClinVarExportRequestType.RESPONSE_FILES:
+        response_json = {
+            "submissionName": "SUB673156",
+            "submissionDate": "2021-03-25",
+            "batchProcessingStatus": "Success",
+            "batchReleaseStatus": "Not released",
+            "totalCount": 1,
+            "totalErrors": 0,
+            "totalSuccess": 1,
+            "totalPublic": 0,
+            "submissions": [
+                {
+                    "identifiers": {
+                        "localID": "ALLELE_1",  # might need to force this ID somehow
+                        "clinvarLocalKey": "adefc5ed-7d59-4119-8b3d-07dcdc504c09_success1",
+                        "localKey": "instx/labby/x42",
+                        "clinvarAccession": "SCV000839746"
+                    },
+                    "processingStatus": "Success"
+                }
+            ]
+        }
+
+    return ClinVarExportRequest.objects.create(
+        url=url,
+        submission_batch=batch,
+        request_type=request_type,
+        request_json=json_data,
+        response_status_code=response_code,
+        response_json=response_json
+    )
 
 
 class TestClinVarExport(TestCase):
@@ -96,7 +146,7 @@ class TestClinVarExport(TestCase):
         c = Classification.create(
             user=user,
             lab=lab,
-            lab_record_id=None,
+            lab_record_id="x42",
             data={
                 SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(MADEUP):c.1913G>A'},
                 SpecialEKeys.INTERPRETATION_SUMMARY: {'value': 'I have an interpretation summary'},
@@ -118,7 +168,7 @@ class TestClinVarExport(TestCase):
         c.condition_resolution = {"sort_text": "ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "display_text": "MONDO:0008841 ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "resolved_join": None,
-                                  "resolved_terms": [{"name":"ataxia-telangiectasia with generalized skin pigmentation and early death","term_id": "MONDO:0008841"}]}
+                                  "resolved_terms": [{"name": "ataxia-telangiectasia with generalized skin pigmentation and early death","term_id": "MONDO:0008841"}]}
         c.save()
 
         export_prepare = ClinvarAlleleExportPrepare(allele=allele)
@@ -142,3 +192,14 @@ class TestClinVarExport(TestCase):
         # next response is set to be "processing"
         _, outcome = clinvar_export_config.next_request(batch)
         self.assertEqual(outcome, ClinVarResponseOutcome.ASK_AGAIN_LATER)
+
+        # next response is should be to be "processed"
+        _, outcome = clinvar_export_config.next_request(batch)
+        self.assertEqual(outcome, ClinVarResponseOutcome.ASK_AGAIN_NOW)
+        self.assertEqual(batch.file_url, 'https://dsubmit.ncbi.nlm.nih.gov/api/2.0/files/xxxxxxxx/sub999999-summary-report.json/?format=attachment')
+
+        _, outcome = clinvar_export_config.next_request(batch)
+        self.assertEqual(outcome, ClinVarResponseOutcome.COMPLETE)
+        self.assertEqual(batch.status, ClinVarExportBatchStatus.SUBMITTED)
+        clinvar_export.refresh_from_db()
+        self.assertEqual(clinvar_export.scv, "SCV000839746")

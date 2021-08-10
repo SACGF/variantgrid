@@ -9,7 +9,7 @@ from requests import Response
 
 from classification.json_utils import JsonObjType
 from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
-    ClinVarExportBatchStatus, ClinVarExport, ClinVarExportSubmission, ClinVarExportSubmissionStatus
+    ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus
 from library.log_utils import report_message
 
 
@@ -114,6 +114,8 @@ class ClinVarExportConfig:
     def next_request(self, batch: ClinVarExportBatch) -> Tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
         clinvar_request: ClinVarExportRequest
         if not batch.submission_identifier:
+            batch.status = ClinVarExportBatchStatus.UPLOADING
+            batch.save()
             clinvar_request = self._send_data(
                 batch=batch,
                 request_type=ClinVarExportRequestType.INITIAL_SUBMISSION,
@@ -131,6 +133,7 @@ class ClinVarExportConfig:
                 url=batch.file_url)
 
         handle_outcome = self.handle_request_response(clinvar_request)
+        batch.refresh_from_db()  # just in case we've indirectly modified it
         return clinvar_request, handle_outcome
 
     def _handle_initial_submission(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
@@ -140,6 +143,7 @@ class ClinVarExportConfig:
                 (actions := response_json.get('actions')) and \
                 (submission_identifier := actions[0].get('id')):
             clinvar_request.submission_batch.submission_identifier = submission_identifier
+            clinvar_request.submission_batch.save()
             return ClinVarResponseOutcome.ASK_AGAIN_LATER
 
         elif clinvar_request.response_status_code == 204:
@@ -159,11 +163,13 @@ class ClinVarExportConfig:
                     elif files := response_json.get("files"):
                         for file_json in files:
                             if url := file_json.get('url'):
-                                clinvar_request.file_url = url
+                                clinvar_request.submission_batch.file_url = url
+                                clinvar_request.submission_batch.save()
                                 # don't need to wait before requesting the file
                                 return ClinVarResponseOutcome.ASK_AGAIN_NOW
+
         # couldn't find "processing" or still in progress, this is unexpected
-        raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find status of processor or file")
+        raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find status of processing or file")
 
     def _handle_response_file(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         if (response_json := clinvar_request.response_json) and (submissions_json := response_json.get('submissions')):
@@ -174,7 +180,7 @@ class ClinVarExportConfig:
                 identifiers_json = submission_json.get("identifiers")
 
                 clinvar_export_submission: ClinVarExportSubmission
-                local_key = identifiers_json.filter("localKey")
+                local_key = identifiers_json.get("localKey")
                 if clinvar_export_submission := submission_set.filter(localKey=local_key).first():
                     clinvar_export = clinvar_export_submission.clinvar_export
                     # TODO, do we want to do anything with the submission? e.g. around status?
@@ -202,15 +208,12 @@ class ClinVarExportConfig:
                 else:
                     report_message(f"ClinVarExportRequest - could not find localKey", level='error', extra_data={"target": clinvar_request.pk, "localKey": local_key})
             else:
-                report_message(f"Expected submissions", level='error', extra_data={"target": clinvar_export_submission.pk})
+                report_message(f"Expected submissions in ClinVarRequest", level='error', extra_data={"target": clinvar_request.pk})
 
             clinvar_request.submission_batch.status = ClinVarExportBatchStatus.SUBMITTED
             clinvar_request.submission_batch.save()
 
-
-
             return ClinVarResponseOutcome.COMPLETE
-
 
     def handle_request_response(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         if clinvar_request.handled:
@@ -226,7 +229,6 @@ class ClinVarExportConfig:
 
         return self._handle_request_response_extra(clinvar_request)
 
-
     @transaction.atomic()
     def _handle_request_response_extra(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         try:
@@ -238,6 +240,9 @@ class ClinVarExportConfig:
 
             elif clinvar_request.request_type == ClinVarExportRequestType.RESPONSE_FILES:
                 return self._handle_response_file(clinvar_request)
+
+            else:
+                raise ValueError(f'Unexpected request type "{clinvar_request.request_type}"')
         finally:
             clinvar_request.handled = True
             clinvar_request.save()

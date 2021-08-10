@@ -191,7 +191,11 @@ class ClinVarExportConverter:
             data["clinicalSignificance"] = self.json_clinical_significance
             data["conditionSet"] = self.condition_set
             allele_id = self.clinvar_export_record.clinvar_allele.allele_id
+
             local_id = f"ALLELE_{allele_id}"
+            c = self.classification_based_on.classification
+            local_key = c.lab.group_name + "/" + c.lab_record_id
+
             # Important, using the umbrella term as it doesn't change
             condition = self.clinvar_export_record.condition_resolved
             term_ids = "_".join([term.id.replace(":", "_") for term in condition.terms])
@@ -200,7 +204,7 @@ class ClinVarExportConverter:
                 term_ids = f"{term_ids}_{join.value}"
 
             data["localID"] = local_id
-            data["localKey"] = f"{local_id}_{term_ids}"
+            data["localKey"] = local_key
             data["observedIn"] = self.observed_in
             data["releaseStatus"] = "public"
             data["variantSet"] = self.variant_set
