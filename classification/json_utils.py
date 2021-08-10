@@ -136,6 +136,11 @@ class ValidatedJson():
     messages: JsonMessages = JSON_MESSAGES_EMPTY
 
     def to_json(self) -> JsonDataType:
+        """
+        Unlike most to_json methods, this will lose data as it will return the pure JSON
+        stripping away representation of the validation messages.
+        Use serialize, deserialize to keep the messages.
+        """
         return self.json_data
 
     @staticmethod

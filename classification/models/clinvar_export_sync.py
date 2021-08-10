@@ -8,7 +8,8 @@ from requests import Response
 
 from classification.json_utils import JsonObjType
 from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
-    ClinVarExportBatchStatus, ClinVarExport
+    ClinVarExportBatchStatus, ClinVarExport, ClinVarExportSubmission, ClinVarExportSubmissionStatus
+from library.log_utils import report_message
 
 
 class _ClinVarExportConfigDic(TypedDict):
@@ -160,17 +161,48 @@ class ClinVarExportConfig:
 
     def _handle_response_file(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         if (response_json := clinvar_request.response_json) and (submissions_json := response_json.get('submissions')):
+
+            submission_set = clinvar_request.submission_batch.clinvarexportsubmission_set
+
             for submission_json in submissions_json:
                 identifiers_json = submission_json.get("identifiers")
-                clinvar_export = ClinVarExport.get_from_identifiers(identifiers_json)
-                clinvar_export.submission_json = submission_json
-                if scv := identifiers_json.get("clinvarAccession"):
-                    clinvar_export.scv = scv
-                # TODO update status?
-                clinvar_export.save()
+
+                clinvar_export_submission: ClinVarExportSubmission
+                local_key = identifiers_json.filter("localKey")
+                if clinvar_export_submission := submission_set.filter(localKey=local_key).first():
+                    clinvar_export = clinvar_export_submission.clinvar_export
+                    # TODO, do we want to do anything with the submission? e.g. around status?
+
+                    if scv := identifiers_json.get("clinvarAccession"):
+                        clinvar_export.scv = scv
+                        clinvar_export.save()
+
+                        clinvar_export_submission.scv = scv
+
+                    new_status: Optional[ClinVarExportSubmissionStatus] = None
+                    if processing_status := submission_json.get("processingStatus"):
+                        if processing_status == "Success":
+                            clinvar_export_submission.status = ClinVarExportSubmissionStatus.SUCCESS
+                        elif processing_status == "Error":
+                            clinvar_export_submission.status = ClinVarExportSubmissionStatus.ERROR
+                        # expect statuses of Success or Error
+
+                    clinvar_export_submission.response_json = submission_json
+                    if new_status:
+                        clinvar_export_submission.status = new_status
+                    else:
+                        report_message(f"ClinVarExportSubmission - could not determine status", level='error', extra_data={"target": clinvar_export_submission.pk})
+                    clinvar_export_submission.save()
+                else:
+                    report_message(f"ClinVarExportRequest - could not find localKey", level='error', extra_data={"target": clinvar_request.pk, "localKey": local_key})
+            else:
+                report_message(f"Expected submissions", level='error', extra_data={"target": clinvar_export_submission.pk})
 
             clinvar_request.submission_batch.status = ClinVarExportBatchStatus.SUBMITTED
             clinvar_request.submission_batch.save()
+
+
+
             return ClinVarResponseOutcome.COMPLETE
 
 

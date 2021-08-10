@@ -66,13 +66,11 @@ class ClinVarExport(TimeStampedModel):
     clinvar_allele = models.ForeignKey(ClinVarAllele, null=True, blank=True, on_delete=models.CASCADE)
     condition = models.JSONField()
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
-    scv = models.TextField(null=True, blank=True)  # if not set yet
+    scv = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
     release_status = models.CharField(max_length=1, choices=ClinVarReleaseStatus.choices, default=ClinVarReleaseStatus.WHEN_READY)
     last_evaluated = models.DateTimeField(default=now)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
-
-    processed_json = models.JSONField(null=True, blank=True)
 
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'pk': self.pk})
@@ -89,18 +87,6 @@ class ClinVarExport(TimeStampedModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-    @staticmethod
-    def get_from_identifiers(identifier: JsonObjType) -> 'ClinVarExport':
-        """
-        e.g.
-        "identifiers": {
-            "localID": "adefc5ed-7d59-4119-8b3d-07dcdc504c09",
-            "localKey": "adefc5ed-7d59-4119-8b3d-07dcdc504c09",
-            "clinvarLocalKey": "adefc5ed-7d59-4119-8b3d-07dcdc504c09"
-          },
-        """
-        raise NotImplementedError("Have not implemented get_from_identifier")
 
     @lazy
     def _condition_resolved(self) -> ConditionResolved:
@@ -123,7 +109,10 @@ class ClinVarExport(TimeStampedModel):
 
     @staticmethod
     def new_condition(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]) -> 'ClinVarExport':
-        cc = ClinVarExport(clinvar_allele=clinvar_allele, condition=condition.to_json())
+        cc = ClinVarExport(
+            clinvar_allele=clinvar_allele,
+            condition=condition.to_json()
+        )
         cc.update_classification(candidate)
         return cc
 
@@ -146,14 +135,8 @@ class ClinVarExport(TimeStampedModel):
         return content
 
     @property
-    def last_submission(self) -> Optional['ClinVarExportSubmission']:
+    def previous_submission(self) -> Optional['ClinVarExportSubmission']:
         return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportBatchStatus.REJECTED).order_by('-created').first()
-
-    def submission_body_previous(self) -> Optional[JsonObjType]:
-        # ignore rejected submissions
-        if last_submission := self.last_submission:
-            return last_submission.submission_body
-        return None
 
     def update(self):
         """
@@ -162,7 +145,7 @@ class ClinVarExport(TimeStampedModel):
         """
         from classification.models.clinvar_export_convertor import ClinVarExportConverter
 
-        current_validated_json_body: ValidatedJson = ClinVarExportConverter(clinvar_export_record=self).as_json
+        current_validated_json_body: ValidatedJson = ClinVarExportConverter(clinvar_export_record=self).as_validated_json
         self.submission_body_validated = current_validated_json_body.serialize()
         lazy.invalidate(self, 'submission_body')
 
@@ -170,8 +153,8 @@ class ClinVarExport(TimeStampedModel):
         if current_validated_json_body.has_errors:
             status = ClinVarExportStatus.IN_ERROR
         else:
-            if previous_submission := self.submission_body_previous():
-                if previous_submission != current_validated_json_body.pure_json():
+            if previous_submission := self.previous_submission:
+                if previous_submission.submission_body != current_validated_json_body.pure_json():
                     status = ClinVarExportStatus.CHANGES_PENDING
                 else:
                     status = ClinVarExportStatus.UP_TO_DATE
@@ -264,13 +247,19 @@ class ClinVarExportBatch(TimeStampedModel):
                     current_batch_size = 0
                     all_batches.append(current_batch)
 
+                pure_json = record.submission_body.pure_json()
+                localId = pure_json["localID"]
+                localKey = pure_json["localKey"]
+
                 ClinVarExportSubmission(
                     clinvar_export=record,
                     classification_based_on=record.classification_based_on,
                     submission_batch=current_batch,
                     submission_full=full_current.pure_json(),
                     submission_body=record.submission_body.pure_json(),
-                    submission_version=CLINVAR_EXPORT_CONVERSION_VERSION
+                    submission_version=CLINVAR_EXPORT_CONVERSION_VERSION,
+                    localId=localId,
+                    localKey=localKey
                 ).save()
                 current_batch_size += 1
                 record.status = ClinVarExportStatus.UP_TO_DATE
@@ -292,6 +281,8 @@ class ClinVarExportSubmission(TimeStampedModel):
 
     class Meta:
         verbose_name = "ClinVar export submission"
+        # below should be uncommented, but have to migrate any existing data first
+        # unique_together = ("clinvar_export", "localKey")
 
     clinvar_export = models.ForeignKey(ClinVarExport, on_delete=models.CASCADE)  # if there's been an actual submission, don't allow deletes
     classification_based_on = models.ForeignKey(ClassificationModification, on_delete=models.PROTECT)
@@ -301,8 +292,12 @@ class ClinVarExportSubmission(TimeStampedModel):
     submission_body = models.JSONField()  # used to see if there are any changes since last submission (other than going from novel to update)
     submission_version = models.IntegerField()
 
+    localId = models.TextField()
+    localKey = models.TextField()
+
     # individual record failure, batch can be in error too
     status = models.CharField(max_length=1, choices=ClinVarExportSubmissionStatus.choices, default=ClinVarExportSubmissionStatus.WAITING)
+    scv = models.TextField(null=True, blank=True)
     response_json = models.JSONField(null=True, blank=True)
 
 

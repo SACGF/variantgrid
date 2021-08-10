@@ -2,7 +2,7 @@
 {% load js_tags %}
 {% load classification_tags %}
 {% labelled label="Full Detail" %}<a class="hover-link" href="{% url 'clinvar_export' clinvar_export.pk %}">View ClinVar Export</a>{% endlabelled %}
-{% with batch=clinvar_export.last_submission.submission_batch %}
+{% with batch=clinvar_export.previous_submission.submission_batch %}
     {% labelled label="Last Submission Batch" %}{% if batch %}
         <a data-href="{% url 'clinvar_export_batch_detail' batch.pk %}" data-toggle="ajax-modal">ClinVar Submission Batch {{ batch.pk }}</a> : {{ batch.get_status_display }} : {% timestamp batch.modified %}
     {% endif %}{% endlabelled %}

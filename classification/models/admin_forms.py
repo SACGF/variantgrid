@@ -611,6 +611,8 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
                 except ClinVarRequestException as clinvar_except:
                     messages.add_message(request, level=messages.ERROR, message=f"Batch {batch.pk} - {clinvar_except}")
 
+
+
     next_action.short_description = "Next Action"
     download_json.short_description = "Download JSON"
     actions = ["export_as_csv", download_json, next_action]

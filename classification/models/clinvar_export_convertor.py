@@ -182,7 +182,7 @@ class ClinVarExportConverter:
         return value
 
     @lazy
-    def as_json(self) -> ValidatedJson:
+    def as_validated_json(self) -> ValidatedJson:
         data = dict()
         if self.classification_based_on is None:
             return ValidatedJson(None, JsonMessages.error("No classification is currently associated with this allele and condition"))
@@ -213,8 +213,12 @@ class ClinVarExportConverter:
             genome_build = self.classification_based_on.get_genome_build()
             if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
                 json_data = {"variant": [{"hgvs": c_hgvs}]}
-                # TODO add Ensembl rejection
-                return ValidatedJson(json_data)
+                errors = JSON_MESSAGES_EMPTY
+
+                if c_hgvs.startswith("ENST"):
+                    errors += JsonMessages.error("ClinVar doesn't support Ensemble transcripts")
+
+                return ValidatedJson(json_data, errors)
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
         except:
