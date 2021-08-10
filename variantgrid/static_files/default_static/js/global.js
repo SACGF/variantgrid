@@ -208,7 +208,14 @@ function enhanceAndMonitor() {
     const observer = new MutationObserver((mutationsList, observer) => {
         mutationsList.forEach((mutation) => {
             for (let node of mutation.addedNodes) {
-                checkNode($(node), true);
+                node = $(node);
+                if (!node.attr('data-p')) {
+                    checkNode($(node), true);
+                    // add an attribute at the top level to stop items being processed multiple times
+                    // only do at top level so we don't mark everything with data-p, but does
+                    // run the risk of adding a child of something that's already been added
+                    node.attr('data-p', '1');
+                }
             }
         });
     });
