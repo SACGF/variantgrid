@@ -1346,7 +1346,7 @@ const VCForm = (function() {
                     ])
                 );
             } else {
-                descriptionSpan = eKey.description ? fixLinks(EKeys.fixDescription(eKey.description)) : $('<i>', {text:'No help is provided for this field'});
+                descriptionSpan = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
                 if (eKey.hide === true) {
                     descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));
                 }
