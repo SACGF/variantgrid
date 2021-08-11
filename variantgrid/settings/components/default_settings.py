@@ -575,7 +575,7 @@ INSTALLED_APPS = [
     'avatar',
     'vcauth',
     'datetimeutc',
-    'django_admin_json_editor',
+    'django_json_widget',
     'django.contrib.humanize',
     'django.contrib.sites',
     'captcha',

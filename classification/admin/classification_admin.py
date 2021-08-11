@@ -1,27 +1,22 @@
 import json
+from typing import Dict
 
 from django.contrib import admin, messages
-from django.contrib.admin import AllValuesFieldListFilter, RelatedFieldListFilter
-from django.contrib.auth.models import User
+from django.contrib.admin import RelatedFieldListFilter
 from django.db.models import QuerySet
-from django.forms import forms
-from django.http import HttpResponse
 from django.utils import timezone
-from django_admin_json_editor.admin import JSONEditorWidget
 
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.classification_import import process_classification_import
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import EvidenceKey, ConditionText, \
-    ConditionTextMatch, DiscordanceReport, DiscordanceReportClassification, send_discordance_notification, \
-    ClinVarExportBatch, ClinVarExport, EvidenceKeyMap, ClinVarExportBatchStatus, ClinVarExportRequest, ClinVarAllele
+from classification.models import EvidenceKey, DiscordanceReport, DiscordanceReportClassification, \
+    send_discordance_notification, \
+    EvidenceKeyMap, ClinicalContext, ClassificationReportTemplate, ClassificationModification
 from classification.models.classification import Classification, ClassificationImport
-from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
 from library.guardian_utils import admin_bot
-from snpdb.admin import ModelAdminBasics
-from snpdb.admin_utils import AllValuesChoicesFieldListFilter
-from snpdb.models import ImportSource, Lab, Organization, GenomeBuild
+from snpdb.admin_utils import ModelAdminBasics, short_description
+from snpdb.models import ImportSource, GenomeBuild
 
 
 class VariantMatchedFilter(admin.SimpleListFilter):
@@ -38,36 +33,6 @@ class VariantMatchedFilter(admin.SimpleListFilter):
             return queryset.filter(variant__isnull=False)
         if self.value() == 'False':
             return queryset.filter(variant__isnull=True)
-        return queryset
-
-
-class ClassificationLabFilter(admin.SimpleListFilter):
-    list_per_page = 200
-    title = 'Lab Filter'
-    parameter_name = 'lab'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return [(lab.id, lab.name) for lab in Lab.objects.all()]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(lab=self.value())
-        return queryset
-
-
-class ClassificationOrgFilter(admin.SimpleListFilter):
-    list_per_page = 200
-    title = 'Org Filter'
-    parameter_name = 'org'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return [(org.id, org.name) for org in Organization.objects.all()]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(lab__organization=self.value())
         return queryset
 
 
@@ -105,21 +70,6 @@ class ClinicalContextFilter(admin.SimpleListFilter):
         return queryset
 
 
-class ClassificationUserFilter(admin.SimpleListFilter):
-    list_per_page = 200
-    title = 'User Filter'
-    parameter_name = 'user'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return [(user.id, user.username) for user in User.objects.all()]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(user=self.value())
-        return queryset
-
-
 class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
     title = 'Imported Genome Build Filter'
     parameter_name = 'genome_build'
@@ -136,18 +86,25 @@ class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
         return queryset
 
 
-class ClassificationAdmin(admin.ModelAdmin):
+class ClassificationModificationAdmin(admin.TabularInline):
+    model = ClassificationModification
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Classification)
+class ClassificationAdmin(ModelAdminBasics):
     list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
-    list_filter = (ClassificationOrgFilter, ClassificationLabFilter, ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ClassificationUserFilter,)
+    list_filter = (('lab__organization', RelatedFieldListFilter), ('lab', RelatedFieldListFilter), ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ('user', RelatedFieldListFilter),)
     search_fields = ('id', 'lab_record_id')
     list_per_page = 500
+    inlines = (ClassificationModificationAdmin,)
 
-    fieldsets = (
-        ('ID', {'fields': ('lab_record_id',)}),
-        ('Links', {'fields': ('sample', 'lab', 'user', 'clinical_context')}),
-        ('Variant', {'fields': ('chgvs_grch37', 'chgvs_grch38')}),
-        ('Data', {'fields': ('clinical_significance', 'evidence',)}),
-    )
+
 
     def created_detailed(self, obj: Classification):
         return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
@@ -161,7 +118,11 @@ class ClassificationAdmin(admin.ModelAdmin):
     modified_detailed.admin_order_field = 'modified'
     modified_detailed.short_description = 'Modified'
 
-    def populate_base_variant_data(self, request, queryset):
+    def has_add_permission(self, request):
+        return False
+
+    @short_description("Populate base variant data")
+    def populate_base_variant_data(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
             refseq_transcript_id = vc.get(SpecialEKeys.REFSEQ_TRANSCRIPT_ID)
             ensembl_transcript_id = vc.get(SpecialEKeys.ENSEMBL_TRANSCRIPT_ID)
@@ -202,30 +163,24 @@ class ClassificationAdmin(admin.ModelAdmin):
                 else:
                     self.message_user(request, "(%i) No changes with = %s" % (vc.id, json.dumps(patch)))
 
-    populate_base_variant_data.short_description = "Populate base variant data"
-
+    @short_description("Revalidate")
     def revalidate(self, request, queryset):
         for vc in queryset:
             vc.revalidate(request.user)
         self.message_user(request, str(queryset.count()) + " records revalidated")
 
-    revalidate.short_description = "Revalidate"
-
+    @short_description("Publish - Logged in Users")
     def publish_logged_in_users(self, request, queryset):
         self.publish_share_level(request, queryset, ShareLevel.ALL_USERS)
 
-    publish_logged_in_users.short_description = 'Publish - Org'
-
+    @short_description("Publish - Organisation")
     def publish_org(self, request, queryset):
         self.publish_share_level(request, queryset, ShareLevel.INSTITUTION)
 
-    publish_org.short_description = 'Publish - Organisation'
-
-    def publish_share_level(self, request, queryset, share_level: ShareLevel):
+    def publish_share_level(self, request, queryset: QuerySet[Classification], share_level: ShareLevel):
         already_published = 0
         in_error = 0
         published = 0
-        vc: Classification
         for vc in queryset:
             if vc.share_level_enum >= share_level:
                 already_published += 1
@@ -244,18 +199,18 @@ class ClassificationAdmin(admin.ModelAdmin):
             self.message_user(request, message=f"({in_error}) records can't be published due to validation errors", level=messages.ERROR)
         self.message_user(request, message=f"({published}) records have been freshly published", level=messages.INFO)
 
-    def reattempt_variant_matching(self, request, queryset):
-        qs = queryset
-        qs.order_by('evidence__genome_build')
+    @short_description("Variant re-matching")
+    def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
+        qs: QuerySet[Classification] = queryset.order_by('evidence__genome_build')
 
         invalid_genome_build_count = 0
         valid_record_count = 0
-        imports_by_genome = {}
+        imports_by_genome: Dict[int, ClassificationImport] = dict()
 
         for vc in qs:
             try:
                 genome_build = vc.get_genome_build()
-                if not genome_build.pk in imports_by_genome:
+                if genome_build.pk not in imports_by_genome:
                     imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=request.user,
                                                                                              genome_build=genome_build)
                 vc_import = imports_by_genome[genome_build.pk]
@@ -264,7 +219,7 @@ class ClassificationAdmin(admin.ModelAdmin):
                 vc.save()
                 valid_record_count = valid_record_count + 1
 
-            except:
+            except BaseException:
                 invalid_genome_build_count = invalid_genome_build_count + 1
 
         for vc_import in imports_by_genome.values():
@@ -274,39 +229,32 @@ class ClassificationAdmin(admin.ModelAdmin):
             self.message_user(request, f'Records with missing or invalid genome_builds : {invalid_genome_build_count}')
         self.message_user(request, f'Records revalidating : {valid_record_count}')
 
-    reattempt_variant_matching.short_description = 'Variant re-matching'
-
-    def recalculate_cached_chgvs(self, request, queryset):
-        vc: Classification
+    @short_description("Re-calculate cached chgvs")
+    def recalculate_cached_chgvs(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
             vc.update_cached_c_hgvs()
             vc.save()
 
-    recalculate_cached_chgvs.short_description = 'Re-calculate cached chgvs'
-
-    def set_withdraw(self, request, queryset, withdraw: bool) -> int:
-        vc: Classification
+    def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool) -> int:
         count = 0
         for vc in queryset:
             try:
                 actioned = vc.set_withdrawn(user=request.user, withdraw=withdraw)
                 if actioned:
                     count += 1
-            except:
+            except BaseException:
                 pass
         return count
 
-    def withdraw_true(self, request, queryset):
+    @short_description("Withdraw")
+    def withdraw_true(self, request, queryset: QuerySet[Classification]):
         count = self.set_withdraw(request, queryset, True)
         self.message_user(request, f"{count} records now newly set to withdrawn")
 
-    withdraw_true.short_description = 'Withdraw'
-
+    @short_description("Un-Withdraw")
     def withdraw_false(self, request, queryset):
         count = self.set_withdraw(request, queryset, False)
         self.message_user(request, f"{count} records now newly set to un-withdrawn")
-
-    withdraw_false.short_description = 'Un-Withdraw'
 
     """
     def fix_allele_freq_history(self, request, queryset):
@@ -323,24 +271,38 @@ class ClassificationAdmin(admin.ModelAdmin):
                recalculate_cached_chgvs,
                # fix_allele_freq_history,
                withdraw_true,
-               withdraw_false]
+               withdraw_false,
+               'export_as_csv']
 
     def get_form(self, request, obj=None, **kwargs):
         return super(ClassificationAdmin, self).get_form(request, obj, widgets={
-            'lab_record_id': admin.widgets.AdminTextInputWidget()
+            'lab_record_id': admin.widgets.AdminTextInputWidget(),
+            'chgvs_grch37': admin.widgets.AdminTextInputWidget(),
+            'chgvs_grch37_full': admin.widgets.AdminTextInputWidget(),
+            'chgvs_grch38': admin.widgets.AdminTextInputWidget(),
+            'chgvs_grch38_full': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
 
-class ClinicalContextAdmin(admin.ModelAdmin):
+@admin.register(ClinicalContext)
+class ClinicalContextAdmin(ModelAdminBasics):
     list_display = ('id', 'allele', 'name', 'status', 'modified',)
 
-    def recalc(self, request, queryset):
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget()
+        })
+
+    def has_add_permission(self, request):
+        return False
+
+    @short_description("Recalculate Status")
+    def recalculate(self, request, queryset):
         for dc in queryset:
             dc.recalc_and_save(cause='Admin recalculation')  # cause of None should change to Unknown, which is accurate if this was required
-        self.message_user(request, 'Recalced %i statuses' % queryset.count())
+        self.message_user(request, 'Recalculated %i statuses' % queryset.count())
 
-    recalc.short_description = 'Recalc status'
-    actions = [recalc]
+    actions = [recalculate, 'export_as_csv']
 
 
 class EvidenceKeySectionFilter(admin.SimpleListFilter):
@@ -371,7 +333,8 @@ class MaxShareLevelFilter(admin.SimpleListFilter):
         return queryset
 
 
-class EvidenceKeyAdmin(admin.ModelAdmin):
+@admin.register(EvidenceKey)
+class EvidenceKeyAdmin(ModelAdminBasics):
     list_per_page = 500
     list_filter = (EvidenceKeySectionFilter, MaxShareLevelFilter)
     ordering = ('key',)
@@ -403,53 +366,16 @@ class EvidenceKeyAdmin(admin.ModelAdmin):
     actions = [validate]
 
     def get_form(self, request, obj=None, **kwargs):
-
-        options_schema = {
-            'type': 'array',
-            'title': 'select',
-            'description': 'Options - ONLY meaningful if value type is Select',
-            'items': {
-                'type': 'object',
-                'title': 'option',
-                'properties': {
-                    'key': {
-                        'type': 'string',
-                        'description': 'value stored against the record'
-                    },
-                    'label': {
-                        'type': 'string',
-                        'description': 'value displayed to the user'
-                    },
-                    'index': {
-                        'type': 'number',
-                        'required': True,
-                        'description': 'Number to be used for RedCap exports'
-                    }
-                }
-            }
-        }
-        examples_schema = {
-            'type': 'array',
-            'title': 'examples',
-            'items': {
-                'type': 'string',
-                'title': 'example'
-            }
-        }
-
-        return super(EvidenceKeyAdmin, self).get_form(request, obj, widgets={
-
+        return super().get_form(request, obj, widgets={
             'key': admin.widgets.AdminTextInputWidget(),
             'label': admin.widgets.AdminTextInputWidget(),
             'sub_label': admin.widgets.AdminTextInputWidget(),
             'see': admin.widgets.AdminURLFieldWidget(),
-            'if_key': admin.widgets.AdminTextInputWidget(),
-            'options': JSONEditorWidget(options_schema, True),
-            'examples': JSONEditorWidget(examples_schema, True),
-
+            'if_key': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
 
+@admin.register(ClassificationReportTemplate)
 class ClassificationReportTemplateAdmin(admin.ModelAdmin):
     list_display = ('name', 'modified')
 
@@ -458,79 +384,6 @@ class ClassificationReportTemplateAdmin(admin.ModelAdmin):
             'name': admin.widgets.AdminTextInputWidget(),
             'template': admin.widgets.AdminTextareaWidget()
         }, **kwargs)
-
-
-class ConditionTextStatusFilter(admin.SimpleListFilter):
-    title = 'Status Filter'
-    parameter_name = 'status_filter'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return [("outstanding", "Only with outstanding classifications")]
-
-    def queryset(self, request, queryset):
-        if value := self.value():
-            if value == "outstanding":
-                queryset = queryset.exclude(classifications_count_outstanding=0)
-        return queryset
-
-
-class ConditionTextAdmin(ModelAdminBasics):
-    search_fields = ('id', 'normalized_text')
-    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding"]
-    list_filter = [ConditionTextStatusFilter, ClassificationLabFilter]
-
-    def get_form(self, request, obj=None, **kwargs):
-        return super().get_form(request, obj, widgets={
-            'normalized_text': admin.widgets.AdminTextInputWidget()
-        }, **kwargs)
-
-    def auto_match(self, request, queryset):
-        condition_text: ConditionText
-        for condition_text in queryset:
-            ConditionTextMatch.attempt_automatch(condition_text=condition_text)
-            condition_text.save()
-
-    auto_match.short_description = "Automatch (leaves existing data)"
-
-    def clear(self, request, queryset):
-        condition_text: ConditionText
-        for condition_text in queryset:
-            condition_text.clear()
-
-    clear.short_description = "Clear any matches"
-
-    actions = [auto_match, clear]
-
-
-class ConditionTextMatchUserFilter(admin.SimpleListFilter):
-    list_per_page = 200
-    title = 'User Filter'
-    parameter_name = 'user'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return [
-            ("any", "Any User"),
-            ("non_admin", "Non Admin"),
-            ("bot", "Auto-Assigned")
-        ]
-
-    def queryset(self, request, queryset):
-        if user := self.value():
-            if user == "any":
-                queryset = queryset.filter(last_edited_by__isnull=False).exclude(last_edited_by=admin_bot())
-            elif user == "non_admin":
-                queryset = queryset.filter(last_edited_by__is_superuser=False).exclude(last_edited_by=admin_bot())
-            elif user == "bot":
-                queryset = queryset.filter(last_edited_by=admin_bot())
-        return queryset
-
-
-class ConditionTextMatchAdmin(ModelAdminBasics):
-    list_display = ["pk", "condition_text", "gene_symbol", "classification", "condition_xrefs", "condition_multi_operation", "last_edited_by", "created", "modified"]
-    list_filter = [ConditionTextMatchUserFilter]
-    search_fields = ('id', 'condition_text__normalized_text', 'gene_symbol__symbol', 'classification__id', 'condition_xrefs')
 
 
 class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
@@ -555,22 +408,29 @@ class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
         return queryset
 
 
+class DiscordanceReportClassificationAdmin(admin.TabularInline):
+    model = DiscordanceReportClassification
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DiscordanceReport)
 class DiscordanceReportAdmin(ModelAdminBasics):
     list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "clinical_sigs", "labs"]
     list_filter = [DiscordanceReportAdminLabFilter]
-
-    def send_notification(self, request, queryset):
-        ds: DiscordanceReport
-        for ds in queryset:
-            send_discordance_notification(ds)
-
-    send_notification.short_description = "Send discordance notification"
-
-    actions = [send_notification]
+    inlines = (DiscordanceReportClassificationAdmin,)
 
     def allele(self, obj: DiscordanceReport):
         cc = obj.clinical_context
         return str(cc.allele)
+    allele.ordering = 'clinical_context__allele__pk'
 
     def clinical_sigs(self, obj: DiscordanceReport):
         clinical_sigs = set()
@@ -602,3 +462,14 @@ class DiscordanceReportAdmin(ModelAdminBasics):
                 labs.add(c.lab)
         labs = sorted(labs, key=lambda x: x.name)
         return ", ".join([lab.name for lab in labs])
+
+    def has_add_permission(self, request):
+        return False
+
+    @short_description("Send discordance notification")
+    def send_notification(self, request, queryset):
+        ds: DiscordanceReport
+        for ds in queryset:
+            send_discordance_notification(ds)
+
+    actions = [send_notification]

@@ -1,27 +1,22 @@
 from typing import Optional
 
 from django.contrib import admin
+from django.contrib.admin import RelatedFieldListFilter
+
+from snpdb.admin_utils import ModelAdminBasics, short_description
 from sync import models
+from sync.models import SyncRun, ClassificationModificationSyncRecord
 from sync.models.models import SyncDestination
 
 
-class ByDestinationFilter(admin.SimpleListFilter):
-    list_per_page = 200
-    title = 'Destination Filter'
-    parameter_name = 'destination'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return [(destination.pk, destination.name) for destination in SyncDestination.objects.all()]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(destination=self.value())
-        return queryset
-
-
-class SyncDestinationAdmin(admin.ModelAdmin):
+@admin.register(SyncDestination)
+class SyncDestinationAdmin(ModelAdminBasics):
     list_display = ('name', 'config', 'enabled')
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
 
     def _run_sync(self, request, queryset, max_rows: Optional[int] = None):
         sync_destination: SyncDestination
@@ -29,37 +24,42 @@ class SyncDestinationAdmin(admin.ModelAdmin):
             sync_destination.run(full_sync=False, max_rows=max_rows)
             self.message_user(request, message=f"Completed {str(sync_destination)} row limit = {max_rows}")
 
+    @short_description("Run now (delta sync)")
     def run_sync(self, request, queryset):
         self._run_sync(request, queryset)
-    run_sync.short_description = "Run now (delta sync)"
 
+    @short_description("Run now (delta sync) single row")
     def run_sync_single(self, request, queryset):
         self._run_sync(request, queryset, max_rows=1)
-    run_sync_single.short_description = "Run now (delta sync) single row"
 
+    @short_description("Run now (delta sync) 10 rows")
     def run_sync_ten(self, request, queryset):
         self._run_sync(request, queryset, max_rows=10)
-    run_sync_ten.short_description = "Run now (delta sync) 10 rows"
 
+    @short_description("Run now (full sync)")
     def run_sync_full(self, request, queryset):
         sync_destination: SyncDestination
         for sync_destination in queryset:
             sync_destination.run(full_sync=True)
             self.message_user(request, message=f"Completed {str(sync_destination)}")
-    run_sync_full.short_description = "Run now (full sync)"
 
-    actions = [run_sync, run_sync_single, run_sync_ten, run_sync_full]
+    actions = [run_sync, run_sync_single, run_sync_ten, run_sync_full, 'export_as_csv']
 
 
-class SyncRunAdmin(admin.ModelAdmin):
+@admin.register(SyncRun)
+class SyncRunAdmin(ModelAdminBasics):
     list_display = ('id', 'destination', 'created', 'status', 'meta')
-    list_filter = (ByDestinationFilter,)
+    list_filter = (('destination', RelatedFieldListFilter),)
+
+    def has_add_permission(self, request):
+        return False
 
 
-class ClassificationModificationSyncRecordAdmin(admin.ModelAdmin):
+@admin.register(ClassificationModificationSyncRecord)
+class ClassificationModificationSyncRecordAdmin(ModelAdminBasics):
     list_display = ('id', 'run', 'created', 'classification_modification', 'success', 'meta')
+    search_fields = ('classification_modification__classification__lab_record_id', 'classification_modification__classification__id')
 
+    def has_add_permission(self, request):
+        return False
 
-admin.site.register(models.SyncDestination, SyncDestinationAdmin)
-admin.site.register(models.SyncRun, SyncRunAdmin)
-admin.site.register(models.ClassificationModificationSyncRecord, ClassificationModificationSyncRecordAdmin)

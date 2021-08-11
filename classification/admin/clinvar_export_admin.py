@@ -4,8 +4,7 @@ from django.http import HttpResponse
 
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, ClinVarExportRequest
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
-from snpdb.admin import ModelAdminBasics
-from snpdb.admin_utils import AllValuesChoicesFieldListFilter, short_description
+from snpdb.admin_utils import AllValuesChoicesFieldListFilter, short_description, ModelAdminBasics
 import json
 
 

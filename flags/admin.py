@@ -1,46 +1,71 @@
 from django.contrib import admin
+from django.contrib.admin import RelatedFieldListFilter, AllValuesFieldListFilter, TabularInline
+
 from flags import models
-from flags.models import FlagStatus
+from flags.models import FlagStatus, Flag, FlagComment, FlagResolution, FlagTypeResolution, FlagCollection
 from flags.models.models import FlagType
+from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
 
 
-class FlagTypeFilter(admin.SimpleListFilter):
-    list_per_page = 200
-    title = 'Flag Type'
-    parameter_name = 'flag_type'
-    default_value = None
+class FlagCommentAdmin(TabularInline):
+    model = FlagComment
 
-    def lookups(self, request, model_admin):
-        return [(flag_type.id, flag_type.label) for flag_type in FlagType.objects.all()]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(flag_type=self.value())
-        return queryset
+    def has_add_permission(self, request, obj):
+        return False
 
 
-class FlagStatusFilter(admin.SimpleListFilter):
-    list_per_page = 50
-    title = 'Resolution'
-    parameter_name = 'resolution'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return FlagStatus.CHOICES
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(resolution__status=self.value())
-        return queryset
-
-
-class FlagAdmin(admin.ModelAdmin):
+@admin.register(Flag)
+class FlagAdmin(ModelAdminBasics):
     list_display = ('id', 'collection', 'flag_type', 'resolution', 'user', 'data', 'created', 'modified')
-    list_filter = (FlagTypeFilter, FlagStatusFilter,)
+    list_filter = (('flag_type', RelatedFieldListFilter), ('resolution__status', AllValuesChoicesFieldListFilter), ('user', RelatedFieldListFilter))
+    inlines = (FlagCommentAdmin,)
 
-admin.site.register(models.FlagType)
-admin.site.register(models.FlagTypeContext)
-admin.site.register(models.FlagCollection)
-admin.site.register(models.Flag, FlagAdmin)
-admin.site.register(models.FlagResolution)
-admin.site.register(models.FlagTypeResolution)
+    def has_add_permission(self, request):
+        return False
+
+
+class FlagTypeResolution(TabularInline):
+    model = FlagTypeResolution
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+@admin.register(FlagType)
+class FlagTypeAdmin(ModelAdminBasics):
+    list_display = ('id', 'context', 'label', 'description', 'help_text', 'raise_permission')
+    list_filter = (('context', RelatedFieldListFilter), )
+    inlines = (FlagTypeResolution,)
+
+
+class FlagInline(TabularInline):
+    model = Flag
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FlagCollection)
+class FlagCollectionAdmin(ModelAdminBasics):
+    list_display = ('pk', 'text')
+    list_filter = (('context', RelatedFieldListFilter), )
+    search_fields = ('pk',)
+    inlines = (FlagInline,)
+
+    def text(self, obj: FlagCollection):
+        return str(obj)
+
+    def has_add_permission(self, request):
+        return False
+

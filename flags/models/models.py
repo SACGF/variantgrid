@@ -51,10 +51,16 @@ class FlagResolution(TimeStampedModel, ModelUtilsMixin):
     description = models.TextField()
     status = models.TextField(max_length=1, default=FlagStatus.OPEN, choices=FlagStatus.CHOICES)
 
+    def __str__(self):
+        return self.label
+
 
 class FlagTypeContext(models.Model, ModelUtilsMixin):
     id = models.TextField(primary_key=True)
     label = models.TextField()
+
+    def __str__(self):
+        return self.label
 
 
 class FlagType(TimeStampedModel, ModelUtilsMixin):
@@ -66,6 +72,9 @@ class FlagType(TimeStampedModel, ModelUtilsMixin):
     help_text = models.TextField(default='')
 
     raise_permission = models.TextField(max_length=1, choices=FlagPermissionLevel.choices(), default=FlagPermissionLevel.ADMIN.value)
+
+    def __str__(self):
+        return self.label
 
     @property
     def raise_permission_enum(self) -> FlagPermissionLevel:

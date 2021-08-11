@@ -1,8 +1,15 @@
+import csv
+
 from django.contrib import admin
+from django.db import models
+from django.db.models import AutoField, ForeignKey, DateTimeField
+from django.http import HttpResponse
 from django.utils.encoding import smart_text
-
-
 # https://stackoverflow.com/questions/41228687/how-to-decorate-admin-actions-in-django-action-name-used-as-dict-key
+from django_json_widget.widgets import JSONEditorWidget
+from guardian.admin import GuardedModelAdmin
+
+
 def short_description(short_description: str):
     def decorator(admin_action):
         def wrapper(*args, **kwargs):
@@ -49,3 +56,71 @@ class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
                 'display': self.empty_value_display,
             }
 
+
+class AdminExportCsvMixin:
+    def export_as_csv(self, request, queryset):
+
+        meta = self.model._meta
+        field_names = [field.name for field in meta.fields]
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
+        writer = csv.writer(response)
+
+        writer.writerow(field_names)
+        for obj in queryset:
+            writer.writerow([getattr(obj, field) for field in field_names])
+        return response
+
+    export_as_csv.short_description = "Export Selected as CSV"
+
+    def _is_readonly(self, f) -> bool:
+        if not f.editable:
+            return True  # does this make all the below redundant?
+        if isinstance(f, (AutoField, ForeignKey)):
+            return True
+        if isinstance(f, DateTimeField):
+            if f.auto_now or f.auto_now_add:
+                return True
+        return False
+
+    def _get_readonly_fields(self, request, obj=None):
+        return [f.name for f in self.model._meta.fields if self._is_readonly(f)]
+
+    def _get_fields(self, request, obj=None, **kwargs):
+        first = []
+        second = []
+        for f in self.model._meta.fields:
+            if isinstance(f, (AutoField, ForeignKey)):
+                # put ids and foreign keys first
+                # first.append(f.name)
+                first.append(f.name)
+            else:
+                second.append(f.name)
+
+        return first + second
+
+
+class ModelAdminBasics(admin.ModelAdmin, AdminExportCsvMixin):
+    formfield_overrides = {
+        models.JSONField: {'widget': JSONEditorWidget},
+    }
+
+    # wanted to call this BaseModelAdmin but that was already taken
+    actions = ["export_as_csv"]
+
+    def get_readonly_fields(self, request, obj=None):
+        return self._get_readonly_fields(request=request, obj=obj)
+
+    def get_fields(self, request, obj=None):
+        return self._get_fields(request=request, obj=obj)
+
+
+class GuardedModelAdminBasics(GuardedModelAdmin, AdminExportCsvMixin):
+    actions = ["export_as_csv"]
+
+    def get_readonly_fields(self, request, obj=None):
+        return self._get_readonly_fields(request=request, obj=obj)
+
+    def get_fields(self, request, obj=None):
+        return self._get_fields(request=request, obj=obj)

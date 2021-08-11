@@ -1,81 +1,13 @@
-import csv
 from typing import List
 
 from django.contrib import admin, messages
-from django.db.models import AutoField, ForeignKey, DateTimeField
-from django.http import HttpResponse
 from django.utils.html import format_html
-from guardian.admin import GuardedModelAdmin
 from snpdb import models
+from snpdb.admin_utils import AdminExportCsvMixin, ModelAdminBasics, GuardedModelAdminBasics
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models_admin_forms import LabAdmin, OrganizationAdmin
-
-
-class AdminExportCsvMixin:
-    def export_as_csv(self, request, queryset):
-
-        meta = self.model._meta
-        field_names = [field.name for field in meta.fields]
-
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
-        writer = csv.writer(response)
-
-        writer.writerow(field_names)
-        for obj in queryset:
-            writer.writerow([getattr(obj, field) for field in field_names])
-        return response
-
-    export_as_csv.short_description = "Export Selected as CSV"
-
-    def _is_readonly(self, f) -> bool:
-        if not f.editable:
-            return True  # does this make all the below redundant?
-        if isinstance(f, (AutoField, ForeignKey)):
-            return True
-        if isinstance(f, DateTimeField):
-            if f.auto_now or f.auto_now_add:
-                return True
-        return False
-
-    def _get_readonly_fields(self, request, obj=None):
-        return [f.name for f in self.model._meta.fields if self._is_readonly(f)]
-
-    def _get_fields(self, request, obj=None, **kwargs):
-        first = []
-        second = []
-        for f in self.model._meta.fields:
-            if isinstance(f, (AutoField, ForeignKey)):
-                # put ids and foreign keys first
-                # first.append(f.name)
-                first.append(f.name)
-            else:
-                second.append(f.name)
-
-        return first + second
-
-
-class ModelAdminBasics(admin.ModelAdmin, AdminExportCsvMixin):
-    # wanted to call this BaseModelAdmin but that was already taken
-    actions = ["export_as_csv"]
-
-    def get_readonly_fields(self, request, obj=None):
-        return self._get_readonly_fields(request=request, obj=obj)
-
-    def get_fields(self, request, obj=None):
-        return self._get_fields(request=request, obj=obj)
-
-
-class GuardedModelAdminBasics(GuardedModelAdmin, AdminExportCsvMixin):
-    actions = ["export_as_csv"]
-
-    def get_readonly_fields(self, request, obj=None):
-        return self._get_readonly_fields(request=request, obj=obj)
-
-    def get_fields(self, request, obj=None):
-        return self._get_fields(request=request, obj=obj)
 
 
 class AlleleClingenFilter(admin.SimpleListFilter):
@@ -175,7 +107,8 @@ class ClinVarKeyAdmin(ModelAdminBasics):
     def get_form(self, request, obj=None, **kwargs):
 
         return super(ClinVarKeyAdmin, self).get_form(request, obj, widgets={
-            'id': admin.widgets.AdminTextInputWidget()
+            'id': admin.widgets.AdminTextInputWidget(),
+            'behalf_org_id': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
 

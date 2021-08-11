@@ -1,5 +1,7 @@
 from django.contrib import admin
 from unidecode import unidecode
+
+from snpdb.admin_utils import ModelAdminBasics
 from snpdb.models import Organization, Lab
 import re
 
@@ -16,7 +18,7 @@ def make_code_friendly(text: str) -> str:
     return re.sub(r'[^a-z0-9_]', '', text)
 
 
-class LabAdmin(admin.ModelAdmin):
+class LabAdmin(ModelAdminBasics):
     list_per_page = 200
     list_display = ('name', 'group_name', 'organization', 'external', 'classification_config')
 
@@ -64,7 +66,7 @@ class LabAdmin(admin.ModelAdmin):
     actions = [fix_group_name]
 
 
-class OrganizationAdmin(admin.ModelAdmin):
+class OrganizationAdmin(ModelAdminBasics):
 
     list_display = ('name', 'group_name', 'classification_config')
 

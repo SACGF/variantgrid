@@ -1,12 +1,21 @@
 from django.contrib import admin
 from manual import models
+from manual.models import ManualMigrationAttempt, ManualMigrationRequired
+from snpdb.admin_utils import ModelAdminBasics
 
-class ManualMigrationTaskAdmin(admin.ModelAdmin):
+
+@admin.register(ManualMigrationAttempt)
+class ManualMigrationAttemptAdmin(ModelAdminBasics):
     list_display = ('id', 'created', 'task', 'note')
 
-class ManualMigrationRequiredAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(ManualMigrationRequired)
+class ManualMigrationRequiredAdmin(ModelAdminBasics):
     list_display = ('id', 'created', 'task', 'note')
 
-admin.site.register(models.ManualMigrationTask)
-admin.site.register(models.ManualMigrationAttempt, ManualMigrationTaskAdmin)
-admin.site.register(models.ManualMigrationRequired, ManualMigrationRequiredAdmin)
+    def has_add_permission(self, request):
+        return False
+
