@@ -322,7 +322,7 @@ class ClinVarExportConverter:
         else:
             data["affectedStatus"] = ValidatedJson(None, JsonMessages.error("Affected status not provided and no default config provided"))
         if allele_origin := self.clinvar_value(SpecialEKeys.ALLELE_ORIGIN).value(single=True, optional=True):
-            data["allele_origin"] = allele_origin
+            data["alleleOrigin"] = allele_origin
         else:
             data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided"))
         data["collectionMethod"] = "curation"  # TODO confirm hardcoded of curation
