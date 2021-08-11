@@ -69,11 +69,15 @@ class ClinVarExportSync:
 
     @lazy
     def _config(self) -> _ClinVarExportConfigDic:
-        return settings.CLINVAR_EXPORT or {"enabled": False, "api_key": None}
+        return settings.CLINVAR_EXPORT or {"enabled": False, "test": True, "api_key": None}
 
     @property
     def is_enabled(self) -> bool:
         return self._config.get('enabled')
+
+    @property
+    def is_test(self) -> bool:
+        return self._config.get('test')
 
     @property
     def api_key(self) -> Optional[str]:
@@ -116,21 +120,30 @@ class ClinVarExportSync:
         if not batch.submission_identifier:
             batch.status = ClinVarExportBatchStatus.UPLOADING
             batch.save()
+            url = "https://submit.ncbi.nlm.nih.gov/api/v1/submissions/"
+            if self.is_test:
+                url += "?dry-run=true"
+
             clinvar_request = self._send_data(
                 batch=batch,
                 request_type=ClinVarExportRequestType.INITIAL_SUBMISSION,
                 json_data=batch.to_json(),
-                url=f"https://submit.ncbi.nlm.nih.gov/api/v1/submissions/?dry-run=true")
-        elif not batch.file_url:
-            clinvar_request = self._send_data(
-                batch=batch,
-                request_type=ClinVarExportRequestType.POLLING_SUBMISSION,
-                url=f"https://submit.ncbi.nlm.nih.gov/api/v1/submissions/{batch.submission_identifier}/actions/")
+                url=url)
+
         else:
-            clinvar_request = self._send_data(
-                batch=batch,
-                request_type=ClinVarExportRequestType.RESPONSE_FILES,
-                url=batch.file_url)
+            if not self.is_test:
+                raise ValueError("ClinVarExport test is set to True, but attempted to perform an action other than initial submission")
+
+            if not batch.file_url:
+                clinvar_request = self._send_data(
+                    batch=batch,
+                    request_type=ClinVarExportRequestType.POLLING_SUBMISSION,
+                    url=f"https://submit.ncbi.nlm.nih.gov/api/v1/submissions/{batch.submission_identifier}/actions/")
+            else:
+                clinvar_request = self._send_data(
+                    batch=batch,
+                    request_type=ClinVarExportRequestType.RESPONSE_FILES,
+                    url=batch.file_url)
 
         handle_outcome = self.handle_request_response(clinvar_request)
         batch.refresh_from_db()  # just in case we've indirectly modified it
@@ -148,7 +161,8 @@ class ClinVarExportSync:
 
         elif clinvar_request.response_status_code == 204:
             # means it's just test? not really sure what the best thing to do about this is
-            # clinvar_request.submission_batch.status = ClinVarExportBatchStatus.REJECTED
+            clinvar_request.submission_batch.status = ClinVarExportBatchStatus.SUBMITTED
+            clinvar_request.submission_batch.save()
             return ClinVarResponseOutcome.COMPLETE
         else:
             raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find actions[0].id submission ID")

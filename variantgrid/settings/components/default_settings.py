@@ -849,7 +849,7 @@ MESSAGE_TAGS = {
 
 
 def get_clinvar_export_secrets() -> dict:
-    return get_secrets("CLINVAR_EXPORT", ["enabled", "api_key"])
+    return get_secrets("CLINVAR_EXPORT", ["enabled", "test", "api_key"])
 
 
 def get_keycloak_sync_secrets() -> dict:
