@@ -148,7 +148,7 @@ class ValidatedJson():
         if isinstance(obj, ValidatedJson):
             if obj.messages:
                 return {
-                    "*validated_json$": True,
+                    "*wrapper$": "VJ",
                     "messages": obj.messages,
                     "wrap": ValidatedJson._serialize(obj.json_data)
                 }
@@ -168,7 +168,7 @@ class ValidatedJson():
     @staticmethod
     def _deserialize(json_thing: JsonDataType) -> Union[JsonDataType, 'ValidatedJson']:
         if isinstance(json_thing, dict):
-            if "*validated_json$" in json_thing:
+            if json_thing.get("*wrapper$") == "VJ":
                 return ValidatedJson(json_data=ValidatedJson._deserialize(json_thing.get('wrap')),
                                      messages=JsonMessages.deserialize(json_thing.get('messages')))
             else:
@@ -181,17 +181,17 @@ class ValidatedJson():
 
     @staticmethod
     def deserialize(json_thing: JsonDataType) -> 'ValidatedJson':
-        dser = ValidatedJson._deserialize(json_thing)
-        if isinstance(dser, ValidatedJson):
-            return dser
+        d_ser = ValidatedJson._deserialize(json_thing)
+        if isinstance(d_ser, ValidatedJson):
+            return d_ser
         else:
-            return ValidatedJson(json_thing)
+            return ValidatedJson(d_ser)
 
     def pure_json(self) -> JsonDataType:
         """
         returns dicts, lists, str, int, etc not combined with
         """
-        return json.loads(json.dumps(self))
+        return json.loads(json.dumps(self.to_json()))
 
     @staticmethod
     def _traverse_messages(json_data) -> JsonMessages:

@@ -16,6 +16,7 @@ class JsonUtilTests(TestCase):
                 , JsonMessages.info("This is a list of numbers"))
         })
         serialized = original.serialize()
-        print(json.dumps(serialized))
         deserialized = ValidatedJson.deserialize(serialized)
         self.assertEqual(original, deserialized)
+
+        self.assertEqual(original.pure_json(), {"normal": 3, "validated": [1, 2]})
