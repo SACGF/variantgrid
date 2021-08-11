@@ -17,9 +17,6 @@ class ClinVarExportAdmin(ModelAdminBasics):
     def has_add_permission(self, request, obj=None):
         return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
     def get_form(self, request, obj=None, **kwargs):
         return super(ClinVarExportAdmin, self).get_form(request, obj, widgets={
             'scv': admin.widgets.AdminTextInputWidget()
