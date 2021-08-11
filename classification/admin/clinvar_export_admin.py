@@ -70,7 +70,6 @@ class ClinVarExportRequestAdmin(admin.TabularInline):
 
 @admin.register(ClinVarExportBatch)
 class ClinVarExportBatchAdmin(ModelAdminBasics):
-    model = ClinVarExportBatch
     list_display = ("pk", "clinvar_key", "created", "modified", "record_count", "status")
     list_filter = (('status', AllValuesChoicesFieldListFilter), ('clinvar_key', admin.RelatedFieldListFilter))
     search_fields = ('pk', )

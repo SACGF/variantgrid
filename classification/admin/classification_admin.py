@@ -104,8 +104,6 @@ class ClassificationAdmin(ModelAdminBasics):
     list_per_page = 500
     inlines = (ClassificationModificationAdmin,)
 
-
-
     def created_detailed(self, obj: Classification):
         return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
