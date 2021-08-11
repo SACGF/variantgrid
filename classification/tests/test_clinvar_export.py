@@ -8,7 +8,7 @@ from classification.json_utils import JsonObjType
 from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
     ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus
 from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
-from classification.models.clinvar_export_sync import clinvar_export_config, ClinVarResponseOutcome
+from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarResponseOutcome
 from classification.models.tests.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild, ClinVarKey
@@ -185,20 +185,20 @@ class TestClinVarExport(TestCase):
         self.assertEqual(len(batches), 1)
 
         batch = batches[0]
-        _, outcome = clinvar_export_config.next_request(batch)
+        _, outcome = clinvar_export_sync.next_request(batch)
         self.assertEqual(outcome, ClinVarResponseOutcome.ASK_AGAIN_LATER)
         self.assertEqual(batch.submission_identifier, "SUB999999-1")
 
         # next response is set to be "processing"
-        _, outcome = clinvar_export_config.next_request(batch)
+        _, outcome = clinvar_export_sync.next_request(batch)
         self.assertEqual(outcome, ClinVarResponseOutcome.ASK_AGAIN_LATER)
 
         # next response is should be to be "processed"
-        _, outcome = clinvar_export_config.next_request(batch)
+        _, outcome = clinvar_export_sync.next_request(batch)
         self.assertEqual(outcome, ClinVarResponseOutcome.ASK_AGAIN_NOW)
         self.assertEqual(batch.file_url, 'https://dsubmit.ncbi.nlm.nih.gov/api/2.0/files/xxxxxxxx/sub999999-summary-report.json/?format=attachment')
 
-        _, outcome = clinvar_export_config.next_request(batch)
+        _, outcome = clinvar_export_sync.next_request(batch)
         self.assertEqual(outcome, ClinVarResponseOutcome.COMPLETE)
         self.assertEqual(batch.status, ClinVarExportBatchStatus.SUBMITTED)
         clinvar_export.refresh_from_db()

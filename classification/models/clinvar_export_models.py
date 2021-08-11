@@ -66,7 +66,7 @@ class ClinVarExport(TimeStampedModel):
     clinvar_allele = models.ForeignKey(ClinVarAllele, null=True, blank=True, on_delete=models.CASCADE)
     condition = models.JSONField()
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
-    scv = models.TextField(null=True, blank=True)
+    scv = models.TextField(blank=True, default='')
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
     release_status = models.CharField(max_length=1, choices=ClinVarReleaseStatus.choices, default=ClinVarReleaseStatus.WHEN_READY)
     last_evaluated = models.DateTimeField(default=now)
@@ -176,16 +176,13 @@ class ClinVarExportBatchStatus(models.TextChoices):
 
 class ClinVarExportBatch(TimeStampedModel):
     class Meta:
-        verbose_name = "ClinVar Export batch"
+        verbose_name = "ClinVar export batch"
 
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.CASCADE)
     submission_version = models.IntegerField()
     status = models.CharField(max_length=1, choices=ClinVarExportBatchStatus.choices, default=ClinVarExportBatchStatus.AWAITING_UPLOAD)
     submission_identifier = models.TextField(null=True, blank=True)
     file_url = models.TextField(null=True, blank=True)
-
-    def get_absolute_url(self):
-        return reverse('clinvar_export_batch', kwargs={'pk': self.pk})
 
     def __str__(self):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"

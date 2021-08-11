@@ -32,7 +32,7 @@ from annotation.models import AnnotationVersion
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
-from classification.models.clinvar_export_sync import clinvar_export_config
+from classification.models.clinvar_export_sync import clinvar_export_sync
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
@@ -709,7 +709,7 @@ def view_lab(request, pk):
         'override_source': override_source,
         'override_values': override_values,
         'has_write_permission': has_write_permission,
-        'clinvar_export_enabled': clinvar_export_config.is_enabled
+        'clinvar_export_enabled': clinvar_export_sync.is_enabled
     }
     return render(request, 'snpdb/settings/view_lab.html', context)
 

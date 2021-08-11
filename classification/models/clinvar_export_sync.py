@@ -65,7 +65,7 @@ class ClinVarResponseOutcome(Enum):
     COMPLETE = auto()
 
 
-class ClinVarExportConfig:
+class ClinVarExportSync:
 
     @lazy
     def _config(self) -> _ClinVarExportConfigDic:
@@ -248,4 +248,4 @@ class ClinVarExportConfig:
             clinvar_request.save()
 
 
-clinvar_export_config = ClinVarExportConfig()
+clinvar_export_sync = ClinVarExportSync()
