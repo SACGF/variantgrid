@@ -15,10 +15,13 @@ import re
 import json
 
 
+# Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
+
+
 class ClinVarEvidenceKey:
     """
-    Handles the basic mapping for evidence keys to ClinVar
-    Revolves around select/mutli-select fields having equivilents
+    Handles the basic mapping of a single field to ClinVar
+    Revolves around select/mutli-select fields having equivalents
     """
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
@@ -56,6 +59,10 @@ class ClinVarEvidenceKey:
                 raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT")
 
     def value(self, single: bool = True, optional: bool = False) -> ValidatedJson:
+        """
+        :param single: Is a single value expected. Adds an error to ValidatedJson if number of values is 2 or more.
+        :param optional: Is the value optional, if not adds an error to ValidatedJson if number of values is zero.
+        """
         messages = self.messages
         if len(self.values) == 0:
             if not optional:
@@ -73,7 +80,13 @@ class ClinVarEvidenceKey:
         return len(self.values) > 0
 
 
+# Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
+
+
 class ClinVarCitation(TypedDict, total=False):
+    """
+    Dictionary representation of a citation in the ClinVar format
+    """
     db: str
     id: str
     url: str
@@ -84,10 +97,13 @@ class ClinVarExportConverter:
     CITATION_DB_MAPPING = {
         DbRegexes.PUBMED.db: "PubMed",
         DbRegexes.PMC.db: "pmc",
-        DbRegexes.NCBIBookShelf.db: "BookShelf"  # TODO confirm this is correct mapping
+        DbRegexes.NCBIBookShelf.db: "BookShelf"
     }
 
     def __init__(self, clinvar_export_record: ClinVarExport):
+        """
+        :param clinvar_export_record: the record to use as a basis to convert to ClinVar json (with validation)
+        """
         self.clinvar_export_record = clinvar_export_record
 
     @lazy
@@ -98,70 +114,12 @@ class ClinVarExportConverter:
     def classification_based_on(self) -> ClassificationModification:
         return self.clinvar_export_record.classification_based_on
 
-    # convenience method for forms
-    def evidence_key(self, key: str):
-        return EvidenceKeyMap.cached().get(key).pretty_value(self.classification_based_on.get(key), dash_for_none=True)
-
-    @property
-    def allele_origin(self):
-        return self.evidence_key(SpecialEKeys.ALLELE_ORIGIN)
-
-    @property
-    def mode_of_inheritance(self):
-        return self.evidence_key(SpecialEKeys.MODE_OF_INHERITANCE)
-
-    @property
-    def affected_status(self):
-        return self.evidence_key(SpecialEKeys.AFFECTED_STATUS)
-
-    @property
-    def genome_build(self):
-        return self.evidence_key(SpecialEKeys.GENOME_BUILD)
-
-    @property
-    def interpretation_summary(self):
-        # strip out any XML
-        interpret = self.evidence_key(SpecialEKeys.INTERPRETATION_SUMMARY)
-        soup = bs4.BeautifulSoup(interpret, 'lxml')
-        return soup.text
-
-    @property
-    def curation_context(self):
-        return self.evidence_key(SpecialEKeys.CURATION_CONTEXT)
-
-    @property
-    def assertion_method(self):
-        return self.evidence_key(SpecialEKeys.ASSERTION_METHOD)
-
-    # probably wont use this
-    @property
-    def patient_phenotype(self):
-        return self.evidence_key(SpecialEKeys.PATIENT_PHENOTYPE)
-
-    @property
-    def clinical_significance(self):
-        return self.evidence_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
     @property
     def citation_refs(self) -> List[VCDbRefDict]:
-        # TODO allow other database references "PubMed", "BookShelf", "DOI", "pmc"
-        # TODO check to see if the PubMeds exist?
         pubmed_refs = {ref.get('id'): ref for ref in self.classification_based_on.db_refs if ref.get('db') in ClinVarExportConverter.CITATION_DB_MAPPING}
         unique_refs = list(pubmed_refs.values())
         unique_refs.sort(key=lambda x: x.get('id'))
         return unique_refs
-
-    @property
-    def condition(self) -> str:
-        """
-        Note condition isn't actually sent, but the value from ConditionTextMatching
-        this is just here for reference
-        """
-        return self.evidence_key(SpecialEKeys.CONDITION)
-
-    @property
-    def curated_date(self):
-        return self.classification_based_on.curated_date
 
     @property
     def c_hgvs(self):

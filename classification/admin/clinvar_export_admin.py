@@ -10,7 +10,7 @@ import json
 
 @admin.register(ClinVarExport)
 class ClinVarExportAdmin(ModelAdminBasics):
-    list_display = ("pk", "clinvar_allele", "status", "classification_based_on", "condition", "scv", "created", "modified")
+    list_display = ("pk", "clinvar_allele", "status", "release_status", "classification_based_on", "condition", "scv", "created", "modified")
     list_filter = (('clinvar_allele__clinvar_key', admin.RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter))
     search_fields = ('pk', "scv")
 

@@ -9,6 +9,9 @@ import json
 import re
 
 # FIXME, move this out of classifications and into snpdb
+from htmlmin.decorators import not_minified_response
+
+from classification.json_utils import JsonObjType, JsonDataType
 from classification.views.classification_datatables import DatatableConfig
 from library.utils import format_significant_digits
 
@@ -103,6 +106,14 @@ def dash_if_empty(val):
     if val is None or len(val.strip()) == 0:
         return mark_safe('<span class="no-value">-</span>')
     return val
+
+
+@not_minified_response
+@register.inclusion_tag("classification/tags/code_block_json.html")
+def code_json(data: JsonDataType):
+    output = ""
+
+    return {"data": data}
 
 
 @register.inclusion_tag("classification/tags/timestamp.html")

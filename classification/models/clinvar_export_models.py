@@ -216,13 +216,15 @@ class ClinVarExportBatch(TimeStampedModel):
 
     @staticmethod
     @transaction.atomic()
-    def create_batches(qs: QuerySet, force_update: bool = False) -> List['ClinVarExportBatch']:
+    def create_batches(qs: QuerySet[ClinVarExport], force_update: bool = False) -> List['ClinVarExportBatch']:
         all_batches: List[ClinVarExportBatch] = list()
 
         current_batch: Optional[ClinVarExportBatch] = None
         current_batch_size = 0
 
+        qs = qs.exclude(release_status=ClinVarReleaseStatus.ON_HOLD)
         qs = qs.order_by('clinvar_allele__clinvar_key')
+
         if not force_update:
             qs = qs.filter(status__in=[ClinVarExportStatus.NEW_SUBMISSION, ClinVarExportStatus.CHANGES_PENDING])
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')

@@ -143,7 +143,7 @@ def clinvar_export_review(request, pk):
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     if request.method == "POST":
-        clinvar_export.scv = request.POST.get("scv") or None
+        clinvar_export.scv = request.POST.get("scv") or ""
         if release_status_str := request.POST.get("release_status"):
             clinvar_export.release_status = ClinVarReleaseStatus(release_status_str)
         clinvar_export.save()
