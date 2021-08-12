@@ -65,9 +65,13 @@ $(document).ready(function() {
                 expandedTr = null;
             } else {
                 // Close previous row (if there is one)
-                if (expandedRow && expandedTr) {
-                    expandedRow.child.hide();
-                    expandedTr.removeClass('shown');
+                try {
+                    if (expandedRow && expandedTr) {
+                        expandedRow.child.hide();
+                        expandedTr.removeClass('shown');
+                    }
+                } catch (ex) {
+                    console.log("Couldn't hide previous row");
                 }
                 expandedRow = row;
                 expandedTr = tr;
