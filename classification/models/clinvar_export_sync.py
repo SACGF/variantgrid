@@ -15,11 +15,12 @@ from library.log_utils import report_message
 
 class _ClinVarExportConfigDic(TypedDict):
     enabled: bool
+    test: bool  # if true, dry run
     api_key: str
 
 
 class ClinVarRequestExceptionType(Enum):
-    OUR_DATA_ISSUE = auto()  # note this is
+    OUR_DATA_ISSUE = auto()
     API_KEY_ISSUE = auto()
     TOO_MANY_REQUESTS = auto()
     CLINVAR_SERVER_ISSUE = auto()
@@ -60,12 +61,15 @@ class ClinVarRequestException(Exception):
 
 
 class ClinVarResponseOutcome(Enum):
-    ASK_AGAIN_NOW = auto()
+    ASK_AGAIN_NOW = auto()  # if we can immediately do the next thing in the queue for this batch
     ASK_AGAIN_LATER = auto()
     COMPLETE = auto()
 
 
 class ClinVarExportSync:
+    """
+    In charge of
+    """
 
     @lazy
     def _config(self) -> _ClinVarExportConfigDic:

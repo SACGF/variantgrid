@@ -294,8 +294,8 @@ class ClinVarExportSubmission(TimeStampedModel):
     submission_body = models.JSONField()  # used to see if there are any changes since last submission (other than going from novel to update)
     submission_version = models.IntegerField()
 
-    localId = models.TextField()
-    localKey = models.TextField()
+    localId = models.TextField()  # should be static
+    localKey = models.TextField()  # can change as the selected classification changes
 
     # individual record failure, batch can be in error too
     status = models.CharField(max_length=1, choices=ClinVarExportSubmissionStatus.choices, default=ClinVarExportSubmissionStatus.WAITING)
@@ -323,21 +323,7 @@ class ClinVarExportRequest(TimeStampedModel):
 
 
 """
-# OLD CODE for syncing submissions to Exports
-
-@receiver(post_save, sender=ClinVarExport)
-def set_condition_alias_permissions(sender, created: bool, instance: ClinVarExport, **kwargs):  # pylint: disable=unused-argument
-    if created:
-        group = instance.lab.group
-        assign_perm(ClinVarExport.get_read_perm(), group, instance)
-        assign_perm(ClinVarExport.get_write_perm(), group, instance)
-
-
-class ClinVarExportSubmission(TimeStampedModel, GuardianPermissionsMixin):
-    clinvar_export = models.ForeignKey(ClinVarExport, on_delete=CASCADE)
-    evidence = models.JSONField()
-    submission_status = models.TextField()
-
+# CODE for immediate syncing submissions to Exports
 
 @receiver(classification_post_publish_signal, sender=Classification)
 def published(sender,
@@ -347,22 +333,10 @@ def published(sender,
               previous_share_level: ShareLevel,
               user: User,
               **kwargs):
-
-    cve: ClinVarExport
-    if cve := ClinVarExport.objects.filter(classification_based_on__classification=classification).first():
-        cve.update_with(newly_published)
-        cve.save()
+    pass
 
 
 @receiver(flag_comment_action, sender=Flag)
 def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):  # pylint: disable=unused-argument
-    # Keeps condition_text_match in sync with the classifications when withdraws happen/finish
-    flag = flag_comment.flag
-    if flag.flag_type == flag_types.classification_flag_types.classification_withdrawn:
-        cl: Classification
-        if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
-            cve: ClinVarExport
-            if cve := ClinVarExport.objects.filter(classification_based_on__classification=cl).first():
-                cve.withdrawn = flag_comment.resolution.status == FlagStatus.OPEN
-                cve.save()
+    pass
 """
