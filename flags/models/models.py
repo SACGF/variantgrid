@@ -285,7 +285,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         permission = self.permission_level(user)
         return permission in (FlagPermissionLevel.ADMIN, FlagPermissionLevel.OWNER)
 
-    def flags(self, user: User = None, only_open=False) -> QuerySet:
+    def flags(self, user: User = None, only_open=False) -> QuerySet[Flag]:
         if not user:
             qs = Flag.objects.filter(collection=self)
         else:
@@ -300,7 +300,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         return qs
 
     @staticmethod
-    def filter_for_open_flags(qs: QuerySet, flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet:
+    def filter_for_open_flags(qs: QuerySet['FlagsMixin'], flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet:
         """
         Takes the QuerySet and returns a filtered version where the item contain at least one of the provided flag_types
         e.g. if you passed in a QuerySet of Alleles and a missing 38 flag type, the resulting QuerySet will still be Alleles

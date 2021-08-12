@@ -7,7 +7,7 @@ from annotation.regexes import DbRegexes
 from classification.enums import SpecialEKeys
 from classification.json_utils import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition, ClinVarExport
+    MultiCondition, ClinVarExport, classification_flag_types
 from classification.models.evidence_mixin import VCDbRefDict
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import GenomeBuild, ClinVarKey
@@ -100,6 +100,14 @@ class ClinVarExportConverter:
         DbRegexes.NCBIBookShelf.db: "BookShelf"
     }
 
+    FLAG_TYPES_TO_MESSAGES = {
+        classification_flag_types.classification_withdrawn: JsonMessages.error("Classification has since been withdrawn"),
+        classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
+        classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
+        classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
+        classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
+    }
+
     def __init__(self, clinvar_export_record: ClinVarExport):
         """
         :param clinvar_export_record: the record to use as a basis to convert to ClinVar json (with validation)
@@ -167,7 +175,12 @@ class ClinVarExportConverter:
             data["releaseStatus"] = "public"
             data["variantSet"] = self.variant_set
 
-            return ValidatedJson(data)
+            messages = JSON_MESSAGES_EMPTY
+            for flag in self.classification_based_on.classification.flag_collection.flags(only_open=True):
+                if message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
+                    messages += message
+
+            return ValidatedJson(data, messages)
 
     @property
     def variant_set(self) -> ValidatedJson:
@@ -177,8 +190,8 @@ class ClinVarExportConverter:
                 json_data = {"variant": [{"hgvs": c_hgvs}]}
                 errors = JSON_MESSAGES_EMPTY
 
-                # if c_hgvs.startswith("ENST"):
-                #    errors += JsonMessages.error("ClinVar doesn't support Ensemble transcripts")
+                if c_hgvs.startswith("ENST"):
+                    errors += JsonMessages.error("ClinVar doesn't support Ensemble transcripts")
 
                 return ValidatedJson(json_data, errors)
             else:

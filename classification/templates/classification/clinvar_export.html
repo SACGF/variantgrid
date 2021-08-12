@@ -33,7 +33,11 @@
                     {% if clinvar_export.classification_based_on %}
                         {% labelled label="Classification Version as of" %}{% timestamp clinvar_export.classification_based_on.created time_ago=True %}{% endlabelled %}
                     {% endif %}
-                    {% labelled label="Sync Status" %}{{ clinvar_export.get_status_display }}{% endlabelled %}
+                    {% labelled label="Sync Status" %}
+                        {% if clinvar_export.status == "E" %}{{ 'error' | severity_icon }} <span class="text-danger">Error</span>{% else %}
+                        {{ clinvar_export.get_status_display }}
+                        {% endif %}
+                    {% endlabelled %}
                     {% labelled label="SCV" %}
                         <div class="input-group">
                             <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
