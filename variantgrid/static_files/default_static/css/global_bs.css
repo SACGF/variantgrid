@@ -728,10 +728,12 @@ ul.compact li:before {
   font-family: monospace;
   color: #444;
   font-weight: 400;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 6px 6px 6px 12px;
   background-color: #eee;
+}
+.json.code-block {
+  border: 1px solid #bbb;
+  padding: 8px;
+  border-radius: 8px;
 }
 .json .js-valid {
   margin-left: 16px;
@@ -745,7 +747,8 @@ ul.compact li:before {
   border-bottom-right-radius: 4px;
 }
 .json > .js-valid {
-  margin-left: 0;
+  margin: 0;
+  padding: 0;
 }
 .json .js-block {
   display: block;

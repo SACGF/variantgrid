@@ -3,7 +3,7 @@
     {% for history_entry in history %}
         <div class="card mb-4">
             <div class="card-header">{% timestamp history_entry.created time_ago=True %}</div>
-            <div class="card-body">{% code_json history_entry.submission_full %}</div>
+            {% code_json history_entry.submission_full css_class='card-body'%}
             <div class="card-footer">{% if history_entry.submission_batch %}
                 <a data-href="{% url 'clinvar_export_batch_detail' history_entry.submission_batch.pk %}" data-toggle="ajax-modal">{{ history_entry.submission_batch }}</a>
             {% endif %}</div>

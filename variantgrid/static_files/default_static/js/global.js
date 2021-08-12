@@ -108,12 +108,13 @@ function enhanceAndMonitor() {
         {test: '.convert-timestamp', func: (node) => { convertTimestampDom(node); }},
 
         {test: '.format-json', func: (node) => {
-
-                let text = node.text().trim();
-                let textJson = JSON.parse(text);
-                let prettyHtml = formatJson(textJson);
-                $(node).replaceWith(prettyHtml);
-
+            let text = node.text().trim();
+            let textJson = JSON.parse(text);
+            let prettyHtml = formatJson(textJson);
+            prettyHtml.attr('class', node.attr('class') + ' ' + prettyHtml.attr('class'));
+            prettyHtml.removeClass('format-json');
+            prettyHtml.attr('data-p', 1);
+            node.replaceWith(prettyHtml);
         }},
 
         // if have a wide checkbox row, make it so clicking anywhere on the row activates the checkbox

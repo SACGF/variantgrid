@@ -773,14 +773,19 @@ ul.compact {
 }
 
 // formatted json
+
 .json {
     font-family: monospace;
     color: #444;
     font-weight: 400;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    padding: 6px 6px 6px 12px;
     background-color: #eee;
+
+    &.code-block {
+        border: 1px solid #bbb;
+        padding: 8px;
+        border-radius: 8px;
+    }
+
     .js-valid {
       margin-left: 16px;
       // go back and fourth of if fit-content looks better for a box that surrounds everything
@@ -795,7 +800,8 @@ ul.compact {
       }
     }
     > .js-valid {
-      margin-left: 0; // if first element is validation, don't indent it
+      margin: 0; // if first element is validation, don't indent it
+      padding: 0;
     }
   .js-block {display: block; margin-left: 24px;}
   .js-num {color: #444;}

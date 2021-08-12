@@ -11,7 +11,7 @@ import re
 # FIXME, move this out of classifications and into snpdb
 from htmlmin.decorators import not_minified_response
 
-from classification.json_utils import JsonObjType, JsonDataType
+from classification.json_utils import JsonObjType, JsonDataType, ValidatedJson
 from classification.views.classification_datatables import DatatableConfig
 from library.utils import format_significant_digits
 
@@ -109,8 +109,12 @@ def dash_if_empty(val):
 
 
 @register.inclusion_tag("classification/tags/code_block_json.html")
-def code_json(data: JsonDataType):
-    return {"data": data}
+def code_json(data: JsonDataType, css_class: Optional[str] = ""):
+    if not css_class:
+        if not data or \
+                not ((isinstance(data, ValidatedJson) and data.messages) or '*wrapper$' in data):
+            css_class = "code-block"
+    return {"data": data, "css_class": css_class}
 
 
 @register.inclusion_tag("classification/tags/timestamp.html")
