@@ -24,6 +24,9 @@
             $('#kill-query').submit();
         }
     }
+    function testRollbarJs() {
+        Rollbar.error("Testing rollbar JS");
+    }
     </script>
     <style type="text/css">
         div#reference-check {
@@ -277,6 +280,7 @@
                 <a href="{% url 'database_statistics' %}" class="btn btn-outline-primary">Database statistics</a>
                 <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
                 <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
+                <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="testRollbarJs()" />
             </div>
         </form>
 
