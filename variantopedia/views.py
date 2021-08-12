@@ -29,7 +29,7 @@ from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback
+from library.log_utils import report_exc_info, log_traceback, report_message
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -102,8 +102,10 @@ def dashboard(request):
 def server_status(request):
     if request.method == "POST":
         action = request.POST.get('action')
-        if action == 'test-slack':
+        if action == 'Test Slack':
             notify_server_status.apply_async()
+        elif action == 'Test Rollbar':
+            report_message("Testing Rollbar", level='error')
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
             with connection.cursor() as cursor:
@@ -112,6 +114,9 @@ def server_status(request):
                 messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
         else:
             print(f"Unrecognised action {action}")
+
+        return redirect(reverse('server_status'))
+
         # TODO should redirect to read-only version of the page
 
     celery_workers = {}

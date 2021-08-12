@@ -270,13 +270,13 @@
         <div class="row mt-4"></div>
         <form method="POST">
             {% csrf_token %}
-            <input type="hidden" name="action" value="test-slack" />
             <div class="btn-toolbar mt-4">
                 {% if url_name_visible.view_upload_stats %}
                     <a href="{% url 'view_upload_stats' %}" class="btn btn-outline-primary">Upload Stats</a>
                 {% endif %}
                 <a href="{% url 'database_statistics' %}" class="btn btn-outline-primary">Database statistics</a>
-                <input type="submit" value="Test Slack" class="btn btn-outline-secondary" />
+                <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
+                <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
             </div>
         </form>
 
