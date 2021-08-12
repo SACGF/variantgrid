@@ -750,11 +750,9 @@ ul.compact li:before {
   margin-left: 24px;
 }
 .json .js-num {
-  font-family: "monospace";
   color: #444;
 }
 .json .js-bool {
-  font-family: "monospace";
   color: #444;
 }
 .json .js-null {
