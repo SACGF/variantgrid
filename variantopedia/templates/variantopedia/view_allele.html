@@ -72,7 +72,7 @@
                                                 </button>
                                             </div>
                                             <div class="modal-body">
-                                                <pre>{{ allele.clingen_allele.api_response|jsonify_pretty }}</pre>
+                                                {% code_json allele.clingen_allele.api_response %}
                                             </div>
                                         </div>
                                     </div>

@@ -53,18 +53,8 @@
         </form>
         {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
             <h4>Export Preview</h4>
-            {% with json_messages=clinvar_export.submission_full.all_messages %}
-                {% if json_messages %}
-                    <p class="text-muted">Messages from producing ClinVar Export</p>
-                {% endif %}
-                <ul class="list-group mb-4">
-                    {% for message in json_messages %}
-                        <li class="list-group-item list-group-item-{{ message.bs }}">{{ message.severity | severity_icon }} {{ message.text }}</li>
-                    {% endfor %}
-                </ul>
-            {% endwith %}
             <p class="text-muted">This is how the data will be submitted to ClinVar</p>
-            <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission_full.to_json | jsonify_pretty }}</div>
+            {% code_json clinvar_export.submission_full.serialize %}
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab label="Submission History" tab_set="clinvar_tabs" url="clinvar_export_history" param=clinvar_export.pk %}

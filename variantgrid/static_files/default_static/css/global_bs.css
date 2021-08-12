@@ -724,4 +724,62 @@ ul.compact li:before {
   border: 2px solid #dc3545 !important;
 }
 
+.json {
+  font-family: monospace;
+  color: #444;
+  font-weight: 400;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 6px 6px 6px 12px;
+  background-color: #eee;
+}
+.json .js-valid {
+  margin-left: 16px;
+  width: fit-content;
+}
+.json .js-valid .js-valid-body {
+  display: block;
+  padding: 4px;
+  border: 1px dashed #888;
+  border-top: none;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+.json .js-block {
+  display: block;
+  margin-left: 24px;
+}
+.json .js-num {
+  font-family: "monospace";
+  color: #444;
+}
+.json .js-bool {
+  font-family: "monospace";
+  color: #444;
+}
+.json .js-null {
+  color: #888;
+  font-style: italic;
+}
+.json .js-qt {
+  color: #494;
+}
+.json .js-str {
+  color: #464;
+}
+.json .js-br {
+  color: #448;
+}
+.json .js-pr {
+  color: #44b;
+}
+.json .js-colon {
+  color: #666;
+  margin-right: 4px;
+}
+.json .js-comma {
+  color: #888;
+  display: inline-block;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

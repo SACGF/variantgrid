@@ -137,7 +137,6 @@ class ClinVarExportColumns(DatatableConfig):
         )
 
 
-@not_minified_response
 def clinvar_export_review(request, pk):
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
@@ -156,7 +155,6 @@ def clinvar_export_review(request, pk):
     })
 
 
-@not_minified_response
 def clinvar_export_history(request, pk):
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)

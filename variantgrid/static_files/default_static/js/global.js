@@ -107,6 +107,15 @@ function enhanceAndMonitor() {
         // timestamps
         {test: '.convert-timestamp', func: (node) => { convertTimestampDom(node); }},
 
+        {test: '.format-json', func: (node) => {
+
+                let text = node.text().trim();
+                let textJson = JSON.parse(text);
+                let prettyHtml = formatJson(textJson);
+                $(node).replaceWith(prettyHtml);
+
+        }},
+
         // if have a wide checkbox row, make it so clicking anywhere on the row activates the checkbox
         {test: '.list-group-checkbox', func: (node) => {
             node.click(function(event) {
@@ -816,7 +825,7 @@ TableFormat.expandAjax = function(url, param, expectedHeight, data) {
 function createModalShell(id, title) {
     return $(`
         <div class="modal fade" id="${id}" tabindex="-1" role="dialog" aria-labelledby="${id}Label" aria-hidden="true">
-            <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-dialog modal-xl" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="${id}Label">${title}</h5>
@@ -949,5 +958,82 @@ function severityIcon(severity) {
         case 'I': return $('<i class="fas fa-info-circle text-info"></i>'); // info
         case 'S': return $('<i class="fas fa-check-circle text-success"></i>'); // success
         default: return $(severity);
+    }
+}
+
+function formatJson(jsonObj) {
+    return $('<div>', {class:'json', html:_formatJson(jsonObj)});
+}
+
+function _formatJson(jsonObj) {
+    if (_.isNumber(jsonObj)) {
+        return $('<span>', {class: 'js-num', text: jsonObj});
+    } else if (_.isBoolean(jsonObj)) {
+        return $('<span>', {class: 'js-bool', text: jsonObj});
+    } else if (_.isString(jsonObj)) {
+        let text = JSON.stringify(jsonObj);
+        text = text.substring(1, text.length-1);
+        let html = [];
+        html.push($('<span>', {class: 'js-qt', text:"\""}));
+        // TODO format "/" as special escape character
+        html.push($('<span>', {class: 'js-str', text: text}));
+        html.push($('<span>', {class: 'js-qt', text:"\""}));
+        return $('<span>', {html:html});
+        // return $('<span>', {class: 'js-str', text: JSON.stringify(jsonObj)});
+    } else if (jsonObj === null) {
+        return $('<span>', {class: 'js-null', text: 'null'});
+    } else if (_.isArray(jsonObj)) {
+        let html = [];
+        html.push($('<span>', {class: 'js-br', text: '['}));
+        let first = true;
+        for (let elem of jsonObj) {
+            if (!first) {
+                html.push($('<span>', {class: 'js-comma', text: ','}));
+            } else {
+                first = false;
+            }
+            html.push(_formatJson(elem));
+        }
+        html.push($('<span>', {class: 'js-br', text: ']'}));
+        return ($('<span>', {html: html}));
+    } else if  (jsonObj && jsonObj["*wrapper$"] === "VJ") {
+        let messages = jsonObj.messages;
+        if (messages.length) {
+            let html = [];
+            let items = [];
+            for (let message of messages) {
+                let bsSeverity = "info";
+                switch (message.severity) {
+                    case "error": bsSeverity = "danger"; break;
+                    case "warning": bsSeverity = "warning"; break;
+                }
+                items.push($('<li>', {class: `list-group-item list-group-item-${bsSeverity}`, html: [severityIcon(message.severity), message.text]}));
+            }
+            html.push($('<ul>', {class: 'list-group', html: items}));
+            html.push($('<div>', {class: 'js-valid-body', html: _formatJson(jsonObj.wrap)}));
+            return $('<div>', {class:'js-valid', html:html});
+        } else {
+            return _formatJson(jsonObj.wrap);
+        }
+    } else {
+        let html = [];
+        let content = [];
+        html.push($('<span>', {class: 'js-pr', text: '{'}));
+        let first = true;
+
+        for (let [key, value] of Object.entries(jsonObj)) {
+            if (!first) {
+                content.push($('<span>', {class: 'js-comma', text: ','}));
+                content.push($('<br/>'));
+            } else {
+                first = false;
+            }
+            content.push(_formatJson(key));
+            content.push($('<span>', {class: 'js-colon', text: ':'}));
+            content.push(_formatJson(value));
+        }
+        html.push($('<span>', {class: 'js-block', html: content}));
+        html.push($('<span>', {class: 'js-pr', text: '}'}));
+        return ($('<span>', {class:'js-obj', html: html}));
     }
 }

@@ -108,11 +108,8 @@ def dash_if_empty(val):
     return val
 
 
-@not_minified_response
 @register.inclusion_tag("classification/tags/code_block_json.html")
 def code_json(data: JsonDataType):
-    output = ""
-
     return {"data": data}
 
 
