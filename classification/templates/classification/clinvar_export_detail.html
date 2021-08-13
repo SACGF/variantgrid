@@ -8,6 +8,6 @@
     {% endif %}{% endlabelled %}
 {% endwith %}
 {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
-{% labelled label="Current Classification Candidate" %}<a class="hover-link" href="{% url 'view_classification' classification.id_str %}">{{ classification.classification.friendly_label }}</a>{% endlabelled %}
+{% labelled label="Current Classification Candidate" %}<a class="hover-link" href="{% url 'view_classification' classification.id_str %}">{{ classification.classification.friendly_label }}</a> as of {% timestamp classification.created time_ago=True %}{% endlabelled %}
 {% labelled label="Clinical Significance" %}{{ classification | ekey:'clinical_significance' }}{% endlabelled %}
 {% labelled label="Interpretation Summary" %}<div style="white-space: pre-line">{{ interpretation_summary }}</div>{% endlabelled %}
