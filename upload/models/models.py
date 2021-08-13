@@ -11,7 +11,6 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
-from django.db.models.fields import BigIntegerField
 from django.db.models.query import QuerySet
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -96,7 +95,7 @@ class UploadPipeline(models.Model):
     INITIAL_PROGRESS_STATUS = "Processing"
     status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    items_processed = BigIntegerField(null=True)
+    items_processed = models.BigIntegerField(null=True)
     processing_seconds_wall_time = models.IntegerField(null=True)
     processing_seconds_cpu_time = models.IntegerField(null=True)
     progress_status = models.TextField(null=True)
