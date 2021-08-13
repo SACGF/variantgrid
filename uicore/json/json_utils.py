@@ -1,7 +1,9 @@
 import collections
 
+from uicore.json.json_types import JsonDataType
 
-def strip_json(json_values):
+
+def strip_json(json_values: JsonDataType) -> JsonDataType:
     """
     Remove null, empty strings and false and empty lists from JSON values
     (contents of arrays wont be affected).

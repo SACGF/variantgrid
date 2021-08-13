@@ -10,7 +10,7 @@ from classification.models import ClassificationModification, EvidenceKeyMap, Ev
     MultiCondition, ClinVarExport, classification_flag_types
 from classification.models.evidence_mixin import VCDbRefDict
 from ontology.models import OntologyTerm, OntologyService
-from snpdb.models import GenomeBuild, ClinVarKey
+from snpdb.models import ClinVarKey
 import re
 import json
 
@@ -129,11 +129,6 @@ class ClinVarExportConverter:
         unique_refs.sort(key=lambda x: x.get('id'))
         return unique_refs
 
-    @property
-    def c_hgvs(self):
-        gb = GenomeBuild.get_from_fuzzy_string(self.genome_build)
-        return self.classification_based_on.classification.get_c_hgvs(genome_build=gb)
-
     def clinvar_value(self, key: str) -> ClinVarEvidenceKey:
         evidence_key = EvidenceKeyMap.cached_key(key)
         value = self.classification_based_on.evidence.get(key)
@@ -162,12 +157,15 @@ class ClinVarExportConverter:
             c = self.classification_based_on.classification
             local_key = c.lab.group_name + "/" + c.lab_record_id
 
+            """
+            # Below was used when condition was literally part of the localID
             # Important, using the umbrella term as it doesn't change
             condition = self.clinvar_export_record.condition_resolved
             term_ids = "_".join([term.id.replace(":", "_") for term in condition.terms])
             if join := condition.join:
                 join = MultiCondition(join)
                 term_ids = f"{term_ids}_{join.value}"
+            """
 
             data["localID"] = local_id
             data["localKey"] = local_key
@@ -196,7 +194,7 @@ class ClinVarExportConverter:
                 return ValidatedJson(json_data, errors)
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
-        except:
+        except BaseException:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property

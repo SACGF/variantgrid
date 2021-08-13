@@ -128,8 +128,8 @@ def mock_send_data(
 
 class TestClinVarExport(TestCase):
 
-    @mock.patch('classification.models.clinvar_export_sync.ClinVarExportConfig._send_data', side_effect=mock_send_data)
-    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False, CLINVAR_EXPORT={"enabled": True, "api_key": "ABC123"})
+    @mock.patch('classification.models.clinvar_export_sync.ClinVarExportSync._send_data', side_effect=mock_send_data)
+    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False, CLINVAR_EXPORT={"enabled": True, "test": False, "api_key": "ABC123"})
     def test_clinvar_setup(self, mocked_send_data):
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")

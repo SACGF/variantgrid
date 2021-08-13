@@ -43,7 +43,7 @@ class JsonMessage:
 @dataclass(frozen=True)
 class JsonMessages:
 
-    messages: List[str] = field(default_factory=list)
+    messages: List[JsonMessage] = field(default_factory=list)
 
     @staticmethod
     def error(message: str):
@@ -80,7 +80,7 @@ JSON_MESSAGES_EMPTY = JsonMessages()
 
 
 @dataclass(frozen=True)
-class ValidatedJson():
+class ValidatedJson:
     """
     ValidatedJson can have a base bit of JSON that's either pure JSON, or other ValidatedJson
     Allowing validation messages to be associated with the parts that caused the problems

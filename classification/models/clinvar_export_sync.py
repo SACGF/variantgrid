@@ -135,7 +135,7 @@ class ClinVarExportSync:
                 url=url)
 
         else:
-            if not self.is_test:
+            if self.is_test:
                 raise ValueError("ClinVarExport test is set to True, but attempted to perform an action other than initial submission")
 
             if not batch.file_url:
@@ -154,7 +154,6 @@ class ClinVarExportSync:
         return clinvar_request, handle_outcome
 
     def _handle_initial_submission(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
-
         if clinvar_request.response_status_code in {200, 201} and \
                 (response_json := clinvar_request.response_json) and \
                 (actions := response_json.get('actions')) and \

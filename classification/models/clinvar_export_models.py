@@ -16,7 +16,6 @@ import copy
 
 CLINVAR_EXPORT_CONVERSION_VERSION = 2
 
-# CLINVAR ALLELE
 
 class ClinVarAllele(TimeStampedModel):
     """
@@ -43,7 +42,6 @@ class ClinVarExportStatus(models.TextChoices):
     """
     The status of an Export as compared to the last batch.
     Note doesn't involve itself in the status as data progresses
-    TODO review this
     """
 
     NEW_SUBMISSION = "N", "New Submission"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
@@ -197,7 +195,7 @@ class ClinVarExportBatch(TimeStampedModel):
                     "content": {
                         "behalfOrgID": self.clinvar_key.behalf_org_id or "testorg",
                         "clinvarSubmission": [submission.submission_full for submission in
-                                               self.clinvarexportsubmission_set.order_by('created')],
+                                              self.clinvarexportsubmission_set.order_by('created')],
                         "submissionName": f"submission_{self.id}"
                     }
                 }
@@ -251,8 +249,8 @@ class ClinVarExportBatch(TimeStampedModel):
                     all_batches.append(current_batch)
 
                 pure_json = record.submission_body.pure_json()
-                localId = pure_json["localID"]
-                localKey = pure_json["localKey"]
+                local_id = pure_json["localID"]
+                local_key = pure_json["localKey"]
 
                 ClinVarExportSubmission(
                     clinvar_export=record,
@@ -261,8 +259,8 @@ class ClinVarExportBatch(TimeStampedModel):
                     submission_full=full_current.pure_json(),
                     submission_body=record.submission_body.pure_json(),
                     submission_version=CLINVAR_EXPORT_CONVERSION_VERSION,
-                    localId=localId,
-                    localKey=localKey
+                    localId=local_id,
+                    localKey=local_key
                 ).save()
                 current_batch_size += 1
                 record.status = ClinVarExportStatus.UP_TO_DATE
