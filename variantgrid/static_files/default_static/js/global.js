@@ -269,7 +269,7 @@ function loadAjaxBlock(dom, url) {
             dom.html(results);
         },
         error: (call, status, text) => {
-            dom.replaceWith("Error Loading Data");
+            dom.replaceWith($('<div>', {class: 'ajax-error', html:[severityIcon('C'), "Error Loading Data"]}));
         },
         complete: (jqXHR, textStatus) => {
             if (showingOverlay) {

@@ -552,6 +552,13 @@ div.background-image {
 .zero-value {
     color: #AAAAAA;
 }
+.ajax-error {
+  width: 100%;
+  color: #844;
+  font-weight: bold;
+  text-align: center;
+  animation: fadeInOpacity ease-out 1s;
+}
 
 // still used by wiki (not yet compatible with bootstrap's d-none
 .hidden { display: none }

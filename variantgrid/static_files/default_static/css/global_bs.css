@@ -489,6 +489,14 @@ div.background-image {
   color: #AAAAAA;
 }
 
+.ajax-error {
+  width: 100%;
+  color: #844;
+  font-weight: bold;
+  text-align: center;
+  animation: fadeInOpacity ease-out 1s;
+}
+
 .hidden {
   display: none;
 }

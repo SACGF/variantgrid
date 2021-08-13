@@ -1,11 +1,32 @@
 {% load js_tags %}
+{% load ui_utils %}
 {% if history %}
     {% for history_entry in history %}
         <div class="card mb-4">
-            <div class="card-header">{% timestamp history_entry.created time_ago=True %}</div>
-            {% code_json history_entry.submission_full css_class='card-body'%}
+            <div class="card-header">ClinVar Submission ({{ history_entry.pk }})</div>
+            <div class="card-body">
+                {% labelled label="Created" %}{% timestamp history_entry.created time_ago=True %}{% endlabelled %}
+                {% labelled label="Status" %}{{ history_entry.get_status_display }}{% endlabelled %}
+                {% labelled label="Classification" %}
+                    <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
+                        {{ clinvar_export.classification_based_on.classification.friendly_label }}
+                        as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
+                    </a>
+                {% endlabelled %}
+                {% labelled label="Data" %}
+                    <a href="#submission-{{ history_entry.pk }}" class="toggle-link" data-toggle="collapse">Toggle Data</a>
+                {% endlabelled %}
+                <div id="submission-{{ history_entry.pk }}" class="collapse">
+                    <label>Content</label>
+                    {% code_json history_entry.submission_full %}
+                    <div class="mt-4">
+                        <label>Response</label>
+                        {% code_json history_entry.response_json %}
+                    </div>
+                </div>
+            </div>
             <div class="card-footer">{% if history_entry.submission_batch %}
-                <a data-href="{% url 'clinvar_export_batch_detail' history_entry.submission_batch.pk %}" data-toggle="ajax-modal">{{ history_entry.submission_batch }}</a>
+                Included in <a data-href="{% url 'clinvar_export_batch_detail' history_entry.submission_batch.pk %}" data-toggle="ajax-modal">{{ history_entry.submission_batch }}</a>
             {% endif %}</div>
         </div>
     {% endfor %}

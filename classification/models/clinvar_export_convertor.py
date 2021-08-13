@@ -191,7 +191,7 @@ class ClinVarExportConverter:
                 errors = JSON_MESSAGES_EMPTY
 
                 if c_hgvs.startswith("ENST"):
-                    errors += JsonMessages.error("ClinVar doesn't support Ensemble transcripts")
+                    errors += JsonMessages.error("ClinVar doesn't support Ensembl transcripts")
 
                 return ValidatedJson(json_data, errors)
             else:

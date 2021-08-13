@@ -4,7 +4,7 @@
 {% labelled label="Records in Submission" %}{{ submissions.count }}{% endlabelled %}
 {% labelled label="Status" %}{{ batch.get_status_display }}{% endlabelled %}
 
-<h4>Requests</h4>
+<label>Requests</label>
 {% for clinvar_request in batch.requests %}
     <div class="card mt-4">
         <div class="card-header">
@@ -18,11 +18,12 @@
                 <a href="#creq-{{clinvar_request.pk}}" data-toggle="collapse" class="toggle-link">Toggle</a>
             {% endlabelled %}
             <div id="creq-{{clinvar_request.pk}}" class="collapse">
-                <div class="my-2"><b>Request</b></div>
+                <div class="mt-4"><label>Request</label>
                 {% code_json clinvar_request.request_json %}
-
-                <div class="my-2"><b>Response</b></div>
+                </div>
+                <div class="mt-4"><label>Response</label>
                 {% code_json clinvar_request.response_json %}
+                </div>
             </div>
         </div>
     </div>
