@@ -26,9 +26,11 @@
     }
     function testRollbarJs() {
         Rollbar.error("Testing Rollbar JS");
+        window.alert("If configured correctly, Rollbar should have recorded an error.");
+        return false;
     }
     </script>
-    <style type="text/css">
+    <style>
         div#reference-check {
             margin: 20px 0px 20px 0px;
         }
@@ -280,7 +282,7 @@
                 <a href="{% url 'database_statistics' %}" class="btn btn-outline-primary">Database statistics</a>
                 <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
                 <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
-                <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="testRollbarJs()" />
+                <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="return testRollbarJs()" />
             </div>
         </form>
 

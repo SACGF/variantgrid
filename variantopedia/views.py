@@ -104,8 +104,10 @@ def server_status(request):
         action = request.POST.get('action')
         if action == 'Test Slack':
             notify_server_status.apply_async()
+            messages.add_message(request, level=messages.INFO, message=f"Slack should have been sent the health check.")
         elif action == 'Test Rollbar':
             report_message("Testing Rollbar", level='error')
+            messages.add_message(request, level=messages.INFO, message=f"Rollbar should have been sent an error.")
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
             with connection.cursor() as cursor:

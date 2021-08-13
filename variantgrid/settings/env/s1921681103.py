@@ -34,7 +34,7 @@ VARIANT_CLASSIFICATION_STATS_USE_SHARED = True
 DISCORDANCE_EMAIL = 'discordance@test.shariant.org.au'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 
-ROLLBAR['enabled'] = False
+ROLLBAR['enabled'] = True
 
 INTERNAL_IPS = [
     '127.0.0.1',
