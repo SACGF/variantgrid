@@ -25,7 +25,7 @@ from classification.models.discordance_models import DiscordanceReport, Discorda
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_ref import ClassificationRef
-from classification.templatetags.js_tags import jsonify
+from uicore.templatetags.js_tags import jsonify
 
 register = Library()
 

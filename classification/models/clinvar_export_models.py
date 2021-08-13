@@ -6,7 +6,8 @@ from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 
-from classification.json_utils import ValidatedJson, JsonObjType
+from uicore.json.validated_json import ValidatedJson
+from uicore.json.json_types import JsonObjType
 from classification.models import ClassificationModification, ConditionResolved
 from snpdb.models import ClinVarKey, Allele
 from django.utils.timezone import now

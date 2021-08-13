@@ -1,54 +1,14 @@
-import collections
-import json
 import copy
-
-
-# A little hack that will make call 'to_json' on any non json serializable class
-# So you can implement to_json to become json serializable
+import json
 from dataclasses import dataclass, field
-from typing import Union, Dict, Any, List, Iterator
-
+from typing import List, Iterator, Union
 from lazy import lazy
+from uicore.json.json_types import JsonDataType
 
 
-def _default(self, obj):
-    return getattr(obj.__class__, "to_json", _default.default)(obj)
-
-
-_default.default = json.JSONEncoder().default
-json.JSONEncoder.default = _default
-
-
-def strip_json(json_values):
-    """
-    Remove null, empty strings and false and empty lists from JSON values
-    (contents of arrays wont be affected).
-    Can optimise exports of json data when fields are often blank
-    """
-    if isinstance(json_values, collections.Mapping):
-        ret_value = {}
-        for key, value in json_values.items():
-            if value == '' or value is None or value is False or (isinstance(value, list) and not value):
-                pass
-            else:
-                value = strip_json(value)
-                ret_value[key] = value
-        return ret_value
-
-    if isinstance(json_values, list):
-        ret_value = []
-        for value in json_values:
-            ret_value.append(strip_json(value))
-        return ret_value
-    return json_values
-
-
-# These are too self-referential to define properly
-# so mainly exist to document code
-JsonPrimitiveType = Union[str, int, float, bool, None]
-JsonObjType = Dict[JsonPrimitiveType, Any]
-JsonListType = List[Any]
-JsonDataType = Union[JsonListType, JsonObjType, JsonPrimitiveType]
+# ValidatedJson (with JSonMessages) is used for serializing to JSon where there's also the need to providing infos or warnings
+# e.g. for converting a classification to the ClinVar format, but providing errors around illegal values.
+# The "pure" JSON can be extracted, or the ValidatedJson can be serialized (and later rendered)
 
 
 @dataclass(frozen=True)
@@ -78,6 +38,7 @@ class JsonMessage:
     @staticmethod
     def deserialize(json_data: JsonDataType):
         return JsonMessage(severity=json_data.get("severity"), text=json_data.get("text"))
+
 
 @dataclass(frozen=True)
 class JsonMessages:
@@ -114,16 +75,8 @@ class JsonMessages:
     def deserialize(json_data: JsonDataType):
         return JsonMessages(messages=[JsonMessage.deserialize(row) for row in json_data])
 
+
 JSON_MESSAGES_EMPTY = JsonMessages()
-
-
-class ClinVarSubmissionNotes:
-
-    def __init__(self):
-        self.errors: List[str] = list()
-
-    def add_error(self, text):
-        self.errors.append(text)
 
 
 @dataclass(frozen=True)

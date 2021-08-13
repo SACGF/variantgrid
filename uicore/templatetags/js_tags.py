@@ -8,11 +8,9 @@ from django.utils.safestring import mark_safe
 import json
 import re
 
-# FIXME, move this out of classifications and into snpdb
-from htmlmin.decorators import not_minified_response
 
-from classification.json_utils import JsonObjType, JsonDataType, ValidatedJson
-from classification.views.classification_datatables import DatatableConfig
+from uicore.json.validated_json import ValidatedJson
+from uicore.json.json_types import JsonDataType
 from library.utils import format_significant_digits
 
 register = template.Library()
@@ -108,16 +106,21 @@ def dash_if_empty(val):
     return val
 
 
-@register.inclusion_tag("classification/tags/code_block_json.html")
+@register.inclusion_tag("uicore/tags/code_block_json.html")
 def code_json(data: JsonDataType, css_class: Optional[str] = ""):
+    if isinstance(data, ValidatedJson):
+        data = data.serialize()
+
     if not css_class:
-        if not data or \
-                not ((isinstance(data, ValidatedJson) and data.messages) or '*wrapper$' in data):
+        # if we're formatting ValidatedJson and the first element has messages, that provides formatting
+        # so we don't need code-block
+        # Also if we already have a css_class (like card-body) we don't need code-block
+        if not data or ('*wrapper$' not in data and not data.get('messages')):
             css_class = "code-block"
     return {"data": data, "css_class": css_class}
 
 
-@register.inclusion_tag("classification/tags/timestamp.html")
+@register.inclusion_tag("uicore/tags/timestamp.html")
 def timestamp(timestamp, time_ago: bool = False):
     css_class = 'time-ago' if time_ago else ''
     if timestamp:
@@ -151,11 +154,6 @@ def duration(td):
 
 
 @register.filter
-def get_item(dictionary, key):
-    return dictionary.get(key)
-
-
-@register.filter
 def format_preference(value):
     if value is True:
         return 'Yes'
@@ -163,6 +161,14 @@ def format_preference(value):
         return 'No'
     else:
         return value
+
+
+# Filters to make up for how purposefully crippled Django Templates are
+
+
+@register.filter
+def get_item(dictionary, key):
+    return dictionary.get(key)
 
 
 @register.filter

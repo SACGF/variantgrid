@@ -4,7 +4,7 @@ from unittest import mock
 from django.test import TestCase, override_settings
 
 from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
-from classification.json_utils import JsonObjType
+from uicore.json.json_types import JsonObjType
 from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
     ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus
 from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare

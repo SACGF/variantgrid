@@ -1,6 +1,5 @@
 from unittest import TestCase
-import json
-from classification.json_utils import ValidatedJson, JsonMessages
+from uicore.json.validated_json import JsonMessages, ValidatedJson
 
 
 class JsonUtilTests(TestCase):

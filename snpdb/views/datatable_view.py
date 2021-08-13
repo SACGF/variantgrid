@@ -11,7 +11,7 @@ from django.db.models import QuerySet, Q
 from kombu.utils import json
 from lazy import lazy
 
-from classification.json_utils import JsonDataType
+from uicore.json.json_types import JsonDataType
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
 from snpdb.views.datatable_mixins import JSONResponseView

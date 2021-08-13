@@ -5,7 +5,7 @@ from lazy import lazy
 
 from annotation.regexes import DbRegexes
 from classification.enums import SpecialEKeys
-from classification.json_utils import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
+from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types
 from classification.models.evidence_mixin import VCDbRefDict
