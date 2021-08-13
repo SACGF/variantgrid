@@ -9,9 +9,8 @@
                 {% labelled label="Status" %}{{ history_entry.get_status_display }}{% endlabelled %}
                 {% labelled label="Classification" %}
                     <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
-                        {{ clinvar_export.classification_based_on.classification.friendly_label }}
+                        {{ clinvar_export.classification_based_on.classification.friendly_label }}</a>
                         as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
-                    </a>
                 {% endlabelled %}
                 {% labelled label="Data" %}
                     <a href="#submission-{{ history_entry.pk }}" class="toggle-link" data-toggle="collapse">Toggle Data</a>

@@ -32,7 +32,7 @@
                     {% labelled label="Current Candidate Classification" %}
                         {% if clinvar_export.classification_based_on %}
                         <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
-                            {{ clinvar_export.classification_based_on.classification.friendly_label }} as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}</a>
+                            {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
                         {% else %}
                         <div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>
                         {% endif %}
