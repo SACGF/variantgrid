@@ -10,7 +10,7 @@ from snpdb.models.models_genome import GenomeBuild, Contig
 class ClinGenAllele(TimeStampedModel):
     """ Canonical Allele - @see http://reg.clinicalgenome.org """
     # id = "CA" stripped off, eg CA7169043 => 7169043
-    id = models.IntegerField(primary_key=True)
+    id = models.BigIntegerField(primary_key=True)
     api_response = models.JSONField(null=False)  # returned
 
     CLINGEN_ALLELE_URL_PATTERN = re.compile(r"http.*/allele/CA(\d+)$")

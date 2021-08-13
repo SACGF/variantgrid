@@ -10,6 +10,7 @@ django_admin_json_editor==0.2.3
 django_autocomplete_light==3.5.1
 django-avatar==5.0.0
 django-compressor==2.4
+django-dag==1.4.3
 django_debug_toolbar==3.1.1
 django_downloadview==2.1.1
 django_extensions==3.0.4
@@ -27,7 +28,6 @@ django_starfield==1.0.post1
 django_termsandconditions==2.0.6
 easy_thumbnails==2.7
 git+https://github.com/azavea/django-amazon-ses@a9dd749575cfaa6e1fc7c289b535cba9798b8018#egg=django-amazon-ses
-git+https://github.com/davmlaw/django-dag#egg=django-dag
 git+https://github.com/davmlaw/django-datetime-utc#egg=django-datetime-utc
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
