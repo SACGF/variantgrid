@@ -108,6 +108,12 @@ def server_status(request):
         elif action == 'Test Rollbar':
             report_message("Testing Rollbar", level='error')
             messages.add_message(request, level=messages.INFO, message=f"Rollbar should have been sent an error.")
+        elif action == 'Test Message Branding':
+            messages.success(request, "Success message")
+            messages.info(request, "Info message")
+            messages.warning(request, "Warning message")
+            messages.error(request, "Error message")
+
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
             with connection.cursor() as cursor:

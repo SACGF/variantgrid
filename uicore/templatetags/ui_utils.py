@@ -246,7 +246,10 @@ def severity_icon(severity: str) -> str:
         return SafeString('<i class="fas fa-exclamation-triangle text-warning"></i>')
     if severity.startswith('I'):  # info
         return SafeString('<i class="fas fa-info-circle text-info"></i>')
+    if severity.startswith('S'):  # success
+        return SafeString('<i class="fas fa-check-circle text-success"></i>')
     # debug
+
     return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
 
 

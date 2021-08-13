@@ -3,8 +3,7 @@ from typing import Optional
 from django.contrib import admin
 from django.contrib.admin import RelatedFieldListFilter
 
-from snpdb.admin_utils import ModelAdminBasics, short_description
-from sync import models
+from snpdb.admin_utils import ModelAdminBasics, admin_action
 from sync.models import SyncRun, ClassificationModificationSyncRecord
 from sync.models.models import SyncDestination
 
@@ -24,26 +23,24 @@ class SyncDestinationAdmin(ModelAdminBasics):
             sync_destination.run(full_sync=False, max_rows=max_rows)
             self.message_user(request, message=f"Completed {str(sync_destination)} row limit = {max_rows}")
 
-    @short_description("Run now (delta sync)")
+    @admin_action("Run now (delta sync)")
     def run_sync(self, request, queryset):
         self._run_sync(request, queryset)
 
-    @short_description("Run now (delta sync) single row")
+    @admin_action("Run now (delta sync) single row")
     def run_sync_single(self, request, queryset):
         self._run_sync(request, queryset, max_rows=1)
 
-    @short_description("Run now (delta sync) 10 rows")
+    @admin_action("Run now (delta sync) 10 rows")
     def run_sync_ten(self, request, queryset):
         self._run_sync(request, queryset, max_rows=10)
 
-    @short_description("Run now (full sync)")
+    @admin_action("Run now (full sync)")
     def run_sync_full(self, request, queryset):
         sync_destination: SyncDestination
         for sync_destination in queryset:
             sync_destination.run(full_sync=True)
             self.message_user(request, message=f"Completed {str(sync_destination)}")
-
-    actions = [run_sync, run_sync_single, run_sync_ten, run_sync_full, 'export_as_csv']
 
 
 @admin.register(SyncRun)

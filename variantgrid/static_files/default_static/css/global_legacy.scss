@@ -433,7 +433,7 @@ li.error {
     background-color: #C9F0DD;
 }
 
-.warning {
+.warning:not(.alert-warning) {
     background-color: #FEBC00;
 }
 

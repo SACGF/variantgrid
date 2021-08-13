@@ -1,6 +1,8 @@
 import csv
+import inspect
+from typing import Optional
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse
@@ -10,15 +12,40 @@ from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdmin
 
 
-def short_description(short_description: str):
-    def decorator(admin_action):
+def admin_action(short_description: str):
+    """
+    Decorator, if used in ModelAdminBasics
+    """
+
+    def decorator(method):
         def wrapper(*args, **kwargs):
-            return admin_action(*args, **kwargs)
+            # Just so the user knows that something happened no matter what
+            request = args[1]
+            queryset = args[2]
+            messages.info(request, message=f"Called \"{short_description}\" on {queryset.count()} records")
+
+            return method(*args, **kwargs)
         wrapper.short_description = short_description
-        wrapper.__name__ = short_description
+        wrapper.__name__ = method.__name__
+        wrapper.is_action = True
         return wrapper
     return decorator
 
+
+def admin_list_column(short_description: Optional[str] = None, order_field: Optional[str] = None):
+
+    def decorator(method):
+        def wrapper(*args, **kwargs):
+            # empty wrapper, we just want to modify short_description and mark as is_action
+            return method(*args, **kwargs)
+        if short_description:
+            wrapper.short_description = short_description
+        if order_field:
+            wrapper.admin_order_field = order_field
+        wrapper.__name__ = method.__name__
+        wrapper.is_action = True
+        return wrapper
+    return decorator
 
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
 
@@ -105,6 +132,14 @@ class ModelAdminBasics(admin.ModelAdmin, AdminExportCsvMixin):
     formfield_overrides = {
         models.JSONField: {'widget': JSONEditorWidget},
     }
+
+    def __new__(cls,  *args, **kwargs):
+        actions = {}
+
+        actions = dict((name, func) for name, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_action', False)))
+        if actions:
+            cls.actions = ['export_as_csv'] + list(actions.keys())
+        return super().__new__(cls)
 
     # wanted to call this BaseModelAdmin but that was already taken
     actions = ["export_as_csv"]

@@ -3,7 +3,7 @@ from django.contrib.admin import RelatedFieldListFilter
 from django.db.models import QuerySet
 from classification.models import ConditionText, ConditionTextMatch
 from library.guardian_utils import admin_bot
-from snpdb.admin_utils import ModelAdminBasics, short_description
+from snpdb.admin_utils import ModelAdminBasics, admin_action
 
 
 class ConditionTextStatusFilter(admin.SimpleListFilter):
@@ -46,19 +46,17 @@ class ConditionTextAdmin(ModelAdminBasics):
             'normalized_text': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
-    @short_description("Automatch (leaves existing data)")
+    @admin_action("Automatch (leaves existing data)")
     def auto_match(self, request, queryset: QuerySet[ConditionText]):
         for condition_text in queryset:
             ConditionTextMatch.attempt_automatch(condition_text=condition_text)
             condition_text.save()
 
-    @short_description("Clear any matches")
+    @admin_action("Clear any matches")
     def clear(self, request, queryset):
         condition_text: ConditionText
         for condition_text in queryset:
             condition_text.clear()
-
-    actions = ['export_as_csv', auto_match, clear]
 
 
 class ConditionTextMatchUserFilter(admin.SimpleListFilter):

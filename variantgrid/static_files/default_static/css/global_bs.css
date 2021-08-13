@@ -724,6 +724,21 @@ ul.compact li:before {
   border: 2px solid #dc3545 !important;
 }
 
+#django-messages {
+  animation: fadeInOpacity ease-out 1s;
+}
+#django-messages i {
+  animation: fadeInScale ease-out 0.5s;
+}
+
+@keyframes fadeInOpacity {
+  0% {
+    opacity: 0.1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
 .json {
   font-family: monospace;
   color: #444;

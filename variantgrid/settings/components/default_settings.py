@@ -839,14 +839,14 @@ POPEN_SHELL = True  # For vcf split - todo put back...
 from django.contrib.messages import constants as messages
 
 # @see https://docs.djangoproject.com/en/3.1/ref/settings/#message-tags
+# Provide both Bootstrap classes (for within the product) and default (for within the admin)
 MESSAGE_TAGS = {
-    messages.DEBUG: 'alert-info',
-    messages.INFO: 'alert-info',
-    messages.SUCCESS: 'alert-success',
-    messages.WARNING: 'alert-warning',
-    messages.ERROR: 'alert-danger',
+    messages.DEBUG: 'debug alert-info',
+    messages.INFO: 'info alert-info',  # annoyingly this is branded same as success in admin
+    messages.SUCCESS: 'success alert-success',
+    messages.WARNING: 'warning alert-warning',
+    messages.ERROR: 'error alert-danger',
 }
-
 
 def get_clinvar_export_secrets() -> dict:
     return get_secrets("CLINVAR_EXPORT", ["enabled", "test", "api_key"])

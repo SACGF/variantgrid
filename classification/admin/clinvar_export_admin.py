@@ -4,7 +4,7 @@ from django.http import HttpResponse
 
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, ClinVarExportRequest
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
-from snpdb.admin_utils import AllValuesChoicesFieldListFilter, short_description, ModelAdminBasics
+from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action
 import json
 
 
@@ -22,21 +22,19 @@ class ClinVarExportAdmin(ModelAdminBasics):
             'scv': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
-    @short_description("Add to ClinVar Submission Batch")
+    @admin_action("Add to ClinVar Submission Batch")
     def add_to_batch(self, request, queryset):
         batches = ClinVarExportBatch.create_batches(queryset, force_update=True)
         if batches:
             for batch in batches:
-                messages.add_message(request, level=messages.INFO, message=f"Submission Batch for {batch.clinvar_key} created with {batch.clinvarexportsubmission_set.count()} submissions")
+                messages.info(request, message=f"Submission Batch for {batch.clinvar_key} created with {batch.clinvarexportsubmission_set.count()} submissions")
         else:
-            messages.add_message(request, level=messages.WARNING, message="No records in pending non-errored state to add to a new batch")
+            messages.warning(request, message="No records in pending non-errored state to add to a new batch")
 
-    @short_description("Re-calculate status")
+    @admin_action("Re-calculate status")
     def force_recalc_status(self, request, queryset: QuerySet[ClinVarExport]):
         for export in queryset:
             export.update()
-
-    actions = ["export_as_csv", force_recalc_status, add_to_batch]
 
 
 @admin.register(ClinVarAllele)
@@ -84,10 +82,10 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
     def record_count(self, obj: ClinVarExportBatch):
         return obj.clinvarexportsubmission_set.count()
 
-    @short_description("Download JSON")
+    @admin_action("Download JSON")
     def download_json(self, request, queryset: QuerySet[ClinVarExportBatch]):
         if queryset.count() != 1:
-            messages.add_message(request, level=messages.ERROR, message="Can only download one batch at a time")
+            messages.error(request, message="Error Can only download one batch at a time")
             return
 
         batch: ClinVarExportBatch = queryset.first()
@@ -99,20 +97,18 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
         response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{batch.pk}.json'
         return response
 
-    @short_description("Next Action")
+    @admin_action("Next Action")
     def next_action(self, request, queryset: QuerySet[ClinVarExportBatch]):
         queryset: QuerySet[ClinVarExportBatch] = queryset.filter(status__in=(
             ClinVarExportBatchStatus.UPLOADING,
             ClinVarExportBatchStatus.AWAITING_UPLOAD
         ))
         if not queryset:
-            messages.add_message(request, level=messages.ERROR, message="No selected records in status of Uploading or Awaiting Upload")
+            messages.error(request, message="No selected records in status of Uploading or Awaiting Upload")
         else:
             for batch in queryset:
                 try:
                     clinvar_export_sync.next_request(batch)
-                    messages.add_message(request, level=messages.SUCCESS, message=f"Batch {batch.pk} - updated")
+                    messages.success(request, message=f"Batch {batch.pk} - updated")
                 except ClinVarRequestException as clinvar_except:
-                    messages.add_message(request, level=messages.ERROR, message=f"Batch {batch.pk} - {clinvar_except}")
-
-    actions = ["export_as_csv", download_json, next_action]
+                    messages.error(request, message=f"Batch {batch.pk} - {clinvar_except}")

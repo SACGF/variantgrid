@@ -15,7 +15,7 @@ from classification.models import EvidenceKey, DiscordanceReport, DiscordanceRep
     EvidenceKeyMap, ClinicalContext, ClassificationReportTemplate, ClassificationModification
 from classification.models.classification import Classification, ClassificationImport
 from library.guardian_utils import admin_bot
-from snpdb.admin_utils import ModelAdminBasics, short_description
+from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from snpdb.models import ImportSource, GenomeBuild
 
 
@@ -104,22 +104,18 @@ class ClassificationAdmin(ModelAdminBasics):
     list_per_page = 500
     inlines = (ClassificationModificationAdmin,)
 
+    @admin_list_column(short_description="Created", order_field="created")
     def created_detailed(self, obj: Classification):
         return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
-    created_detailed.admin_order_field = 'created'
-    created_detailed.short_description = 'Created'
-
+    @admin_list_column(short_description="Modified", order_field="modified")
     def modified_detailed(self, obj: Classification):
         return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-
-    modified_detailed.admin_order_field = 'modified'
-    modified_detailed.short_description = 'Modified'
 
     def has_add_permission(self, request):
         return False
 
-    @short_description("Populate base variant data")
+    @admin_action("Populate base variant data")
     def populate_base_variant_data(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
             refseq_transcript_id = vc.get(SpecialEKeys.REFSEQ_TRANSCRIPT_ID)
@@ -161,17 +157,17 @@ class ClassificationAdmin(ModelAdminBasics):
                 else:
                     self.message_user(request, "(%i) No changes with = %s" % (vc.id, json.dumps(patch)))
 
-    @short_description("Revalidate")
+    @admin_action("Revalidate")
     def revalidate(self, request, queryset):
         for vc in queryset:
             vc.revalidate(request.user)
         self.message_user(request, str(queryset.count()) + " records revalidated")
 
-    @short_description("Publish - Logged in Users")
+    @admin_action("Publish - Logged in Users")
     def publish_logged_in_users(self, request, queryset):
         self.publish_share_level(request, queryset, ShareLevel.ALL_USERS)
 
-    @short_description("Publish - Organisation")
+    @admin_action("Publish - Organisation")
     def publish_org(self, request, queryset):
         self.publish_share_level(request, queryset, ShareLevel.INSTITUTION)
 
@@ -197,7 +193,7 @@ class ClassificationAdmin(ModelAdminBasics):
             self.message_user(request, message=f"({in_error}) records can't be published due to validation errors", level=messages.ERROR)
         self.message_user(request, message=f"({published}) records have been freshly published", level=messages.INFO)
 
-    @short_description("Variant re-matching")
+    @admin_action("Variant re-matching")
     def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
         qs: QuerySet[Classification] = queryset.order_by('evidence__genome_build')
 
@@ -227,7 +223,7 @@ class ClassificationAdmin(ModelAdminBasics):
             self.message_user(request, f'Records with missing or invalid genome_builds : {invalid_genome_build_count}')
         self.message_user(request, f'Records revalidating : {valid_record_count}')
 
-    @short_description("Re-calculate cached chgvs")
+    @admin_action("Re-calculate cached chgvs")
     def recalculate_cached_chgvs(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
             vc.update_cached_c_hgvs()
@@ -244,33 +240,23 @@ class ClassificationAdmin(ModelAdminBasics):
                 pass
         return count
 
-    @short_description("Withdraw")
+    @admin_action("Withdraw")
     def withdraw_true(self, request, queryset: QuerySet[Classification]):
         count = self.set_withdraw(request, queryset, True)
         self.message_user(request, f"{count} records now newly set to withdrawn")
 
-    @short_description("Un-Withdraw")
+    @admin_action("Un-Withdraw")
     def withdraw_false(self, request, queryset):
         count = self.set_withdraw(request, queryset, False)
         self.message_user(request, f"{count} records now newly set to un-withdrawn")
 
     """
+    @admin_action("Fix allele Freq History")
     def fix_allele_freq_history(self, request, queryset):
         results = EvidenceKeyToUnit(key_names=["allele_frequency"]).migrate(queryset, dry_run=False)
         for result in results:
             self.message_user(request, result)
     """
-
-    actions = [revalidate,
-               populate_base_variant_data,
-               publish_logged_in_users,
-               publish_org,
-               reattempt_variant_matching,
-               recalculate_cached_chgvs,
-               # fix_allele_freq_history,
-               withdraw_true,
-               withdraw_false,
-               'export_as_csv']
 
     def get_form(self, request, obj=None, **kwargs):
         return super(ClassificationAdmin, self).get_form(request, obj, widgets={
@@ -294,13 +280,11 @@ class ClinicalContextAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @short_description("Recalculate Status")
+    @admin_action("Recalculate Status")
     def recalculate(self, request, queryset):
         for dc in queryset:
             dc.recalc_and_save(cause='Admin recalculation')  # cause of None should change to Unknown, which is accurate if this was required
         self.message_user(request, 'Recalculated %i statuses' % queryset.count())
-
-    actions = [recalculate, 'export_as_csv']
 
 
 class EvidenceKeySectionFilter(admin.SimpleListFilter):
@@ -347,6 +331,7 @@ class EvidenceKeyAdmin(ModelAdminBasics):
         ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')})
     )
 
+    @admin_action("Validate key")
     def validate(self, request, queryset):
         good_count = 0
         key: EvidenceKey
@@ -358,10 +343,6 @@ class EvidenceKeyAdmin(ModelAdminBasics):
                 self.message_user(request, str(ve), 'error')
 
         self.message_user(request, str(good_count) + " keys passed validation")
-
-    validate.short_description = "Validate key"
-
-    actions = [validate]
 
     def get_form(self, request, obj=None, **kwargs):
         return super().get_form(request, obj, widgets={
@@ -464,10 +445,8 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @short_description("Send discordance notification")
+    @admin_action("Send discordance notification")
     def send_notification(self, request, queryset):
         ds: DiscordanceReport
         for ds in queryset:
             send_discordance_notification(ds)
-
-    actions = [send_notification]
