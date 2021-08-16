@@ -124,7 +124,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
     """ qs: Variant queryset annotated w/VariantZygosityCountCollection """
 
     agg_kwargs = {
-        "total": Count("id"),
+        "total": Count("id", distinct=True),
         "REF": Sum("global_variant_zygosity__ref_count"),
         "HET": Sum("global_variant_zygosity__het_count"),
         "HOM_ALT": Sum("global_variant_zygosity__hom_count"),
@@ -134,18 +134,18 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
     q_classification = Classification.get_variant_q(user, genome_build,
                                                     clinical_significance_list=clinical_significance_list)
     classifications = {
-        "clinvar": (Q(clinvar__isnull=False), "highest_pathogenicity"),
-        "classification": (q_classification, "clinical_significance")
+        "clinvar": ("clinvar", Q(clinvar__isnull=False), "highest_pathogenicity"),
+        "classification": ("classification", q_classification, "clinical_significance")
     }
 
-    for classification, (classification_q, clinical_significance_path) in classifications.items():
-        agg_kwargs[f"{classification}_count"] = Count("id", filter=classification_q)
+    for classification, (count_path, classification_q, clinical_significance_path) in classifications.items():
+        agg_kwargs[f"{classification}_count"] = Count(count_path, filter=classification_q, distinct=True)
         if clinical_significance:
             for cs in clinical_significance_list:
                 q_clinical_significance = Q(**{f"{classification}__{clinical_significance_path}": cs})
                 if classification_q:
                     q_clinical_significance &= classification_q
-                agg_kwargs[f"{classification}_{cs}"] = Count("id", filter=q_clinical_significance)
+                agg_kwargs[f"{classification}_{cs}"] = Count(count_path, filter=q_clinical_significance, distinct=True)
 
     return qs.aggregate(**agg_kwargs)
 
