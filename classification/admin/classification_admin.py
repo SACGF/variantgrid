@@ -1,5 +1,5 @@
 import json
-from typing import Dict
+from typing import Dict, Set
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter
@@ -16,7 +16,7 @@ from classification.models import EvidenceKey, DiscordanceReport, DiscordanceRep
 from classification.models.classification import Classification, ClassificationImport
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
-from snpdb.models import ImportSource, GenomeBuild
+from snpdb.models import ImportSource, GenomeBuild, Lab
 
 
 class VariantMatchedFilter(admin.SimpleListFilter):
@@ -403,15 +403,17 @@ class DiscordanceReportClassificationAdmin(admin.TabularInline):
 @admin.register(DiscordanceReport)
 class DiscordanceReportAdmin(ModelAdminBasics):
     list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "clinical_sigs", "labs"]
+    list_select_related = ('clinical_context', 'clinical_context__allele')
     list_filter = [DiscordanceReportAdminLabFilter]
     inlines = (DiscordanceReportClassificationAdmin,)
 
-    def allele(self, obj: DiscordanceReport):
+    @admin_list_column("Allele", order_field="clinical_context__allele__pk")
+    def allele(self, obj: DiscordanceReport) -> str:
         cc = obj.clinical_context
         return str(cc.allele)
-    allele.ordering = 'clinical_context__allele__pk'
 
-    def clinical_sigs(self, obj: DiscordanceReport):
+    @admin_list_column("Clinical Significances")
+    def clinical_sigs(self, obj: DiscordanceReport) -> str:
         clinical_sigs = set()
         for dr in DiscordanceReportClassification.objects.filter(report=obj):
             clinical_sigs.add(dr.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
@@ -422,7 +424,8 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         pretty = [e_key_cs.pretty_value(cs) for cs in sorted_list]
         return pretty
 
-    def days_open(self, obj: DiscordanceReport):
+    @admin_list_column()
+    def days_open(self, obj: DiscordanceReport) -> int:
         closed = obj.report_completed_date
         if not closed:
             delta = timezone.now() - obj.report_started_date
@@ -430,11 +433,13 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         delta = closed - obj.report_started_date
         return delta.days
 
+    @admin_list_column()
     def classification_count(self, obj: DiscordanceReport):
         return obj.discordancereportclassification_set.count()
 
-    def labs(self, obj: DiscordanceReport):
-        labs = set()
+    @admin_list_column()
+    def labs(self, obj: DiscordanceReport) -> str:
+        labs: Set[Lab] = set()
         drc: DiscordanceReportClassification
         for drc in obj.discordancereportclassification_set.all():
             if c := drc.classification_original.classification:

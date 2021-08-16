@@ -1,20 +1,22 @@
 import csv
 import inspect
-from typing import Optional
+from typing import Optional, List
 
 from django.contrib import admin, messages
+from django.contrib.admin.widgets import ForeignKeyRawIdWidget
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse
 from django.utils.encoding import smart_text
-# https://stackoverflow.com/questions/41228687/how-to-decorate-admin-actions-in-django-action-name-used-as-dict-key
 from django_json_widget.widgets import JSONEditorWidget
-from guardian.admin import GuardedModelAdmin
+from guardian.admin import GuardedModelAdminMixin
 
 
+# https://stackoverflow.com/questions/41228687/how-to-decorate-admin-actions-in-django-action-name-used-as-dict-key
 def admin_action(short_description: str):
     """
-    Decorator, if used in ModelAdminBasics
+    Decorator, if used in ModelAdminBasics, marks function as something that can be done on selected rows.
+    As a bonus will also send an info message confirming to the user how many rows were selected for the action
     """
 
     def decorator(method):
@@ -22,7 +24,11 @@ def admin_action(short_description: str):
             # Just so the user knows that something happened no matter what
             request = args[1]
             queryset = args[2]
-            messages.info(request, message=f"Called \"{short_description}\" on {queryset.count()} records")
+            count = queryset.count()
+            if count == 1:
+                messages.info(request, message=f"Called \"{short_description}\" on \"{queryset.first()}\"")
+            else:
+                messages.info(request, message=f"Called \"{short_description}\" on {queryset.count()} records")
 
             return method(*args, **kwargs)
         wrapper.short_description = short_description
@@ -33,6 +39,13 @@ def admin_action(short_description: str):
 
 
 def admin_list_column(short_description: Optional[str] = None, order_field: Optional[str] = None):
+    """
+    Mark a function as acting like an admin list column
+    Note that the column still needs to be added to "list_display" as that is the easiest
+    way to allow ordering of columns.
+    :short_description: Optional Overrides the default display name
+    :order_field: Optional, If provided is used to order the table using this database column
+    """
 
     def decorator(method):
         def wrapper(*args, **kwargs):
@@ -43,11 +56,16 @@ def admin_list_column(short_description: Optional[str] = None, order_field: Opti
         if order_field:
             wrapper.admin_order_field = order_field
         wrapper.__name__ = method.__name__
-        wrapper.is_action = True
+        wrapper.is_list_column = True
         return wrapper
     return decorator
 
+
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
+    """
+    Used to provide filter for choice fields (will display the choice label and not just the code)
+    e.g. list_filter = ('status', AllValuesChoicesFieldListFilter)
+    """
 
     def choices(self, changelist):
         yield {
@@ -84,9 +102,24 @@ class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
             }
 
 
-class AdminExportCsvMixin:
-    def export_as_csv(self, request, queryset):
+class ModelAdminBasics(admin.ModelAdmin):
+    """
+    Make every Admin class extend this (or GuardedModelAdminBasics)
+    *
+    * Provides support for annotating methods @admin_method
+    * Comes with export_as_csv for selected rows
+    * Sets a nice default editor for JSONFields
+    * Marks foreign keys as readonly (override is_readonly_field and set value for
+    * autocomplete_fields or raw_id_fields if you need editable foreign fields)
+    """
 
+    formfield_overrides = {
+        models.JSONField: {'widget': JSONEditorWidget},
+        # sadly this doesn't work as general widget since "rel" and "admin_site" need values
+        # models.ForeignKey: {'widget': ForeignKeyRawIdWidget}
+    }
+
+    def export_as_csv(self, request, queryset) -> HttpResponse:
         meta = self.model._meta
         field_names = [field.name for field in meta.fields]
 
@@ -98,10 +131,20 @@ class AdminExportCsvMixin:
         for obj in queryset:
             writer.writerow([getattr(obj, field) for field in field_names])
         return response
+    export_as_csv.short_description = "Export selected as CSV"
 
-    export_as_csv.short_description = "Export Selected as CSV"
+    def __new__(cls,  *args, **kwargs):
+        """
+        Sets up actions (methods annotated with @admin_action)
+        """
+        actions = {}
 
-    def _is_readonly(self, f) -> bool:
+        actions = dict((name, func) for name, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_action', False)))
+        if actions:
+            cls.actions = ['export_as_csv'] + list(actions.keys())
+        return super().__new__(cls)
+
+    def is_readonly_field(self, f) -> bool:
         if not f.editable:
             return True  # does this make all the below redundant?
         if isinstance(f, (AutoField, ForeignKey)):
@@ -111,12 +154,12 @@ class AdminExportCsvMixin:
                 return True
         return False
 
-    def _get_readonly_fields(self, request, obj=None):
-        return [f.name for f in self.model._meta.fields if self._is_readonly(f)]
+    def _get_readonly_fields(self, request, obj=None) -> List[str]:
+        return [f.name for f in self.model._meta.fields if self.is_readonly_field(f)]
 
-    def _get_fields(self, request, obj=None, **kwargs):
-        first = []
-        second = []
+    def _get_fields(self, request, obj=None, **kwargs) -> List[str]:
+        first: List[str] = list()
+        second: List[str] = list()
         for f in self.model._meta.fields:
             if isinstance(f, (AutoField, ForeignKey)):
                 # put ids and foreign keys first
@@ -127,23 +170,6 @@ class AdminExportCsvMixin:
 
         return first + second
 
-
-class ModelAdminBasics(admin.ModelAdmin, AdminExportCsvMixin):
-    formfield_overrides = {
-        models.JSONField: {'widget': JSONEditorWidget},
-    }
-
-    def __new__(cls,  *args, **kwargs):
-        actions = {}
-
-        actions = dict((name, func) for name, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_action', False)))
-        if actions:
-            cls.actions = ['export_as_csv'] + list(actions.keys())
-        return super().__new__(cls)
-
-    # wanted to call this BaseModelAdmin but that was already taken
-    actions = ["export_as_csv"]
-
     def get_readonly_fields(self, request, obj=None):
         return self._get_readonly_fields(request=request, obj=obj)
 
@@ -151,11 +177,5 @@ class ModelAdminBasics(admin.ModelAdmin, AdminExportCsvMixin):
         return self._get_fields(request=request, obj=obj)
 
 
-class GuardedModelAdminBasics(GuardedModelAdmin, AdminExportCsvMixin):
-    actions = ["export_as_csv"]
-
-    def get_readonly_fields(self, request, obj=None):
-        return self._get_readonly_fields(request=request, obj=obj)
-
-    def get_fields(self, request, obj=None):
-        return self._get_fields(request=request, obj=obj)
+class GuardedModelAdminBasics(GuardedModelAdminMixin, ModelAdminBasics):
+    pass
