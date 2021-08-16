@@ -132,7 +132,7 @@ class ModelAdminBasics(admin.ModelAdmin):
         return response
     export_as_csv.short_description = "Export selected as CSV"
 
-    def __new__(cls,  *args, **kwargs):
+    def __new__(cls, *args, **kwargs):
         """
         Sets up actions (methods annotated with @admin_action)
         """
