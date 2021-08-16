@@ -3,7 +3,10 @@
     <div class="accordion indicator-plus-before round-indicator mb-4">
         <div class="card">
             <div class="card-header collapsed" id="heading-{{ page_id }}" data-toggle="collapse" data-target="#help-{{ page_id }}" >
-                <a class="card-title">{{ help_page_title }} <i class="far fa-question-circle"></i></a>
+                <a class="card-title d-inline-flex w-100 mb-0">
+                    <div class="flex-grow-1">{{ help_page_title }}</div>
+                    <div class="mr-4">Help <i class="far fa-question-circle"></i></div>
+                </a>
             </div>
 
             <div id="help-{{ page_id }}" class="collapse" aria-labelledby="heading-{{ page_id }}">

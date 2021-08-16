@@ -70,7 +70,10 @@ def page_help_embedded(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_page_help_embedded',))
     parser.delete_first_token()
-    return PageHelpContent(nodelist, title=kwargs.get('title'))
+    if title := kwargs.get("title") or args[0]:
+        return PageHelpContent(nodelist, title=title)
+    else:
+        raise ValueError("page_help_embedded must have attribute 'title'")
 
 
 class PageHelpContent(template.Node):
@@ -82,6 +85,7 @@ class PageHelpContent(template.Node):
         self.title = title
 
     def render(self, context):
+
         title = TagUtils.value_str(context, self.title)
         page_id = title.replace(' ', '-').replace('/', '_')
         content = self.nodelist.render(context)
@@ -89,7 +93,7 @@ class PageHelpContent(template.Node):
         return loader.render_to_string("uicore/tags/help.html", context={
             'page_id': page_id,
             'page_title': None,
-            'help_page_title': title + ' Help',
+            'help_page_title': title,
             'page_help_html': content,
             'help_url': settings.HELP_URL
         })
