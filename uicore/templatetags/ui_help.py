@@ -21,7 +21,8 @@ def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3")
     Displays a heading and page help loaded from a file.
     :param page_id: Used to determine the help page
     :param title: The title for the heading and the help drop down
-    :param show_title: Should we show a heading at all
+    :param show_title: Should we show a heading at all - deprecated, generally always show title (use page_help instead
+    of header if page help is available).
     :param header: Default header if there's no attached help
     """
     suffix_help = True

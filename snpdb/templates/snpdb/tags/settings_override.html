@@ -3,8 +3,7 @@
 {% load js_tags %}
 
 {% if override_source %}
-    <h4>Settings</h4>
-    {% page_help page_id='settings/user_settings_help' title='Settings' show_title=False %}
+    {% page_help page_id='settings/user_settings_help' title='Settings' %}
     <p>
         Default values are searched for in the following until a value is found: Lab, Organisation then Global.<br>
         Leave "{{ override_level }} override" blank to accept the default value, or override it with your own value.
