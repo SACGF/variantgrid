@@ -1347,8 +1347,10 @@ const VCForm = (function() {
                 );
             } else {
                 descriptionSpan = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
-                if (eKey.hide === true) {
-                    descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));
+                if (this.isEditMode()) {
+                    if (eKey.hide === true) {
+                        descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));
+                    }
                 }
                 let description = $('<div>', {class: "description mt-2"}).appendTo(content);
                 descriptionSpan.appendTo(description);
