@@ -3,8 +3,15 @@
 {% load js_tags %}
 
 {% if override_source %}
-    {% page_help page_id='settings/user_settings_help' title='Settings' %}
-    <p>
+    {% page_help_embedded page_id='settings/user_settings_help' title='Settings' %}
+        {% if form.fields.columns %}
+            <p>
+                <b>Columns and Node Counts:</b>
+                These are used to configure an analysis when it is created - they do not affect existing analyses.
+            </p>
+        {% endif %}
+    {% end_page_help_embedded %}
+    <p class="text-info">
         Default values are searched for in the following until a value is found: Lab, Organisation then Global.<br>
         Leave "{{ override_level }} override" blank to accept the default value, or override it with your own value.
     </p>

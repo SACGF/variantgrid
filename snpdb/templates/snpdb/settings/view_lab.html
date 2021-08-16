@@ -56,8 +56,10 @@
                     {% crispy lab_form form_helper.horizontal_nested %}
 
                     {% if group_initial_perm_form %}
-                        <h4>Groups</h4>
-                        <p>
+                        {% page_help_embedded "Groups" %}
+                            <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.
+                        {% end_page_help_embedded %}
+                        <p class="text-info">
                             The settings below are how data is initially shared with your groups.
                             You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
                         </p>

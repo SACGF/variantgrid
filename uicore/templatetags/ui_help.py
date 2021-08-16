@@ -74,11 +74,12 @@ class PageHelpContent(template.Node):
 
         title = TagUtils.value_str(context, self.title)
         page_id = html_id_safe(title)
-        content = self.nodelist.render(context)
+        content = self.nodelist.render(context).strip()
 
         return loader.render_to_string("uicore/tags/help.html", context={
             'page_id': page_id,
             'page_title': title,
             'page_help_html': content,
+            'header_tag': 'h4',  # can revert back to just a tag if there's no help content
             'help_url': settings.HELP_URL
         })
