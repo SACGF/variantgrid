@@ -138,14 +138,14 @@ class SearchResult:
 
     def __init__(self, record: Any,
                  genome_builds: Optional[Set[GenomeBuild]] = None,
-                 annotation_consortia: Optional[str] = None,
+                 annotation_consortia: Optional[List[str]] = None,
                  message: Optional[Union[str, List[str]]] = None,
                  is_debug_data: bool = False,
                  initial_score: int = 0):
         self.record = record
         self.genome_build = None  # Set as we display search results for each build
         self.genome_builds = genome_builds
-        self.annotation_consortia = annotation_consortia
+        self.annotation_consortia = annotation_consortia or []
         search_message = getattr(record, "search_message", None)
         if search_message and not message:
             message = search_message
@@ -162,17 +162,14 @@ class SearchResult:
 
     def apply_search_score(self, preferred_genome_build: GenomeBuild):
         self.is_preferred_build = not self.genome_builds or preferred_genome_build in self.genome_builds
-        self.is_preferred_annotation = not self.annotation_consortia or preferred_genome_build.annotation_consortium == self.annotation_consortia
+        self.is_preferred_annotation = not self.annotation_consortia or preferred_genome_build.annotation_consortium in self.annotation_consortia
 
     @property
     def header_string(self):
         text = self.search_type
         extras = []
-        if self.annotation_consortia:
-            if self.annotation_consortia == AnnotationConsortium.ENSEMBL:
-                extras.append("Ensembl")
-            elif self.annotation_consortia == AnnotationConsortium.REFSEQ:
-                extras.append("RefSeq")
+        for ac in self.annotation_consortia:
+            extras.append(AnnotationConsortium(ac).name)
         if self.genome_builds:
             extras.extend((genome_build.name for genome_build in self.genome_builds))
 
@@ -542,7 +539,7 @@ def _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
                 transcript_hgvs = f"{transcript_version.accession}:{allele}"
                 try:
                     for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
-                        result.annotation_consortia = gene.annotation_consortium
+                        result.annotation_consortia = [gene.annotation_consortium]
                         results_by_record[result.record].append(result)
                         transcript_accessions_by_record[result.record].append(transcript_version.accession)
                 except:
@@ -558,17 +555,15 @@ def _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
                     if m:
                         unique_messages[m] = True
 
-            # We want to bring our build's annotation consortium to front, so set to our build's AC if multiple
-            most_relevant_annotation_consortia = None
+            unique_annotation_consortia = set()
             for r in results_for_record:
-                if r.annotation_consortia:
-                    if not (most_relevant_annotation_consortia and most_relevant_annotation_consortia == genome_build.annotation_consortium):
-                        most_relevant_annotation_consortia = r.annotation_consortia
+                unique_annotation_consortia.update(r.annotation_consortia)
+
             messages = list(unique_messages.keys())
             # All weights should be the same, just take 1st
             initial_score = results_for_record[0].initial_score
             results.append(SearchResult(record, message=messages, initial_score=initial_score,
-                                        annotation_consortia=most_relevant_annotation_consortia))
+                                        annotation_consortia=list(unique_annotation_consortia)))
     return results
 
 
