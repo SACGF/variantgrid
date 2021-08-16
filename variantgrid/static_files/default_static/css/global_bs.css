@@ -58,6 +58,11 @@ label {
   text-decoration: underline !important;
 }
 
+.modal-body-scroll {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
 /*
 .card-body {
     background-color: #f5fff5;

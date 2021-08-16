@@ -1362,16 +1362,50 @@ const VCForm = (function() {
                     ]);
                 }
             }
+            jHelp.css({'max-height': 494});
 
-            let fontSize = 13;
-            jHelp.css({'font-size': fontSize, 'max-height': 600});
-            while (this.helpOverflowAmount() > 0 && fontSize > 10) {
-                fontSize--;
-                jHelp.css({'font-size': fontSize});
-            }
             if (this.helpOverflowAmount() > 0) {
-                jHelp.css({'max-height': jHelp[0].scrollHeight});
+                $('<div>', {
+                    style: 'position:absolute; bottom: 0px; right: 0px; padding: 4px; background-color: white; border-radius: 4px',
+                    html: $('<a>', {text: 'Click for full content', class: 'hover-link'}).click(function(e) {
+
+                        let first = true;
+                        function titledValue(title, value) {
+                            return $("<div>", {class: first ? 'mb-4' : 'my-4', html:[
+                                $("<label>", {"text": title, "style": "font-weight:600"}),
+                                $("<hr>", {"style": "margin-top:0.5rem;margin-bottom:0.5rem"}),
+                                $("<div>", {class:'text-body', html: value})
+                            ]});
+                            first = false;
+                        }
+                        let helpHtml = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
+                        let popupContent = $('<div>');
+                        popupContent.append(titledValue("Description", helpHtml));
+
+                        if (eKey.see) {
+                            popupContent.append(titledValue("Relevant Link", $('<a>', {class: 'hover-link external-link', href: eKey.see, text: eKey.see, target: eKey.key})));
+                        }
+                        if (explain) {
+                            popupContent.append(titledValue("Lab Specific Details", explain));
+                        }
+                        if (note) {
+                            popupContent.append(titledValue("Note", explain));
+                        }
+                        let valueHtml;
+                        if (value) {
+                            valueHtml = $("<div>", {style:'white-space:pre-wrap;word-break: break-word;', html: value});
+                        } else {
+                            valueHtml = $("<i>", {class:'no-value', text:"No Value"});
+                        }
+                        popupContent.append(titledValue("Value", valueHtml));
+
+                        createModal('info', eKey.label, popupContent);
+                    })
+                }).appendTo(jHelp);
             }
+            // if (this.helpOverflowAmount() > 0) {
+            //    jHelp.css({'max-height': jHelp[0].scrollHeight});
+            //}
 
         },
 

@@ -75,6 +75,10 @@ label {
       text-decoration: underline !important;
   }
 }
+.modal-body-scroll {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
 
 // not sure if we want to give all cards the pyprus background
 // but stops the screen from being too white..

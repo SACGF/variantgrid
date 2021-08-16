@@ -844,6 +844,20 @@ function createModalShell(id, title) {
     `);
 }
 
+function createModal(id, title, body) {
+    let modalContent = createModalShell(id, title);
+    modalContent.find('.modal-body').addClass('modal-body-scroll').html(body);
+    modalContent.find('.modal-footer').html(`
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+    `);
+    let modalDialog = modalContent.modal({focus:true, show:false});
+    modalContent.on('hidden.bs.modal', function() {
+        modalContent.modal('dispose');
+        modalContent.remove();
+    });
+    modalDialog.modal('show');
+}
+
 // Suggestions
 
 function suggestionDialog(userName) {
