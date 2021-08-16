@@ -115,7 +115,28 @@
         {% endif %}
 
         <div data-toggle="ajax" href="{% url 'clinvar_key' clinvar_key.pk %}">Loading</div>
-        <h4>Records</h4>
+        {% page_help_embedded "Records &amp; Batches" %}
+            <p>{{ 'info' | severity_icon }}Important : Changes to classifications are not automatically reflected here. Classifications might be more up to date.</p>
+            {% if missing_condition_count %}
+            <p>{{ 'info' | severity_icon }}Important : Only classifications with standard conditions can be submitted to ClinVar.</p>
+            {% endif %}
+            <p>ClinVar accepts one record per submitter/allele/condition combination - below are the records we will be sending to ClinVar on your behalf.</p>
+            <p>If a record's sync status is "In Error" the linked classification has one or more of the following:
+                <ul>
+                    <li>An open flag (such as variant matching warning or discordance) which must be resolved.</li>
+                    <li>Missing key values required by ClinVar - note that {{ site_name }} admins can set defaults for some values.</li>
+                    <li>Have some values that don't translate to ClinVar - e.g. an Ensembl transcript</li>
+                </ul>
+            </p>
+            <label>Records</label>
+            <p>All ClinVar Exports can be downloaded for review.</p>
+            <p>An export record can be marked as "On Hold" to stop it from being submitted to ClinVar - it will later have to be manually set back to ready when appropriate.</p>
+            <p>If records have been externally submitted to ClinVar and have had a SCV, they can be entered by clicking on a row and going to the ClinVar Export,
+            otherwise {{ site_name }} will automatically assign the records SCV returned from ClinVar.
+            </p>
+            <label>Batches</label>
+            <p>Data is sent to ClinVar in batches, these just show you the technical detail data that was sent to ClinVar if required for review.</p>
+        {% end_page_help_embedded %}
         {% if missing_condition_count %}
             {% labelled label="Classifications w/out standard condition" %}
                 <a href="{% url 'condition_matchings' %}" title="Only classifications with standard conditions can be submitted to ClinVar">

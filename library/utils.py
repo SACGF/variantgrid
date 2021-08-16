@@ -2,6 +2,7 @@ import csv
 import io
 import operator
 import math
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -313,6 +314,19 @@ def filename_safe(filename) -> str:
     # leave room for an extension so make sure the filename is 250 characters
     filename = "".join(c for c in filename if c.isalnum() or c in keepcharacters).strip().lower()[0:250]
     return filename
+
+
+def html_id_safe(text: str) -> str:
+    """
+    Makes a string that can be made into an HTML id and referenced easily
+    """
+    if not text:
+        return str(uuid.uuid4())
+    text = re.sub("[^0-9A-Za-z]", "-", text)
+    text = re.sub("_{2,}", "-", text)
+    if not text[0].isalpha():
+        text = "x" + text
+    return text
 
 
 def html_link(url: str, title: str) -> SafeString:
