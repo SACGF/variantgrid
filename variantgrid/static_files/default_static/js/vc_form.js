@@ -1397,6 +1397,27 @@ const VCForm = (function() {
                         }
                         popupContent.append(titledValue("Value", valueHtml));
 
+                        if (refs !== null && refs.length) {
+                            let refsDom = $('<div>', {class: 'refs'});
+                            for (let ref of refs) {
+                                let refDom = $('<div>', {class: 'ref'}).appendTo(refsDom);
+                                $('<a>', {class: 'hover-link external-link', href: ref.url, text: ref.id, target: '_blank'}).appendTo(refDom);
+                                if (ref.summary) {
+                                    let summaryDom = $('<div>', {class: 'ref-summary'}).appendTo(refDom);
+                                    try {
+                                       $(`<div>${ref.summary}</div>`).appendTo(summaryDom);
+                                    } catch (e) {
+                                        summaryDom.attr('text', ref.summary);
+                                    }
+                                } else if (ref.internal_id) {
+                                    $('<div>', {class: 'ref-summary ml-1 my-1 d-inline', text: 'See citations for more info'}).appendTo(refDom);
+                                } else {
+                                    $('<div>', {class: 'ref-summary ml-1 my-1 d-inline', text: 'No summary available'}).appendTo(refDom);
+                                }
+                            }
+                            popupContent.append(titledValue("References", refsDom));
+                        }
+
                         createModal('info', eKey.label, popupContent);
                     })
                 }).appendTo(jHelp);
