@@ -10,9 +10,10 @@ h3:not(.popover-header), h4:not(.popover-header) {
 h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-header) {
     margin-top: 28px; // more spacing for a page divided into several h3s
 }
-.card-title h4 {
+.card-header h4, .card-header h5 {
+  margin-top: 0;
   margin-bottom: 0;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
 }
 
 /// FORMS
