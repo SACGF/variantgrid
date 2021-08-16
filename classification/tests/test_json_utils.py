@@ -11,8 +11,7 @@ class JsonUtilTests(TestCase):
                 [
                     1,
                     ValidatedJson(2, JsonMessages.info("This is the number 2"))
-                ]
-                , JsonMessages.info("This is a list of numbers"))
+                ], JsonMessages.info("This is a list of numbers"))
         })
         serialized = original.serialize()
         deserialized = ValidatedJson.deserialize(serialized)

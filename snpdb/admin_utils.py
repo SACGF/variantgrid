@@ -3,7 +3,6 @@ import inspect
 from typing import Optional, List
 
 from django.contrib import admin, messages
-from django.contrib.admin.widgets import ForeignKeyRawIdWidget
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse

@@ -15,7 +15,6 @@ from snpdb.models import GenomeBuild, ClinVarKey
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
 
 
-
 def mock_send_data(
         batch: ClinVarExportBatch,
         request_type: ClinVarExportRequestType,
