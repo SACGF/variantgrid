@@ -514,7 +514,6 @@ const Diff = (function() {
                         let keyDescription;
                         if (eKey.description) {
                             keyDescription = EKeys.fixDescription(eKey.description).prop('outerHTML').replaceAll("\n", "<br/>");
-                            console.log(keyDescription);
                         } else {
                             keyDescription = "";
                         }

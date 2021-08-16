@@ -460,7 +460,6 @@ EKeys.fixDescription = function(htmlText) {
     htmlText = replaceAll(htmlText, /<\/ul>\s+/gm, '</ul>');
     htmlText = replaceAll(htmlText, /^\s+$/gm, '');
     htmlText = replaceAll(htmlText, /[\n\r]{3,}/gm, '\n\n');
-    console.log(htmlText);
     let html = $('<span>', {html: htmlText});
     html.find('p').each(function() {
         let $this = $(this);
