@@ -654,13 +654,14 @@ table.as_table td {
 }
 
 ul.compact {
-  margin: 0;
+  margin: 4px 0 4px 0;
   padding-left: 10px;
-  line-height: 1.2;
+  line-height: 0.5rem;
 }
 ul.compact li {
   display: block;
   position: relative;
+  line-height: 1rem;
 }
 ul.compact li:before {
   color: #777;
@@ -675,6 +676,7 @@ ul.compact li:before {
   font-weight: 900;
   font-family: "Font Awesome 5 Free";
   content: "";
+  line-height: 0;
 }
 
 .threshold {

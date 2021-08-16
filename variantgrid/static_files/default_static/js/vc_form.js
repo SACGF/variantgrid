@@ -1362,21 +1362,19 @@ const VCForm = (function() {
                     ]);
                 }
             }
-            jHelp.css({'max-height': 494});
+            jHelp.css({'max-height': 660});
 
             if (this.helpOverflowAmount() > 0) {
                 $('<div>', {
                     style: 'position:absolute; bottom: 0px; right: 0px; padding: 4px; background-color: white; border-radius: 4px',
                     html: $('<a>', {text: 'Click for full content', class: 'hover-link'}).click(function(e) {
 
-                        let first = true;
                         function titledValue(title, value) {
-                            return $("<div>", {class: first ? 'mb-4' : 'my-4', html:[
+                            return $("<div>", {class: 'mb-4', html:[
                                 $("<label>", {"text": title, "style": "font-weight:600"}),
                                 $("<hr>", {"style": "margin-top:0.5rem;margin-bottom:0.5rem"}),
                                 $("<div>", {class:'text-body', html: value})
                             ]});
-                            first = false;
                         }
                         let helpHtml = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
                         let popupContent = $('<div>');
@@ -1393,7 +1391,7 @@ const VCForm = (function() {
                         }
                         let valueHtml;
                         if (value) {
-                            valueHtml = $("<div>", {style:'white-space:pre-wrap;word-break: break-word;', html: value});
+                            valueHtml = $("<div>", {style:'white-space:pre-wrap;word-break: break-word;', html: eKey.formatValue(value)});
                         } else {
                             valueHtml = $("<i>", {class:'no-value', text:"No Value"});
                         }

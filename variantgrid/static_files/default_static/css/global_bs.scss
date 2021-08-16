@@ -715,12 +715,13 @@ table.as_table {
 }
 
 ul.compact {
-  margin: 0;
+  margin: 4px 0 4px 0;
   padding-left: 10px;
-  line-height: 1.2;
+  line-height: 0.5rem;
   li {
     display: block;
     position: relative;
+    line-height: 1rem;
     &:before {
       color: #777;
       position: relative;
@@ -734,6 +735,7 @@ ul.compact {
       font-weight: 900;
       font-family: 'Font Awesome 5 Free';
       content: "\f111";
+      line-height: 0;
     }
   }
 }
