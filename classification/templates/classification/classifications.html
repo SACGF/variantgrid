@@ -143,7 +143,17 @@
 {% endblock %}
 {% block content %}
     <div class="container">
-        <h3>Classification Listing</h3>
+        {% if labs.count > 0 and can_create_classification %}
+            <form method="get" action="{% url 'search' %}">
+                <div class="card">
+                    <div class="card-header">Create Classification</div>
+                    <div class="card-body">
+                        {% crispy search_and_classify_form %}
+                    </div>
+                </div>
+            </form>
+        {% endif %}
+
         {% page_help_embedded title="Classification Listing" %}
             {% if labs.count > 0 and can_create_classification %}
             <p>
@@ -156,17 +166,6 @@
             You can import into REDCap using this  <a href="/classification/redcap_data_dictionary.csv">data definition</a>.<br/>
             Records will only be included in REDCap downloads if they have a value for <b>redcap_record_id</b>.
         {% end_page_help_embedded %}
-
-        {% if labs.count > 0 and can_create_classification %}
-        <form method="get" action="{% url 'search' %}">
-            <div class="card">
-                <div class="card-header">Create Classification</div>
-                <div class="card-body">
-                    {% crispy search_and_classify_form %}
-                </div>
-            </div>
-        </form>
-    {% endif %}
     </div>
     <div class="container-table">
         <div class="row filter-row">

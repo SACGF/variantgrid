@@ -7,6 +7,11 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
   margin-top: 28px;
 }
 
+.card-title h4 {
+  margin-bottom: 0;
+  font-size: 1.2rem;
+}
+
 .select2-selection.form-control {
   height: 33px !important;
   padding: 4px 0 0 0 !important;
