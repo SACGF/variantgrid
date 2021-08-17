@@ -61,6 +61,7 @@
 <script>$(document).ready(() => {
     var table = $('#{{ table_id }}').DataTable({
         order: [1, "asc"],
+        dom: '<"top"><"toolbar"<"custom">f>rt<"bottom"ilp><"clear">',
         "orderFixed": {
             post: [7, "desc"]
         },
