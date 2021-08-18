@@ -109,6 +109,12 @@ class UserForm(BaseModelForm):
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'email']
+        labels = {
+            "first_name": "First Name",
+            "last_name": "Last Name",
+            "email": "Email Address",
+            "user_name": "Username"
+        }
 
 
 class UserContactForm(BaseModelForm):
@@ -117,6 +123,9 @@ class UserContactForm(BaseModelForm):
         model = UserContact
         fields = ['phone_number']
         widgets = {'phone_number': TextInput()}
+        labels = {
+            "phone_number": "Phone Number"
+        }
 
 
 class LabForm(forms.ModelForm, ROFormMixin):
@@ -321,12 +330,23 @@ class SettingsOverrideForm(BaseModelForm):
                    'default_sort_by_column': autocomplete.ModelSelect2(url='custom_column_autocomplete',
                                                                        forward=['columns'],
                                                                        attrs={'data-placeholder': 'Column...'})}
+        labels = {
+            "email_weekly_updates" : "Email Regular Updates",
+            "email_discordance_updates": "Email Discordance Updates",
+            "variant_link_in_analysis_opens_new_tab": "Variant Link in Analysis Opens New Tab",
+            "tool_tips": "Tooltips",
+            "node_debug_tab": "Node Debug Tab",
+            "import_messages": "Import Messages",
+            "default_sort_by_column": "Default Sort by Column",
+            "igv_port": "IGV Port",
+            "default_genome_build": "Default Genome Build",
+            "default_lab": "Default Lab"
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['columns'].queryset = CustomColumnsCollection.filter_public()
         self.fields['default_genome_build'].queryset = GenomeBuild.builds_with_annotation()
-        self.fields['email_weekly_updates'].label = 'Email regular updates'
         self._hide_unused_fields()
 
     def _hide_unused_fields(self):

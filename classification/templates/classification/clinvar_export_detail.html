@@ -1,11 +1,11 @@
 {% load ui_utils %}
 {% load js_tags %}
 {% load classification_tags %}
-{% labelled label="Full detail" %}<a class="hover-link" href="{% url 'clinvar_export' clinvar_export.pk %}">View ClinVar Export ({{ clinvar_export.pk }})</a>{% endlabelled %}
-{% labelled label="Last evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
+{% labelled label="Full Detail" %}<a class="hover-link" href="{% url 'clinvar_export' clinvar_export.pk %}">View ClinVar Export ({{ clinvar_export.pk }})</a>{% endlabelled %}
+{% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
 {% with errors=clinvar_export.submission_body.all_messages.errors %}
     {% if errors %}
-        {% labelled label="Outstanding issues" %}
+        {% labelled label="Outstanding Issues" %}
             <ul class="compact">
             {% for error in errors %}
                 <li>{{ error.text }}</li>
@@ -19,6 +19,6 @@
         <a data-href="{% url 'clinvar_export_batch_detail' batch.pk %}" data-toggle="ajax-modal">ClinVar Submission Batch ({{ batch.pk }})</a> : {{ batch.get_status_display }} : {% timestamp batch.modified %}
     {% endif %}{% endlabelled %}
 {% endwith %}
-{% labelled label="Current classification candidate" %}<a class="hover-link" href="{% url 'view_classification' classification.id_str %}">{{ classification.classification.friendly_label }}</a> as of {% timestamp classification.created time_ago=True %}{% endlabelled %}
-{% labelled label="Clinical significance" %}{{ classification | ekey:'clinical_significance' }}{% endlabelled %}
-{% labelled label="Interpretation summary" %}<div style="white-space: pre-line">{{ interpretation_summary }}</div>{% endlabelled %}
+{% labelled label="Current Classification Candidate" %}<a class="hover-link" href="{% url 'view_classification' classification.id_str %}">{{ classification.classification.friendly_label }}</a> as of {% timestamp classification.created time_ago=True %}{% endlabelled %}
+{% labelled label="Clinical Significance" %}{{ classification | ekey:'clinical_significance' }}{% endlabelled %}
+{% labelled label="Interpretation Summary" %}<div style="white-space: pre-line">{{ interpretation_summary }}</div>{% endlabelled %}

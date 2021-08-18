@@ -120,6 +120,7 @@ class SettingsOverride(models.Model):
     """ We want UserSettings to cascade via Org -> Lab -> User
         Where the later levels override if they are non-null """
     objects = InheritanceManager()
+
     email_weekly_updates = models.BooleanField(null=True, blank=True)
     email_discordance_updates = models.BooleanField(null=True, blank=True)
     columns = models.ForeignKey(CustomColumnsCollection, on_delete=SET_NULL, null=True, blank=True)
@@ -128,7 +129,7 @@ class SettingsOverride(models.Model):
     tool_tips = models.BooleanField(null=True, blank=True)
     node_debug_tab = models.BooleanField(null=True, blank=True)
     import_messages = models.BooleanField(null=True, blank=True)  # Get a message once import is done
-    igv_port = models.IntegerField(null=True, blank=True)
+    igv_port = models.IntegerField("IGV Port", null=True, blank=True)
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE, null=True, blank=True)
 
 

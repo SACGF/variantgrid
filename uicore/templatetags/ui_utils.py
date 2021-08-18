@@ -302,7 +302,7 @@ def checked(test: bool) -> str:
 @register.filter()
 def boolean(test: bool) -> str:
     if test:
-        return SafeString('<i class="text-success far fa-check-square" style="margin-top:4px"></i>')
+        return SafeString('<i class="text-success fas fa-check-circle" style="margin-top:4px"></i>')
     else:
         return SafeString('<i class="text-secondary fas fa-times-circle" style="margin-top:4px"></i>')
 

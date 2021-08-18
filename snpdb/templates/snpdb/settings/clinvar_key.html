@@ -1,13 +1,13 @@
 {% load js_tags %}
 {% load ui_utils %}
 <h4>ClinVar Key</h4>
-{% labelled label="ClinVar key name" %}{{ clinvar_key.id }}{% endlabelled %}
-{% labelled label="On behalf of org ID" %}{{ clinvar_key.behalf_org_id }}{% endlabelled %}
+{% labelled label="ClinVar Key Name" %}{{ clinvar_key.id }}{% endlabelled %}
+{% labelled label="On Behalf of Org ID" %}{{ clinvar_key.behalf_org_id }}{% endlabelled %}
 {% labelled label="Configuration" %}<a href="#clinvar-key-config" class='toggle-link' data-toggle="collapse">Toggle Display</a>{% endlabelled %}
 <div id="clinvar-key-config" class="collapse">
-    {% labelled label="Used by labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
-    {% labelled label="ClinVar API key" %}{% if clinvar_key.api_key %}****{% else %}Submitting using {{ site_name }} key{% endif %}{% endlabelled %}
-    {% labelled label="Inject ACMG into description" %}{{ clinvar_key.inject_acmg_description | boolean }}{% endlabelled %}
-    {% labelled label="Default affected status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
-    {% labelled label="Assert method configuration" %}{% code_json clinvar_key.assertion_method_lookup %}</div>{% endlabelled %}
+    {% labelled label="Used by Labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
+    {% labelled label="ClinVar API Key" %}{% if clinvar_key.api_key %}****{% else %}Submitting using {{ site_name }} key{% endif %}{% endlabelled %}
+    {% labelled label="Inject ACMG into Description" %}{{ clinvar_key.inject_acmg_description | boolean }}{% endlabelled %}
+    {% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
+    {% labelled label="Assert Method Configuration" %}{% code_json clinvar_key.assertion_method_lookup %}</div>{% endlabelled %}
 </div>

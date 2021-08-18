@@ -17,13 +17,13 @@
     </p>
     <div class="form-group row">
         <div class="col-3"></div>
-        <div class="col-4 override-header override-value">Default value</div>
-        <div class="col-5 override-header">{{ override_level }} override</div>
+        <div class="col-4 override-header override-value"><label>Default Value</label></div>
+        <div class="col-5 override-header"><label>{{ override_level }} Override</label></div>
     </div>
 {% endif %}
 
 {% for field in form %}
-    <div class="form-group row user-overrides">
+    <div class="form-group row user-overrides" style="align-items: center">
         {{ field.errors }}
         <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0">{{ field.label_tag }}</label>
         <div class="col-6 col-md-4">
