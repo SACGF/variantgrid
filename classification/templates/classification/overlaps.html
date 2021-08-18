@@ -50,7 +50,7 @@
     {% page_help page_id='classification/overlaps_help' title='Classification Overlaps' %}
 
     <p>
-        <span class="text-info">Showing alleles with two or more classifications involving</span>
+        <span class="text-info">Showing alleles with two or more classifications involving :</span>
         {% if user.is_superuser %}Any Lab{% else %}
         {% for lab in labs %}<span class="comma-sep">{{ lab }}</span>{% endfor %}
         {% endif %}
