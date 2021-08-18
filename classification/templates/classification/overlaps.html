@@ -50,7 +50,7 @@
     {% page_help page_id='classification/overlaps_help' title='Classification Overlaps' %}
 
     <p>
-        Showing alleles with two or more classifications involving
+        <span class="text-info">Showing alleles with two or more classifications involving</span>
         {% if user.is_superuser %}Any Lab{% else %}
         {% for lab in labs %}<span class="comma-sep">{{ lab }}</span>{% endfor %}
         {% endif %}
@@ -83,7 +83,7 @@
 
     {% if overlaps %}
     <div class="mt-5">
-        <p>Note that records that are unshared or classified as Drug Response or Artefact are not used for calculations.</p>
+        <p class="text-info">Note that records that are unshared or classified as Drug Response or Artefact are not used for calculations.</p>
         <h5>Overlap Records</h5>
         <table class="table">
             <thead>

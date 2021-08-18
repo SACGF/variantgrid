@@ -460,13 +460,30 @@ def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
     return bs.get_text()
 
 
-def html_to_text(html: str) -> Optional[str]:
+def html_to_text(html: str, preserve_lines: bool = False) -> Optional[str]:
     if not html:
         return None
-    if html.startswith('http'):
-        html = f'<div>{html}</div>'
-    bs = BeautifulSoup(html, features="html.parser")
-    return bs.get_text()
+    bs = BeautifulSoup(f'<body>{html}</body>', features="html.parser")
+
+    if not preserve_lines:
+        return bs.get_text()
+    else:
+
+        def replace_with_newlines(element):
+            text = ''
+            for elem in element.recursiveChildGenerator():
+                if isinstance(elem, str):
+                    text += elem.strip() + " "
+                elif elem.name == 'br':
+                    text += '\n'
+            return text
+
+        def get_plain_text(soup):
+            plain_text = ''
+            lines = soup.find("body")
+            return replace_with_newlines(lines)
+
+        return get_plain_text(bs).strip()
 
 
 def timestamp_as_number_formatter(row: Dict, field: str):

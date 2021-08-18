@@ -2,6 +2,8 @@ from typing import Optional, List, Iterable
 
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel
@@ -14,7 +16,7 @@ from django.utils.timezone import now
 import copy
 
 
-CLINVAR_EXPORT_CONVERSION_VERSION = 2
+CLINVAR_EXPORT_CONVERSION_VERSION = 3
 
 
 class ClinVarAllele(TimeStampedModel):
@@ -144,6 +146,7 @@ class ClinVarExport(TimeStampedModel):
         """
         from classification.models.clinvar_export_convertor import ClinVarExportConverter
 
+        # TODO, maybe optimise this if nothing changes?
         current_validated_json_body: ValidatedJson = ClinVarExportConverter(clinvar_export_record=self).as_validated_json
         self.submission_body_validated = current_validated_json_body.serialize()
         lazy.invalidate(self, 'submission_body')
@@ -161,6 +164,12 @@ class ClinVarExport(TimeStampedModel):
                 status = ClinVarExportStatus.NEW_SUBMISSION
         self.status = status
         self.save()
+
+
+@receiver(post_save, sender=ClinVarKey)
+def updated_clinvar_key(sender, instance: ClinVarKey, **kwargs):
+    for export in ClinVarExport.objects.filter(clinvar_allele__clinvar_key=instance):
+        export.update()
 
 
 class ClinVarExportBatchStatus(models.TextChoices):

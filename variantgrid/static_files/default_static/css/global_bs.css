@@ -655,7 +655,7 @@ table.as_table td {
 
 ul.compact {
   margin: 4px 0 4px 0;
-  padding-left: 10px;
+  padding-left: 0;
   line-height: 0.5rem;
 }
 ul.compact li {

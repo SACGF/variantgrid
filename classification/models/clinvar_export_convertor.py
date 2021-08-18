@@ -4,7 +4,8 @@ import bs4
 from lazy import lazy
 
 from annotation.regexes import DbRegexes
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, EvidenceKeyValueType
+from library.utils import html_to_text
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types
@@ -135,12 +136,11 @@ class ClinVarExportConverter:
         return ClinVarEvidenceKey(evidence_key, value)
 
     def value(self, key: str) -> Any:
-        if value := self.classification_based_on.get(key):
-            if isinstance(value, str):
-                # FIXME, only do if key is multiline text
-                soup = bs4.BeautifulSoup(value, 'lxml')
-                return soup.text
-        return value
+        value = self.classification_based_on.get(key)
+        if isinstance(value, str) and EvidenceKeyMap.cached_key(key).value_type == EvidenceKeyValueType.TEXT_AREA:
+            return html_to_text(value, preserve_lines=True)
+        else:
+            return value
 
     @lazy
     def as_validated_json(self) -> ValidatedJson:
@@ -240,8 +240,19 @@ class ClinVarExportConverter:
                 return citation
             data["citation"] = [citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
+
+        comment_parts: List[str] = list()
+
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
-            data["comment"] = interpret
+            comment_parts.append(interpret)
+
+        if self.clinvar_key.inject_acmg_description and (acmg_summary := self.classification_based_on.criteria_strength_summary()):
+            comment_parts.append(acmg_summary)
+
+        comment_parts = filter(None, comment_parts)
+        if comment_parts:
+            data["comment"] = "\n\n".join(comment_parts)
+
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
             # FIXME also check validation date?
             data["dateLastEvaluated"] = date_last_evaluated
