@@ -49,7 +49,7 @@
                 <div id='edit-avatar'></div>
                 {% avatar user class='circular-avatar' %}<a class="hover-link" href="javascript:changeAvatar()"><br/>Change avatar</a>
             {% endlabelled %}
-            {% labelled id="user_name" label="User Name" %}{{ user.username }}{% endlabelled %}
+            {% labelled id="user_name" label="Username" %}{{ user.username }}{% endlabelled %}
             {% if use_oidc %}
                 {% labelled id="first_name" label="First Name" %}{{ user.first_name }}{% endlabelled %}
                 {% labelled id="last_name" label="Last Name" %}{{ user.last_name }}{% endlabelled %}

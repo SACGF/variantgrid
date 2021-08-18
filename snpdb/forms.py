@@ -146,6 +146,13 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "email": EmailInput(),
             "slack_webhook": URLInput()
         }
+        labels = {
+            "url": "URL",
+            "clinvar_key": "ClinVar Key",
+            "group_name": "Group Name",
+            "upload_location": "Upload Location",
+            "slack_webhook": "Slack Webhook"
+        }
         help_texts = {
             "email": "Lab wide email for discordance and general communications.",
             "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",

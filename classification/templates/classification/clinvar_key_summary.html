@@ -138,7 +138,7 @@
             <p>Data is sent to ClinVar in batches, these just show you the technical detail data that was sent to ClinVar if required for review.</p>
         {% end_page_help_embedded %}
         {% if missing_condition_count %}
-            {% labelled label="Classifications w/out standard condition" %}
+            {% labelled label="Classifications w/out Standard Condition" %}
                 <a href="{% url 'condition_matchings' %}" title="Only classifications with standard conditions can be submitted to ClinVar">
                     {{ 'warning' | severity_icon }}
                     {{ missing_condition_count }}</a>
