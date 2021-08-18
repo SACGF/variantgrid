@@ -74,14 +74,15 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
     return {f"{region}_summary": interesting_summary(qs, **kwargs) for region, qs in nearby_qs.items()}
 
 
-def interesting_summary(qs, user, genome_build, total=True, clinvar=True, clinical_significance=False):
+def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classifications=True, clinical_significance=False):
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
     # print(counts)
     summary = None
     if num_variants := counts['total']:
-        classification_types = {
-            "Classifications": "classification",
-        }
+        classification_types = dict()
+        if classifications:
+            classification_types["Classifications"] = "classification"
+
         if clinvar:
             classification_types["ClinVar"] = "clinvar"
 
