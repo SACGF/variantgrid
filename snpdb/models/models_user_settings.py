@@ -129,7 +129,7 @@ class SettingsOverride(models.Model):
     tool_tips = models.BooleanField(null=True, blank=True)
     node_debug_tab = models.BooleanField(null=True, blank=True)
     import_messages = models.BooleanField(null=True, blank=True)  # Get a message once import is done
-    igv_port = models.IntegerField("IGV Port", null=True, blank=True)
+    igv_port = models.IntegerField(null=True, blank=True)
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE, null=True, blank=True)
 
 
