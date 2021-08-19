@@ -106,6 +106,14 @@ td.dt-preview {
 
 // when we expand on that preview to show more details
 table.dataTable {
+    tr.odd, tr.even {
+        &:hover {
+            background-color: #f8f8f8;
+            .toggle-link:before {
+                opacity: 1;
+            }
+        }
+    }
     .dt-detail {
         font-size: 12px;
         white-space: pre-wrap;

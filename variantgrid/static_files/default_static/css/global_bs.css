@@ -84,6 +84,12 @@ td.dt-preview:hover {
   text-decoration-color: gray;
 }
 
+table.dataTable tr.odd:hover, table.dataTable tr.even:hover {
+  background-color: #f8f8f8;
+}
+table.dataTable tr.odd:hover .toggle-link:before, table.dataTable tr.even:hover .toggle-link:before {
+  opacity: 1;
+}
 table.dataTable .dt-detail {
   font-size: 12px;
   white-space: pre-wrap;
