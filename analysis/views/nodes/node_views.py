@@ -30,7 +30,7 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
 from snpdb.models.models_variant import Variant
@@ -259,7 +259,7 @@ class TagNodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["datatable_config"] = ClassificationDatatableConfig(self.request)
+        context["datatable_config"] = ClassificationColumns(self.request)
         context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(tag=settings.TAG_REQUIRES_CLASSIFICATION)
         return context
 

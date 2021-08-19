@@ -21,7 +21,7 @@ ALLELE_SOMATIC_VALUES = ['somatic', 'likely_somatic']
 ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 
-class ClassificationDatatableConfig(DatatableConfig):
+class ClassificationColumns(DatatableConfig):
 
     def render_c_hgvs(self, row: Dict[str, Any]):
         values = []
@@ -135,6 +135,7 @@ class ClassificationDatatableConfig(DatatableConfig):
                 name='clinical_significance',
                 label='Clinical Significance',
                 client_renderer='VCTable.clinical_significance',
+                client_renderer_td='VCTable.clinical_significance_td',
                 sort_keys=['clinical_significance', 'clin_sig_sort'],
                 orderable=True
             ),

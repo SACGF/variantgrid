@@ -48,6 +48,7 @@ class RichColumn:
                  renderer: Optional[Callable[[Dict[str, Any]], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
                  client_renderer: Optional[str] = None,
+                 client_renderer_td: Optional[str] = None,
                  visible: bool = True,
                  detail: bool = False,
                  css_class: str = None,
@@ -63,6 +64,7 @@ class RichColumn:
         :param renderer: Optional server renderer for the value
         :param default_sort: If this column should be the default sort order, provide ascending or descending here
         :param client_renderer: JavaScript function to render the client
+        :param client_renderer_td: JavaScript function that maps to DataTables createdCell https://datatables.net/reference/option/columns.createdCell
         :param visible: If false column would be hidden (useful for sending data we don't want to display)
         :param detail: If True, the column will be shown in the expand section of the table only (requires responsive)
         :param css_class: css class to apply to the column
@@ -95,6 +97,7 @@ class RichColumn:
         self.orderable = orderable
         self.renderer = renderer
         self.client_renderer = client_renderer
+        self.client_renderer_td = client_renderer_td
         self.default_sort = default_sort
         self.enabled = enabled
         self.detail = detail

@@ -2117,10 +2117,13 @@ VCTable.clinical_significance = (data, type, row) => {
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
     let label = csKey.prettyValue(data);
     if (data && data.length) {
-        return $('<span>', {class:`cs cs-${data.toLowerCase()}`, text:label.val}).prop('outerHTML') //`<span class="cs cs-${data}">${label}</span>`;
+        return label.val;
     } else {
         return $('<span>', {class: 'no-value', text: '-'}).prop('outerHTML');
     }
+};
+VCTable.clinical_significance_td = ( cell, cellData, rowData, rowIndex, colIndex ) => {
+    $(cell).addClass(`text-center cs cs-${(cellData || '').toLowerCase()}`);
 };
 VCTable.evidence_key = (key_name, data, type, row) => {
     let csKey = EKeys.cachedKeys.key(key_name);

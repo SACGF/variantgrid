@@ -70,7 +70,7 @@ from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
 from upload.uploaded_file_type import retry_upload_pipeline
 from classification.classification_stats import get_grouped_classification_counts
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 
 
 @terms_required
@@ -351,7 +351,7 @@ def sample_variants_gene_detail(request, sample_id, gene_symbol):
     context = {'sample': sample,
                'sample_ids': [sample.pk],
                'gene_symbol': gene_symbol,
-               "datatable_config": ClassificationDatatableConfig(request)}
+               "datatable_config": ClassificationColumns(request)}
     return render(request, 'snpdb/data/sample_variants_gene_detail.html', context)
 
 

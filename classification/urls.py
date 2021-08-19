@@ -12,7 +12,7 @@ from classification.views.discordance_report_views import discordance_report_vie
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns
 from classification.views.classification_dashboard_view import problem_download
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
@@ -119,7 +119,7 @@ rest_urlpatterns = [
     perm_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
     perm_path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
-    perm_path('api/classifications/datatables/', DatabasetableView.as_view(column_class=ClassificationDatatableConfig), name='classification_datatables'),
+    perm_path('api/classifications/datatables/', DatabasetableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
 
     perm_path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
               name='lab_gene_classification_counts_api'),

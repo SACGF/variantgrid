@@ -56,11 +56,11 @@ def view_hgvs_issues(request: HttpRequest) -> Response:
             "matching_variant_transcript": matching_variant_transcript.count()
         }
     }
-    from classification.views.classification_datatables import ClassificationDatatableConfig
+    from classification.views.classification_datatables import ClassificationColumns
     context = {
         "counts": issue_counts,
         "allele_columns": AlleleColumns(request),
-        "classification_columns": ClassificationDatatableConfig(request)
+        "classification_columns": ClassificationColumns(request)
     }
 
     return render(request, "classification/hgvs_issues.html", context)

@@ -37,6 +37,7 @@ $(document).ready(function() {
         columnDefs: [{% for rc in rich_columns %}
             {
             {% if rc.client_renderer %}render: {{rc.client_renderer | safe }}, {% endif %}
+            {% if rc.client_renderer_td %}createdCell: {{ rc.client_renderer_td | safe }}, {% endif %}
             data: '{{ rc.name }}',
             orderable: {% if rc.orderable %}true{%else%}false{%endif%},
             className: '{{ rc.css_classes }}{% if forloop.first and expand_client_renderer %} toggle-link{% endif %}',

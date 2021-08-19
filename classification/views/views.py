@@ -55,7 +55,7 @@ from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification import ClassificationModification
 from classification.classification_changes import ClassificationChanges
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_redcap import ExportFormatterRedcap
 from variantopedia.forms import SearchAndClassifyForm
@@ -108,7 +108,7 @@ def classifications(request):
         "VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
         "VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
         "VARIANT_CLASSIFICATION_ID_FILTER": settings.VARIANT_CLASSIFICATION_ID_FILTER,
-        "datatable_config": ClassificationDatatableConfig(request),
+        "datatable_config": ClassificationColumns(request),
         "user_settings": user_settings,
     }
     return render(request, 'classification/classifications.html', context)
@@ -379,7 +379,7 @@ def classification_qs(request):
     if extra_filters:
         extra_filters = json.loads(extra_filters)
 
-    config = ClassificationDatatableConfig(request)
+    config = ClassificationColumns(request)
     qs = ClassificationModification.latest_for_user(user=request.user, published=True)
     qs = config.filter_queryset(qs)
     # TODO sort
