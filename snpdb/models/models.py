@@ -258,7 +258,12 @@ class ClinVarKey(TimeStampedModel):
         """
         if user.is_superuser:
             return ClinVarKey.objects.all().order_by('pk')
-        return ClinVarKey.objects.filter(pk__in=Lab.valid_labs_qs(user).filter(clinvar_key__isnull=False).select_related('clinvar_key')).order_by('pk')
+
+        labs = Lab.valid_labs_qs(user).filter(clinvar_key__isnull=False)
+        if labs:
+            return ClinVarKey.objects.filter(pk__in=labs.values_list('clinvar_key', flat=True)).order_by('pk')
+        else:
+            return ClinVarKey.objects.none()
 
     def check_user_can_access(self, user: User) -> None:
         """

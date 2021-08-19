@@ -212,8 +212,11 @@ def clinvar_export_batch_download(request, pk):
 def clinvar_export_summary(request, pk: Optional[str] = None):
     clinvar_key: ClinVarKey
     if not pk:
-        clinvar_key = ClinVarKey.clinvar_keys_for_user(request.user).first()
-        return redirect(reverse('clinvar_key_summary', kwargs={'pk': clinvar_key.pk}))
+        if clinvar_key := ClinVarKey.clinvar_keys_for_user(request.user).first():
+            return redirect(reverse('clinvar_key_summary', kwargs={'pk': clinvar_key.pk}))
+        else:
+            # page has special support if no clinvar key is available to the user
+            return render(request, 'classification/clinvar_key_summary_none.html')
 
     clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
     clinvar_key.check_user_can_access(request.user)

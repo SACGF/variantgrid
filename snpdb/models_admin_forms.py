@@ -20,7 +20,7 @@ def make_code_friendly(text: str) -> str:
 
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'external', 'classification_config')
+    list_display = ('name', 'group_name', 'organization', 'external', 'clinvar_key', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
@@ -28,6 +28,12 @@ class LabAdmin(ModelAdminBasics):
         ('Style', {'fields': ('url', 'css_class')}),
         ('Submissions', {'fields': ('classification_config', 'upload_location', 'external', 'clinvar_key')})
     )
+
+    def is_readonly_field(self, f) -> bool:
+        if f.name == 'clinvar_key':
+            return False
+        return super().is_readonly_field(f)
+
 
     def get_form(self, request, obj=None, **kwargs):
 
