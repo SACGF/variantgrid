@@ -150,6 +150,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "url": "URL",
             "clinvar_key": "ClinVar Key",
             "group_name": "Group Name",
+            "organization": "Organisation",  # really need to do translations, even if just en-US vs en-UK
             "upload_location": "Upload Location",
             "slack_webhook": "Slack Webhook"
         }
