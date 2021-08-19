@@ -24,9 +24,13 @@ nav.navbar a.nav-link.active {
   height: 35px;
 }
 
+body {
+  overflow-y: hidden;
+}
+
 .main-content {
   padding-bottom: 60px;
-  overflow: scroll;
+  overflow: auto;
   max-width: calc(100vw);
 }
 
@@ -64,7 +68,7 @@ nav.navbar a.nav-link.active {
   .main-content {
     padding-top: 80px;
     margin-left: 170px;
-    overflow: scroll;
+    overflow: auto;
     max-width: calc(100vw);
     height: calc(100vh);
   }
