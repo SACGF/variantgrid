@@ -279,7 +279,10 @@
                     }
                     if (relationship.relation === "panelappau") {
                         let extra = relationship.extra || {};
-                        let tooltip = `Phenotype: ${extra.phenotype_row}<br/>Evidence: ${extra.evidence ? extra.evidence.join(',') : ''}<br/>Via related term: ${relationship.via}`;
+                        let tooltip = `Phenotype: ${extra.phenotype_row}<br/>Evidence: ${extra.evidence ? extra.evidence.join(',') : ''}`;
+                        if (relationship.via) {
+                            tooltip += `<br/>Via related term: ${relationship.via}`;
+                        }
                         html.push( $('<span>', {class: 'text-muted', text: 'PanelApp AU', 'data-toggle':'popover', 'title': 'Gene Relationship', 'data-content': tooltip}) );
                     } else if (relationship.source == "gencc_file") {
                         let extra = relationship.extra || {};

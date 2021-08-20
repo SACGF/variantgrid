@@ -9,7 +9,7 @@ from lazy import lazy
 from annotation.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
-from ontology.models import OntologyTerm, OntologyService, OntologySnake
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
 
 
 class OntologySnakeJson(TypedDict):
@@ -67,6 +67,8 @@ class OntologyMatch:
         )
 
     def as_json(self) -> Dict:
+
+
         data = {
             "id": self.term.id,
             "url": reverse("ontology_term", kwargs={"term": self.term.url_safe_id}),
@@ -247,7 +249,13 @@ class OntologyMatching:
                 return
 
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
+            had_panel_app = False
             for snake in snakes:
+                if snake.show_steps()[0].relation.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
+                    if had_panel_app:
+                        continue
+                    had_panel_app = True
+
                 mondo_term = snake.leaf_term
                 mondo_meta = self.find_or_create(mondo_term.id)
                 mondo_meta.gene_relationships.append(snake)  # assign the snake to the term
