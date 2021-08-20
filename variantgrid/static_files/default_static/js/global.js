@@ -152,7 +152,7 @@ function enhanceAndMonitor() {
                 }
                 if (!node.hasClass('external-link')) {
                     // putting external icon next to images breaks a few layouts
-                    if (!node.children('<div>') && !node.children('<img>')) {
+                    if (node.find('div').length === 0 && node.find('img').length === 0) {
                         node.addClass('external-link');
                     }
                 }
