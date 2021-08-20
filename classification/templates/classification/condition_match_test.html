@@ -60,7 +60,7 @@
         <form method="GET">
             {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
             {% labelled label="Gene Symbol" %}<input class="form-control" style="max-width:300px" name="gene_symbol" value="{{ gene_symbol | default_if_none:'' }}" />
-                <span class="text-muted">(optional)</span>
+                {% field_help %}(optional){% end_field_help %}
             {% endlabelled %}
             <button class="btn btn-primary">Search</button>
         </form>

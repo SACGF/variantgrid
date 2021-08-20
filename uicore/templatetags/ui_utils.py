@@ -111,6 +111,23 @@ class InstallInstructionsTag(template.Node):
         """
 
 
+@register.tag(name='field_help')
+def field_help(parser, token):
+    tag_name, args, kwargs = parse_tag(token, parser)
+    nodelist = parser.parse(('end_field_help',))
+    parser.delete_first_token()
+    return FieldHelpTag(nodelist)
+
+
+class FieldHelpTag(template.Node):
+    def __init__(self, nodelist):
+        self.nodelist = nodelist
+
+    def render(self, context):
+        output = self.nodelist.render(context)
+        return f'<div class="form-text text-muted">{output}</div>'
+
+
 @register.tag(name='labelled')
 def render_labelled(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)

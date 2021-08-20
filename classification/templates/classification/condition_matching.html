@@ -184,7 +184,16 @@
         function renderOntologies(ontos) {
             let tbody = $('#mp-results tbody');
             tbody.empty();
-            for (let onto of ontos) {
+
+            let errors = ontos.errors;
+            for (let error of errors) {
+                tbody.append($('<tr>', {html:
+                        $('<td>', {'colspan': 4, html: [severityIcon('error'), $('<span>', {text:error})]})
+                }));
+            }
+
+            let terms = ontos.terms;
+            for (let onto of terms) {
                 ontologyTr(onto).appendTo(tbody);
             }
         }
@@ -224,12 +233,10 @@
                 error: (call, status, text) => {
                     resultsDom.LoadingOverlay('hide');
                     resultsDom.find('tbody').empty().append($('<tr>', {html:
-                            $('<td>', {'col-span': 4, text: 'Error retrieving mondo terms'})
+                            $('<td>', {'colspan': 4,  html: [severityIcon('critical'), $('<span>', {text:"Error retrieving MONDO suggestions."})]})
                     }));
                     console.log(status);
                     console.log(text);
-                    // $('<div/>', {class:'no-value w-100 text-center', text:'Error Retrieving'}).appendTo(resultsDom);
-                    // FIXME show errors
                 },
                 success: async (results) => {
                     resultsDom.LoadingOverlay('hide');
@@ -462,7 +469,7 @@
                     'Content-Type': 'application/json'
                 },
                 data: JSON.stringify({"changes": changes}),
-                url: '{% url 'condition_text_matching_api' condition_text.pk %}', // FIXME generate the URLS
+                url: '{% url 'condition_text_matching_api' condition_text.pk %}',
                 type: 'POST',
                 error: (call, status, text) => {
                     $('#condition-list').LoadingOverlay('hide');
@@ -484,7 +491,7 @@
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
-                url: '{% url 'condition_text_matching_api' condition_text.pk %}', // FIXME generate the URLS
+                url: '{% url 'condition_text_matching_api' condition_text.pk %}',
                 type: 'GET',
                 error: (call, status, text) => {
                     $('#condition-list').LoadingOverlay('hide');
@@ -646,7 +653,10 @@
                 <div class="modal-body">
                     <input id="mp-id" type="hidden" />
 
-                    {% labelled label="Selected Terms" %}<input class="form-control" id="mp-selected" style="border-color:#444466"/>{% endlabelled %}
+                    {% labelled label="Selected Terms" %}
+                        <input class="form-control" id="mp-selected" style="border-color:#444466"/>
+                        {% field_help %}Standard ontology terms to match to e.g. "MONDO:0000555"{% end_field_help %}
+                    {% endlabelled %}
                     {% labelled label="Multi-Mode" %}
                         <div id="mp-multimode" class="collapse">
                             <div class="btn-group btn-group-toggle" data-toggle="buttons">
@@ -668,7 +678,6 @@
                             <span class="input-group-append"><button id="mp-search-button" class="btn btn-outline-primary" name="action">Search</button></span>
                         </div>
                     {% endlabelled %}
-
 
                     <label>Select Relevant Ontology Terms Below</label>
                     <table class="table" id="mp-results">

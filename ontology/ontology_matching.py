@@ -217,6 +217,7 @@ class OntologyMatching:
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
         self.term_map: Dict[str, OntologyMatch] = dict()
+        self.errors: List[str] = list()
         self.search_text: Optional[SearchText] = None
         self.sub_type = None
         if search_term:
@@ -230,6 +231,9 @@ class OntologyMatching:
             self.term_map[term_id] = mondo
 
         return mondo
+
+    def add_error(self, error:str):
+        self.errors.append(error)
 
     def populate_relationships(self):
         """
@@ -262,7 +266,7 @@ class OntologyMatching:
         return iter(values)
 
     def as_json(self) -> Any:
-        return [value.as_json() for value in self]
+        return {"errors": self.errors, "terms": [value.as_json() for value in self]}
 
     @staticmethod
     def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None) -> 'OntologyMatching':
@@ -272,7 +276,10 @@ class OntologyMatching:
 
         if selected:
             for select in selected:
-                ontology_matches.select_term(select)
+                try:
+                    ontology_matches.select_term(select)
+                except ValueError:
+                    ontology_matches.add_error(f"\"{select}\" is not a valid ontology term.")
 
         if search_text:
             # WARNING, this code is duplicated in condition_text_matching.embedded_ids_check
