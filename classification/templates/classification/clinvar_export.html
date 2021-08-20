@@ -31,14 +31,17 @@
                     {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
                     {% labelled label="c.hgvs" %}{% c_hgvs clinvar_export.classification_based_on %}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
-                    {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
-                    {% labelled label="Current Candidate Classification" %}
+                    {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}
+                    {% field_help %}{{ site_name }} updated this export using the data available at this time.{% end_field_help %}
+                    {% endlabelled %}
+                    {% labelled label="Current Classification Candidate" %}
                         {% if clinvar_export.classification_based_on %}
                         <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
                             {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
                         {% else %}
                         <div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>
                         {% endif %}
+                        {% field_help %}The classification and the modified date that will be exported for this allele/condition combination.{% end_field_help %}
                     {% endlabelled %}
 
                     {% labelled label="Sync Status" %}

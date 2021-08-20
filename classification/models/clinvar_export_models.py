@@ -126,13 +126,14 @@ class ClinVarExport(TimeStampedModel):
         """
         Returns the data that should be directly copied into a ClinVarBatch
         """
-        content = copy.deepcopy(self.submission_body)
+        content: ValidatedJson = copy.deepcopy(self.submission_body)
         # ValidatedJson is meant to be immutable, but will make an exception here
-        if scv := self.scv:
-            content["recordStatus"] = "update"
-            content["clinvarAccession"] = scv
-        else:
-            content["recordStatus"] = "novel"
+        if content.json_data:
+            if scv := self.scv:
+                content["recordStatus"] = "update"
+                content["clinvarAccession"] = scv
+            else:
+                content["recordStatus"] = "novel"
         return content
 
     @property

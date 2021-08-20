@@ -758,6 +758,9 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
     }
 };
 TableFormat.hgvs = function(data, type, columns) {
+    if (!data) {
+        return "?";
+    }
     let genomeBuild = data.genomeBuild;
     let transcript = data.transcript;
     let geneSymbol = data.geneSymbol;

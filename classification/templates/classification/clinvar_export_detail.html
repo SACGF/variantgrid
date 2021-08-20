@@ -19,6 +19,10 @@
         <a data-href="{% url 'clinvar_export_batch_detail' batch.pk %}" data-toggle="ajax-modal">ClinVar Submission Batch ({{ batch.pk }})</a> : {{ batch.get_status_display }} : {% timestamp batch.modified %}
     {% endif %}{% endlabelled %}
 {% endwith %}
-{% labelled label="Current Classification Candidate" %}<a class="hover-link" href="{% url 'view_classification' classification.id_str %}">{{ classification.classification.friendly_label }}</a> as of {% timestamp classification.created time_ago=True %}{% endlabelled %}
+{% labelled label="Current Classification Candidate" %}
+    {% if classification %}
+    <a class="hover-link" href="{% url 'view_classification' classification.id_str %}">{{ classification.classification.friendly_label }}</a> as of {% timestamp classification.created time_ago=True %}
+    {% endif %}
+{% endlabelled %}
 {% labelled label="Clinical Significance" %}{{ classification | ekey:'clinical_significance' }}{% endlabelled %}
 {% labelled label="Interpretation Summary" %}<div style="white-space: pre-line">{{ interpretation_summary }}</div>{% endlabelled %}
