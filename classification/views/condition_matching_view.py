@@ -1,5 +1,5 @@
 import re
-from typing import Optional
+from typing import Optional, List
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -12,7 +12,8 @@ from rest_framework.views import APIView
 from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition, \
     ConditionMatchingSuggestion, condition_matching_suggestions
 from library.utils import empty_to_none
-from ontology.ontology_matching import normalize_condition_text
+from ontology.models import OntologyTerm
+from ontology.ontology_matching import normalize_condition_text, OntologyMatch
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
@@ -98,31 +99,43 @@ class ConditionTextMatchingAPI(APIView):
 
         data = request.data.get("changes")
         ctm: Optional[ConditionTextMatch] = None
+        errors: List[str] = list()
         for update in data:
             terms = update.get('terms')
+            valid_terms: List[str] = list()
             if terms:
                 terms = [term.strip() for term in terms]
-                terms = [term for term in terms if term]
+                for term in terms:
+                    if term:
+                        try:
+                            om = OntologyTerm.get_or_stub(term)
+                            valid_terms.append(om.id)
+                        except ValueError:
+                            errors.append(f'"{term}" is not a valid ontology term.')
 
+        if not errors and valid_terms:
             ctm = ct.conditiontextmatch_set.get(pk=update.get('ctm_id'))
-            ctm.condition_xrefs = terms
+            ctm.condition_xrefs = valid_terms
             ctm.condition_multi_operation = MultiCondition(update.get('joiner') or MultiCondition.NOT_DECIDED)
             ctm.last_edited_by = request.user
             ctm.save()
-        update_condition_text_match_counts(ct)
-        ct.save()
+
+            update_condition_text_match_counts(ct)
+            ct.save()
 
         if len(data) == 1 and ctm and not ctm.is_root and not (ctm.is_gene_level and not ctm.condition_xrefs):
             # if we only have 1 suggestion, and it's not the root, and isn't a blanked out record with empty conditions
             cms = ConditionMatchingSuggestion(ctm)
             cms.validate()
             return Response({
+                "errors": errors,
                 "suggestions": [cms.as_json()],
                 "count_outstanding": ct.classifications_count_outstanding
             })
         else:
             suggestions = condition_matching_suggestions(ct)
             return Response({
+                "errors": errors,
                 "suggestions": [cms.as_json() for cms in suggestions],
                 "count_outstanding": ct.classifications_count_outstanding
             })

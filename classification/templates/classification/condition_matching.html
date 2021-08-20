@@ -137,7 +137,11 @@
         }
 
         function idSafe(id) {
-            return id.replace(":", "-");
+            idStr = id.replaceAll(/\W/g,"-")
+            if (idStr.length == 0 || idStr.match(/^[\W].*$/)) {
+                idStr = "x" + idStr;
+            }
+            return idStr;
         }
 
         function ontologyTr(onto) {
@@ -522,6 +526,11 @@
         }
 
         function applySuggestionUpdates(results, complete) {
+            let errors = results.errors;
+            if (errors && errors.length) {
+                window.alert(errors.join("\n") + "\n- rejecting change.")
+            }
+
             let suggestions = results.suggestions;
             $("#count_outstanding").text(results.count_outstanding);
             if (results.count_outstanding == 0) {
@@ -655,7 +664,7 @@
 
                     {% labelled label="Selected Terms" %}
                         <input class="form-control" id="mp-selected" style="border-color:#444466"/>
-                        {% field_help %}Standard ontology terms to match to e.g. "MONDO:0000555"{% end_field_help %}
+                        {% field_help %}Standard ontology terms to match, comma separated if multiple to e.g. "MONDO:0000444, MONDO:0000555"{% end_field_help %}
                     {% endlabelled %}
                     {% labelled label="Multi-Mode" %}
                         <div id="mp-multimode" class="collapse">
@@ -752,7 +761,7 @@
                         <div class="col-3"><b>Group</b></div>
                         <div class="col-4"><b>Selected Terms</b></div>
                         <div class="col-1 text-center" style="border-right:1px dashed #ccc"><b>Edit</b></div>
-                        <div class="col-4"><b>Quick Suggestions</b></div>
+                        <div class="col-4"><b class="text-muted">Quick Suggestions</b></div>
                     </div>
                 </li>
                 {% condition_match condition_match %}
