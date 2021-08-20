@@ -34,14 +34,14 @@
                     {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}
                     {% field_help %}{{ site_name }} updated this export using the data available at this time.{% end_field_help %}
                     {% endlabelled %}
-                    {% labelled label="Current Classification Candidate" %}
+                    {% labelled label="Source Classification" %}
                         {% if clinvar_export.classification_based_on %}
-                        <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
-                            {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
+                            <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
+                                {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
+                            {% field_help %}The classification that will be exported for this allele/condition combination.{% end_field_help %}
                         {% else %}
-                        <div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>
+                            <div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>
                         {% endif %}
-                        {% field_help %}The classification and the modified date that will be exported for this allele/condition combination.{% end_field_help %}
                     {% endlabelled %}
 
                     {% labelled label="Sync Status" %}
@@ -70,6 +70,12 @@
         {% ui_register_tab_embedded label="Export Preview" tab_set="clinvar_tabs" %}
             <p class="text-info">This is the representation data that will be submitted to ClinVar (validation messages wont be sent).</p>
             {% code_json clinvar_export.submission_full.serialize %}
+            {% with diffs=clinvar_export.differences_since_last_submission %}
+                {% if diffs %}
+                    <h4>Differences Since Last Submission</h4>
+                    {% code_json diffs %}
+                {% endif %}
+            {% endwith %}
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab label="Submission History" tab_set="clinvar_tabs" url="clinvar_export_history" param=clinvar_export.pk %}

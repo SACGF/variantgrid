@@ -8,6 +8,7 @@ from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 
+from uicore.json.json_utils import JsonDiff, JsonDiffs
 from uicore.json.validated_json import ValidatedJson
 from uicore.json.json_types import JsonObjType
 from classification.models import ClassificationModification, ConditionResolved
@@ -139,6 +140,11 @@ class ClinVarExport(TimeStampedModel):
     @property
     def previous_submission(self) -> Optional['ClinVarExportSubmission']:
         return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportBatchStatus.REJECTED).order_by('-created').first()
+
+    def differences_since_last_submission(self) -> Optional[JsonObjType]:
+        if previous := self.previous_submission:
+            return JsonDiffs.differences(self.submission_body.pure_json(), previous.submission_body).to_json("previous", "current")
+        return None
 
     def update(self):
         """

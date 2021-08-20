@@ -8,7 +8,7 @@
             <div class="card-body">
                 {% labelled label="Created" %}{% timestamp history_entry.created time_ago=True %}{% endlabelled %}
                 {% labelled label="Status" %}{{ history_entry.get_status_display }}{% endlabelled %}
-                {% labelled label="Classification" %}
+                {% labelled label="Source Classification" %}
                     <a href="{% url 'view_classification' history_entry.classification_based_on.id_str %}" target="_blank">
                         {{ history_entry.classification_based_on.classification.friendly_label }}</a>
                         as of {% timestamp history_entry.classification_based_on.created time_ago=True %}

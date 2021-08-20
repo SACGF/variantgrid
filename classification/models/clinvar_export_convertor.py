@@ -244,12 +244,11 @@ class ClinVarExportConverter:
         comment_parts: List[str] = list()
 
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
-            comment_parts.append(interpret)
+            comment_parts.append(interpret.strip())
 
         if self.clinvar_key.inject_acmg_description and (acmg_summary := self.classification_based_on.criteria_strength_summary()):
             comment_parts.append(acmg_summary)
 
-        comment_parts = filter(None, comment_parts)
         if comment_parts:
             data["comment"] = "\n\n".join(comment_parts)
 

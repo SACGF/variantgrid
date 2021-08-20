@@ -476,7 +476,7 @@ def html_to_text(html: str, preserve_lines: bool = False) -> Optional[str]:
                     text += elem.strip() + " "
                 elif elem.name == 'br':
                     text += '\n'
-            return text
+            return text.strip()
 
         def get_plain_text(soup):
             plain_text = ''
