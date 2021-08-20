@@ -119,12 +119,14 @@ class JsonDiffs:
                     JsonDiffs._differences(obj1.get(key), obj2.get(key), path + [JsonPathKey(key)], diffs)
                 return
             if isinstance(obj1, list):
-                if len(obj1) != len(obj2):
-                    diffs.append(JsonDiff(json_path=path + JsonPathKey("length"), a=len(obj1), b=len(obj2)))
+                # if len(obj1) != len(obj2):
+                #    diffs.append(JsonDiff(json_path=path + [JsonPathKey("length")], a=len(obj1), b=len(obj2)))
 
                 max_length = max(len(obj1), len(obj2))
-                for index in range(0, len(obj1)):
-                    JsonDiffs._differences(obj1[index], obj2[index], path + [JsonPathIndex(index)], diffs)
+                for index in range(0, max_length):
+                    obj1_index = obj1[index] if len(obj1) > index else None
+                    obj2_index = obj2[index] if len(obj2) > index else None
+                    JsonDiffs._differences(obj1_index, obj2_index, path + [JsonPathIndex(index)], diffs)
                 return
 
         diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))

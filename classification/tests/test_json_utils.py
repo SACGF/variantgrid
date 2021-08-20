@@ -40,3 +40,9 @@ class JsonUtilTests(TestCase):
         self.assertEqual(diffs[2].json_path_str, '["b"]["d"]')
         self.assertEqual(diffs[2].a, None)
         self.assertEqual(diffs[2].b, True)
+
+        diffs = JsonDiffs.differences(
+            ["A", "b"],
+            ["a", "b", "c"]
+        ).json_diffs
+        print(diffs)
