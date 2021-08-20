@@ -143,7 +143,7 @@ class ClinVarExport(TimeStampedModel):
 
     def differences_since_last_submission(self) -> Optional[JsonObjType]:
         if previous := self.previous_submission:
-            return JsonDiffs.differences(self.submission_body.pure_json(), previous.submission_body).to_json("previous", "current")
+            return JsonDiffs.differences(previous.submission_body, self.submission_body.pure_json()).to_json("previous", "current")
         return None
 
     def update(self):
