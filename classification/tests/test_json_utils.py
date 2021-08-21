@@ -21,11 +21,10 @@ class JsonUtilTests(TestCase):
 
         self.assertEqual(original.pure_json(), {"normal": 3, "validated": [1, 2]})
 
-
     def test_json_diff(self):
         diffs = JsonDiffs.differences(
-            {"a": 3, "b": {"c": False}, 4: [1,2]},
-            {"a": 4, "b": {"d": True}, 4: [1,2]}
+            {"a": 3, "b": {"c": False}, 4: [1, 2]},
+            {"a": 4, "b": {"d": True}, 4: [1, 2]}
         ).json_diffs
         print(diffs)
         self.assertEqual(len(diffs), 3)

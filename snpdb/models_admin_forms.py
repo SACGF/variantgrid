@@ -34,7 +34,6 @@ class LabAdmin(ModelAdminBasics):
             return False
         return super().is_readonly_field(f)
 
-
     def get_form(self, request, obj=None, **kwargs):
 
         return super(LabAdmin, self).get_form(request, obj, widgets={

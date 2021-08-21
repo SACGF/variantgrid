@@ -339,7 +339,7 @@ class SettingsOverrideForm(BaseModelForm):
                                                                        forward=['columns'],
                                                                        attrs={'data-placeholder': 'Column...'})}
         labels = {
-            "email_weekly_updates" : "Email Regular Updates",
+            "email_weekly_updates": "Email Regular Updates",
             "email_discordance_updates": "Email Discordance Updates",
             "variant_link_in_analysis_opens_new_tab": "Variant Link in Analysis Opens New Tab",
             "tool_tips": "Tooltips",
