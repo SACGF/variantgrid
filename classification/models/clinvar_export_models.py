@@ -142,7 +142,7 @@ class ClinVarExport(TimeStampedModel):
         return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportBatchStatus.REJECTED).order_by('-created').first()
 
     def differences_since_last_submission(self) -> Optional[JsonObjType]:
-        if previous := self.previous_submission:
+        if previous := self.previous_submission and self.classification_based_on:  # no point showing diffs if currently no classification
             return JsonDiffs.differences(previous.submission_body, self.submission_body.pure_json()).to_json("previous", "current")
         return None
 
