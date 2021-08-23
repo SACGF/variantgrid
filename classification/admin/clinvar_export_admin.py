@@ -2,10 +2,22 @@ from django.contrib import messages, admin
 from django.db.models import QuerySet
 from django.http import HttpResponse
 
-from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, ClinVarExportRequest
+from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
+    ClinVarExportRequest, ClinVarExportSubmission
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
 from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action
 import json
+
+
+class ClinVarExportSubmissionAdmin(admin.TabularInline):
+    model = ClinVarExportSubmission
+    list_display = ("pk", )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(ClinVarExport)
@@ -13,6 +25,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
     list_display = ("pk", "clinvar_allele", "status", "release_status", "classification_based_on", "condition", "scv", "created", "modified")
     list_filter = (('clinvar_allele__clinvar_key', admin.RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter))
     search_fields = ('pk', "scv")
+    inlines = (ClinVarExportSubmissionAdmin, )
 
     def has_add_permission(self, request, obj=None):
         return False
