@@ -28,7 +28,7 @@
                 <div class="card-header">Summary of ClinVar Export {{ clinvar_export.pk }}</div>
                 <div class="card-body">
                     {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
-                    {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
+                    {% labelled label="Allele" %}{% with allele=clinvar_export.clinvar_allele.allele %}<a class="hover-link" href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endwith %}{% endlabelled %}
                     {% labelled label="c.hgvs" %}{% c_hgvs clinvar_export.classification_based_on %}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
                     {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}

@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional, Iterable
 from django.conf import settings
+from django.db.models import QuerySet, When, Value, Case, IntegerField
 from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -9,13 +10,19 @@ from htmlmin.decorators import not_minified_response
 
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    Classification, ClinVarReleaseStatus, EvidenceKeyMap
+    Classification, ClinVarReleaseStatus, EvidenceKeyMap, ClinVarExportStatus
 from genes.hgvs import CHGVS
+from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
 from library.utils import html_to_text, delimited_row
-from snpdb.models import ClinVarKey, Lab
+from snpdb.models import ClinVarKey, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import json
+
+
+@timed_cache(size_limit=30, ttl=60)
+def allele_for(allele_id: int) -> Allele:
+    return Allele.objects.select_related('clingen_allele').get(pk=allele_id)
 
 
 class ClinVarExportBatchColumns(DatatableConfig):
@@ -60,6 +67,10 @@ def clinvar_export_batch_detail(request, pk: int):
 
 class ClinVarExportColumns(DatatableConfig):
 
+    def render_allele(self, row: Dict[str, Any]) -> str:
+        allele = allele_for(row["clinvar_allele__allele"])
+        return f"{allele:CA}"
+
     def render_c_hgvs(self, row: Dict[str, Any]):
         if row["classification_based_on__classification__variant"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
@@ -91,8 +102,9 @@ class ClinVarExportColumns(DatatableConfig):
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
-            RichColumn("clinvar_allele__clinvar_key", name="ClinVar Key", orderable=True, enabled=False, search=False),
+            RichColumn("clinvar_allele__allele", name="Allele", renderer=self.render_allele),
             RichColumn(name="c_hgvs", label='c.hgvs',
+                    visible=False,  # still allow this to be searched on
                     sort_keys=["classification_based_on__classification__chgvs_grch38"],
                     extra_columns=[
                         "classification_based_on__classification__variant",
@@ -106,19 +118,20 @@ class ClinVarExportColumns(DatatableConfig):
                         "classification_based_on__classification__chgvs_grch38"
                     ]
             ),
+
             # TODO store plain text condition so we can search it and sort it
             RichColumn("condition",
-                       name="condition",
+                       label="Condition Umbrella",
                        client_renderer='VCTable.condition',
                        search=["condition__display_text"],
                        sort_keys=["condition__sort_text"]
             ),
-            RichColumn("status", label="Sync Status", client_renderer='renderStatus', orderable=True, search=False),
+            RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"], orderable=True, search=False),
             RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True, search=False),
             RichColumn("scv", label="SCV", orderable=True),
         ]
 
-    def get_initial_query_params(self, clinvar_key: Optional[str] = None, status: Optional[str] = None):
+    def get_initial_query_params(self, clinvar_key: Optional[str] = None, status: Optional[str] = None) -> QuerySet[ClinVarExport]:
         clinvar_keys = ClinVarKey.clinvar_keys_for_user(self.user)
         if clinvar_key:
             clinvar_keys = clinvar_keys.filter(pk=clinvar_key)
@@ -130,11 +143,23 @@ class ClinVarExportColumns(DatatableConfig):
 
         return cve
 
-    def get_initial_queryset(self):
-        return self.get_initial_query_params(
+    def get_initial_queryset(self) -> QuerySet[ClinVarExport]:
+        initial_qs = self.get_initial_query_params(
             clinvar_key=self.get_query_param('clinvar_key'),
             status=self.get_query_param('status')
         )
+        # add sorting for status so important changes show first
+        whens = [
+            When(status=ClinVarExportStatus.NEW_SUBMISSION, then=Value(1)),
+            When(status=ClinVarExportStatus.CHANGES_PENDING, then=Value(2)),
+            When(status=ClinVarExportStatus.UP_TO_DATE, then=Value(3)),
+            When(status=ClinVarExportStatus.IN_ERROR, then=Value(4))
+        ]
+        case = Case(*whens, default=Value(0), output_field=IntegerField())
+        initial_qs = initial_qs.annotate(status_sort=case)
+
+        return initial_qs
+
 
 
 def clinvar_export_review(request, pk):
