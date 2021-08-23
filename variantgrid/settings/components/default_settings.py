@@ -31,7 +31,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(SETTINGS_DIR))
 PRIVATE_DATA_ROOT = os.path.join(BASE_DIR, "data")
 UPLOAD_RELATIVE_PATH = "data/uploads"  # Needed for FileSystemStorage
 UPLOAD_DIR = os.path.join(BASE_DIR, UPLOAD_RELATIVE_PATH)
-UPLOAD_ENABLED = True  # This disables uploading files or creating variants (used eg if Redis is out of sync)
+UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg if out of disk)
 
 # Absolute filesystem path to the directory that will hold GLOBALLY VISIBLE user-uploaded files.
 # Example: "/var/www/example.com/media/"
@@ -295,6 +295,10 @@ VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
 VCF_IMPORT_STORE_GVCF_NON_VAR_BLOCKS = False
 VCF_IMPORT_VT_COMMAND = "vt"  # Needs to be installed and in path
+VCF_IMPORT_SKIP_RECORD_REGEX = {
+    "CNV": "<CNV>",
+    "Fusion": "VARTYPE=fusion",
+}
 
 COMPANY = None  # Used for gene list categories
 
@@ -404,7 +408,6 @@ INITIAL_USER_DATA_PREFIX_KWARGS = {}  # Create UserDataPrefix object to setup IG
 
 USER_SETTINGS_SHOW_GROUPS = True
 
-REDIS_PIPELINE_SIZE = 100000
 SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
@@ -412,6 +415,7 @@ SITE_NAME = "VariantGrid"
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = False  # set True to only find classified variants
 SEARCH_SUMMARY = True
 SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = True
+SEARCH_SUMMARY_VARIANT_SHOW_CLASSIFICATIONS = True
 SILENCED_SYSTEM_CHECKS = ['models.E006']  # 'captcha.recaptcha_test_key_error']
 SITE_ID = 2
 SITE_MESSAGE = None  # displayed at the top of all logged-in pages
@@ -572,7 +576,7 @@ INSTALLED_APPS = [
     'avatar',
     'vcauth',
     'datetimeutc',
-    'django_admin_json_editor',
+    'django_json_widget',
     'django.contrib.humanize',
     'django.contrib.sites',
     'captcha',
@@ -771,7 +775,7 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
     "classification_import_tool": False,
     "condition_aliases": False,
-    "clinvar_exports": False,
+    "clinvar_key_summary": False,
     "condition_matchings": False,
     "condition_match_test": False
 }
@@ -800,7 +804,6 @@ VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
-VARIANT_PK_HASH_USE_REDIS = False
 
 VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH = False
 VIEW_GENE_SHOW_HOTSPOT_GRAPH = True
@@ -823,6 +826,9 @@ AWS_SES_ACCESS_KEY_ID = None
 AWS_SES_SECRET_ACCESS_KEY = None
 AWS_SES_REGION = None
 
+CLINVAR_EXPORT = None
+
+
 # Command line tool to unzip and cat a file to stdout
 # for macOS need to set this to gzcat as the default zcat has short-comings
 BASH_ZCAT = 'zcat'
@@ -834,13 +840,17 @@ POPEN_SHELL = True  # For vcf split - todo put back...
 from django.contrib.messages import constants as messages
 
 # @see https://docs.djangoproject.com/en/3.1/ref/settings/#message-tags
+# Provide both Bootstrap classes (for within the product) and default (for within the admin)
 MESSAGE_TAGS = {
-    messages.DEBUG: 'alert-info',
-    messages.INFO: 'alert-info',
-    messages.SUCCESS: 'alert-success',
-    messages.WARNING: 'alert-warning',
-    messages.ERROR: 'alert-danger',
+    messages.DEBUG: 'debug alert-info',
+    messages.INFO: 'info alert-info',  # annoyingly this is branded same as success in admin
+    messages.SUCCESS: 'success alert-success',
+    messages.WARNING: 'warning alert-warning',
+    messages.ERROR: 'error alert-danger',
 }
+
+def get_clinvar_export_secrets() -> dict:
+    return get_secrets("CLINVAR_EXPORT", ["enabled", "test", "api_key"])
 
 
 def get_keycloak_sync_secrets() -> dict:

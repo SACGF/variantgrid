@@ -7,6 +7,7 @@ from django.utils.safestring import SafeText
 import os
 
 from library.log_utils import report_message
+from library.utils import html_id_safe
 from uicore.templatetags.ui_utils import parse_tag, TagUtils
 
 register = Library()
@@ -15,19 +16,19 @@ register = Library()
 @register.inclusion_tag("uicore/tags/help.html")
 def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3"):
     """
-    Displays a heading and page help
+    Best to use page_help_embedded now so help can be dynamic.
+
+    Displays a heading and page help loaded from a file.
     :param page_id: Used to determine the help page
     :param title: The title for the heading and the help drop down
-    :param show_title: Should we show a heading at all
+    :param show_title: Should we show a heading at all - deprecated, generally always show title (use page_help instead
+    of header if page help is available).
+    :param header: Default header if there's no attached help
     """
     suffix_help = True
 
     if not title or title == SafeText(' '):
-        help_page_title = 'Page Help'
-    else:
-        help_page_title = title
-        if suffix_help:
-            help_page_title += ' Help'
+        title = 'Page Help'
 
     help_url = settings.HELP_URL
     page_help_html = None
@@ -42,27 +43,12 @@ def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3")
         report_message(f"Could not find help for {page_help_path}")
 
     return {
-        'page_id': page_id.replace('/', '-').replace(' ', '-'),
+        'page_id': html_id_safe(page_id),
         'page_title': title if show_title else None,
-        'help_page_title': help_page_title,
+        'help_page_title': title,
         "page_help_html": page_help_html,
         "header_tag": header_tag,
         "help_url": help_url}
-
-
-@register.inclusion_tag("uicore/tags/help.html")
-def page_help_manual(page_label: str, content: str):
-
-    page_id = page_label.replace(' ', '-').replace('/', '_')
-    help_url = settings.HELP_URL
-
-    return {
-        'page_id': page_id,
-        'page_title': None,
-        'help_page_title': page_label + ' Help',
-        'page_help_html': content,
-        'help_url': help_url
-    }
 
 
 @register.tag(name='page_help_embedded')
@@ -70,7 +56,10 @@ def page_help_embedded(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_page_help_embedded',))
     parser.delete_first_token()
-    return PageHelpContent(nodelist, title=kwargs.get('title'))
+    if title := kwargs.get("title") or args[0]:
+        return PageHelpContent(nodelist, title=title)
+    else:
+        raise ValueError("page_help_embedded must have attribute 'title'")
 
 
 class PageHelpContent(template.Node):
@@ -82,14 +71,15 @@ class PageHelpContent(template.Node):
         self.title = title
 
     def render(self, context):
+
         title = TagUtils.value_str(context, self.title)
-        page_id = title.replace(' ', '-').replace('/', '_')
-        content = self.nodelist.render(context)
+        page_id = html_id_safe(title)
+        content = self.nodelist.render(context).strip()
 
         return loader.render_to_string("uicore/tags/help.html", context={
             'page_id': page_id,
-            'page_title': None,
-            'help_page_title': title + ' Help',
+            'page_title': title,
             'page_help_html': content,
+            'header_tag': 'h4',  # can revert back to just a tag if there's no help content
             'help_url': settings.HELP_URL
         })

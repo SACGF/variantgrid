@@ -1,3 +1,4 @@
+{% load ui_utils %}
 <style>
     .stack-trace {
         white-space: pre-line;
@@ -6,7 +7,7 @@
 <div id="django-messages">
     {% for message in messages %}
       <div class="alert {{ message.tags }}" role="alert">
-        <i class="fas fa-exclamation-circle"></i> {{ message }}
+        {{ message.tags | severity_icon }} {{ message }}
           {% if "saved successfully" in message.message %}<div class="float-right"><span class="convert-timestamp seconds float-right"></span></div>{% endif %}
       </div>
     {% endfor %}

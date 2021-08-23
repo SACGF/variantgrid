@@ -457,6 +457,7 @@ function replaceAll(originalString, find, replace) {
 EKeys.fixDescription = function(htmlText) {
     htmlText = htmlText.trim();
     htmlText = replaceAll(htmlText, /(<br>|<br\/>|<br \/>)/gm, '\n');
+    htmlText = replaceAll(htmlText, /<\/ul>\s+/gm, '</ul>');
     htmlText = replaceAll(htmlText, /^\s+$/gm, '');
     htmlText = replaceAll(htmlText, /[\n\r]{3,}/gm, '\n\n');
     let html = $('<span>', {html: htmlText});

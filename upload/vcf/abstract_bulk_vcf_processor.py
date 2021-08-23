@@ -31,9 +31,12 @@ class AbstractBulkVCFProcessor:
     def genome_build(self):
         return self.upload_pipeline.genome_build
 
-    def set_max_variant(self, variant_ids):
-        max_returned_variant_id = max(map(int, variant_ids))
-        self.max_variant_id = max(self.max_variant_id, max_returned_variant_id)
+    def set_max_variant(self, variant_hashes, variant_ids):
+        # Keep track of max annotated variant (only non-reference are annotated)
+        non_ref_variant_ids = self.variant_pk_lookup.filter_non_reference(variant_hashes, variant_ids)
+        if non_ref_variant_ids:
+            max_returned_variant_id = max(map(int, non_ref_variant_ids))
+            self.max_variant_id = max(self.max_variant_id, max_returned_variant_id)
 
     def get_max_variant_id(self):
         """ 0 means it was never set, so we return None """

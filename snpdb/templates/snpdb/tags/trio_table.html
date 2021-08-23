@@ -1,22 +1,33 @@
 {% load karyomapping_tags %}
 
 <table>
-<tr><th>Trio ID:
-    <td><a href="{% url 'view_trio' trio.pk %}">{{ trio.pk }}
-<tr><th>Name:
-    <td>{{ trio.name }}
-<tr><th>Cohort:
-    <td><a href="{% url 'view_cohort' trio.cohort.pk %}">{{ trio.cohort }}</a>
-<tr><th>Mother:
-    <td><a href="{% url 'view_sample' trio.mother.sample.pk %}">{{ trio.mother_details }}</a>
-<tr><th>Father:
-    <td><a href="{% url 'view_sample' trio.father.sample.pk %}">{{ trio.father_details }}</a>
-<tr><th>Proband:
-    <td><a href="{% url 'view_sample' trio.proband.sample.pk %}">{{ trio.proband }}</a>
+    <tr><th>Trio ID:</th>
+        <td><a href="{% url 'view_trio' trio.pk %}">{{ trio.pk }}</a></td>
+    </tr>
+    <tr><th>Name:</th>
+        <td>{{ trio.name }}</td>
+    </tr>
+    <tr><th>Genome Build:</th>
+        <td>{{ trio.genome_build }}</td>
+    </tr>
+    <tr><th>Cohort:</th>
+        <td><a href="{% url 'view_cohort' trio.cohort.pk %}">{{ trio.cohort }}</a></td>
+    </tr>
+    <tr><th>Mother:</th>
+        <td><a href="{% url 'view_sample' trio.mother.sample.pk %}">{{ trio.mother_details }}</a></td>
+    </tr>
+    <tr><th>Father:</th>
+        <td><a href="{% url 'view_sample' trio.father.sample.pk %}">{{ trio.father_details }}</a></td>
+    </tr>
+    <tr><th>Proband:</th>
+        <td><a href="{% url 'view_sample' trio.proband.sample.pk %}">{{ trio.proband }}</a></td>
+    </tr>
 
 {% if trio.genomekaryomappingcounts  %}
-    <tr><th>Whole sample counts ({{ trio.genomekaryomappingcounts.trio.genome_build }})
-        <td>{% genome_karyomapping_counts_summary trio.genomekaryomappingcounts %}
+    <tr><th>Whole sample karyomapping counts</th>
+        <td>{% genome_karyomapping_counts_summary trio.genomekaryomappingcounts %}</td>
+    </tr>
 {% endif %}
+
 </table>
 

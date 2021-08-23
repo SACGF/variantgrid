@@ -55,4 +55,5 @@ def _variant_interesting_summary(user: User, variant: Variant, genome_build, cli
 
     return interesting_summary(qs, user, genome_build, total=False,
                                clinvar=settings.SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR,
+                               classifications=settings.SEARCH_SUMMARY_VARIANT_SHOW_CLASSIFICATIONS,
                                clinical_significance=clinical_significance)

@@ -17,7 +17,7 @@ from model_utils.models import TimeStampedModel
 
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
-    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolvedTermDict
+    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved
 from annotation.regexes import db_ref_regexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
@@ -384,24 +384,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         """
         if terms := self.condition_xref_terms:
 
-            def format_term(term: OntologyTerm) -> str:
-                if name := term.name:
-                    return f"{term.id} {term.name}"
-                return term.id
+            condition_resolved_obj = ConditionResolved(terms=_sort_terms(terms), join=None if len(terms) <= 1 else MultiCondition(self.condition_multi_operation))
+            return condition_resolved_obj.to_json()
 
-            terms = _sort_terms(terms)  # sorts by name
-            text = ", ".join([format_term(term) for term in terms])
-            sort_text = ", ".join([term.name for term in terms]).lower()
-            if len(terms) > 1:
-                text = f"{text}; {MultiCondition(self.condition_multi_operation).label}"
-
-            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolvedTermDict(term_id=term.id, name=term.name or "") for term in terms]
-            return ConditionResolvedDict(
-                display_text=text,
-                sort_text=sort_text,
-                resolved_terms=resolved_term_dicts,
-                resolved_join=self.condition_multi_operation
-            )
         return None
 
 

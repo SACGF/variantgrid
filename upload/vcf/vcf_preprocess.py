@@ -10,7 +10,8 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.file_utils import name_from_filename
 import pandas as pd
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
-    UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage
+    UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage, \
+    SimpleVCFImportInfo
 from upload.tasks.vcf.unknown_variants_task import SeparateUnknownVariantsTask
 
 
@@ -39,7 +40,7 @@ def create_sub_step(upload_step, sub_step_name, sub_step_commands):
 def preprocess_vcf(upload_step):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
-    VCF_FILTER_UNKNOWN_CONTIGS_SUB_STEP = "vcf_filter_unknown_contigs"
+    VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
     DECOMPOSE_SUB_STEP = "decompose"
     NORMALIZE_SUB_STEP = "normalize"
     UNIQ_SUB_STEP = "uniq"
@@ -62,16 +63,19 @@ def preprocess_vcf(upload_step):
 
     upload_pipeline = upload_step.upload_pipeline
     vcf_name = name_from_filename(vcf_filename, remove_gz=True)
-    base_filename = f"{vcf_name}.skipped_contigs.tsv"
-    skipped_contigs_stats_file = get_import_processing_filename(upload_pipeline.pk, base_filename)
+    skipped_contigs_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_contigs.tsv")
+    skipped_records_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_records.tsv")
+
     manage_command = settings.MANAGE_COMMAND
-    read_variants_cmd = manage_command + ["vcf_filter_unknown_contigs",
+    read_variants_cmd = manage_command + ["vcf_clean_and_filter",
                                           "--genome-build",
                                           genome_build.name,
-                                          "--unknown-contigs-stats-file",
-                                          skipped_contigs_stats_file]
-    pipe_commands[VCF_FILTER_UNKNOWN_CONTIGS_SUB_STEP] = read_variants_cmd
-    sub_steps[VCF_FILTER_UNKNOWN_CONTIGS_SUB_STEP] = create_sub_step(upload_step, VCF_FILTER_UNKNOWN_CONTIGS_SUB_STEP, read_variants_cmd)
+                                          "--skipped-contigs-stats-file",
+                                          skipped_contigs_stats_file,
+                                          "--skipped-records-stats-file",
+                                          skipped_records_stats_file]
+    pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
+    sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
 
     # VT isn't the bottleneck here, it's my programs - so no speed advantage to using "+" for Uncompressed BCF streams
     pipe_commands[DECOMPOSE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "decompose", "-s", "-"]
@@ -146,16 +150,22 @@ def preprocess_vcf(upload_step):
             if p.returncode:
                 raise CalledProcessError(p.returncode, p_cmd, output=stderr_output)
 
+    clean_sub_step = sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP]
     if os.path.exists(skipped_contigs_stats_file):
-        contig_sub_step = sub_steps[VCF_FILTER_UNKNOWN_CONTIGS_SUB_STEP]
-        df = pd.read_csv(skipped_contigs_stats_file, header=None, sep='\t', names=["contig", "count"], index_col=0)
-        if df.empty:
-            import_info = VCFSkippedContigs.objects.create(upload_step=contig_sub_step)
+        df = pd.read_csv(skipped_contigs_stats_file, header=None, sep='\t', index_col=0)
+        if not df.empty:
+            import_info = VCFSkippedContigs.objects.create(upload_step=clean_sub_step)
 
-            for contig, count in df.iterrows():
+            for contig, count in df.iloc[:, 0].iteritems():
                 VCFSkippedContig.objects.create(import_info=import_info,
                                                 contig=contig,
                                                 num_skipped=count)
+    if os.path.exists(skipped_records_stats_file):
+        df = pd.read_csv(skipped_records_stats_file, header=None, sep='\t', index_col=0)
+        if not df.empty:
+            for name, count in df.iloc[:, 0].iteritems():
+                message_string = f"Skipped {count} '{name}' records."
+                SimpleVCFImportInfo.objects.create(upload_step=clean_sub_step, message_string=message_string)
 
     # Create this here so downstream tasks can add modified imported variant messages
     import_info, _ = ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)

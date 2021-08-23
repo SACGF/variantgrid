@@ -40,9 +40,11 @@
                 {% labelled label="Extra" %}
                     {% if term.extra %}
                     <a href="#ontology-extra" data-toggle="collapse" class="toggle-link">Toggle raw extra data (technical)</a>
-                    <div id="ontology-extra" class="text-monospace collapse" style="white-space: pre-wrap; font-size: small">{{ term.extra | jsonify_pretty }}</div>
                     {% else %}<div class="no-value">-</div>{% endif %}
                 {% endlabelled %}
+                {% if term.extra %}
+                <div id="ontology-extra" class="collapse mb-4">{% code_json term.extra %}</div>
+                {% endif %}
                 {% if term.aliases %}
                     {% labelled label="Aliases" %}{% for alias in term.aliases %}{{ alias }}<br/>{% endfor %}{% endlabelled %}
                 {% endif %}

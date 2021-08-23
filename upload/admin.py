@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 
-from snpdb.admin import ModelAdminBasics
+from snpdb.admin_utils import ModelAdminBasics
 from snpdb.models import ProcessingStatus
 from . import models
 from .models import UploadStep

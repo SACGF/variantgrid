@@ -6,7 +6,7 @@ from operator import itemgetter
 
 from snpdb.models.models_enums import ImportStatus
 from classification.models import Classification
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 
 register = Library()
 
@@ -20,7 +20,7 @@ def related_data_context(context, samples):
     if classifications.exists():
         tag_context["has_classifications"] = True
         tag_context["sample_ids_list"] = [s.pk for s in samples]
-        tag_context["datatable_config"] = ClassificationDatatableConfig(context["request"])
+        tag_context["datatable_config"] = ClassificationColumns(context["request"])
     return tag_context
 
 

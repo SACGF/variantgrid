@@ -1,9 +1,12 @@
-{% if page_title %}<{{ header_tag }}>{{ page_title }}</{{ header_tag }}>{% endif %}
+{% if not page_help_html and page_title %}<{{ header_tag }}>{{ page_title }}</{{ header_tag }}>{% endif %}
 {% if page_help_html %}
-    <div class="accordion indicator-plus-before round-indicator mb-4">
+    <div class="page-help accordion indicator-plus-before round-indicator my-4">
         <div class="card">
             <div class="card-header collapsed" id="heading-{{ page_id }}" data-toggle="collapse" data-target="#help-{{ page_id }}" >
-                <a class="card-title">{{ help_page_title }} <i class="far fa-question-circle"></i></a>
+                <a class="card-title d-inline-flex w-100 mb-0" style="align-items: center">
+                    <h4 class="flex-grow-1">{% if page_title %}{{ page_title }}{% endif %}</h4>
+                    <div class="mr-4">Help <i class="far fa-question-circle"></i></div>
+                </a>
             </div>
 
             <div id="help-{{ page_id }}" class="collapse" aria-labelledby="heading-{{ page_id }}">

@@ -89,7 +89,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
 
 class VariantTagsInsertTask(ImportVCFStepTask):
     """ This is run after the VCF import data insertion stage.
-        Variants will be in database, and redis at this stage """
+        Variants will be in database at this stage """
 
     def process_items(self, upload_step: UploadStep):
         uploaded_file = upload_step.upload_pipeline.uploaded_file

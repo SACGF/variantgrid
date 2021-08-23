@@ -7,6 +7,9 @@ EstablishedType = TypeVar("EstablishedType", bound=Hashable)
 
 
 class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
+    """
+    Lets you combine old-candidates with new candidates
+    """
 
     def __init__(self):
         self.collapsed_new_candidates: List[CandidateType] = list()

@@ -111,6 +111,23 @@ class InstallInstructionsTag(template.Node):
         """
 
 
+@register.tag(name='field_help')
+def field_help(parser, token):
+    tag_name, args, kwargs = parse_tag(token, parser)
+    nodelist = parser.parse(('end_field_help',))
+    parser.delete_first_token()
+    return FieldHelpTag(nodelist)
+
+
+class FieldHelpTag(template.Node):
+    def __init__(self, nodelist):
+        self.nodelist = nodelist
+
+    def render(self, context):
+        output = self.nodelist.render(context)
+        return f'<div class="form-text text-muted">{output}</div>'
+
+
 @register.tag(name='labelled')
 def render_labelled(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
@@ -211,8 +228,9 @@ class LabelledValueTag(template.Node):
 
         div_id = ""
         for_id = ""
-        if give_div_id:
-            div_id = f"id=\"{complete_id}\""
+        if complete_id:
+            if give_div_id:
+                div_id = f"id=\"{complete_id}\""
             for_id = f"for=\"{complete_id}\""
 
         if output in ("", "None"):
@@ -245,7 +263,10 @@ def severity_icon(severity: str) -> str:
         return SafeString('<i class="fas fa-exclamation-triangle text-warning"></i>')
     if severity.startswith('I'):  # info
         return SafeString('<i class="fas fa-info-circle text-info"></i>')
+    if severity.startswith('S'):  # success
+        return SafeString('<i class="fas fa-check-circle text-success"></i>')
     # debug
+
     return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
 
 
@@ -264,10 +285,43 @@ def danger_badge(count: Optional[int]) -> str:
 
 
 @register.filter()
+def badge(count: Optional[int], status: Optional[str] = None) -> str:
+    if count is None:
+        return ""
+    if status is None:
+        status = "danger"
+
+    render_status = status
+    if count == 0:
+        if status == 'danger':
+            render_status = 'success'
+        elif status == 'success':
+            render_status = 'secondary'
+    return SafeString(f' <span class="d-inline-block ml-1 badge badge-{render_status}">{count}</span>')
+
+
+@register.filter()
+def success_badge(count: Optional[int]) -> str:
+    if count is None:
+        return ""
+    if count == 0:
+        return SafeString(' <span class="d-inline-block ml-1 badge badge-secondary">0</span>')
+    return SafeString(f' <span class="d-inline-block ml-1 badge badge-success">{count}</span>')
+
+
+@register.filter()
 def checked(test: bool) -> str:
     if test:
         return SafeString('checked="checked"')
     return ''
+
+
+@register.filter()
+def boolean(test: bool) -> str:
+    if test:
+        return SafeString('<i class="text-success fas fa-check-circle" style="margin-top:4px"></i>')
+    else:
+        return SafeString('<i class="text-secondary fas fa-times-circle" style="margin-top:4px"></i>')
 
 
 class TagUtils:

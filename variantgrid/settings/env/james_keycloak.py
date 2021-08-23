@@ -72,6 +72,7 @@ LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=http%3A%2F%2Fubuntu-18.04%3A8000'
 
 ALLOWED_HOSTS = ["*"]
+COMPRESS_ENABLED = False
 """
 
 VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = True

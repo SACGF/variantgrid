@@ -12,7 +12,6 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
-        <h3>Condition Match Testing</h3>
         {% page_help_embedded title='Condition Match Testing' %}
             <p>
             This page lets admin users test text to see what terms will be auto applied or suggested.
@@ -52,8 +51,7 @@
         <h4>Download</h4>
         <form method="POST" action="{% url 'condition_match_test_download' %}">
             {% csrf_token %}
-            Run and download auto matching attempts. (Note doesn't apply the results, just produces them for download).<br/>
-            This takes a while so it's recommended you limit your results.<br/>
+            <p class="text-info">Downloads auto matching attempts. (Note doesn't apply the results, just produces them for download).</p>
             <input class="btn btn-primary" type="submit" value="Download" />
         </form>
         <hr/>
@@ -62,7 +60,7 @@
         <form method="GET">
             {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
             {% labelled label="Gene Symbol" %}<input class="form-control" style="max-width:300px" name="gene_symbol" value="{{ gene_symbol | default_if_none:'' }}" />
-                <span class="text-muted">(optional)</span>
+                {% field_help %}(optional){% end_field_help %}
             {% endlabelled %}
             <button class="btn btn-primary">Search</button>
         </form>

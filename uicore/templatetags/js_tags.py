@@ -8,8 +8,9 @@ from django.utils.safestring import mark_safe
 import json
 import re
 
-# FIXME, move this out of classifications and into snpdb
-from classification.views.classification_datatables import DatatableConfig
+
+from uicore.json.validated_json import ValidatedJson
+from uicore.json.json_types import JsonDataType
 from library.utils import format_significant_digits
 
 register = template.Library()
@@ -17,13 +18,13 @@ register = template.Library()
 
 def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
     if isinstance(json_me, str):
-        return json_me
-    elif isinstance(json_me, bool):
+        json_me = json_me.replace('"', '\"')
+        return mark_safe(f"\"{json_me}\"")
+    if isinstance(json_me, bool):
         if json_me:
             return mark_safe('true')
-        else:
-            return mark_safe('false')
-    elif isinstance(json_me, int) or isinstance(json_me, float):
+        return mark_safe('false')
+    if isinstance(json_me, (int, float)):
         return json_me
     indent = 0 if not pretty else 4
     text = json.dumps(json_me, indent=indent)
@@ -43,6 +44,7 @@ def jsonify(json_me) -> Union[str, Any]:
 def jsonify_pretty(json_me) -> Union[str, float]:
     return jsonify_for_js(json_me, pretty=True)
 
+
 @register.filter
 def query_unquote(query_string):
     return urllib.parse.unquote(query_string)
@@ -51,10 +53,9 @@ def query_unquote(query_string):
 @register.filter
 def jsstring(text):
     if text:
-        text = text.replace('\\', '\\\\').replace('`','\`').replace('</script>','<\\/script>')
+        text = text.replace('\\', '\\\\').replace('`', '\`').replace('</script>', '<\\/script>')
         return mark_safe(text)
-    else:
-        return ''
+    return ''
 
 
 @register.filter
@@ -70,17 +71,17 @@ def format_value(val):
         return mark_safe('<span class="no-value">None</span>')
     if val == "":
         return mark_safe('<span class="none">""</span>')
-    if isinstance(val, dict) or isinstance(val, list):
+    if isinstance(val, (dict, list)):
         return mark_safe(f'<span class="json">{escape(json.dumps(val))}</span>')
     if isinstance(val, float):
         val = format(Decimal(str(val)).normalize(), 'f')
         return mark_safe(f'<span class="number">{val}</span>')
-    elif isinstance(val, int):
+    if isinstance(val, int):
         return mark_safe(f'<span class="number">{val}</span>')
-    else:
-        val = escape(val)
-        val = val.replace("\n", "<br/>")
-        return mark_safe(val)
+
+    val = escape(val)
+    val = val.replace("\n", "<br/>")
+    return mark_safe(val)
 
 
 @register.filter()
@@ -104,7 +105,21 @@ def dash_if_empty(val):
     return val
 
 
-@register.inclusion_tag("classification/tags/timestamp.html")
+@register.inclusion_tag("uicore/tags/code_block_json.html")
+def code_json(data: JsonDataType, css_class: Optional[str] = ""):
+    if isinstance(data, ValidatedJson):
+        data = data.serialize()
+
+    if not css_class:
+        # if we're formatting ValidatedJson and the first element has messages, that provides formatting
+        # so we don't need code-block
+        # Also if we already have a css_class (like card-body) we don't need code-block
+        if not data or ('*wrapper$' not in data and not data.get('messages')):
+            css_class = "code-block"
+    return {"data": data, "css_class": css_class}
+
+
+@register.inclusion_tag("uicore/tags/timestamp.html")
 def timestamp(timestamp, time_ago: bool = False):
     css_class = 'time-ago' if time_ago else ''
     if timestamp:
@@ -114,8 +129,7 @@ def timestamp(timestamp, time_ago: bool = False):
             "timestamp": timestamp,
             "css_class": css_class
         }
-    else:
-        return {"css_class": "empty"}
+    return {"css_class": "empty"}
 
 
 @register.filter()
@@ -138,18 +152,20 @@ def duration(td):
 
 
 @register.filter
-def get_item(dictionary, key):
-    return dictionary.get(key)
-
-
-@register.filter
 def format_preference(value):
     if value is True:
         return 'Yes'
-    elif value is False:
+    if value is False:
         return 'No'
-    else:
-        return value
+    return value
+
+
+# Filters to make up for how purposefully crippled Django Templates are
+
+
+@register.filter
+def get_item(dictionary, key):
+    return dictionary.get(key)
 
 
 @register.filter

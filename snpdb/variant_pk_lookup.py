@@ -1,21 +1,20 @@
 """
 Variant table is massive, so we need a way to quickly look up a variant PK for insertion
+
+RedisVariantPKLookup deleted 2021-08-05
 """
 import abc
 import logging
 import os
 from collections import defaultdict
-from time import time
 from typing import List, Iterable, Tuple
 
-from django.conf import settings
 from django.db.models import Q, Value, TextField
 from django.db.models.aggregates import Max
 from django.db.models.functions import Concat
 
-from library.django_utils import get_redis
 from library.utils import md5sum_str
-from snpdb.models import Variant, Locus, Sequence, GenomeBuild, ProcessingStatus, VariantCoordinate
+from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate
 from upload.vcf import sql_copy_files
 
 
@@ -45,8 +44,18 @@ class VariantPKLookup(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
+    def _get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
         pass
+
+    def get_variant_ids(self, variant_hashes: Iterable, validate_not_null=True) -> List[str]:
+        variant_ids = self._get_variant_ids(variant_hashes)
+        if validate_not_null:
+            if not all(variant_ids):  # Quick test if ok
+                # Slowly find the first bad record
+                for variant_hash, pk in zip(variant_hashes, variant_ids):
+                    if not pk:
+                        raise ValueError(f"Variant hash {variant_hash} had no PK in DB!")
+        return variant_ids
 
     @abc.abstractmethod
     def _get_loci_ids(self, loci_hashes: Iterable) -> List[str]:
@@ -61,6 +70,10 @@ class VariantPKLookup(abc.ABC):
                     if not pk:
                         raise ValueError(f"Loci hash {loci_hash} had no PK in DB!")
         return loci_ids
+
+    @abc.abstractmethod
+    def filter_non_reference(self, variant_hashes, variant_ids) -> List:
+        pass
 
     def get_variant_coordinate_hash(self, chrom, position, ref, alt):
         """ For VCF records (needs GenomeBuild supplied) """
@@ -90,7 +103,7 @@ class VariantPKLookup(abc.ABC):
         # during final finish call of batch_process_check(insert_all=True)
         num_variant_hashes = len(self.variant_hashes)
         if num_variant_hashes and num_variant_hashes >= minimum_pipeline_size:
-            variant_ids = self.get_variant_ids(self.variant_hashes)
+            variant_ids = self.get_variant_ids(self.variant_hashes, validate_not_null=False)
             for variant_hash, variant_id, variant_coordinate in zip(self.variant_hashes, variant_ids,
                                                                     self.variant_coordinates):
                 if variant_id:
@@ -171,7 +184,7 @@ class VariantPKLookup(abc.ABC):
 
         loci_ids = self.get_loci_ids(loci_parts_by_hash)  # Validates all are not null
         locus_pk_by_hash = dict(zip(loci_parts_by_hash, loci_ids))
-        variant_ids = self.get_variant_ids(locus_hash_and_alt_id_by_variant_hash)  # unknowns will be None
+        variant_ids = self.get_variant_ids(locus_hash_and_alt_id_by_variant_hash, validate_not_null=False)
         unknown_variants = []
         for variant_hash, variant_pk in zip(locus_hash_and_alt_id_by_variant_hash, variant_ids):
             if variant_pk is None:
@@ -187,190 +200,14 @@ class VariantPKLookup(abc.ABC):
 
     @classmethod
     def factory(cls, *args, **kwargs):
-        if settings.VARIANT_PK_HASH_USE_REDIS:
-            klass = RedisVariantPKLookup
-        else:
-            klass = DBVariantPKLookup
-        return klass(*args, **kwargs)
-
-
-class RedisVariantPKLookup(VariantPKLookup):
-    """ Redis implementation """
-    MAX_LOCI_ID = 'MAX_LOCI_ID'
-    MAX_VARIANT_ID = 'MAX_VARIANT_ID'
-
-    def __init__(self, genome_build: GenomeBuild = None, working_dir=None, redis_check=True):
-        super().__init__(genome_build, working_dir=working_dir)
-        self.redis = get_redis()
-        if redis_check:
-            self.redis_check = self._redis_sanity_check()
-
-    def _get_variant_hash(self, contig_id, position, ref_id, alt_id):
-        locus_hash = self._get_locus_hash(contig_id, position, ref_id)
-        return f"{locus_hash}_{alt_id}"
-
-    def _get_locus_hash(self, contig_id, position, ref_id):
-        return '_'.join((str(contig_id), str(position), str(ref_id)))
-
-    def get_variant_ids(self, variant_hashes: Iterable) -> List[int]:
-        return self.redis.mget(variant_hashes)
-
-    def _get_loci_ids(self, loci_hashes: Iterable) -> List[str]:
-        return self.redis.mget(loci_hashes)
-
-    def _insert_new_loci(self, new_loci_rows: List[Tuple]):
-        super()._insert_new_loci(new_loci_rows)
-        self._update_loci_hash()  # Read in new loci
-
-    def _insert_new_variants(self, new_variant_rows: List[Tuple]):
-        super()._insert_new_variants(new_variant_rows)
-        self._update_variants_hash()  # Read in new variants
-
-    def _redis_sanity_check(self) -> bool:
-        """ Check that the first and last Variant is stored in Redis, throws exception on error
-                Returns whether it was able to perform a check or not """
-        from upload.models import UploadStep  # Circular import
-
-        running_insert_jobs = UploadStep.objects.filter(name=UploadStep.CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME,
-                                                        status=ProcessingStatus.PROCESSING)
-        if running_insert_jobs.exists():
-            logging.warning("Unknown variant insert job running - unable to perform Redis sanity check")
-            return False
-
-        qs = Variant.objects.order_by("pk")
-        first_variant = qs.first()
-        last_variant = qs.last()
-
-        for v in [first_variant, last_variant]:
-            if v is None:
-                continue
-            v_hash = self._get_variant_hash(v.locus.contig_id, v.locus.position, v.locus.ref_id, v.alt_id)
-            variant_id = self.redis.get(v_hash)
-            if variant_id is None:
-                missing_key_msg = f"Redis sanity check failed - variant: {v.pk} ({v_hash}) missing!"
-                logging.error(missing_key_msg)
-                raise ValueError(missing_key_msg)
-            if v.pk != int(variant_id):
-                diff_key_msg = f"Redis sanity check failed - hash: {v_hash} value from variant {v.pk} != '{variant_id}'"
-                logging.error(diff_key_msg)
-                raise ValueError(diff_key_msg)
-        return True  # Checked ok
-
-    # Note we use setnx - to not overwrite any variants/loci
-    # This means that if there's ever a duplicated locus/variant from some race condition error,
-    # it will never be used (lower primary key will be kept as insert in pk order).
-    # See https://redis.io/commands/setnx
-    def update_redis_hashes(self):
-        """ This updates both loci and variants  """
-        print("update_redis_hashes....")
-        self._update_loci_hash()
-        self._update_variants_hash()
-
-    def _update_variants_hash(self):
-        max_variant_id = int(self.redis.get(self.MAX_VARIANT_ID) or 0)
-
-        old_max_variant_id = max_variant_id
-        max_dict = Variant.objects.all().aggregate(Max("id"))
-        max_variant_id = max_dict["id__max"] or 0
-        num_potential_new_variants = max_variant_id - old_max_variant_id
-
-        if num_potential_new_variants:
-            start = time()
-            logging.debug("Updating approx ~%d variants.", num_potential_new_variants)
-
-            variants_qs = Variant.objects.all()
-
-            if old_max_variant_id:
-                variants_qs = variants_qs.filter(id__gt=old_max_variant_id)
-
-            values_qs = variants_qs.values_list('id', 'locus__id', 'locus__contig', 'locus__position',
-                                                'locus__ref', 'alt')
-
-            i = 0
-            redis_pipeline = self.redis.pipeline()
-            inserted = 0
-
-            # Count takes ~1% of the time and nice to give a running progress
-            num_to_insert = values_qs.count()
-            for variant_id, locus_id, contig_id, position, ref_id, alt_id in values_qs.order_by("pk").iterator():
-                locus_hash = self._get_locus_hash(contig_id, position, ref_id)
-
-                redis_pipeline.setnx(locus_hash, locus_id)
-                i += 1
-
-                if variant_id:
-                    variant_hash = self._get_variant_hash(contig_id, position, ref_id, alt_id)
-                    redis_pipeline.setnx(variant_hash, variant_id)
-
-                if i >= settings.REDIS_PIPELINE_SIZE:
-                    redis_pipeline.execute()
-                    redis_pipeline = self.redis.pipeline()
-                    inserted += i
-                    i = 0
-
-                    percent_done = 100.0 * inserted / num_to_insert
-                    logging.debug("Inserted %d of %d (%.2f%%)", inserted, num_to_insert, percent_done)
-
-            if i:
-                logging.debug("Inserting remaining %d", i)
-                redis_pipeline.execute()
-                inserted += i
-
-            end = time()
-            time_taken = end - start
-            logging.debug("Inserted %d of %d - Update took %.3f seconds", inserted, num_to_insert, time_taken)
-
-        self.redis.set(self.MAX_VARIANT_ID, max_variant_id)
-
-    def _update_loci_hash(self):
-        """ Updates Just the loci (for when you have inserted loci but not variants yet) """
-
-        max_loci_id = int(self.redis.get(self.MAX_LOCI_ID) or 0)
-        old_max_loci_id = max_loci_id
-        max_dict = Locus.objects.all().aggregate(Max("id"))
-        max_loci_id = max_dict["id__max"] or 0
-        num_new_loci = max_loci_id - old_max_loci_id
-
-        if not num_new_loci:  # Look and double check
-            if last_locus := Locus.objects.order_by("pk").last():
-                locus_hash = self._get_locus_hash(last_locus.contig_id, last_locus.position, last_locus.ref_id)
-                locus_pk = self.redis.get(locus_hash)
-                if locus_pk is None:
-                    num_new_loci = "unknown...."
-
-        if num_new_loci:
-            start = time()
-            i = 0
-            redis_pipeline = self.redis.pipeline()
-            logging.debug("Updating %d loci.", num_new_loci)
-
-            loci_values_qs = Locus.objects.values_list('id', 'contig', 'position', 'ref')
-            if old_max_loci_id:
-                loci_values_qs = loci_values_qs.filter(id__gt=old_max_loci_id)
-
-            for locus_id, contig_id, position, ref_id in loci_values_qs.order_by("pk").iterator():
-                locus_hash = self._get_locus_hash(contig_id, position, ref_id)
-
-                redis_pipeline.setnx(locus_hash, locus_id)
-
-                i += 1
-                if i >= settings.REDIS_PIPELINE_SIZE:
-                    logging.info("Pipeline execute (%d)", settings.REDIS_PIPELINE_SIZE)
-                    redis_pipeline.execute()
-                    redis_pipeline = self.redis.pipeline()
-                    i = 0
-
-            if i:
-                redis_pipeline.execute()
-
-            end = time()
-            time_taken = end - start
-            logging.debug("Update took %.1f seconds", time_taken)
-
-        self.redis.set(self.MAX_LOCI_ID, max_loci_id)
+        return DBVariantPKLookup(*args, **kwargs)
 
 
 class DBVariantPKLookup(VariantPKLookup):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reference_seq_id = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT)[0].pk
+
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id
 
@@ -390,7 +227,7 @@ class DBVariantPKLookup(VariantPKLookup):
 
         return [contig_hashes[h[0]].get("_".join([str(s) for s in h[1:]])) for h in hashes]
 
-    def get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
+    def _get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
         annotate_kwargs = {
             "hash": Concat("locus__position", Value("_"), "locus__ref_id", Value("_"), "alt_id",
                            output_field=TextField())
@@ -413,3 +250,6 @@ class DBVariantPKLookup(VariantPKLookup):
             return qs.annotate(**annotate_kwargs)
 
         return self._get_ids_for_hashes(loci_hashes, get_queryset)
+
+    def filter_non_reference(self, variant_hashes, variant_ids) -> List:
+        return [vh_vi[1] for vh_vi in zip(variant_hashes, variant_ids) if vh_vi[0][3] != self.reference_seq_id]

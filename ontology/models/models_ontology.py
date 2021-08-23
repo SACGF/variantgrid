@@ -446,6 +446,17 @@ class OntologySnake:
             text += f" {'<' if not forwards else ''}-{step.relation.relation}-{'>' if forwards else ''} {step.dest_term}"
         return text
 
+    @lazy
+    def _sort_key(self):
+        if steps := self.show_steps():
+            last_step = steps[0]
+            return (last_step.relation.from_import.import_source or '').lower(), len(steps)
+        else:
+            return "", 0
+
+    def __lt__(self, other: 'OntologySnake'):
+        return self._sort_key < other._sort_key
+
     @property
     def leaf_relationship(self) -> OntologyTermRelation:
         return self.paths[-1]
@@ -539,6 +550,8 @@ class OntologySnake:
                     if len(new_snake.paths) <= max_depth:
                         new_snakes.append(new_snake)
                     seen.add(other_term)
+
+        valid_snakes.sort()
 
         return OntologySnakes(valid_snakes)
 

@@ -1,7 +1,8 @@
 from django.test import TestCase, override_settings
+
 from classification.enums import SubmissionSource
-from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.models.classification import Classification
+from classification.models.tests.test_utils import ClassificationTestUtils
 
 
 class ClassificationTestValidation(TestCase):

@@ -12,25 +12,54 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
     <div class="container">
-        <a href="{% url 'clinvar_exports' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all ClinVar Exports</a>
-        <h3>ClinVar Export</h3>
         {% page_help_embedded title='ClinVar Export' %}
             <p>
-            Help will go here for exporting to Clinvar
+            This page shows detailed information about a ClinVar Export record and allows individual records to be marked as On Hold and
+            assigned a SCV.
             </p>
+            <p>Only assign an export a SCV if it already had one from a submission external to {{ site_name }}, otherwise can leave that alone
+            and it will be automatically assigned upon successful submission.</p>
+            <p>You can also review the exact data to be sent to ClinVar as well as the history of data that has been sent for this submitter/allele/condition combination.</p>
         {% end_page_help_embedded %}
 
         <form method="post">
             {% csrf_token %}
             <div class="card mb-4">
-                <div class="card-header">Summary</div>
+                <div class="card-header">Summary of ClinVar Export {{ clinvar_export.pk }}</div>
                 <div class="card-body">
                     {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
-                    {% labelled label="Allele" %}{{ clinvar_export.clinvar_allele.allele }}{% endlabelled %}
+                    {% labelled label="Allele" %}{% with allele=clinvar_export.clinvar_allele.allele %}<a class="hover-link" href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endwith %}{% endlabelled %}
+                    {% labelled label="c.hgvs" %}{% c_hgvs clinvar_export.classification_based_on %}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
-                    {% labelled label="Current Candidate Classification" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">{{ clinvar_export.classification_based_on.classification.friendly_label }}</a>{% endlabelled %}
+                    {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}
+                    {% field_help %}{{ site_name }} updated this export using the data available at this time.{% end_field_help %}
+                    {% endlabelled %}
+                    {% labelled label="Source Classification" %}
+                        {% if clinvar_export.classification_based_on %}
+                            <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
+                                {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
+                            {% field_help %}The classification that will be exported for this allele/condition combination.{% end_field_help %}
+                        {% else %}
+                            <div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>
+                        {% endif %}
+                    {% endlabelled %}
+
+                    {% labelled label="Sync Status" %}
+                        {% if clinvar_export.status == "E" %}{{ 'error' | severity_icon }} <span class="text-danger">Error - see Export Preview for details</span>{% else %}
+                        {{ clinvar_export.get_status_display }}
+                        {% endif %}
+                    {% endlabelled %}
+                    <hr/>
                     {% labelled label="SCV" %}
-                        <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
+                        <div class="input-group">
+                            <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
+                        </div>
+                    {% endlabelled %}
+                    {% labelled label="Release Status" %}
+                        <select name="release_status" class="form-control">
+                            <option value="R">Release When Ready</option>
+                            <option value="H" {% if clinvar_export.release_status == 'H' %}selected{% endif %}>On Hold</option>
+                        </select>
                     {% endlabelled %}
                 </div>
                 <div class="card-footer">
@@ -38,17 +67,15 @@
                 </div>
             </div>
         </form>
-        {% ui_register_tab_embedded label="Other Details" tab_set="clinvar_tabs" %}
-            <h4>Export Preview</h4>
-            <p class="text-muted">This is how the data will be submitted to ClinVar</p>
-            {% with json_messages=clinvar_export.submission_full_current.all_messages %}
-                <ul class="list-group mb-4">
-                    {% for message in json_messages %}
-                        <li class="list-group-item list-group-item-{{ message.bs }}">{{ message.severity | severity_icon }} {{ message.text }}</li>
-                    {% endfor %}
-                </ul>
+        {% ui_register_tab_embedded label="Export Preview" tab_set="clinvar_tabs" %}
+            <p class="text-info">This is the representation data that will be submitted to ClinVar (validation messages wont be sent).</p>
+            {% code_json clinvar_export.submission_full.serialize %}
+            {% with diffs=clinvar_export.differences_since_last_submission %}
+                {% if diffs %}
+                    <h4>Differences Since Last Submission</h4>
+                    {% code_json diffs %}
+                {% endif %}
             {% endwith %}
-            <div class="code formatted-text" id="submission_json">{{ clinvar_export.submission_full_current.to_json | jsonify_pretty }}</div>
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab label="Submission History" tab_set="clinvar_tabs" url="clinvar_export_history" param=clinvar_export.pk %}

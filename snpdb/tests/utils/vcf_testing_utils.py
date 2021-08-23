@@ -1,10 +1,11 @@
 import vcf
 
-from snpdb.models import Locus, Variant, Sequence
+from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantAllele, AlleleOrigin, \
+    AlleleConversionTool
 
 
-def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build) -> Variant:
-    """ For test only - doesn't use Redis """
+def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:
+    """ For test only - doesn't use VariantPKLookup """
     contig = genome_build.contigs.get(name=chrom)
     ref_seq, _ = Sequence.objects.get_or_create(seq=ref.upper(), length=1)
     alt_seq, _ = Sequence.objects.get_or_create(seq=alt.upper(), length=1)
@@ -13,8 +14,20 @@ def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, ge
     return variant
 
 
+def create_mock_allele(variant: Variant, genome_build: GenomeBuild):
+    allele = Allele.objects.create()
+    VariantAllele.objects.create(
+        variant=variant,
+        genome_build=genome_build,
+        allele=allele,
+        origin=AlleleOrigin.IMPORTED_TO_DATABASE,
+        conversion_tool=AlleleConversionTool.DBSNP
+    )
+    return allele
+
+
 def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_variant_id_from_info=False):
-    """ For tests - doesn't use Redis """
+    """ For tests - doesn't use VariantPKLookup """
 
     pk_by_seq = Sequence.get_pk_by_seq()
     for v in vcf.Reader(filename=vcf_filename):

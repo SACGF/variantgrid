@@ -62,6 +62,3 @@ class Command(BaseCommand):
                 total_deleted += variants_deleted
 
         print(f"Total deleted: {total_deleted}")
-        print("You should probably run:")
-        print("python3.8 manage.py load_variants_hash_in_redis --clear")
-        # Convert any ref=alt sequences into alt='='

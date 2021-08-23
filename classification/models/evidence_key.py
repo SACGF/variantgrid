@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict
+from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -10,7 +10,7 @@ from lazy import lazy
 from classification.enums import CriteriaEvaluation, SubmissionSource
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
-from classification.json_utils import strip_json
+from uicore.json.json_utils import strip_json
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
 from library.utils import empty_to_none
@@ -97,7 +97,7 @@ class EvidenceKey(TimeStampedModel):
         :param normal_value_obj: A value or dict with a key value
         :return: A list of options that matched
         """
-        value = None
+        value: Optional[Any]
         if isinstance(normal_value_obj, Mapping):
             value = normal_value_obj.get('value')
         else:
@@ -137,7 +137,7 @@ class EvidenceKey(TimeStampedModel):
     @property
     def virtual_options(self) -> Optional[List[EvidenceKeyOption]]:
         if self.options:
-            return self.options
+            return cast(List[EvidenceKeyOption], self.options)
         if self.value_type == EvidenceKeyValueType.CRITERIA:
             for criteria in [CriteriaEvaluation.BENIGN_OPTIONS,
                              CriteriaEvaluation.NEUTRAL_OPTIONS,
@@ -145,7 +145,7 @@ class EvidenceKey(TimeStampedModel):
                 if self.default_crit_evaluation in (o.get('key') for o in criteria):
                     return EvidenceKey.__special_up_options(criteria, self.default_crit_evaluation)
             print(f"Warning, could not work out what list {self.default_crit_evaluation} fits into")
-            return []
+            return list()
 
         return None
 
@@ -168,8 +168,8 @@ class EvidenceKey(TimeStampedModel):
         return self.classification_sorter_value(val)
 
     def validate(self):
-        if self.options:
-            for option in self.options:
+        if options := self.options:
+            for option in options:
                 option_key = option.get('key')
                 if option_key is not None:
                     if ' ' in option_key:
@@ -259,14 +259,14 @@ class EvidenceKey(TimeStampedModel):
                 value = [value]
             str_values = []
             for val in value:
-                match: Dict
+                matched_option: Dict
                 if val == '' or val is None:
-                    match = next((option for option in options if option.get('key') is None or option.get('key') == ''), None)
+                    matched_option = next((option for option in options if option.get('key') is None or option.get('key') == ''), None)
                 else:
-                    match = next((option for option in options if option.get('key') == val), None)
+                    matched_option = next((option for option in options if option.get('key') == val), None)
 
-                if match:
-                    part_value = match.get('label') or EvidenceKey.pretty_label_from_string(match.get('key'))
+                if matched_option:
+                    part_value = matched_option.get('label') or EvidenceKey.pretty_label_from_string(matched_option.get('key'))
                 else:
                     part_value = val
                 if part_value is not None:

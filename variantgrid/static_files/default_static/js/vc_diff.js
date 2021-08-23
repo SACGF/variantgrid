@@ -511,7 +511,13 @@ const Diff = (function() {
                         }
                         let diffBreakdownString = diffBreakdown.join('<br/>');
 
-                        let keyDescription = eKey.description || '';
+                        let keyDescription;
+                        if (eKey.description) {
+                            keyDescription = EKeys.fixDescription(eKey.description).prop('outerHTML').replaceAll("\n", "<br/>");
+                        } else {
+                            keyDescription = "";
+                        }
+                        let content = $('<div>', {style:'white-space: pre-wrap;'});
                         th.attr('title', eKey.label);
                         th.attr('data-content', `${diffHelp}<br>${diffBreakdownString}<br>---<br>${keyDescription}`);
 

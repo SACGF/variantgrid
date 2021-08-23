@@ -51,10 +51,16 @@ class FlagResolution(TimeStampedModel, ModelUtilsMixin):
     description = models.TextField()
     status = models.TextField(max_length=1, default=FlagStatus.OPEN, choices=FlagStatus.CHOICES)
 
+    def __str__(self):
+        return self.label
+
 
 class FlagTypeContext(models.Model, ModelUtilsMixin):
     id = models.TextField(primary_key=True)
     label = models.TextField()
+
+    def __str__(self):
+        return self.label
 
 
 class FlagType(TimeStampedModel, ModelUtilsMixin):
@@ -66,6 +72,9 @@ class FlagType(TimeStampedModel, ModelUtilsMixin):
     help_text = models.TextField(default='')
 
     raise_permission = models.TextField(max_length=1, choices=FlagPermissionLevel.choices(), default=FlagPermissionLevel.ADMIN.value)
+
+    def __str__(self):
+        return self.label
 
     @property
     def raise_permission_enum(self) -> FlagPermissionLevel:
@@ -276,7 +285,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         permission = self.permission_level(user)
         return permission in (FlagPermissionLevel.ADMIN, FlagPermissionLevel.OWNER)
 
-    def flags(self, user: User = None, only_open=False) -> QuerySet:
+    def flags(self, user: User = None, only_open=False) -> QuerySet[Flag]:
         if not user:
             qs = Flag.objects.filter(collection=self)
         else:
@@ -291,7 +300,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         return qs
 
     @staticmethod
-    def filter_for_open_flags(qs: QuerySet, flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet:
+    def filter_for_open_flags(qs: QuerySet['FlagsMixin'], flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet:
         """
         Takes the QuerySet and returns a filtered version where the item contain at least one of the provided flag_types
         e.g. if you passed in a QuerySet of Alleles and a missing 38 flag type, the resulting QuerySet will still be Alleles

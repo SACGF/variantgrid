@@ -6,6 +6,7 @@ from snpdb.models import Trio
 
 register = Library()
 
+
 @register.inclusion_tag("snpdb/tags/trio_table.html", takes_context=False)
 def trio_table(trio: Trio):
     return {"trio": trio}

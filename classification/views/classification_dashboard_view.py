@@ -11,7 +11,7 @@ from snpdb.models import Lab
 from snpdb.models.models_genome import GenomeBuild
 from classification.models.classification import Classification, \
     ClassificationModification
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_export_flags import ExportFormatterFlags
 
 
@@ -56,7 +56,7 @@ def dashboard(request: HttpRequest) -> Response:
     }
 
     context = {
-        "datatable_config": ClassificationDatatableConfig(request),
+        "datatable_config": ClassificationColumns(request),
         "labs": labs,
         "counts": issue_counts
     }

@@ -1,0 +1,20 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load classification_tags %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
+{% load datatable_tags %}
+{% block title %}Clinical Key Summary{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        <h3>ClinVar Export Summary</h3>
+        <hr/>
+        <p>{{ 'info' | severity_icon }} Your lab is not currently configured for ClinVar exports - by the {{ site_name }} administrators.</p>
+        <p>After usage of the ClinVar API has been finalised, ClinVar export functionality will be opened up to all labs.</p>
+        <hr/>
+    </div>
+{% endblock %}

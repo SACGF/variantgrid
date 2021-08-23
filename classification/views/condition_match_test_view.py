@@ -105,6 +105,9 @@ def condition_match_test_view(request):
                 valid = False
     if valid:
         auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
+        for error in auto_matches.errors:
+            messages.error(request, error)
+
         suggestion = top_level_suggestion(normalize_condition_text(condition_text))
         if suggestion and gene_symbol:
             has_gene_symbol = OntologySnake.has_gene_relationship(suggestion.terms[0], gene_symbol)

@@ -28,7 +28,7 @@ from annotation.models.molecular_consequence_enums import MolecularConsequenceCo
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification
 from classification.models.classification_utils import classification_gene_symbol_filter
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
@@ -317,7 +317,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     )
     context["show_wiki"] = settings.VIEW_GENE_SHOW_WIKI
     context["show_annotation"] = settings.VARIANT_DETAILS_SHOW_ANNOTATION
-    context["datatable_config"] = ClassificationDatatableConfig(request)
+    context["datatable_config"] = ClassificationColumns(request)
 
     return render(request, "genes/view_gene_symbol.html", context)
 

@@ -74,7 +74,7 @@
         </div>
         {% endif %}
 
-        <p>For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
+        <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
         {% labelled label="Showing issues for your labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
         <a class="btn btn-outline-primary" href="{% url 'classification_dashboard_download' %}"><i class="fas fa-file-csv"></i> Download all issues requiring action</a>
 

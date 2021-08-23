@@ -1,11 +1,10 @@
 """
-
-Uploaded VCFs are first passed through this command to make sure contigs are ok
-
-(VT will die on bad contigs)
-
+Uploaded VCFs are first passed through this command to fix things that will cause VT to die (eg bad contigs)
 """
+import re
 from collections import Counter
+
+from django.conf import settings
 from django.core.management.base import BaseCommand
 import sys
 
@@ -17,12 +16,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--vcf', help='VCF file, default: - (stdin)', default="-")
         parser.add_argument('--genome-build', help='GenomeBuild name', required=True)
-        parser.add_argument('--unknown-contigs-stats-file', help='File name to write stats')
+        parser.add_argument('--skipped-contigs-stats-file', help='File name')
+        parser.add_argument('--skipped-records-stats-file', help='File name')
 
     def handle(self, *args, **options):
         vcf_filename = options["vcf"]
         build_name = options["genome_build"]
-        skipped_contigs_stats_file = options.get("unknown_contigs_stats_file")
+        skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
+        skipped_records_stats_file = options.get("skipped_records_stats_file")
 
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
@@ -35,6 +36,13 @@ class Command(BaseCommand):
             f = open(vcf_filename)
 
         skipped_contigs = Counter()
+        skipped_records = Counter()
+
+        skip_patterns = {}
+        if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):
+            for name, regex in skip_regex.items():
+                skip_patterns[name] = re.compile(regex)
+
         for line in f:
             if line and line[0] != '#':
                 chrom, rest_of_line = line.split("\t", 1)
@@ -48,11 +56,28 @@ class Command(BaseCommand):
                         skipped_contigs[chrom] += 1
                     continue
 
+                if skip_patterns:
+                    if skip_reason := self._check_skip_line(skip_patterns, line):
+                        skipped_records[skip_reason] += 1
+                        continue
+
                 sys.stdout.write("\t".join([fasta_chrom, rest_of_line]))
             else:
                 sys.stdout.write(line)
 
-        if skipped_contigs_stats_file:
-            with open(skipped_contigs_stats_file, "w") as f:
-                for contig, count in skipped_contigs.items():
-                    f.write('%s\t%d\n' % (contig, count))
+        self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
+        self._write_skip_counts(skipped_records, skipped_records_stats_file)
+
+    @staticmethod
+    def _write_skip_counts(counts, filename):
+        if counts and filename:
+            with open(filename, "w") as f:
+                for name, count in counts.items():
+                    f.write('%s\t%d\n' % (name, count))
+
+    @staticmethod
+    def _check_skip_line(skip_patterns: dict, line: str):
+        for name, pattern in skip_patterns.items():
+            if pattern.findall(line):
+                return name
+        return None

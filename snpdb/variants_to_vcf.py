@@ -82,7 +82,9 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
 
     qs = vcf.get_variant_qs(original_qs)
     ca = vcf.cohort.cohort_genotype_collection.cohortgenotype_alias
-    qs = qs.filter(**{f"{ca}__filters__isnull": True})  # Somalier only uses PASS by default
+    # Restrict to just this build (was returning multiple results due to GRCh37/hg19)
+    qs = qs.filter(locus__contig__genomebuildcontig__genome_build=vcf.genome_build,
+                   **{f"{ca}__filters__isnull": True})  # Somalier only uses PASS by default
     columns = ["id", "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq",
                f"{ca}__samples_zygosity", f"{ca}__samples_allele_depth",
                f"{ca}__samples_read_depth", f"{ca}__samples_allele_frequency"]

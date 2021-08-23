@@ -11,6 +11,7 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
@@ -24,7 +25,7 @@ from classification.models.discordance_models import DiscordanceReport, Discorda
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_ref import ClassificationRef
-from classification.templatetags.js_tags import jsonify
+from uicore.templatetags.js_tags import jsonify
 
 register = Library()
 
@@ -90,6 +91,8 @@ def classification_groups(
 
 
 def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):
+    if isinstance(val, ClassificationModification):
+        val = val.get(key)
     if not key:
         raise ValueError('ekey filter must have a key')
     e_key = EvidenceKeyMap.cached_key(key)
@@ -261,8 +264,14 @@ def classification_table(
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
 def c_hgvs(c_hgvs: Union[CHGVS, str]):
-    if isinstance(c_hgvs, str):
+    if isinstance(c_hgvs, ClassificationModification):
+        if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
+            c_hgvs = CHGVS(c_hgvs)
+            c_hgvs.genome_build = GenomeBuildManager.get_current_genome_build()
+
+    elif isinstance(c_hgvs, str):
         c_hgvs = CHGVS(c_hgvs)
+
     return {"c_hgvs": c_hgvs}
 
 

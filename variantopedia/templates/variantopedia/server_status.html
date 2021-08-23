@@ -24,8 +24,13 @@
             $('#kill-query').submit();
         }
     }
+    function testRollbarJs() {
+        Rollbar.error("Testing Rollbar JS");
+        window.alert("If configured correctly, Rollbar should have recorded an error.");
+        return false;
+    }
     </script>
-    <style type="text/css">
+    <style>
         div#reference-check {
             margin: 20px 0px 20px 0px;
         }
@@ -69,9 +74,6 @@
         </div>
         {% endif %}
 
-        {% if redis_status %}
-        {% labelled id="redis" label="Redis" %}<div class="alert alert-{{ redis_status }}">{{  redis_message }}</div>{% endlabelled %}
-        {% endif %}
         {% labelled id="highest_variant" label="Highest Variant Annotated w/latest" %}<div class="alert alert-{{ highest_variant_annotated.status }}">{{  highest_variant_annotated.message }}</div>{% endlabelled %}
         {% labelled id="low_disk" label="Disk Free" %}
             <div class="alert alert-{{ disk_free.status }}">
@@ -273,13 +275,15 @@
         <div class="row mt-4"></div>
         <form method="POST">
             {% csrf_token %}
-            <input type="hidden" name="action" value="test-slack" />
             <div class="btn-toolbar mt-4">
                 {% if url_name_visible.view_upload_stats %}
                     <a href="{% url 'view_upload_stats' %}" class="btn btn-outline-primary">Upload Stats</a>
                 {% endif %}
                 <a href="{% url 'database_statistics' %}" class="btn btn-outline-primary">Database statistics</a>
-                <input type="submit" value="Test Slack" class="btn btn-outline-secondary" />
+                <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
+                <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
+                <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="return testRollbarJs()" />
+                <input type="submit" name="action" value="Test Message Branding" class="btn btn-outline-secondary" />
             </div>
         </form>
 

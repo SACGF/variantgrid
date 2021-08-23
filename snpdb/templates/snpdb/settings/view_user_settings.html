@@ -49,11 +49,11 @@
                 <div id='edit-avatar'></div>
                 {% avatar user class='circular-avatar' %}<a class="hover-link" href="javascript:changeAvatar()"><br/>Change avatar</a>
             {% endlabelled %}
-            {% labelled id="user_name" label="User name" %}{{ user.username }}{% endlabelled %}
+            {% labelled id="user_name" label="Username" %}{{ user.username }}{% endlabelled %}
             {% if use_oidc %}
-                {% labelled id="first_name" label="First name" %}{{ user.first_name }}{% endlabelled %}
-                {% labelled id="last_name" label="Last name" %}{{ user.last_name }}{% endlabelled %}
-                {% labelled id="email" label="Email address" %}{{ user.email }}{% endlabelled %}
+                {% labelled id="first_name" label="First Name" %}{{ user.first_name }}{% endlabelled %}
+                {% labelled id="last_name" label="Last Name" %}{{ user.last_name }}{% endlabelled %}
+                {% labelled id="email" label="Email Address" %}{{ user.email }}{% endlabelled %}
             {% else %}
                 {% crispy user_form form_helper.horizontal_nested %}
             {% endif %}
@@ -64,8 +64,11 @@
             {% endif %}
 
             {% if group_initial_perm_forms %}
-            <h3>Groups</h3>
-            <p>
+            {% page_help_embedded "Groups" %}
+                <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.
+            {% end_page_help_embedded %}
+
+            <p class="text-info">
                 The settings below are how data is initially shared with your groups.
                 You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
             </p>

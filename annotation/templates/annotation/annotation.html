@@ -9,7 +9,6 @@
 {% block head %}
 <script>
     $(document).ready(() => {
-        fixLinks();
         $(".load-cached-web-resource").click(function() {
             const cwr_name = $(this).attr("cached-web-resource");
             const loadButton = $(this);
@@ -123,7 +122,7 @@
                             <div id="{{ build_name }}-contigs" class='contig-details collapse'>{{ details.contigs.contigs }}</div>
                         </div>
                     {% endlabelled %}
-                    {% labelled label="Gene/Transcript information" %}
+                    {% labelled label="Gene/Transcript Information" %}
                         {% if details.genes_and_transcripts %}
                             <div>
                                 <b>Annotation:</b> {{ details.annotation_consortium }}
@@ -390,9 +389,9 @@ If all the files are in place, the uploads can be triggered by a single command 
 
                     {% endinstall-instructions %}
                 {% endlabelled %}
-                    <hr/>
                 </div>
                 {% if somalier_enabled %}
+                     <hr/>
                     {% labelled label="Somalier" %}
                         {% if somalier %}
                             {{ somalier }}

@@ -33,7 +33,7 @@
         "parents_should_cache": false,
         "analysis_update_uuid": null,
         "status": "R",
-        "impact_min": "M",
+        "impact_min": "3",
         "always_keep_splice_variants_regardless_of_impact": true,
         "cadd_score_min": null,
         "revel_score_min": null,

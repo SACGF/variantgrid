@@ -75,7 +75,7 @@
 {% block content %}
     <div class="container-table">
         <h3>HGVS Issues</h3>
-        <p>Note that only Alleles with 1 or more classifications attached will be considered.</p>
+        <p class="text-info">Note that only Alleles with 1 or more classifications attached will be considered.</p>
         <a class="btn btn-outline-primary" href="{% url 'hgvs_issues_download' %}"><i class="fas fa-file-csv"></i> Download HGVS Allele Issues</a>
         <div class="mt-4">
         {% ui_register_tab_embedded tab_set="hgvs_issues" label="Missing 37/38" badge=counts.allele.missing_rep %}

@@ -29,7 +29,7 @@ from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback
+from library.log_utils import report_exc_info, log_traceback, report_message
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -43,7 +43,6 @@ from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMerge
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
-from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
@@ -103,8 +102,18 @@ def dashboard(request):
 def server_status(request):
     if request.method == "POST":
         action = request.POST.get('action')
-        if action == 'test-slack':
+        if action == 'Test Slack':
             notify_server_status.apply_async()
+            messages.add_message(request, level=messages.INFO, message=f"Slack should have been sent the health check.")
+        elif action == 'Test Rollbar':
+            report_message("Testing Rollbar", level='error')
+            messages.add_message(request, level=messages.INFO, message=f"Rollbar should have been sent an error.")
+        elif action == 'Test Message Branding':
+            messages.success(request, "Success message")
+            messages.info(request, "Info message")
+            messages.warning(request, "Warning message")
+            messages.error(request, "Error message")
+
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
             with connection.cursor() as cursor:
@@ -113,6 +122,9 @@ def server_status(request):
                 messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
         else:
             print(f"Unrecognised action {action}")
+
+        return redirect(reverse('server_status'))
+
         # TODO should redirect to read-only version of the page
 
     celery_workers = {}
@@ -152,22 +164,6 @@ def server_status(request):
             _ = genome_build.reference_fasta  # Throws exception on error
     except (KeyError, FileNotFoundError):
         can_access_reference = False
-
-    try:
-        variant_pk_lookup = VariantPKLookup.factory()
-        redis_check = getattr(variant_pk_lookup, "redis_check", None)
-        if redis_check is None:
-            redis_status = None
-            redis_message = None
-        elif redis_check:
-            redis_status = "info"
-            redis_message = "OK"
-        else:
-            redis_status = "warning"
-            redis_message = "Inserts running - unable to check"
-    except ValueError as ve:
-        redis_status = "danger"
-        redis_message = str(ve)
 
     # Variant Annotation - incredibly quick check
     highest_variant_annotated = {}
@@ -214,16 +210,16 @@ def server_status(request):
     dashboard_notices = get_dashboard_notices(request.user, days_ago)
     total_counts = get_total_counts(request.user)
 
-    context = {"celery_workers": celery_workers,
-               "queries": long_running_sql(),
-               "can_access_reference": can_access_reference,
-               "redis_status": redis_status,
-               "redis_message": redis_message,
-               "disk_free": disk_free,
-               "highest_variant_annotated": highest_variant_annotated,
-               "sample_enrichment_kits_df": sample_enrichment_kits_df,
-               "dashboard_notices": dashboard_notices,
-               "total_counts": total_counts}
+    context = {
+        "celery_workers": celery_workers,
+        "queries": long_running_sql(),
+        "can_access_reference": can_access_reference,
+        "disk_free": disk_free,
+        "highest_variant_annotated": highest_variant_annotated,
+        "sample_enrichment_kits_df": sample_enrichment_kits_df,
+        "dashboard_notices": dashboard_notices,
+        "total_counts": total_counts,
+    }
     return render(request, "variantopedia/server_status.html", context)
 
 

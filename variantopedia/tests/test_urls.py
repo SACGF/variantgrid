@@ -37,7 +37,7 @@ class Test(URLTestCase):
         super().tearDownClass()
 
     def testUrls(self):
-        # Don't test 'server_status' as it polls Redis and Celery worker queues etc
+        # Don't test 'server_status' as it polls Celery worker queues etc
         variant_kwargs = {"variant_id": self.variant.pk}
 
         URL_NAMES_AND_KWARGS = [

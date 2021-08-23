@@ -1,21 +1,28 @@
-from typing import List, Any, Mapping, TypedDict
+from re import RegexFlag
+from typing import List, Any, Mapping, TypedDict, Union
 import bs4
 from lazy import lazy
 
 from annotation.regexes import DbRegexes
-from classification.enums import SpecialEKeys
-from classification.json_utils import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
+from classification.enums import SpecialEKeys, EvidenceKeyValueType
+from library.utils import html_to_text
+from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition, ClinVarExport
+    MultiCondition, ClinVarExport, classification_flag_types
 from classification.models.evidence_mixin import VCDbRefDict
 from ontology.models import OntologyTerm, OntologyService
-from snpdb.models import GenomeBuild
+from snpdb.models import ClinVarKey
+import re
+import json
+
+
+# Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
 
 
 class ClinVarEvidenceKey:
     """
-    Handles the basic mapping for evidence keys to ClinVar
-    Revolves around select/mutli-select fields having equivilents
+    Handles the basic mapping of a single field to ClinVar
+    Revolves around select/mutli-select fields having equivalents
     """
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
@@ -53,6 +60,10 @@ class ClinVarEvidenceKey:
                 raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT")
 
     def value(self, single: bool = True, optional: bool = False) -> ValidatedJson:
+        """
+        :param single: Is a single value expected. Adds an error to ValidatedJson if number of values is 2 or more.
+        :param optional: Is the value optional, if not adds an error to ValidatedJson if number of values is zero.
+        """
         messages = self.messages
         if len(self.values) == 0:
             if not optional:
@@ -70,7 +81,13 @@ class ClinVarEvidenceKey:
         return len(self.values) > 0
 
 
+# Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
+
+
 class ClinVarCitation(TypedDict, total=False):
+    """
+    Dictionary representation of a citation in the ClinVar format
+    """
     db: str
     id: str
     url: str
@@ -81,85 +98,37 @@ class ClinVarExportConverter:
     CITATION_DB_MAPPING = {
         DbRegexes.PUBMED.db: "PubMed",
         DbRegexes.PMC.db: "pmc",
-        DbRegexes.NCBIBookShelf.db: "BookShelf"  # TODO confirm this is correct mapping
+        DbRegexes.NCBIBookShelf.db: "BookShelf"
+    }
+
+    FLAG_TYPES_TO_MESSAGES = {
+        classification_flag_types.classification_withdrawn: JsonMessages.error("Classification has since been withdrawn"),
+        classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
+        classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
+        classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
+        classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
     }
 
     def __init__(self, clinvar_export_record: ClinVarExport):
+        """
+        :param clinvar_export_record: the record to use as a basis to convert to ClinVar json (with validation)
+        """
         self.clinvar_export_record = clinvar_export_record
+
+    @lazy
+    def clinvar_key(self) -> ClinVarKey:
+        return self.clinvar_export_record.clinvar_allele.clinvar_key
 
     @property
     def classification_based_on(self) -> ClassificationModification:
         return self.clinvar_export_record.classification_based_on
 
-    # convenience method for forms
-    def evidence_key(self, key: str):
-        return EvidenceKeyMap.cached().get(key).pretty_value(self.classification_based_on.get(key), dash_for_none=True)
-
-    @property
-    def allele_origin(self):
-        return self.evidence_key(SpecialEKeys.ALLELE_ORIGIN)
-
-    @property
-    def mode_of_inheritance(self):
-        return self.evidence_key(SpecialEKeys.MODE_OF_INHERITANCE)
-
-    @property
-    def affected_status(self):
-        return self.evidence_key(SpecialEKeys.AFFECTED_STATUS)
-
-    @property
-    def genome_build(self):
-        return self.evidence_key(SpecialEKeys.GENOME_BUILD)
-
-    @property
-    def interpretation_summary(self):
-        # strip out any XML
-        interpret = self.evidence_key(SpecialEKeys.INTERPRETATION_SUMMARY)
-        soup = bs4.BeautifulSoup(interpret, 'lxml')
-        return soup.text
-
-    @property
-    def curation_context(self):
-        return self.evidence_key(SpecialEKeys.CURATION_CONTEXT)
-
-    @property
-    def assertion_method(self):
-        return self.evidence_key(SpecialEKeys.ASSERTION_METHOD)
-
-    # probably wont use this
-    @property
-    def patient_phenotype(self):
-        return self.evidence_key(SpecialEKeys.PATIENT_PHENOTYPE)
-
-    @property
-    def clinical_significance(self):
-        return self.evidence_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
     @property
     def citation_refs(self) -> List[VCDbRefDict]:
-        # TODO allow other database references "PubMed", "BookShelf", "DOI", "pmc"
-        # TODO check to see if the PubMeds exist?
         pubmed_refs = {ref.get('id'): ref for ref in self.classification_based_on.db_refs if ref.get('db') in ClinVarExportConverter.CITATION_DB_MAPPING}
         unique_refs = list(pubmed_refs.values())
         unique_refs.sort(key=lambda x: x.get('id'))
         return unique_refs
-
-    @property
-    def condition(self) -> str:
-        """
-        Note condition isn't actually sent, but the value from ConditionTextMatching
-        this is just here for reference
-        """
-        return self.evidence_key(SpecialEKeys.CONDITION)
-
-    @property
-    def curated_date(self):
-        return self.classification_based_on.curated_date
-
-    @property
-    def c_hgvs(self):
-        gb = GenomeBuild.get_from_fuzzy_string(self.genome_build)
-        return self.classification_based_on.classification.get_c_hgvs(genome_build=gb)
 
     def clinvar_value(self, key: str) -> ClinVarEvidenceKey:
         evidence_key = EvidenceKeyMap.cached_key(key)
@@ -167,15 +136,14 @@ class ClinVarExportConverter:
         return ClinVarEvidenceKey(evidence_key, value)
 
     def value(self, key: str) -> Any:
-        if value := self.classification_based_on.get(key):
-            if isinstance(value, str):
-                # FIXME, only do if key is multiline text
-                soup = bs4.BeautifulSoup(value, 'lxml')
-                return soup.text
-        return value
+        value = self.classification_based_on.get(key)
+        if isinstance(value, str) and EvidenceKeyMap.cached_key(key).value_type == EvidenceKeyValueType.TEXT_AREA:
+            return html_to_text(value, preserve_lines=True)
+        else:
+            return value
 
     @lazy
-    def as_json(self) -> ValidatedJson:
+    def as_validated_json(self) -> ValidatedJson:
         data = dict()
         if self.classification_based_on is None:
             return ValidatedJson(None, JsonMessages.error("No classification is currently associated with this allele and condition"))
@@ -184,52 +152,81 @@ class ClinVarExportConverter:
             data["clinicalSignificance"] = self.json_clinical_significance
             data["conditionSet"] = self.condition_set
             allele_id = self.clinvar_export_record.clinvar_allele.allele_id
+
             local_id = f"ALLELE_{allele_id}"
+            c = self.classification_based_on.classification
+            local_key = c.lab.group_name + "/" + c.lab_record_id
+
+            """
+            # Below was used when condition was literally part of the localID
             # Important, using the umbrella term as it doesn't change
             condition = self.clinvar_export_record.condition_resolved
             term_ids = "_".join([term.id.replace(":", "_") for term in condition.terms])
             if join := condition.join:
                 join = MultiCondition(join)
                 term_ids = f"{term_ids}_{join.value}"
+            """
 
             data["localID"] = local_id
-            data["localKey"] = f"{local_id}_{term_ids}"
+            data["localKey"] = local_key
             data["observedIn"] = self.observed_in
             data["releaseStatus"] = "public"
             data["variantSet"] = self.variant_set
 
-            return ValidatedJson(data)
+            messages = JSON_MESSAGES_EMPTY
+            for flag in self.classification_based_on.classification.flag_collection.flags(only_open=True):
+                if message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
+                    messages += message
+
+            return ValidatedJson(data, messages)
 
     @property
     def variant_set(self) -> ValidatedJson:
         try:
             genome_build = self.classification_based_on.get_genome_build()
             if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
-                return ValidatedJson({"hgvs": c_hgvs})
+                json_data = {"variant": [{"hgvs": c_hgvs}]}
+                errors = JSON_MESSAGES_EMPTY
+
+                if c_hgvs.startswith("ENST"):
+                    errors += JsonMessages.error("ClinVar doesn't support Ensembl transcripts")
+
+                return ValidatedJson(json_data, errors)
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
-        except:
+        except BaseException:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property
-    def json_assertion_criteria(self) -> ValidatedJson:
-        data = dict()
-        acmg_citation = {
-            "db": "PubMed",
-            "id": "PubMed:25741868"
-        }
+    def json_assertion_criteria(self) -> Union[dict, ValidatedJson]:
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
-        if assertion_criteria == "acmg":
-            data["citation"] = acmg_citation
-            data["method"] = EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value(assertion_criteria)
-        elif assertion_criteria is None:
-            data["citation"] = ValidatedJson(None, JsonMessages.error("No value for required field \"Assertion method\""))
-            data["method"] = None
-        else:
-            data["citation"] = ValidatedJson(acmg_citation, JsonMessages.error(f"ADMIN: AssertionMethod value \"{assertion_criteria}\" can't provide citation for it yet"))
-            data["method"] = None
 
-        return ValidatedJson(data)
+        assertion_method_lookups = self.clinvar_key.assertion_method_lookup
+        acmg_criteria = {
+            "citation": {
+                "db": "PubMed",
+                "id": "PubMed:25741868"
+            },
+            "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value("acmg")
+        }
+
+        if assertion_criteria == "acmg":
+            return acmg_criteria
+        else:
+            for key, criteria in assertion_method_lookups.items():
+                raw_criteria = criteria
+                if criteria == "acmg":
+                    criteria = acmg_criteria
+
+                if not assertion_criteria:
+                    if not criteria or re.compile(key, RegexFlag.IGNORECASE).match(""):
+                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
+                else:
+                    expr = re.compile(key, RegexFlag.IGNORECASE)
+                    if expr.match(assertion_criteria):
+                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
+            else:
+                return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:
@@ -241,15 +238,25 @@ class ClinVarExportConverter:
                     "id": str(citation.get("idx"))  # TODO confirm this is the kind of ID they want, not the prefixed one?
                 }
                 return citation
-            data["citations"] = [citation_to_json(citation) for citation in citations]
+            data["citation"] = [citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
+
+        comment_parts: List[str] = list()
+
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
-            data["comment"] = interpret
+            comment_parts.append(interpret.strip())
+
+        if self.clinvar_key.inject_acmg_description and (acmg_summary := self.classification_based_on.criteria_strength_summary()):
+            comment_parts.append(acmg_summary)
+
+        if comment_parts:
+            data["comment"] = "\n\n".join(comment_parts)
+
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
             # FIXME also check validation date?
             data["dateLastEvaluated"] = date_last_evaluated
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
-            data["modeOfInheritance"] = mode_of_inheritance.value(single=False)
+            data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
         return ValidatedJson(data)
 
     @property
@@ -283,12 +290,20 @@ class ClinVarExportConverter:
 
     @property
     def observed_in(self) -> ValidatedJson:
+        # can return array, but we only have one
+        # (though
         data = dict()
-        data["affectedStatus"] = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS).value(single=True)
+        affected_status_value = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS)
+        if affected_status_value:
+            data["affectedStatus"] = affected_status_value.value(single=True)
+        elif default_affected_status := self.clinvar_key.default_affected_status:
+            data["affectedStatus"] = ValidatedJson(default_affected_status, JsonMessages.info("Using configured default for affected status"))
+        else:
+            data["affectedStatus"] = ValidatedJson(None, JsonMessages.error("Affected status not provided and no default config provided"))
         if allele_origin := self.clinvar_value(SpecialEKeys.ALLELE_ORIGIN).value(single=True, optional=True):
-            data["allele_origin"] = allele_origin
+            data["alleleOrigin"] = allele_origin
         else:
             data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided"))
         data["collectionMethod"] = "curation"  # TODO confirm hardcoded of curation
         # numberOfIndividuals do we do anything with this?
-        return ValidatedJson(data)
+        return ValidatedJson([data])

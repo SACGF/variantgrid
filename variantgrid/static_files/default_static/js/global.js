@@ -1,23 +1,44 @@
-function setupTooltips() {
-    tooltipsDoms = $('[data-toggle=tooltip]');
-    tooltipsDoms.tooltip({html:true, trigger : 'hover'});
-    tooltipsDoms.click(function(e) {
-        $(this).tooltip('hide');
-    });
+/*jshint esversion: 6 */
+/*globals $:false, jQuery:false, console:false, moment:false, Rollbar:false */
+/*globals toMarkdown:false */
 
-    // when hitting enter on an input that has an input-group-append button
-    // automatically trigger the button
-    $('.input-group-append').closest('.input-group').find('input').keyup(function(event) {
-        if (event.which === 13) {
-            let button = $(this).closest('.input-group').find('.input-group-append .btn');
-            if (button.length) {
-                event.preventDefault();
-                event.stopPropagation();
-                button.click();
-            }
+function tweakAjax() {
+    // automatically send X-CSRFToken on ajax calls
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            //if (settings.type == 'POST' || settings.type == 'PUT' || settings.type == 'DELETE' || settings.type == 'PATCH') {
+                if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+                    // Only send the token to relative URLs i.e. locally.
+                    xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+                } else {
+                    // console.log("Didn't add CSRF! to external url '" + settings.url + "'");
+                }
+            //}
         }
     });
 
+    $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+        console.log(settings);
+        if (settings.suppressErrors) {
+            return;
+        }
+        // only relevant when using ODIC https://mozilla-django-oidc.readthedocs.io/en/stable/xhr.html
+        if (jqxhr.status === 403 && jqxhr.getResponseHeader('refresh_url')) {
+                // shouldn't happen anymore if avoid sending cookie refresh on ajax call
+                alert('Session has timed out, refreshing');
+                //document.location.href = jqxhr.headers.get("refresh_url");
+                location.reload();
+            //}
+        }
+        console.log("Ajax error");
+        console.log(event);
+        console.log(jqxhr);
+        // messagePoller.stop_polling();
+        // $.blockUI({ message: $('#ajax-error') });
+    });
+}
+
+function enhanceAndMonitor() {
     let popoverOpts = {
         html: true,
         trigger: 'hover click',
@@ -28,25 +49,171 @@ function setupTooltips() {
             return $(this).attr('title');
         }
     };
-    $('[data-content]').popover(popoverOpts);
 
-    function checkNode(node) {
-        // tooltips in jqgrid freak out popover
-        if (node.attr('role') === 'gridcell') {
-            return;
-        }
+    // setup a list of processors
+    // they have a test (a selector for a node to meet)
+    // then an action to perform over that node if the test is met
+    // done like this so can respond to dynamically added elements through ajax or complicated js
+    let processors = [
+        // these elements don't like being screwed with
+        // by providing no function it means anything tht is one of these will be skipped
+        {test: `[role="gridcell"]`, func: null},
+        {test: `.select2-selection__clear`, func: null},
 
-        if (node.attr('data-content')) {
-            node.addClass('hover-detail');
-            node.popover(popoverOpts);
-        } else if (node.attr('title') && node.attr('class') !== 'select2-selection__clear') {
-            node.tooltip({html: true, trigger : 'hover'});
-            $(node).click(function(e) {
-                $(this).tooltip('hide');
+        // load ajax blocks as soon as we see them
+        {test: '[data-toggle="ajax"]', func: (node) => {loadAjaxBlock(node);}},
+
+        {test: '[data-toggle="ajax-modal"]', func: (node) => {
+            node.addClass('modal-link');
+            node.click(function() {
+                loadAjaxModal($(this));
+                return false;
             });
+        }},
+
+        // setup popovers
+        {test: '[data-content]', func: (node) => {node.addClass('hover-detail'); node.popover(popoverOpts);}},
+
+        // everything with a title (that isn't data-content aka popover) give a tooltip
+        {test: '[title]:not([data-content])',
+            func: (node) => {
+                node.tooltip({html:true, trigger : 'hover'});
+                node.click(function(e) {$(this).tooltip('hide');});
+            }
+        },
+        // load the active ajax tab now
+        {test: '.nav-tabs a.active[data-href][data-toggle="tab"]',
+            func: (node) => {loadAjaxTab(node);}
+        },
+        // load ajax tabes when they become shown
+        {test: '.nav-tabs a[data-href][data-toggle="tab"]',
+            func: (node) => {node.on('shown.bs.tab', function(e) {loadAjaxTab($(this));});}
+        },
+        // input with button at the end, have it so if you hit enter in the input, hte button activates
+        {test: '.input-group-append',
+            func: (node) => {
+                node.closest('.input-group').find('input').keyup(function (event) {
+                    if (event.which === 13) {
+                        let button = $(this).closest('.input-group').find('.input-group-append .btn');
+                        if (button.length) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            button.click();
+                        }
+                    }
+                });
+            }
+        },
+        // timestamps
+        {test: '.convert-timestamp', func: (node) => { convertTimestampDom(node); }},
+
+        {test: '.format-json', func: (node) => {
+            let text = node.text().trim();
+            let textJson = JSON.parse(text);
+            let prettyHtml = formatJson(textJson);
+            prettyHtml.attr('class', node.attr('class') + ' ' + prettyHtml.attr('class'));
+            prettyHtml.removeClass('format-json');
+            prettyHtml.attr('data-p', 1);
+            node.replaceWith(prettyHtml);
+        }},
+
+        // if have a wide checkbox row, make it so clicking anywhere on the row activates the checkbox
+        {test: '.list-group-checkbox', func: (node) => {
+            node.click(function(event) {
+                $(this).find('input[type=radio]').prop("checked", true);
+            });
+        }},
+        // similar but for radio buttons
+        {test: '.radio-row', func: (node) => {node.click(event => {$(event.currentTarget).find('[type="radio"]').prop('checked', 'checked').change();});}},
+        // we don't generally allow future dates
+        {test: '.date-picker', func: (node) => {node.datepicker({changeYear: true, yearRange: "-120:+0"});}},
+
+        // is this still used?? Would like to get rid of
+        {test: '#id_import_status',
+            func: (node) => {
+                let importStatus = node.val();
+                if (importStatus !== 'S') {
+                    let className = null;
+                    if (importStatus === 'E') {
+                        className = "error";
+                    } else {
+                        className = "warning";
+                    }
+                    node.addClass(className);
+                }
+            }
+        },
+
+        // fixing external link styles
+        {test: `a[href^="http"], a[href^="ftp"], a[href*="google.com"]`,
+            func: (node) => {
+                if (!node.attr('target')) {
+                    node.attr('target', '_blank');
+                }
+                if (!node.hasClass('external-link')) {
+                    // putting external icon next to images breaks a few layouts
+                    if (node.find('div').length === 0 && node.find('img').length === 0) {
+                        node.addClass('external-link');
+                    }
+                }
+            }
+        },
+
+        {test: 'input[name=csrfmiddlewaretoken]',
+            func: (node) => {
+                let form = node.closest('form');
+                form.submit(function (e) {
+                    // if a page load has changed the cookie, change it in the form
+                    let cookie = getCookie('csrftoken');
+                    node.val(cookie);
+                    return true;
+                });
+            }
         }
-        for (let child of node.children()) {
-            checkNode($(child));
+    ];
+
+    // run the processors, and check recursively
+    function checkNode(node, recursive) {
+        for (let processor of processors) {
+            if (node.is(processor.test)) {
+                if (processor.func) {
+                    processor.func(node);
+                } else {
+                    return; // no function means it's some weird element type we should stay away from
+                }
+            }
+        }
+        // check recursively
+        if (recursive) {
+            for (let child of node.children()) {
+                checkNode($(child), true);
+            }
+        }
+    }
+
+    let badElementTests = [];
+    for (let processor of processors) {
+        if (!processor.func) {
+            badElementTests.push(processor.test);
+        }
+    }
+
+    // update the initial state
+    for (let processor of processors) {
+        if (processor.func) {
+            $(processor.test).each((index, node) => {
+                node = $(node);
+                let isGood = true;
+                for (let badTest in badElementTests) {
+                    if (node.is(badTest)) {
+                        isGood = false;
+                        break;
+                    }
+                }
+                if (isGood) {
+                    processor.func($(node));
+                }
+            });
         }
     }
 
@@ -54,125 +221,100 @@ function setupTooltips() {
     const observer = new MutationObserver((mutationsList, observer) => {
         mutationsList.forEach((mutation) => {
             for (let node of mutation.addedNodes) {
-                checkNode($(node));
+                node = $(node);
+                if (!node.attr('data-p')) {
+                    checkNode($(node), true);
+                    // add an attribute at the top level to stop items being processed multiple times
+                    // only do at top level so we don't mark everything with data-p, but does
+                    // run the risk of adding a child of something that's already been added
+                    node.attr('data-p', '1');
+                }
             }
         });
     });
     observer.observe($('body')[0], { attributes: false, childList: true, subtree: true });
 }
 
-function setupAjaxBlocks() {
-    $('[data-toggle=ajax]').each((index, child) => {
-        child = $(child);
-        let url = child.attr('href');
-        (child).LoadingOverlay('show');
-        $.ajax({
-            type: "GET",
-            url: url,
-            success: (results) => {
-                child.LoadingOverlay('hide');
-                child.html(results);
-                child.find('.convert-timestamp').each((index, elem) => {
-                    convertTimestampDom(elem);
-                });
-                convertTimestamps();
-            },
-            error: (call, status, text) => {
-                $(child).LoadingOverlay('hide');
-                child.replaceWith("Error Loading Data");
-            }
-        });
+function loadAjaxModal(linkDom) {
+    let url = linkDom.attr('data-href') || linkDom.attr('href');
+    let useId = url.replace('/', '_');
+    let modalContent = createModalShell(useId, linkDom.attr('data-title') || linkDom.text());
+    let body = modalContent.find('.modal-body');
+    modalContent.find('.modal-footer').remove();
+    let content = $('<div>').appendTo(body);
+    let modalDialog = modalContent.modal({focus:true, show:false});
+    loadAjaxBlock(content, url);
+
+    modalContent.on('hidden.bs.modal', function() {
+        modalContent.modal('dispose');
+        modalContent.remove();
     });
+    modalDialog.modal('show');
 }
 
-function setupAjaxTabs(element) {
+function loadAjaxBlock(dom, url) {
+    if (!url) {
+        url = dom.attr('href');
+    }
 
-    function loadTab(tab) {
-        let $this = $(tab);
-        if ($this.data('loaded') != 1) {
-            $this.data('loaded', 1);
+    let showingOverlay = false;
+    // give ajax 300 ms to load before we start showing the spinner
+    let spinnerTimeout = window.setTimeout(() => {
+        showingOverlay = true;
+        dom.LoadingOverlay('show');
+    }, 300);
 
-            let firstSlash = $this.attr('data-href').indexOf('/');
-            let url = '';
-            if (firstSlash !== 0) {
-                url = window.location.href + '/' + $this.attr('data-href');
-            } else {
-                url = $this.attr('data-href');
+    $.ajax({
+        type: "GET",
+        url: url,
+        async: true,
+        success: (results) => {
+            dom.html(results);
+        },
+        error: (call, status, text) => {
+            dom.replaceWith($('<div>', {class: 'ajax-error', html:[severityIcon('C'), "Error Loading Data"]}));
+        },
+        complete: (jqXHR, textStatus) => {
+            if (showingOverlay) {
+                dom.LoadingOverlay('hide');
             }
-            //Load the page
-            // TODO error handling
-            let tabContent = $($this.attr('href'));
-            tabContent.load(url, function(data, status, xhr) {
-                if (status === "error") {
-                    // still set data so we can see the error
-                    tabContent.html(data);
-
-                    // console.log(data);
-                    // tabContent.html($("<div>", {class: "alert alert-danger", text: `Error loading tab ${status}`}));
-                } else {
-                    // is this best done with event listeners, rather than specifically on ajax?
-                    convertTimestamps();
-                }
-            });
+            window.clearTimeout(spinnerTimeout);
         }
-    }
-
-    if (!element) {
-        element = $('body');
-    }
-
-    element.find('.nav-tabs a[data-href][data-toggle="tab"]').on('shown.bs.tab', function(e) {
-        loadTab(this);
-    });
-    element.find('.nav-tabs a.active[data-href][data-toggle="tab"]').each(function() {
-        loadTab(this);
     });
 }
 
-function setupListGroupCheckboxes() {
-    $('.list-group-checkbox').click(function(event) {
-        $(this).find('input[type=radio]').prop("checked", true); //.trigger("click");
-        // return false;
-    });
+function loadAjaxTab(tab) {
+    if (tab.data('loaded') !== '1') {
+        tab.data('loaded', '1');
+        if (!tab.attr('data-href')) {
+            console.log(tab);
+            alert(`Tab doesn't have a data-href`);
+            return;
+        }
+
+        // is this all really required?
+        let firstSlash = tab.attr('data-href').indexOf('/');
+        let url = '';
+        if (firstSlash !== 0) {
+            url = window.location.href + '/' + tab.attr('data-href');
+        } else {
+            url = tab.attr('data-href');
+        }
+        let tabContent = $(tab.attr('href'));
+        loadAjaxBlock(tabContent, url);
+    }
 }
 
 function globalSetup() {
-    convertTimestamps();
-    setupAjaxTabs();
-    setupAjaxBlocks();
-    handleAjaxErrors();
-    setupTooltips();
-    highlightImportStatus();
-    setupListGroupCheckboxes();
+    tweakAjax();
+    configureTimestamps();
+    // stops there being a popup to the user
+    $.fn.DataTable.ext.errMode = 'none';
 
-    $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
-    $('.radio-row').click(event => {
-        $(event.currentTarget).find('[type="radio"]').prop('checked', 'checked').change();
-    });
+    // applies many tweaks and functionality (such as ajax blocks)
+    // as well as applying them to dynamically added elements
+    enhanceAndMonitor();
 }
-
-function fixLinks(element) {
-    if (typeof(element) === 'undefined') {
-        element = $('.main-content');
-    }
-    // FIXME make an external-link class with content:after
-    element.find('a').each(function() {
-       let $this = $(this);
-       let href = $this.attr('href');
-       let target = $this.attr('target');
-       if (href && (href.startsWith('http') || href.startsWith('ftp') || href.startsWith('google.com')) && !$this.hasClass('external-link')) {
-           $this.attr('target', '_blank');
-           $this.addClass('hover-link');
-           $this.addClass('external-link');
-           // $this.html($this.html() + ' <i style="opacity:0.4" class="fas fas fa-external-link-alt"></i>')
-       }
-    });
-    return element;
-}
-
-/*jshint esversion: 6 */
-/*globals $:false, jQuery:false, console:false, moment:false, Rollbar:false */
-/*globals toMarkdown:false */
 
 // fix copied from https://github.com/allpro/layout/issues/17
 (function ($){
@@ -186,32 +328,6 @@ function getCookie(name) {
     }
     return null;
 }
-
-// automatically send X-CSRFToken on ajax calls
-$.ajaxSetup({
-    beforeSend: function(xhr, settings) {
-        //if (settings.type == 'POST' || settings.type == 'PUT' || settings.type == 'DELETE' || settings.type == 'PATCH') {
-            if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
-                // Only send the token to relative URLs i.e. locally.
-                xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
-            } else {
-                // console.log("Didn't add CSRF! to external url '" + settings.url + "'");
-            }
-        //}
-    }
-});
-
-$(document).ready(() => {
-    $('input[name=csrfmiddlewaretoken]').each((index, input) => {
-        let inp = $(input);
-        let form = inp.closest('form');
-        form.submit(function (e) {
-            let cookie = getCookie('csrftoken');
-            inp.val(cookie);
-            return true;
-        });
-    });
-});
 
 function setCrossLink(link_selector, urlFunc, pk) {
 	if (pk) {
@@ -341,6 +457,7 @@ function dynamicSort(property, caseSensitive) {
 }
 
 function zero_pad(num, size) {
+    // deprecated use _.pad(num + "", size, '0');
     let s = num + "";
     while (s.length < size) s = "0" + s;
     return s;
@@ -356,21 +473,7 @@ function setAutocompleteValue(selector, value, label) {
     $(selector).append(option).trigger('change');
 }
 
-
-function highlightImportStatus() {
-    let selector = $("#id_import_status");
-    let importStatus = selector.val();
-    if (importStatus !== 'S') {
-        let className = null;
-        if (importStatus === 'E') {
-            className = "error";
-        } else {
-            className = "warning";
-        }
-        selector.addClass(className);
-    }
-}
-
+// called by update_django_messages tag
 function update_django_messages(messages) {
     if (messages.length === 0) {
         return;
@@ -429,7 +532,7 @@ const JS_DATE_FORMAT_DETAILED = 'YYYY-MM-DD HH:mm:ss ZZ';
 const JS_DATE_FORMAT_SECONDS = 'YYYY-MM-DD HH:mm:ss';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'lll';
-function convertTimestamps() {
+function configureTimestamps() {
     $.timeago.settings.allowFuture = true;
     $.timeago.settings.strings = {
         prefixAgo: null,
@@ -450,10 +553,6 @@ function convertTimestamps() {
         wordSeparator: " ",
         numbers: []
     };
-
-    $('.convert-timestamp').each((index, elem) => {
-        convertTimestampDom(elem);
-    });
 }
 function convertTimestampDom(elem) {
     elem = $(elem);
@@ -491,30 +590,6 @@ function createTimestampDom(unix, timeAgo) {
 }
 function convertTimestamp(unixDate) {
     return moment(Number(unixDate) * 1000).format(JS_DATE_FORMAT_SCIENTIFIC);
-}
-function handleAjaxErrors() {
-    $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
-        console.log(settings);
-        if (settings.suppressErrors) {
-            return;
-        }
-        // only relevant when using ODIC https://mozilla-django-oidc.readthedocs.io/en/stable/xhr.html
-        if (jqxhr.status === 403 && jqxhr.getResponseHeader('refresh_url')) {
-            // if (!settings.retry) {
-            //     settings.retry = 1;
-            //     $.ajax(settings);
-            // } else {
-                alert('Session has timed out, refreshing');
-                //document.location.href = jqxhr.headers.get("refresh_url");
-                location.reload();
-            //}
-        }
-        console.log("Ajax error");
-        console.log(event);
-        console.log(jqxhr);
-        // messagePoller.stop_polling();
-        // $.blockUI({ message: $('#ajax-error') });
-    });
 }
 
 function blankToNull(val) {
@@ -565,10 +640,6 @@ function highlightTextAsDom(value, full_text) {
     }
 }
 
-$(document).ready(() => {
-    $.fn.DataTable.ext.errMode = 'none';
-});
-
 let TableFormat = (function() {
     let TableFormat = function() {};
     TableFormat.prototype = {};
@@ -576,12 +647,22 @@ let TableFormat = (function() {
 })();
 TableFormat.timestamp = (data, type, row) => {
     if (data) {
-        timestampStr = convertTimestamp(data);
+        let timestampStr = convertTimestamp(data);
         return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
     } else {
         return '';
     }
 };
+TableFormat.timeAgo = (data, type, row) => {
+    if (data) {
+        return $('<data>', {class:'convert-timestamp time-ago', 'data-timestamp':data, text:data}).prop('outerHTML');
+
+        let timestampStr = convertTimestamp(data);
+        return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
+    } else {
+        return '';
+    }
+}
 TableFormat.choices = (choices, data, type, row) => {
     return $('<span>', {class:`val-${data}`, text:choices[data] || data}).prop('outerHTML');
 };
@@ -668,13 +749,90 @@ TableFormat.boolean = function(style, data, type, columns) {
         return data ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="far fa-circle"></i>';
     }
     return null;
-}
+};
+TableFormat.severeNumber = function(severity, data, type, columns) {
+    if (data === 0) {
+        return '<span class="no-value mono font-weight-bold">0</span>';
+    } else {
+        return `<span class="mono font-weight-bold text-${severity}">${data}</span>`;
+    }
+};
+TableFormat.hgvs = function(data, type, columns) {
+    if (!data) {
+        return "?";
+    }
+    let genomeBuild = data.genomeBuild;
+    let transcript = data.transcript;
+    let geneSymbol = data.geneSymbol;
+    let variant = data.variant;
+    // also turn into a link
+    let dom = $('<div>');
+    if (genomeBuild) {
+        dom.append($('<div>', {text: genomeBuild, class:'text-info'}));
+        // <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="display:inline-block;word-break: break-all">{{ c_hgvs.raw_c }}</span>
+    }
+
+    let cDom = $('<span>', {style:'white-space:nowrap'});
+    if (transcript && variant) {
+        cDom.append($('<span>', {text: transcript}));
+        if (geneSymbol) {
+            cDom.append("(");
+            cDom.append($('<span>', {class: 'text-secondary', style: 'letter-spacing: 0.5px', text: geneSymbol}));
+            cDom.append(")");
+        }
+        cDom.append(":");
+        // used to be display:inline-block; but that doesn't underline
+        cDom.append($('<span>', {style: 'word-break:break-all', text: variant}));
+    } else {
+        cDom.append(data.full);
+    }
+    let variantId = data.variantId;
+    if (variantId) {
+        cDom = $('<a>', {href: Urls.view_allele_from_variant(variantId), class:'hover-link', html: cDom});
+    }
+    dom.append(cDom);
+
+    return dom.prop('outerHTML');
+};
+TableFormat.expandAjax = function(url, param, expectedHeight, data) {
+    if (data) {
+        let dataId = data[param];
+        if (!dataId) {
+            return `<i class="fas fa-bomb text-danger"></i> No value for "${param}" in this ${JSON.stringify(data)} : Developer, is ${param} a column in this table, visible or otherwise?`;
+        }
+        let ajaxId = `ajax_${dataId}`
+        let reverseUrl = Urls[url];
+        if (!reverseUrl) {
+            return `<i class="fas fa-bomb text-danger"></i> URL not configured for "${url} : Developer may need to run<br/>
+            <div class="code">manage.py collectstatic_js_reverse</div>`;
+        }
+        if (param) {
+            reverseUrl = reverseUrl(dataId)
+        }
+
+        let ajaxDom =
+            $('<div>', {html:[
+                $('<div>', {style:`text-align: center;color: #888; min-height:${expectedHeight}`, text:'Loading...'})
+            ]});
+
+        loadAjaxBlock(ajaxDom, reverseUrl);
+
+        if (!expectedHeight) {
+            // put a small div in the row to show that we're thinking
+            expectedHeight = "50px";
+        }
+        // fixme make m proper jquery
+        return ajaxDom;
+    } else {
+        return '';
+    }
+};
 
 // Dialogs
 function createModalShell(id, title) {
     return $(`
         <div class="modal fade" id="${id}" tabindex="-1" role="dialog" aria-labelledby="${id}Label" aria-hidden="true">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-xl" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="${id}Label">${title}</h5>
@@ -690,6 +848,20 @@ function createModalShell(id, title) {
             </div>
         </div>
     `);
+}
+
+function createModal(id, title, body) {
+    let modalContent = createModalShell(id, title);
+    modalContent.find('.modal-body').addClass('modal-body-scroll').html(body);
+    modalContent.find('.modal-footer').html(`
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+    `);
+    let modalDialog = modalContent.modal({focus:true, show:false});
+    modalContent.on('hidden.bs.modal', function() {
+        modalContent.modal('dispose');
+        modalContent.remove();
+    });
+    modalDialog.modal('show');
 }
 
 // Suggestions
@@ -767,12 +939,6 @@ function suggestionDialogSaved() {
     });
 }
 
-// just have it here until we remove it from all pages
-let previouslyOpenedTooltip = null;
-jQuery.fn.extend({multitooltip: function(mode, params) {
-    console.log('multitooltip has been deprecated');
-}});
-
 // FIXME turn into Bootstrap modal
 function showReloadPageErrorDialog(selector, message, allowClose) {
     let buttons = [
@@ -806,10 +972,89 @@ function severityIcon(severity) {
     let first = severity.toUpperCase()[0];
     switch (first) {
         case 'C': return $('<i class="fas fa-bomb text-danger"></i>'); // critical
-        case 'E': return $('<i class="fas fa-exclamation-circle text-danger"></i>'); // error
+        case 'E':  // error
+        case 'D':  // danger (BootStrap)
+            return $('<i class="fas fa-exclamation-circle text-danger"></i>'); // error
         case 'W': return $('<i class="fas fa-exclamation-triangle text-warning"></i>'); // warning
         case 'I': return $('<i class="fas fa-info-circle text-info"></i>'); // info
         case 'S': return $('<i class="fas fa-check-circle text-success"></i>'); // success
         default: return $(severity);
+    }
+}
+
+function formatJson(jsonObj) {
+    return $('<div>', {class:'json', html:_formatJson(jsonObj)});
+}
+
+function _formatJson(jsonObj) {
+    if (_.isNumber(jsonObj)) {
+        return $('<span>', {class: 'js-num', text: jsonObj});
+    } else if (_.isBoolean(jsonObj)) {
+        return $('<span>', {class: 'js-bool', text: jsonObj});
+    } else if (_.isString(jsonObj)) {
+        let text = JSON.stringify(jsonObj);
+        text = text.substring(1, text.length-1);
+        let html = [];
+        html.push($('<span>', {class: 'js-qt', text:"\""}));
+        // TODO format "/" as special escape character
+        html.push($('<span>', {class: 'js-str', text: text}));
+        html.push($('<span>', {class: 'js-qt', text:"\""}));
+        return $('<span>', {html:html});
+        // return $('<span>', {class: 'js-str', text: JSON.stringify(jsonObj)});
+    } else if (jsonObj === null) {
+        return $('<span>', {class: 'js-null', text: 'null'});
+    } else if (_.isArray(jsonObj)) {
+        let html = [];
+        html.push($('<span>', {class: 'js-br', text: '['}));
+        let first = true;
+        for (let elem of jsonObj) {
+            if (!first) {
+                html.push($('<span>', {class: 'js-comma', text: ','}));
+            } else {
+                first = false;
+            }
+            html.push(_formatJson(elem));
+        }
+        html.push($('<span>', {class: 'js-br', text: ']'}));
+        return ($('<span>', {html: html}));
+    } else if  (jsonObj && jsonObj["*wrapper$"] === "VJ") {
+        let messages = jsonObj.messages;
+        if (messages.length) {
+            let html = [];
+            let items = [];
+            for (let message of messages) {
+                let bsSeverity = "info";
+                switch (message.severity) {
+                    case "error": bsSeverity = "danger"; break;
+                    case "warning": bsSeverity = "warning"; break;
+                }
+                items.push($('<li>', {class: `list-group-item list-group-item-${bsSeverity}`, html: [severityIcon(message.severity), message.text]}));
+            }
+            html.push($('<ul>', {class: 'list-group', html: items}));
+            html.push($('<div>', {class: 'js-valid-body', html: _formatJson(jsonObj.wrap)}));
+            return $('<div>', {class:'js-valid', html:html});
+        } else {
+            return _formatJson(jsonObj.wrap);
+        }
+    } else {
+        let html = [];
+        let content = [];
+        html.push($('<span>', {class: 'js-pr', text: '{'}));
+        let first = true;
+
+        for (let [key, value] of Object.entries(jsonObj)) {
+            if (!first) {
+                content.push($('<span>', {class: 'js-comma', text: ','}));
+                content.push($('<br/>'));
+            } else {
+                first = false;
+            }
+            content.push(_formatJson(key));
+            content.push($('<span>', {class: 'js-colon', text: ':'}));
+            content.push(_formatJson(value));
+        }
+        html.push($('<span>', {class: 'js-block', html: content}));
+        html.push($('<span>', {class: 'js-pr', text: '}'}));
+        return ($('<span>', {class:'js-obj', html: html}));
     }
 }

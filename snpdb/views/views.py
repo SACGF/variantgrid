@@ -32,6 +32,7 @@ from annotation.models import AnnotationVersion
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
+from classification.models.clinvar_export_sync import clinvar_export_sync
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
@@ -63,13 +64,13 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
 from upload.uploaded_file_type import retry_upload_pipeline
 from classification.classification_stats import get_grouped_classification_counts
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 
 
 @terms_required
@@ -350,7 +351,7 @@ def sample_variants_gene_detail(request, sample_id, gene_symbol):
     context = {'sample': sample,
                'sample_ids': [sample.pk],
                'gene_symbol': gene_symbol,
-               "datatable_config": ClassificationDatatableConfig(request)}
+               "datatable_config": ClassificationColumns(request)}
     return render(request, 'snpdb/data/sample_variants_gene_detail.html', context)
 
 
@@ -708,8 +709,19 @@ def view_lab(request, pk):
         'override_source': override_source,
         'override_values': override_values,
         'has_write_permission': has_write_permission,
+        'clinvar_export_enabled': clinvar_export_sync.is_enabled
     }
     return render(request, 'snpdb/settings/view_lab.html', context)
+
+
+def view_clinvar_key(request, pk: str):
+    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
+    clinvar_key.check_user_can_access(request.user)
+
+    return render(request, 'snpdb/settings/clinvar_key.html', {
+        'clinvar_key': clinvar_key,
+        'labs': Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
+    })
 
 
 def view_organization(request, pk):
@@ -1204,6 +1216,10 @@ def help_static_page(request, page_name):
     """ This embeds static pages in a help template """
     context = {"page_name": page_name}
     return render(request, 'snpdb/help/help_static_page.html', context)
+
+
+def ajax_hello_world(request, data:str):
+    return render(request, 'snpdb/ajax_hello_world.html', {'data': data})
 
 
 def staff_only(request):

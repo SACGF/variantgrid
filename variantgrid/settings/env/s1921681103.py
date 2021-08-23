@@ -17,6 +17,7 @@ AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
 
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
+CLINVAR_EXPORT = get_clinvar_export_secrets()
 
 SYNC_DETAILS = get_shariant_sync_secrets()
 VARIANT_CLASSIFICATION_NEW_GROUPING = True
@@ -33,7 +34,7 @@ VARIANT_CLASSIFICATION_STATS_USE_SHARED = True
 DISCORDANCE_EMAIL = 'discordance@test.shariant.org.au'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 
-ROLLBAR['enabled'] = False
+ROLLBAR['enabled'] = True
 
 INTERNAL_IPS = [
     '127.0.0.1',
@@ -300,7 +301,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "keycloak_admin": True,
     "classification_import_upload": True,
     "condition_aliases": True,
-    "clinvar_exports": True,
+    "clinvar_key_summary": True,
     "condition_matchings": True,
     "condition_match_test": True
 })
@@ -322,3 +323,5 @@ VARIANT_CLASSIFICATION_MATCH_VARIANTS = False
 
 PREFER_ALLELE_LINKS = True
 PANEL_APP_CHECK_ENABLED = True
+
+CLINVAR_EXPORT_ENABLED = True

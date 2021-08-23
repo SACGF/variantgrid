@@ -11,6 +11,8 @@ from variantgrid.settings.components.celery_settings import *  # pylint: disable
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
+CLINVAR_EXPORT = get_clinvar_export_secrets()
+
 aws_dict = get_aws_secrets()
 AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
         [aws_dict[k] for k in ('AWS_SES_ACCESS_KEY_ID', 'AWS_SES_SECRET_ACCESS_KEY', 'AWS_SES_REGION')]
@@ -211,6 +213,7 @@ USER_SETTINGS_SHOW_BUILDS = False
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = True
 SEARCH_SUMMARY = True  # Little tips that show up on search
 SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = False
+SEARCH_SUMMARY_VARIANT_SHOW_CLASSIFICATIONS = False
 
 UNSHARED_FLAG_ENABLED = True
 VIEW_GENE_SHOW_HOTSPOT_GRAPH = False

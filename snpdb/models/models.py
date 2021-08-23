@@ -6,15 +6,16 @@ etc and things that don't fit anywhere else.
 'snpdb' was the highly unoriginal name I used before 'VariantGrid'
 """
 import json
+import re
 from functools import total_ordering
 from datetime import datetime
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import QuerySet, TextChoices
 from django.db.models.aggregates import Count
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
@@ -214,6 +215,15 @@ class LabUser:
         return self.user == other.user
 
 
+class ClinVarAssertionMethods(TextChoices):
+    # "yes", "no", "unknown", "not provided", "not applicable"
+    yes = "yes"
+    no = "no"
+    unknown = "unknown"
+    not_provided = "not provided"
+    not_applicable = "not applicable"
+
+
 class ClinVarKey(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar key"
@@ -221,10 +231,25 @@ class ClinVarKey(TimeStampedModel):
     id = models.TextField(primary_key=True)
     api_key = models.TextField(null=True, blank=True)
     behalf_org_id = models.TextField(null=False, blank=True, default='')  # maybe this should be the id?
-    # TODO key, other details
+
+    default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
+    inject_acmg_description = models.BooleanField(blank=True, default=False)
+    assertion_method_lookup = models.JSONField(null=False, default=dict)
 
     def __str__(self):
         return f"ClinVarKey ({self.id})"
+
+    def clean(self):
+        #  validate assertion method lookup
+        if not isinstance(self.assertion_method_lookup, dict):
+            raise ValidationError({'assertion_method_lookup': ValidationError("Must be a dictionary of regular expression keys to \"acmg\" or {citation: db, id or url} and {method: str}")})
+        for key, assertion_dict in self.assertion_method_lookup.items():
+            try:
+                re.compile(key)
+            except:
+                raise ValidationError({'assertion_method_lookup': ValidationError(f'%s is not a valid regular expression', params={'key': key})})
+            if assertion_dict != "acmg" and (not isinstance(assertion_dict, dict) or 'citation' not in assertion_dict or 'method' not in assertion_dict):
+                raise ValidationError({'assertion_method_lookup': ValidationError('%s must have value for citation (db,id or url) and method', params={'key': key})})
 
     @staticmethod
     def clinvar_keys_for_user(user: User) -> QuerySet:
@@ -232,8 +257,13 @@ class ClinVarKey(TimeStampedModel):
         Ideally this would be on ClinVarKey but can't be due to ordering
         """
         if user.is_superuser:
-            return ClinVarKey.objects.all()
-        return ClinVarKey.objects.filter(pk__in=Lab.valid_labs_qs(user).filter(clinvar_key__isnull=False).select_related('clinvar_key'))
+            return ClinVarKey.objects.all().order_by('pk')
+
+        labs = Lab.valid_labs_qs(user).filter(clinvar_key__isnull=False)
+        if labs:
+            return ClinVarKey.objects.filter(pk__in=labs.values_list('clinvar_key', flat=True)).order_by('pk')
+        else:
+            return ClinVarKey.objects.none()
 
     def check_user_can_access(self, user: User) -> None:
         """

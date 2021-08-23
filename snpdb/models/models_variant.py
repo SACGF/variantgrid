@@ -179,6 +179,12 @@ class Allele(FlagsMixin, models.Model):
             name += f" ({self.clingen_allele})"
         return name
 
+    def __format__(self, format_spec: str):
+        if format_spec == 'CA' and (cligen_allele := self.clingen_allele):
+            return str(cligen_allele)
+        else:
+            return f"Allele {self.pk}"
+
     def validate(self, liftover_complete=True):
         """
         :param liftover_complete: If False does not check for missing representations

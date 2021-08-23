@@ -14,7 +14,6 @@
     }
 
     $(document).ready(function() {
-        fixLinks();
         Flags.instance.init({userId: '{{user.id}}', filter:'#allele-card'});
 
         EKeys.load().then(eKeys => {
@@ -72,9 +71,7 @@
                                                   <span aria-hidden="true">&times;</span>
                                                 </button>
                                             </div>
-                                            <div class="modal-body">
-                                                <pre>{{ allele.clingen_allele.api_response|jsonify_pretty }}</pre>
-                                            </div>
+                                            {% code_json allele.clingen_allele.api_response css_class="modal-body" %}
                                         </div>
                                     </div>
                                 </div>

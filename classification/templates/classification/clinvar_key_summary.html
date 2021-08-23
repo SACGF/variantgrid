@@ -1,0 +1,162 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load classification_tags %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
+{% load datatable_tags %}
+{% block title %}Clinical Key Summary{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <script>
+        function records(data) {
+            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
+        }
+        function batches(data) {
+            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
+        }
+        function renderStatus(data, type, row) {
+            let dom = null;
+            if (data === 'D') {
+                dom = severityIcon('success');
+                dom.attr('title', 'Up to date');
+            } else if (data === 'E') {
+                dom = severityIcon('error');
+                dom.attr('title', 'ClinVar conversion issues, unable to submit');
+            } else if (data === 'N') {
+                dom = $('<i class="fas fa-cloud-upload-alt text-success"></i>')
+                dom.attr('title', 'New submission');
+            } else if (data == 'C') {
+                dom = $('<i class="fas fa-cloud-upload-alt text-primary"></i>')
+                dom.attr('title', 'Changes to existing ClinVar record pending');
+            } else {
+                dom = $('<span>', {text: data});
+            }
+            if (dom.attr('title')) {
+                dom.attr('data-toggle', 'tooltip');
+            }
+            return dom.prop('outerHTML');
+        }
+        function renderReleaseStatus(data, type, row) {
+            let dom = null;
+            if (data === 'R') {
+                dom = severityIcon('success');
+                dom.attr('title', 'Release when ready');
+                dom.attr('data-toggle', 'tooltip');
+            } else if (data === 'H') {
+                dom = $('<i class="fas fa-clock"></i>');
+                dom.attr('title', 'On hold');
+                dom.attr('data-toggle', 'tooltip');
+            } else {
+                dom = $('<span>', {text: data});
+            }
+            if (row.status === "E") {
+                dom.css('opacity', 0.4);
+            }
+            return dom.prop('outerHTML');
+        }
+        function renderSCV(data, type, row) {
+            if (!data) {
+                return $('<span>', {text: '-', class:'no-value'}).prop('outerHTML');
+            } else {
+                return data;
+            }
+        }
+        function renderId(data, type, row) {
+            let content = [$('<span/>', {text:data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
+            // let id = data.id;
+            // let elem = $('<a/>', {href: `/classification/clinvar_export/${id}`, html: content, class:'id-link'});
+            let elem = $('<span>', {html: content});
+            return elem.prop('outerHTML');
+        };
+        $(document).ready(() => {
+            {% datatable_definition table_config=export_columns data='records' table_id='records' url='clinvar_exports_datatables' %}
+            {% datatable_definition table_config=export_batch_columns data='batches' table_id='batches' url='clinvar_export_batch_datatables' %}
+        });
+    </script>
+    <style>
+        .clinvar-export-table .dt-allele {
+            width: 15%;
+        }
+        .clinvar-export-table .dt-scv {
+            width: 15%;
+        }
+        .clinvar-export-table td.dt-release_status, .clinvar-export-table td.dt-status {
+            width: 10%;
+            text-align: center;
+            position: relative;
+        }
+        .clinvar-export-table td.dt-release_status i, .clinvar-export-table td.dt-status i {
+            position: relative;
+            left: -10px;
+        }
+        .clinvar-export-table .dt-condition {
+            width: 40%;
+        }
+        .clinvar-export-batches-table .dt-created {
+            width: 50%;
+        }
+        .clinvar-export-batches-table .dt-status {
+            width: 50%;
+        }
+    </style>
+{% endblock head %}
+{% block content %}
+    <div class="container">
+        {% if all_keys.count > 1 %}
+            <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
+                {% for key in all_keys %}<a type="button" href="{% url 'clinvar_key_summary' key.pk %}" class="btn {% if key.pk == clinvar_key.pk %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ key.pk }}</a>{% endfor %}
+            </div>
+        {% endif %}
+
+        <div data-toggle="ajax" href="{% url 'clinvar_key' clinvar_key.pk %}">Loading</div>
+        {% page_help_embedded "Records &amp; Batches" %}
+            <p>{{ 'info' | severity_icon }}Important : Changes to classifications are not automatically reflected here. Classifications might be more up to date.</p>
+            {% if missing_condition_count %}
+            <p>{{ 'info' | severity_icon }}Important : Only classifications with standard conditions can be submitted to ClinVar.</p>
+            {% endif %}
+            <p>ClinVar accepts one record per submitter/allele/condition combination - below are the records we will be sending to ClinVar on your behalf.</p>
+            <p>If a record's sync status is "In Error" the linked classification has one or more of the following:
+                <ul>
+                    <li>An open flag (such as variant matching warning or discordance) which must be resolved.</li>
+                    <li>Missing key values required by ClinVar - note that {{ site_name }} admins can set defaults for some values.</li>
+                    <li>Has some values that don't translate to ClinVar - e.g. an Ensembl transcript</li>
+                </ul>
+            </p>
+            <label>Records</label>
+            <p>All ClinVar Exports can be downloaded for review.</p>
+            <p>An export record can be marked as "On Hold" to stop it from being submitted to ClinVar - it will later have to be manually set back to ready when appropriate.</p>
+            <p>If records have been externally submitted to ClinVar and have had a SCV, they can be entered by clicking on a row and going to the ClinVar Export,
+            otherwise {{ site_name }} will automatically assign the records SCV returned from ClinVar.
+            </p>
+            <label>Batches</label>
+            <p>Data is sent to ClinVar in batches, these just show you the technical detail data that was sent to ClinVar if required for review.</p>
+        {% end_page_help_embedded %}
+        {% if missing_condition_count %}
+            {% labelled label="Classifications w/out Standard Condition" %}
+                <a href="{% url 'condition_matchings' %}" title="Only classifications with standard conditions can be submitted to ClinVar">
+                    {{ 'warning' | severity_icon }}
+                    {{ missing_condition_count }}</a>
+            {% endlabelled %}
+        {% else %}
+            {% labelled label="Classifications w/out standard condition" %}
+                {{ 'success' | severity_icon }} All shared classifications have a standard condition
+            {% endlabelled %}
+        {% endif %}
+        <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
+
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Records" badge=count_records badge_status='success' %}
+            {% datatable table_config=export_columns table_id='records' class_name='sticky-header clinvar-export-table' %}
+            <div data-toolbar="#records">
+                <a class="download-link" href="{% url 'clinvar_key_summary_export_download' clinvar_key.pk %}">Download</a>
+            </div>
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Export Batches" badge=count_batch badge_status='success' %}
+            {% datatable table_config=export_batch_columns table_id='batches' class_name='sticky-header clinvar-export-batches-table' %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_render_tabs tab_set='clinvar_tabs' %}
+    </div>
+{% endblock content %}

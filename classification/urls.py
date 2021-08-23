@@ -12,7 +12,7 @@ from classification.views.discordance_report_views import discordance_report_vie
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns
 from classification.views.classification_dashboard_view import problem_download
-from classification.views.classification_datatables import ClassificationDatatableConfig
+from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
@@ -46,11 +46,15 @@ urlpatterns = [
     perm_path('classification_grid/export/', views.export_classifications_grid, name='export_classifications_grid'),
     perm_path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
 
-    perm_path('clinvar_export', clinvar_export_view.clinvar_exports_view, name='clinvar_exports'),
-    perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportRecordColumns), name='clinvar_exports_datatables'),
-    perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review_view, name='clinvar_export'),
-    perm_path('clinvar_export/<int:pk>/history', clinvar_export_view.clinvar_export_history_view, name='clinvar_export_history'),
-    perm_path('clinvar_export_batch/<int:pk>', clinvar_export_view.clinvar_export_batch_view, name='clinvar_export_batch'),
+    perm_path('clivnar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
+    perm_path('clinvar_export_summary/<str:pk>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
+    perm_path('clinvar_export_summary/<str:clinvar_key>/download', clinvar_export_view.clinvar_export_download, name='clinvar_key_summary_export_download'),
+    perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportColumns), name='clinvar_exports_datatables'),
+    perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review, name='clinvar_export'),
+    perm_path('clinvar_export/<int:pk>/detail', clinvar_export_view.clinvar_export_detail, name='clinvar_export_detail'),
+    perm_path('clinvar_export/<int:pk>/history', clinvar_export_view.clinvar_export_history, name='clinvar_export_history'),
+    perm_path('clinvar_export_batch/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportBatchColumns), name='clinvar_export_batch_datatables'),
+    perm_path('clinvar_export_batch/<int:pk>/detail', clinvar_export_view.clinvar_export_batch_detail, name='clinvar_export_batch_detail'),
     perm_path('clinvar_export_batch/<int:pk>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
@@ -115,7 +119,7 @@ rest_urlpatterns = [
     perm_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
     perm_path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
-    perm_path('api/classifications/datatables/', DatabasetableView.as_view(column_class=ClassificationDatatableConfig), name='classification_datatables'),
+    perm_path('api/classifications/datatables/', DatabasetableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
 
     perm_path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
               name='lab_gene_classification_counts_api'),

@@ -3,21 +3,27 @@
 {% load js_tags %}
 
 {% if override_source %}
-    <h4>Settings</h4>
-    {% page_help page_id='settings/user_settings_help' title='Settings' show_title=False %}
-    <p>
+    {% page_help_embedded page_id='settings/user_settings_help' title='Settings' %}
+        {% if form.fields.columns %}
+            <p>
+                <b>Columns and Node Counts:</b>
+                These are used to configure an analysis when it is created - they do not affect existing analyses.
+            </p>
+        {% endif %}
+    {% end_page_help_embedded %}
+    <p class="text-info">
         Default values are searched for in the following until a value is found: Lab, Organisation then Global.<br>
         Leave "{{ override_level }} override" blank to accept the default value, or override it with your own value.
     </p>
     <div class="form-group row">
         <div class="col-3"></div>
-        <div class="col-4 override-header override-value">Default value</div>
-        <div class="col-5 override-header">{{ override_level }} override</div>
+        <div class="col-4 override-header override-value"><label>Default Value</label></div>
+        <div class="col-5 override-header"><label>{{ override_level }} Override</label></div>
     </div>
 {% endif %}
 
 {% for field in form %}
-    <div class="form-group row user-overrides">
+    <div class="form-group row user-overrides" style="align-items: center">
         {{ field.errors }}
         <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0">{{ field.label_tag }}</label>
         <div class="col-6 col-md-4">

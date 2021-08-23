@@ -120,6 +120,7 @@ class SettingsOverride(models.Model):
     """ We want UserSettings to cascade via Org -> Lab -> User
         Where the later levels override if they are non-null """
     objects = InheritanceManager()
+
     email_weekly_updates = models.BooleanField(null=True, blank=True)
     email_discordance_updates = models.BooleanField(null=True, blank=True)
     columns = models.ForeignKey(CustomColumnsCollection, on_delete=SET_NULL, null=True, blank=True)

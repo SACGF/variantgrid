@@ -1346,9 +1346,11 @@ const VCForm = (function() {
                     ])
                 );
             } else {
-                descriptionSpan = eKey.description ? fixLinks(EKeys.fixDescription(eKey.description)) : $('<i>', {text:'No help is provided for this field'});
-                if (eKey.hide === true) {
-                    descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));
+                descriptionSpan = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
+                if (this.isEditMode()) {
+                    if (eKey.hide === true) {
+                        descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));
+                    }
                 }
                 let description = $('<div>', {class: "description mt-2"}).appendTo(content);
                 descriptionSpan.appendTo(description);
@@ -1360,16 +1362,69 @@ const VCForm = (function() {
                     ]);
                 }
             }
+            jHelp.css({'max-height': 660});
 
-            let fontSize = 13;
-            jHelp.css({'font-size': fontSize, 'max-height': 600});
-            while (this.helpOverflowAmount() > 0 && fontSize > 10) {
-                fontSize--;
-                jHelp.css({'font-size': fontSize});
-            }
             if (this.helpOverflowAmount() > 0) {
-                jHelp.css({'max-height': jHelp[0].scrollHeight});
+                $('<div>', {
+                    style: 'position:absolute; bottom: 0px; right: 0px; padding: 4px; background-color: white; border-radius: 4px',
+                    html: $('<a>', {text: 'Click for full content', class: 'hover-link'}).click(function(e) {
+
+                        function titledValue(title, value) {
+                            return $("<div>", {class: 'mb-4', html:[
+                                $("<label>", {"text": title, "style": "font-weight:600"}),
+                                $("<hr>", {"style": "margin-top:0.5rem;margin-bottom:0.5rem"}),
+                                $("<div>", {class:'text-body', html: value})
+                            ]});
+                        }
+                        let helpHtml = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
+                        let popupContent = $('<div>');
+                        popupContent.append(titledValue("Description", helpHtml));
+
+                        if (eKey.see) {
+                            popupContent.append(titledValue("Relevant Link", $('<a>', {class: 'hover-link external-link', href: eKey.see, text: eKey.see, target: eKey.key})));
+                        }
+                        if (explain) {
+                            popupContent.append(titledValue("Lab Specific Details", explain));
+                        }
+                        if (note) {
+                            popupContent.append(titledValue("Note", explain));
+                        }
+                        let valueHtml;
+                        if (value) {
+                            valueHtml = $("<div>", {style:'white-space:pre-wrap;word-break: break-word;', html: eKey.formatValue(value)});
+                        } else {
+                            valueHtml = $("<i>", {class:'no-value', text:"No Value"});
+                        }
+                        popupContent.append(titledValue("Value", valueHtml));
+
+                        if (refs !== null && refs.length) {
+                            let refsDom = $('<div>', {class: 'refs'});
+                            for (let ref of refs) {
+                                let refDom = $('<div>', {class: 'ref'}).appendTo(refsDom);
+                                $('<a>', {class: 'hover-link external-link', href: ref.url, text: ref.id, target: '_blank'}).appendTo(refDom);
+                                if (ref.summary) {
+                                    let summaryDom = $('<div>', {class: 'ref-summary'}).appendTo(refDom);
+                                    try {
+                                       $(`<div>${ref.summary}</div>`).appendTo(summaryDom);
+                                    } catch (e) {
+                                        summaryDom.attr('text', ref.summary);
+                                    }
+                                } else if (ref.internal_id) {
+                                    $('<div>', {class: 'ref-summary ml-1 my-1 d-inline', text: 'See citations for more info'}).appendTo(refDom);
+                                } else {
+                                    $('<div>', {class: 'ref-summary ml-1 my-1 d-inline', text: 'No summary available'}).appendTo(refDom);
+                                }
+                            }
+                            popupContent.append(titledValue("References", refsDom));
+                        }
+
+                        createModal('info', eKey.label, popupContent);
+                    })
+                }).appendTo(jHelp);
             }
+            // if (this.helpOverflowAmount() > 0) {
+            //    jHelp.css({'max-height': jHelp[0].scrollHeight});
+            //}
 
         },
 
@@ -2062,10 +2117,13 @@ VCTable.clinical_significance = (data, type, row) => {
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
     let label = csKey.prettyValue(data);
     if (data && data.length) {
-        return $('<span>', {class:`cs cs-${data.toLowerCase()}`, text:label.val}).prop('outerHTML') //`<span class="cs cs-${data}">${label}</span>`;
+        return label.val;
     } else {
         return $('<span>', {class: 'no-value', text: '-'}).prop('outerHTML');
     }
+};
+VCTable.clinical_significance_td = ( cell, cellData, rowData, rowIndex, colIndex ) => {
+    $(cell).addClass(`text-center cs cs-${(cellData || '').toLowerCase()}`);
 };
 VCTable.evidence_key = (key_name, data, type, row) => {
     let csKey = EKeys.cachedKeys.key(key_name);

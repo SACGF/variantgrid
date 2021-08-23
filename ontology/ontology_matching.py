@@ -9,7 +9,7 @@ from lazy import lazy
 from annotation.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
-from ontology.models import OntologyTerm, OntologyService, OntologySnake
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
 
 
 class OntologySnakeJson(TypedDict):
@@ -67,6 +67,8 @@ class OntologyMatch:
         )
 
     def as_json(self) -> Dict:
+
+
         data = {
             "id": self.term.id,
             "url": reverse("ontology_term", kwargs={"term": self.term.url_safe_id}),
@@ -217,6 +219,7 @@ class OntologyMatching:
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
         self.term_map: Dict[str, OntologyMatch] = dict()
+        self.errors: List[str] = list()
         self.search_text: Optional[SearchText] = None
         self.sub_type = None
         if search_term:
@@ -231,6 +234,9 @@ class OntologyMatching:
 
         return mondo
 
+    def add_error(self, error:str):
+        self.errors.append(error)
+
     def populate_relationships(self):
         """
         Given a gene symbol, provide all terms that have a relationship to that gene symbol
@@ -243,7 +249,13 @@ class OntologyMatching:
                 return
 
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
+            had_panel_app = False
             for snake in snakes:
+                if snake.show_steps()[0].relation.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
+                    if had_panel_app:
+                        continue
+                    had_panel_app = True
+
                 mondo_term = snake.leaf_term
                 mondo_meta = self.find_or_create(mondo_term.id)
                 mondo_meta.gene_relationships.append(snake)  # assign the snake to the term
@@ -262,7 +274,7 @@ class OntologyMatching:
         return iter(values)
 
     def as_json(self) -> Any:
-        return [value.as_json() for value in self]
+        return {"errors": self.errors, "terms": [value.as_json() for value in self]}
 
     @staticmethod
     def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None) -> 'OntologyMatching':
@@ -272,7 +284,10 @@ class OntologyMatching:
 
         if selected:
             for select in selected:
-                ontology_matches.select_term(select)
+                try:
+                    ontology_matches.select_term(select)
+                except ValueError:
+                    ontology_matches.add_error(f"\"{select}\" is not a valid ontology term.")
 
         if search_text:
             # WARNING, this code is duplicated in condition_text_matching.embedded_ids_check

@@ -10,6 +10,11 @@ h3:not(.popover-header), h4:not(.popover-header) {
 h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-header) {
     margin-top: 28px; // more spacing for a page divided into several h3s
 }
+.card-header h4, .card-header h5 {
+  margin-top: 0;
+  margin-bottom: 0;
+  font-size: 1.1rem;
+}
 
 /// FORMS
 
@@ -70,6 +75,10 @@ label {
       text-decoration: underline !important;
   }
 }
+.modal-body-scroll {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
 
 // not sure if we want to give all cards the pyprus background
 // but stops the screen from being too white..
@@ -97,6 +106,14 @@ td.dt-preview {
 
 // when we expand on that preview to show more details
 table.dataTable {
+    tr.odd, tr.even {
+        &:hover {
+            background-color: #f8f8f8;
+            .toggle-link:before {
+                opacity: 1;
+            }
+        }
+    }
     .dt-detail {
         font-size: 12px;
         white-space: pre-wrap;
@@ -124,8 +141,30 @@ table.dataTable {
 }
 table.dataTable td.dataTables_empty {
     font-size: 16px;
-    padding-top: 12px;
+    padding-top: 22px;
     padding-bottom: 12px;
+    color: #BBBBBB !important;
+    font-style: italic;
+    &:before {
+        display: inline-block;
+        font-style: normal;
+        font-variant: normal;
+        text-rendering: auto;
+        font-family: 'FontAwesome';
+        content: "\f1b2";
+        opacity: 0.4;
+        margin-right: 8px;
+    }
+}
+table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
+    cursor:pointer;
+}
+.dataTables_wrapper .toolbar {
+    display: flex;
+    align-items: baseline;
+    .custom {
+        flex-grow: 1;
+    }
 }
 
 .variant-coordinate {
@@ -301,6 +340,16 @@ a {
     opacity: 0.4;
     margin-left: 4px;
 }
+.modal-link::after {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'FontAwesome';
+    content: "\f2d0";
+    opacity: 0.4;
+    margin-left: 4px;
+}
 .mail-link::after {
     display: inline-block;
     font-style: normal;
@@ -330,8 +379,9 @@ a {
     content: "\f105";
     opacity: 0.6;
     margin-right: 4px;
+    width: 12px;
 }
-.toggle-link[aria-expanded=true]:before, tr.parent .toggle-link:before {
+.toggle-link[aria-expanded=true]:before, tr.parent .toggle-link:before, .toggle-link[aria-expanded=true]:before, tr.shown .toggle-link:before {
    content: "\f107";
 }
 
@@ -519,6 +569,13 @@ div.background-image {
 .zero-value {
     color: #AAAAAA;
 }
+.ajax-error {
+  width: 100%;
+  color: #844;
+  font-weight: bold;
+  text-align: center;
+  animation: fadeInOpacity ease-out 1s;
+}
 
 // still used by wiki (not yet compatible with bootstrap's d-none
 .hidden { display: none }
@@ -533,7 +590,7 @@ div.background-image {
     text-decoration: none;
     cursor: help;
 }
-.hover-link, nav ol.breadcrumb .breadcrumb-item a {
+.hover-link, nav ol.breadcrumb .breadcrumb-item a, .modal-link, .download-link, .mail-link {
 	color: #44a;
     text-decoration: none;
 	cursor: pointer;
@@ -657,7 +714,7 @@ table.as_table {
     font-weight: 400;
     border: 1px solid #ddd;
     border-radius: 10px;
-    padding: 2px;
+    padding: 6px 6px 6px 12px;
     background-color: #eee;
 }
 .code.card-body {
@@ -666,12 +723,13 @@ table.as_table {
 }
 
 ul.compact {
-  margin: 0;
-  padding-left: 10px;
-  line-height: 1.2;
+  margin: 4px 0 4px 0;
+  padding-left: 0;
+  line-height: 0.5rem;
   li {
     display: block;
     position: relative;
+    line-height: 1rem;
     &:before {
       color: #777;
       position: relative;
@@ -685,6 +743,7 @@ ul.compact {
       font-weight: 900;
       font-family: 'Font Awesome 5 Free';
       content: "\f111";
+      line-height: 0;
     }
   }
 }
@@ -737,4 +796,61 @@ ul.compact {
 
 .site-message.border.severity-E {
   border: 2px solid #dc3545 !important;
+}
+
+// Django messages
+#django-messages {
+    animation: fadeInOpacity ease-out 1s;
+  i {
+    animation: fadeInScale ease-out 0.5s;
+  }
+}
+@keyframes fadeInOpacity {
+    0% {opacity:0.1}
+    100% {opacity:1}
+}
+
+// formatted json
+
+.json {
+    font-family: monospace;
+    color: #444;
+    font-weight: 400;
+    background-color: #eee;
+
+    &.code-block {
+        border: 1px solid #bbb;
+        padding: 8px;
+        border-radius: 8px;
+    }
+
+    .js-valid {
+      margin-left: 16px;
+      // go back and fourth of if fit-content looks better for a box that surrounds everything
+      // width: fit-content;
+      .js-valid-body {
+        display: block;
+        padding: 4px;
+        border: 1px dashed #888;
+        border-top: none;
+        border-bottom-left-radius: 4px;
+        border-bottom-right-radius: 4px;
+      }
+    }
+    > .js-valid {
+      margin: 0; // if first element is validation, don't indent it
+      padding: 0;
+    }
+  .js-block {display: block; margin-left: 24px;}
+  .js-num {color: #444;}
+  .js-bool {color: #444;}
+  .js-null {color: #888; font-style: italic;}
+  .js-qt {color: #494;}
+  .js-str {color: #464;}
+  .js-br {color: #448;}
+  .js-pr {color: #44b;}
+  .js-colon {color: #666; margin-right: 4px;}
+  .js-comma {
+    color: #888; display:inline-block;
+  }
 }

@@ -54,10 +54,11 @@ class BulkUnknownVariantInserter:
             raise ValueError(msg)
 
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
+        # This has been decomposed (only be 1 alt per line)
         chrom = columns[0]
         position = columns[1]
-        ref = columns[3]
-        alt = columns[4]
+        ref = columns[3].strip().upper()
+        alt = columns[4].strip().upper()
         if self.store_gvcf_non_var_blocks is False:
             if alt == "<NON_REF>":
                 self.num_skipped_gvcf_non_var_blocks += 1
@@ -82,20 +83,19 @@ class BulkUnknownVariantInserter:
 
     def batch_process_check(self, insert_all=False):
         if insert_all:
-            minimum_pipeline_size = 0
-            minimum_unknown_insert_size = 0
+            minimum_size = 0
         else:
-            minimum_pipeline_size = settings.REDIS_PIPELINE_SIZE
-            minimum_unknown_insert_size = settings.SQL_BATCH_INSERT_SIZE
+            minimum_size = settings.SQL_BATCH_INSERT_SIZE
 
-        self.variant_pk_lookup.batch_check(minimum_pipeline_size)
+        self.variant_pk_lookup.batch_check(minimum_size)
 
         # Unknown variants
         num_unknown_variants = len(self.variant_pk_lookup.unknown_variant_coordinates)
-        if num_unknown_variants and num_unknown_variants >= minimum_unknown_insert_size:
-            unknown_variants_basename = f"unknown_variants_step_{self.upload_step.pk}_batch_{self.unknown_variants_batch_id}.csv"
-            unknown_variants_filename = os.path.join(self.unknown_dir, unknown_variants_basename)
-            huv_args = (self.upload_step.upload_pipeline, self.variant_pk_lookup.unknown_variant_coordinates, unknown_variants_filename)
+        if num_unknown_variants and num_unknown_variants >= minimum_size:
+            uv_basename = f"unknown_variants_step_{self.upload_step.pk}_batch_{self.unknown_variants_batch_id}.csv"
+            unknown_variants_filename = os.path.join(self.unknown_dir, uv_basename)
+            huv_args = (self.upload_step.upload_pipeline, self.variant_pk_lookup.unknown_variant_coordinates,
+                        unknown_variants_filename)
 
             if USE_THREADS:
                 future = self.executor.submit(handle_unknown_variants, *huv_args)

@@ -37,7 +37,7 @@ DB_WORKERS = {'queue': 'db_workers', 'routing_key': 'db_workers'}  # Default Que
 # Require reading from filesystem (upload directory or images & reports)
 WEB_WORKERS = {'queue': 'web_workers', 'routing_key': 'web_workers'}
 
-# This is used for inserting new Variants/Loci and updating Redis with hashes
+# This is used for inserting new Variants/Loci
 # 1 worker to avoid race conditions so we end up with 1 and only 1 variant for chrom/post/ref/alt
 VARIANT_ID_SINGLE_WORKER = {'queue': 'variant_id_single_worker', 'routing_key': 'variant_id_single_worker'}
 
@@ -89,7 +89,6 @@ CELERY_ROUTES = {
 
     # VariantID workers
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
-    'upload.tasks.load_variants_hash_in_redis_task.load_variants_hash_in_redis': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.UpdateVariantZygosityCountsTask': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.reload_vcf_task': VARIANT_ID_SINGLE_WORKER,
     'snpdb.tasks.validation_task.validate_variant_data': VARIANT_ID_SINGLE_WORKER,
@@ -135,7 +134,6 @@ CELERY_IMPORTS = (
     'upload.tasks.import_patient_records_task',
     'upload.tasks.import_ped_task',
     'upload.tasks.import_variant_tags_task',
-    'upload.tasks.load_variants_hash_in_redis_task',
     'upload.tasks.vcf.genotype_vcf_tasks',
     'upload.tasks.vcf.import_sql_copy_task',
     'upload.tasks.vcf.import_vcf_step_task',

@@ -41,7 +41,7 @@
             <th>Lab</th>
             <th>HGVS <span class="text-secondary">{{ genome_build }}</span></th>
             <th class="text-center">Clinical Significance</th>
-            <th>Conditions</th>
+            <th>Condition</th>
             <th>{% if show_allele_origin %}Origin, {% endif %}Zygosities</th>
             <th><span class="text-secondary">Latest</span><br/>ACMG</th>
             <th><span class="text-secondary">Latest</span><br/>Curated</th>
@@ -61,6 +61,7 @@
 <script>$(document).ready(() => {
     var table = $('#{{ table_id }}').DataTable({
         order: [1, "asc"],
+        dom: '<"top"><"toolbar"<"custom">f>rt<"bottom"ilp><"clear">',
         "orderFixed": {
             post: [7, "desc"]
         },
