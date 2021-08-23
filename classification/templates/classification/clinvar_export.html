@@ -29,16 +29,18 @@
                 <div class="card-body">
                     {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
                     {% labelled label="Allele" %}{% with allele=clinvar_export.clinvar_allele.allele %}<a class="hover-link" href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endwith %}{% endlabelled %}
-                    {% labelled label="c.hgvs" %}{% c_hgvs clinvar_export.classification_based_on %}{% endlabelled %}
-                    {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}{% endlabelled %}
+                    {% comment %}{% labelled label="c.hgvs" %}{% c_hgvs clinvar_export.classification_based_on %}{% endlabelled %}{% endcomment %}
+                    {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}
+                        {% field_help %}If using MONDO, any classification with the same allele and this condition or a more specific condition will be considered under this export.{% end_field_help %}
+                    {% endlabelled %}
                     {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}
-                    {% field_help %}{{ site_name }} updated this export using the data available at this time.{% end_field_help %}
+                    {% field_help %}{{ site_name }} cached data for this export using the data available at this time.{% end_field_help %}
                     {% endlabelled %}
                     {% labelled label="Source Classification" %}
                         {% if clinvar_export.classification_based_on %}
                             <a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
                                 {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
-                            {% field_help %}The classification that will be exported for this allele/condition combination.{% end_field_help %}
+                            {% field_help %}The classification's data that will be exported for this allele/condition combination.{% end_field_help %}
                         {% else %}
                             <div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>
                         {% endif %}
