@@ -11,7 +11,6 @@ import json
 
 class ClinVarExportSubmissionAdmin(admin.TabularInline):
     model = ClinVarExportSubmission
-    list_display = ("pk", )
 
     def has_add_permission(self, request, obj=None):
         return False
