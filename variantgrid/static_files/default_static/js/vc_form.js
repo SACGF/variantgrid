@@ -399,7 +399,6 @@ const VCForm = (function() {
             linkData[SpecialEKeys.VARIANT_COORDINATE] = this.variantCoordinate();
             linkData[SpecialEKeys.C_HGVS] = this.cHGVS();
 
-
             let allLinks = vcLinks.generateLinks(linkData).map(vcLink => {return vcLink.asAnchor("bootstrap").addClass('list-group-item').addClass('list-group-item-action')});
             for (let link of allLinks) {
                 link.attr('data-placement', 'left');

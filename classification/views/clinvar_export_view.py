@@ -80,9 +80,10 @@ class ClinVarExportColumns(DatatableConfig):
             else:
                 c_hgvs_str = row["classification_based_on__classification__chgvs_grch38"]
 
+            data: Dict[str, Any]
             c_hgvs = CHGVS(c_hgvs_str)
             if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
-                return {
+                data = {
                     "genomeBuild": genome_build,
                     "transcript": c_hgvs.transcript,
                     "geneSymbol": c_hgvs.gene_symbol,
@@ -91,7 +92,13 @@ class ClinVarExportColumns(DatatableConfig):
                     # "variantId": row["classification_based_on__classification__variant"]
                 }
             else:
-                return {"full": c_hgvs_str}
+                data = {"full": c_hgvs_str}
+
+            if allele_id := row["clinvar_allele__allele"]:
+                allele = allele_for(row["clinvar_allele__allele"])
+                data["allele"] =  f"{allele:CA}"
+
+            return data
         else:
             return None
 
@@ -102,11 +109,10 @@ class ClinVarExportColumns(DatatableConfig):
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
-            RichColumn("clinvar_allele__allele", name="Allele", renderer=self.render_allele),
-            RichColumn(name="c_hgvs", label='c.hgvs',
-                    visible=False,  # still allow this to be searched on
+            RichColumn(name="c_hgvs", label='Allele',
                     sort_keys=["classification_based_on__classification__chgvs_grch38"],
                     extra_columns=[
+                        "clinvar_allele__allele",
                         "classification_based_on__classification__variant",
                         "classification_based_on__published_evidence__genome_build__value",
                         "classification_based_on__classification__chgvs_grch37",
@@ -114,6 +120,7 @@ class ClinVarExportColumns(DatatableConfig):
                     ],
                     renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
                     search=[
+                        "clinvar_allele__allele",
                         "classification_based_on__classification__chgvs_grch37",
                         "classification_based_on__classification__chgvs_grch38"
                     ]

@@ -263,7 +263,7 @@ def classification_table(
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[CHGVS, str]):
+def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build=False):
     if isinstance(c_hgvs, ClassificationModification):
         if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
             c_hgvs = CHGVS(c_hgvs)
@@ -272,7 +272,7 @@ def c_hgvs(c_hgvs: Union[CHGVS, str]):
     elif isinstance(c_hgvs, str):
         c_hgvs = CHGVS(c_hgvs)
 
-    return {"c_hgvs": c_hgvs}
+    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build}
 
 
 @register.inclusion_tag("classification/tags/hgvs.html", takes_context=True)

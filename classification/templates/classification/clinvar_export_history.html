@@ -1,7 +1,7 @@
 {% load js_tags %}
 {% load ui_utils %}
 {% if history %}
-    <p class="text-info">Below is the history of what was sent to ClinVar for this submitter/allele/condition combination.</p>
+    <p class="text-info">Below is the history of what was sent to ClinVar for this ClinVar Key/allele/condition combination.</p>
     {% for history_entry in history %}
         <div class="card mb-4">
             <div class="card-header">ClinVar Submission ({{ history_entry.pk }})</div>

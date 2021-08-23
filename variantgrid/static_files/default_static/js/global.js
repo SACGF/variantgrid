@@ -765,8 +765,13 @@ TableFormat.hgvs = function(data, type, columns) {
     let transcript = data.transcript;
     let geneSymbol = data.geneSymbol;
     let variant = data.variant;
+    let allele = data.allele;
     // also turn into a link
     let dom = $('<div>');
+    if (allele) {
+        dom.append($('<div>', {text: allele, class:'font-weight-bold'}));
+    }
+
     if (genomeBuild) {
         dom.append($('<div>', {text: genomeBuild, class:'text-info'}));
         // <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="display:inline-block;word-break: break-all">{{ c_hgvs.raw_c }}</span>
