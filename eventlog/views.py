@@ -7,7 +7,6 @@ import logging
 from eventlog.grids import EventColumns
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
-from snpdb.views.datatable_view import BaseDatatableView
 
 
 def eventlog_view(view_func):
@@ -30,12 +29,6 @@ def eventlog(request):
     return render(request, 'eventlog.html', context={
         'datatable_config': EventColumns(request)
     })
-
-
-class EventLogDatatableView(BaseDatatableView):
-
-    def config_for_request(self, request):
-        return EventColumns(request)
 
 
 @require_POST

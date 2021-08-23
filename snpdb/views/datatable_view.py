@@ -5,12 +5,14 @@ import logging
 import operator
 from datetime import datetime
 from functools import reduce
-from typing import List, Dict, Optional, Any, Callable, Union
+from typing import List, Dict, Optional, Any, Callable, Union, TypeVar, Generic, Type
 
+from django.contrib.auth.models import User
+from django.db import models
 from django.db.models import QuerySet, Q
+from django.http import HttpRequest, QueryDict
 from kombu.utils import json
 from lazy import lazy
-
 from uicore.json.json_types import JsonDataType
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
@@ -142,13 +144,13 @@ class RichColumn:
         return False
 
 
-class DatatableConfig:
+DC = TypeVar('DC', bound=models.Model)  # Data Class
+
+
+class DatatableConfig(Generic[DC]):
     """
     This class both determines how the client side table should be defined (via tags)
     and how the server will send data to it via ajax (via BaseDatatableView)
-
-    Most functionality from BaseDatatableView has been slowly migrated into this class
-    as the ability to initate this with just a request comes in handy
     """
 
     search_box_enabled: bool = False
@@ -160,9 +162,9 @@ class DatatableConfig:
         all_columns = list(set(column_names))
         return all_columns
 
-    def __init__(self, request):
-        self.request = request
-        self.user = request.user
+    def __init__(self, request: HttpRequest):
+        self.request: HttpRequest = request
+        self.user: User = request.user
 
     @lazy
     def default_sort_order_column(self) -> RichColumn:
@@ -176,10 +178,10 @@ class DatatableConfig:
     def enabled_columns(self) -> List[RichColumn]:
         return [rc for rc in self.rich_columns if rc.enabled]
 
-    def get_initial_queryset(self):
+    def get_initial_queryset(self) -> QuerySet[DC]:
         raise NotImplementedError("Need to provide a model or implement get_initial_queryset!")
 
-    def power_search(self, qs: QuerySet, search_string: str) -> QuerySet:
+    def power_search(self, qs: QuerySet[DC], search_string: str) -> QuerySet[DC]:
         search_cols = set()
         rich_col: RichColumn
         for rich_col in self.enabled_columns:  # TODO do we want to check not enabled columns too?
@@ -187,12 +189,12 @@ class DatatableConfig:
 
         filters: List[Q] = list()
         for search_col in search_cols:
-            filters.append( Q(**{f'{search_col}__icontains': search_string}) )
+            filters.append(Q(**{f'{search_col}__icontains': search_string}))
         or_filter = reduce(operator.or_, filters)
         qs = qs.filter(or_filter)
         return qs
 
-    def filter_queryset(self, qs: QuerySet) -> QuerySet:
+    def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         """
         Override to apply extra GET/POST params to filter what data is returned
         :param qs: The default QuerySet
@@ -202,6 +204,11 @@ class DatatableConfig:
 
     @staticmethod
     def _row_expand_ajax(expand_view: str, id_field: str = 'id', expected_height: Optional[int] = None) -> str:
+        """
+        :expand_view Name of the django view - as found in urls.py
+        :id_field Parameter to go to the view (assumes that the view takes 1 parameter)
+        :expected_height Expected height in pixels of an expanded view, doesn't need to be accurate, just looks better if it's roughly correct
+        """
         expected_height_str = f"{expected_height if expected_height else 100}px"
         return f"TableFormat.expandAjax.bind(null, '{expand_view}', '{id_field}', '{expected_height_str}')"
 
@@ -231,7 +238,7 @@ class DatatableConfig:
             return json.loads(value)
         return None
 
-    def ordering(self, qs: QuerySet) -> QuerySet:
+    def ordering(self, qs: QuerySet) -> QuerySet[DC]:
         """ Get parameters from the request and prepare order by clause
         """
         #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
@@ -259,7 +266,7 @@ class DatatableConfig:
 
         return qs.order_by(*sort_by_list)
 
-    def pre_render(self, qs: QuerySet):
+    def pre_render(self, qs: QuerySet[DC]):
         """
         Last method called before we start rendering
         qs: The QuerySet with all filtering, ordering applied
@@ -267,20 +274,24 @@ class DatatableConfig:
         pass
 
 
-class DatatableMixin(object):
-    """ JSON data for datatables """
+class DatabasetableView(Generic[DC], JSONResponseView):
+    """
+    Wraps a column_class to give it functionality for a view to provide data to a DataTables view
+    """
     config: DatatableConfig
     max_display_length = 100
 
-    def config_for_request(self, request) -> DatatableConfig:
-        raise NotImplementedError("DatatableMixing must implement config_for_request")
+    column_class: Type[DC] = None
 
-    def get(self, request, *args, **kwargs):
+    def config_for_request(self, request: HttpRequest) -> DatatableConfig[DC]:
+        return self.column_class(request)
+
+    def get(self, request: HttpRequest, *args, **kwargs):
         self.config = self.config_for_request(request)
         return super().get(request, *args, **kwargs)
 
     @property
-    def _querydict(self):
+    def _querydict(self) -> QueryDict:
         if self.request.method == 'POST':
             return self.request.POST
         else:
@@ -298,25 +309,25 @@ class DatatableMixin(object):
             value = value.timestamp()
         return value
 
-    def render_column(self, row: Dict, column: RichColumn):
+    def render_cell(self, row: Dict, column: RichColumn) -> JsonDataType:
         """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type """
         if column.renderer:
             return column.renderer(row)
         if column.extra_columns:
             data_dict = dict()
             for col in column.value_columns:
-                data_dict[col] = DatatableMixin.sanitize_value(row.get(col))
+                data_dict[col] = DatabasetableView.sanitize_value(row.get(col))
             return data_dict
 
         elif column.key:
-            return DatatableMixin.sanitize_value(row.get(column.key))
+            return DatabasetableView.sanitize_value(row.get(column.key))
         else:
             return None
 
-    def ordering(self, qs: QuerySet):
+    def ordering(self, qs: QuerySet[DC]):
         return self.config.ordering(qs)
 
-    def paging(self, qs):
+    def paging(self, qs:QuerySet[DC]) -> QuerySet[DC]:
         limit = min(int(self._querydict.get('length', 10)), self.max_display_length)
         start = int(self._querydict.get('start', 0))
 
@@ -328,19 +339,19 @@ class DatatableMixin(object):
 
         return qs[start:offset]
 
-    def get_initial_queryset(self):
+    def get_initial_queryset(self) -> QuerySet[DC]:
         return self.config.get_initial_queryset()
 
-    def get_query_param(self, param: str):
+    def get_query_param(self, param: str) -> Any:
         return self._querydict.get(param)
 
-    def get_query_json(self, param: str):
+    def get_query_json(self, param: str) -> JsonDataType:
         value = self.get_query_param(param)
         if value:
             return json.loads(value)
         return None
 
-    def filter_queryset(self, qs):
+    def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         qs = self.config.filter_queryset(qs)
         if qs is not None:
             if (search_text := self.get_query_param('search[value]')) and (search_text := search_text.strip()):
@@ -349,7 +360,7 @@ class DatatableMixin(object):
 
         raise NotImplementedError("filter_queryset returned None")
 
-    def prepare_results(self, qs: QuerySet):
+    def prepare_results(self, qs: QuerySet[DC]):
         self.config.pre_render(qs)
 
         data = []
@@ -360,12 +371,12 @@ class DatatableMixin(object):
             # fix me, do server side rendering
             row_json = {}
             for rc in self.config.enabled_columns:
-                value = self.render_column(row=row, column=rc)
+                value = self.render_cell(row=row, column=rc)
                 row_json[rc.name] = value
             data.append(row_json)
         return data
 
-    def handle_exception(self, e):
+    def handle_exception(self, e: BaseException):
         report_exc_info()
         logger.exception(str(e))
         raise e
@@ -399,19 +410,7 @@ class DatatableMixin(object):
                    'recordsTotal': total_records,
                    'recordsFiltered': total_display_records,
                    'data': data
-            }
+                   }
             return ret
         except Exception as e:
             return self.handle_exception(e)
-
-
-class BaseDatatableView(DatatableMixin, JSONResponseView):
-    pass
-
-
-class DatabasetableView(BaseDatatableView):
-
-    column_class = None
-
-    def config_for_request(self, request):
-        return self.column_class(request)

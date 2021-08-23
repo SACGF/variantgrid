@@ -1,12 +1,12 @@
 from typing import Dict, Any, Optional, Iterable
 from django.conf import settings
 from django.db.models import QuerySet, When, Value, Case, IntegerField
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
+from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.timezone import now
 from pytz import timezone
-from htmlmin.decorators import not_minified_response
 
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
@@ -18,6 +18,8 @@ from library.utils import html_to_text, delimited_row
 from snpdb.models import ClinVarKey, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import json
+
+from uicore.json.json_types import JsonDataType
 
 
 @timed_cache(size_limit=30, ttl=60)
@@ -65,13 +67,13 @@ def clinvar_export_batch_detail(request, pk: int):
     })
 
 
-class ClinVarExportColumns(DatatableConfig):
+class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def render_allele(self, row: Dict[str, Any]) -> str:
         allele = allele_for(row["clinvar_allele__allele"])
         return f"{allele:CA}"
 
-    def render_c_hgvs(self, row: Dict[str, Any]):
+    def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
         if row["classification_based_on__classification__variant"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
             c_hgvs_str: str
@@ -95,14 +97,14 @@ class ClinVarExportColumns(DatatableConfig):
                 data = {"full": c_hgvs_str}
 
             if allele_id := row["clinvar_allele__allele"]:
-                allele = allele_for(row["clinvar_allele__allele"])
-                data["allele"] =  f"{allele:CA}"
+                allele = allele_for(allele_id)
+                data["allele"] = f"{allele:CA}"
 
             return data
         else:
             return None
 
-    def __init__(self, request):
+    def __init__(self, request: HttpRequest):
         super().__init__(request)
 
         self.search_box_enabled = True
@@ -120,13 +122,11 @@ class ClinVarExportColumns(DatatableConfig):
                     ],
                     renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
                     search=[
-                        "clinvar_allele__allele",
+                        # "clinvar_allele__allele__clingen_allele__id",  # need a string
                         "classification_based_on__classification__chgvs_grch37",
                         "classification_based_on__classification__chgvs_grch38"
                     ]
             ),
-
-            # TODO store plain text condition so we can search it and sort it
             RichColumn("condition",
                        label="Condition Umbrella",
                        client_renderer='VCTable.condition',
@@ -168,8 +168,7 @@ class ClinVarExportColumns(DatatableConfig):
         return initial_qs
 
 
-
-def clinvar_export_review(request, pk):
+def clinvar_export_review(request: HttpRequest, pk) -> HttpResponseBase:
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
@@ -187,7 +186,7 @@ def clinvar_export_review(request, pk):
     })
 
 
-def clinvar_export_history(request, pk):
+def clinvar_export_history(request: HttpRequest, pk) -> HttpResponseBase:
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
@@ -199,7 +198,7 @@ def clinvar_export_history(request, pk):
     })
 
 
-def clinvar_export_download(request, clinvar_key: str):
+def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpResponseBase:
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key)
     clinvar_key.check_user_can_access(request.user)
 
@@ -229,7 +228,7 @@ def clinvar_export_download(request, clinvar_key: str):
     return response
 
 
-def clinvar_export_batch_download(request, pk):
+def clinvar_export_batch_download(request: HttpRequest, pk) -> HttpResponseBase:
     clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=pk)
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
 
@@ -241,7 +240,7 @@ def clinvar_export_batch_download(request, pk):
     return response
 
 
-def clinvar_export_summary(request, pk: Optional[str] = None):
+def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> HttpResponseBase:
     clinvar_key: ClinVarKey
     if not pk:
         if clinvar_key := ClinVarKey.clinvar_keys_for_user(request.user).first():
@@ -271,7 +270,7 @@ def clinvar_export_summary(request, pk: Optional[str] = None):
     })
 
 
-def clinvar_export_detail(request, pk: Optional[str] = None):
+def clinvar_export_detail(request: HttpRequest, pk: Optional[str] = None) -> HttpResponseBase:
     clinvar_export = get_object_or_404(ClinVarExport, pk=pk)
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 

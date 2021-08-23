@@ -1,4 +1,5 @@
 from django.db.models import QuerySet
+from django.http import HttpRequest
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
@@ -6,9 +7,9 @@ from library.guardian_utils import bot_group
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
-class EventColumns(DatatableConfig):
+class EventColumns(DatatableConfig[Event]):
 
-    def __init__(self, request):
+    def __init__(self, request: HttpRequest):
         super().__init__(request)
 
         self.rich_columns = [
@@ -24,13 +25,13 @@ class EventColumns(DatatableConfig):
             RichColumn('details', detail=True),
         ]
 
-    def get_initial_queryset(self):
+    def get_initial_queryset(self) -> QuerySet[Event]:
         event_qs = Event.objects.all()
         if not self.user.is_staff:
             event_qs = event_qs.filter(user=self.user)
         return event_qs
 
-    def filter_queryset(self, qs: QuerySet) -> QuerySet:
+    def filter_queryset(self, qs: QuerySet[Event]) -> QuerySet[Event]:
         filter_param = self.get_query_param('filter')
         if filter_param and filter_param != 'everything':
             if filter_param == 'logins':
