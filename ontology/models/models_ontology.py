@@ -294,7 +294,7 @@ class OntologyTerm(TimeStampedModel):
                 name=""
             )
         except ValueError:
-            if existing := OntologyTerm.objects.filter(ontology_service=prefix, name=postfix).first():
+            if existing := OntologyTerm.objects.filter(ontology_service=prefix, name__iexact=postfix).first():
                 return existing
             raise ValueError(f"Can not convert {id_str} to a proper id")
 
