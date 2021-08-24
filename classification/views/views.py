@@ -37,7 +37,7 @@ from library.log_utils import log_traceback
 from library.utils import delimited_row
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Variant, UserSettings, Sample, Lab
+from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
@@ -292,8 +292,8 @@ def view_classification(request, record_id):
 def view_classification_diff(request):
     extra_data = dict()
 
-    if request.GET.get('history'):
-        vc_id = int(request.GET.get('history'))
+    if history_str := request.GET.get('history'):
+        vc_id = int(history_str)
         vc = Classification.objects.get(pk=vc_id)
         qs = ClassificationModification.objects.filter(classification=vc, published=True)
         qs = ClassificationModification.filter_for_user(request.user, qs).order_by('-created')
@@ -314,18 +314,24 @@ def view_classification_diff(request):
         if vc.can_write(request.user) and vc.last_published_version.id != vc.last_edited_version.id:
             records.insert(0, vc.last_edited_version)
 
-    elif request.GET.get('clinical_context'):
-        cc = ClinicalContext.objects.get(pk=request.GET.get('clinical_context'))
+    elif clinical_context_str := request.GET.get('clinical_context'):
+        cc = ClinicalContext.objects.get(pk=clinical_context_str)
         records = cc.classification_modifications
         records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
-    elif request.GET.get('variant_compare'):
-        ref = ClassificationRef.init_from_str(user=request.user, id_str=request.GET.get('variant_compare'))
+    elif variant_id_str := request.GET.get('variant_compare'):
+        ref = ClassificationRef.init_from_str(user=request.user, id_str=variant_id_str)
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
         # filter out variant we're comparing with, make it last in calculation
         latest_others_for_variant = [vcm for vcm in compare_all if vcm.classification.id != ref.record.id]
         latest_others_for_variant.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         compare_all = [ref.modification] + latest_others_for_variant
+        records = compare_all
+
+    elif allele_id_str := request.GET.get('allele'):
+        allele_id = int(allele_id_str)
+        compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
+        compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         records = compare_all
 
     elif cids := request.GET.get('cids'):
@@ -634,7 +640,7 @@ def clin_sig_change_data(request):
     def yield_data():
 
         genome_build = GenomeBuildManager.get_current_genome_build()
-        yield delimited_row(['classification first submitted', 'date changed', 'org', 'lab', f'c.hgvs {genome_build}', 'url', 'from', 'to', 'status', 'comments', 'discordance(s)','other labs for allele at time'], '\t')
+        yield delimited_row(['classification first submitted', 'date changed', 'org', 'lab', f'c.hgvs {genome_build}', 'url', 'from', 'to', 'status', 'comments', 'discordance(s)', 'other labs for allele at time'], '\t')
 
         flag_changed_re = re.compile(r"^Classification (has )?changed from (?P<from>.*?) to (?P<to>.*?)$")
         de_number_re = re.compile(r"(.*?) [(].*?[)]")
@@ -654,9 +660,6 @@ def clin_sig_change_data(request):
             cs_to: str = 'ERROR'
             comments: List[str] = list()
             resolution: Optional[str] = 'In Progress'
-            org: Optional[str] = 'Record has been deleted'
-            lab: Optional[str] = ''
-            url: Optional[str] = ''
             classification_created: datetime
             date_raised: datetime = flag.created
             discordance_dates: List[datetime] = list()
@@ -676,8 +679,7 @@ def clin_sig_change_data(request):
                     for discordance in Flag.objects.filter(collection=source.flag_collection_safe,
                                                            flag_type=classification_flag_types.discordant).order_by(
                             'created'):
-                        discordance_date = discordance.created
-                        discordance_dates.append(discordance_date)
+                        discordance_dates.append(discordance.created)
 
                     if allele := source.variant.allele:
                         cl: Classification
@@ -692,7 +694,6 @@ def clin_sig_change_data(request):
                 continue
 
             for index, flag_comment in enumerate(flag.flagcomment_set.order_by('created')):
-                last_comment = flag_comment
                 if text := flag_comment.text:
                     if index == 0:
                         if match := flag_changed_re.match(text):
@@ -708,7 +709,7 @@ def clin_sig_change_data(request):
             other_lab_list = list(other_labs)
             other_lab_list.sort()
             other_lab_str = ", ".join(other_lab.name for other_lab in other_lab_list)
-            discordance_date_str = " ".join([discordance_date.strftime('%Y-%m-%d %H:%M:%S') for dd in discordance_dates])
+            discordance_date_str = " ".join([dd.strftime('%Y-%m-%d %H:%M:%S') for dd in discordance_dates])
             yield delimited_row([classification_created.strftime('%Y-%m-%d %H:%M:%S'), date_raised.strftime('%Y-%m-%d %H:%M:%S'), org, lab, c_hgvs, url, cs_from, cs_to, resolution, '\n'.join(comments), discordance_date_str, other_lab_str], '\t')
 
     response = StreamingHttpResponse(yield_data(), content_type='text/tsv')

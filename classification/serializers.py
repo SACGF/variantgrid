@@ -4,6 +4,7 @@ from snpdb.serializers import VariantSerializer
 from classification.models import Classification
 
 
+# Is this used?
 class ClassificationSerializer(serializers.ModelSerializer):
     variant = VariantSerializer()
     clinical_significance = serializers.SerializerMethodField()

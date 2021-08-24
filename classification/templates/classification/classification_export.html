@@ -204,7 +204,7 @@
         </div>
     {% endlabelled %}
     {% if user.is_superuser %}
-        {% labelled label="Benchmark Only"%}
+        {% labelled label="Benchmark Only" value_css="admin-only" %}
             <div class="form-check">
                 <label class="form-check-label">
                     <input id="benchmark" name="benchmark" value="true" type="checkbox" class="form-check-input" />
