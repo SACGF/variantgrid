@@ -14,11 +14,10 @@ from annotation.models import CitationSource, Citation
 from annotation.views import simple_citation_html
 from library.django_utils import get_url_from_view_path
 from classification.enums.classification_enums import SpecialEKeys
-from classification.models import EvidenceKey, ClassificationGroups, ClassificationModification
+from classification.models import ClassificationGroups, ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_export_utils import ExportFormatter, \
     AlleleGroup, ConflictStrategy
-from snpdb.models import Lab
 
 
 @dataclass(frozen=True, eq=True)
@@ -30,15 +29,14 @@ class CitationStub:
         if self.source < other.source:
             return True
         if self.source == other.source:
-            return self.citation_id.rjust(10, '0') < other.citation_id.rjust(10, '0')
+            return self.idx.rjust(10, '0') < other.idx.rjust(10, '0')
         return False
 
 
 class CitationCounter:
 
     def __init__(self):
-        # self.all_citations: Dict[CitationDetails, Set[Any]] = defaultdict(set)
-        self.all_citations: Dict[CitationStub, Set[Lab]] = defaultdict(set)
+        self.all_citations: Dict[CitationStub, Set[str]] = defaultdict(set)
 
     def reference_citations(self, cm: ClassificationModification):
         for db_ref in cm.db_refs:
@@ -78,7 +76,7 @@ class ExportFormatterMVL(ExportFormatter):
         return True
 
     def __init__(self, conflict_strategy: str, cs_override_labels: Dict[str, str], *args, **kwargs):
-        super().__init__( *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.conflict_strategy = conflict_strategy
         self.cs_translator = {
             'B': 'BENIGN',
@@ -120,10 +118,7 @@ class ExportFormatterMVL(ExportFormatter):
 
             transcript = c_parts.transcript
             c_hgvs = c_parts.raw_c
-            # could probably do <th style="text-align:left">
-            # but
-            summaries = []
-            abstracts = []
+
             warnings: List[str] = []
             using_classification_score = None
             classification = ''
@@ -148,7 +143,7 @@ class ExportFormatterMVL(ExportFormatter):
 
                 if using_classification_score is None or \
                     (self.conflict_strategy == ConflictStrategy.MOST_BENIGN and this_classification_score < using_classification_score) or \
-                    (self.conflict_strategy == ConflictStrategy.MOST_PATHOGENIC and this_classification_score > using_classification_score):
+                        (self.conflict_strategy == ConflictStrategy.MOST_PATHOGENIC and this_classification_score > using_classification_score):
                     using_classification_score = this_classification_score
                     classification = this_classification
 

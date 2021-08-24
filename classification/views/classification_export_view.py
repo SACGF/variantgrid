@@ -39,10 +39,10 @@ def parse_since(since_str: str) -> datetime:
         since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
         since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
         return since_date
-    except:
+    except BaseException:
         pass
 
-    if m := re.compile("([0-9]+)(\w*)").match(since_str):
+    if m := re.compile(r"([0-9]+)(\w*)").match(since_str):
         amount = int(m.group(1))
         unit = m.group(2)
         if unit:
@@ -66,7 +66,7 @@ def parse_since(since_str: str) -> datetime:
 
     try:
         return datetime.utcfromtimestamp(float(since_str)).replace(tzinfo=timezone.utc)
-    except:
+    except BaseException:
         pass
 
     raise ValueError(f"Could not parse since string {since_str}")
@@ -86,7 +86,6 @@ def export_view(request: HttpRequest) -> Response:
     format_json = {'id': 'json', 'name': 'JSON'}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
     format_vcf = {'id': 'vcf', 'name': 'VCF'}
-    #format_errors = {'id': 'errors', 'name': 'Liftover Errors'}
     formats = [
         format_keys,
         format_csv,
@@ -94,7 +93,6 @@ def export_view(request: HttpRequest) -> Response:
         format_mvl,
         format_redcap,
         format_vcf,
-    #    format_errors
     ]
 
     context = {
@@ -122,11 +120,8 @@ def export_view_redirector(request: HttpRequest) -> Response:
     include_labs = all_params.pop('include_labs', None)
     since_str = all_params.pop('since', None)
     if since_str:
-        # try:
         since = parse_since(since_str).astimezone(timezone.get_default_timezone())
         since_str = since_str + " -> " + since.strftime("%Y-%m-%d %H:%M:%S %z")
-        #except Exception as e:
-        #    since_str = str(e)
     else:
         since_str = 'All'
 
@@ -284,28 +279,28 @@ class ClassificationApiExportView(APIView):
         return formatter.export()
 
 
-def _single_classification_mod_qs(request, record_id) -> QuerySet:
+def _single_classification_mod_qs(request: HttpRequest, record_id) -> QuerySet:
     vcm = ClassificationRef.init_from_obj(request.user, record_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
     return qs
 
 
 @not_minified_response
-def template_report(request, record_id) -> HttpResponseBase:
+def template_report(request: HttpRequest, record_id) -> HttpResponseBase:
     qs = _single_classification_mod_qs(request, record_id)
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
 
     return ExportFormatterReport(user=request.user, genome_build=genome_build, qs=qs).export(as_attachment=False)
 
 
-def redcap_data_dictionary(request) -> HttpResponseBase:
+def redcap_data_dictionary(request: HttpRequest) -> HttpResponseBase:
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="redcap_data_definition.csv"'
     export_redcap_definition(response)
     return response
 
 
-def record_csv(request, record_id) -> HttpResponseBase:
+def record_csv(request: HttpRequest, record_id) -> HttpResponseBase:
     vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, record_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 

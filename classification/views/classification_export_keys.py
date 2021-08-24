@@ -6,8 +6,8 @@ from django.http import StreamingHttpResponse
 
 from classification.models import ClassificationModification, EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCBlobDict
-from classification.views.classification_export_utils import ExportFormatter, AlleleGroup, \
-    BaseExportFormatter
+from classification.views.classification_export_utils import BaseExportFormatter
+from library.utils import DebugTimer
 
 """
 For generating a report about the usage of evidence keys.
@@ -150,6 +150,9 @@ class ExportFormatterKeys(BaseExportFormatter):
     Formats as a general CSV
     """
 
+    def benchmark(self, row_limit: int = 100) -> DebugTimer:
+        raise NotImplementedError("Benchmark not supported by ExportFormatterKeys")
+
     def __init__(self, qs: QuerySet, *args, **kwargs):
         self.qs = qs.order_by("-modified")
         self.key_counters: Dict[str, KeyCount] = dict()
@@ -164,7 +167,6 @@ class ExportFormatterKeys(BaseExportFormatter):
             self.count_classification(vcm)
 
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
-        row_count = 0
         def stream_response():
             yield '{"keys":'
             self.process()

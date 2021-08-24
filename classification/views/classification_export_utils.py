@@ -116,18 +116,18 @@ class UsedKeyTracker:
         cols = []
         evidence = classification_modification.get_visible_evidence(self.user)
         for used_key in self.ordered_keys:
-            valueObj = evidence.get(used_key.ekey.key)
+            value_obj = evidence.get(used_key.ekey.key)
             if used_key.has_value:
-                if not valueObj:
+                if not value_obj:
                     cols.append(None)
                 else:
-                    value = valueObj.get('value')
+                    value = value_obj.get('value')
                     cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty))
             if used_key.has_note:
-                if not valueObj:
+                if not value_obj:
                     cols.append(None)
                 else:
-                    cols.append(valueObj.get('note'))
+                    cols.append(value_obj.get('note'))
         return cols
 
 
@@ -135,9 +135,11 @@ class ConflictStrategy:
     MOST_BENIGN = 'most_benign'
     MOST_PATHOGENIC = 'most_pathogenic'
 
+
 class VCFEncoding:
     BASIC = 'basic'
     FULL = 'full'
+
 
 class VariantWithChgvs:
 
@@ -331,17 +333,17 @@ class ExportFormatter(BaseExportFormatter):
         return EvidenceKeyMap.instance()
 
     def generate_filename(self,
-        prefix: str = 'classifications',
-        include_date=True,
-        include_genome_build: bool = True,
-        suffix: str = None,
-        extension: str = 'csv') -> str:
+                          prefix: str = 'classifications',
+                          include_date=True,
+                          include_genome_build: bool = True,
+                          suffix: str = None,
+                          extension: str = 'csv') -> str:
 
-        parts = []
+        parts: List[str] = list()
         if prefix:
             parts.append(prefix)
         if include_date:
-            parts.append( now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d") )
+            parts.append(now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d"))
         if include_genome_build:
             parts.append(self.genome_build.name)
         if suffix:
@@ -369,8 +371,6 @@ class ExportFormatter(BaseExportFormatter):
         return transcripts
 
     def filter_mismatched_transcripts(self, allele_group: AlleleGroup):
-        #flag_collection_id = Allele.objects.filter(pk=allele_group.allele_id).values_list('flag_collection_id',
-        #                                                                                  flat=True).first()
         flag_collection_id = allele_group.allele_flag_collection_id
         """
         transcripts: Set[str] = set()
@@ -420,7 +420,8 @@ class ExportFormatter(BaseExportFormatter):
     def classification_warning_flags(self):
         return set(Flag.objects.filter(
             flag_type__in=[classification_flag_types.matching_variant_warning_flag,
-                          classification_flag_types.transcript_version_change_flag],
+                           classification_flag_types.transcript_version_change_flag
+                           ],
             resolution__status=FlagStatus.OPEN
         ).values_list('collection_id', flat=True).distinct())
 
@@ -571,13 +572,6 @@ class ExportFormatter(BaseExportFormatter):
     def is_discordant(self, vc: Classification):
         if flag_collection_id := vc.flag_collection_id:
             return flag_collection_id in self.discordant_collections
-            """
-            return Flag.objects.filter(
-                collection=flag_collection_id,
-                flag_type=classification_flag_types.discordant,
-                resolution__status=FlagStatus.OPEN
-            ).exists()
-            """
         return False
 
     def report_stats(self, row_count: int):
@@ -585,8 +579,7 @@ class ExportFormatter(BaseExportFormatter):
         if self.user.groups.filter(name=bot_group().name):
             return
 
-        now = datetime.utcnow()
-        url = None
+        end = datetime.utcnow()
         body_parts = [f":simple_smile: {self.user.username}"]
         if request := get_current_request():
             body_parts.append(f"URL : `{request.path_info}`")
@@ -599,7 +592,7 @@ class ExportFormatter(BaseExportFormatter):
         if request := get_current_request():
             for key, value in request.GET.items():
                 nb.add_field(key, value)
-        nb.add_field("Duration", str((now - self.started).seconds) + " seconds")
+        nb.add_field("Duration", str((end - self.started).seconds) + " seconds")
         nb.send()
 
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
@@ -618,7 +611,7 @@ class ExportFormatter(BaseExportFormatter):
                 except GeneratorExit:
                     # user has cancelled the download, just stop now
                     return
-                except:
+                except BaseException:
                     print('Excepting during export')
                     log_traceback()
                     report_exc_info()
@@ -643,7 +636,7 @@ class ExportFormatter(BaseExportFormatter):
         self.prepare_groups()
         timer.tick("Prepare Groups")
 
-        header = self.header()
+        _ = self.header()
         timer.tick("Header")
 
         allele_groups = list()
@@ -657,7 +650,7 @@ class ExportFormatter(BaseExportFormatter):
             self.row(allele_group)
         timer.tick(f"Converted {len(allele_groups)} to rows")
 
-        footer = self.footer()
+        _ = self.footer()
         timer.tick("Footer")
 
         return timer

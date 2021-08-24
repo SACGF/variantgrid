@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 from typing import Optional
 from lazy import lazy
 from classification.models.classification import ClassificationModification
@@ -30,10 +29,10 @@ class ExportFormatterJSON(ExportFormatter):
     @lazy
     def json_params(self) -> ClassificationJsonParams:
         return ClassificationJsonParams(current_user=self.user,
-                                                 include_data=True,
-                                                 api_version=2,
-                                                 strip_complicated=True,
-                                                 include_messages=False)
+                                        include_data=True,
+                                        api_version=2,
+                                        strip_complicated=True,
+                                        include_messages=False)
 
     def to_row(self, vcm: ClassificationModification, withdrawn=False) -> Optional[str]:
         json_values = vcm.as_json(self.json_params)

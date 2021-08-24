@@ -13,7 +13,6 @@ from email_manager.models import EmailLog
 from flags.models import FlagCollection
 from library.log_utils import report_exc_info, report_message
 from snpdb.models import Lab, UserSettings
-from classification.enums import ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
     DiscordanceReportClassification, DiscordanceReport

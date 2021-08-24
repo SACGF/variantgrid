@@ -274,7 +274,7 @@ class DatatableConfig(Generic[DC]):
         pass
 
 
-class DatabasetableView(Generic[DC], JSONResponseView):
+class DatabaseTableView(Generic[DC], JSONResponseView):
     """
     Wraps a column_class to give it functionality for a view to provide data to a DataTables view
     """
@@ -316,18 +316,18 @@ class DatabasetableView(Generic[DC], JSONResponseView):
         if column.extra_columns:
             data_dict = dict()
             for col in column.value_columns:
-                data_dict[col] = DatabasetableView.sanitize_value(row.get(col))
+                data_dict[col] = DatabaseTableView.sanitize_value(row.get(col))
             return data_dict
 
         elif column.key:
-            return DatabasetableView.sanitize_value(row.get(column.key))
+            return DatabaseTableView.sanitize_value(row.get(column.key))
         else:
             return None
 
     def ordering(self, qs: QuerySet[DC]):
         return self.config.ordering(qs)
 
-    def paging(self, qs:QuerySet[DC]) -> QuerySet[DC]:
+    def paging(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         limit = min(int(self._querydict.get('length', 10)), self.max_display_length)
         start = int(self._querydict.get('start', 0))
 

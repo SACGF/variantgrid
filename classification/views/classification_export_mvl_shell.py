@@ -10,8 +10,6 @@ class ExportFormatterMVLShell(ExportFormatterMVL):
         out = io.StringIO()
         writer = csv.writer(out, delimiter='\t')
 
-        variant_details = f'This is a test'
-
         for c_parts, vcms_w_chgvs in group.iter_c_hgvs_versionless_transcripts():
 
             transcript = c_parts.transcript

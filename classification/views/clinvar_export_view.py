@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional, Iterable
 from django.conf import settings
 from django.db.models import QuerySet, When, Value, Case, IntegerField
-from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
+from django.http import HttpResponse, StreamingHttpResponse, HttpRequest, QueryDict
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -35,7 +35,8 @@ class ClinVarExportBatchColumns(DatatableConfig):
     def __init__(self, request):
         super().__init__(request)
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail', expected_height=120)
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail',
+                                                                       expected_height=120)
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
             RichColumn("clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
@@ -112,29 +113,31 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
             RichColumn(name="c_hgvs", label='Allele',
-                    sort_keys=["classification_based_on__classification__chgvs_grch38"],
-                    extra_columns=[
-                        "clinvar_allele__allele",
-                        "classification_based_on__classification__variant",
-                        "classification_based_on__published_evidence__genome_build__value",
-                        "classification_based_on__classification__chgvs_grch37",
-                        "classification_based_on__classification__chgvs_grch38",
-                    ],
-                    renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
-                    search=[
-                        # "clinvar_allele__allele__clingen_allele__id",  # need a string
-                        "classification_based_on__classification__chgvs_grch37",
-                        "classification_based_on__classification__chgvs_grch38"
-                    ]
-            ),
+                       sort_keys=["classification_based_on__classification__chgvs_grch38"],
+                       extra_columns=[
+                           "clinvar_allele__allele",
+                           "classification_based_on__classification__variant",
+                           "classification_based_on__published_evidence__genome_build__value",
+                           "classification_based_on__classification__chgvs_grch37",
+                           "classification_based_on__classification__chgvs_grch38",
+                       ],
+                       renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
+                       search=[
+                           # "clinvar_allele__allele__clingen_allele__id",  # need a string
+                           "classification_based_on__classification__chgvs_grch37",
+                           "classification_based_on__classification__chgvs_grch38"
+                       ]
+                       ),
             RichColumn("condition",
                        label="Condition Umbrella",
                        client_renderer='VCTable.condition',
                        search=["condition__display_text"],
                        sort_keys=["condition__sort_text"]
-            ),
-            RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"], orderable=True, search=False),
-            RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True, search=False),
+                       ),
+            RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"],
+                       orderable=True, search=False),
+            RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True,
+                       search=False),
             RichColumn("scv", label="SCV", orderable=True),
         ]
 
@@ -173,8 +176,10 @@ def clinvar_export_review(request: HttpRequest, pk) -> HttpResponseBase:
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     if request.method == "POST":
-        clinvar_export.scv = request.POST.get("scv") or ""
-        if release_status_str := request.POST.get("release_status"):
+        # noinspection PyTypeChecker
+        post: QueryDict = request.POST
+        clinvar_export.scv = post.get("scv") or ""
+        if release_status_str := post.get("release_status"):
             clinvar_export.release_status = ClinVarReleaseStatus(release_status_str)
         clinvar_export.save()
         add_save_message(request, valid=True, name="ClinVarExport")
@@ -203,7 +208,9 @@ def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpRespo
     clinvar_key.check_user_can_access(request.user)
 
     def rows() -> Iterable[str]:
-        yield delimited_row(["ID", "URL", "Genome Build", "c.hgvs", "Clinical Significance", "Interpretation Summary", "Sync Status", "Release Status", "SCV"])
+        yield delimited_row(
+            ["ID", "URL", "Genome Build", "c.hgvs", "Clinical Significance", "Interpretation Summary", "Sync Status",
+             "Release Status", "SCV"])
         row: ClinVarExport
         clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         for row in ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id'):
@@ -216,10 +223,13 @@ def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpRespo
                 genome_build = str(genome_build_obj)
                 c_hgvs = classification_based_on.classification.get_c_hgvs(genome_build_obj)
                 interpretation_summary = html_to_text(classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))
-                clinical_significance = clin_sig_e_key.pretty_value(classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+                clinical_significance = clin_sig_e_key.pretty_value(
+                    classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
 
             url = get_url_from_view_path(row.get_absolute_url())
-            yield delimited_row([row.id, url, genome_build or "", c_hgvs or "", clinical_significance or "", interpretation_summary or "", row.get_status_display(), row.get_release_status_display(), row.scv])
+            yield delimited_row([row.id, url, genome_build or "", c_hgvs or "", clinical_significance or "",
+                                 interpretation_summary or "", row.get_status_display(),
+                                 row.get_release_status_display(), row.scv])
             pass
 
     date_str = now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
@@ -253,7 +263,8 @@ def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> Ht
     clinvar_key.check_user_can_access(request.user)
 
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
+    missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                                                      condition_resolution__isnull=True)
 
     export_columns = ClinVarExportColumns(request)
     export_batch_columns = ClinVarExportBatchColumns(request)

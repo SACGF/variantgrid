@@ -291,8 +291,6 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
                 evidence_q_list.append(Q(**{f"published_evidence__{e_key}__value__startswith": transcript_id}))
 
             match_evidence = reduce(operator.or_, evidence_q_list)
-        else:
-            return None
-    else:
-        return None
-    return match_gene | match_evidence
+            return match_gene | match_evidence
+
+    return None

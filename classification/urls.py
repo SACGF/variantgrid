@@ -20,7 +20,7 @@ from classification.views.classification_overlaps_view import view_overlaps, pos
     view_clinical_context
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.views import classification_import_tool, AutopopulateView
-from snpdb.views.datatable_view import DatabasetableView
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
 
@@ -49,16 +49,16 @@ urlpatterns = [
     perm_path('clivnar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
     perm_path('clinvar_export_summary/<str:pk>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
     perm_path('clinvar_export_summary/<str:clinvar_key>/download', clinvar_export_view.clinvar_export_download, name='clinvar_key_summary_export_download'),
-    perm_path('clinvar_export/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportColumns), name='clinvar_exports_datatables'),
+    perm_path('clinvar_export/datatable', DatabaseTableView.as_view(column_class=clinvar_export_view.ClinVarExportColumns), name='clinvar_exports_datatables'),
     perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review, name='clinvar_export'),
     perm_path('clinvar_export/<int:pk>/detail', clinvar_export_view.clinvar_export_detail, name='clinvar_export_detail'),
     perm_path('clinvar_export/<int:pk>/history', clinvar_export_view.clinvar_export_history, name='clinvar_export_history'),
-    perm_path('clinvar_export_batch/datatable', DatabasetableView.as_view(column_class=clinvar_export_view.ClinVarExportBatchColumns), name='clinvar_export_batch_datatables'),
+    perm_path('clinvar_export_batch/datatable', DatabaseTableView.as_view(column_class=clinvar_export_view.ClinVarExportBatchColumns), name='clinvar_export_batch_datatables'),
     perm_path('clinvar_export_batch/<int:pk>/detail', clinvar_export_view.clinvar_export_batch_detail, name='clinvar_export_batch_detail'),
     perm_path('clinvar_export_batch/<int:pk>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
-    perm_path('condition_matching/datatable', DatabasetableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
+    perm_path('condition_matching/datatable', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     perm_path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
 
     perm_path('condition_match_test', condition_match_test_view, name='condition_match_test'),
@@ -96,7 +96,7 @@ urlpatterns = [
     perm_path('overlaps', view_overlaps, name='overlaps'),
     perm_path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
     perm_path('hgvs_issues', view_hgvs_issues, name='hgvs_issues'),
-    perm_path('hgvs_issues/allele/datatable', DatabasetableView.as_view(column_class=AlleleColumns), name='allele_datatable'),
+    perm_path('hgvs_issues/allele/datatable', DatabaseTableView.as_view(column_class=AlleleColumns), name='allele_datatable'),
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),
@@ -119,7 +119,7 @@ rest_urlpatterns = [
     perm_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
     perm_path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
-    perm_path('api/classifications/datatables/', DatabasetableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
+    perm_path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
 
     perm_path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
               name='lab_gene_classification_counts_api'),

@@ -66,9 +66,9 @@ class RedcapDefinition:
 
     @staticmethod
     def safe_key(key: str) -> str:
-        #redcap has a limit of 26 characters for a key
-        #we prefix vc_ bringing that down to 23
-        #we can suffix with _1, _2, ... _10 and notes _n1 to _n10 bringing that down to 19
+        # redcap has a limit of 26 characters for a key
+        # we prefix vc_ bringing that down to 23
+        # we can suffix with _1, _2, ... _10 and notes _n1 to _n10 bringing that down to 19
         return key[:19]
 
     def row(self):

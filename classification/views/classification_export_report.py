@@ -1,12 +1,8 @@
 from typing import Optional
 
-from django.http import StreamingHttpResponse, HttpResponse
+from django.http import HttpResponse
 from django.template import engines
-import re
-
 from annotation.citations import get_citations
-from snpdb.models import Organization
-from classification.enums.classification_enums import SpecialEKeys
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.classification import ClassificationModification, \
     Classification
@@ -33,13 +29,10 @@ class ExportFormatterReport(ExportFormatter):
         self.prepare_groups()
 
         row_datas = list()
-        org: Optional[Organization] = None
-        for vcm in self.raw_qs:
-            row_data = self.row_data(vcm)
-            row_datas.append(row_data)
-            org = vcm.classification.lab.organization
-            # only support 1 record for now
-            break
+        # only support 1 record for now
+        vcm = self.raw_qs.first()
+        row_data = self.row_data(vcm)
+        row_datas.append(row_data)
 
         self.row_count += 1
         report = ClassificationReportTemplate.preferred_template_for(vcm)

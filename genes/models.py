@@ -143,9 +143,9 @@ class GeneSymbol(models.Model):
     symbol = CITextField(primary_key=True)
 
     @staticmethod
-    def cast(symbol: Union[str, 'GeneSymbol']) -> 'GeneSymbol':
+    def cast(symbol: Union[str, 'GeneSymbol']) -> Optional['GeneSymbol']:
         if isinstance(symbol, str):
-            return GeneSymbol.objects.first(symbol=symbol)
+            return GeneSymbol.objects.filter(symbol=symbol).first()
         return symbol
 
     @property
