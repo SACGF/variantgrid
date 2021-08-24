@@ -82,16 +82,16 @@
                 envelope["publish"] = publish;
             }
         }
-        let envelope_text = JSON.stringify(envelope, null, 4);
+        let prettyHtml = formatJson(envelope);
         let previewDom =  $('#request_preview');
-        previewDom.text(envelope_text);
+        previewDom.html(prettyHtml);
         
         if (!valid) {
             previewDom.addClass('invalid');
         } else {
             previewDom.removeClass('invalid');
         }
-        return [envelope_text, valid]
+        return [JSON.stringify(envelope), valid]
     }
 
     function run() {
@@ -113,7 +113,7 @@
                 $('#response_preview').text(text || `An error occurred ${status}`);
             },
             success: (record) => {
-                $('#response_preview').text(JSON.stringify(record, null, 4));
+                $('#response_preview').html(formatJson(record));
                 let link = null;
                 if (record.meta && record.meta.id) {
                     let id = record.meta.id;
@@ -282,17 +282,19 @@ div.json {
             {% endlabelled %}
         </div>
     </form>
-    <div class="row" id="preview">
+    <div class="row no-gutters" id="preview">
         <div class="col-md-5">
             <label>Request Preview</label>
-            <div id="request_preview" class="json"></div>
+            <div id="request_preview"></div>
         </div>
         <div class="col-md-2 align-self-center">
-            <button class="btn btn-primary w-100" onclick="run()">&gt; Import &gt;</button>
+            <div class="mx-2">
+                <button class="btn btn-primary w-100" onclick="run()">&gt; Import &gt;</button>
+            </div>
         </div>
         <div class="col-md-5">
             <label>Response</label>
-            <div id="response_preview" class="json"></div>
+            <div id="response_preview"></div>
         </div>
     </div>
 
