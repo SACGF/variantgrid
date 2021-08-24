@@ -192,8 +192,11 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     "classification_import_upload": True,
     "condition_matchings": True,
-    "condition_match_test": True
+    "condition_match_test": True,
     # "condition_aliases": True
+
+    # ClinVarExport
+    "clinvar_key_summary": True
 })
 
 PREFER_ALLELE_LINKS = True
