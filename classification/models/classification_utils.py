@@ -268,7 +268,7 @@ class UserClassificationStats:
         ).filter(lab__in=Lab.valid_labs_qs(self.user, admin_check=True)).order_by('-created').exclude(withdrawn=True).count()
 
 
-def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
+def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Optional[Q]:
 
     # We want to filter using the genes set via variant annotation
     genes: Optional[Iterable[Gene]] = None

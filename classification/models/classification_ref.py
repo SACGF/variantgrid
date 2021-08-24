@@ -129,7 +129,7 @@ class ClassificationRef:
                 params: ClassificationJsonParams) -> dict:
 
         params.version = self.cached_version or self.version
-        params.include_data = params.include_data or not params.version is None
+        params.include_data = params.include_data or params.version is not None
 
         return self.record.as_json(params)
 

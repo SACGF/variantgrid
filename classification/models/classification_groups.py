@@ -19,7 +19,7 @@ D = TypeVar("D")
 @dataclass(frozen=True)
 class MultiValues(Generic[D]):
 
-    values: Iterable[D]
+    values: List[D]
     uniform: bool
 
     def __iter__(self):
@@ -162,7 +162,7 @@ class ClassificationGroup:
         return self.c_hgvses[0]
 
     @lazy
-    def flag_types(self) -> Set[str]:
+    def flag_types(self) -> List[List[str]]:
         FLAG_TYPES = [
             classification_flag_types.matching_variant_flag,
             classification_flag_types.matching_variant_warning_flag,
@@ -191,8 +191,8 @@ class ClassificationGroup:
     @lazy
     def acmg_criteria(self) -> MultiValues[CriteriaStrength]:
 
-        def criteria_converter(cm: ClassificationModification) -> Set[str]:
-            strengths: Set[str] = set()
+        def criteria_converter(cm: ClassificationModification) -> Set[CriteriaStrength]:
+            strengths: Set[CriteriaStrength] = set()
             for e_key in EvidenceKeyMap.cached().criteria():
                 strength = cm.get(e_key.key)
                 if CriteriaEvaluation.is_met(strength):

@@ -315,7 +315,7 @@ class ConditionResolved:
 
             resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in self.terms]
 
-            jsoned = {
+            jsoned: ConditionResolvedDict = {
                 "resolved_terms": resolved_term_dicts,
                 "resolved_join": join,
                 "display_text": text,
@@ -323,7 +323,7 @@ class ConditionResolved:
             }
             return jsoned
         else:
-            jsoned = {
+            jsoned: ConditionResolvedDict = {
                 "display_text": self.plain_text,
                 "sort_text": self.plain_text
             }

@@ -45,9 +45,9 @@ def published(sender, classification, previously_published, newly_published, use
         )
 
         if significant_change:
-            ekey = EvidenceKey.objects.get(pk=SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            old_label = ekey.pretty_value(old_classification)
-            new_label = ekey.pretty_value(new_classification)
+            e_key = EvidenceKey.objects.get(pk=SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            old_label = e_key.pretty_value(old_classification)
+            new_label = e_key.pretty_value(new_classification)
             # we have changed clinical significance since our last publishing
             classification.flag_collection_safe.add_flag(
                 flag_type=classification_flag_types.significance_change,
