@@ -31,39 +31,15 @@
         display: block;
         line-height: 150%;
     }
-    h5 {
-        margin-top: 20px;
-    }
 
     .install-instructions {
-        background-image: url("/static/icons/admin.svg");
         min-height: 16px;
         background-size: 16px 16px;
         background-position: 8px 50%;
         background-repeat: no-repeat;
         padding: 16px 16px 16px 28px;
         border-radius: 4px;
-    }
-
-    .not-installed {
         background-color: #F0D9ED !important;
-    }
-
-    .install-instructions-toggle {
-        font-size: small;
-    }
-
-    #annotation-version-history {
-        margin-top: 20px;
-    }
-
-    table#annotation-versions {
-        border-collapse: collapse;
-    }
-
-    table#annotation-versions th, table#annotation-versions td {
-        border: 1px solid black;
-        padding: 5px;
     }
 </style>
 {% endblock head %}
@@ -323,7 +299,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                     <table class="table">
                         <thead>
                             <tr>
-                                <th></th>{% for service in ontology_services %}<th>{{ service }}</th>{% endfor %}
+                                <th></th>{% for service in ontology_services %}<th class="num">{{ service }}</th>{% endfor %}
                             </tr>
                         </thead>
                         <tbody>
@@ -332,7 +308,8 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                                 <th>{{ ontology_row }}</th>
                                 {% for ontology_col in ontology_services %}
                                     {% with key=ontology_row|add:ontology_col %}
-                                    <td>{{ ontology_relationship_counts | get_item:key | intcomma}}</td>
+
+                                    <td class="num {% if forloop.counter > forloop.parentloop.counter %}no-value{% endif %}">{{ ontology_relationship_counts | get_item:key | intcomma}}</td>
                                     {% endwith %}
                                 {% endfor %}
                                 </tr>
@@ -367,7 +344,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                             Use (GRC38 version or later as it has aliases) and make sure you tick "unique"
  <code>{{ python_command }} manage.py ontology_import --biomart (location of mart_export)</code><br/>
                             If you are licensed to have access to mimTitles.txt it can be imported via
- <code>{{ python_command }} manage.py ontology_import --omim (location of mimTitles.txt)</code><br/>
+ <code>{{ python_command }} manage.py ontology_import --omim (location of mimTitles.txt)</code>
                         </div>
                         <div class="mt-4">
                             <b>HPO/OMIM/HGNC phenotype_to_genes</b><br/>

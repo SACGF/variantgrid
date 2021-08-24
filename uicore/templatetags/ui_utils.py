@@ -80,7 +80,7 @@ def render_install_instructions(parser, token):
 
 class InstallInstructionsTag(template.Node):
 
-    def __init__(self, nodelist, installed: bool, label: FilterExpression = None):
+    def __init__(self, nodelist, installed: FilterExpression, label: FilterExpression = None):
         self.nodelist = nodelist
         self.installed = installed
         self.label = label
@@ -95,16 +95,22 @@ class InstallInstructionsTag(template.Node):
             id_safe = str(uuid.uuid4()).replace("-", "_") + "_instructions"
         else:
             id_safe = re.sub(r"\W", "_", label_str).lower()
-        css_classes = ["install-instructions"]
+
+        div_css_classes = ["install-instructions", "collapse"]
+        link_css_classes = ["toggle-link"]
+        link_extra = ""
         if self.installed.resolve(context):
-            css_classes.append("collapse")
+            link_css_classes.append("collapsed")
         else:
-            css_classes.append("not-installed")
+            link_extra = "aria-expanded='true'"
+            div_css_classes.append("not-installed")
+            div_css_classes.append("show")
+
 
         return f"""
         <div>
-        <a class='toggle-link install-instructions-toggle' data-toggle='collapse' href='#{id_safe}'>{label_str} Install/Update Instructions</a>
-        <div class='{' '.join(css_classes)}' id='{id_safe}'>
+        <a class='{' '.join(link_css_classes)}' data-toggle='collapse' href='#{id_safe}' {link_extra}><i class="fas fa-key" aria-hidden="true"></i> {label_str} Install/Update Instructions</a>
+        <div class='{' '.join(div_css_classes)}' id='{id_safe}'>
         {self.nodelist.render(context)}
         </div>
         </div>
