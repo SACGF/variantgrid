@@ -34,7 +34,7 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
 /// GENERAL FORMS
 
 // make the labels look different enough from plain text
-label {
+label, form label {
     color: #555;
     font-weight: 500;
 }
