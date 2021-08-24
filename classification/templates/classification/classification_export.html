@@ -25,7 +25,7 @@
         let format = $("input[name='format']:checked").val();
         if (format != lastFormat) {
             $('.custom-option').hide();
-            $(`.custom-option.${format}`).show('fast');
+            $(`[data-format=${format}]`).show('fast');
             lastFormat = format;
         }
         let share_level = $("input[name='share_level']:checked").val();
@@ -214,7 +214,7 @@
         {% endlabelled %}
     {% endif %}
 
-    {% labelled label="Organistion exclusion" %}
+    {% labelled label="Organistion Exclusion" %}
         {% for org in orgs %}
             <div class="form-check">
                 <label class="form-check-label">
@@ -224,7 +224,7 @@
             </div>
         {% endfor %}
     {% endlabelled %}
-    {% labelled label="Lab selection" %}
+    {% labelled label="Lab Selection" %}
         <div class="form-check">
             <label class="form-check-label">
                 <input checked="true" id="lab_selection_mode_exclude" name="lab_selection_mode" value="exclude" type="radio" class="form-check-input" />
@@ -261,23 +261,23 @@
         {% endfor %}
     {% endlabelled %}
 
-    <div class="custom-option clinvar">
+    <div class="custom-option" data-format="clinvar">
         {% labelled label="Clinvar XML" %}
             The Clinvar XML export is a work in progress. It will also be managed by its own page in the near future.<br/>
             Note you must restrict yourself to one lab for a ClinVar export.
         {% endlabelled %}
     </div>
-    <div class="custom-option keys">
+    <div class="custom-option" data-format="keys">
         {% labelled label="Evidence Keys Report" %}
             This report provides a summary of how each evidence key is used.
         {% endlabelled %}
     </div>
-    <div class="custom-option csv">
-        {% labelled label="CSV grouping" %}
+    <div class="custom-option" data-format="csv">
+        {% labelled label="CSV Grouping" %}
             The CSV file will have one row per variant classification.<br/>
             Unlike other formats, classifications with variant matching issues will be included at the bottom of the file.
         {% endlabelled %}
-        {% labelled label="Value format" %}
+        {% labelled label="Value Format" %}
             <div class="form-check">
                 <label class="form-check-label">
                     <input checked="true" id="value_format_codes" type="radio" name="value_format" value="codes" class="form-check-input" />
@@ -292,12 +292,12 @@
             </div>
         {% endlabelled %}
     </div>
-    <div class="custom-option mvl">
-        {% labelled label="MVL grouping" %}
+    <div class="custom-option" data-format="mvl">
+        {% labelled label="MVL Grouping" %}
             MVLs will have one row per transcript-variant combination.<br/>
             If there are multiple classifications for a transcript-variant pair then the details of those will be in the report abstract section for that row.
         {% endlabelled %}
-        {% labelled label="MVL conflict strategy" %}
+        {% labelled label="MVL Conflict Strategy" %}
             <div class="form-check">
                 <label class="form-check-label">
                     <input checked="true" id="conflict_most_pathogenic" type="radio" name="conflict_strategy" value="most_pathogenic" class="form-check-input" />
@@ -311,7 +311,7 @@
                 </label>
             </div>
         {% endlabelled %}
-        {% labelled label="Transcript strategy" %}
+        {% labelled label="Transcript Strategy" %}
             <div class="form-check">
                 <label class="form-check-label">
                     <input checked="true" id="transcript_strategy_refseq" type="radio" name="transcript_strategy" value="refseq" class="form-check-input" />
@@ -325,7 +325,7 @@
                 </label>
             </div>
         {% endlabelled %}
-        {% labelled label="Clinical significance labels" %}
+        {% labelled label="Clinical Significance Labels" %}
             MVL installations might have custom labels for clinical significance values.<br/>
             If your system does not use the defaults below, you can override individual values.
         {% endlabelled %}
@@ -345,7 +345,7 @@
             <input class="form-control" id="cs_p" type="text" placeholder="PATHOGENIC" />
         {% endlabelled %}
         {% if user.is_superuser %}
-            {% labelled label="VCF detail level (admin only)" %}
+            {% labelled label="VCF Detail Level" value_css="admin-only" %}
                 <div class="form-check">
                     <label class="form-check-label">
                         <input checked="true" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
@@ -361,17 +361,17 @@
             {% endlabelled %}
         {% endif %}
     </div>
-    <div class="custom-option json">
-        {% labelled label="JSON grouping" %}
+    <div class="custom-option" data-format="json">
+        {% labelled label="JSON Grouping" %}
             The JSON file will have one object per variant classification.<br/>
             Selecting different genome builds will not affect the JSON, it will include Shariant available data for each genome build in the allele section of the record.
         {% endlabelled %}
     </div>
-    <div class="custom-option vcf">
-        {% labelled label="VCF grouping" %}
+    <div class="custom-option" data-format="vcf">
+        {% labelled label="VCF Grouping" %}
             The VCF will have one row per variant, but details of individual classifications will be included as INFO fields in that row.
         {% endlabelled %}
-        {% labelled label="VCF encoding level" %}
+        {% labelled label="VCF Encoding Level" %}
             <div class="form-check">
                 <label class="form-check-label">
                     <input checked="true" id="encoding_basic" type="radio" name="encoding" value="basic" class="form-check-input" />
@@ -386,11 +386,11 @@
             </div>
         {% endlabelled %}
     </div>
-    <div class="custom-option redcap">
-        {% labelled label="REDCap grouping" %}
+    <div class="custom-option" data-format="redcap">
+        {% labelled label="REDCap Grouping" %}
             The REDCap file will have one row for each distinct <b>redcap_record_id</b>. Records without a value for that will be excluded.
         {% endlabelled %}
-        {% labelled label="REDCap data definition" %}
+        {% labelled label="REDCap Data Definition" %}
             Click <a href="/classification/redcap_data_dictionary.csv">here to download the REDCap data definition</a>.
         {% endlabelled %}
     </div>
