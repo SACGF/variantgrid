@@ -35,6 +35,7 @@
             {% labelled label="Since" %}{{ since }}{% endlabelled %}
             {% labelled label="Format" %}{{ format }}{% endlabelled %}
             {% if the_rest %}
+                <hr/>
                 {% for key, value in the_rest.items %}
                     {% labelled label=key %}{{ value }}{% endlabelled %}
                 {% endfor %}
