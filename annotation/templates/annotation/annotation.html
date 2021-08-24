@@ -226,7 +226,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                             <div class="no-value">Not installed</div>
                         {% endif %}
                         {% install-instructions "Clinvar" installed=details.clinvar %}
-                            Download VCF (with date in file name) from <a href="http://www.ncbi.nlm.nih.gov/clinvar/">NCBI ClinVar</a> site, then run:
+                            Download VCF (with date in file name) from <a href="https://www.ncbi.nlm.nih.gov/clinvar/">NCBI ClinVar</a> site, then run:
 
                             <code>{{ python_command }} manage.py clinvar_import ${VARIANTGRID_SETUP_DATA}/clinvar_20180401.vcf.gz</code>
                        {% endinstall-instructions %}
@@ -271,7 +271,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                         <div class="no-value">Not installed</div>
                     {% endif %}
                     {% install-instructions "Human Protein Atlas" installed=hpa_counts %}
-                        <div>Go to <a href='http://v15.proteinatlas.org/about/download'>Protein Atlas Download Page</a> (We only support version &lt;=15 currently)> and download <b>rna_tissue.csv.zip</b> note the version (ie <b>15</b>):</div>
+                        <div>Go to <a href='https://v15.proteinatlas.org/about/download'>Protein Atlas Download Page</a> (We only support version &lt;=15 currently)> and download <b>rna_tissue.csv.zip</b> note the version (ie <b>15</b>):</div>
                         <code>{{ python_command }} manage.py human_protein_atlas_import --hpa-version 15 ${VARIANTGRID_SETUP_DATA}/rna_tissue.csv.zip</code>
                     {% endinstall-instructions %}
                 {% endlabelled %}
@@ -340,7 +340,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                         </div>
                         <div class="mt-4">
                             <b>OMIM</b><br/>Direct OMIM import requires a license, but will be populated via MONDO, HPO Diseases File and biomart<br/>
-                            Export: "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="http://www.ensembl.org/biomart/martview/">Ensembl Biomart</a><br/> as a TSV.
+                            Export: "MIM Morbid Accession", "MIM Morbid Description" columns from <a href="https://www.ensembl.org/biomart/martview/">Ensembl Biomart</a><br/> as a TSV.
                             Use (GRC38 version or later as it has aliases) and make sure you tick "unique"
  <code>{{ python_command }} manage.py ontology_import --biomart (location of mart_export)</code><br/>
                             If you are licensed to have access to mimTitles.txt it can be imported via
