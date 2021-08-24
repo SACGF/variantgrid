@@ -2304,7 +2304,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                         clinical_context: Optional['ClinicalContext'] = None,
                         exclude_withdrawn: bool = True,
                         shared_only: bool = False,
-                        **kwargs) -> QuerySet:
+                        **kwargs) -> QuerySet['ClassificationModification']:
         """
 
         :param user: The active user

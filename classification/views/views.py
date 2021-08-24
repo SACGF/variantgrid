@@ -8,7 +8,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
-from django.forms import formset_factory
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
@@ -21,7 +20,7 @@ from jfu.http import upload_receive, UploadResponse, JFUResponse
 import json
 import mimetypes
 from requests.models import Response
-from typing import Optional, List
+from typing import Optional, List, Set
 
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
@@ -34,22 +33,21 @@ from genes.hgvs import get_kind_and_transcript_accession_from_invalid_hgvs
 from library.django_utils import require_superuser, get_url_from_view_path
 from library.file_utils import rm_if_exists
 from library.guardian_utils import is_superuser
-from library.log_utils import log_traceback, report_event
+from library.log_utils import log_traceback
 from library.utils import delimited_row
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Variant, UserSettings, Sample, Allele, Lab, ClinVarKey
+from snpdb.models import Variant, UserSettings, Sample, Lab
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
     create_classification_for_sample_and_variant_objects, generate_auto_populate_data
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel
-from classification.forms import EvidenceKeyForm
+from classification.enums import SubmissionSource, SpecialEKeys
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, ClinVarExportStatus
+    ConditionResolvedDict
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -64,7 +62,7 @@ from variantopedia.forms import SearchAndClassifyForm
 @user_passes_test(is_superuser)
 def activity(request, latest_timestamp: Optional[str] = None):
     if latest_timestamp:
-        latest_timestamp = datetime.fromtimestamp( float(latest_timestamp) )
+        latest_timestamp = datetime.fromtimestamp(float(latest_timestamp))
     changes = ClassificationChanges.list_changes(latest_date=latest_timestamp)
     last_date = changes[len(changes)-1].date.timestamp() if changes else None
     context = {
@@ -292,7 +290,6 @@ def view_classification(request, record_id):
 
 
 def view_classification_diff(request):
-    records = []
     extra_data = dict()
 
     if request.GET.get('history'):
@@ -331,21 +328,12 @@ def view_classification_diff(request):
         compare_all = [ref.modification] + latest_others_for_variant
         records = compare_all
 
-    elif request.GET.get('variant'):
-        variant_id = int(request.GET.get('variant'))
-        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Variant.objects.get(pk=variant_id).allele, published=True)
-        compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
-        records = compare_all
-
-    elif request.GET.get('allele'):
-        allele_id = int(request.GET.get('allele'))
-        compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
-        compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
-        records = compare_all
-
     elif cids := request.GET.get('cids'):
         records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
         records = [record for record in records if record]
+
+    else:
+        raise ValueError("Diff not given valid diff type")
 
     # filter out any Nones inserted by filtering on user permission etc
     records = [record for record in records if record]
@@ -375,10 +363,6 @@ def classification_qs(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="classifications.csv"'
 
-    extra_filters = request.GET.get("extra_filters")
-    if extra_filters:
-        extra_filters = json.loads(extra_filters)
-
     config = ClassificationColumns(request)
     qs = ClassificationModification.latest_for_user(user=request.user, published=True)
     qs = config.filter_queryset(qs)
@@ -388,7 +372,6 @@ def classification_qs(request):
 
 
 def classification_import_tool(request: HttpRequest) -> Response:
-    EKeyFormSet = formset_factory(EvidenceKeyForm, extra=3)
     all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
     selected_lab = None
     if len(all_labs) == 1:
@@ -575,7 +558,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
 
 
 @login_not_required
-def evidence_keys(request, external_page=True, max_share_level=None):
+def evidence_keys(request: HttpRequest, external_page=True) -> HttpResponse:
     """ public page to display EKey details """
 
     context = {'keys': EvidenceKeyMap.instance().all_keys}
@@ -596,8 +579,8 @@ def evidence_keys(request, external_page=True, max_share_level=None):
     return render(request, 'classification/evidence_keys.html', context)
 
 
-def evidence_keys_logged_in(request, max_share_level=None):
-    return evidence_keys(request, external_page=False, max_share_level=max_share_level)
+def evidence_keys_logged_in(request: HttpRequest) -> HttpResponse:
+    return evidence_keys(request, external_page=False)
 
 
 def classification_graphs(request):
@@ -671,13 +654,13 @@ def clin_sig_change_data(request):
             cs_to: str = 'ERROR'
             comments: List[str] = list()
             resolution: Optional[str] = 'In Progress'
-            c_hgvs: Optional[str] = 'CANT RESOLVE'
             org: Optional[str] = 'Record has been deleted'
             lab: Optional[str] = ''
             url: Optional[str] = ''
             classification_created: datetime
             date_raised: datetime = flag.created
             discordance_dates: List[datetime] = list()
+            other_labs: Set[Lab] = set()
 
             flag_collection = flag.collection
             if source := flag_collection.source_object:
@@ -697,7 +680,6 @@ def clin_sig_change_data(request):
                         discordance_dates.append(discordance_date)
 
                     if allele := source.variant.allele:
-                        other_labs = set()
                         cl: Classification
                         for cl in Classification.objects.filter(variant__in=allele.variants):
                             if cl.lab != source.lab and cl.created < flag.created:
