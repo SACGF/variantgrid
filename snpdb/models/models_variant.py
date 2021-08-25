@@ -28,10 +28,10 @@ from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 
-LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$")
+LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = r"^([^:]+):(\d+)$"
-VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>([GATC]+)$")
-REF_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>= \(ref\)$")
+VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>([GATC]+)$", re.IGNORECASE)
+REF_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>= \(ref\)$", re.IGNORECASE)
 
 allele_validate_signal = django.dispatch.Signal(providing_args=["allele"])
 
