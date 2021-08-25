@@ -408,7 +408,8 @@ class GeneVersion(models.Model):
         Genes/TranscriptVersion needs to be able to represent both RefSeq and Ensembl """
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     version = models.IntegerField()  # RefSeq GeneIDs are always 1 (not versioned)
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    # symbol can be null as Ensembl has genes w/o symbols, eg ENSG00000238009 (lncRNA)
+    gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     hgnc = models.ForeignKey(HGNC, null=True, on_delete=CASCADE)
     description = models.TextField(null=True)
     biotype = models.TextField(null=True)

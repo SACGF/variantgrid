@@ -591,7 +591,7 @@ class EnsemblParser(GFFParser):
 
         return GeneVersion(gene_id=attributes["gene_id"],
                            version=int(attributes["version"]),
-                           gene_symbol_id=attributes["Name"],
+                           gene_symbol_id=attributes.get("Name"),  # Can be null (eg lncRNA)
                            hgnc_id=hgnc_id,
                            description=description,
                            biotype=attributes["biotype"],
