@@ -253,7 +253,7 @@ def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> Ht
     clinvar_key.check_user_can_access(request.user)
 
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
+    missing_condition = Classification.objects.filter(withdrawn=False, lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
 
     export_columns = ClinVarExportColumns(request)
     export_batch_columns = ClinVarExportBatchColumns(request)
