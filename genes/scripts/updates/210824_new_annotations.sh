@@ -2,11 +2,7 @@
 
 set -e
 
-# VG dir
-if [ -z $VG_DIR ]; then
-  echo "You need to define 'VG_DIR'"
-  exit 1;
-fi
+VG_DIR=$(dirname $(dirname $(dirname $(dirname ${BASH_SOURCE[0]}))))
 
 GFF3_TO_GENEPRED=$(which gff3ToGenePred)
 if [ -z ${GFF3_TO_GENEPRED} ]; then
