@@ -18,28 +18,26 @@ echo "Downloading ENSEMBL"
 mkdir -p ensembl
 cd ensembl
 
-if false; then
-  for release in 102 103 104; do
-    gff=Homo_sapiens.GRCh38.${release}.gff3.gz;
-    GENEPRED="$(basename ${gff} .gff.gz).genePred"
-    echo "GenePred = ${GENEPRED}";
+for release in 102 103 104; do
+  gff=Homo_sapiens.GRCh38.${release}.gff3.gz;
+  GENEPRED="$(basename ${gff} .gff.gz).genePred"
+  echo "GenePred = ${GENEPRED}";
 
-    if [[ ! -e ${gff} ]]; then
-      wget ftp://ftp.ensembl.org/pub/release-${release}/gff3/homo_sapiens/${gff}
-    fi
+  if [[ ! -e ${gff} ]]; then
+    wget ftp://ftp.ensembl.org/pub/release-${release}/gff3/homo_sapiens/${gff}
+  fi
 
-    if [[ ! -e ${GENEPRED} ]]; then
-      ${GFF3_TO_GENEPRED} -processAllGeneChildren ${gff} ${GENEPRED}
-    fi
+  if [[ ! -e ${GENEPRED} ]]; then
+    ${GFF3_TO_GENEPRED} -processAllGeneChildren ${gff} ${GENEPRED}
+  fi
 
-    echo "Inserting gene annotation"
+  echo "Inserting gene annotation"
 
-    python3.8 ${VG_DIR}/manage.py import_gene_annotation --genome-build=GRCh38 --replace --annotation-consortium=Ensembl \
-      --gff ${gff} \
-      --genePred ${GENEPRED}
+  python3.8 ${VG_DIR}/manage.py import_gene_annotation --genome-build=GRCh38 --replace --annotation-consortium=Ensembl \
+    --gff ${gff} \
+    --genePred ${GENEPRED}
 
-  done
-fi
+done
 
 cd ..
 
