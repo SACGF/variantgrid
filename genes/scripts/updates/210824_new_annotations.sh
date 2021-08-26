@@ -4,12 +4,16 @@ set -e
 
 VG_DIR=$(dirname $(dirname $(dirname $(dirname ${BASH_SOURCE[0]}))))
 
-GFF3_TO_GENEPRED=$(which gff3ToGenePred)
+GFF3_TO_GENEPRED=$(which gff3ToGenePred || echo) # blank but not return 1 causing script to exit due to set -e
+echo "genepred?"
 if [ -z ${GFF3_TO_GENEPRED} ]; then
-  echo "Downloading gff3ToGenePred command line tool"
-  wget hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/gff3ToGenePred
-  chmod a+x gff3ToGenePred
-  GFF3_TO_GENEPRED=./gff3ToGenePred
+  echo "not in path"
+  if [ ! -e gff3ToGenePred ]; then
+    echo "Downloading gff3ToGenePred command line tool"
+    wget http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/gff3ToGenePred
+    chmod a+x gff3ToGenePred
+  fi
+  GFF3_TO_GENEPRED=$(pwd)/gff3ToGenePred
 fi
 
 
