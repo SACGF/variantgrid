@@ -20,7 +20,7 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
 }
 
 .form-control .select2-selection__arrow {
-  top: 5px !important;
+  display: none;
 }
 
 label, form label {

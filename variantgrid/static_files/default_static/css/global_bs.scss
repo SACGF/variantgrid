@@ -28,7 +28,8 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
 }
 // adjust the expand/collapse arrow location accordingly
 .form-control .select2-selection__arrow {
-    top: 5px !important;
+    // top: 5px !important;
+    display: none;  // is redundant to another indicator
 }
 
 /// GENERAL FORMS
