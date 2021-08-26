@@ -304,6 +304,6 @@ class ClinVarExportConverter:
             data["alleleOrigin"] = allele_origin
         else:
             data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided"))
-        data["collectionMethod"] = "curation"  # TODO confirm hardcoded of curation
+        data["collectionMethod"] = "clinical testing"
         # numberOfIndividuals do we do anything with this?
         return ValidatedJson([data])
