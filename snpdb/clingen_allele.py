@@ -24,7 +24,6 @@ from typing import Dict, List, Tuple, Optional
 import requests
 from django.conf import settings
 
-from genes.hgvs import HGVSMatcher
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta
@@ -95,6 +94,18 @@ class ClinGenAlleleRegistryAPI:
         return cls.get(url)
 
     @classmethod
+    def get_external_code(cls, er_type: ClinGenAlleleExternalRecordType, external_code):
+        suffix = f"/alleles?{er_type.value}={external_code}"
+        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
+        return cls.get(url)
+
+    @classmethod
+    def get_hgvs(cls, hgvs_string: str):
+        suffix = f"/allele?hgvs={hgvs_string}"
+        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
+        return cls.get(url)
+
+    @classmethod
     def get(cls, url):
         response = requests.get(url)
         cls._check_response(response)
@@ -117,7 +128,10 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                                           clingen_api: ClinGenAlleleRegistryAPI = None):
     """ Ensures that we have ClinGenAllele for variants
         You don't need to, but more efficient to make variants distinct """
-    from upload.models import ModifiedImportedVariant  # Circular import
+    # Circular imports
+    from genes.hgvs import HGVSMatcher
+    from upload.models import ModifiedImportedVariant
+
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
@@ -255,6 +269,9 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
 def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
                            clingen_api: ClinGenAlleleRegistryAPI = None) -> VariantAllele:
     """ Call ClinGen and setup VariantAllele - use existing if provided, otherwise create """
+    # Circular import
+    from genes.hgvs import HGVSMatcher
+
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
@@ -351,17 +368,7 @@ def get_clingen_allele(code: str, clingen_api: ClinGenAlleleRegistryAPI = None) 
     return clingen_allele
 
 
-def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordType, external_code,
-                                           clingen_api: ClinGenAlleleRegistryAPI = None) -> List[ClinGenAllele]:
-    # TODO: We could cache this? At the moment we have to make a new API call every build
-    if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
-
-    suffix = f"/alleles?{er_type.value}={external_code}"
-    url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
-
-    # Returns a list for external records
-    api_response_list = clingen_api.get(url)
+def _store_clingen_api_response(api_response_list) -> List[ClinGenAllele]:
     clingen_allele_list = []
     for api_response in api_response_list:
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
@@ -372,6 +379,26 @@ def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordT
         link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
 
     return clingen_allele_list
+
+
+def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordType, external_code,
+                                           clingen_api: ClinGenAlleleRegistryAPI = None) -> List[ClinGenAllele]:
+    # TODO: We could cache this? At the moment we have to make a new API call every build
+    if clingen_api is None:
+        clingen_api = ClinGenAlleleRegistryAPI()
+
+    api_response_list = clingen_api.get_external_code(er_type, external_code)
+    return _store_clingen_api_response(api_response_list)
+
+
+def get_clingen_allele_from_hgvs(hgvs_string, clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
+    if clingen_api is None:
+        clingen_api = ClinGenAlleleRegistryAPI()
+
+    api_response = clingen_api.get_hgvs(hgvs_string)
+    clingen_list = _store_clingen_api_response([api_response])
+    return clingen_list[0]
+
 
 
 def link_allele_to_existing_variants(allele: Allele, conversion_tool,

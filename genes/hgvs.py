@@ -22,6 +22,7 @@ from pyhgvs.utils import make_transcript
 
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
 from library.log_utils import report_exc_info
+from snpdb.clingen_allele import get_clingen_allele_from_hgvs
 from snpdb.models import Variant, AssemblyMoleculeType, Contig
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
@@ -384,38 +385,38 @@ class HGVSMatcher:
             hgvs_name = hgvs_name.replace(":m.", ":g.")
         return mitochondria, hgvs_name
 
-    def get_transcript_version_and_pyhgvs_transcript(self, transcript_name):
+    def _get_transcript_version_and_pyhgvs_transcript(self, transcript_name):
         transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
                                                                       best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
+        return self._create_pyhgvs_transcript(transcript_version)
+
+    @staticmethod
+    def _create_pyhgvs_transcript(transcript_version: TranscriptVersion):
         # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
         # so replace it with the DB records
         transcript_version.data["gene_name"] = transcript_version.gene_version.gene_symbol_id
         return transcript_version, make_transcript(transcript_version.data)
 
-    def get_pyhgvs_transcript(self, transcript_name):
-        return self.get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
+    def _get_pyhgvs_transcript(self, transcript_name):
+        return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
 
-    def get_variant_tuple(self, hgvs_name: str) -> VariantCoordinate:
-        """ VariantCoordinate.chrom = Contig name """
+    def _pyhgvs_get_variant_tuple(self, hgvs_name: str, transcript_version):
         mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
-        transcript_version = None
-        pyhgvs_transcript = None
 
         def get_transcript(transcript_name):
-            """ So we can capture transcript_version and use it for validation later """
-            nonlocal transcript_version
-            nonlocal pyhgvs_transcript
-            transcript_version, pyhgvs_transcript = self.get_transcript_version_and_pyhgvs_transcript(transcript_name)
-            return pyhgvs_transcript
+            # Already know what transcript it is
+            return self._create_pyhgvs_transcript(transcript_version)
 
         variant_tuple = pyhgvs.parse_hgvs_name(lookup_hgvs_name, self.genome_build.genome_fasta.fasta,
                                                get_transcript=get_transcript,
                                                indels_start_with_same_base=False)
+
         (chrom, position, ref, alt) = variant_tuple
         contig = self.genome_build.chrom_contig_mappings[chrom]
         if mitochondria and contig != mitochondria:
             reason = f"chrom: {chrom} ({contig}/{contig.get_molecule_type_display()}) is not mitochondrial!"
             raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
+        chrom = contig.name
 
         # @see https://varnomen.hgvs.org/bg-material/numbering/
         # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
@@ -429,7 +430,37 @@ class HGVSMatcher:
                     reason = f"Outside boundaries of transcript {transcript_version}: {transcript_version.coordinates}"
                     raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
 
-        chrom = contig.name
+        return chrom, position, ref, alt
+
+    def _clingen_get_variant_tuple(self, hgvs_string: str):
+        # ClinGen Allele Registry doesn't like gene names - so strip
+        hgvs_name = HGVSName(hgvs_string)
+        hgvs_name.gene = None
+        cleaned_hgvs = hgvs_name.format()
+
+        ca = get_clingen_allele_from_hgvs(cleaned_hgvs)
+        return ca.get_variant_tuple(self.genome_build)
+
+    @staticmethod
+    def _pyhgvs_ok(transcript_version: TranscriptVersion) -> bool:
+        """ Some transcripts align with gaps to the genome, and thus we can't use PyHGVS (which uses exons + CDS) """
+        return not transcript_version.alignment_gap and transcript_version.length is not None
+
+    def get_variant_tuple(self, hgvs_name: str) -> VariantCoordinate:
+        """ VariantCoordinate.chrom = Contig name """
+
+        transcript_version = None
+        if transcript_name := HGVSName(hgvs_name).transcript:
+            transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
+                                                                          best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
+
+        if transcript_version is None or self._pyhgvs_ok(transcript_version):
+            variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_name, transcript_version)
+        else:
+            variant_tuple = self._clingen_get_variant_tuple(hgvs_name)
+
+        (chrom, position, ref, alt) = variant_tuple
+
         ref = ref.upper()
         alt = alt.upper()
 
@@ -448,10 +479,10 @@ class HGVSMatcher:
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_name: str):
         _mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
-        hgvs = pyhgvs.HGVSName(lookup_hgvs_name)
+        hgvs = HGVSName(lookup_hgvs_name)
         transcript = None
         if hgvs.transcript:
-            transcript = self.get_pyhgvs_transcript(hgvs.transcript)
+            transcript = self._get_pyhgvs_transcript(hgvs.transcript)
         return hgvs, transcript
 
     def get_original_and_used_transcript_versions(self, hgvs_name) -> Tuple[str, str]:
@@ -500,7 +531,7 @@ class HGVSMatcher:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
         chrom, offset, ref, alt = variant.as_tuple()
         if transcript_name:
-            transcript = self.get_pyhgvs_transcript(transcript_name)
+            transcript = self._get_pyhgvs_transcript(transcript_name)
             contig_mappings = self.genome_build.chrom_contig_mappings
             transcript_contig = contig_mappings.get(transcript.tx_position.chrom)
             if variant.locus.contig != transcript_contig:

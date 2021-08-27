@@ -553,6 +553,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
+    # Sometimes there is a gap aligning transcripts to the genome, which means we can't use this TranscriptVersion
+    # to resolve HGVS (as PyHGVS only uses exons/CDS and has adjustment for gaps)
+    alignment_gap = models.BooleanField(default=False)
     data = models.JSONField(null=False, blank=True, default=empty_dict)  # for pyHGVS
 
     class Meta:
