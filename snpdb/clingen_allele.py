@@ -164,9 +164,9 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                   genome_build, num_existing_records, num_no_record)
 
     variant_id_allele_error: List[Tuple[int, Allele, Optional[str]]] = []
-    if reference_variant_ids_without_alleles:
-        logging.debug("%d reference variants", len(reference_variant_ids_without_alleles))
-        empty_alleles = [Allele()] * len(reference_variant_ids_without_alleles)
+    if num_ref := len(reference_variant_ids_without_alleles):
+        logging.debug("%d reference variants", num_ref)
+        empty_alleles = [Allele() for _ in range(num_ref)]
         reference_alleles = Allele.objects.bulk_create(empty_alleles)
         variant_id_allele_error.extend(((variant_id, allele, None) for variant_id, allele in
                                         zip(reference_variant_ids_without_alleles, reference_alleles)))
