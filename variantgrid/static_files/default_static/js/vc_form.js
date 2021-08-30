@@ -2118,7 +2118,7 @@ VCTable.clinical_significance = (data, type, row) => {
     if (data && data.length) {
         return label.val;
     } else {
-        return $('<span>', {class: 'no-value', text: '-'}).prop('outerHTML');
+        return $('<span>', {class: 'no-value', text: 'Unclassified'}).prop('outerHTML');
     }
 };
 VCTable.clinical_significance_td = ( cell, cellData, rowData, rowIndex, colIndex ) => {
