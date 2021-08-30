@@ -1,7 +1,11 @@
+from typing import Dict, Optional
+
 from django.conf import settings
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 import re
+
+from lazy import lazy
 
 from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild, Contig
@@ -49,23 +53,52 @@ class ClinGenAllele(TimeStampedModel):
     def looks_like_id(code):
         return ClinGenAllele.get_id_from_code(code) >= 0
 
-    def get_p_hgvs(self, transcript_id, match_version=True):
-        if not match_version:
-            transcript_id = ClinGenAllele._strip_transcript_version(transcript_id)
-
-        transcript_alleles = self.api_response.get("transcriptAlleles")
-        if transcript_alleles:
+    @lazy
+    def transcript_alleles_by_transcript_accession(self) -> Dict[str, Dict]:
+        ta_by_tv = {}
+        if transcript_alleles := self.api_response.get("transcriptAlleles"):
             for ta in transcript_alleles:
                 for t_hgvs in ta["hgvs"]:
-                    hgvs_transcript = t_hgvs.split(":")[0]
-                    if not match_version:
-                        hgvs_transcript = ClinGenAllele._strip_transcript_version(hgvs_transcript)
-                    if transcript_id == hgvs_transcript:
-                        protein_effect = ta.get("proteinEffect")
-                        if protein_effect:
-                            p_hgvs = protein_effect.get("hgvs")
-                            if p_hgvs:
-                                return p_hgvs
+                    transcript_accession = t_hgvs.split(":")[0]
+                    ta_by_tv[transcript_accession] = ta
+        return ta_by_tv
+
+    @lazy
+    def transcript_alleles_by_transcript(self) -> Dict[str, Dict]:
+        """ Version stripped off """
+        ta_by_t = {}
+        for transcript_accession, ta in self.transcript_alleles_by_transcript_accession.items():
+            transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
+            ta_by_t[transcript_id] = ta
+        return ta_by_t
+
+    def _get_transcript_allele(self, transcript_accession, match_version=True) -> Optional[Dict]:
+        if match_version:
+            ta = self.transcript_alleles_by_transcript_accession.get(transcript_accession)
+        else:
+            transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
+            ta = self.transcript_alleles_by_transcript.get(transcript_id)
+        return ta
+
+    def get_p_hgvs(self, transcript_accession, match_version=True):
+        if ta := self._get_transcript_allele(transcript_accession, match_version):
+            if protein_effect := ta.get("proteinEffect"):
+                if p_hgvs := protein_effect.get("hgvs"):
+                    return p_hgvs
+        return None
+
+    def get_c_hgvs(self, transcript_accession, match_version=True) -> Optional[str]:
+        if ta := self._get_transcript_allele(transcript_accession, match_version):
+            transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
+            for t_hgvs in ta["hgvs"]:
+                hgvs_transcript_accession = t_hgvs.split(":")[0]
+                if match_version:
+                    if transcript_accession == hgvs_transcript_accession:
+                        return t_hgvs
+                else:
+                    hgvs_transcript_id = ClinGenAllele._strip_transcript_version(hgvs_transcript_accession)
+                    if transcript_id == hgvs_transcript_id:
+                        return t_hgvs
         return None
 
     @staticmethod

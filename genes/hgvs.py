@@ -6,6 +6,7 @@ block external postgres connections. See discussion at:
 https://github.com/SACGF/variantgrid/issues/839
 
 """
+import logging
 from dataclasses import dataclass
 
 from Bio.Data.IUPACData import protein_letters_1to3_extended
@@ -20,9 +21,10 @@ from typing import List, Optional, Tuple
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
 
+from annotation.models import VariantAnnotationVersion
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
 from library.log_utils import report_exc_info
-from snpdb.clingen_allele import get_clingen_allele_from_hgvs
+from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant
 from snpdb.models import Variant, AssemblyMoleculeType, Contig
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
@@ -388,14 +390,14 @@ class HGVSMatcher:
     def _get_transcript_version_and_pyhgvs_transcript(self, transcript_name):
         transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
                                                                       best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
-        return self._create_pyhgvs_transcript(transcript_version)
+        return transcript_version, self._create_pyhgvs_transcript(transcript_version)
 
     @staticmethod
     def _create_pyhgvs_transcript(transcript_version: TranscriptVersion):
         # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
         # so replace it with the DB records
         transcript_version.data["gene_name"] = transcript_version.gene_version.gene_symbol_id
-        return transcript_version, make_transcript(transcript_version.data)
+        return make_transcript(transcript_version.data)
 
     def _get_pyhgvs_transcript(self, transcript_name):
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
@@ -403,7 +405,7 @@ class HGVSMatcher:
     def _pyhgvs_get_variant_tuple(self, hgvs_name: str, transcript_version):
         mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
 
-        def get_transcript(transcript_name):
+        def get_transcript(_transcript_name):
             # Already know what transcript it is
             return self._create_pyhgvs_transcript(transcript_version)
 
@@ -527,30 +529,61 @@ class HGVSMatcher:
         if HGVSMatcher.can_shrink_long_ref(hgvs_name, max_allele_length=max_allele_length):
             hgvs_name.ref_allele = ""
 
-    def variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
-        """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
+    def _variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
+        hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_name)
+        logging.info("%s -> %s (%s)", variant, hgvs_name, hgvs_method)
+        return HGVSNameExtra(hgvs_name)
+
+    def _variant_to_hgvs(self, variant: Variant, transcript_name=None) -> Tuple[HGVSName, str]:
+        """ returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not """
+
         chrom, offset, ref, alt = variant.as_tuple()
-        if transcript_name:
-            transcript = self._get_pyhgvs_transcript(transcript_name)
-            contig_mappings = self.genome_build.chrom_contig_mappings
-            transcript_contig = contig_mappings.get(transcript.tx_position.chrom)
-            if variant.locus.contig != transcript_contig:
-                accession = TranscriptVersion.get_accession(transcript.name, transcript.version)
-                contig_msg = f"Variant contig={variant.locus.contig} (chrom={chrom}) while " \
-                             f"Transcript {accession} contig={transcript_contig} (chrom={transcript.tx_position.chrom})"
-                raise self.TranscriptContigMismatchError(contig_msg)
-        else:
-            transcript = None
         if alt == Variant.REFERENCE_ALT:
             alt = ref
 
-        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
-                                                transcript, max_allele_length=sys.maxsize)
-        return HGVSNameExtra(hgvs_name)
+        hgvs_method = "pyhgvs"
+        if transcript_name:
+            transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
+                                                                          best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
+
+            if self._pyhgvs_ok(transcript_version):
+                # Sanity Check - make sure contig is the same
+                contig_mappings = self.genome_build.chrom_contig_mappings
+                transcript_chrom = transcript_version.data["chrom"]
+                transcript_contig = contig_mappings.get(transcript_chrom)
+                if variant.locus.contig != transcript_contig:
+                    contig_msg = f"Variant contig={variant.locus.contig} (chrom={chrom}) while Transcript " \
+                                 f"{transcript_version.accession} contig={transcript_contig} (chrom={transcript_chrom})"
+                    raise self.TranscriptContigMismatchError(contig_msg)
+
+                pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
+                hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
+                                                        pyhgvs_transcript, max_allele_length=sys.maxsize)
+            else:
+                # Try VEP
+                version = VariantAnnotationVersion.latest(self.genome_build)
+                if variant_annotation := variant.varianttranscriptannotation_set.filter(version=version).first():
+                    hgvs_method = "VEP"
+                    hgvs_string = variant_annotation.hgvs_c
+                else:
+                    # Try ClinGen
+                    if ca := get_clingen_allele_for_variant(self.genome_build, variant):
+                        hgvs_string = ca.get_c_hgvs(transcript_version.accession)
+                        hgvs_method = "ClinGen Allele Registry"
+                    else:
+                        hgvs_string = None
+
+                    if hgvs_string is None:
+                        raise ValueError(f"Couldn't get c.HGVS for '{variant}' from VEP or ClinGen Allele Registry")
+                hgvs_name = HGVSName(hgvs_string)
+        else:
+            hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
+                                                    transcript=None, max_allele_length=sys.maxsize)
+        return hgvs_name, hgvs_method
 
     def variant_to_hgvs(self, variant: Variant, transcript_name=None, max_allele_length=10) -> Optional[str]:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
-        return self.variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name).format(max_allele_length=max_allele_length)
+        return self._variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name).format(max_allele_length=max_allele_length)
 
     def variant_to_g_hgvs(self, variant: Variant):
         g_hgvs = self.variant_to_hgvs(variant)
@@ -561,7 +594,7 @@ class HGVSMatcher:
 
     def variant_to_c_hgvs_extra(self, variant: Variant, transcript_name: str) -> HGVSNameExtra:
         if transcript_name:
-            return self.variant_to_hgvs_extra(variant, transcript_name)
+            return self._variant_to_hgvs_extra(variant, transcript_name)
         # add warning about no transcript
         return HGVSNameExtra()
 
