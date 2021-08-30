@@ -22,7 +22,7 @@ import json
 class ClinVarEvidenceKey:
     """
     Handles the basic mapping of a single field to ClinVar
-    Revolves around select/mutli-select fields having equivalents
+    Revolves around select/multi-select fields having equivalents stored in "clinvar" attribute of the EvidenceKey
     """
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
@@ -253,8 +253,9 @@ class ClinVarExportConverter:
             data["comment"] = "\n\n".join(comment_parts)
 
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
-            # FIXME also check validation date?
+            # FIXME fall back to other date types? or at least raising a warning
             data["dateLastEvaluated"] = date_last_evaluated
+
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
             data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
         return ValidatedJson(data)

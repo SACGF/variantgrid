@@ -8,7 +8,7 @@ from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 
-from uicore.json.json_utils import JsonDiff, JsonDiffs
+from uicore.json.json_utils import JsonDiffs
 from uicore.json.validated_json import ValidatedJson
 from uicore.json.json_types import JsonObjType
 from classification.models import ClassificationModification, ConditionResolved

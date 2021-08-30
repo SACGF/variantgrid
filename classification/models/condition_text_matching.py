@@ -153,7 +153,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return not self.classification_id and self.mode_of_inheritance is None and self.gene_symbol_id is not None
 
     @lazy
-    def children(self) -> QuerySet:
+    def children(self) -> QuerySet['ConditionTextMatch']:
         order_by: str
         if self.is_root:
             order_by = 'gene_symbol__symbol'
@@ -850,7 +850,6 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     suggestions.append(display_root_cms)
 
     # filled in and gene level, exclude root as we take care of that before-hand
-    filled_in: QuerySet
     filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs'))
     filled_in = filled_in.filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
     root_level_terms = root_cms.terms
