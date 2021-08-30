@@ -30,7 +30,7 @@ class LabAdmin(ModelAdminBasics):
     )
 
     def is_readonly_field(self, f) -> bool:
-        if f.name == 'clinvar_key':
+        if f.name == 'clinvar_key' or f.name == 'organization':
             return False
         return super().is_readonly_field(f)
 
