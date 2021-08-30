@@ -213,6 +213,10 @@ class CHGVS:
         # variant is a better name for what comes after the c. than "raw_c"
         return self.raw_c
 
+    @property
+    def without_gene_symbol_str(self) -> str:
+        return f'{self.transcript}:{self.raw_c}'
+
     def with_gene_symbol(self, gene_symbol: str) -> 'CHGVS':
         if self.transcript:
             new_full_chgvs = f'{self.transcript}({gene_symbol}):{self.raw_c}'

@@ -5,6 +5,7 @@ from lazy import lazy
 
 from annotation.regexes import DbRegexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType
+from genes.hgvs import CHGVS
 from library.utils import html_to_text
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
@@ -185,13 +186,30 @@ class ClinVarExportConverter:
         try:
             genome_build = self.classification_based_on.get_genome_build()
             if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
-                json_data = {"variant": [{"hgvs": c_hgvs}]}
-                errors = JSON_MESSAGES_EMPTY
+                c_hgvs_obj = CHGVS(c_hgvs)
+                c_hgvs_no_gene = c_hgvs_obj.without_gene_symbol_str
 
+                variant_data = [{"hgvs": c_hgvs_no_gene}]
+                json_data = {"variant": [{"hgvs": c_hgvs_no_gene}]}
+
+                hgvs_errors = JSON_MESSAGES_EMPTY
                 if c_hgvs.startswith("ENST"):
-                    errors += JsonMessages.error("ClinVar doesn't support Ensembl transcripts")
+                    hgvs_errors += JsonMessages.error("ClinVar doesn't support Ensembl transcripts")
 
-                return ValidatedJson(json_data, errors)
+                gene_symbols = list()
+                if gene_symbol := self.value(SpecialEKeys.GENE_SYMBOL):
+                    gene_symbols.append({"symbol": gene_symbol})
+
+                json_data = {
+                    "variant": [
+                        {
+                            "hgvs": ValidatedJson(c_hgvs_no_gene,hgvs_errors),
+                            "gene": gene_symbols
+                        }
+                    ]
+                }
+
+                return json_data
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
         except BaseException:
