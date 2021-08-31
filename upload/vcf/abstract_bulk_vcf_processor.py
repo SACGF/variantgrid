@@ -20,7 +20,8 @@ class AbstractBulkVCFProcessor:
         self.batch_size = batch_size
 
         self.rows_processed = 0
-        self.max_variant_id = 0
+        self.max_variant_id = 0  # Non reference variant (ie that will be annotated)
+        self.set_max_variant_called = False
         self.modified_imported_variants_file_id = 0
         self.variant_hashes = []
         self.modified_imported_variant_hashes = []
@@ -33,6 +34,7 @@ class AbstractBulkVCFProcessor:
 
     def set_max_variant(self, variant_hashes, variant_ids):
         # Keep track of max annotated variant (only non-reference are annotated)
+        self.set_max_variant_called = True
         non_ref_variant_ids = self.variant_pk_lookup.filter_non_reference(variant_hashes, variant_ids)
         if non_ref_variant_ids:
             max_returned_variant_id = max(map(int, non_ref_variant_ids))
@@ -40,7 +42,15 @@ class AbstractBulkVCFProcessor:
 
     def get_max_variant_id(self):
         """ 0 means it was never set, so we return None """
-        return self.max_variant_id or None
+
+        if self.max_variant_id:
+            return self.max_variant_id
+
+        if self.rows_processed and self.set_max_variant_called is False:
+            msg = "max_variant_id not set, importers must call set_max_variant() if you process any variants!"
+            raise ValueError(msg)
+
+        return None  # No variants, or only reference
 
     def add_modified_imported_variant(self, variant, variant_hash, miv_hash_list=None, miv_list=None):
         old_multiallelic = variant.INFO.get("OLD_MULTIALLELIC")
