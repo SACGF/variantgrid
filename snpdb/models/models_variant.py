@@ -376,6 +376,10 @@ class Variant(models.Model):
         contig = locus.contig
         return VariantCoordinate(chrom=contig.name, pos=locus.position, ref=locus.ref.seq, alt=self.alt.seq)
 
+    @staticmethod
+    def is_ref_alt_reference(ref, alt):
+        return ref == alt or alt == '.'
+
     @property
     def is_reference(self) -> bool:
         return self.alt.seq == self.REFERENCE_ALT
@@ -455,9 +459,9 @@ class Variant(models.Model):
 
     @staticmethod
     def clean_variant_fields(chrom, position, ref, alt, want_chr):
-        ref = ref.upper()
-        alt = alt.upper()
-        if ref == alt:
+        ref = ref.strip().upper()
+        alt = alt.strip().upper()
+        if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
         chrom = format_chrom(chrom, want_chr)
         return chrom, position, ref, alt

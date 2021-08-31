@@ -64,7 +64,7 @@ class BulkUnknownVariantInserter:
                 self.num_skipped_gvcf_non_var_blocks += 1
                 return  # Skip
 
-        if alt == ref:
+        if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
 
         self.variant_pk_lookup.add(chrom, position, ref, alt)
