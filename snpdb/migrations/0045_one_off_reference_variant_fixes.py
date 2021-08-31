@@ -48,7 +48,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
     expected = {'snpdb.Sequence', 'snpdb.Variant'}
     unexpected_deleted = set(deleted) - expected
     if unexpected_deleted:
-        raise ValueError(f"Unexpected deletion of: {unexpected_deleted}")
+        raise ValueError(f"Removing Sequence = '.' caused unexpected deletion of: {unexpected_deleted}")
 
 
 class Migration(migrations.Migration):
