@@ -29,6 +29,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
     Sequence = apps.get_model("snpdb", "Sequence")
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     ClinVar = apps.get_model("annotation", "ClinVar")
+    AnnotationRangeLock = apps.get_model("annotation", "AnnotationRangeLock")
 
     REFERENCE_ALT = '='
 
@@ -54,6 +55,10 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
     if clinvar_records:
         print(f"Updating variant on {len(clinvar_records)} ClinVar records (reference variant with alt='.')")
         ClinVar.objects.bulk_update(clinvar_records, ["variant"], batch_size=2000)
+
+    # We can just delete AnnotationRangeLocks with a count of 1 - if there are more complicated ones then we'll
+    # have to deal with them by hand, but hopefully this is all of them
+    AnnotationRangeLock.objects.filter(min_variant__alt__seq='.', count=1).delete()
 
     # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
     # These wouldn't have been linked to alleles etc, and liftover pipeline just would have failed
