@@ -226,9 +226,9 @@ class ClinVarExportSync:
                     new_status: Optional[ClinVarExportSubmissionStatus] = None
                     if processing_status := submission_json.get("processingStatus"):
                         if processing_status == "Success":
-                            clinvar_export_submission.status = ClinVarExportSubmissionStatus.SUCCESS
+                            new_status = ClinVarExportSubmissionStatus.SUCCESS
                         elif processing_status == "Error":
-                            clinvar_export_submission.status = ClinVarExportSubmissionStatus.ERROR
+                            new_status = ClinVarExportSubmissionStatus.ERROR
                         # expect statuses of Success or Error
 
                     clinvar_export_submission.response_json = submission_json
@@ -239,7 +239,8 @@ class ClinVarExportSync:
                     clinvar_export_submission.save()
                 else:
                     report_message(f"ClinVarExportRequest - could not find localKey", level='error', extra_data={"target": clinvar_request.pk, "localKey": local_key})
-            else:
+
+            if not submission_json:
                 report_message(f"Expected submissions in ClinVarRequest", level='error', extra_data={"target": clinvar_request.pk})
 
             clinvar_request.submission_batch.status = ClinVarExportBatchStatus.SUBMITTED if success_count > 0 else ClinVarExportBatchStatus.REJECTED
