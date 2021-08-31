@@ -28,6 +28,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
     Allele = apps.get_model("snpdb", "Allele")
     Sequence = apps.get_model("snpdb", "Sequence")
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
+    ClinVar = apps.get_model("annotation", "ClinVar")
 
     REFERENCE_ALT = '='
 
@@ -41,6 +42,18 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
         variant_ids = ", ".join([str(pk) for pk in affected_variants.values_list("pk", flat=True)])
         print(f"Deleting Alleles for {genome_build} variants - may want to check these have Alleles later:")
         print(variant_ids)
+
+    # Some ClinVar records had been read in with alt='.' need to convert to alt='='
+    ref_alt = Sequence.objects.get(seq=REFERENCE_ALT)
+    clinvar_records = []
+    for cv in ClinVar.objects.filter(variant__alt__seq='.'):
+        ref_variant = Variant.objects.get_or_create(locus=cv.variant.locus, alt=ref_alt)[0]
+        cv.variant = ref_variant
+        cv.append(clinvar_records)
+
+    if clinvar_records:
+        print(f"Updating variant on {len(clinvar_records}} ClinVar records (reference variant with alt='.')")
+        ClinVar.objects.bulk_update(clinvar_records, ["variant"], batch_size=2000)
 
     # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
     # These wouldn't have been linked to alleles etc, and liftover pipeline just would have failed
