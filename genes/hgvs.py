@@ -411,7 +411,7 @@ class HGVSMatcher:
                     reason = f"{k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
                     raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
 
-        if ref == alt:
+        if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
         return VariantCoordinate(chrom, position, ref, alt)
 

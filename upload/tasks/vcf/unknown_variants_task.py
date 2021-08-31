@@ -63,7 +63,7 @@ class BulkUnknownVariantInserter:
                 self.num_skipped_gvcf_non_var_blocks += 1
                 return  # Skip
 
-        if alt == ref:
+        if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
 
         # Always insert a reference with every non-ref alt variant
