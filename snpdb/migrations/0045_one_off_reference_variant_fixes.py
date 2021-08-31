@@ -49,7 +49,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
     for cv in ClinVar.objects.filter(variant__alt__seq='.'):
         ref_variant = Variant.objects.get_or_create(locus=cv.variant.locus, alt=ref_alt)[0]
         cv.variant = ref_variant
-        cv.append(clinvar_records)
+        clinvar_records.append(cv)
 
     if clinvar_records:
         print(f"Updating variant on {len(clinvar_records)} ClinVar records (reference variant with alt='.')")
