@@ -109,10 +109,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             raise ValueError(f"Could not find 'samples_allele_frequency' in {COHORT_GENOTYPE_HEADER}")
         self.cohort_gt_vaf_index -= self.COHORT_GT_NUM_ADDED_FIELDS
 
-    def get_max_variant_id(self):
-        """ 0 means it was never set, so we return None """
-        return self.max_variant_id or None
-
     def finish(self):
         """ This is called at the very end so we can collect any remaining items to process """
 
