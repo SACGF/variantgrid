@@ -24,7 +24,8 @@ from pyhgvs.utils import make_transcript
 from annotation.models import VariantAnnotationVersion
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
 from library.log_utils import report_exc_info
-from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant
+from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
+    ClinGenAlleleRegistryException
 from snpdb.models import Variant, AssemblyMoleculeType, Contig
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
@@ -549,7 +550,6 @@ class HGVSMatcher:
         if transcript_name:
             transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
                                                                           best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
-
             if self._pyhgvs_ok(transcript_version):
                 # Sanity Check - make sure contig is the same
                 contig_mappings = self.genome_build.chrom_contig_mappings
@@ -572,14 +572,18 @@ class HGVSMatcher:
                     hgvs_string = variant_annotation.hgvs_c
                 else:
                     # Try ClinGen
-                    if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                        hgvs_string = ca.get_c_hgvs(transcript_version.accession)
-                        hgvs_method = "ClinGen Allele Registry"
-                    else:
-                        hgvs_string = None
+                    hgvs_fail_message = f"Couldn't get c.HGVS for '{variant}' from VEP or ClinGen Allele Registry"
+                    try:
+                        if ca := get_clingen_allele_for_variant(self.genome_build, variant):
+                            hgvs_string = ca.get_c_hgvs(transcript_version.accession)
+                            hgvs_method = "ClinGen Allele Registry"
+                        else:
+                            hgvs_string = None
+                    except ClinGenAlleleRegistryException as cgare:
+                        raise ValueError(hgvs_fail_message) from cgare
 
                     if hgvs_string is None:
-                        raise ValueError(f"Couldn't get c.HGVS for '{variant}' from VEP or ClinGen Allele Registry")
+                        raise ValueError(hgvs_fail_message)
                 hgvs_name = HGVSName(hgvs_string)
         else:
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
