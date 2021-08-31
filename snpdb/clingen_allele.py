@@ -337,8 +337,10 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
 def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
                                    clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
     """ Retrieves from DB or calls API then caches in DB   """
-    va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
+    if clingen_api is None:
+        clingen_api = ClinGenAlleleRegistryAPI()
 
+    va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     if va.allele.clingen_allele is None:
         if va.error:
             clingen_api.check_api_response(va.error)
