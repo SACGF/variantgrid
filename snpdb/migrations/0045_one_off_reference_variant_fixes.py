@@ -43,6 +43,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
         variant_ids = ", ".join([str(pk) for pk in affected_variants.values_list("pk", flat=True)])
         print(f"Deleting Alleles for {genome_build} variants - may want to check these have Alleles later:")
         print(variant_ids)
+        bad_alleles.delete()
 
     # Some ClinVar records had been read in with alt='.' need to convert to alt='='
     ref_alt = Sequence.objects.get(seq=REFERENCE_ALT)
