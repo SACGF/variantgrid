@@ -566,7 +566,8 @@ class HGVSMatcher:
             else:
                 # Try VEP
                 version = VariantAnnotationVersion.latest(self.genome_build)
-                if variant_annotation := variant.varianttranscriptannotation_set.filter(version=version).first():
+                transcript_annotation_qs = variant.varianttranscriptannotation_set.filter(version=version)
+                if variant_annotation := transcript_annotation_qs.filter(transcript_version=transcript_version).first():
                     hgvs_method = "VEP"
                     hgvs_string = variant_annotation.hgvs_c
                 else:
