@@ -52,7 +52,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
         cv.append(clinvar_records)
 
     if clinvar_records:
-        print(f"Updating variant on {len(clinvar_records}} ClinVar records (reference variant with alt='.')")
+        print(f"Updating variant on {len(clinvar_records)}} ClinVar records (reference variant with alt='.')")
         ClinVar.objects.bulk_update(clinvar_records, ["variant"], batch_size=2000)
 
     # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
