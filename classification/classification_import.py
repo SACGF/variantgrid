@@ -1,10 +1,13 @@
 import os
-from typing import List
+from typing import List, Dict, Tuple
+
+from django.contrib.auth.models import User
+from django.db.models import QuerySet
 
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
 from library.vcf_utils import write_vcf_from_tuples
-from snpdb.models import Variant
+from snpdb.models import Variant, ImportSource
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadedFile, UploadPipeline, UploadStep, \
@@ -12,7 +15,7 @@ from upload.models import UploadedFile, UploadPipeline, UploadStep, \
 from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, \
     UploadStepTaskType, VCFPipelineStage
 from upload.upload_processing import process_upload_pipeline
-from classification.models.classification import ClassificationImport
+from classification.models.classification import ClassificationImport, Classification
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 
 
@@ -120,3 +123,31 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
                                   pipeline_stage_dependency=VCFPipelineStage.DATA_INSERTION,
                                   script=class_name)
         sort_order += 1
+
+
+def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -> Tuple[int, int]:
+    qs: QuerySet[Classification] = queryset.order_by('evidence__genome_build')
+
+    invalid_record_count = 0
+    valid_record_count = 0
+    imports_by_genome: Dict[int, ClassificationImport] = dict()
+
+    for vc in qs:
+        try:
+            genome_build = vc.get_genome_build()
+            if genome_build.pk not in imports_by_genome:
+                imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
+                                                                                         genome_build=genome_build)
+            vc_import = imports_by_genome[genome_build.pk]
+            vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
+            vc.classification_import = vc_import
+            vc.save()
+            valid_record_count += 1
+
+        except BaseException:
+            invalid_record_count += 1
+
+    for vc_import in imports_by_genome.values():
+        process_classification_import(vc_import, ImportSource.API)
+
+    return valid_record_count, invalid_record_count
