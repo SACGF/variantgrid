@@ -8,7 +8,8 @@
 {% for clinvar_request in batch.requests %}
     <div class="card mt-4">
         <div class="card-header">
-            ClinVar Request ({{ clinvar_request.pk }})
+            <div class="float-left">ClinVar Request ({{ clinvar_request.pk }})</div>
+            <div class="float-right">{% timestamp clinvar_request.created time_ago=True %}</div>
         </div>
         <div class="card-body">
             {% labelled label="Type" %}{{ clinvar_request.get_request_type_display }}{% endlabelled %}
