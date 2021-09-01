@@ -64,7 +64,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
     # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
     # These wouldn't have been linked to alleles etc, and liftover pipeline just would have failed
     (n, deleted) = Sequence.objects.filter(seq='.').delete()
-    expected = {'snpdb.Sequence', 'snpdb.Variant'}
+    expected = {'snpdb.Sequence', 'snpdb.Variant', 'snpdb.VariantZygosityCount'}
     unexpected_deleted = set(deleted) - expected
     if unexpected_deleted:
         raise ValueError(f"Removing Sequence = '.' caused unexpected deletion of: {unexpected_deleted}")
