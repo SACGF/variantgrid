@@ -451,7 +451,7 @@ class HGVSMatcher:
     @staticmethod
     def _pyhgvs_ok(transcript_version: TranscriptVersion) -> bool:
         """ Some transcripts align with gaps to the genome, and thus we can't use PyHGVS (which uses exons + CDS) """
-        return not transcript_version.alignment_gap and transcript_version.length is not None
+        return not transcript_version.alignment_gap and transcript_version.has_valid_data
 
     def get_variant_tuple(self, hgvs_name: str) -> VariantCoordinate:
         """ VariantCoordinate.chrom = Contig name """
@@ -536,7 +536,7 @@ class HGVSMatcher:
 
     def _variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
         hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_name)
-        logging.info("%s -> %s (%s)", variant, hgvs_name, hgvs_method)
+        # logging.debug("%s -> %s (%s)", variant, hgvs_name, hgvs_method)
         return HGVSNameExtra(hgvs_name)
 
     def _variant_to_hgvs(self, variant: Variant, transcript_name=None) -> Tuple[HGVSName, str]:

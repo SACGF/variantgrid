@@ -26,6 +26,7 @@
                 <th>Genome Build</th>
                 <th>Gene</th>
                 <th>BioType</th>
+                <th>Alignment Gap</th>
                 <th>Coordinates</th>
                 <th>Length</th>
                 <th>JSON</th>
@@ -40,6 +41,7 @@
                 <td>{{ genome_build_id }}</td>
                 <td><a class="hover-link" href="{% url 'view_gene' transcript_version.gene.pk %}">{{ transcript_version.gene }}</a></td>
                 <td>{{ transcript_version.biotype }}</td>
+                <td>{{ transcript_version.alignment_gap }}</td>
                 {% if transcript_version.has_valid_data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
