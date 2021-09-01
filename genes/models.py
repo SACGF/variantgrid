@@ -683,7 +683,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             try:
                 transcript_version = transcript_versions_qs.get(version=version)
             except TranscriptVersion.DoesNotExist:
-                possible_versions = set(transcript_versions_qs.values_list('version', flat=True).all())
+                possible_versions = set(transcript_versions_qs.values_list('version', flat=True))
                 possible_versions = [int(p) for p in possible_versions if p is not None]
                 possible_versions.sort()
                 if possible_versions:
