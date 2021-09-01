@@ -6,18 +6,16 @@ block external postgres connections. See discussion at:
 https://github.com/SACGF/variantgrid/issues/839
 
 """
-import logging
-from dataclasses import dataclass
-
-from Bio.Data.IUPACData import protein_letters_1to3_extended
-from django.conf import settings
 import enum
-from lazy import lazy
-import pyhgvs
 import re
 import sys
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+import pyhgvs
+from Bio.Data.IUPACData import protein_letters_1to3_extended
+from django.conf import settings
+from lazy import lazy
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
 
