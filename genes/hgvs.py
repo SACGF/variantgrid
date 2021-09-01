@@ -7,6 +7,7 @@ https://github.com/SACGF/variantgrid/issues/839
 
 """
 import enum
+import logging
 import re
 import sys
 from dataclasses import dataclass
@@ -451,18 +452,43 @@ class HGVSMatcher:
         """ Some transcripts align with gaps to the genome, and thus we can't use PyHGVS (which uses exons + CDS) """
         return not transcript_version.alignment_gap and transcript_version.has_valid_data
 
-    def get_variant_tuple(self, hgvs_name: str) -> VariantCoordinate:
+    def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
         """ VariantCoordinate.chrom = Contig name """
 
-        transcript_version = None
-        if transcript_name := HGVSName(hgvs_name).transcript:
-            transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
-                                                                          best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
-
-        if transcript_version is None or self._pyhgvs_ok(transcript_version):
-            variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_name, transcript_version)
+        # TODO: Make this depend on settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT
+        hgvs_name = HGVSName(hgvs_string)
+        if transcript_accession := hgvs_name.transcript:
+            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+            kwargs = {
+                "genome_build": self.genome_build,
+                "transcript_id": transcript_id,
+            }
+            if version:
+                kwargs["version__gte"] = version
+            variant_tuple = None
+            hgvs_methods = []
+            for tv in TranscriptVersion.objects.filter(**kwargs).order_by("version"):
+                hgvs_name.transcript = tv.accession
+                hgvs_string_for_version = hgvs_name.format()
+                if self._pyhgvs_ok(tv):
+                    hgvs_methods.append(f"PyHGVS: {hgvs_string_for_version}")
+                    variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
+                else:
+                    try:
+                        hgvs_methods.append(f"ClinGenAllele Registry: {hgvs_string_for_version}")
+                        variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
+                    except ClinGenAlleleRegistryException as cgare:
+                        #raise ValueError(f"Could not convert '{hgvs_string}' using ClinGenAllele Registry") from cgare
+                        pass
+                if variant_tuple:
+                    break
+            attempts = ", ".join(hgvs_methods)
+            if variant_tuple is None:
+                raise ValueError(f"Could not convert {hgvs_string} - tried: {attempts}")
+            else:
+                logging.info("HGVS methods tried: %s", attempts)
         else:
-            variant_tuple = self._clingen_get_variant_tuple(hgvs_name)
+            variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string, None)
 
         (chrom, position, ref, alt) = variant_tuple
 
@@ -476,7 +502,7 @@ class HGVSMatcher:
                     non_standard_bases = non_standard_bases.replace(n, "")
                 if non_standard_bases:
                     reason = f"{k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
-                    raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
+                    raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
