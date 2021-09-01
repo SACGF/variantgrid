@@ -958,6 +958,10 @@ def _one_off_set_transcript_version_alignment_gap(apps, schema_editor):
 
     for build_name, transcript_accessions in TRANSCRIPT_VERSIONS.items():
         genome_build = GenomeBuild.objects.get(pk=build_name)
+        total = TranscriptVersion.objects.filter(genome_build=genome_build).count()
+        if not total:
+            continue
+
         tv_by_version = defaultdict(set)
         for ta in transcript_accessions:
             (transcript_id, version) = ta.split(".")
@@ -968,7 +972,6 @@ def _one_off_set_transcript_version_alignment_gap(apps, schema_editor):
                                              version=version, transcript_id__in=transcripts).update(alignment_gap=True)
 
         num_alignment_gap = TranscriptVersion.objects.filter(genome_build=genome_build, alignment_gap=True).count()
-        total = TranscriptVersion.objects.filter(genome_build=genome_build).count()
         percent = 100 * num_alignment_gap / total
         print(f"{build_name}: {num_alignment_gap} transcript versions with gap ({percent:.2f}%)")
 
