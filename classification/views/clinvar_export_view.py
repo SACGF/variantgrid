@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional, Iterable
 from django.conf import settings
-from django.db.models import QuerySet, When, Value, Case, IntegerField
+from django.db.models import QuerySet, When, Value, Case, IntegerField, Count
 from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
@@ -38,8 +38,9 @@ class ClinVarExportBatchColumns(DatatableConfig):
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail', expected_height=120)
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
-            RichColumn("clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
+            RichColumn("clinvar_key", label="ClinVar Key", orderable=True, enabled=False),
             RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn("record_count", label="Records In Submission", orderable=True),
             RichColumn("status", renderer=self.render_status, orderable=True)
         ]
 
@@ -51,9 +52,11 @@ class ClinVarExportBatchColumns(DatatableConfig):
         return cve
 
     def get_initial_queryset(self):
-        return self.get_initial_query_params(
+        initial_qs = self.get_initial_query_params(
             clinvar_key=self.get_query_param('clinvar_key')
         )
+        initial_qs = initial_qs.annotate(record_count=Count('clinvarexportsubmission'))
+        return initial_qs
 
 
 def clinvar_export_batch_detail(request, pk: int):
@@ -203,23 +206,34 @@ def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpRespo
     clinvar_key.check_user_can_access(request.user)
 
     def rows() -> Iterable[str]:
-        yield delimited_row(["ID", "URL", "Genome Build", "c.hgvs", "Clinical Significance", "Interpretation Summary", "Sync Status", "Release Status", "SCV"])
+        yield delimited_row(["ID", "URL", "Genome Build", "c.HGVS", "Condition Umbrella", "Clinical Significance", "Interpretation Summary", "Sync Status", "Release Status", "SCV"])
         row: ClinVarExport
         clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         for row in ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id'):
             genome_build: Optional[str] = None
             c_hgvs: Optional[str] = None
+            condition_umbrella: Optional[str] = None
             interpretation_summary: Optional[str] = None
             clinical_significance: Optional[str] = None
             if classification_based_on := row.classification_based_on:
                 genome_build_obj = classification_based_on.get_genome_build()
                 genome_build = str(genome_build_obj)
                 c_hgvs = classification_based_on.classification.get_c_hgvs(genome_build_obj)
+                condition_umbrella = row.condition_resolved.as_plain_text
                 interpretation_summary = html_to_text(classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))
                 clinical_significance = clin_sig_e_key.pretty_value(classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
 
             url = get_url_from_view_path(row.get_absolute_url())
-            yield delimited_row([row.id, url, genome_build or "", c_hgvs or "", clinical_significance or "", interpretation_summary or "", row.get_status_display(), row.get_release_status_display(), row.scv])
+            yield delimited_row([
+                row.id, url,
+                genome_build or "",
+                c_hgvs or "",
+                condition_umbrella or "",
+                clinical_significance or "",
+                interpretation_summary or "",
+                row.get_status_display(),
+                row.get_release_status_display(),
+                row.scv])
             pass
 
     date_str = now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
