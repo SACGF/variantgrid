@@ -17,10 +17,9 @@ class Command(BaseCommand):
             transcripts_with_gaps.add(tv.accession)
             transcripts_with_gaps.add(tv.transcript_id)
 
-        # This gets all variants with a transcript overlapping - so may not be the one the classification actually used
         gene_symbols = set()
         classification_to_rematch = set()
-        for c in Classification.objects.filter(variant__varianttranscriptannotation__transcript_version__alignment_gap=True).distinct():
+        for c in Classification.objects.filter(variant__isnull=False):
             if c.transcript in transcripts_with_gaps:
                 classification_to_rematch.add(c.pk)
                 if gene_symbol := c.get("gene_symbol"):
