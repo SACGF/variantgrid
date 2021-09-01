@@ -564,19 +564,40 @@ class HGVSMatcher:
                 hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                         pyhgvs_transcript, max_allele_length=sys.maxsize)
             else:
-                # Try VEP
-                version = VariantAnnotationVersion.latest(self.genome_build)
-                transcript_annotation_qs = variant.varianttranscriptannotation_set.filter(version=version)
-                if variant_annotation := transcript_annotation_qs.filter(transcript_version=transcript_version).first():
-                    hgvs_method = "VEP"
-                    hgvs_string = variant_annotation.hgvs_c
-                else:
+                hgvs_string = None
+                attempted_methods = []
+
+                # TODO: Need to write some code to put bases and genes on VEP HGVS
+                use_vep_hgvs = False
+                if use_vep_hgvs:
+                    attempted_method = "VEP"
+                    attempted_methods.append(attempted_method)
+                    version = VariantAnnotationVersion.latest(self.genome_build)
+                    transcript_annotation_qs = variant.varianttranscriptannotation_set.filter(version=version)
+                    if variant_annotation := transcript_annotation_qs.filter(transcript_version=transcript_version).first():
+                        hgvs_method = attempted_method
+                        hgvs_string = variant_annotation.hgvs_c
+
+                if hgvs_string is None:
                     # Try ClinGen
-                    hgvs_fail_message = f"Couldn't get c.HGVS for '{variant}' from VEP or ClinGen Allele Registry"
+                    attempted_method = "ClinGen Allele Registry"
+                    attempted_methods.append(attempted_method)
+                    methods_str = " or ".join(attempted_methods)
+                    hgvs_fail_message = f"Couldn't get c.HGVS for '{variant}' from {methods_str}"
                     try:
                         if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                            hgvs_string = ca.get_c_hgvs(transcript_version.accession)
-                            hgvs_method = "ClinGen Allele Registry"
+                            hgvs_string, t_data = ca.get_c_hgvs_and_data(transcript_version.accession)
+                            hgvs_name = HGVSName(hgvs_string)
+                            hgvs_name.gene = t_data.get("geneSymbol")
+                            if hgvs_name.mutation_type in {"dup", "del", "delins"}:
+                                coord = t_data["coordinates"][0]
+                                if hgvs_name.mutation_type == "dup":
+                                    clingen_key = "allele"
+                                else:
+                                    clingen_key = "referenceAllele"
+                                hgvs_name.ref_allele = coord[clingen_key]
+                            hgvs_string = hgvs_name.format()
+                            hgvs_method = attempted_method
                         else:
                             hgvs_string = None
                     except ClinGenAlleleRegistryException as cgare:

@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from django.conf import settings
 from django.db import models
@@ -87,19 +87,19 @@ class ClinGenAllele(TimeStampedModel):
                     return p_hgvs
         return None
 
-    def get_c_hgvs(self, transcript_accession, match_version=True) -> Optional[str]:
+    def get_c_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str], Optional[Dict]]:
         if ta := self._get_transcript_allele(transcript_accession, match_version):
             transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
             for t_hgvs in ta["hgvs"]:
                 hgvs_transcript_accession = t_hgvs.split(":")[0]
                 if match_version:
                     if transcript_accession == hgvs_transcript_accession:
-                        return t_hgvs
+                        return t_hgvs, ta
                 else:
                     hgvs_transcript_id = ClinGenAllele._strip_transcript_version(hgvs_transcript_accession)
                     if transcript_id == hgvs_transcript_id:
-                        return t_hgvs
-        return None
+                        return t_hgvs, ta
+        return None, None
 
     @staticmethod
     def filtered_genomic_alleles(genomic_alleles, genome_build: GenomeBuild):
