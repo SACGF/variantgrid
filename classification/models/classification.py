@@ -295,6 +295,13 @@ class ConditionResolved:
         }
         return term_dict
 
+    @property
+    def as_plain_text(self) -> str:
+        if text := self.plain_text:
+            return text
+        else:
+            return self.to_json()['display_text']
+
     def to_json(self) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
         if self.terms:
