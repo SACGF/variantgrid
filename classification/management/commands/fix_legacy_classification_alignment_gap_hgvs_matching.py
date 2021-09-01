@@ -32,4 +32,5 @@ class Command(BaseCommand):
         num_classifications = classification_qs.count()
         print(f"Rematching {num_classifications} classifications total (also includes variant=None)")
 
-        reattempt_variant_matching(admin_bot(), classification_qs)
+        valid_record_count, invalid_record_count = reattempt_variant_matching(admin_bot(), classification_qs)
+        print(f"{valid_record_count=}, {invalid_record_count=}")
