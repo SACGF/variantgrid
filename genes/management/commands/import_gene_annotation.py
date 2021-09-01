@@ -6,6 +6,8 @@ GenePred is way easier to parse, but also want GFF3 as then we can have gene ID,
 
 """
 from collections import Counter, defaultdict
+from typing import Tuple, Optional
+
 from django.core.management.base import BaseCommand
 from pyhgvs.utils import read_genepred
 import os
@@ -42,6 +44,7 @@ class Command(BaseCommand):
         consortia = [ac[1] for ac in AnnotationConsortium.choices]
         builds = [gb.name for gb in GenomeBuild.builds_with_annotation()]
 
+        parser.add_argument('--dry-run', action='store_true', help="Don't actually modify anything")
         parser.add_argument('--genome-build', choices=builds, required=True)
         parser.add_argument('--annotation-consortium', choices=consortia, required=True)
         parser.add_argument('--replace', action='store_true', help="Replace gene symbols and relations")
@@ -53,6 +56,7 @@ class Command(BaseCommand):
         parser.add_argument('--genePred', nargs="+", required=True)
 
     def handle(self, *args, **options):
+        dry_run = options["dry_run"]
         build_name = options["genome_build"]
         annotation_consortium_name = options["annotation_consortium"]
         replace = options["replace"]
@@ -63,6 +67,9 @@ class Command(BaseCommand):
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         ac_dict = invert_dict(dict(AnnotationConsortium.choices))
         annotation_consortium = ac_dict[annotation_consortium_name]
+
+        if dry_run:
+            print("Dry Run (not actually inserting any data)")
 
         # gff/genePred sanity checks
         if len(gff3_filenames) != len(genepred_filenames):
@@ -101,9 +108,10 @@ class Command(BaseCommand):
             num_remaining_file_pairs -= 1
             update_known_objects = num_remaining_file_pairs > 0
             self.insert_gene_annotations(gff3_filename, genepred_filename, update_known_objects,
-                                         replace=replace, release_version=release_version)
+                                         dry_run=dry_run, replace=replace, release_version=release_version)
 
-        Gene.delete_orphaned_fake_genes()
+        if not dry_run:
+            Gene.delete_orphaned_fake_genes()
 
         if replace:
             print(f"Please run command classification_cache_chgvs to update classification records with new gene symbols")
@@ -125,15 +133,17 @@ class Command(BaseCommand):
         return f"{gene_id}.{version}"
 
     def insert_gene_annotations(self, gff3_filename, genepred_filename, update_known_objects,
-                                replace=False, release_version=None):
+                                dry_run=False, replace=False, release_version=None):
         """ update_known_objects - set false as optimisation if you know it's the last loop """
 
         print(f"insert_gene_annotations('{gff3_filename}', '{genepred_filename}')")
-        import_source = GeneAnnotationImport.objects.create(genome_build=self.genome_build,
-                                                            annotation_consortium=self.annotation_consortium,
-                                                            filename=gff3_filename)
+        import_source = GeneAnnotationImport(genome_build=self.genome_build,
+                                             annotation_consortium=self.annotation_consortium, filename=gff3_filename)
+        if not dry_run:
+            import_source.save()
+
         release = None
-        if release_version:
+        if release_version and not dry_run:
             release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
                                                                               genome_build=self.genome_build,
                                                                               annotation_consortium=self.annotation_consortium,
@@ -160,6 +170,7 @@ class Command(BaseCommand):
         # If we import the same transcript ID later via a GFF3, we can change the gene version to the real one
         known_transcript_versions_to_update_with_gene_accession = defaultdict(list)
         known_gene_versions_to_update = []
+        transcript_versions_to_update_with_alignment_gap = set()  # Could be new or existing
 
         with open_handle_gzip(gff3_filename, "rt") as f:
             for line in f:
@@ -216,28 +227,45 @@ class Command(BaseCommand):
                         else:
                             # print(f"{transcript_version.accession} is unknown - have {transcript_versions_dict}")
                             unknown_transcript_versions_by_gene_accession[gene_accession].append(transcript_version)
+                    elif parser.is_alignment(feature_type, attributes):
+                        # cDNA match lines come after transcript in GFF so we are just going to update them
+                        transcript_accession, has_gap = parser.get_transcript_id_and_has_gap(attributes)
+                        if has_gap:
+                            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+                            transcript_versions_dict = self.known_transcript_versions_by_transcript_id.get(transcript_id, {})
+                            known_transcript_version = version in transcript_versions_dict
+                            if replace or not known_transcript_version:
+                                transcript_versions_to_update_with_alignment_gap.add(transcript_accession)
+
                 except:
                     print(f"Couldn't handle line:")
                     print(line)
                     raise
 
-        genepred_data_by_transcript_id = self.get_genepred_data_by_transcript_id(parser, gff3_existing_transcript_versions, genepred_filename)
+        genepred_data_by_transcript_id = self.get_genepred_data_by_transcript_id(parser,
+                                                                                 gff3_existing_transcript_versions,
+                                                                                 genepred_filename)
 
         # Insert new data
         if unknown_gene_symbols:
             print(f"Inserting {len(unknown_gene_symbols)} gene symbols")
-            GeneSymbol.objects.bulk_create(unknown_gene_symbols, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
+            if not dry_run:
+                GeneSymbol.objects.bulk_create(unknown_gene_symbols,
+                                               batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
             self.known_gene_symbols.update(unknown_gene_symbols)
 
         if unknown_gene_ids:
             print(f"Inserting {len(unknown_gene_ids)} genes")
-            unknown_genes = (Gene(identifier=gene_id, annotation_consortium=self.annotation_consortium) for gene_id in unknown_gene_ids)
-            Gene.objects.bulk_create(unknown_genes, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
+            unknown_genes = (Gene(identifier=gene_id, annotation_consortium=self.annotation_consortium)
+                             for gene_id in unknown_gene_ids)
+            if not dry_run:
+                Gene.objects.bulk_create(unknown_genes, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
 
         if unknown_gene_versions:
             print(f"Inserting {len(unknown_gene_versions)} gene versions")
             old_max_gene_id = highest_pk(GeneVersion)
-            GeneVersion.objects.bulk_create(unknown_gene_versions, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
+            if not dry_run:
+                GeneVersion.objects.bulk_create(unknown_gene_versions, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
             gene_version_qs = GeneVersion.objects.filter(gene__annotation_consortium=self.annotation_consortium,
                                                          genome_build=self.genome_build)
             if old_max_gene_id:
@@ -246,7 +274,8 @@ class Command(BaseCommand):
 
         if unknown_transcripts:
             print(f"Inserting {len(unknown_transcripts)} transcripts")
-            Transcript.objects.bulk_create(unknown_transcripts, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
+            if not dry_run:
+                Transcript.objects.bulk_create(unknown_transcripts, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
 
         unknown_transcript_versions = []
         unknown_transcript_ids = set()
@@ -270,13 +299,16 @@ class Command(BaseCommand):
 
         if unknown_transcript_versions:
             print(f"Inserting {len(unknown_transcript_versions)} transcript versions")
-            TranscriptVersion.objects.bulk_create(unknown_transcript_versions, batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
+            if not dry_run:
+                TranscriptVersion.objects.bulk_create(unknown_transcript_versions,
+                                                      batch_size=Command.BATCH_SIZE, ignore_conflicts=True)
 
         # UPDATES
         if known_gene_versions_to_update:
             print(f"Updating {len(known_gene_versions_to_update)} GeneVersions to new symbols")
-            GeneVersion.objects.bulk_update(known_gene_versions_to_update,
-                                            fields=["import_source", "gene_symbol_id"], batch_size=Command.BATCH_SIZE)
+            if not dry_run:
+                GeneVersion.objects.bulk_update(known_gene_versions_to_update, ["import_source", "gene_symbol_id"],
+                                                batch_size=Command.BATCH_SIZE)
             # No need to update gene versions as only ever 1 GFF when using "replace-symbols"
 
         # Remove any genePred that were inserted in unknown_transcript_versions
@@ -296,8 +328,9 @@ class Command(BaseCommand):
 
         if transcript_versions_to_update:
             print(f"Updating {len(transcript_versions_to_update)} transcript versions")
-            fields = ['import_source', 'data']
-            TranscriptVersion.objects.bulk_update(transcript_versions_to_update, fields, batch_size=Command.BATCH_SIZE)
+            if not dry_run:
+                TranscriptVersion.objects.bulk_update(transcript_versions_to_update, ['import_source', 'data'],
+                                                      batch_size=Command.BATCH_SIZE)
 
         if known_transcript_versions_to_update_with_gene_accession:
             transcript_versions_to_update = []
@@ -316,8 +349,23 @@ class Command(BaseCommand):
                     transcript_versions_to_update.append(tv)
 
             print(f"Updating {len(transcript_versions_to_update)} TranscriptVersions with proper gene version")
-            TranscriptVersion.objects.bulk_update(transcript_versions_to_update,
-                                                  ["import_source", "gene_version"], batch_size=Command.BATCH_SIZE)
+            if not dry_run:
+                TranscriptVersion.objects.bulk_update(transcript_versions_to_update,
+                                                      ["import_source", "gene_version"], batch_size=Command.BATCH_SIZE)
+
+        if transcript_versions_to_update_with_alignment_gap:
+            num_transcripts = len(transcript_versions_to_update_with_alignment_gap)
+            print(f"Updating {num_transcripts} TranscriptVersions with alignment_gap")
+
+            # There are only a limited number of versions so can use that to batch update
+            tv_by_version = defaultdict(set)
+            for transcript_accession in transcript_versions_to_update_with_alignment_gap:
+                transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+                tv_by_version[version].add(transcript_id)
+
+            for version, transcripts in tv_by_version.items():
+                TranscriptVersion.objects.filter(genome_build=self.genome_build, version=version,
+                                                 transcript_id__in=transcripts).update(alignment_gap=True)
 
         if release or (update_known_objects and (unknown_transcript_versions or transcript_versions_to_update)):
             tv_qs = import_source.transcriptversion_set.all()
@@ -330,7 +378,8 @@ class Command(BaseCommand):
                 release_gene_version_list.append(ReleaseGeneVersion(release=release, gene_version=gv))
             if release_gene_version_list:
                 print(f"Inserting {len(release_gene_version_list)} gene versions for release {release}")
-                ReleaseGeneVersion.objects.bulk_create(release_gene_version_list)
+                if not dry_run:
+                    ReleaseGeneVersion.objects.bulk_create(release_gene_version_list)
 
             release_transcript_version_list = []
             for transcript_id, version in gff3_transcript_versions.items():
@@ -338,15 +387,18 @@ class Command(BaseCommand):
                 release_transcript_version_list.append(ReleaseTranscriptVersion(release=release, transcript_version=tv))
             if release_transcript_version_list:
                 print(f"Inserting {len(release_transcript_version_list)} transcript versions for release {release}")
-                ReleaseTranscriptVersion.objects.bulk_create(release_transcript_version_list)
+                if not dry_run:
+                    ReleaseTranscriptVersion.objects.bulk_create(release_transcript_version_list)
 
             print("Matching existing gene list symbols to this release...")
-            gm = GeneMatcher(release)
-            gm.match_unmatched_in_hgnc_and_gene_lists()
+            if not dry_run:
+                gm = GeneMatcher(release)
+                gm.match_unmatched_in_hgnc_and_gene_lists()
 
             if unknown_gene_ids and self.annotation_consortium == AnnotationConsortium.REFSEQ:
                 print("Created new RefSeq genes - retrieving gene summaries via API")
-                retrieve_refseq_gene_summaries()
+                if not dry_run:
+                    retrieve_refseq_gene_summaries()
 
     @staticmethod
     def set_transcript_data(existing_transcript_version, data):
@@ -472,6 +524,10 @@ class GFFParser:
     def clean_and_validate_genepred_id(self, transcript):
         return transcript
 
+    def is_alignment(self, feature_type, attributes):
+        """ https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md#alignments """
+        return False  # Don't handle by default
+
 
 class RefSeqParser(GFFParser):
     GENE_TYPES = {"gene", "pseudogene"}
@@ -495,6 +551,14 @@ class RefSeqParser(GFFParser):
             transcript_id = attributes["transcript_id"]
             valid = RefSeqParser.valid_transcript_id(transcript_id)
         return valid
+
+    def is_alignment(self, feature_type, attributes):
+        if feature_type == "cDNA_match":
+            # Looks like 'Target=NM_013289.3 1013 1063 +'
+            if target := attributes.get("Target"):
+                transcript_id = target.split()[0]
+                return self.valid_transcript_id(transcript_id)
+        return False
 
     def get_gene_version(self, attributes):
         """ Looks like:
@@ -555,10 +619,25 @@ class RefSeqParser(GFFParser):
         VALID_TRANSCRIPT_TYPES = ["NM_", "NR_"]
         return any(map(transcript_id.startswith, VALID_TRANSCRIPT_TYPES))
 
+    @staticmethod
+    def get_valid_transcript_target(attributes) -> Optional[str]:
+        valid_transcript_target = None
+        # cDNA_match row - attribute looks like 'Target=NM_013289.3 1013 1063 +'
+        if target := attributes.get("Target"):
+            transcript_id = target.split()[0]
+            if RefSeqParser.valid_transcript_id(transcript_id):
+                valid_transcript_target = transcript_id
+        return valid_transcript_target
+
     def clean_and_validate_genepred_id(self, transcript):
         if not self.valid_transcript_id(transcript):
             raise RuntimeError
         return transcript
+
+    def get_transcript_id_and_has_gap(self, attributes) -> Tuple[str, bool]:
+        transcript_id = self.get_valid_transcript_target(attributes)
+        has_gap = int(attributes["gap_count"]) > 0
+        return transcript_id, has_gap
 
 
 class EnsemblParser(GFFParser):
