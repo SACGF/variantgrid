@@ -467,16 +467,16 @@ class HGVSMatcher:
                     hgvs_methods.append(f"PyHGVS: {hgvs_string_for_version}")
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
                 elif attempt_clingen:
-                    error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry"
+                    # error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry"
                     try:
                         hgvs_methods.append(f"ClinGenAllele Registry: {hgvs_string_for_version}")
                         variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
                     except ClinGenAlleleAPIException as cga_api:
                         attempt_clingen = False
-                        logging.error(error_message, cga_api)
+                        # logging.error(error_message, cga_api)
                         # raise ValueError(error_message) from cga_api
                     except ClinGenAlleleServerException as cga_se:
-                        logging.error(error_message, cga_se)
+                        # logging.error(error_message, cga_se)
 
                         # If it's unknown reference we can just retry with another version, other errors are fatal
                         if not cga_se.is_unknown_reference():
@@ -627,7 +627,7 @@ class HGVSMatcher:
                                     hgvs_string = hgvs_name.format()
                                     hgvs_method = attempted_method
                         except ClinGenAlleleRegistryException as cga_re:
-                            logging.error(cga_re)
+                            # logging.error(cga_re)
                             attempt_clingen = False
 
                     if hgvs_string:
