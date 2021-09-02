@@ -41,33 +41,37 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
         bad_alleles = qs.annotate(num_variants=Count("variantallele")).filter(num_variants__gte=2)
         affected_variants = Variant.objects.filter(variantallele__allele__in=bad_alleles)
         variant_ids = ", ".join([str(pk) for pk in affected_variants.values_list("pk", flat=True)])
-        print(f"Deleting Alleles for {genome_build} variants - may want to check these have Alleles later:")
-        print(variant_ids)
+        if variant_ids:
+            print(f"Deleting Alleles for {genome_build} variants - may want to check these have Alleles later:")
+            print(variant_ids)
         bad_alleles.delete()
 
-    # Some ClinVar records had been read in with alt='.' need to convert to alt='='
-    ref_alt = Sequence.objects.get(seq=REFERENCE_ALT)
-    clinvar_records = []
-    for cv in ClinVar.objects.filter(variant__alt__seq='.'):
-        ref_variant = Variant.objects.get_or_create(locus=cv.variant.locus, alt=ref_alt)[0]
-        cv.variant = ref_variant
-        clinvar_records.append(cv)
+    # We wrongly inserted an alt='.' instead of REFERENCE_ALT
+    if bad_seq := Sequence.objects.filter(seq='.').first():
+        ref_alt = Sequence.objects.get_or_create(seq=REFERENCE_ALT)[0]
 
-    if clinvar_records:
-        print(f"Updating variant on {len(clinvar_records)} ClinVar records (reference variant with alt='.')")
-        ClinVar.objects.bulk_update(clinvar_records, ["variant"], batch_size=2000)
+        # Some ClinVar records had been read in with alt='.' need to convert to alt='='
+        clinvar_records = []
+        for cv in ClinVar.objects.filter(variant__alt=bad_seq):
+            ref_variant = Variant.objects.get_or_create(locus=cv.variant.locus, alt=ref_alt)[0]
+            cv.variant = ref_variant
+            clinvar_records.append(cv)
 
-    # We can just delete AnnotationRangeLocks with a count of 1 - if there are more complicated ones then we'll
-    # have to deal with them by hand, but hopefully this is all of them
-    AnnotationRangeLock.objects.filter(min_variant__alt__seq='.', count=1).delete()
+        if clinvar_records:
+            print(f"Updating variant on {len(clinvar_records)} ClinVar records (reference variant with alt='.')")
+            ClinVar.objects.bulk_update(clinvar_records, ["variant"], batch_size=2000)
 
-    # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
-    # These wouldn't have been linked to alleles etc, and liftover pipeline just would have failed
-    (n, deleted) = Sequence.objects.filter(seq='.').delete()
-    expected = {'snpdb.Sequence', 'snpdb.Variant', 'snpdb.VariantZygosityCount'}
-    unexpected_deleted = set(deleted) - expected
-    if unexpected_deleted:
-        raise ValueError(f"Removing Sequence = '.' caused unexpected deletion of: {unexpected_deleted}")
+        # We can just delete AnnotationRangeLocks with a count of 1 - if there are more complicated ones then we'll
+        # have to deal with them by hand, but hopefully this is all of them
+        AnnotationRangeLock.objects.filter(min_variant__alt=bad_seq, count=1).delete()
+
+        # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
+        # These wouldn't have been linked to alleles etc, and liftover pipeline just would have failed
+        (n, deleted) = bad_seq.delete()
+        expected = {'snpdb.Sequence', 'snpdb.Variant', 'snpdb.VariantZygosityCount'}
+        unexpected_deleted = set(deleted) - expected
+        if unexpected_deleted:
+            raise ValueError(f"Removing Sequence = '.' caused unexpected deletion of: {unexpected_deleted}")
 
 
 class Migration(migrations.Migration):
