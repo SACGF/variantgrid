@@ -152,11 +152,13 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "group_name": "Group Name",
             "organization": "Organisation",  # really need to do translations, even if just en-US vs en-UK
             "upload_location": "Upload Location",
+            "upload_auto_pattern": "Upload Auto Pattern",
             "slack_webhook": "Slack Webhook"
         }
         help_texts = {
             "email": "Lab wide email for discordance and general communications.",
             "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
+            "upload_auto_pattern": "If provided, then uploading files that match this pattern will be automatically processed, otherwise there will be a delay for manual review.",
             "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",
             "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit."
         }

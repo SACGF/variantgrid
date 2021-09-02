@@ -109,12 +109,16 @@ function enhanceAndMonitor() {
 
         {test: '.format-json', func: (node) => {
             let text = node.text().trim();
-            let textJson = JSON.parse(text);
-            let prettyHtml = formatJson(textJson);
-            prettyHtml.attr('class', node.attr('class') + ' ' + prettyHtml.attr('class'));
-            prettyHtml.removeClass('format-json');
-            prettyHtml.attr('data-p', 1);
-            node.replaceWith(prettyHtml);
+            console.log(text);
+            try {
+                // if not valid JSON, just print as is
+                let textJson = JSON.parse(text);
+                let prettyHtml = formatJson(textJson);
+                prettyHtml.attr('class', node.attr('class') + ' ' + prettyHtml.attr('class'));
+                prettyHtml.removeClass('format-json');
+                prettyHtml.attr('data-p', 1);
+                node.replaceWith(prettyHtml);
+            } catch (e) {}
         }},
 
         // if have a wide checkbox row, make it so clicking anywhere on the row activates the checkbox
@@ -671,7 +675,7 @@ TableFormat.flags = (data, type, row) => {
         return $('<div>', {'data-flags': data, class:'flags', text:'...'}).prop('outerHTML');
     }
 };
-TableFormat.limit = (limit, data, type, row) => {
+TableFormat.limit = (limit, data, type, row) => {``
     if (typeof(data) === 'string' && data.length > limit) {
         return $('<span>', {class:'hover-detail', text:data.substring(0, limit) + '...', title:data}).prop('outerHTML');
     }

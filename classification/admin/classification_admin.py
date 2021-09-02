@@ -11,7 +11,8 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import get_
 from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
-    send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification
+    send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
+    UploadedFileLab
 from classification.models.classification import Classification
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
@@ -431,3 +432,14 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         ds: DiscordanceReport
         for ds in queryset:
             send_discordance_notification(ds)
+
+
+@admin.register(UploadedFileLab)
+class UploadedFileLabAdmin(ModelAdminBasics):
+    list_display = ("pk", "lab", "created", "url", "status", "comment")
+    pass
+
+    def is_readonly_field(self, f) -> bool:
+        if f.name in ("url", "filename"):
+            return True
+        return super().is_readonly_field(f)

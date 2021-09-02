@@ -298,6 +298,10 @@ class Lab(models.Model):
     organization = models.ForeignKey(Organization, null=False, blank=False, on_delete=CASCADE)
     # location where the lab can upload files to, (in some environments may refer to s3 directory)
     upload_location = models.TextField(null=True, blank=True)
+    upload_auto_pattern = models.TextField(default="", blank=True)
+    """
+    If provided, and filename matches, file upload will be automatically set to auto_processed
+    """
 
     email = models.TextField(blank=True)
     slack_webhook = models.TextField(blank=True)
@@ -306,16 +310,6 @@ class Lab(models.Model):
         if self.organization != other.organization:
             return self.organization.name < other.organization.name
         return self.name < other.name
-
-    def send_notification(self,
-                          message: str,
-                          blocks: Optional[Dict] = None,
-                          username: Optional[str] = None,
-                          emoji: str = ":dna:"):
-        if slack_url := self.slack_webhook:
-            send_notification(message=message, blocks=blocks, username=username, emoji=emoji, slack_webhook_url=slack_url)
-        else:
-            raise ValueError("Lab is not configured to send Slack notifications")
 
     class Meta:
         ordering = ['name']
@@ -437,6 +431,12 @@ class Lab(models.Model):
             raise PermissionDenied(msg)
 
     def save(self, **kwargs):
+        if upload_auto_pattern := self.upload_auto_pattern:
+            try:
+                re.compile(upload_auto_pattern)
+            except ValueError as ve:
+                raise ValueError(f"Upload auto pattern {upload_auto_pattern} is not a valid regular expression")
+
         super().save(**kwargs)
         if self.group_name:
             # pre-create the groups

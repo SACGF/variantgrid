@@ -114,9 +114,24 @@ def code_json(data: JsonDataType, css_class: Optional[str] = ""):
         # if we're formatting ValidatedJson and the first element has messages, that provides formatting
         # so we don't need code-block
         # Also if we already have a css_class (like card-body) we don't need code-block
-        if not data or ('*wrapper$' not in data and not data.get('messages')):
+        if not data or not isinstance(data, dict) or ('*wrapper$' not in data and not data.get('messages')):
             css_class = "code-block"
     return {"data": data, "css_class": css_class}
+
+
+@register.inclusion_tag("uicore/tags/code_block_regex.html")
+def code_regex(data: str):
+    error = None
+    extension = None
+    pattern = data
+    try:
+        re.compile(data)
+    except ValueError:
+        error = f"Invalid pattern: {data}"
+
+    if match := re.compile(r"\.\*\\\.(?P<extension>.+)").match(data):
+        extension = match.group('extension')
+    return {"error": error, "extension": extension, "pattern": pattern}
 
 
 @register.inclusion_tag("uicore/tags/timestamp.html")

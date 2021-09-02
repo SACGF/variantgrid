@@ -4,6 +4,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, classification_import_upload_view, \
     classification_accumulation_graph
+from classification.views.classification_import_upload_view import UploadedFileLabColumns
 from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
@@ -35,6 +36,8 @@ urlpatterns = [
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),
+    perm_path('classification/import_upload/<int:lab_id>', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload_lab"),
+    perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedFileLabColumns), name='classification_import_upload_datatable'),
 
     perm_path('classification/create', views.create_classification, name='create_classification'),
     perm_path('classification/create_from_hgvs/<genome_build_name>/<hgvs_string>', views.create_classification_from_hgvs, name='create_classification_from_hgvs'),

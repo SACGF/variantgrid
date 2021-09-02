@@ -17,6 +17,11 @@ AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
 
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
+aws_s3_dict = get_s3_secrets()
+AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
+    [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
+AWS_DEFAULT_ACL = None
+
 CLINVAR_EXPORT = get_clinvar_export_secrets()
 
 SYNC_DETAILS = get_shariant_sync_secrets()
