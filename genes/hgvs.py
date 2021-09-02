@@ -487,8 +487,8 @@ class HGVSMatcher:
             attempts = ", ".join(hgvs_methods)
             if variant_tuple is None:
                 raise ValueError(f"Could not convert {hgvs_string} - tried: {attempts}")
-            else:
-                logging.debug("HGVS methods tried: %s", attempts)
+            # else:
+            # logging.debug("HGVS methods tried: %s", attempts)
         else:
             variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string, None)
 
@@ -637,8 +637,8 @@ class HGVSMatcher:
             attempts = ", ".join(hgvs_methods)
             if hgvs_name is None:
                 raise ValueError(f"Could not convert {variant} to HGVS - tried: {attempts}")
-            else:
-                logging.warning("HGVS methods tried: %s", attempts)
+            # else:
+            #    logging.warning("HGVS methods tried: %s", attempts)
         else:
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                     transcript=None, max_allele_length=sys.maxsize)
