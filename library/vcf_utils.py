@@ -1,11 +1,13 @@
-import numpy as np
 import operator
 import os
 import re
 from collections import defaultdict
 from typing import Tuple
 
+import numpy as np
 import vcf
+
+from snpdb.models import Variant
 
 
 class VCFConstant:
@@ -62,7 +64,10 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     with open(vcf_filename, "wt") as f:
         f.write(header + "\n")
         for vcf_record in vcf_tuples:
-            line = "\t".join([str(s) for s in vcf_record]) + empty_columns
+            (chrom, position, id_col, ref, alt) = vcf_record
+            if alt == Variant.REFERENCE_ALT:
+                alt = "."
+            line = "\t".join((chrom, str(position), str(id_col), ref, alt)) + empty_columns
             f.write(line + "\n")
 
 

@@ -106,7 +106,6 @@ class InstallInstructionsTag(template.Node):
             div_css_classes.append("not-installed")
             div_css_classes.append("show")
 
-
         return f"""
         <div>
         <a class='{' '.join(link_css_classes)}' data-toggle='collapse' href='#{id_safe}' {link_extra}><i class="fas fa-key" aria-hidden="true"></i> {label_str} Install/Update Instructions</a>

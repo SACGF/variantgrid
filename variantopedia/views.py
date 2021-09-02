@@ -515,7 +515,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         # If we require a ClinGen call (eg have Allele but no ClinGen, and settings say we can get it then don't
         # provide the data so we will do an async call)
         if not variant_allele.needs_clingen_call():
-            logging.info("Skipping as we need clinvar call")
             variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
 
     variant_tags = []

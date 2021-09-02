@@ -30,8 +30,7 @@ from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, Proces
 
 LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = r"^([^:]+):(\d+)$"
-VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>([GATC]+)$", re.IGNORECASE)
-REF_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>= \(ref\)$", re.IGNORECASE)
+VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 
 allele_validate_signal = django.dispatch.Signal(providing_args=["allele"])
 
@@ -393,6 +392,10 @@ class Variant(models.Model):
     @property
     def is_deletion(self) -> bool:
         return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length > self.alt.length
+
+    @property
+    def can_have_clingen_allele(self) -> bool:
+        return self.is_standard_variant or self.is_reference
 
     @property
     def can_have_annotation(self) -> bool:

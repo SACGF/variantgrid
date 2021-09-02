@@ -255,8 +255,8 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
         Successful calls link variants in all builds (that exist)
         errors are only stored on the requesting build """
 
-    if not variant.is_standard_variant:
-        msg = f"No ClinGenAllele for non-standard variant: {variant}"
+    if not variant.can_have_clingen_allele:
+        msg = f"No ClinGenAllele for variant: {variant}"
         raise ClinGenAlleleAPIException(msg)
 
     try:
@@ -273,7 +273,7 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, genome_build))
+                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build))
     return va
 
 
@@ -310,7 +310,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, genome_build),
+                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build),
                                               error=api_response)
 
     else:
@@ -414,7 +414,6 @@ def get_clingen_allele_from_hgvs(hgvs_string, clingen_api: ClinGenAlleleRegistry
     return clingen_list[0]
 
 
-
 def link_allele_to_existing_variants(allele: Allele, conversion_tool,
                                      known_variants=None) -> Dict[GenomeBuild, VariantAllele]:
     """ known_variants - be able to pass in variants you already know are linked to Allele. Workaround to deal with
@@ -442,7 +441,7 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
                     raise
 
             if variant:
-                defaults = {"origin": AlleleOrigin.variant_origin(variant, genome_build),
+                defaults = {"origin": AlleleOrigin.variant_origin(variant, allele, genome_build),
                             "conversion_tool": conversion_tool}
                 va, _ = VariantAllele.objects.get_or_create(variant=variant,
                                                             genome_build=genome_build,

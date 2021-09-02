@@ -38,9 +38,6 @@ def view_hgvs_issues(request: HttpRequest) -> Response:
     allele_missing_rep_qs = FlagCollection.filter_for_open_flags(qs=alleles_qs, flag_types=[allele_flag_types.missing_37, allele_flag_types.missing_38])
 
     allele_missing_clingen = alleles_qs.filter(clingen_allele__isnull=True)
-    # There are no ClinGen Allele Registry records for reference variants in GRCh38 (still want refs in other builds)
-    va_ref_38 = VariantAllele.objects.filter(genome_build=GenomeBuild.grch38(), variant__alt__seq=Variant.REFERENCE_ALT)
-    allele_missing_clingen.exclude(variantallele__in=va_ref_38)
     allele_37_not_38 = FlagCollection.filter_for_open_flags(qs=alleles_qs, flag_types=[allele_flag_types.allele_37_not_38])
 
     vcqs = Classification.objects.filter(withdrawn=False)
