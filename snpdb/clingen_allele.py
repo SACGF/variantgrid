@@ -149,7 +149,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     qs = VariantAllele.objects.filter(variant__in=variants).values_list("variant_id", flat=True)
     variant_ids_with_allele = set(qs)
 
-    reference_variant_ids_without_alleles = []
+    skip_variant_ids_without_alleles = []
     # These are kept in sync
     variant_ids_without_alleles = []
     variant_hgvs = []
@@ -162,8 +162,8 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     for v in variants:
         variant_id = v.pk
         if variant_id not in variant_ids_with_allele:
-            if v.is_reference:
-                reference_variant_ids_without_alleles.append(variant_id)
+            if v.can_have_clingen_allele:
+                skip_variant_ids_without_alleles.append(variant_id)
             else:
                 variant_ids_without_alleles.append(variant_id)
                 variant_hgvs.append(hgvs_matcher.variant_to_g_hgvs(v))
@@ -175,12 +175,12 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                   genome_build, num_existing_records, num_no_record)
 
     variant_id_allele_error: List[Tuple[int, Allele, Optional[str]]] = []
-    if num_ref := len(reference_variant_ids_without_alleles):
-        logging.debug("%d reference variants", num_ref)
-        empty_alleles = [Allele() for _ in range(num_ref)]
+    if num_skip := len(skip_variant_ids_without_alleles):
+        logging.debug("%d variants skipping ClingenAlleleRegistry", num_skip)
+        empty_alleles = [Allele() for _ in range(num_skip)]
         reference_alleles = Allele.objects.bulk_create(empty_alleles)
         variant_id_allele_error.extend(((variant_id, allele, None) for variant_id, allele in
-                                        zip(reference_variant_ids_without_alleles, reference_alleles)))
+                                        zip(skip_variant_ids_without_alleles, reference_alleles)))
 
     if variant_hgvs:
         # Create Allele / ClinGenAlleles if they don't exist
