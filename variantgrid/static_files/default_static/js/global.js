@@ -681,6 +681,13 @@ TableFormat.limit = (limit, data, type, row) => {``
     }
     return data;
 };
+TableFormat.text = (data, type, row) => {
+    if (data === '' || data === null) {
+        return $('<span/>', {class:'no-value', text:'-'}).prop('outerHTML');
+    } else {
+        return data;
+    }
+}
 TableFormat.preview = (columns, data, type, row) => {
     let dom = $('<div>');
     let hasValue = false;

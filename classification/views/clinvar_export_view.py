@@ -225,7 +225,8 @@ def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpRespo
 
             url = get_url_from_view_path(row.get_absolute_url())
             yield delimited_row([
-                row.id, url,
+                row.id,
+                url,
                 genome_build or "",
                 c_hgvs or "",
                 condition_umbrella or "",

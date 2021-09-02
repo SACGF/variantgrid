@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.views import View
 
 from classification.models.upload_file_lab import UploadedFileLab, UploadedFileLabStatus
+from library.django_utils import get_url_from_view_path
 from library.log_utils import report_event, NotificationBuilder
 from library.utils import filename_safe
 from snpdb.models import Lab
@@ -25,7 +26,7 @@ class UploadedFileLabColumns(DatatableConfig[UploadedFileLab]):
             RichColumn(key="filename", orderable=True),
             RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="status", label="Status", orderable=True, renderer=lambda x: UploadedFileLabStatus(x["status"]).label),
-            RichColumn(key="comment")
+            RichColumn(key="comment", client_renderer='TableFormat.text')
         ]
 
     def get_initial_queryset(self) -> QuerySet[UploadedFileLab]:
@@ -108,7 +109,7 @@ class FileUploadView(View):
                         status = UploadedFileLabStatus.AutoProcessed
 
                 user: User = requests.user
-                UploadedFileLab.objects.create(
+                uploaded_file = UploadedFileLab.objects.create(
                     url=file_url,
                     filename=file_obj.name,
                     user=requests.user,
@@ -116,6 +117,7 @@ class FileUploadView(View):
                     status=status
                 )
 
+                admin_url = get_url_from_view_path(f"/admin/classification/uploadedfilelab/{uploaded_file.pk}/change")
                 notifier = NotificationBuilder(
                     message="File Uploaded",
                     emoji=":file_folder:"
@@ -123,7 +125,7 @@ class FileUploadView(View):
                     add_field("For Lab", lab.name).\
                     add_field("By User", user.username).\
                     add_field("Path", "s3://" + bucket + "/" + file_path_within_bucket).\
-                    add_markdown(f"*URL:* <{file_url}>")
+                    add_markdown(f"*URL:* <{admin_url}>")
 
                 if status == UploadedFileLabStatus.AutoProcessed:
                     notifier.add_markdown("This file should be automatically processed.")

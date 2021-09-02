@@ -2,6 +2,7 @@
 {% load static %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
+{% load ui_help %}
 {% load js_tags %}
 {% load datatable_tags %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
@@ -18,7 +19,22 @@
 {% endblock %}
 {% block content %}
     <div class="container">
-        <h3>Classifications Upload</h3>
+        {% page_help_embedded title="Classifications Upload" %}
+            <p>This page allows you to upload classification data to be shared within {{ site_name }}.</p>
+            {% if selected_lab.upload_location %}
+                {% if selected_lab.upload_auto_pattern %}
+                    <p>After uploading a file in the right format it will begin automatically importing classifications.
+                        Depending on the size of your file it may take between a minute to an hour to process the entire file.
+                    </p>
+                {% else %}
+                    <p>{{ site_name }} administrators will be notified once your file is uploaded.<br/>
+                    They will then be able to process the file, you can check the status of your uploads in the table below.<br/>
+                    Please allow a business day for your file to be processed.</p>
+                {% endif %}
+            {% else %}
+                This lab has not been configured for uploads yet. Please contact a {{ site_name }} administrator if you'd like to upload a file.
+            {% endif %}
+        {% end_page_help_embedded %}
         {% if labs %}
             <div class="btn-group mb-4" role="group" aria-label="Lab">
                 {% for lab in labs %}<a type="button" href="{% url 'classification_import_upload_lab' lab.pk %}" class="btn {% if selected_lab.pk == lab.pk %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ lab.name }}</a>{% endfor %}
