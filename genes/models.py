@@ -662,6 +662,28 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return TranscriptVersion.objects.filter(**kwargs)
 
     @staticmethod
+    def filter_best_transcripts_by_accession(genome_build: GenomeBuild, transcript_accession) -> QuerySet['TranscriptVersion']:
+        """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order
+              * If transcript_accession has a version, use that version -> latest in order
+              * If transcript_accession has no version, go from latest -> earliest
+        """
+        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        kwargs = {
+            "genome_build": genome_build,
+            "transcript_id": transcript_id,
+        }
+        if version:
+            order_by = "version"
+            if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT:
+                kwargs["version__gte"] = version
+            else:
+                kwargs["version"] = version
+        else:
+            order_by = "-version"
+
+        return TranscriptVersion.objects.filter(**kwargs).order_by(order_by)
+
+    @staticmethod
     def raise_bad_or_missing_transcript(genome_build: GenomeBuild, identifier, version):
         """ Checks whether a transcript we can't match is wrong (their fault) or we don't have it (our fault) """
 

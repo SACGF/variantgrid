@@ -35,11 +35,22 @@ class ClinGenAlleleRegistryException(Exception):
 
 
 class ClinGenAlleleServerException(ClinGenAlleleRegistryException):
-    """ Could not contact server """
-    def __init__(self, method, status_code, reason):
-        msg = f"Error contacting ClinGen Allele Registry. Method: '{method}', Response: {status_code}"
+    """ Could not contact server, or response != 200 """
+    def __init__(self, method, status_code, response_json):
+        print(f"{response_json=}")
+        json_str = ", ".join([f"{k}: {v}" for k, v in response_json.items()])
+        msg = f"Error contacting ClinGen Allele Registry. Method: '{method}', Response: {status_code}, JSON: {json_str}"
         super().__init__(msg)
-        self.description = f'Error connecting to server: {reason}'
+        self.status_code = status_code
+        self.response_json = response_json
+        self.description = json_str
+
+    def is_unknown_reference(self):
+        """ Eg error is they don't have that particular transcript - could retry """
+        if self.status_code == 500:
+            if message := self.response_json.get("message"):
+                return "Unknown reference" in message
+        return False
 
     def get_fake_api_response(self):
         msg = self.args[0]
@@ -52,7 +63,7 @@ class ClinGenAlleleServerException(ClinGenAlleleRegistryException):
 
 
 class ClinGenAlleleAPIException(ClinGenAlleleRegistryException):
-    """ API returned response, but was an error """
+    """ API returned 200 OK, but was an error """
 
 
 class ClinGenAlleleRegistryAPI:
@@ -75,7 +86,7 @@ class ClinGenAlleleRegistryAPI:
     def _check_response(response: requests.Response):
         """ Throws Exception if response status code is not 200 OK """
         if response.status_code != 200:
-            raise ClinGenAlleleServerException(response.request.method, response.status_code, response.reason)
+            raise ClinGenAlleleServerException(response.request.method, response.status_code, response.json())
 
     def _put(self, url, data):
         logging.debug("Calling ClinGen API")
@@ -342,6 +353,7 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
 
     va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     if va.allele.clingen_allele is None:
+        logging.error("ClinGen Allele failed!")
         if va.error:
             clingen_api.check_api_response(va.error)
         if not settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
