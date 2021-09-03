@@ -13,44 +13,34 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <script>
-    function classificationDiscordant(data) {
-        data.flags = JSON.stringify(['classification_discordant']);
-        data.my_labs = "true";
-    }
-    function classificationMatchingVariant(data) {
-        data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
-        data.my_labs = "true";
-    }
-    function classificationComments(data) {
-        data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
-        data.my_labs = "true";
-    }
-    function classificationUnshared(data) {
-        data.flags = JSON.stringify(['classification_unshared']);
-        data.my_labs = "true";
-    }
-    function classificationWithdrawn(data) {
-        data.flags = JSON.stringify(['classification_withdrawn']);
-        data.my_labs = "true";
-    }
-
-    $(document).ready(() => {
-        EKeys.load().then(() => {
+        function classificationDiscordant(data) {
+            data.flags = JSON.stringify(['classification_discordant']);
+            data.my_labs = "true";
+        }
+        function classificationMatchingVariant(data) {
+            data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
+            data.my_labs = "true";
+        }
+        function classificationComments(data) {
+            data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
+            data.my_labs = "true";
+        }
+        function classificationUnshared(data) {
+            data.flags = JSON.stringify(['classification_unshared']);
+            data.my_labs = "true";
+        }
+        function classificationWithdrawn(data) {
+            data.flags = JSON.stringify(['classification_withdrawn']);
+            data.my_labs = "true";
+        }
+        $(document).ready(() => {
             $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
                 Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
             });
-
-            {% datatable_definition table_config=datatable_config data='classificationDiscordant' table_id='classifications-discordant' url='classification_datatables' %}
-            {% datatable_definition table_config=datatable_config data='classificationMatchingVariant' table_id='classifications-matching' url='classification_datatables' %}
-            {% datatable_definition table_config=datatable_config data='classificationComments' table_id='classifications-comment' url='classification_datatables' %}
-            {% datatable_definition table_config=datatable_config data='classificationUnshared' table_id='classifications-unshared' url='classification_datatables' %}
-            {% datatable_definition table_config=datatable_config data='classificationWithdrawn' table_id='classifications-withdrawn' url='classification_datatables' %}
-
             $('.dataTable').on('draw.dt', () => {
                 Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
             });
         });
-    });
     </script>
 {% endblock %}
 
@@ -80,25 +70,24 @@
 
         <div class="mt-4">
             {% ui_register_tab_embedded tab_set="classification_issues" label="Discordance" badge=counts.classifications.discordant %}
-                {% datatable table_config=datatable_config table_id='classifications-discordant' class_name='sticky-header classification-table' %}
+                {% datatable_complete table_config=datatable_config data='classificationDiscordant' table_id='classifications-discordant' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=counts.classifications.comments %}
-                {% datatable table_config=datatable_config table_id='classifications-comment' class_name='sticky-header classification-table' %}
+                {% datatable_complete table_config=datatable_config data='classificationMatchingVariant' table_id='classifications-matching' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=counts.classifications.variant_matching %}
-                {% datatable table_config=datatable_config table_id='classifications-matching' class_name='sticky-header classification-table' %}
+                {% datatable_complete table_config=datatable_config data='classificationComments' table_id='classifications-comment' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=counts.classifications.unshared %}
-                {% datatable table_config=datatable_config table_id='classifications-unshared' class_name='sticky-header classification-table' %}
+                {% datatable_complete table_config=datatable_config data='classificationUnshared' table_id='classifications-unshared' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=counts.classifications.withdrawn %}
-                {% datatable table_config=datatable_config table_id='classifications-withdrawn' class_name='sticky-header classification-table' %}
+                {% datatable_complete table_config=datatable_config data='classificationWithdrawn' table_id='classifications-withdrawn' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
             {% end_ui_register_tab_embedded %}
-
 
             {% ui_render_tabs tab_set="classification_issues" %}
         </div>
