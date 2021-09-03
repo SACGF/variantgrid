@@ -175,6 +175,9 @@ class Flag(TimeStampedModel):
         )
         flag_comment_action.send(sender=Flag, flag_comment=fc, old_resolution=old_resolution)
 
+    def __str__(self):
+        return f"{self.flag_type} ({self.resolution})"
+
 
 class FlagInfos:
 
