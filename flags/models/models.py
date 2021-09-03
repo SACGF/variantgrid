@@ -11,7 +11,7 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from collections import defaultdict
 from lazy import lazy
-from typing import Tuple, List, Optional, Union, Dict, Iterable, Any
+from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar
 import datetime
 import django.dispatch
 
@@ -302,14 +302,17 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             qs = qs.filter(FlagCollection.Q_OPEN_FLAGS)
         return qs
 
+    QST = TypeVar("QST", bound='FlagsMixin')
+
     @staticmethod
-    def filter_for_open_flags(qs: QuerySet['FlagsMixin'], flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet:
+    def filter_for_open_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet[QST]:
         """
         Takes the QuerySet and returns a filtered version where the item contain at least one of the provided flag_types
         e.g. if you passed in a QuerySet of Alleles and a missing 38 flag type, the resulting QuerySet will still be Alleles
         @param flag_types if provided one of these flag types have to be included (otherwise any open flag can be included)
         @param exclude_flag_types if provided then these flags can't be included (typically used with withdrawn)
         """
+
         open_flag_collections = Flag.objects.filter(FlagCollection.Q_OPEN_FLAGS)
         if flag_types:
             open_flag_collections = open_flag_collections.filter(flag_type__in=flag_types)

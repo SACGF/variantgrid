@@ -3,12 +3,12 @@ import io
 import operator
 import math
 import uuid
+import inspect
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from operator import attrgetter
 from urllib.parse import urlparse
-
 from bs4 import BeautifulSoup
 from dateutil import parser
 from decimal import Decimal
@@ -30,6 +30,8 @@ from django.conf import settings
 from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
+
+from uicore.json.json_types import JsonObjType
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
@@ -765,3 +767,56 @@ def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P]
         else:
             fails.append(element)
     return passes, fails
+
+
+def export_column(label: Optional[str] = None):
+    """
+    Extend ExportRow and annotate methods with export_column.
+    The order of defined methods determines the order that the results will appear in an export file
+    :param label: The label that will appear in the CSV header
+    """
+
+    def decorator(method):
+        def wrapper(*args, **kwargs):
+            return method(*args, **kwargs)
+        # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
+        wrapper.line_number = inspect.getsourcelines(method)[1]
+        wrapper.label = label
+        wrapper.__name__ = method.__name__
+        wrapper.is_export = True
+        return wrapper
+    return decorator
+
+
+class ExportRow:
+
+    @staticmethod
+    def get_export_methods(cls):
+        if not hasattr(cls, 'export_methods'):
+            export_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_export', False))]
+            export_methods.sort(key=lambda x: x.line_number)
+
+            cls.export_methods = export_methods
+
+            if not cls.export_methods:
+                raise ValueError(f"ExportRow class {cls} has no @export_columns")
+        return cls.export_methods
+
+    @classmethod
+    def csv_header(cls) -> List[str]:
+        row = list()
+        for method in ExportRow.get_export_methods(cls):
+            row.append(method.label or method.__name__)
+        return row
+
+    def to_csv(self) -> List[str]:
+        row = list()
+        for method in ExportRow.get_export_methods(self.__class__):
+            row.append(method(self))
+        return row
+
+    def to_json(self) -> JsonObjType:
+        row = dict()
+        for method in ExportRow.get_export_methods(self.__class__):
+            row[method.__name__] = method(self)
+        return row
