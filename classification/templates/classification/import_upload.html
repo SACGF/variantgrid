@@ -36,7 +36,7 @@
             {% endif %}
         {% end_page_help_embedded %}
         {% if labs %}
-            <div class="btn-group mb-4" role="group" aria-label="Lab">
+            <div class="btn-group mb-4" style="flex-wrap: wrap" role="group" aria-label="Lab">
                 {% for lab in labs %}<a type="button" href="{% url 'classification_import_upload_lab' lab.pk %}" class="btn {% if selected_lab.pk == lab.pk %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ lab.name }}</a>{% endfor %}
             </div>
             {% if selected_lab.upload_location %}
