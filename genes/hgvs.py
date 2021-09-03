@@ -16,12 +16,13 @@ from typing import List, Optional, Tuple
 import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
+from django.core.cache import cache
 from lazy import lazy
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
 
-from annotation.models import VariantAnnotationVersion
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
+from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
     ClinGenAlleleRegistryException, ClinGenAlleleServerException, ClinGenAlleleAPIException
@@ -452,6 +453,23 @@ class HGVSMatcher:
         """ Some transcripts align with gaps to the genome, and thus we can't use PyHGVS (which uses exons + CDS) """
         return not transcript_version.alignment_gap and transcript_version.has_valid_data
 
+    @staticmethod
+    def _get_clingen_allele_registry_key(transcript_version: TranscriptVersion) -> str:
+        return f"clingen_allele_registry_unknown_reference_{transcript_version.accession}"
+
+    @staticmethod
+    def _clingen_allele_registry_ok(transcript_version: TranscriptVersion) -> bool:
+        """ So we don't keep hammering their server for the same transcript they don't have, we store in Redis
+            cache that they don't have that transcript - this expires over time so we'll check again in case
+            they updated their references and now have it """
+        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_version)
+        return not cache.get(key)
+
+    @staticmethod
+    def _set_clingen_allele_registry_missing_transcript(transcript_version: TranscriptVersion):
+        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_version)
+        cache.set(key, True, timeout=WEEK_SECS)
+
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
         """ VariantCoordinate.chrom = Contig name """
 
@@ -466,7 +484,7 @@ class HGVSMatcher:
                 if self._pyhgvs_ok(tv): # Attempt to use PyHGVS 1st as it's faster
                     hgvs_methods.append(f"PyHGVS: {hgvs_string_for_version}")
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
-                elif attempt_clingen:
+                elif attempt_clingen and self._clingen_allele_registry_ok(tv):
                     error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry"
                     try:
                         hgvs_methods.append(f"ClinGenAllele Registry: {hgvs_string_for_version}")
@@ -476,7 +494,9 @@ class HGVSMatcher:
                         logging.error(error_message, cga_api)
                     except ClinGenAlleleServerException as cga_se:
                         # If it's unknown reference we can just retry with another version, other errors are fatal
-                        if not cga_se.is_unknown_reference():
+                        if cga_se.is_unknown_reference():
+                            self._set_clingen_allele_registry_missing_transcript(tv)
+                        else:
                             logging.error(error_message, cga_se)
                             attempt_clingen = False
                 if variant_tuple:
@@ -539,7 +559,8 @@ class HGVSMatcher:
 
     @staticmethod
     def can_shrink_long_ref(hgvs_name, max_allele_length=10) -> bool:
-        SHRINKABLE_MUTATION_TYPES = {"del", "dup"}  # "delins" in more complicated than just removing ref_allele as alt_allele can be massive too
+        # "delins" in more complicated than just removing ref_allele as alt_allele can be massive too
+        SHRINKABLE_MUTATION_TYPES = {"del", "dup"}
         return hgvs_name.mutation_type in SHRINKABLE_MUTATION_TYPES and \
                len(hgvs_name.ref_allele) > max_allele_length
 
