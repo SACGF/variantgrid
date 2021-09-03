@@ -6,6 +6,7 @@ from django_extensions.db.models import TimeStampedModel
 import re
 
 from lazy import lazy
+from pyhgvs import HGVSName
 
 from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild, Contig
@@ -87,7 +88,25 @@ class ClinGenAllele(TimeStampedModel):
                     return p_hgvs
         return None
 
-    def get_c_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str], Optional[Dict]]:
+    def get_c_hgvs(self, transcript_accession):
+        """ c.HGVS has reference bases on it """
+        hgvs_string = None
+        raw_hgvs_string, t_data = self._get_raw_c_hgvs_and_data(transcript_accession)
+        if raw_hgvs_string:  # Has for this transcript version
+            hgvs_name = HGVSName(raw_hgvs_string)
+            hgvs_name.gene = t_data.get("geneSymbol")
+            if hgvs_name.mutation_type in {"dup", "del", "delins"}:
+                coord = t_data["coordinates"][0]
+                if hgvs_name.mutation_type == "dup":
+                    clingen_key = "allele"
+                else:
+                    clingen_key = "referenceAllele"
+                hgvs_name.ref_allele = coord[clingen_key]
+            hgvs_string = hgvs_name.format()
+        return hgvs_string
+
+    def _get_raw_c_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],
+                                                                                          Optional[Dict]]:
         if ta := self._get_transcript_allele(transcript_accession, match_version):
             transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
             for t_hgvs in ta["hgvs"]:
