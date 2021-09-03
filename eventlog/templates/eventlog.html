@@ -34,7 +34,8 @@
         $(document).ready(() => {
             $("select#predefined-filters").change(applyFilters);
             $("#exclude-admin").click(applyFilters);
-            {% datatable_definition table_config=datatable_config table_id='event-datatable' url='event_log_datatable' data='datatableFilter' responsive=True %}
+
+            {% datatable_complete table_config=datatable_config table_id='event-datatable' class_name='event-table sticky-header' data='datatableFilter' responsive=True %}
         });
     </script>
     <style>
@@ -86,6 +87,6 @@
 
         </form>
 
-        {% datatable datatable_config 'event-datatable' class_name='event-table responsive sticky-header' %}
+        <table id="event-datatable"></table>
     </div>
 {% endblock content %}

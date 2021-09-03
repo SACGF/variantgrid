@@ -153,6 +153,7 @@ class DatatableConfig(Generic[DC]):
     and how the server will send data to it via ajax (via BaseDatatableView)
     """
 
+    data_view: str = None  # view name of what the html/js DataTable should connect to
     search_box_enabled: bool = False
     rich_columns: List[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method

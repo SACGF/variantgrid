@@ -1,0 +1,141 @@
+{% load js_tags %}
+{% comment %}Convert this all to a pure JavaScript function that takes a dictionary input{% endcomment %}
+$(document).ready(function() {
+    let tableId = '{{table_id}}';
+    let tableDom = $(`#${tableId}`);
+
+    tableDom.css('width', '100%');
+    tableDom.addClass('table');
+    tableDom.addClass('stripe');
+    tableDom.addClass('dataTable');
+    {% if class_name %}
+        tableDom.addClass('{{ class_name }}');
+    {% endif %}
+    {% if expandable %}
+        tableDom.addClass('expandable');
+    {% endif %}
+    let tHead = $('<thead/>').appendTo(tableDom);
+    let tHeadRow = $('<tr/>').appendTo(tHead);
+    {% for rc in rich_columns %}
+        $('<th/>', {class: '{{ rc.css_classes }}', html: "{{ rc.label }}"}).appendTo(tHeadRow);
+    {% endfor %}
+
+
+    let lengthKey = `datatable_length_${tableId}`;
+    let lengthValue = parseInt(localStorage.getItem(lengthKey)) || 10;
+
+    let datatable = tableDom.DataTable({
+        {% if responsive %}
+        responsive: {
+            details: {
+                type: 'column',
+                target: 'td.dt-preview',
+                renderer: TableFormat.detailRenderer
+            }
+        },
+        {% endif %}
+        processing: true,
+        serverSide: true,
+        pageLength: lengthValue,
+        dom: '<"top"><"toolbar"<"custom">{% if search_box_enabled %}f{% endif %}>rt<"bottom"ilp><"clear">',
+        {% if sort_order %}
+        order: {{ sort_order | jsonify }},
+        {% endif %}
+        {% if hide_filter_count %}
+        language: {
+            infoFiltered: ""
+        },
+        {% endif %}
+        ajax: {
+            url: '{% url url %}',
+            type: 'POST',
+            {% if data %}data: {{ data | safe }},{% endif %}
+        },
+        bFilter: {{ search_box_enabled | jsonify }},
+        columnDefs: [{% for rc in rich_columns %}
+            {
+            {% if rc.client_renderer %}render: {{rc.client_renderer | safe }}, {% endif %}
+            {% if rc.client_renderer_td %}createdCell: {{ rc.client_renderer_td | safe }}, {% endif %}
+            data: '{{ rc.name }}',
+            orderable: {% if rc.orderable %}true{%else%}false{%endif%},
+            className: '{{ rc.css_classes }}{% if forloop.first and expand_client_renderer %} toggle-link{% endif %}',
+            visible: {{ rc.visible | jsonify }},
+            targets: {{ forloop.counter0 }}
+            },
+        {% endfor %}]
+    });
+    {% if expand_client_renderer %}
+        let expandedTr = null;
+        let expandedRow = null;
+        let hoverTimeout = null;
+        tableDom.on('click', 'tr', function() {
+            let tr = $(this); //.closest('tr');
+            if (!tr.hasClass('odd') && !tr.hasClass('even')) {
+                // not a regular row
+                return;
+            }
+            let row = datatable.row( tr );
+            if ( row.child.isShown() ) {
+                // This row is already open - close it
+                row.child.hide();
+                tr.removeClass('shown');
+
+                expandedRow = null;
+                expandedTr = null;
+            } else {
+                // Close previous row (if there is one)
+                try {
+                    if (expandedRow && expandedTr) {
+                        expandedRow.child.hide();
+                        expandedTr.removeClass('shown');
+                    }
+                } catch (ex) {
+                    // no-op
+                }
+                expandedRow = row;
+                expandedTr = tr;
+
+                if (!tr.hasClass('loaded')) {
+                    // loading hasn't started yet, load the row
+                    let childHtml = {{ expand_client_renderer | safe }}(row.data());
+                    row.child( childHtml );
+                    tr.addClass('loaded');
+                }
+                // show the row
+                row.child.show();
+                tr.addClass('shown');
+            }
+        });
+        // PRE-FETCH data
+        // if hovering over a single row for 500ms, pre-fetch the client data ready to display
+        tableDom.on('mouseenter', 'tr', function() {
+            let tr = $(this);
+            if (!tr.hasClass('odd') && !tr.hasClass('even') || tr.hasClass('loaded')) {
+                return; // either not an odd or even row, or already
+            }
+            window.clearTimeout(hoverTimeout);
+            hoverTimeout = window.setTimeout(() => {
+                if (!tr.hasClass('loaded')) { // could have been clicked on
+                    let row = datatable.row( tr );
+                    let childHtml = {{ expand_client_renderer | safe }}(row.data());
+                    row.child( childHtml );
+                    tr.addClass('loaded');
+                    tr.addClass('pre-fetched'); // in case we ever want to do stats on it
+                }
+            }, 500);
+        });
+        tableDom.on('mouseleave', 'tr', function() {
+            window.clearTimeout(hoverTimeout);
+        });
+    {% endif %}
+    tableDom.on( 'error.dt', function ( e, settings, techNote, message ) {
+        Rollbar.warning("DataTables error " + message);
+        console.log( 'An error has been reported by DataTables: ', message );
+    });
+    $(`select[name=${tableId}_length]`).change(function() {
+        localStorage.setItem(lengthKey, $(this).val());
+    });
+    // move any externally defined toolbar elements onto it
+
+    $(`[data-toolbar="#${tableId}"]`).detach().appendTo($(`#${tableId}`).closest('.dataTables_wrapper').find('.toolbar .custom'));
+});
