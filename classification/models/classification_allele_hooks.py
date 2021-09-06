@@ -1,5 +1,6 @@
 from django.dispatch.dispatcher import receiver
 
+from flags.models import FlagStatus
 from genes.hgvs import HGVSMatcher
 from snpdb.models import GenomeBuild
 from snpdb.models.flag_types import allele_flag_types
@@ -15,19 +16,23 @@ def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-a
     if v37 and v38:
         matcher37 = HGVSMatcher(genome_build=GenomeBuild.grch37())
         matcher38 = HGVSMatcher(genome_build=GenomeBuild.grch38())
-        transcripts = set()
-        existing_flags = allele.flags_of_type(allele_flag_types.allele_37_not_38).values_list('data__transcript',
-                                                                                              flat=True)
-        for transcript in existing_flags:
-            if transcript:
-                transcripts.add(transcript)
+        classification_transcripts = set()
         vc: Classification
         for vc in vcs:
-            transcript = vc.transcript
-            if transcript:
-                transcripts.add(transcript)
+            if transcript := vc.transcript:
+                classification_transcripts.add(transcript)
 
-        for transcript in transcripts:
+        # There may be open flags against transcripts no longer used in classifications - remove them
+        for flag in allele.flags_of_type(allele_flag_types.allele_37_not_38).filter(resolution__status=FlagStatus.OPEN):
+            if transcript := flag.data.get("transcript"):
+                if transcript not in classification_transcripts:
+                    allele.close_open_flags_of_type(
+                        allele_flag_types.allele_37_not_38,
+                        data={'transcript': transcript},
+                        comment="Transcript (version) no longer used",
+                    )
+
+        for transcript in classification_transcripts:
             chgvs37 = None
             chgvs38 = None
             try:
