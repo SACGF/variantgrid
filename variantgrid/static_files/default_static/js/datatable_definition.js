@@ -157,6 +157,8 @@ let DataTableDefinition = (function() {
             );
 
             let tableId = this.tableId;
+            let lengthKey = this.lengthKey;
+
             $(`select[name=${tableId}_length]`).change(function() {
                 localStorage.setItem(lengthKey, $(this).val());
             });
