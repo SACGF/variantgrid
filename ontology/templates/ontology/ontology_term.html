@@ -3,32 +3,22 @@
 {% load ui_utils %}
 {% load ui_menu_bars %}
 {% load ontology_tags %}
-{% load datatable_tags %}
 {% load js_tags %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 {% load ui_tabs_builder %}
 {% block title %}{{ term.id }}{% endblock title %}
 {% block content %}
     <script>
-        {% if datatable_config %}
-            function classificationFilter(data, type) {
-                data.ontology_term_id = "{{ term.id }}";
-                return data;
-            }
+        function classificationFilter(data, type) {
+            data.ontology_term_id = "{{ term.id }}";
+            return data;
+        }
 
-            $(document).ready(function() {
-                let tableDom = $('#vc-datatable');
-                if (tableDom.length) {
-                    EKeys.load().then(() => {
-                        {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
-                        let vcDatatable = $('#vc-datatable');
-                        vcDatatable.on('draw.dt', () => {
-                            Flags.instance.init({userId: '{{user.id}}'});
-                        });
-                    });
-                }
+        $(document).ready(function() {
+            let tableDom = $('#vc-datatable').on('draw.dt', () => {
+                Flags.instance.init({userId: '{{user.id}}'});
             });
-        {% endif %}
+        });
     </script>
 
     <div class="container">
@@ -71,7 +61,7 @@
 
                 <div id="relationships" class="collapse {% if relationship_count < 30 %}show{% endif %}">
                 {% if parent_relationships is not None %}
-                    <hr/>
+                    <hr />
                     {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
                         {% if parent_relationships %}
                             {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
@@ -154,7 +144,7 @@
         <div class="container-table mt-4">
             <h4>Classifications</h4>
             Filtering on records with resolved conditions to <b>{{ term }}</b>
-            {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
+            <table id="vc-datatable" class="classification-table" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter'></table>
         </div>
 
         {% if patients_qs.exists %}

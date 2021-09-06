@@ -1,6 +1,4 @@
 {% extends "uicore/page/base.html" %}
-{% load datatable_tags %}
-{% load classification_tags %}
 {% load ui_menu_bars %}
 {% load ui_help %}
 {% block title %}Condition Matching{% endblock %}
@@ -30,12 +28,6 @@
         function applyFilters() {
             $('#condition-text-datatable').DataTable().ajax.reload();
         }
-
-        $(document).ready(() => {
-            EKeys.load().then(() => {
-                {% datatable_definition table_config=datatable_config data='datatableFilter' table_id='condition-text-datatable' url='condition_text_datatable' responsive=True %}
-            });
-        });
     </script>
 {% endblock head %}
 {% block content %}
@@ -73,6 +65,6 @@
                 </div>
             </div>
         </div>
-        {% datatable datatable_config 'condition-text-datatable' class_name='condition-text-datatable responsive sticky-header' %}
+        <table id="condition-text-datatable" class="condition-text-datatable sticky-header" data-datatable-url="{% url 'condition_text_datatable' %}" data-datatable-data="datatableFilter"></table>
     </div>
 {% endblock %}

@@ -152,7 +152,7 @@ class DatatableConfig(Generic[DC]):
     This class both determines how the client side table should be defined (via tags)
     and how the server will send data to it via ajax (via BaseDatatableView)
     """
-    search_box_enabled: bool = False
+    search_box_enabled = False
     rich_columns: List[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
 

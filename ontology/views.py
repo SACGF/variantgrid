@@ -48,7 +48,6 @@ class OntologyTermView(TemplateView):
                 "parent_relationships": LimitedCollection(parent_relationships, 250) if not is_gene else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
                 "child_relationships": LimitedCollection(child_relationships, 250) if not is_gene else None,
-                "datatable_config": ClassificationColumns(self.request),
                 "patients_qs": patients_qs,
             }
 
