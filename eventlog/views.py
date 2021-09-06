@@ -1,3 +1,4 @@
+from django.http import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -26,9 +27,12 @@ def eventlog_view(view_func):
 
 
 def eventlog(request):
-    return render(request, 'eventlog.html', context={
-        'datatable_config': EventColumns(request)
-    })
+    return render(request, 'eventlog.html', context={})
+
+
+def eventlog_detail(request: HttpRequest, pk: int):
+    event = Event.objects.get(pk=pk)
+    return render(request, 'eventlog_detail.html', context={'event': event})
 
 
 @require_POST

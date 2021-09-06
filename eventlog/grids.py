@@ -1,3 +1,5 @@
+from typing import Dict, Any
+
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
@@ -9,20 +11,25 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 class EventColumns(DatatableConfig[Event]):
 
+    def render_data(self, row: Dict[str, Any]):
+        if filename := row.get('filename'):
+            return filename
+        elif detail := row.get('details'):
+            return detail.split('\n', 1)[0]
+
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('date', client_renderer='TableFormat.timestamp', orderable=True, default_sort=SortOrder.DESC),
             RichColumn('severity', client_renderer='severityRenderer', orderable=True),
             RichColumn('user__username', name='user', orderable=True),
             RichColumn('app_name', label='App name', orderable=True),
             RichColumn('name', orderable=True),
-            RichColumn(key=None, name='preview', label='Data',
-                       client_renderer='TableFormat.preview.bind(null, ["filename", "details"])'),
-            RichColumn('id', label='ID', detail=True),
-            RichColumn('filename', detail=True),
-            RichColumn('details', detail=True),
+            RichColumn(name='data', extra_columns=["details", "filename"], renderer=self.render_data, client_renderer='TableFormat.limit.bind(null, 75)'),
+            RichColumn('id', visible=False)
         ]
 
     def get_initial_queryset(self) -> QuerySet[Event]:
