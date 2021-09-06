@@ -56,7 +56,6 @@ def dashboard(request: HttpRequest) -> Response:
     }
 
     context = {
-        "datatable_config": ClassificationColumns(request),
         "labs": labs,
         "counts": issue_counts
     }

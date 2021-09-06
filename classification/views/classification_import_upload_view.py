@@ -45,8 +45,7 @@ class FileUploadView(View):
             selected_lab = labs.get(pk=lab_id)
             context = {
                 "labs": labs,
-                "selected_lab": selected_lab,
-                "datatable_config": UploadedFileLabColumns(request),
+                "selected_lab": selected_lab
             }
             return render(request, 'classification/import_upload.html', context)
         else:

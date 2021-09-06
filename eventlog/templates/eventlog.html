@@ -1,7 +1,5 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_menu_bars %}
-{% load datatable_tags %}
-
 {% block title %}Event Log{% endblock title  %}
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block head %}
@@ -85,6 +83,6 @@
 
         </form>
 
-        {% datatable_complete table_id='event-datatable' class_name='event-table sticky-header' table_config=datatable_config data='datatableFilter' responsive=True %}
+        <table id="event-datatable" class="event-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'event_log_datatable' %}" data-datatable-data="datatableFilter"></table>
     </div>
 {% endblock content %}

@@ -106,7 +106,6 @@ def classifications(request):
         "VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
         "VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
         "VARIANT_CLASSIFICATION_ID_FILTER": settings.VARIANT_CLASSIFICATION_ID_FILTER,
-        "datatable_config": ClassificationColumns(request),
         "user_settings": user_settings,
     }
     return render(request, 'classification/classifications.html', context)

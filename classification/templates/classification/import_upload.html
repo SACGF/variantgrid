@@ -4,7 +4,6 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load js_tags %}
-{% load datatable_tags %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block title %}File Upload{% endblock %}
 {% block head %}
@@ -12,9 +11,6 @@
         function datatableFilter(data) {
             data.lab_id = {{ selected_lab.pk }};
         }
-        $(document).ready(() => {
-            {% datatable_definition table_config=datatable_config table_id='import-datatable' url='classification_import_upload_datatable' data='datatableFilter' responsive=True %}
-        });
     </script>
 {% endblock %}
 {% block content %}
@@ -65,10 +61,10 @@
                     </div>
                 </form>
                 <h4>File Upload History</h4>
-                {% datatable datatable_config 'import-datatable' class_name='import-table responsive sticky-header' %}
+                <table data-datatable-url="{% url 'classification_import_upload_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
 
                 {% else %}
-                    <p>Your lab has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
+                    <p>{{ 'warning' | severity_icon }} Your lab has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
                 {% endif %}
         {% else %}
             <div class="chunk borderless">

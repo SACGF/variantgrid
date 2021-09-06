@@ -71,10 +71,6 @@
             let elem = $('<span>', {html: content});
             return elem.prop('outerHTML');
         };
-        $(document).ready(() => {
-            {% datatable_definition table_config=export_columns data='records' table_id='records' url='clinvar_exports_datatables' %}
-            {% datatable_definition table_config=export_batch_columns data='batches' table_id='batches' url='clinvar_export_batch_datatables' %}
-        });
     </script>
     <style>
         .clinvar-export-table .dt-allele {
@@ -148,13 +144,13 @@
         <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
 
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Records" badge=count_records badge_status='success' %}
-            {% datatable table_config=export_columns table_id='records' class_name='sticky-header clinvar-export-table' %}
+            <table id="records" data-datatable-url="{% url 'clinvar_exports_datatables' %}" data-datatable-data="records" class_name="sticky-header clinvar-export-table"></table>
             <div data-toolbar="#records">
                 <a class="download-link" href="{% url 'clinvar_key_summary_export_download' clinvar_key.pk %}">Download</a>
             </div>
         {% end_ui_register_tab_embedded %}
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Export Batches" badge=count_batch badge_status='success' %}
-            {% datatable table_config=export_batch_columns table_id='batches' class_name='sticky-header clinvar-export-batches-table' %}
+            <table id="batches" data-datatable-url="{% url 'clinvar_export_batch_datatables' %}" data-datatable-data="batches" class="sticky-header clinvar-export-batches-table"></table>
         {% end_ui_register_tab_embedded %}
 
         {% ui_render_tabs tab_set='clinvar_tabs' %}

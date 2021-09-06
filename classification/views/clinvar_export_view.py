@@ -278,8 +278,6 @@ def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> Ht
         'clinvar_key': clinvar_key,
         'labs': labs,
         'missing_condition_count': missing_condition.count(),
-        'export_columns': export_columns,
-        'export_batch_columns': export_batch_columns,
         'count_records': export_columns.get_initial_query_params(clinvar_key=pk).count(),
         'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=pk).count()
     })

@@ -3,10 +3,8 @@
 {% load static %}
 {% load js_tags %}
 {% load compress %}
-{% load datatable_tags %}
 {% load ui_help %}
 {% load ui_menu_bars %}
-
 {% block title %}Classifications{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -130,13 +128,9 @@
             debouncedFilterGrid();
         });
 
-        EKeys.load().then(() => {
-            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' %}
-
-            let vcDatatable = $('#vc-datatable');
-            vcDatatable.on('draw.dt', () => {
-                Flags.instance.init({userId: '{{user.id}}'});
-            });
+        let vcDatatable = $('#vc-datatable');
+        vcDatatable.on('draw.dt', () => {
+            Flags.instance.init({userId: '{{user.id}}'});
         });
     });
 </script>
@@ -222,7 +216,7 @@
         </div>
         <div class="row">
             <div class="col">
-                {% datatable datatable_config 'vc-datatable' class_name='classification-table sticky-header' %}
+                <table id="vc-datatable" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter' class="sticky-header classification-table"></table>
                 <div>
                 Download as
                     <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>,

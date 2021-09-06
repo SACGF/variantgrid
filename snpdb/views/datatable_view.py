@@ -13,7 +13,7 @@ from django.db.models import QuerySet, Q
 from django.http import HttpRequest, QueryDict
 from kombu.utils import json
 from lazy import lazy
-from uicore.json.json_types import JsonDataType
+from uicore.json.json_types import JsonDataType, JsonObjType
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
 from snpdb.views.datatable_mixins import JSONResponseView
@@ -152,8 +152,6 @@ class DatatableConfig(Generic[DC]):
     This class both determines how the client side table should be defined (via tags)
     and how the server will send data to it via ajax (via BaseDatatableView)
     """
-
-    data_view: str = None  # view name of what the html/js DataTable should connect to
     search_box_enabled: bool = False
     rich_columns: List[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
@@ -382,7 +380,36 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         logger.exception(str(e))
         raise e
 
+    def json_definition(self) -> JsonObjType:
+        config = self.config
+
+        data: JsonObjType = {
+            "responsive": any(col.detail for col in config.enabled_columns),
+            "searchBoxEnabled": config.search_box_enabled,
+            "expandClientRenderer": config.expand_client_renderer,
+        }
+        if config.default_sort_order_column:
+            data["order"] = [[config.column_index(config.default_sort_order_column), "asc" if config.default_sort_order_column.default_sort != SortOrder.DESC else "desc"]]
+
+        columns: List[JsonObjType] = []
+        for rc in config.enabled_columns:
+            columns.append({
+                "data": rc.name,
+                "label": rc.label,
+                "render": rc.client_renderer,
+                "createdCell": rc.client_renderer_td,
+                "orderable": rc.orderable,
+                "className": rc.css_classes,
+                "visible": rc.visible,
+            })
+        data["columns"] = columns;
+
+        return data
+
     def get_context_data(self, *args, **kwargs):
+        if definition_request := self.get_query_param("dataTableDefinition"):
+            return self.json_definition()
+
         try:
             self.initialize(*args, **kwargs)
 

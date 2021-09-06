@@ -4,7 +4,6 @@
 {% load js_tags %}
 {% load english_tags %}
 {% load compress %}
-{% load datatable_tags %}
 {% load ui_help %}
 {% load ui_utils %}
 {% load ui_menu_bars %}
@@ -70,23 +69,23 @@
 
         <div class="mt-4">
             {% ui_register_tab_embedded tab_set="classification_issues" label="Discordance" badge=counts.classifications.discordant %}
-                {% datatable_complete table_config=datatable_config data='classificationDiscordant' table_id='classifications-discordant' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
+                <table id="classifications-discordant" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationDiscordant"></table>
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=counts.classifications.comments %}
-                {% datatable_complete table_config=datatable_config data='classificationMatchingVariant' table_id='classifications-matching' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
+                <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=counts.classifications.variant_matching %}
-                {% datatable_complete table_config=datatable_config data='classificationComments' table_id='classifications-comment' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
+                <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=counts.classifications.unshared %}
-                {% datatable_complete table_config=datatable_config data='classificationUnshared' table_id='classifications-unshared' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
+                <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=counts.classifications.withdrawn %}
-                {% datatable_complete table_config=datatable_config data='classificationWithdrawn' table_id='classifications-withdrawn' class_name='sticky-header classification-table' wait_for="EKeys.load()" %}
+                <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
             {% end_ui_register_tab_embedded %}
 
             {% ui_render_tabs tab_set="classification_issues" %}

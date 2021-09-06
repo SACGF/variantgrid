@@ -11,7 +11,6 @@ class EventColumns(DatatableConfig[Event]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.data_view = 'event_log_datatable'
 
         self.rich_columns = [
             RichColumn('date', client_renderer='TableFormat.timestamp', orderable=True, default_sort=SortOrder.DESC),

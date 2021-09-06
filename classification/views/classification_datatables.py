@@ -86,7 +86,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
     def __init__(self, request: HttpRequest):
         self.term_cache: Dict[str, OntologyTerm] = dict()
         super().__init__(request)
-        self.data_view = 'classification_datatables'
 
         user_settings = UserSettings.get_for_user(self.user)
 
