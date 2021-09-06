@@ -61,9 +61,14 @@
 <script>$(document).ready(() => {
     var table = $('#{{ table_id }}').DataTable({
         order: [1, "asc"],
-        dom: '<"top"><"toolbar"<"custom">f>rt<"bottom"ilp><"clear">',
+        dom: '<"top"><"toolbar"<"custom">f>rt<"bottom"<"showing"il>p><"clear">',
         "orderFixed": {
             post: [7, "desc"]
+        },
+        pagingType: "input",
+        classes: {
+            'sPageButton': 'btn btn-outline-primary btn-rnd-rect',
+            'sPageButtonDisabled': 'disabled'
         },
         pageLength: 50,
         responsive: {
