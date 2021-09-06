@@ -139,6 +139,13 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
 .dataTables_wrapper .toolbar .custom {
   flex-grow: 1;
 }
+.dataTables_wrapper .bottom {
+  display: flex;
+  align-items: center;
+}
+.dataTables_wrapper .bottom .showing {
+  flex-grow: 1;
+}
 
 .variant-coordinate {
   word-break: break-all;
@@ -253,19 +260,29 @@ a.list-group-item-action {
 }
 
 .btn-rnd-rect {
-  width: 40px;
-  height: 40px;
-  padding: 7px 8px 7px 12px;
-  border-radius: 15px;
-  text-align: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  margin-right: 4px;
+}
+.btn-rnd-rect i.fas {
+  margin: 0;
 }
 
 .btn-circle {
   width: 50px;
-  height: 50px;
-  padding: 7px 8px 7px 12px;
+  height: 32px;
   border-radius: 25px;
-  text-align: center;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-circle i.fas {
+  margin: 0;
 }
 
 .accordion > .card {

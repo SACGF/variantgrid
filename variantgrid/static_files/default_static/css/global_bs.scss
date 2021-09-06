@@ -160,12 +160,22 @@ table.dataTable td.dataTables_empty {
 table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
     cursor:pointer;
 }
-.dataTables_wrapper .toolbar {
+.dataTables_wrapper {
+  .toolbar {
     display: flex;
     align-items: baseline;
+
     .custom {
-        flex-grow: 1;
+      flex-grow: 1;
     }
+  }
+  .bottom {
+    display: flex;
+    align-items: center;
+    .showing {
+      flex-grow: 1;
+    }
+  }
 }
 
 .variant-coordinate {
@@ -308,18 +318,28 @@ a.list-group-item-action {
     }
 }
 .btn-rnd-rect {
-  width: 40px;
-  height: 40px;
-  padding: 7px 8px 7px 12px;
-  border-radius: 15px;
-  text-align: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  margin-right: 4px;
+    & i.fas {
+    margin: 0;
+  }
 }
 .btn-circle {
   width: 50px;
-  height: 50px;
-  padding: 7px 8px 7px 12px;
+  height: 32px;
   border-radius: 25px;
-  text-align: center;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  & i.fas {
+    margin: 0;
+  }
 }
 
 // Undo this bootstrap so drop downs don't get cut off on classification form
