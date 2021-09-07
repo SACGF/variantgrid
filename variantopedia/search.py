@@ -40,7 +40,7 @@ from variantopedia.models import SearchTypes
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
-HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":(c|g|p)\..*\d+")
+HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":[cgpn]\..*\d+")
 ONTOLOGY_PATTERN = re.compile(r"\w+:\s*.*")
 MAX_RESULTS_PER_TYPE = 50
 
