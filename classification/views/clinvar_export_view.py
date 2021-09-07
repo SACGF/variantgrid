@@ -6,6 +6,7 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.timezone import now
+from lazy import lazy
 from pytz import timezone
 
 from classification.enums import ShareLevel, SpecialEKeys
@@ -14,7 +15,7 @@ from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExpo
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.utils import html_to_text, delimited_row
+from library.utils import html_to_text, delimited_row, export_column, ExportRow
 from snpdb.models import ClinVarKey, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 import json
@@ -201,41 +202,75 @@ def clinvar_export_history(request: HttpRequest, pk) -> HttpResponseBase:
     })
 
 
+class ClinVarExportSummary(ExportRow):
+
+    def __init__(self, clinvar_export: ClinVarExport):
+        self.clinvar_export = clinvar_export
+
+    @property
+    def classification(self):
+        return self.clinvar_export.classification_based_on
+
+    @lazy
+    def genome_build_row(self):
+        if classification := self.classification:
+            try:
+                return classification.get_genome_build()
+            except KeyError:
+                pass
+
+    @export_column("ID")
+    def id(self):
+        return self.clinvar_export.id
+
+    @export_column("URL")
+    def url(self):
+        return get_url_from_view_path(self.clinvar_export.get_absolute_url())
+
+    @export_column("Genome Build")
+    def genome_build(self):
+        return str(self.genome_build_row) if self.genome_build_row else None
+
+    @export_column("c.HGVS")
+    def c_hgvs(self):
+        if genome_build := self.genome_build_row:
+            return self.classification.classification.get_c_hgvs(genome_build)
+
+    @export_column("Condition Umbrella")
+    def condition_umbrella(self):
+        return self.clinvar_export.condition_resolved.as_plain_text
+
+    @export_column("Interpretation Summary")
+    def interpretation_summary(self):
+        if classification := self.classification:
+            return html_to_text(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY))
+
+    @export_column("Clinical Significance")
+    def clinical_significance(self):
+        if classification := self.classification:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+
+    @export_column("Sync Status")
+    def sync_status(self):
+        return self.clinvar_export.get_status_display()
+
+    @export_column("Release Status")
+    def release_status(self):
+        return self.clinvar_export.get_release_status_display()
+
+    @export_column("SCV")
+    def scv(self):
+        return self.clinvar_export.scv
+
+
 def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpResponseBase:
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key)
     clinvar_key.check_user_can_access(request.user)
 
     def rows() -> Iterable[str]:
-        yield delimited_row(["ID", "URL", "Genome Build", "c.HGVS", "Condition Umbrella", "Clinical Significance", "Interpretation Summary", "Sync Status", "Release Status", "SCV"])
-        row: ClinVarExport
-        clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        for row in ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id'):
-            genome_build: Optional[str] = None
-            c_hgvs: Optional[str] = None
-            condition_umbrella: Optional[str] = None
-            interpretation_summary: Optional[str] = None
-            clinical_significance: Optional[str] = None
-            if classification_based_on := row.classification_based_on:
-                genome_build_obj = classification_based_on.get_genome_build()
-                genome_build = str(genome_build_obj)
-                c_hgvs = classification_based_on.classification.get_c_hgvs(genome_build_obj)
-                condition_umbrella = row.condition_resolved.as_plain_text
-                interpretation_summary = html_to_text(classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))
-                clinical_significance = clin_sig_e_key.pretty_value(classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
-
-            url = get_url_from_view_path(row.get_absolute_url())
-            yield delimited_row([
-                row.id,
-                url,
-                genome_build or "",
-                c_hgvs or "",
-                condition_umbrella or "",
-                clinical_significance or "",
-                interpretation_summary or "",
-                row.get_status_display(),
-                row.get_release_status_display(),
-                row.scv])
-            pass
+        return ClinVarExportSummary.csv_generator(
+            ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
+        )
 
     date_str = now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
     response = StreamingHttpResponse(rows(), content_type='text/csv')

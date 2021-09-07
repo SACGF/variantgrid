@@ -809,6 +809,12 @@ class ExportRow:
         return cls.export_methods
 
     @classmethod
+    def csv_generator(cls, data: Iterable[Any]) -> Iterator[str]:
+        yield delimited_row(cls.csv_header())
+        for raw_data in data:
+            yield delimited_row(cls(raw_data).to_csv())
+
+    @classmethod
     def csv_header(cls) -> List[str]:
         row = list()
         for method in ExportRow.get_export_methods(cls):
