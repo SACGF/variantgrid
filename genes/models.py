@@ -733,6 +733,14 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
         return transcript_version
 
+    @staticmethod
+    def get_for_lrg(genome_build: GenomeBuild, lrg_identifier: str) -> Optional['TranscriptVersion']:
+        """ Attempts to load RefSeq TranscriptVersion we have from LRG identifier """
+        transcript_version: Optional[TranscriptVersion] = None
+        if lrg_identifier == "LRG_199t1":
+            transcript_version = TranscriptVersion.get_transcript_version(genome_build, "NM_004006.2")
+        return transcript_version
+
     @property
     def length(self) -> Optional[int]:
         if 'exons' in self.data:
@@ -850,6 +858,35 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     def __str__(self):
         return f"{self.accession} ({self.gene_version.gene_symbol}/{self.genome_build.name})"
+
+
+class LRGRefSeqGene(models.Model):
+    """ A Locus Reference Genomic (LRG) is a manually curated record that contains stable and thus, un-versioned
+        reference sequences designed specifically for reporting sequence variants with clinical implications.
+
+        These map to RefSeq, see https://www.ncbi.nlm.nih.gov/refseq/rsg/lrg/
+
+        We don't link directly to TranscriptVersion as they are per-build """
+    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    lrg = models.TextField()
+    rna = models.TextField()  # RefSeq transcript accession
+    t = models.TextField(null=True)
+    category = models.CharField(max_length=1, choices=GeneSymbolAliasSource.choices)
+
+    class Meta:
+        # LRG_994 has multiple entries for LRG/t as there are multiple protein versions for t1 and t2
+        # But we don't need protein so will ignore that. RNA/t is unique per LRG
+        unique_together = ("lrg", "t")
+
+    @staticmethod
+    def get_transcript_version(genome_build: GenomeBuild, lrg_identifier: str) -> Optional[TranscriptVersion]:
+        """ Attempts to load RefSeq TranscriptVersion we have from LRG identifier """
+        transcript_version: Optional[TranscriptVersion] = None
+        if m := re.match("(LRG_\d+)(t\d+)", lrg_identifier):
+            lrg, t = m.groups()
+            if lrg_ref_seq_gene := LRGRefSeqGene.objects.filter(lrg=lrg, t=t).first():
+                transcript_version = TranscriptVersion.get_transcript_version(genome_build, lrg_ref_seq_gene.rna)
+        return transcript_version
 
 
 class GeneAnnotationRelease(models.Model):

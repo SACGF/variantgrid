@@ -5,13 +5,16 @@ from annotation.models.models import CachedWebResource
 from genes.models import GeneListCategory
 from genes.tasks.cached_web_resource_tasks import PanelAppEnglandPanelsWebResourceTask, \
     PanelAppAustraliaPanelsWebResourceTask, GnomADGeneConstraintWebResourceTask, PfamWebResourceTask, \
-    UniProtWebResourceTask, RefSeqGeneSummaryWebResourceTask, HGNCWebResourceTask
+    UniProtWebResourceTask, RefSeqGeneSummaryWebResourceTask, HGNCWebResourceTask, LRGRefSeqGeneWebResourceTask
 
 # For some reason this doesn't work as a variable, has to be stored here...
 gnomad_gene_constraint_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
                                                                                    GnomADGeneConstraintWebResourceTask)
 
 hgnc_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_HGNC, HGNCWebResourceTask)
+
+lrg_ref_seq_gene_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE,
+                                                                             LRGRefSeqGeneWebResourceTask)
 
 panel_app_england_panels_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
                                                                                      PanelAppEnglandPanelsWebResourceTask)

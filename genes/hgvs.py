@@ -21,7 +21,7 @@ from lazy import lazy
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
 
-from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
+from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol, LRGRefSeqGene
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
 from library.utils import clean_string
@@ -387,17 +387,18 @@ class HGVSMatcher:
 
     def __init__(self, genome_build: GenomeBuild):
         self.genome_build = genome_build
+        self.attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
 
-    def _fix_mito(self, hgvs_name: str) -> Tuple[Contig, str]:
+    def _fix_mito(self, hgvs_string: str) -> Tuple[Contig, str]:
         """ mito contig returned if mito (name possibly changed)
             PyHGVS doesn't support m. yet """
         mitochondria = None
-        if "m." in hgvs_name:
+        if "m." in hgvs_string:
             mitochondria = self.genome_build.contigs.get(molecule_type=AssemblyMoleculeType.MITOCHONDRION)
-            if hgvs_name.startswith("m."):  # Bare ie "m.4409T>C"
-                hgvs_name = mitochondria.refseq_accession + ":" + hgvs_name
-            hgvs_name = hgvs_name.replace(":m.", ":g.")
-        return mitochondria, hgvs_name
+            if hgvs_string.startswith("m."):  # Bare ie "m.4409T>C"
+                hgvs_string = mitochondria.refseq_accession + ":" + hgvs_string
+            hgvs_string = hgvs_string.replace(":m.", ":g.")
+        return mitochondria, hgvs_string
 
     def _get_transcript_version_and_pyhgvs_transcript(self, transcript_name):
         transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
@@ -414,8 +415,8 @@ class HGVSMatcher:
     def _get_pyhgvs_transcript(self, transcript_name):
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
 
-    def _pyhgvs_get_variant_tuple(self, hgvs_name: str, transcript_version):
-        mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
+    def _pyhgvs_get_variant_tuple(self, hgvs_string: str, transcript_version):
+        mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_string)
 
         def get_transcript(_transcript_name):
             # Already know what transcript it is
@@ -429,7 +430,7 @@ class HGVSMatcher:
         contig = self.genome_build.chrom_contig_mappings[chrom]
         if mitochondria and contig != mitochondria:
             reason = f"chrom: {chrom} ({contig}/{contig.get_molecule_type_display()}) is not mitochondrial!"
-            raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
+            raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
         chrom = contig.name
 
         # @see https://varnomen.hgvs.org/bg-material/numbering/
@@ -442,18 +443,62 @@ class HGVSMatcher:
                 tv_end = transcript_version.data["end"]
                 if not (tv_start <= position <= tv_end):
                     reason = f"Outside boundaries of transcript {transcript_version}: {transcript_version.coordinates}"
-                    raise pyhgvs.InvalidHGVSName(hgvs_name, reason=reason)
+                    raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
 
         return chrom, position, ref, alt
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
-        # ClinGen Allele Registry doesn't like gene names - so strip
+        # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)
         hgvs_name = HGVSName(hgvs_string)
-        hgvs_name.gene = None
+        if not self._is_lrg(hgvs_name):
+            hgvs_name.gene = None
         cleaned_hgvs = hgvs_name.format()
 
-        ca = get_clingen_allele_from_hgvs(cleaned_hgvs)
-        return ca.get_variant_tuple(self.genome_build)
+        try:
+            ca = get_clingen_allele_from_hgvs(cleaned_hgvs)
+            return ca.get_variant_tuple(self.genome_build)
+        except ClinGenAlleleAPIException as cga_api:
+            self.attempt_clingen = False
+            raise
+        except ClinGenAlleleServerException as cga_se:
+            # If it's unknown reference we can just retry with another version, other errors are fatal
+            if cga_se.is_unknown_reference():
+                transcript_accession = hgvs_name.transcript or hgvs_name.gene
+                self._set_clingen_allele_registry_missing_transcript(transcript_accession)
+            else:
+                self.attempt_clingen = False
+            raise
+
+    @staticmethod
+    def _is_lrg(hgvs_name: HGVSName) -> bool:
+        return not hgvs_name.transcript and (hgvs_name.gene and hgvs_name.gene.startswith("LRG_"))
+
+    @staticmethod
+    def _lrg_get_hgvs_name_and_transcript_version(genome_build: GenomeBuild, hgvs_string: str):
+        hgvs_name = HGVSName(hgvs_string)
+        lrg_identifier = hgvs_name.gene
+
+        if transcript_version := LRGRefSeqGene.get_transcript_version(genome_build, lrg_identifier):
+            if HGVSMatcher._pyhgvs_ok(transcript_version):
+                logging.info("LRG %s using local transcript version: %s", lrg_identifier, transcript_version)
+                # Replace LRG transcript with local RefSeq
+                hgvs_name.gene = None
+                hgvs_name.transcript = transcript_version.accession
+                return hgvs_name, transcript_version
+        return None, None
+
+    def _lrg_get_variant_tuple(self, hgvs_string: str):
+        new_hgvs_name, transcript_version = self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_string)
+        if new_hgvs_name:
+            new_hgvs_string = new_hgvs_name.format()
+            logging.info("LRG %s - searching for '%s'", hgvs_string, new_hgvs_string)
+            return self._pyhgvs_get_variant_tuple(new_hgvs_string, transcript_version)
+
+        logging.info("LRG %s using ClinGen", hgvs_string)
+        try:
+            return self._clingen_get_variant_tuple(hgvs_string)
+        except ClinGenAlleleRegistryException as cga_re:
+            raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
 
     @staticmethod
     def _pyhgvs_ok(transcript_version: TranscriptVersion) -> bool:
@@ -461,43 +506,46 @@ class HGVSMatcher:
         return not transcript_version.alignment_gap and transcript_version.has_valid_data
 
     @staticmethod
-    def _get_clingen_allele_registry_key(transcript_version: TranscriptVersion) -> str:
-        return f"clingen_allele_registry_unknown_reference_{transcript_version.accession}"
+    def _get_clingen_allele_registry_key(transcript_accession: str) -> str:
+        return f"clingen_allele_registry_unknown_reference_{transcript_accession}"
 
-    @staticmethod
-    def _clingen_allele_registry_ok(transcript_version: TranscriptVersion) -> bool:
+    def _clingen_allele_registry_ok(self, transcript_accession: str) -> bool:
         """ So we don't keep hammering their server for the same transcript they don't have, we store in Redis
             cache that they don't have that transcript - this expires over time so we'll check again in case
             they updated their references and now have it """
-        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_version)
+
+        if not self.attempt_clingen:
+            return False  # Had non-recoverable errors before
+
+        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_accession)
         return not cache.get(key)
 
     @staticmethod
     def _set_clingen_allele_registry_missing_transcript(transcript_version: TranscriptVersion):
-        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_version)
+        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_version.accession)
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
         """ VariantCoordinate.chrom = Contig name """
 
         hgvs_name = HGVSName(hgvs_string)
-        if transcript_accession := hgvs_name.transcript:
-            attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
+        if self._is_lrg(hgvs_name):
+            variant_tuple = self._lrg_get_variant_tuple(hgvs_string)
+        elif transcript_accession := hgvs_name.transcript:
             variant_tuple = None
             hgvs_methods = []
             for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession):
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
-                if self._pyhgvs_ok(tv): # Attempt to use PyHGVS 1st as it's faster
+                if self._pyhgvs_ok(tv):  # Attempt to use PyHGVS 1st as it's faster
                     hgvs_methods.append(f"PyHGVS: {hgvs_string_for_version}")
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
-                elif attempt_clingen and self._clingen_allele_registry_ok(tv):
+                elif self._clingen_allele_registry_ok(tv.accession):
                     error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry"
                     try:
                         hgvs_methods.append(f"ClinGenAllele Registry: {hgvs_string_for_version}")
                         variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
                     except ClinGenAlleleAPIException as cga_api:
-                        attempt_clingen = False
                         logging.error(error_message, cga_api)
                     except ClinGenAlleleServerException as cga_se:
                         # If it's unknown reference we can just retry with another version, other errors are fatal
@@ -505,7 +553,6 @@ class HGVSMatcher:
                             self._set_clingen_allele_registry_missing_transcript(tv)
                         else:
                             logging.error(error_message, cga_se)
-                            attempt_clingen = False
                 if variant_tuple:
                     break
             attempts = ", ".join(hgvs_methods)
@@ -536,11 +583,15 @@ class HGVSMatcher:
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_name: str):
         _mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
-        hgvs = HGVSName(lookup_hgvs_name)
+        hgvs_name = HGVSName(lookup_hgvs_name)
+        if self._is_lrg(hgvs_name):
+            if new_hgvs_name := self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, lookup_hgvs_name)[0]:
+                hgvs_name = new_hgvs_name
+
         transcript = None
-        if hgvs.transcript:
-            transcript = self._get_pyhgvs_transcript(hgvs.transcript)
-        return hgvs, transcript
+        if hgvs_name.transcript:
+            transcript = self._get_pyhgvs_transcript(hgvs_name.transcript)
+        return hgvs_name, transcript
 
     def get_original_and_used_transcript_versions(self, hgvs_name) -> Tuple[str, str]:
         hgvs, transcript = self._get_hgvs_and_pyhgvs_transcript(hgvs_name)
@@ -569,7 +620,7 @@ class HGVSMatcher:
         # "delins" in more complicated than just removing ref_allele as alt_allele can be massive too
         SHRINKABLE_MUTATION_TYPES = {"del", "dup"}
         return hgvs_name.mutation_type in SHRINKABLE_MUTATION_TYPES and \
-               len(hgvs_name.ref_allele) > max_allele_length
+            len(hgvs_name.ref_allele) > max_allele_length
 
     @staticmethod
     def format_hgvs_remove_long_ref(hgvs_name, max_allele_length=10):

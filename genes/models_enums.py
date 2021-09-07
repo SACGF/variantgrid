@@ -17,3 +17,9 @@ class GeneSymbolAliasSource(models.TextChoices):
     UCSC = "U", 'UCSC'
     HGNC = "H", 'HGNC'
     MANUAL = "M", 'Manual'
+
+
+class LRGRefSeqGeneCategory(models.TextChoices):
+    ALIGNED_SELECTED = "S", 'aligned: Selected'
+    ALIGNED_HISTORICAL = "H", "aligned: historical"
+    REFERENCE_STANDARD = "R", "reference standard"
