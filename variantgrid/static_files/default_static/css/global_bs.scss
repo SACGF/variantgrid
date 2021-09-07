@@ -317,6 +317,16 @@ a.list-group-item-action {
       }
     }
 }
+.link-toolbar {
+    > *:not(:first-child) {
+        margin-left: 10px;
+        &::before {
+          content: '|';
+          margin-right: 10px;
+          color: grey !important;
+        }
+    }
+}
 .btn-rnd-rect {
   width: 32px;
   height: 32px;

@@ -259,6 +259,15 @@ a.list-group-item-action {
   height: 32px;
 }
 
+.link-toolbar > *:not(:first-child) {
+  margin-left: 10px;
+}
+.link-toolbar > *:not(:first-child)::before {
+  content: "|";
+  margin-right: 10px;
+  color: grey !important;
+}
+
 .btn-rnd-rect {
   width: 32px;
   height: 32px;

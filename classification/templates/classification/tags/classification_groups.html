@@ -24,18 +24,19 @@
     {% endwith %}
 {% endfor %}
 {% if diff_latest or diff_all %}
-    <div class="btn-toolbar mb-4">
-    {% if diff_latest %}
-        <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
-    {% endif %}
-    {% if diff_all %}
-        <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
-    {% endif %}
-    {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
+    <div data-toolbar="#{{ table_id }}" class="link-toolbar">
+        {% if diff_latest %}
+            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
+        {% endif %}
+        {% if diff_all %}
+            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
+        {% endif %}
+        {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
     </div>
 {% endif %}
 {% if classification_groups %}
-<table class="table sticky-header" id="{{ table_id }}" width="100%">
+<div class="mt-4"></div>
+<table class="table sticky-header w-100" id="{{ table_id }}">
     <thead>
         <tr>
             <th>Lab</th>
@@ -59,7 +60,8 @@
     </tbody>
 </table>
 <script>$(document).ready(() => {
-    var table = $('#{{ table_id }}').DataTable({
+    var tableDom = $('#{{ table_id }}')
+    var table = tableDom.DataTable({
         order: [1, "asc"],
         dom: '<"top"><"toolbar"<"custom">f>rt<"bottom"<"showing"il>p><"clear">',
         "orderFixed": {
@@ -101,6 +103,7 @@
             Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child', flagGroup:'classifications'});
         },1);
     });
+    $(`[data-toolbar="#{{table_id}}"]`).detach().appendTo(tableDom.closest('.dataTables_wrapper').find('.toolbar .custom'));
 })
 </script>
 {% else %}
