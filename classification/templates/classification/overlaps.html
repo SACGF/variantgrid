@@ -26,7 +26,7 @@
         {% for lab in labs %}<span class="comma-sep">{{ lab }}</span>{% endfor %}
         {% endif %}
     </p>
-    <div data-toggle="ajax" href="{% url 'overlaps_detail' %}" title="Overlaps">
+    <div data-toggle="ajax" href="{% url 'overlaps_detail' %}">
         <div class="loading-message">Loading Overlaps, this may take a while.</div>
     </div>
 
