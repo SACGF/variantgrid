@@ -18,7 +18,7 @@ from genes.models import GeneAnnotationImport, HGNC, \
     GeneSymbol, Gene, GeneVersion, Transcript, TranscriptVersion, GeneAnnotationRelease, ReleaseGeneVersion, \
     ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
-from genes.refseq import retrieve_refseq_gene_summaries
+from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
 from library.django_utils import highest_pk
 from library.file_utils import open_handle_gzip
 from library.utils import invert_dict
