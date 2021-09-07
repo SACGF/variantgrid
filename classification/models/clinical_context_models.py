@@ -10,14 +10,14 @@ import django.dispatch
 from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from typing import List, Optional, Iterable
+from typing import List, Optional, Iterable, Set
 
 from lazy import lazy
 
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.log_utils import report_message
-from snpdb.models import Variant
+from snpdb.models import Variant, Lab
 from snpdb.models.models_variant import Allele
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
@@ -37,6 +37,11 @@ CS_TO_NUMBER = {
     'LP': 3,
     'P': 3,
     'R': 4
+}
+SPECIAL_VUS = {
+    'VUS_A': 1,
+    'VUS_B': 2,
+    'VUS_C': 3
 }
 
 
@@ -82,23 +87,29 @@ class DiscordanceStatus:
 
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceStatus':
-        cs_scores = set()
-        cs_values = set()
-        labs = set()
+        cs_scores: Set[int] = set()
+        cs_vuses: Set[int] = set()
+        cs_values: Set[str] = set()
+        labs: Set[Lab] = set()
+
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
         for vcm in modifications:
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
-                strength = CS_TO_NUMBER.get(clin_sig)
-                if strength:
+                if strength := CS_TO_NUMBER.get(clin_sig):
                     counted_classifications += 1
                     labs.add(vcm.classification.lab)
                     cs_scores.add(strength)
                     cs_values.add(clin_sig)
+                if vus_special := SPECIAL_VUS.get(clin_sig):
+                    cs_vuses.add(vus_special)
+
         if len(cs_scores) > 1:
             level = DiscordanceLevel.DISCORDANT
-        elif len(cs_values) > 1:
+        elif len(cs_values) > 1 or len(cs_vuses) > 1:
+            # importantly you can have a VUS vs VUS_A and still be in agreement
+            # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
             level = DiscordanceLevel.CONCORDANT_CONFIDENCE
         elif len(labs) == 0:
             level = DiscordanceLevel.NO_ENTRIES
@@ -235,7 +246,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     def __str__(self) -> str:
         if self.is_default:
-            return 'Default for allele'
+            return 'Default Grouping for Allele'
         return self.name
 
 

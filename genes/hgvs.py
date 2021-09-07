@@ -242,7 +242,9 @@ class CHGVS:
         return self
 
     def __eq__(self, other):
-        return self.full_c_hgvs == other.full_c_hgvs and self.is_normalised == other.is_normalised
+        if type(other) is type(self):
+            return self.full_c_hgvs == other.full_c_hgvs and self.is_normalised == other.is_normalised and self.genome_build == other.genome_build
+        return NotImplemented
 
     def __hash__(self):
         return hash(self.full_c_hgvs)

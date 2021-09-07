@@ -95,6 +95,15 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return GenomeBuild.objects.filter(name__in=enabled_annotation)
 
     @staticmethod
+    @timed_cache(ttl=60)
+    def builds_with_annotation_cached() -> List['GenomeBuild']:
+        enabled_annotation = []
+        for build_name, values in settings.ANNOTATION.items():
+            if values.get("enabled"):
+                enabled_annotation.append(build_name)
+        return list(GenomeBuild.objects.filter(name__in=enabled_annotation))
+
+    @staticmethod
     def builds_with_annotation_priority(priority: 'GenomeBuild') -> List['GenomeBuild']:
         return [priority] + list(GenomeBuild.builds_with_annotation().exclude(pk=priority.pk).all())
 

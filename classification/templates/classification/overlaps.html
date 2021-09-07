@@ -38,6 +38,15 @@
     .sig-level-A, .sig-level-D {
         opacity: 0.4;
     }
+
+
+    .card-header.discordant {
+        background-color: #dd8888;
+    }
+    .card-header.concordant_agreement {
+        background-color: #88dd88;
+    }
+
     </style>
     <script>
     $(document).ready(() => {
@@ -67,13 +76,13 @@
         </thead>
         <tbody>
             <tr>
-                <th>Involving another lab</th>
+                <th class="text-right">Involving another lab</th>
                 <td class="text-center">{{ overlap_counts.multi_concordant_agreement }}</td>
                 <td class="text-center">{{ overlap_counts.multi_concordant_confidence }}</td>
                 <td class="text-center">{{ overlap_counts.multi_discordant }}</td>
             </tr>
             <tr>
-                <th>Involving only your lab</th>
+                <th class="text-right">Involving only your lab</th>
                 <td class="text-center">{{ overlap_counts.single_concordant_agreement }}</td>
                 <td class="text-center">{{ overlap_counts.single_concordant_confidence }}</td>
                 <td class="text-center">{{ overlap_counts.single_discordant }}</td>
@@ -81,43 +90,46 @@
         </tbody>
     </table>
 
+    <h5>Overlaps</h5>
     {% if overlaps %}
-    <div class="mt-5">
-        <p class="text-info">Note that records that are unshared or classified as Drug Response or Artefact are not used for calculations.</p>
-        <h5>Overlap Records</h5>
-        <table class="table">
-            <thead>
-            <tr>
-                <th style="width:33%">Variants</th>
-                <th style="width:33%">Clinical Groupings</th>
-                <th style="width:33%">Classifications</th>
-            </tr>
-            </thead>
-            {% for overlap in overlaps %}
-            <tr>
-                <td class="variants">
-                {% for hgvs in overlap.unique_hgvs %}
-                    {% hgvs hgvs %}<br/>
-                {% endfor %}
-                </td>
-                <td>
-                    {% if overlap.is_multiple_labs_shared %}<div class="overlap multi-lab level-{{ overlap.discordant_level.name }}">Multi-lab: {{ overlap.discordant_level.label }}</div>
-                    {% elif overlap.is_multi_shared and overlap.discordant_level.name != 'CONCORDANT_AGREEMENT' %}<div class="overlap single-lab level-{{ overlap.discordant_level.name }}">Single-lab: {{ overlap.discordant_level.label }}</div>{% endif %}
-                    {% for cc in overlap.ccs %}
-                    {% clinical_context cc user %}<br/>
-                    {% endfor %}
+        {% for overlap in overlaps %}
+            <div class="card mt-4">
+                <div class="card-header {{ overlap.discordance_status.level.value }}">
+                    <div class="float-left"><b>{{ overlap.discordance_status.level.label }}</b></div>
+                    <div class="float-right">
+                        {% if overlap.is_multiple_labs_shared %}Multi-Lab{% endif %}
                     </div>
-                </td>
-                <td style="padding:8px 0 4px 8px">
-                    <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link">Show Diffs</a><br/><br/>
-                    {%  for vcm in overlap.vcms %}
-                        <div class="my-1">{% classification_quick vcm %}</div>
-                    {%  endfor %}
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
+                </div>
+                <div class="card-body">
+                    {% for hgvs in overlap.unique_hgvs %}
+                        {% c_hgvs hgvs show_genome_build=True %}<br/>
+                    {% endfor %}
+                    {% for grouping in overlap.by_clinical_groupings %}
+                        <hr style="border-top-style: dashed" />
+                        <div class="row" style="align-items: center">
+                            <div class="col-3 text-right">
+                                {% if grouping.clinical_grouping %}
+                                    {% clinical_context grouping.clinical_grouping %}
+                                {% else %}
+                                    <label style="font-style: italic">Not-Shared</label>
+                                {% endif %}
+                            </div>
+                            <div class="col-9">
+                                <div style="font-size:12px;display:flex;flex-wrap:wrap;align-items: center">
+                                    {% for cm in grouping.cms %}
+                                        <div class="m-1">{% classification_quick cm show_clinical_grouping=False %}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="card-footer">
+                    <a href="{{ overlap.allele.get_absolute_url }}" class="hover-link float-left">Go to Allele</a>
+                    <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link float-right">Show Diffs</a>
+                </div>
+            </div>
+        {% endfor %}
     {% else %}
         <div class="no-value">No Records</div>
     {% endif %}

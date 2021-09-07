@@ -2098,6 +2098,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
         return variant_annotation
 
+    def all_chgvs(self) -> List[CHGVS]:
+        all_chgvs: List[CHGVS] = list()
+        for genome_build in GenomeBuild.builds_with_annotation_cached():
+            if text := self.get_c_hgvs(genome_build):
+                chgvs = CHGVS(full_c_hgvs=text)
+                chgvs.genome_build = genome_build
+                chgvs.is_normalised = True
+                all_chgvs.append(chgvs)
+        return all_chgvs
+
+
     def best_hgvs(self, genome_build: GenomeBuild) -> BestHGVS:
         """
         Returns a BestHGVS for this record for the given genome_build.

@@ -149,18 +149,18 @@ def clinical_significance_select(name, value):
     }
 
 
-@register.inclusion_tag("classification/tags/clinical_context.html")
-def clinical_context(cc: ClinicalContext, user: User):
-    return {"cc": cc, "link": user.is_superuser}
+@register.inclusion_tag("classification/tags/clinical_context.html", takes_context=True)
+def clinical_context(context, cc: ClinicalContext):
+    return {"cc": cc, "link": context.request.user.is_superuser}
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification]):
+def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
-    return {"vcm": vcm}
+    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping}
 
 
 class ClinicalGrouping:

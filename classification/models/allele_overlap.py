@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import total_ordering
 from operator import attrgetter
-from typing import Dict, List, Collection
+from typing import Dict, List, Collection, Optional
 
 from django.contrib.auth.models import User
 from lazy import lazy
@@ -12,6 +12,25 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
 from classification.models.classification import Classification
+
+
+class AlleleOverlapClinicalGrouping:
+
+    def __init__(self, clinical_grouping: Optional[ClinicalContext], cms: List[ClassificationModification]):
+        self.cms = cms
+        self.clinical_grouping = clinical_grouping
+
+    @property
+    def _sort_value(self):
+        if clincal_grouping := self.clinical_grouping:
+            if clincal_grouping.is_default:
+                return ""
+            else:
+                return clincal_grouping.name
+        return "zzzzz"
+
+    def __lt__(self, other):
+        return self._sort_value < other._sort_value
 
 
 @total_ordering
@@ -50,7 +69,12 @@ class AlleleOverlap:
 
     @lazy
     def unique_hgvs(self):
-        return sorted({vcm.best_hgvs(self.genome_build) for vcm in self.vcms})
+        all_chgvs = set()
+        for vcm in self.vcms:
+            all_chgvs = all_chgvs.union(vcm.classification.all_chgvs())
+
+        (chgvs_list := list(all_chgvs)).sort()
+        return chgvs_list
 
     @lazy
     def is_multiple_labs_shared(self) -> bool:
@@ -76,6 +100,25 @@ class AlleleOverlap:
             # fall back on allele ID just to give us consistent ordering
             return self.allele.id < other.allele.id
         return score_diff < 0
+
+    def by_clinical_groupings(self) -> List[AlleleOverlapClinicalGrouping]:
+        by_group: Dict[ClinicalContext, List[ClassificationModification]] = defaultdict(list)
+        unshared: List[ClassificationModification] = list()
+        for cm in self.vcms:
+            if (cc := cm.classification.clinical_context) and cm.share_level_enum.is_discordant_level:
+                by_group[cc].append(cm)
+            else:
+                unshared.append(cm)
+
+        groups: List[AlleleOverlapClinicalGrouping] = list()
+        for cc, classifications in by_group.items():
+            groups.append(AlleleOverlapClinicalGrouping(clinical_grouping=cc, cms=classifications))
+        groups.sort()
+        if unshared:
+            groups.append(AlleleOverlapClinicalGrouping(clinical_grouping=None, cms=unshared))
+        return groups
+
+
 
     @staticmethod
     def overlaps_for_user(user: User) -> List['AlleleOverlap']:
@@ -140,7 +183,7 @@ class AlleleOverlap:
         return allele_and_vcs
 
 
-class OverlapCounts():
+class OverlapCounts:
 
     def __init__(self, overlaps: List[AlleleOverlap]):
         multi_lab_counts = defaultdict(lambda: 0)
