@@ -588,7 +588,7 @@ div.background-image {
     border-color: #dddddd !important;
 }
 .loading-message {
-    margin-top: 40px;
+    margin-top: 60px; // have more of a gap at the top for the spinner to go
     margin-bottom: 40px;
     color: #888888;
     width: 100%;
@@ -627,6 +627,10 @@ div.background-image {
 	&:hover {
 		text-display: underline;
 	}
+}
+.card-footer .hover-link {
+    color: #448 !important;
+    font-weight: 500;
 }
 .hover-delete {
     color: #bb4444 !important;

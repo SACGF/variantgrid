@@ -13,13 +13,13 @@
     </thead>
     <tbody>
         <tr>
-            <th class="text-right">Involving another lab</th>
+            <th class="text-right">Involving Another Lab</th>
             <td class="text-center">{{ overlap_counts.multi_concordant_agreement }}</td>
             <td class="text-center">{{ overlap_counts.multi_concordant_confidence }}</td>
             <td class="text-center">{{ overlap_counts.multi_discordant }}</td>
         </tr>
         <tr>
-            <th class="text-right">Involving only your lab</th>
+            <th class="text-right">Involving Only Your Lab</th>
             <td class="text-center">{{ overlap_counts.single_concordant_agreement }}</td>
             <td class="text-center">{{ overlap_counts.single_concordant_confidence }}</td>
             <td class="text-center">{{ overlap_counts.single_discordant }}</td>
@@ -51,7 +51,7 @@
                                 {% clinical_context grouping.clinical_grouping %}
                             {% else %}
                                 <label style="font-style: italic">Not-Shared</label><br/>
-                                <p class="text-info">Does not count towards discordance calculation.</p>
+                                <p class="text-info">Does not count towards discordance</p>
                             {% endif %}
                         </div>
                         <div class="col-9">

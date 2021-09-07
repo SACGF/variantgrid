@@ -265,6 +265,10 @@ class CHGVS:
         Each part being padded so equivalent comparing
         """
         sort_str = ""
+
+        if self.genome_build:
+            sort_str += self.genome_build.pk
+
         if self.is_normalised:
             sort_str = "A"
         else:

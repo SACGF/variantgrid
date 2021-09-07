@@ -520,7 +520,7 @@ div.background-image {
 }
 
 .loading-message {
-  margin-top: 40px;
+  margin-top: 60px;
   margin-bottom: 40px;
   color: #888888;
   width: 100%;
@@ -562,6 +562,11 @@ div.background-image {
 }
 .hover-link:hover, nav ol.breadcrumb .breadcrumb-item a:hover, .modal-link:hover, .download-link:hover, .mail-link:hover {
   text-display: underline;
+}
+
+.card-footer .hover-link {
+  color: #448 !important;
+  font-weight: 500;
 }
 
 .hover-delete {
