@@ -26,13 +26,11 @@ def mock_send_data(
 
     if request_type == ClinVarExportRequestType.INITIAL_SUBMISSION:
         response_json={
-            "actions": [{
-                "id": "SUB999999-1",
-                "responses": [],
-                "status": "submitted",
-                "targetDb": "clinvar",
-                "updated": "2021-03-19T17:24:24.384085Z"
-            }]
+            "id": "SUB999999-1",
+            "responses": [],
+            "status": "submitted",
+            "targetDb": "clinvar",
+            "updated": "2021-03-19T17:24:24.384085Z"
         }
     if request_type == ClinVarExportRequestType.POLLING_SUBMISSION:
 
@@ -106,7 +104,7 @@ def mock_send_data(
                 {
                     "identifiers": {
                         "localID": "ALLELE_1",  # might need to force this ID somehow
-                        "clinvarLocalKey": "adefc5ed-7d59-4119-8b3d-07dcdc504c09_success1",
+                        "clinvarLocalKey": "instx/labby/x42",
                         "localKey": "instx/labby/x42",
                         "clinvarAccession": "SCV000839746"
                     },
