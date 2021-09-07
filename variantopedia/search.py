@@ -23,6 +23,7 @@ from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene,
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
+from library.utils import clean_string
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
@@ -588,9 +589,14 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         except (ValueError, NotImplementedError) as original_error:  # InvalidHGVSName is subclass of ValueError
             original_hgvs_string = hgvs_string
             try:
+                hgvs_string = clean_string(hgvs_string)
+                removed_non_printable = search_string != hgvs_string
                 hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
                 if search_string != hgvs_string:
-                    search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
+                    cleaned_message = f"Warning: Cleaned '{search_string}' => '{hgvs_string}'"
+                    if removed_non_printable:
+                        cleaned_message += " (removed non printable characters)"
+                    search_messages.append(cleaned_message)
                 variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
             except BadTranscript:
                 if results := _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
