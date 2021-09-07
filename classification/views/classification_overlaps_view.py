@@ -17,7 +17,6 @@ from classification.models.allele_overlap import AlleleOverlap, DiscordanceLevel
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
 from classification.models.classification import Classification
-import time
 
 def view_overlaps(request: HttpRequest) -> Response:
     user = request.user
@@ -32,9 +31,6 @@ def view_overlaps(request: HttpRequest) -> Response:
 
 def view_overlaps_detail(request: HttpRequest) -> Response:
     user = request.user
-
-    time.sleep(10)
-
     allele_and_vcs = AlleleOverlap.overlaps_for_user(user)
     overlap_counts = OverlapCounts(allele_and_vcs)
 
