@@ -519,6 +519,15 @@ div.background-image {
   border-color: #dddddd !important;
 }
 
+.loading-message {
+  margin-top: 40px;
+  margin-bottom: 40px;
+  color: #888888;
+  width: 100%;
+  text-align: center;
+  font-weight: 500;
+}
+
 .zero-value {
   color: #AAAAAA;
 }

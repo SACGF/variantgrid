@@ -23,16 +23,25 @@ def view_overlaps(request: HttpRequest) -> Response:
     user = request.user
     labs = set(Lab.valid_labs_qs(user))
 
+    context = {
+        "labs": labs
+    }
+
+    return render(request, "classification/overlaps.html", context)
+
+
+def view_overlaps_detail(request: HttpRequest) -> Response:
+    user = request.user
+
     allele_and_vcs = AlleleOverlap.overlaps_for_user(user)
     overlap_counts = OverlapCounts(allele_and_vcs)
 
     context = {
         "overlaps": allele_and_vcs,
-        "labs": labs,
         "overlap_counts": overlap_counts
     }
 
-    return render(request, "classification/overlaps.html", context)
+    return render(request, "classification/overlaps_detail.html", context)
 
 
 # POST only

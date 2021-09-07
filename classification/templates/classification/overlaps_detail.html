@@ -1,0 +1,75 @@
+{% load classification_tags %}
+{% load english_tags %}
+
+<h5>Overlap Counts</h5>
+<table class="table">
+    <thead>
+        <tr>
+            <th></th>
+            <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts classifications in agreement<br/>e.g. Benign vs Benign, VUS vs VUS, etc">Agreement</span></th>
+            <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts<br/>Likely Benign vs Benign and<br/>Likely Pathogenic vs Pathogenic">Confidence Level</span></th>
+            <th class="text-center">Discordant</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <th class="text-right">Involving another lab</th>
+            <td class="text-center">{{ overlap_counts.multi_concordant_agreement }}</td>
+            <td class="text-center">{{ overlap_counts.multi_concordant_confidence }}</td>
+            <td class="text-center">{{ overlap_counts.multi_discordant }}</td>
+        </tr>
+        <tr>
+            <th class="text-right">Involving only your lab</th>
+            <td class="text-center">{{ overlap_counts.single_concordant_agreement }}</td>
+            <td class="text-center">{{ overlap_counts.single_concordant_confidence }}</td>
+            <td class="text-center">{{ overlap_counts.single_discordant }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<h5>Overlaps</h5>
+{% if overlaps %}
+    {% for overlap in overlaps %}
+        <div class="card mt-4">
+            <div class="card-header {{ overlap.discordance_status.level.value }}">
+                <div class="float-left"><b>{{ overlap.discordance_status.level.label }}</b></div>
+                <div class="float-right" {% if overlap.discordance_status.lab_count <= 1 %}style="font-style:italic"{% else %}style="font-weight:bold"{% endif %}>
+                    {% count overlap.discordance_status.lab_count singular="Single Sharing-Lab" plural="Sharing-Labs" %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                {% for hgvs in overlap.unique_hgvs %}
+                    <div class="col-6">{% c_hgvs hgvs show_genome_build=True %}</div>
+                {% endfor %}
+                </div>
+                {% for grouping in overlap.by_clinical_groupings %}
+                    <hr style="border-top-style: dashed" />
+                    <div class="row" style="align-items: center">
+                        <div class="col-3 text-right">
+                            {% if grouping.clinical_grouping %}
+                                {% clinical_context grouping.clinical_grouping %}
+                            {% else %}
+                                <label style="font-style: italic">Not-Shared</label><br/>
+                                <p class="text-info">Does not count towards discordance calculation.</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-9">
+                            <div style="font-size:12px;display:flex;flex-wrap:wrap;align-items: center">
+                                {% for cm in grouping.cms %}
+                                    <div class="m-1">{% classification_quick cm show_clinical_grouping=False %}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="card-footer">
+                <a href="{{ overlap.allele.get_absolute_url }}" class="hover-link float-left">Go to Allele</a>
+                <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link float-right">Show Diffs</a>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="no-value">No Records</div>
+{% endif %}

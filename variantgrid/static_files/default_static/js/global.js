@@ -272,6 +272,13 @@ function loadAjaxBlock(dom, url) {
     if (!url) {
         url = dom.attr('href');
     }
+    if (!url) {
+        dom.html([
+            severityIcon('C'),
+            "No href provided for AJAX block"
+        ]);
+        throw new Error("Ajax Block not given href");
+    }
 
     let showingOverlay = false;
     // give ajax 300 ms to load before we start showing the spinner

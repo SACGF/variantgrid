@@ -18,7 +18,7 @@ from classification.views.classification_email_view import summary_email_preview
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
-    view_clinical_context
+    view_clinical_context, view_overlaps_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.views import classification_import_tool, AutopopulateView
 from snpdb.views.datatable_view import DatabaseTableView
@@ -96,6 +96,7 @@ urlpatterns = [
 
     perm_path('clinical_context', post_clinical_context, name='clinical_context'),
     perm_path('overlaps', view_overlaps, name='overlaps'),
+    perm_path('overlaps_detail', view_overlaps_detail, name='overlaps_detail'),
     perm_path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
     perm_path('hgvs_issues', view_hgvs_issues, name='hgvs_issues'),
     perm_path('hgvs_issues/allele/datatable', DatabaseTableView.as_view(column_class=AlleleColumns), name='allele_datatable'),
