@@ -71,7 +71,7 @@ class AlleleOverlap:
     def unique_hgvs(self):
         all_chgvs = set()
         for vcm in self.vcms:
-            all_chgvs = all_chgvs.union(vcm.classification.all_chgvs())
+            all_chgvs = all_chgvs.union(vcm.classification.c_hgvs_all())
 
         (chgvs_list := list(all_chgvs)).sort()
         return chgvs_list

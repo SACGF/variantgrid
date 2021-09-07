@@ -43,7 +43,6 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
     CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
-from classification.models.best_hgvs import BestHGVS
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -2098,7 +2097,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
         return variant_annotation
 
-    def all_chgvs(self) -> List[CHGVS]:
+    def c_hgvs_all(self) -> List[CHGVS]:
         all_chgvs: List[CHGVS] = list()
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_c_hgvs(genome_build):
@@ -2108,50 +2107,31 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 all_chgvs.append(chgvs)
         return all_chgvs
 
-
-    def best_hgvs(self, genome_build: GenomeBuild) -> BestHGVS:
-        """
-        Returns a BestHGVS for this record for the given genome_build.
-        Attempts to get cached version first, if it fails is_fallback will be True
-        Fallsback to generate the c hgvs, then use the c hgvs evidence key, then the g hgvs evidence key
-        :param genome_build: The genome we want the build for
-        :return: A BestHGVS with is_fallback = did we have this value cached
-        """
-
-        # see if we can get the cached HGVS
-        hgvs = None
-        if genome_build == genome_build.grch37():
-            hgvs = self.chgvs_grch37
-        elif genome_build == genome_build.grch38():
-            hgvs = self.chgvs_grch38
-
-        if hgvs:
-            return BestHGVS(
-                genome_build=genome_build,
-                desired_build=genome_build,
-                hgvs=hgvs,
-                variant=self.variant
-            )
-        # all non cached HGVS values are to be treated as "is_fallback"
-        # for consistency with the grid view
-        hgvs = self._generate_c_hgvs_extra(genome_build).format()
-        if not hgvs:
-            hgvs = self.get(SpecialEKeys.C_HGVS)
-            if not hgvs:
-                hgvs = self.get(SpecialEKeys.G_HGVS)
-
-        actual_build = None
+    def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> CHGVS:
+        if c_hgvs_str := self.get_c_hgvs(preferred_genome_build):
+            c_hgvs = CHGVS(c_hgvs_str)
+            c_hgvs.genome_build = preferred_genome_build
+            c_hgvs.is_normalised = True
+            c_hgvs.is_desired_build = True
+            return c_hgvs
+        for alt_genome_build in GenomeBuild.builds_with_annotation_cached():
+            if preferred_genome_build == alt_genome_build:
+                continue
+            if c_hgvs_str := self.get_c_hgvs(alt_genome_build):
+                c_hgvs = CHGVS(c_hgvs_str)
+                c_hgvs.genome_build = alt_genome_build
+                c_hgvs.is_normalised = True
+                c_hgvs.is_desired_build = False
+                return c_hgvs_str
+        c_hgvs = CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
         try:
-            actual_build = self.get_genome_build()
-        except:
+            c_hgvs.genome_build = self.get_genome_build()
+        except KeyError:
             pass
-        return BestHGVS(
-            genome_build=actual_build,
-            desired_build=genome_build,
-            hgvs=hgvs,
-            variant=self.variant,
-            is_fallback=True
-        )
+        c_hgvs.is_normalised = False
+        c_hgvs.is_desired_build = preferred_genome_build == c_hgvs.genome_build
+        return c_hgvs
+
 
     def _generate_c_hgvs_extra(self, genome_build: GenomeBuild) -> HGVSNameExtra:
         variant = self.get_variant_for_build(genome_build)
@@ -2471,8 +2451,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         lowest_share_level = self.classification.lowest_share_level(user)
         return self.classification.get_visible_evidence(self.evidence, lowest_share_level)
 
-    def best_hgvs(self, genome_build: GenomeBuild) -> BestHGVS:
-        return self.classification.best_hgvs(genome_build=genome_build)
+    def c_hgvs_best(self, genome_build: GenomeBuild) -> CHGVS:
+        return self.classification.c_hgvs_best(genome_build=genome_build)
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """

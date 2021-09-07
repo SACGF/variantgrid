@@ -19,7 +19,7 @@ from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
 from snpdb.variant_links import variant_link_info
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import BestHGVS, ConditionTextMatch, ConditionResolved
+from classification.models import ConditionTextMatch, ConditionResolved
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, DiscordanceReportClassification
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
@@ -263,7 +263,9 @@ def classification_table(
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build=False):
+def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool]=None):
+    if show_genome_build is None:
+        show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
     if isinstance(c_hgvs, ClassificationModification):
         if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
             c_hgvs = CHGVS(c_hgvs)
@@ -272,12 +274,7 @@ def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build=False):
     elif isinstance(c_hgvs, str):
         c_hgvs = CHGVS(c_hgvs)
 
-    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build}
-
-
-@register.inclusion_tag("classification/tags/hgvs.html", takes_context=True)
-def hgvs(context, hgvs: BestHGVS, show_variant_link: bool = True):
-    return {"hgvs": hgvs, "show_variant_link": show_variant_link}
+    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None}
 
 
 @register.inclusion_tag("classification/tags/classification_row.html", takes_context=True)
@@ -310,7 +307,7 @@ def classification_row(
     if user:
         can_write = vc.can_write(user=user)
 
-    best_hgvs = vc.best_hgvs(genome_build)
+    c_hgvs = vc.c_hgvs_best(preferred_genome_build=genome_build)
     p_hgvs = None
     if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
         p_hgvs = record.get(SpecialEKeys.P_HGVS)
@@ -323,7 +320,7 @@ def classification_row(
         "evidence": record.evidence,
         "condition_obj": vc.condition_resolution_obj,
         "curated": curated,
-        "best_hgvs": best_hgvs,
+        "c_hgvs": c_hgvs,
         "gene_symbol": vcm.get(SpecialEKeys.GENE_SYMBOL),
         "vc": vc,
         "vcm": vcm,
@@ -365,24 +362,6 @@ def classification_count(obj: Allele) -> int:
         return Classification.objects.filter(variant=obj).count()
     else:
         return 0
-
-
-@register.inclusion_tag("classification/tags/classification_discordance_row.html")
-def classification_discordance_row(row: DiscordanceReportClassification, show_flags=False):
-    vc = row.classification_original.classification
-    icon = 'icons/share_level/' + vc.share_level_enum.key + '.png'
-    return {
-        "vc": vc,
-        "icon": icon,
-        "action_log": row.action_log,
-        "condition_obj": vc.condition_resolution_obj,
-        "best_hgvs": row.classfication_effective.get(SpecialEKeys.C_HGVS, None),
-        "starting": row.classification_original,
-        "closing": row.classfication_effective,
-        "starting_curated": row.classification_original.get(SpecialEKeys.CURATION_DATE, None),
-        "closing_curated": row.classfication_effective.get(SpecialEKeys.CURATION_DATE, None),
-        "show_flags": show_flags,
-    }
 
 
 @register.inclusion_tag("classification/tags/variant_card.html", takes_context=True)

@@ -113,30 +113,6 @@
         </div>
     </div>
 
-    {% comment %}
-    <div class="container-table mt-4">
-        <h4>Discordance Summary Table</h4>
-        <table class="table classification-table" style="font-size:small">
-            <thead><tr>
-                <th>ID</th>
-                <th>HGVS</th>
-                <th>Condition</th>
-                <th>Opening<br/>Curated Date / Significance</th>
-                <th>{% if report.report_completed_date %}Closing{% else %}Current{% endif %}<br/>Curated Date / Significance</th>
-                <th>Reviews &amp; Re-classifications</th>
-                {% if ongoing %}
-                <th>Flags</th>
-                {% endif %}
-            </tr></thead>
-            <tbody>
-            {% for row in rows %}
-                {% classification_discordance_row row=row show_flags=ongoing %}
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endcomment %}
-
     <div class="container mt-4">
         <h4>Classifications</h4>
         {% classification_groups classifications %}
