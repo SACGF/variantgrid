@@ -253,7 +253,7 @@ class EvidenceMixin:
         return clean
 
     @staticmethod
-    def patch_with(target: dict, patch: dict):
+    def patch_with(target: dict, patch: dict, tidy_nones=False):
         """
         Update the evidence with normalised patch values.
         """
@@ -272,3 +272,12 @@ class EvidenceMixin:
                         existing.pop(sub_key, None)
                     else:
                         existing[sub_key] = sub_value
+
+        if tidy_nones:
+            for key in patch.keys():
+                if (blob := target.get(key)) and isinstance(blob, dict):
+                    for value in blob.values():
+                        if value is not None:
+                            break
+                    else:
+                        target.pop(key, None)

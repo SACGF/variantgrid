@@ -1570,7 +1570,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # ACTUALLY APPLY THE PATCH
             # update the actual evidence with normalised patch values
             ###
-            Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch)
+            Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch, tidy_nones=True)
 
             self.evidence = use_evidence.data
             clinical_significance_choice = self.calc_clinical_significance_choice()
@@ -2442,7 +2442,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
                 patches_since_evidence.reverse()
                 for patch in patches_since_evidence:
-                    Classification.patch_with(target=data, patch=patch)
+                    Classification.patch_with(target=data, patch=patch, tidy_nones=True)
                 self.cached_evidence = data
         return self.cached_evidence
 
