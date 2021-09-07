@@ -589,12 +589,10 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         except (ValueError, NotImplementedError) as original_error:  # InvalidHGVSName is subclass of ValueError
             original_hgvs_string = hgvs_string
             try:
-                hgvs_string = clean_string(hgvs_string)
-                removed_non_printable = search_string != hgvs_string
                 hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
                 if search_string != hgvs_string:
                     cleaned_message = f"Warning: Cleaned '{search_string}' => '{hgvs_string}'"
-                    if removed_non_printable:
+                    if search_string != clean_string(search_string):
                         cleaned_message += " (removed non printable characters)"
                     search_messages.append(cleaned_message)
                 variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)

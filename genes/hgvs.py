@@ -24,6 +24,7 @@ from pyhgvs.utils import make_transcript
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
+from library.utils import clean_string
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
     ClinGenAlleleRegistryException, ClinGenAlleleServerException, ClinGenAlleleAPIException
 from snpdb.models import Variant, AssemblyMoleculeType, Contig
@@ -694,7 +695,8 @@ class HGVSMatcher:
 
     @classmethod
     def clean_hgvs(cls, hgvs_name):
-        cleaned_hgvs = hgvs_name.replace(" ", "")  # No whitespace in HGVS
+        cleaned_hgvs = clean_string(hgvs_name)  # remove non-printable characters
+        cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
         # Lowercase mutation types, eg NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
         # case insensitive
