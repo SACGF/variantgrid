@@ -1,3 +1,4 @@
+import logging
 from typing import Tuple
 
 from django.conf import settings
@@ -5,8 +6,6 @@ from django.db import models
 from django.db.models import F, FilteredRelation, Q, QuerySet
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
-import logging
-
 from lazy import lazy
 
 from library.django_utils.django_partition import RelatedModelsPartitionModel

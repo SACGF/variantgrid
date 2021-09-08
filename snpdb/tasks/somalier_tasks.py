@@ -4,10 +4,9 @@ import shutil
 from pathlib import Path
 from subprocess import CalledProcessError
 
-from django.conf import settings
-
 import celery
 import pandas as pd
+from django.conf import settings
 from django.db import IntegrityError
 
 from library.django_utils.django_file_utils import get_import_processing_dir

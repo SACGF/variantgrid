@@ -4,9 +4,9 @@ Code taken from Jinghua (Frank) Feng's bwa_gatk_freebayes_annotate_pipeline
 
 """
 
-from io import StringIO
 import logging
 import os
+from io import StringIO
 
 import pandas as pd
 

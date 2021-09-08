@@ -1,10 +1,11 @@
 import operator
 from functools import reduce
 
+import numpy as np
+import pandas as pd
+
 from library.date_utils import get_month_and_year, get_months_since, month_range
 from seqauto.models import SequencingSample, SequencingRun
-import pandas as pd
-import numpy as np
 
 
 def get_sample_enrichment_kits_df():

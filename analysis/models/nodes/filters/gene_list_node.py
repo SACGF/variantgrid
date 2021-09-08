@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List
 
 from django.db import models
@@ -5,7 +6,6 @@ from django.db.models import Q
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
-import logging
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin

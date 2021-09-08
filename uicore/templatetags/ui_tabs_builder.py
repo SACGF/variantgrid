@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Any, Optional
+
 from django import template
 from django.template.base import FilterExpression
 

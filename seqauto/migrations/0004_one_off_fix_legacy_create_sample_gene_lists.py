@@ -5,6 +5,7 @@ from django.db import migrations
 
 from library.utils import md5sum_str
 
+
 # Re-implementation of model methods (can't use them in migrations - and they will be deleted)
 def _get_qc_gene_list_for_sample(apps, sample):
     SampleFromSequencingSample = apps.get_model("seqauto", "SampleFromSequencingSample")

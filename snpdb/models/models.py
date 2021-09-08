@@ -6,9 +6,12 @@ etc and things that don't fit anywhere else.
 'snpdb' was the highly unoriginal name I used before 'VariantGrid'
 """
 import json
+import logging
 import re
-from functools import total_ordering
 from datetime import datetime
+from functools import total_ordering
+from typing import List, TypedDict, Optional
+
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -23,14 +26,12 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-import logging
 from model_utils.managers import InheritanceManager
-from typing import List, TypedDict, Optional, Dict
+
+from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
-from library.log_utils import send_notification
 from library.utils import import_class
-from classification.enums.classification_enums import ShareLevel
 
 
 class Tag(models.Model):

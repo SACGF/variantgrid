@@ -1,4 +1,6 @@
 import collections
+from typing import Optional, Dict, Any
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -10,22 +12,21 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
     HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
-from typing import Optional, Dict, Any
 
 from classification.classification_stats import get_lab_gene_counts
+from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
+from classification.models import ClassificationRef, ClassificationImport, \
+    ClassificationJsonParams, PatchMeta, Classification
+from classification.models.classification import ClassificationProcessError, \
+    ClassificationModification
+from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
+from classification.models.evidence_mixin import EvidenceMixin, VCStore
+from classification.models.flag_types import classification_flag_types
+from classification.tasks.classification_import_task import process_classification_import_task
 from library.log_utils import report_exc_info, report_message
 from library.utils import empty_to_none
 from snpdb.models import Lab, GenomeBuild
 from snpdb.models.models_enums import ImportSource
-from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
-from classification.models import ClassificationRef, ClassificationImport, \
-    ClassificationJsonParams, PatchMeta, Classification
-from classification.models.evidence_mixin import EvidenceMixin, VCStore
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationProcessError, \
-    ClassificationModification
-from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
-from classification.tasks.classification_import_task import process_classification_import_task
 
 
 class BulkInserter:

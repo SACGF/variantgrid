@@ -1,14 +1,12 @@
-from collections import namedtuple
 import csv
 import io
+from collections import namedtuple
 
-from flags.models.models import Flag, FlagComment
-from library.django_utils import get_url_from_view_path
 from classification.enums.classification_enums import SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.views.classification_export_utils import ExportFormatter
-
+from flags.models.models import Flag, FlagComment
+from library.django_utils import get_url_from_view_path
 
 Problem = namedtuple('Problem', 'code message')
 

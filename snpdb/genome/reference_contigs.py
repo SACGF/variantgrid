@@ -11,11 +11,12 @@ In [11]: hg_38_v
 Out[11]: SequenceVariant(ac=NC_000001.11, type=g, posedit=150578440G>A)
 
 """
-from django.conf import settings
 import os
 
-from library.pandas_utils import read_csv_skip_header
 import pandas as pd
+from django.conf import settings
+
+from library.pandas_utils import read_csv_skip_header
 
 GRCH37 = "GCF_000001405.25_GRCh37.p13_assembly_report.txt"
 ASSEMBLY_REPORTS = {"hg19": GRCH37,  # alias

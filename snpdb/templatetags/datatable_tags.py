@@ -1,6 +1,7 @@
-from typing import Union, Optional
+from typing import Union
 
 from django.template import Library
+
 from snpdb.views.datatable_view import DatatableConfig, SortOrder
 
 register = Library()

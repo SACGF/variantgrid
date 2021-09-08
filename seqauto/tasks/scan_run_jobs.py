@@ -1,9 +1,10 @@
-from django.conf import settings
-from django.utils import timezone
-import celery
 import logging
 import os
 import subprocess
+
+import celery
+from django.conf import settings
+from django.utils import timezone
 
 from library.file_utils import name_from_filename, mk_path
 from library.log_utils import get_traceback

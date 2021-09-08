@@ -1,8 +1,8 @@
 import itertools
+from typing import List, Tuple, Iterable, Optional
 
 from django.conf import settings
 from django.contrib.sites.models import Site
-from typing import List, Tuple, Iterable, Optional
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.citations import get_citations
@@ -13,6 +13,9 @@ from annotation.models.models import VariantAnnotation, AnnotationVersion, GeneS
 from annotation.models.models_enums import VariantClass, ClinVarReviewStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
+from classification.enums import SubmissionSource, \
+    SpecialEKeys
+from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
@@ -22,12 +25,8 @@ from seqauto.models import get_20x_gene_coverage
 from snpdb.clingen_allele import get_clingen_allele_for_variant, ClinGenAlleleAPIException
 from snpdb.models import Variant
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ColumnAnnotationLevel
-from classification.enums import SubmissionSource, \
-    SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap
-
+from snpdb.models.models_genome import GenomeBuild
 
 AUTOPOPULATE_MERGE_KEYS = {SpecialEKeys.LITERATURE}
 

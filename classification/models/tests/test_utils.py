@@ -2,8 +2,8 @@ from typing import Tuple
 
 from django.contrib.auth.models import User
 
-from snpdb.models import Lab, Organization
 from classification.models import Classification
+from snpdb.models import Lab, Organization
 
 
 class ClassificationTestUtils:

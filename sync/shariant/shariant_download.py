@@ -1,19 +1,19 @@
+import time
 from datetime import datetime
-from dateutil import tz
 from typing import Optional, Dict
 
 import ijson
 import requests
-import time
+from dateutil import tz
 
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.views.classification_view import BulkInserter
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
 from library.utils import make_json_safe_in_place, batch_iterator
 from snpdb.models.models import Lab, Organization
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
-from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.classification_view import BulkInserter
 
 
 def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:

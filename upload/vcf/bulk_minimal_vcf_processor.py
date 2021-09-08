@@ -1,5 +1,5 @@
-from django.conf import settings
 import cyvcf2
+from django.conf import settings
 
 from library.git import Git
 from upload.models import VCFImporter

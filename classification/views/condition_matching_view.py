@@ -1,10 +1,8 @@
-import re
 from typing import Optional, List
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
-from django.shortcuts import render, get_object_or_404, redirect
-from django.urls import reverse
+from django.shortcuts import render, get_object_or_404
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,7 +11,7 @@ from classification.models import ConditionTextMatch, ConditionText, update_cond
     ConditionMatchingSuggestion, condition_matching_suggestions
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm
-from ontology.ontology_matching import normalize_condition_text, OntologyMatch
+from ontology.ontology_matching import normalize_condition_text
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

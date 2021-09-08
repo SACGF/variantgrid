@@ -1,10 +1,11 @@
+import inspect
+import logging
+
 from django.contrib.auth.models import User
 from django.contrib.auth.signals import user_logged_in
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.utils import timezone
-import inspect
-import logging
 
 from library.enums.log_level import LogLevel
 

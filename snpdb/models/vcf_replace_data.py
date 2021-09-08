@@ -1,7 +1,8 @@
-from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
 import itertools
 import logging
+
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task

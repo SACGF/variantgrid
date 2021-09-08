@@ -9,7 +9,6 @@ from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologySnake
 from patients.models import Patient
 
-
 PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
 PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
 PATIENT_GENE_SYMBOL_PATH = PATIENT_TPM_PATH + "__gene_symbol"

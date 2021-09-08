@@ -1,7 +1,8 @@
-from celery.app.task import Task
 import logging
 import subprocess
 import time
+
+from celery.app.task import Task
 
 from library.log_utils import get_traceback
 from upload.models import UploadPipeline

@@ -1,6 +1,7 @@
-from django.db.models.query_utils import Q
-from functools import reduce
 import operator
+from functools import reduce
+
+from django.db.models.query_utils import Q
 
 CONTROL_POPULATION_DATABASES = ["gnomad_af", "af_1kg", "af_uk10k", "topmed_af"]
 

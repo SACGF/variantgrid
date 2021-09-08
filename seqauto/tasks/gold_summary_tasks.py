@@ -10,9 +10,11 @@ eg: MIR4697HG/NR_024344 and MIR4697/NR_039846 both => ENSG00000264919, ENST00000
 RefSeq 'ANKRD18A' and 'FAM95C' both resolve to ENSG00000273170
 
 """
-import celery
-from collections import defaultdict
 import logging
+from collections import defaultdict
+
+import celery
+import numpy as np
 from scipy import stats
 
 from eventlog.models import create_event
@@ -20,7 +22,6 @@ from genes.models import GeneCoverageCollection, GeneCoverageCanonicalTranscript
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
 from library.utils import get_single_element
-import numpy as np
 from seqauto.models import SequencingRun, GoldReference, GoldCoverageSummary, GoldGeneCoverageCollection, EnrichmentKit
 from snpdb.models import DataState
 from snpdb.models.models_enums import ImportStatus

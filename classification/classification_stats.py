@@ -1,16 +1,16 @@
 
 from collections import Counter, defaultdict
-from django.conf import settings
-from django.contrib.auth.models import User
 from typing import Dict, List, Optional
 
-from library.django_utils import get_field_counts
+import numpy as np
+from django.conf import settings
+from django.contrib.auth.models import User
+
 from classification.enums import ClinicalSignificance
 from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
-import numpy as np
-
+from library.django_utils import get_field_counts
 from snpdb.models import Lab
 
 

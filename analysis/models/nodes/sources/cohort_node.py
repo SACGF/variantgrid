@@ -1,3 +1,5 @@
+import operator
+from functools import reduce
 from typing import Dict, Optional, List
 
 from django.db import models
@@ -6,9 +8,6 @@ from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.expressions import Value, F
 from django.db.models.functions import Concat, Substr, Length, Replace
 from django.urls.base import reverse
-from functools import reduce
-import operator
-
 from lazy import lazy
 
 from analysis.models import GroupOperation, AnalysisNode

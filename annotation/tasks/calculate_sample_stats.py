@@ -1,10 +1,10 @@
+import logging
+import time
 from collections import defaultdict
 from typing import Tuple, Dict, Optional
 
 import celery
 from django.db.models.query_utils import Q
-import logging
-import time
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import SampleVariantAnnotationStats, SampleGeneAnnotationStats, \

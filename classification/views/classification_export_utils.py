@@ -1,19 +1,23 @@
 import collections
 from collections import defaultdict
 from datetime import datetime
+from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.db.models.query import QuerySet
 from django.http.response import StreamingHttpResponse
-from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
-
 from django.utils.timezone import now
 from lazy import lazy
 from pytz import timezone
 from threadlocals.threadlocals import get_current_request
 
+from classification.enums import SpecialEKeys
+from classification.models.classification import ClassificationModification, \
+    Classification
+from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
+from classification.models.flag_types import classification_flag_types
 from flags.models import FlagComment
 from flags.models.enums import FlagStatus
 from flags.models.models import Flag
@@ -25,11 +29,6 @@ from snpdb.models import Contig
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_genome import GenomeBuild, GenomeBuildContig
 from snpdb.models.models_variant import VariantAllele, Allele
-from classification.enums import SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationModification,\
-    Classification
 
 
 class KeyValueFormatter:

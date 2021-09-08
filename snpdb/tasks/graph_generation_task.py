@@ -1,6 +1,7 @@
-import celery
 import logging
 import traceback
+
+import celery
 
 from eventlog.models import create_event
 from library import file_utils

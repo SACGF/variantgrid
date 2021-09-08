@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-from django.core.management.base import BaseCommand
 import logging
+
+from django.core.management.base import BaseCommand
 
 from annotation.models.models import VariantAnnotationVersion, AnnotationRangeLock
 from snpdb.models.models_genome import GenomeBuild

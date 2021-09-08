@@ -2,12 +2,13 @@
 @see https://django-autocomplete-light.readthedocs.io/en/master/
 """
 
+import operator
+from functools import reduce
+
 from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
-from functools import reduce
-import operator
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView

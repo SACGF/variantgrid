@@ -1,12 +1,12 @@
 from collections import defaultdict
+from operator import itemgetter
 
 from django.db.models import Q
 from django.template import Library
-from operator import itemgetter
 
-from snpdb.models.models_enums import ImportStatus
 from classification.models import Classification
 from classification.views.classification_datatables import ClassificationColumns
+from snpdb.models.models_enums import ImportStatus
 
 register = Library()
 

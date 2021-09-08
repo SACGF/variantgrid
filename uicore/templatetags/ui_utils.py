@@ -1,11 +1,10 @@
 import json
+import re
 import uuid
 from typing import Optional, Any
 
 from django import template
 from django.template.base import FilterExpression, kwarg_re
-import re
-
 from django.utils.safestring import SafeString
 
 register = template.Library()

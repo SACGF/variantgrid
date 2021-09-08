@@ -1,17 +1,16 @@
 import logging
+import os
 
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import CASCADE
 from django.urls.base import reverse
-import os
-
 from lazy import lazy
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.genomics.bed_file import BedFileReader
-from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_genome import GenomeBuild
 
 
 class GenomicIntervalsCategory(models.Model):

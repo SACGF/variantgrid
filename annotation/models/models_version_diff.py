@@ -1,15 +1,16 @@
+import operator
 from collections import Counter, defaultdict
+from functools import reduce
+
+import pandas as pd
 from django.db import connection
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.utils.timesince import timesince
-from functools import reduce
 from model_utils.managers import InheritanceManager
-import operator
 
 from annotation.models.models import VariantAnnotationVersion
 from library.database_utils import dictfetchall
-import pandas as pd
 from snpdb.models import VariantGridColumn
 
 

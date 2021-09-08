@@ -2,15 +2,16 @@
 Imports HumanProteinAtlas data @see http://v15.proteinatlas.org/about/download
 """
 
-from django.core.management.base import BaseCommand, CommandError
 import logging
 import os
+
+import pandas as pd
+from django.core.management.base import BaseCommand, CommandError
 
 from annotation.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample, \
     HumanProteinAtlasAbundance
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.file_utils import file_md5sum
-import pandas as pd
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 

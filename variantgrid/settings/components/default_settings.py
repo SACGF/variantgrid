@@ -6,13 +6,12 @@ See __init__.py in this dir for details
 
 """
 
-from collections import defaultdict
 import os
 import socket
+from collections import defaultdict
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
 from library.git import Git
-
 # if certain user settings are not relevant for the environment, list the columns in this
 from variantgrid.settings.components.secret_settings import get_secret, get_secrets
 

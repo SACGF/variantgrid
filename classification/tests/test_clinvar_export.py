@@ -4,7 +4,6 @@ from unittest import mock
 from django.test import TestCase, override_settings
 
 from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
-from uicore.json.json_types import JsonObjType
 from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
     ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus
 from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
@@ -13,6 +12,7 @@ from classification.models.tests.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild, ClinVarKey
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
+from uicore.json.json_types import JsonObjType
 
 
 def mock_send_data(

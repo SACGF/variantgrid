@@ -1,5 +1,6 @@
-from django.conf import settings
 import os
+
+from django.conf import settings
 
 from library.django_utils.django_file_utils import get_import_processing_filename
 from snpdb.models import Variant

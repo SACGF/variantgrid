@@ -27,7 +27,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import json
+import logging
+import operator
 from copy import deepcopy
+from functools import reduce
 
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.core.paginator import Paginator, InvalidPage
@@ -37,10 +41,6 @@ from django.db.models.fields.json import KeyTransform
 from django.db.models.query_utils import Q
 from django.utils.encoding import smart_str
 from django.utils.timezone import localtime
-from functools import reduce
-import json
-import logging
-import operator
 
 from library.log_utils import log_traceback
 

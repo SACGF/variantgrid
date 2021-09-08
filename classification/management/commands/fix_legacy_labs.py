@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User, Group
 from django.core.management import BaseCommand
+
 from classification.models import Classification
 from snpdb.models import Lab, Organization
 

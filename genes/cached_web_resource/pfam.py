@@ -10,9 +10,10 @@ import logging
 import re
 from io import BytesIO
 
+import pandas as pd
+
 from genes.models import TranscriptVersion, Pfam, Transcript, PfamSequence, PfamSequenceIdentifier, PfamDomains
 from genes.models_enums import AnnotationConsortium
-import pandas as pd
 
 BULK_INSERT_SIZE = 2000
 PFAM_SEQUENCE_PATTERN = re.compile(r"(.+?)-\d+$")

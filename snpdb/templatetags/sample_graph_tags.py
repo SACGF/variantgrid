@@ -1,9 +1,9 @@
+import numpy as np
 from django.db.models.aggregates import Min, Max, Count
 from django.template.library import Library
 
 from library.date_utils import diff_month, date_to_month_year_string, month_year_string, month_range
 from snpdb.models.models_vcf import VCF
-import numpy as np
 
 register = Library()
 

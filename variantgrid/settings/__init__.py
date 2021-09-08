@@ -8,7 +8,6 @@
 
 import logging
 import os
-import re
 import socket
 
 DEFAULT_DJANGO_SETTINGS = "variantgrid.settings"

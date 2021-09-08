@@ -10,11 +10,11 @@ from lazy import lazy
 from classification.enums import CriteriaEvaluation, SubmissionSource
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
-from uicore.json.json_utils import strip_json
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
 from library.utils import empty_to_none
 from snpdb.models import VariantGridColumn, Lab
+from uicore.json.json_utils import strip_json
 
 
 class EvidenceKeyOption(TypedDict):

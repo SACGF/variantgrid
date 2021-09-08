@@ -1,6 +1,8 @@
 import typing
 from datetime import datetime, timedelta
+from typing import Set, Optional, List
 
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
@@ -8,18 +10,15 @@ from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-from typing import Set, Optional, List
 
-from flags.models.enums import FlagStatus
-from flags.models.models import FlagComment
-from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
+from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
+from classification.models.classification import ClassificationModification, Classification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationModification, Classification
+from flags.models.enums import FlagStatus
+from flags.models.models import FlagComment
 from snpdb.models import Lab
-import django.dispatch
-
 
 discordance_change_signal = django.dispatch.Signal(providing_args=["discordance_report"])
 

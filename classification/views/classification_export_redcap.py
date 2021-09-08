@@ -1,13 +1,14 @@
-from django.db.models.expressions import OrderBy, RawSQL
-from typing import List
 import csv
 import io
 import re
+from typing import List
+
+from django.db.models.expressions import OrderBy, RawSQL
 
 from classification.enums.classification_enums import EvidenceKeyValueType
+from classification.models.classification import Classification
 from classification.models.evidence_key import EvidenceKeyMap, \
     EvidenceKey
-from classification.models.classification import Classification
 from classification.views.classification_export_utils import ExportFormatter, \
     KeyValueFormatter, UsedKeyTracker
 

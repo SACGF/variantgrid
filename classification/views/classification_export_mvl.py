@@ -12,12 +12,12 @@ from pytz import timezone
 from annotation.citations import get_citations, CitationDetails
 from annotation.models import CitationSource, Citation
 from annotation.views import simple_citation_html
-from library.django_utils import get_url_from_view_path
 from classification.enums.classification_enums import SpecialEKeys
 from classification.models import ClassificationGroups, ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_export_utils import ExportFormatter, \
     AlleleGroup, ConflictStrategy
+from library.django_utils import get_url_from_view_path
 
 
 @dataclass(frozen=True, eq=True)

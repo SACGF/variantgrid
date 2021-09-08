@@ -1,29 +1,28 @@
 from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
+from classification.views import clinvar_export_view
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, classification_import_upload_view, \
     classification_accumulation_graph
-from classification.views.classification_import_upload_view import UploadedFileLabColumns
-from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
-from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
-    ConditionTextColumns, ConditionTextMatchingAPI
-from classification.views import clinvar_export_view
-from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
-from classification.views.evidence_keys_view import EvidenceKeysView
-from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns
 from classification.views.classification_dashboard_view import problem_download
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
+from classification.views.classification_import_upload_view import UploadedFileLabColumns
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
+from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
+from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
+    ConditionTextColumns, ConditionTextMatchingAPI
+from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
+from classification.views.evidence_keys_view import EvidenceKeysView
+from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns
 from classification.views.views import classification_import_tool, AutopopulateView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
-
 
 router = routers.DefaultRouter()
 

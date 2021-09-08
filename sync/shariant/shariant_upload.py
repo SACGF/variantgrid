@@ -1,9 +1,13 @@
+import json
 from typing import Dict, Optional
 
-from django.db.models.query_utils import Q
-import json
 import requests
+from django.db.models.query_utils import Q
 
+from classification.enums.classification_enums import ShareLevel
+from classification.models import EvidenceKeyMap
+from classification.models.classification import ClassificationModification
+from classification.models.classification_utils import ClassificationJsonParams
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
 from library.utils import batch_iterator
@@ -11,10 +15,6 @@ from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
-from classification.enums.classification_enums import ShareLevel
-from classification.models import EvidenceKeyMap
-from classification.models.classification import ClassificationModification
-from classification.models.classification_utils import ClassificationJsonParams
 
 SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use']
 

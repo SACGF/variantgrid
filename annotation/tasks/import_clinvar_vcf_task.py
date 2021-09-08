@@ -1,7 +1,6 @@
 import logging
 
 from annotation.models.models import ClinVarVersion
-from annotation.tasks.calculate_sample_stats import calculate_needed_stats
 from annotation.vcf_files.import_clinvar_vcf import import_clinvar_vcf, \
     check_can_import_clinvar
 from upload.models import UploadedClinVarVersion

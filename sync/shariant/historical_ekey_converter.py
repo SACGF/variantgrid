@@ -1,10 +1,11 @@
-from collections import Mapping
-from django.contrib.auth.models import User
 import copy
+from collections import Mapping
 
-from library.utils import is_not_none
-from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType
+from django.contrib.auth.models import User
+
 from classification.models.classification import Classification
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType
+from library.utils import is_not_none
 
 
 class HistoricalEKeyConverter:

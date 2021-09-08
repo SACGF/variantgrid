@@ -1,13 +1,12 @@
+import json
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Any, Union
 
 from Bio import Entrez, Medline
-import json
 
 from annotation.models import Citation
 from annotation.models.models import CachedCitation, CitationException
 from annotation.models.models_enums import CitationSource
-
 # @param id The primary key of the Citation that led to this CitationDetails
 # @param citation_id The id as it's known in the external database, e.g. PMID:9003501 has a citation_id of 9003501
 from library.log_utils import report_exc_info, report_message

@@ -1,9 +1,10 @@
 import logging
+import os
 import subprocess
+from collections import defaultdict, Counter
 from subprocess import check_output
 from typing import List, Optional
 
-from collections import defaultdict, Counter
 from django.conf import settings
 from django.contrib import messages
 from django.http.response import HttpResponse, HttpResponseRedirect, Http404, \
@@ -14,8 +15,6 @@ from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-import os
-
 from htmlmin.decorators import not_minified_response
 
 from annotation.annotation_versions import get_variant_annotation_version

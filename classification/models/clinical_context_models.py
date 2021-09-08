@@ -1,29 +1,28 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import List, Optional, Iterable, Set
 
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
-import django.dispatch
 from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from typing import List, Optional, Iterable, Set
-
 from lazy import lazy
 
+from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums.clinical_context_enums import ClinicalContextStatus
+from classification.models.classification import Classification, \
+    ClassificationModification
+from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.log_utils import report_message
 from snpdb.models import Variant, Lab
 from snpdb.models.models_variant import Allele
-from classification.enums import ShareLevel, SpecialEKeys
-from classification.enums.clinical_context_enums import ClinicalContextStatus
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification import Classification, \
-    ClassificationModification
 
 clinical_context_signal = django.dispatch.Signal(providing_args=["clinical_context", "status", "is_significance_change", "cause"])
 

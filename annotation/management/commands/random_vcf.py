@@ -1,10 +1,11 @@
-from django.core.management.base import BaseCommand
 import itertools
-from random import randrange
 import sys
+from random import randrange
 
-from snpdb.vcf_export_utils import get_vcf_header_from_contigs
+from django.core.management.base import BaseCommand
+
 from snpdb.models import GenomeBuild
+from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 MAX_SIZE = 1000000
 

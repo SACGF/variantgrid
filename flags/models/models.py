@@ -1,6 +1,10 @@
+import datetime
+from collections import defaultdict
 from functools import total_ordering, reduce
 from operator import __and__
+from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar
 
+import django.dispatch
 from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models import Q
@@ -9,11 +13,7 @@ from django.db.models.expressions import Subquery
 from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from collections import defaultdict
 from lazy import lazy
-from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar
-import datetime
-import django.dispatch
 
 from flags.models.enums import FlagStatus
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin

@@ -1,3 +1,8 @@
+import logging
+import os
+import re
+import sys
+import traceback
 from typing import Any, List
 
 import cyvcf2
@@ -6,22 +11,17 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone
 from django_messages.models import Message
-import logging
-import os
-import re
-import sys
-import traceback
 
 from library.guardian_utils import assign_permission_to_user_and_groups
-from library.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant,\
+from library.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant, \
     cyvcf2_get_contig_lengths_dict
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
     SampleFromSequencingSample, QCGeneList
 from seqauto.signals import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
     Cohort, CohortSample, UserSettings, VCFSourceSettings
-from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ImportSource, VariantsType
+from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
     BackendVCF, UploadStep, ModifiedImportedVariants, UploadStepTaskType, VCFPipelineStage

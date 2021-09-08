@@ -1,5 +1,6 @@
-from typing import Dict, List, Optional, Set
 from collections import defaultdict
+from typing import Dict, List, Optional, Set
+
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel

@@ -1,8 +1,8 @@
-from django.core.management.base import BaseCommand
 import pandas as pd
-from seqauto.models import SoftwarePipeline, SoftwarePipelineNode, SoftwarePipelineEdge
-from library.log_utils import console_logger
+from django.core.management.base import BaseCommand
 
+from library.log_utils import console_logger
+from seqauto.models import SoftwarePipeline, SoftwarePipelineNode, SoftwarePipelineEdge
 
 PIPELINE_NAME = "Pipeline Name"
 PIPELINE_VERSION = "Pipeline Version"

@@ -1,11 +1,11 @@
-from django.conf import settings
-from django.db import models
-from django.db.models.deletion import CASCADE
-from django.db.models.query_utils import Q
 import itertools
 import os
 from typing import Dict, Optional, List
 
+from django.conf import settings
+from django.db import models
+from django.db.models.deletion import CASCADE
+from django.db.models.query_utils import Q
 from lazy import lazy
 
 from genes.models_enums import AnnotationConsortium

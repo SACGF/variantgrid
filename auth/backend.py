@@ -1,7 +1,8 @@
+import json
+
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
-import json
 
 from snpdb.models import UserSettingsOverride
 

@@ -17,6 +17,8 @@ from pyhgvs import HGVSName
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from annotation.models.models import AnnotationVersion
+from classification.models.classification import ClassificationModification, Classification, \
+    CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias, \
     BadTranscript
@@ -33,8 +35,6 @@ from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, D
     ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
-from classification.models.classification import ClassificationModification, Classification, \
-    CreateNoClassificationForbidden
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
 

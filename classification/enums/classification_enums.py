@@ -1,9 +1,9 @@
 import typing
 from enum import Enum
-
-from django.contrib.auth.models import User
 from functools import total_ordering
 from typing import List, Optional, Union
+
+from django.contrib.auth.models import User
 
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum

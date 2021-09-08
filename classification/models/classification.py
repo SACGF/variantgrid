@@ -1,9 +1,14 @@
-from collections import Counter, namedtuple
 import copy
+import logging
+import re
+import uuid
+from collections import Counter, namedtuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
 
+import django.dispatch
 import pytz
 from datetimeutc.fields import DateTimeUTCField
 from django.conf import settings
@@ -16,18 +21,22 @@ from django.db.models.expressions import RawSQL, OuterRef, Value, Subquery
 from django.db.models.functions import LPad, Cast, Concat
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
-import django.dispatch
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
-import logging
-import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
-import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
+from annotation.regexes import db_ref_regexes, DbRegexes
+from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
+    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
+from classification.models.classification_utils import \
+    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta
+from classification.models.evidence_key import EvidenceKeyValueType, \
+    EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
+from classification.models.evidence_mixin import EvidenceMixin, VCPatch
+from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
@@ -41,15 +50,6 @@ from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
-from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
-    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
-from classification.models.evidence_key import EvidenceKeyValueType, \
-    EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
-from classification.models.evidence_mixin import EvidenceMixin, VCPatch
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification_utils import \
-    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta
-from annotation.regexes import db_ref_regexes, DbRegexes
 
 ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 

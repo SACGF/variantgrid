@@ -1,17 +1,16 @@
 import csv
+import logging
+import os
 from typing import Optional
 
 import cyvcf2
+import numpy as np
 from django.conf import settings
-import logging
-import os
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.git import Git
 from library.postgres_utils import postgres_arrays
-import numpy as np
-
 from library.utils import double_quote
 from library.vcf_utils import VCFConstant, cyvcf2_gt_types
 from patients.models_enums import Zygosity

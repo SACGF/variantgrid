@@ -1,7 +1,7 @@
+import re
 from enum import Enum
 from operator import attrgetter
 from re import RegexFlag
-import re
 from typing import List, Union, Match, Dict, Optional
 
 from annotation.models.models import Citation

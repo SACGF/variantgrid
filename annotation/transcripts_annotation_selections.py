@@ -1,8 +1,9 @@
+import operator
+
 from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils.timesince import timesince
 from lazy import lazy
-import operator
 
 from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \

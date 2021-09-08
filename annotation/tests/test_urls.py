@@ -1,6 +1,6 @@
-from django.contrib.auth.models import User
 import unittest
 
+from django.contrib.auth.models import User
 from django.db import IntegrityError
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \

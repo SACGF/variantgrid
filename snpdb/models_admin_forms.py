@@ -1,9 +1,10 @@
+import re
+
 from django.contrib import admin
 from unidecode import unidecode
 
 from snpdb.admin_utils import ModelAdminBasics
 from snpdb.models import Organization, Lab
-import re
 
 
 def make_code_friendly(text: str) -> str:

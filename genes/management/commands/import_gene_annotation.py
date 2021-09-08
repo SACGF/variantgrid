@@ -5,25 +5,25 @@ See [annotation] page for instructions
 GenePred is way easier to parse, but also want GFF3 as then we can have gene ID, biotype and description etc
 
 """
+import os
+import re
 from collections import Counter, defaultdict
 from typing import Tuple, Optional
 
 from django.core.management.base import BaseCommand
 from pyhgvs.utils import read_genepred
-import os
-import re
 
+from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
 from genes.gene_matching import GeneMatcher
 from genes.models import GeneAnnotationImport, HGNC, \
     GeneSymbol, Gene, GeneVersion, Transcript, TranscriptVersion, GeneAnnotationRelease, ReleaseGeneVersion, \
     ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
-from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
 from library.django_utils import highest_pk
 from library.file_utils import open_handle_gzip
 from library.utils import invert_dict
-from snpdb.models.models_genome import GenomeBuild, GenomeFasta
 from snpdb.models.models_enums import SequenceRole
+from snpdb.models.models_genome import GenomeBuild, GenomeFasta
 
 
 class Command(BaseCommand):

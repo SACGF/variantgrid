@@ -1,4 +1,5 @@
 import os
+
 from variantgrid.settings.components.default_settings import BASE_DIR, MANAGE_COMMAND, PRIVATE_DATA_ROOT
 
 SEQAUTO_ENABLED = False

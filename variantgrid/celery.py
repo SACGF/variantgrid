@@ -4,13 +4,14 @@
     http://celery.readthedocs.org/en/latest/django/first-steps-with-django.html
 """
 
-from celery import Celery
-import celery
-from celery.schedules import crontab
-from django.conf import settings
 import logging
 import os
+
+import celery
 import rollbar
+from celery import Celery
+from celery.schedules import crontab
+from django.conf import settings
 
 from library.constants import HOUR_SECS, MINUTE_SECS
 from library.django_utils.rollbar_middleware import RollbarIgnoreException

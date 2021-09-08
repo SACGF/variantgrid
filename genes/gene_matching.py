@@ -1,10 +1,10 @@
+import re
 from collections import defaultdict
 from typing import Iterable, Dict, List
 
 from django.db.models import F, Q, Subquery, OuterRef
 from django.db.models.functions import Upper
 from lazy import lazy
-import re
 
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAnnotationRelease, GeneVersion, \
     ReleaseGeneSymbol, ReleaseGeneSymbolGene, HGNC

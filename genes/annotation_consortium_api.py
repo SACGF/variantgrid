@@ -1,7 +1,8 @@
-from Bio import Entrez
 from typing import Tuple
 from urllib.error import HTTPError
+
 import requests
+from Bio import Entrez
 
 from genes.models_enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild

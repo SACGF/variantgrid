@@ -1,5 +1,6 @@
-import celery
 from collections import Counter, defaultdict
+
+import celery
 
 from analysis.models.models_karyomapping import KaryotypeBins, GenomeKaryomappingCounts, ContigKaryomappingCounts
 from snpdb.models import Trio

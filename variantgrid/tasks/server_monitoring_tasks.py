@@ -1,11 +1,11 @@
 from typing import List, Tuple
 
+import celery
+import requests
 from django.conf import settings
 
 from library.file_utils import get_disk_usage
 from library.log_utils import report_message
-import celery
-import requests
 
 
 def get_disk_messages(directories_list: List[str] = None, info_messages=False) -> List[Tuple[str, str]]:

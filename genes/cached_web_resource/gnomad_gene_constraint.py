@@ -10,13 +10,13 @@ SA Path use gnomad_oe_lof EKey which looks like:
 
 """
 import gzip
+
+import pandas as pd
 import requests
 
-from genes.models import GnomADGeneConstraint,\
+from genes.models import GnomADGeneConstraint, \
     Transcript, GeneVersion
 from genes.models_enums import AnnotationConsortium
-import pandas as pd
-
 from library.pandas_utils import df_nan_to_none
 
 

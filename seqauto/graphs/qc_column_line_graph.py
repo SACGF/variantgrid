@@ -1,8 +1,8 @@
 import hashlib
 import logging
 
-from snpdb.graphs.graphcache import CacheableGraph
 from seqauto.models import QC, QCColumn
+from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models import DataState
 
 

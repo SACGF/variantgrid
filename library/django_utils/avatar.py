@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+
 from library.utils import string_deterministic_hash
 
 

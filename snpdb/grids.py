@@ -1,10 +1,11 @@
+import operator
+from functools import reduce
+
 from django.conf import settings
 from django.db.models import F
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from functools import reduce
 from guardian.shortcuts import get_objects_for_user
-import operator
 
 from library.database_utils import get_queryset_column_names, \
     get_queryset_select_from_where_parts

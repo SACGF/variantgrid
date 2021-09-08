@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List, Iterable
+from typing import Dict, Any, Optional, Iterable
 
 from django.conf import settings
 from django.contrib.auth.decorators import user_passes_test
@@ -7,8 +7,8 @@ from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.shortcuts import render
-from pytz import timezone
 from django.utils.timezone import now
+from pytz import timezone
 from requests.models import Response
 
 from classification.models import Classification, classification_flag_types

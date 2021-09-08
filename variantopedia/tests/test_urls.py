@@ -1,5 +1,6 @@
-from django.contrib.auth.models import User
 import unittest
+
+from django.contrib.auth.models import User
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants, create_fake_variant_annotation
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version

@@ -1,4 +1,5 @@
 from kombu import Exchange, Queue
+
 from variantgrid.settings.components.secret_settings import get_secret
 
 # Using RabbitMQ as Redis broker was re-executing long tasks (eg variant annotation)

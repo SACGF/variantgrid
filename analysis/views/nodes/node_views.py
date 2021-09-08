@@ -1,8 +1,7 @@
-from typing import Tuple
+import json
 
 from django.conf import settings
 from django.http.response import HttpResponse
-import json
 
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
@@ -30,12 +29,11 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
+from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
 from snpdb.models.models_variant import Variant
-from snpdb.models.models_vcf import Sample
-from classification.models.classification import Classification
 
 
 class AllVariantsNodeView(NodeView):

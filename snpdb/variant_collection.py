@@ -1,5 +1,7 @@
-from django.db import connection
 import logging
+
+from django.db import connection
+
 
 # TODO: Could possibly use QS ops - https://docs.djangoproject.com/en/2.0/ref/models/querysets/#union
 # Rewritten as original implementation had problems when joining to a table with multiple entries for a variant

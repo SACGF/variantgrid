@@ -1,6 +1,6 @@
+import operator
 import re
 from functools import reduce
-import operator
 from typing import List, Dict
 
 from django.db.models import Q

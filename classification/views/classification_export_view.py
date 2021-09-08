@@ -1,5 +1,6 @@
+import re
 from datetime import datetime, timedelta
-from django.utils import timezone
+from typing import List
 from urllib.parse import unquote_plus
 
 from django.db.models import QuerySet
@@ -7,16 +8,12 @@ from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render
 from django.urls.base import reverse
+from django.utils import timezone
 from htmlmin.decorators import not_minified_response
 from requests.models import Response
 from rest_framework.request import Request
 from rest_framework.views import APIView
-from typing import List
 
-from library.django_utils import get_url_from_view_path
-from snpdb.models.models import Lab, Organization
-from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_user_settings import UserSettings
 from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
@@ -31,7 +28,10 @@ from classification.views.classification_export_report import ExportFormatterRep
 from classification.views.classification_export_utils import ConflictStrategy, \
     VCFEncoding, BaseExportFormatter
 from classification.views.classification_export_vcf import ExportFormatterVCF
-import re
+from library.django_utils import get_url_from_view_path
+from snpdb.models.models import Lab, Organization
+from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_user_settings import UserSettings
 
 
 def parse_since(since_str: str) -> datetime:

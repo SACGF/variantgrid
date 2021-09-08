@@ -1,8 +1,9 @@
 import abc
+import logging
+
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models.query_utils import InvalidQuery
-import logging
 
 from library.database_utils import iter_dictfetchall
 from library.jqgrid_user_row_config import JqGridUserRowConfig

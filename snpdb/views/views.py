@@ -1,8 +1,11 @@
 import itertools
+import json
+import logging
+from collections import OrderedDict, defaultdict
 from typing import Iterable
 
+import pandas as pd
 from celery.result import AsyncResult
-from collections import OrderedDict, defaultdict
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
@@ -19,8 +22,6 @@ from django.views.decorators.vary import vary_on_cookie
 from django_messages.models import Message
 from global_login_required import login_not_required
 from guardian.shortcuts import get_objects_for_group, get_objects_for_user
-import json
-import logging
 from termsandconditions.decorators import terms_required
 
 from analysis.analysis_templates import get_sample_analysis
@@ -32,7 +33,9 @@ from annotation.models import AnnotationVersion
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
+from classification.classification_stats import get_grouped_classification_counts
 from classification.models.clinvar_export_sync import clinvar_export_sync
+from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
@@ -41,8 +44,6 @@ from library.django_utils import add_save_message, get_model_fields, set_form_re
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
-import pandas as pd
-
 from ontology.models import OntologyTerm
 from patients.forms import PatientForm
 from patients.models import Patient, Clinician
@@ -51,7 +52,7 @@ from snpdb import forms
 from snpdb.bam_file_path import get_example_replacements
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
-    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm, ProjectChoiceForm
+    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
 from snpdb.graphs import graphcache
 from snpdb.graphs.allele_frequency_graph import AlleleFrequencyHistogramGraph
 from snpdb.graphs.chromosome_density_graph import SampleChromosomeDensityGraph
@@ -69,8 +70,6 @@ from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFil
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
 from upload.uploaded_file_type import retry_upload_pipeline
-from classification.classification_stats import get_grouped_classification_counts
-from classification.views.classification_datatables import ClassificationColumns
 
 
 @terms_required

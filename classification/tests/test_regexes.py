@@ -1,5 +1,7 @@
 from django.test.testcases import TestCase
+
 from annotation.regexes import db_ref_regexes, DbRegexes
+
 
 class RegexTests(TestCase):
 

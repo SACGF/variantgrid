@@ -1,5 +1,6 @@
-from email_manager.models import EmailLog
 from django.contrib import admin
+
+from email_manager.models import EmailLog
 
 
 @admin.register(EmailLog)

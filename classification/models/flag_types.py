@@ -1,5 +1,7 @@
 from lazy import lazy
+
 from flags.models.models import FlagType, FlagTypeContext
+
 
 class ClassificationFlagTypes:
 

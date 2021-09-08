@@ -1,8 +1,8 @@
+import logging
 import sys
 
 from django.db.models.aggregates import Max, Min, Count
 from django.utils import timezone
-import logging
 
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models import AnnotationRangeLock, Variant

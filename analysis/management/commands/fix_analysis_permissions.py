@@ -1,7 +1,6 @@
 from django.core.management.base import BaseCommand
 
 from analysis.models.models_analysis import Analysis
-
 # Analysis templates didn't set permissions correctly until fix on October 19th 2020
 # Need to fix legacy data created in systems before this fix: https://github.com/SACGF/variantgrid/issues/84
 # Can be removed once environments fixed

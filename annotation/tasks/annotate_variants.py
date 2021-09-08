@@ -1,9 +1,10 @@
+import logging
+import os
+
+import celery
 from celery import chain
 from django.conf import settings
 from django.utils import timezone
-import celery
-import logging
-import os
 
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models import AnnotationStatus, GenomeBuild

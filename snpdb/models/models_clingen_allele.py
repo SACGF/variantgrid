@@ -1,10 +1,9 @@
+import re
 from typing import Dict, Optional, Tuple
 
 from django.conf import settings
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
-import re
-
 from lazy import lazy
 from pyhgvs import HGVSName
 

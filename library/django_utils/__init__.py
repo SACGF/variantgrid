@@ -1,7 +1,11 @@
-from collections import defaultdict
 import datetime
+import operator
+from collections import defaultdict
+from functools import reduce
+from functools import wraps, partial
 from typing import List, Tuple, Dict
 
+import nameparser
 from dateutil import parser
 from django.conf import settings
 from django.contrib import messages
@@ -14,10 +18,6 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse_lazy
 from django.utils import timezone
 from django.utils.timezone import localtime
-from functools import reduce
-from functools import wraps, partial
-import nameparser
-import operator
 from redis import Redis
 
 from library.utils import invert_dict

@@ -1,8 +1,7 @@
 from django.contrib import admin
-from django.contrib.admin import RelatedFieldListFilter, AllValuesFieldListFilter, TabularInline
+from django.contrib.admin import RelatedFieldListFilter, TabularInline
 
-from flags import models
-from flags.models import FlagStatus, Flag, FlagComment, FlagResolution, FlagTypeResolution, FlagCollection
+from flags.models import Flag, FlagComment, FlagTypeResolution, FlagCollection
 from flags.models.models import FlagType
 from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
 

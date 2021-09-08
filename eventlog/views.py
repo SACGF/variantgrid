@@ -1,11 +1,11 @@
+import logging
+
 from django.http import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-import logging
 
-from eventlog.grids import EventColumns
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
 

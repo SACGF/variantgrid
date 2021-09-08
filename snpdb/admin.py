@@ -1,6 +1,7 @@
 from typing import List
 
 from django.contrib import admin, messages
+
 from snpdb import models
 from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
     admin_action

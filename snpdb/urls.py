@@ -5,7 +5,6 @@ from rest_framework.documentation import include_docs_urls
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from library.django_utils.jqgrid_view import JQGridView
-
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionListGrid, TriosListGrid, VCFListGrid
 from snpdb.views import views, views_json, views_rest, \

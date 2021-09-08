@@ -1,16 +1,15 @@
 import json
-
-# Copied from and full credit to django-datatables-view
-# https://pypi.org/project/django-datatables-view/
+import logging
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponse
+from django.utils.cache import add_never_cache_headers
 from django.utils.encoding import force_text
 from django.utils.functional import Promise
-from django.utils.cache import add_never_cache_headers
 from django.views.generic.base import TemplateView
 
-import logging
+# Copied from and full credit to django-datatables-view
+# https://pypi.org/project/django-datatables-view/
 logger = logging.getLogger(__name__)
 
 

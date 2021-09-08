@@ -1,5 +1,9 @@
+import collections
 import logging
+import re
+from typing import Optional, Pattern, Tuple, Iterable, Set
 
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError
@@ -14,10 +18,6 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
-from typing import Optional, Pattern, Tuple, Iterable, Set
-import collections
-import django.dispatch
-import re
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
@@ -27,8 +27,8 @@ from library.utils import md5sum_str
 from snpdb.models import Wiki
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = r"^([^:]+):(\d+)$"

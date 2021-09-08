@@ -1,5 +1,4 @@
 from django.template import Library
-import json
 
 register = Library()
 

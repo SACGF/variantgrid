@@ -3,8 +3,8 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
 from django_extensions.db.models import TimeStampedModel
 
-from sync.models.models import SyncRun, SyncDestination
 from classification.models.classification import ClassificationModification
+from sync.models.models import SyncRun, SyncDestination
 
 
 class ClassificationModificationSyncRecord(TimeStampedModel):

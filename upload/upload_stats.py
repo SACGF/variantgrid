@@ -1,11 +1,12 @@
 from collections import Counter, defaultdict
+
+import numpy as np
+import pandas as pd
 from django.db.models import ExpressionWrapper, F, fields
 from django.db.models.aggregates import Sum, Count
 from django.utils import timezone
 from django.utils.datastructures import OrderedSet
 
-import numpy as np
-import pandas as pd
 from snpdb.models import VCF
 from upload.models import UploadStep
 

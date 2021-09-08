@@ -1,11 +1,11 @@
 from django.dispatch.dispatcher import receiver
 
+from classification.models.classification import Classification
 from flags.models import FlagStatus
 from genes.hgvs import HGVSMatcher
 from snpdb.models import GenomeBuild
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_variant import Allele, allele_validate_signal
-from classification.models.classification import Classification
 
 
 @receiver(allele_validate_signal, sender=Allele)

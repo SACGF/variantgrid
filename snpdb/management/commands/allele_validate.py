@@ -1,5 +1,7 @@
 from django.core.management import BaseCommand
+
 from snpdb.models import Allele
+
 
 class Command(BaseCommand):
 

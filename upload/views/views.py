@@ -1,4 +1,8 @@
+import json
+import logging
+import os
 from datetime import date, timedelta
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -10,10 +14,6 @@ from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 from django_downloadview import PathDownloadView
 from jfu.http import upload_receive, UploadResponse, JFUResponse
-import json
-import logging
-import os
-
 from lazy import lazy
 
 from annotation.views import get_build_contigs
@@ -28,7 +28,6 @@ from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, Upload
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
     retry_upload_pipeline
-
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.GENE_LIST: "uploaded_gene_list",

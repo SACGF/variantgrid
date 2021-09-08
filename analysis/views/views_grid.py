@@ -1,4 +1,5 @@
 import logging
+import re
 from io import StringIO
 from urllib.parse import urlencode
 
@@ -8,8 +9,6 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
-import re
-
 from vcf import Writer, Reader
 from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 
@@ -17,11 +16,11 @@ from analysis import grids
 from analysis.models import AnalysisNode
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView
-from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 from library.constants import WEEK_SECS
 from library.jqgrid_export import grid_export_csv, StashFile
 from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity
 from snpdb.models.models_variant import Variant
+from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')

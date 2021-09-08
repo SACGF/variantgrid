@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from uicore.json.json_utils import JsonDiff, JsonDiffs
+from uicore.json.json_utils import JsonDiffs
 from uicore.json.validated_json import JsonMessages, ValidatedJson
 
 

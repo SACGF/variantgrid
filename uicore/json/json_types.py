@@ -1,4 +1,4 @@
-from typing import Union, Dict, Any, List
+from typing import Union, Dict, List
 
 # JSON Types, more useful just as documenting than for static type checking
 

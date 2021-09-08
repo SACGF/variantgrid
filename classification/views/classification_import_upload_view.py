@@ -1,7 +1,8 @@
 import os
 import re
-from django.contrib.auth.models import User
+
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
@@ -10,7 +11,7 @@ from django.views import View
 
 from classification.models.upload_file_lab import UploadedFileLab, UploadedFileLabStatus
 from library.django_utils import get_url_from_view_path
-from library.log_utils import report_event, NotificationBuilder
+from library.log_utils import NotificationBuilder
 from library.utils import filename_safe
 from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder

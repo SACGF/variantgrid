@@ -1,11 +1,12 @@
+import os
+
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.urls.base import reverse
-import os
 
+from classification.models.classification import Classification
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.enums.file_attachments import AttachmentFileType
-from classification.models.classification import Classification
 
 
 class ClassificationAttachment(models.Model):

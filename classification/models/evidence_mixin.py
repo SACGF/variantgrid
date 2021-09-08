@@ -1,14 +1,16 @@
+import re
 from functools import total_ordering
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
+
+from django.conf import settings
 from lazy import lazy
+
 from annotation.models import Citation, CitationSource
+from classification.enums import SpecialEKeys, CriteriaEvaluation
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild
-from classification.enums import SpecialEKeys, CriteriaEvaluation
-from django.conf import settings
-import re
 
 
 class VCDbRefDict(TypedDict, total=False):

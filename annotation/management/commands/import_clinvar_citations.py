@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-from django.core.management.base import BaseCommand
 import logging
+
+import pandas as pd
+from django.core.management.base import BaseCommand
 
 from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection, Citation
 from annotation.models.models_enums import CitationSource
 from library.file_utils import file_md5sum
 from library.guardian_utils import admin_bot
 from library.utils import invert_dict
-import pandas as pd
 from snpdb.models.models_enums import ImportSource
 from upload.models import UploadedFile, UploadedFileTypes, UploadedClinVarCitations
 

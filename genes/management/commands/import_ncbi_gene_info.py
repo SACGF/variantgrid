@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
+import pandas as pd
 # Data can be downloaded here:
 # * ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
 from django.core.management.base import BaseCommand
-from genes.models import GeneSymbol, GeneSymbolAlias
-import pandas as pd
 
+from genes.models import GeneSymbol, GeneSymbolAlias
 from genes.models_enums import GeneSymbolAliasSource
 
 

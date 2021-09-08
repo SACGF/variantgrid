@@ -1,20 +1,22 @@
 import operator
 from functools import reduce
 from typing import Dict, Any, List, Optional
+
 from django.conf import settings
 from django.db.models import Q, Subquery, When, Case, TextField, Value, IntegerField, QuerySet
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
 from lazy import lazy
+
+from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
+from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
 from genes.models import TranscriptVersion
 from ontology.models import OntologyTerm
 from snpdb.models import UserSettings, GenomeBuild, Variant, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
-from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
-from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
 from uicore.json.json_types import JsonDataType
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']

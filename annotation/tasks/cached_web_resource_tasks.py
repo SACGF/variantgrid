@@ -1,5 +1,6 @@
-from celery.app.task import Task
 import logging
+
+from celery.app.task import Task
 
 from annotation.clingen.gene_validity import store_clingen_gene_validity_curations_from_web
 from annotation.models.models import CachedWebResource

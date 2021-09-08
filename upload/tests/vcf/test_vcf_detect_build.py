@@ -1,7 +1,8 @@
-from django.conf import settings
-from django.test import TestCase
 import os
 from unittest import skip
+
+from django.conf import settings
+from django.test import TestCase
 
 from upload.vcf.vcf_import import vcf_detect_genome_build, GenomeBuildDetectionException
 

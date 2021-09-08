@@ -1,5 +1,6 @@
-from django.conf import settings
 import logging
+
+from django.conf import settings
 
 from library.file_utils import IteratorFile
 from upload.vcf.sql_copy_files import sql_copy_csv_file

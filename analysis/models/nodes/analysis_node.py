@@ -27,6 +27,7 @@ from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeEr
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from classification.models import Classification, post_delete
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event
@@ -34,7 +35,6 @@ from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource
 from snpdb.variant_collection import write_sql_to_variant_collection
-from classification.models import Classification, post_delete
 from variantgrid.celery import app
 
 

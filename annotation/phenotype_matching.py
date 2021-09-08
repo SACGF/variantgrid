@@ -1,17 +1,15 @@
+import logging
+import time
 from typing import List, Optional, Iterable
 
-from django.db.models import Count
-import logging
 import nltk
-import time
-
+from django.db.models import Count
 
 from annotation.models.models_phenotype_match import PhenotypeMatchTypes, \
     TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, TextPhenotypeSentence
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
 from library.utils import get_and_log_time_since, invert_dict_of_lists
 from patients.models import Patient
-
 
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
 

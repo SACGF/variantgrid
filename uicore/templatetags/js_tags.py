@@ -1,3 +1,5 @@
+import json
+import re
 import urllib
 from decimal import Decimal
 from html import escape
@@ -5,13 +7,10 @@ from typing import Union, Any, Optional
 
 from django import template
 from django.utils.safestring import mark_safe
-import json
-import re
 
-
-from uicore.json.validated_json import ValidatedJson
-from uicore.json.json_types import JsonDataType
 from library.utils import format_significant_digits
+from uicore.json.json_types import JsonDataType
+from uicore.json.validated_json import ValidatedJson
 
 register = template.Library()
 

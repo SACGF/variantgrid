@@ -1,11 +1,11 @@
+import logging
 import operator
+import shutil
 from collections import defaultdict
 from typing import Tuple, Optional
 
 from django.conf import settings
 from lazy import lazy
-import logging
-import shutil
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \

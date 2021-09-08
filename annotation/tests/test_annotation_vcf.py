@@ -1,8 +1,9 @@
+import os
+from uuid import uuid4
+
 from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
-import os
-from uuid import uuid4
 
 from annotation.annotation_versions import get_variant_annotation_version, \
     get_annotation_range_lock_and_unannotated_count
@@ -15,7 +16,6 @@ from annotation.vep_annotation import vep_parse_version_line, get_vep_version_fr
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
-
 
 TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
                                           "test", str(uuid4()))

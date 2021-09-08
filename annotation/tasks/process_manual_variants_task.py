@@ -1,7 +1,7 @@
+import logging
 from typing import List
 
 from django.db.models.query_utils import Q
-import logging
 
 from annotation.models import ManualVariantEntryType
 from annotation.models.models import CreatedManualVariant, ManualVariantEntry

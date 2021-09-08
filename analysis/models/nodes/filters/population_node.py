@@ -1,22 +1,21 @@
+import operator
+from functools import reduce
 from typing import Optional
 
 from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
-from functools import reduce
-import operator
-
 from lazy import lazy
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation import population_frequency
 from annotation.models.models import VariantAnnotation
-from patients.models_enums import SimpleZygosity, GnomADPopulation
-from snpdb.models import Sample, VariantZygosityCountCollection
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
+from patients.models_enums import SimpleZygosity, GnomADPopulation
+from snpdb.models import Sample, VariantZygosityCountCollection
 
 
 class PopulationNode(AnalysisNode):

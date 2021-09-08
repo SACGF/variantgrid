@@ -3,7 +3,7 @@ from typing import TypedDict
 from django.template import Library
 from django.urls import reverse
 
-from snpdb.models import UserSettings, GenomeBuild
+from snpdb.models import GenomeBuild
 
 register = Library()
 

@@ -1,8 +1,9 @@
+import logging
+import os
+
 import cyvcf2
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-import logging
-import os
 
 from annotation.models import ClinVarReviewStatus, Variant
 from annotation.models.models import ClinVar, ClinVarVersion

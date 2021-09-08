@@ -4,11 +4,11 @@ from model_utils.managers import InheritanceManager
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import VariantAnnotationVersion, VariantAnnotation
+from classification.models import Classification, ClassificationModification
 from genes.models import Gene
 from library.utils import rgb_invert
 from snpdb.models import Sample, Cohort, ShareLevel, GenomeBuild, Variant
 from snpdb.models.models_enums import ProcessingStatus
-from classification.models import Classification, ClassificationModification
 from variantgrid.celery import app
 
 

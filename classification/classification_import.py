@@ -4,6 +4,8 @@ from typing import List, Dict, Tuple
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
+from classification.models.classification import ClassificationImport, Classification
+from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
 from library.vcf_utils import write_vcf_from_tuples
@@ -15,9 +17,6 @@ from upload.models import UploadedFile, UploadPipeline, UploadStep, \
 from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, \
     UploadStepTaskType, VCFPipelineStage
 from upload.upload_processing import process_upload_pipeline
-from classification.models.classification import ClassificationImport, Classification
-from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
-
 
 # MAX_VCF_FIELD_LENGTH = 131072
 MAX_VCF_FIELD_LENGTH = 1000  # while maximum is much larger than this, it indicated a problem

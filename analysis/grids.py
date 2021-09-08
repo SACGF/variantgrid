@@ -1,6 +1,6 @@
-import pandas as pd
 from typing import Dict, List, Tuple
 
+import pandas as pd
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, F, Q
 from django.urls.base import reverse

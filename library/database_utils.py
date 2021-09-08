@@ -1,5 +1,5 @@
-from django.db import connection, transaction
 import sqlparse
+from django.db import connection, transaction
 
 
 #970: Added transaction wrapper due to Postgres hanging query

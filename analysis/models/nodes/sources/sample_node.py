@@ -1,11 +1,11 @@
+import operator
+from functools import reduce
 from typing import Optional, List
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import SET_NULL
 from django.db.models.query_utils import Q
-from functools import reduce
-import operator
 
 from analysis.models import GeneCoverageMixin
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter

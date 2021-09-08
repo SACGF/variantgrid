@@ -1,6 +1,7 @@
+import logging
+
 import celery
 from django.contrib.auth.models import User
-import logging
 
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from library.log_utils import log_traceback

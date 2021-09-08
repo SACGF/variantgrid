@@ -1,6 +1,8 @@
 import logging
 from collections import Counter
 from collections import defaultdict
+
+import pandas as pd
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import Q, TextField
 from lazy import lazy
@@ -10,7 +12,6 @@ from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
 from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, VCF
-import pandas as pd
 
 
 class VariantSampleInformation:

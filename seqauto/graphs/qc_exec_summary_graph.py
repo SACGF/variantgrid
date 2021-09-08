@@ -1,4 +1,5 @@
 import hashlib
+
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 

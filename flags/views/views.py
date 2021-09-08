@@ -1,10 +1,11 @@
+import datetime
+from typing import Iterable, Dict, Any, Union, List, Optional
+
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.timezone import now
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from typing import Iterable, Dict, Any, Union, List, Optional
-import datetime
 
 from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagWatch
 from flags.models.enums import FlagStatus

@@ -1,9 +1,10 @@
+import json
+import urllib
+from typing import List, Optional, Dict
+
+import requests
 from django.conf import settings
 from django.contrib.auth.models import User
-import json
-import requests
-from typing import List, Optional, Dict
-import urllib
 
 from library.oauth import OAuthConnector
 from snpdb.models.models import Lab

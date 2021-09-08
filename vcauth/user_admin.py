@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin
+
 from classification.views.classification_email_view import send_summary_email_to_user
 
 

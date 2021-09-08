@@ -9,11 +9,12 @@ Steps are:
     4. Cat them all together again
 """
 
-from argparse import ArgumentParser
-from cyvcf2 import VCF
-from datetime import datetime
 import gzip
 import os
+from argparse import ArgumentParser
+from datetime import datetime
+
+from cyvcf2 import VCF
 
 GRCh37 = "GRCh37"
 GRCh38 = "GRCh38"

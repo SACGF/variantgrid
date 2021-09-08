@@ -1,5 +1,7 @@
 from django.conf import settings
 
+from classification.models.classification import ClassificationImport, \
+    ClassificationImportAlleleSource, Classification
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
@@ -7,8 +9,6 @@ from snpdb.models import GenomeBuild, ImportSource, Variant
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import ModifiedImportedVariant, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
-from classification.models.classification import ClassificationImport,\
-    ClassificationImportAlleleSource, Classification
 from variantgrid.celery import app
 
 

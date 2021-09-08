@@ -7,8 +7,8 @@ from django.db import models
 from django.db.models import Q, CASCADE, SET_NULL
 from lazy import lazy
 
-from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from genes.models import GeneSymbol
 from snpdb.models import Variant, VariantZygosityCountCollection
 

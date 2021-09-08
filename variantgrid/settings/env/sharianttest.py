@@ -4,7 +4,6 @@ Shariant - https://shariant.org.au
 See https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup
 
 """
-import json
 
 from variantgrid.settings.env.shariant import *  # pylint: disable=wildcard-import, unused-wildcard-import
 

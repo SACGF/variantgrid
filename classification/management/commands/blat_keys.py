@@ -12,10 +12,11 @@ Migrations for 'classification':
 
 """
 
-from django.core.management.base import BaseCommand
-from django.utils import timezone
 import os
 import re
+
+from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from classification.models.evidence_key import EvidenceKey
 

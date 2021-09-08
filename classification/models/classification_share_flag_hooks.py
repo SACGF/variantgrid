@@ -3,11 +3,11 @@ from django.db.models.signals import post_save
 from django.dispatch.dispatcher import receiver
 
 from classification.enums.classification_enums import ShareLevel, SpecialEKeys, ClinicalSignificance
-from classification.models.evidence_key import EvidenceKey
-from classification.models.flag_types import classification_flag_types
 from classification.models.classification import \
     Classification, classification_post_publish_signal, \
     classification_revalidate_signal
+from classification.models.evidence_key import EvidenceKey
+from classification.models.flag_types import classification_flag_types
 
 
 @receiver(classification_revalidate_signal, sender=Classification)

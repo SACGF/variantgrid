@@ -1,5 +1,6 @@
-from django.conf import settings
 import logging
+
+from django.conf import settings
 
 from annotation.models.models import CachedWebResource
 from genes.models import GeneListCategory

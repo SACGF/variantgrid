@@ -1,13 +1,11 @@
+import logging
 from typing import Optional
 
-import logging
-
-from patients.models_enums import Zygosity, Sex
-from snpdb.models import Sample, VCFFilter, Specimen, SampleGenotype
-from snpdb.models.models_variant import Variant
 from classification.autopopulate_evidence_keys.evidence_from_variant import AutopopulateData
-from classification.enums import SpecialEKeys, ValidationCode
-from classification.models import VCDataDict
+from classification.enums import SpecialEKeys
+from patients.models_enums import Zygosity, Sex
+from snpdb.models import Sample, Specimen, SampleGenotype
+from snpdb.models.models_variant import Variant
 
 
 def get_zygosity(sample_genotype: SampleGenotype) -> Optional[str]:

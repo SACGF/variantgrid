@@ -1,9 +1,11 @@
 import json
 from typing import Optional
+
 from lazy import lazy
-from classification.models.classification import ClassificationModification
+
 from classification.models import ClassificationJsonParams
-from classification.views.classification_export_utils import ExportFormatter,\
+from classification.models.classification import ClassificationModification
+from classification.views.classification_export_utils import ExportFormatter, \
     AlleleGroup
 
 

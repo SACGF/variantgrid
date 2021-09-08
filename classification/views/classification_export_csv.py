@@ -2,12 +2,12 @@ import csv
 import io
 from typing import Optional
 
-from genes.hgvs import CHGVS
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.views.classification_export_utils import ExportFormatter, \
     AlleleGroup, UsedKeyTracker, \
     KeyValueFormatter
+from genes.hgvs import CHGVS
 
 
 class ExportFormatterCSV(ExportFormatter):

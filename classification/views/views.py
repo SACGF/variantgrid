@@ -1,7 +1,10 @@
+import json
+import mimetypes
+import re
 from datetime import datetime
+from typing import Optional, List, Set
 
 import rest_framework
-import re
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Layout, Field, Submit
 from django.conf import settings
@@ -17,15 +20,27 @@ from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from jfu.http import upload_receive, UploadResponse, JFUResponse
-import json
-import mimetypes
 from requests.models import Response
-from typing import Optional, List, Set
-
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
+    create_classification_for_sample_and_variant_objects, generate_auto_populate_data
+from classification.classification_changes import ClassificationChanges
+from classification.classification_stats import get_grouped_classification_counts, \
+    get_classification_counts, get_criteria_counts
+from classification.enums import SubmissionSource, SpecialEKeys
+from classification.models import ClassificationAttachment, Classification, \
+    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
+    ConditionResolvedDict
+from classification.models.classification import ClassificationModification
+from classification.models.clinical_context_models import ClinicalContext
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.models.flag_types import classification_flag_types
+from classification.views.classification_datatables import ClassificationColumns
+from classification.views.classification_export_csv import ExportFormatterCSV
+from classification.views.classification_export_redcap import ExportFormatterRedcap
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
@@ -40,22 +55,6 @@ from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
-    create_classification_for_sample_and_variant_objects, generate_auto_populate_data
-from classification.classification_stats import get_grouped_classification_counts, \
-    get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict
-from classification.models.clinical_context_models import ClinicalContext
-from classification.models.evidence_key import EvidenceKeyMap
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationModification
-from classification.classification_changes import ClassificationChanges
-from classification.views.classification_datatables import ClassificationColumns
-from classification.views.classification_export_csv import ExportFormatterCSV
-from classification.views.classification_export_redcap import ExportFormatterRedcap
 from variantopedia.forms import SearchAndClassifyForm
 
 

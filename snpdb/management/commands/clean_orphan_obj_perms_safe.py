@@ -1,8 +1,7 @@
 from itertools import chain
 
 from django.core.management.base import BaseCommand
-
-from guardian.utils import clean_orphan_obj_perms, get_user_obj_perms_model, get_group_obj_perms_model
+from guardian.utils import get_user_obj_perms_model, get_group_obj_perms_model
 
 
 class Command(BaseCommand):

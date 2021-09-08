@@ -1,15 +1,16 @@
-from django.contrib.auth.models import User
 import unittest
+
+from django.contrib.auth.models import User
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models.models_genomic_interval import GenomicIntervalsCollection, GenomicIntervalsCategory
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
-from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genomic_interval import GenomicIntervalsCollection, GenomicIntervalsCategory
 from snpdb.tests.test_data import create_fake_trio
 
 

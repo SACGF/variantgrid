@@ -1,8 +1,8 @@
+import pandas as pd
 from numpy import log10
 
 from expression.models import CuffDiffRecord, CuffDiffFile
 from library.utils import sha1_str
-import pandas as pd
 from snpdb.graphs.graphcache import CacheableGraph
 
 

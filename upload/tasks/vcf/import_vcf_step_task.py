@@ -1,11 +1,12 @@
+import logging
+import subprocess
+
+import celery
 from celery.app.task import Task
 from celery.canvas import chain
 from django.db.models.aggregates import Min, Max
 from django.db.models.expressions import F
 from django.utils import timezone
-import celery
-import logging
-import subprocess
 
 from library.log_utils import get_traceback
 from library.utils import import_class

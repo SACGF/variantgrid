@@ -1,4 +1,6 @@
+import json
 from typing import Dict, Any, Optional, Iterable
+
 from django.conf import settings
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count
 from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
@@ -15,11 +17,9 @@ from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExpo
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.utils import html_to_text, delimited_row, export_column, ExportRow
+from library.utils import html_to_text, export_column, ExportRow
 from snpdb.models import ClinVarKey, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
-import json
-
 from uicore.json.json_types import JsonDataType
 
 

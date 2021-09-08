@@ -4,11 +4,10 @@ When a VCF has no samples / format etc.
 No point complicating BulkGenotypeVCFProcessor with lots of if statements etc
 """
 
-from django.conf import settings
 import cyvcf2
+from django.conf import settings
 
 from library.git import Git
-from library.postgres_utils import postgres_arrays
 from patients.models_enums import Zygosity
 from upload.models import VCFImporter
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor

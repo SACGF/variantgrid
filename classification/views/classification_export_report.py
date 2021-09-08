@@ -2,12 +2,12 @@ from typing import Optional
 
 from django.http import HttpResponse
 from django.template import engines
+
 from annotation.citations import get_citations
-from classification.enums import SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap
+from classification.models import ClassificationJsonParams, ClassificationReportTemplate
 from classification.models.classification import ClassificationModification, \
     Classification
-from classification.models import ClassificationJsonParams, ClassificationReportTemplate
+from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_export_utils import ExportFormatter
 from snpdb.models import GenomeBuild
 

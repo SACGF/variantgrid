@@ -2,6 +2,7 @@ import abc
 from collections import defaultdict
 
 import pandas as pd
+
 from library.pandas_jqgrid import DataFrameJqGrid
 from ontology.models import OntologyTerm, OntologySnake
 

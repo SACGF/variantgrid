@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.views.generic import TemplateView
 
 from annotation.models import patients_qs_for_ontology_term
-from classification.views.classification_datatables import ClassificationColumns
 from library.utils import LimitedCollection
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation
 from ontology.panel_app_ontology import update_gene_relations

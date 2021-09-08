@@ -1,3 +1,5 @@
+import json
+
 from django.contrib import messages, admin
 from django.db.models import QuerySet
 from django.http import HttpResponse
@@ -6,7 +8,6 @@ from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAlle
     ClinVarExportRequest, ClinVarExportSubmission
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
 from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action
-import json
 
 
 class ClinVarExportSubmissionAdmin(admin.TabularInline):

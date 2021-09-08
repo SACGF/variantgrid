@@ -1,7 +1,8 @@
+import logging
+
 import celery
 from django.conf import settings
 from django.core.cache import cache
-import logging
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.models import AnnotationRun

@@ -10,9 +10,10 @@ Ideally, this could have been done via Django FilteredRelation - but that doesn'
 (ie can't do 'variantannotation__gene__geneannotation)
 """
 
-from django.db.models.query_utils import Q
-from functools import reduce
 import operator
+from functools import reduce
+
+from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, VariantAnnotation
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook

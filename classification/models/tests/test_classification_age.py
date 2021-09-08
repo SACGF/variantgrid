@@ -5,10 +5,10 @@ from django.test import TestCase
 
 from classification.enums import SubmissionSource, \
     SpecialEKeys, ShareLevel
-from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.models.classification_utils import PatchMeta
+from classification.models.tests.test_utils import ClassificationTestUtils
 
 
 class ClassificationTestCaseAge(TestCase):

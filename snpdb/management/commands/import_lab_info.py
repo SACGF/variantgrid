@@ -1,9 +1,10 @@
-from django.core.management.base import BaseCommand
-import pandas as pd
 import datetime
-from snpdb.models import Lab, LabProject, Organization
-from library.log_utils import console_logger
 
+import pandas as pd
+from django.core.management.base import BaseCommand
+
+from library.log_utils import console_logger
+from snpdb.models import Lab, LabProject, Organization
 
 LEADER = 'Leader'
 MEMBERS = 'Members'

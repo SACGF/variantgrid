@@ -8,8 +8,8 @@ from analysis.grids import VariantGrid
 from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_analysis
 from library.django_utils import set_form_read_only
-from snpdb.models.models_user_settings import UserTagColors, UserSettings
 from snpdb.models.models_enums import BuiltInFilters
+from snpdb.models.models_user_settings import UserTagColors, UserSettings
 
 
 class NodeView(UpdateView):

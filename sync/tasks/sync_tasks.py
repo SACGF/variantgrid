@@ -1,4 +1,5 @@
 import celery
+
 from sync.models.models import SyncDestination
 
 

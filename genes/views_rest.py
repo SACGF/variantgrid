@@ -1,4 +1,6 @@
+import json
 from collections import defaultdict
+
 from django.http.response import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -10,7 +12,6 @@ from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
-import json
 
 from genes.gene_matching import GeneSymbolMatcher, GeneMatcher
 from genes.models import GeneInfo, GeneList, GeneAnnotationRelease, \

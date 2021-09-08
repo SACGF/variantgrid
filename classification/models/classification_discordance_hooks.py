@@ -7,18 +7,17 @@ from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
 from classification.enums import SpecialEKeys, ShareLevel
-from classification.models.clinical_context_models import ClinicalContext, \
-    clinical_context_signal
-from classification.models.discordance_models import DiscordanceReport
-from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
-from classification.models.flag_types import classification_flag_types
 from classification.models.classification import Classification, \
     classification_current_state_signal, \
     classification_post_publish_signal, \
     classification_variant_set_signal, ClassificationModification, \
     classification_withdraw_signal
 from classification.models.classification_utils import ValidationMerger
-
+from classification.models.clinical_context_models import ClinicalContext, \
+    clinical_context_signal
+from classification.models.discordance_models import DiscordanceReport
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from classification.models.flag_types import classification_flag_types
 
 INTERNAL_REVIEW_RELEVANT_DAYS = 365
 

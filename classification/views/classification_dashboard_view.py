@@ -5,14 +5,12 @@ from rest_framework.response import Response
 from termsandconditions.decorators import terms_required
 
 from classification.models import classification_flag_types
-from flags.models import FlagCollection
-from snpdb.forms import LabSelectForm
-from snpdb.models import Lab
-from snpdb.models.models_genome import GenomeBuild
 from classification.models.classification import Classification, \
     ClassificationModification
-from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_export_flags import ExportFormatterFlags
+from flags.models import FlagCollection
+from snpdb.models import Lab
+from snpdb.models.models_genome import GenomeBuild
 
 
 @terms_required

@@ -1,20 +1,20 @@
+import json
+import re
 from re import RegexFlag
 from typing import List, Any, Mapping, TypedDict, Union
-import bs4
+
 from lazy import lazy
 
 from annotation.regexes import DbRegexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType
-from genes.hgvs import CHGVS
-from library.utils import html_to_text
-from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types
 from classification.models.evidence_mixin import VCDbRefDict
+from genes.hgvs import CHGVS
+from library.utils import html_to_text
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import ClinVarKey
-import re
-import json
+from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON

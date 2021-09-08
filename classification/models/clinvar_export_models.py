@@ -1,3 +1,4 @@
+import copy
 from typing import Optional, List, Iterable
 
 from django.db import models, transaction
@@ -5,17 +6,15 @@ from django.db.models import QuerySet, TextChoices
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils.timezone import now
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 
-from uicore.json.json_utils import JsonDiffs
-from uicore.json.validated_json import ValidatedJson
-from uicore.json.json_types import JsonObjType
 from classification.models import ClassificationModification, ConditionResolved
 from snpdb.models import ClinVarKey, Allele
-from django.utils.timezone import now
-import copy
-
+from uicore.json.json_types import JsonObjType
+from uicore.json.json_utils import JsonDiffs
+from uicore.json.validated_json import ValidatedJson
 
 CLINVAR_EXPORT_CONVERSION_VERSION = 3
 

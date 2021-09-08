@@ -2,25 +2,25 @@
 Liftover via Clingen Allele Registry or NCBI remap
 """
 import logging
+import operator
+import os
 from collections import defaultdict
+from functools import reduce
 from typing import Dict, List, Tuple, Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query_utils import Q
-from functools import reduce
-import operator
-import os
 
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.vcf_utils import write_vcf_from_tuples
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.models.models_enums import ImportSource, AlleleConversionTool
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_variant import AlleleSource, Liftover, Allele, Variant, VariantAlleleCollectionSource, \
     VariantAllele, VariantAlleleCollectionRecord
-from snpdb.models.models_enums import ImportSource, AlleleConversionTool
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 

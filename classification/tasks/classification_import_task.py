@@ -2,9 +2,9 @@ import logging
 
 import celery
 
-from library.log_utils import log_traceback
-from classification.models import ClassificationImport
 from classification.classification_import import process_classification_import
+from classification.models import ClassificationImport
+from library.log_utils import log_traceback
 
 
 @celery.task

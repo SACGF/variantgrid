@@ -7,10 +7,10 @@ from django.db import transaction
 from lazy import lazy
 from requests import Response
 
-from uicore.json.json_types import JsonObjType
 from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
     ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus
 from library.log_utils import report_message
+from uicore.json.json_types import JsonObjType
 
 
 class _ClinVarExportConfigDic(TypedDict):

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-from collections import defaultdict
-from django.core.management.base import BaseCommand
 import logging
+from collections import defaultdict
+
+from django.core.management.base import BaseCommand
 
 from snpdb.models import Sample
 

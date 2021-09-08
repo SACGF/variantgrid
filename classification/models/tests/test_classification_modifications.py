@@ -1,11 +1,11 @@
 from django.test import TestCase
 
-from library.guardian_utils import admin_bot
 from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.models.classification import Classification, ClassificationModification, VCBlobKeys
 from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
+from classification.models.tests.test_utils import ClassificationTestUtils
+from library.guardian_utils import admin_bot
 
 
 class ClassificationTestCaseModifications(TestCase):

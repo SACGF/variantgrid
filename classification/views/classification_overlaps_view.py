@@ -1,7 +1,5 @@
 import re
-from collections import defaultdict
 from datetime import datetime
-from typing import Dict
 
 from django.conf import settings
 from django.db import transaction
@@ -9,14 +7,15 @@ from django.http.request import HttpRequest
 from django.shortcuts import render, redirect, get_object_or_404
 from requests.models import Response
 
+from classification.models import ClassificationRef
+from classification.models.allele_overlap import AlleleOverlap, OverlapCounts
+from classification.models.classification import Classification
+from classification.models.clinical_context_models import ClinicalContext
+from classification.models.flag_types import classification_flag_types
 from library.django_utils import require_superuser
 from snpdb.models import Allele, Lab
 from snpdb.models.models_variant import Variant
-from classification.models import ClassificationRef
-from classification.models.allele_overlap import AlleleOverlap, DiscordanceLevel, OverlapCounts
-from classification.models.clinical_context_models import ClinicalContext
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification import Classification
+
 
 def view_overlaps(request: HttpRequest) -> Response:
     user = request.user

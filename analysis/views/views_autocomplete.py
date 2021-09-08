@@ -2,7 +2,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
-from analysis.models import Analysis, AnalysisTemplate, Q, AnalysisTemplateVersion
+from analysis.models import Analysis, AnalysisTemplate
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 

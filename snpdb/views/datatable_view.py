@@ -13,10 +13,11 @@ from django.db.models import QuerySet, Q
 from django.http import HttpRequest, QueryDict
 from kombu.utils import json
 from lazy import lazy
-from uicore.json.json_types import JsonDataType, JsonObjType
+
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
 from snpdb.views.datatable_mixins import JSONResponseView
+from uicore.json.json_types import JsonDataType, JsonObjType
 
 logger = logging.getLogger(__name__)
 

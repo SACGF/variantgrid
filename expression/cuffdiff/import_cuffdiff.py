@@ -1,13 +1,14 @@
+import logging
+import os
+
+import pandas as pd
 from django.conf import settings
 from django.db import connection
 from guardian.shortcuts import assign_perm
-import logging
-import os
 
 from expression.models import CuffDiffFile, CuffDiffRecord
 from library.pandas_utils import df_handle_below_minimum_floats
 from snpdb.models.models_enums import ImportStatus, AnnotationLevel
-import pandas as pd
 
 # None means don't validate
 COLUMNS = ['test_id', None, 'gene', 'locus', None, None, 'status', 'value_1', 'value_2', 'log2(fold_change)', 'test_stat', 'p_value', 'q_value', 'significant']

@@ -93,17 +93,18 @@ Comments = Correlates with age of cancer diagnosis.
 """
 # ===================================
 
+import multiprocessing as mp
+import random
 from argparse import RawTextHelpFormatter
 from collections import defaultdict, namedtuple
 from functools import partial
-from scipy.optimize import minimize
+
 import configargparse
-import random
+import numpy as np
 import vcf
+from scipy.optimize import minimize
 
 from library.genomics.fasta_wrapper import FastaFileWrapper
-import multiprocessing as mp
-import numpy as np
 
 VERSION = "1.0.1"
 

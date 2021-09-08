@@ -1,11 +1,11 @@
+import logging
+import operator
+from functools import reduce
 from typing import Optional
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
-from functools import reduce
-import logging
-import operator
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm

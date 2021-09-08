@@ -3,10 +3,11 @@
     This can be deleted once all environments have been upgraded """
 from pathlib import Path
 
+import pandas as pd
 from django.conf import settings
 from django.core.management import BaseCommand
 from django.db import IntegrityError
-import pandas as pd
+
 from analysis.models import PhenotypeNodeOntologyTerm
 from ontology.models import OntologyTerm, OntologyService
 

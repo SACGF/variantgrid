@@ -1,8 +1,9 @@
-from django.conf import settings
 import codecs
 import logging
 import os
 import subprocess
+
+from django.conf import settings
 
 from library import genomics
 from library.file_utils import mk_path

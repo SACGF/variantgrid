@@ -1,26 +1,24 @@
 import json
-from logging import StreamHandler
 import logging
+import re
 import socket
-import markdown
-from typing import Dict, Optional, List, Tuple, Any, Union
-
-import requests
-import rollbar
 import sys
 import traceback
-import re
+from logging import StreamHandler
+from typing import Dict, Optional, List, Tuple, Any, Union
 
+import markdown
+import requests
+import rollbar
 from django.conf import settings
-from django.utils import timezone
-
 from django.contrib.auth.models import User
+from django.utils import timezone
 from markdown import markdown
 from rest_framework.request import Request
+from threadlocals.threadlocals import get_current_request, get_current_user
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
-from threadlocals.threadlocals import get_current_request, get_current_user
 
 
 def report_event(name: str, request: Request = None, extra_data: Dict = None):

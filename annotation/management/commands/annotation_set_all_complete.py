@@ -1,6 +1,7 @@
-from django.core.management.base import BaseCommand
 import logging
 import os
+
+from django.core.management.base import BaseCommand
 
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models.models import AnnotationVersion

@@ -1,9 +1,10 @@
+import logging
+from time import sleep
+
 import celery
 from celery.contrib.abortable import AbortableTask
 from celery.result import AsyncResult
 from django.db.utils import OperationalError, IntegrityError
-import logging
-from time import sleep
 
 from analysis.exceptions import NodeConfigurationException, NodeParentErrorsException, CeleryTasksObsoleteException, \
     NodeOutOfDateException

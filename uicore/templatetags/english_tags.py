@@ -1,4 +1,5 @@
 from typing import Optional, List, Union
+
 from django import template
 from django.db.models import QuerySet
 

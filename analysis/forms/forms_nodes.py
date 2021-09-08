@@ -1,3 +1,5 @@
+import json
+
 from dal import autocomplete, forward
 from dal_select2.widgets import ModelSelect2Multiple
 from django import forms
@@ -5,7 +7,6 @@ from django.forms.models import fields_for_model
 from django.forms.widgets import TextInput, HiddenInput
 from django_starfield import Stars
 from guardian.shortcuts import get_objects_for_user
-import json
 
 from analysis import models
 from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis
