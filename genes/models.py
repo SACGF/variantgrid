@@ -830,8 +830,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     @staticmethod
     def get_preferred_transcript(data: Dict[str, 'TranscriptVersion']) -> Optional['TranscriptVersion']:
         for transcript_key in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
-            transcript = data.get(transcript_key)
-            if transcript:
+            if transcript := data.get(transcript_key):
                 return transcript
         return None
 
