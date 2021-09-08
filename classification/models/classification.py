@@ -1538,7 +1538,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # if this is the first submission, create a version regardless of if there's data or not
             apply_patch = self.id is None
 
-        pending_modification: Optional[ClassificationModification] = None
+        pending_modification: Optional[ClassificationModification]
 
         # only make a modification if there's data to actually patch
         if apply_patch:
@@ -2124,7 +2124,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 c_hgvs.genome_build = alt_genome_build
                 c_hgvs.is_normalised = True
                 c_hgvs.is_desired_build = False
-                return c_hgvs_str
+                return c_hgvs
         c_hgvs = CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
         try:
             c_hgvs.genome_build = self.get_genome_build()
@@ -2454,7 +2454,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         return self.classification.get_visible_evidence(self.evidence, lowest_share_level)
 
     def c_hgvs_best(self, genome_build: GenomeBuild) -> CHGVS:
-        return self.classification.c_hgvs_best(genome_build=genome_build)
+        return self.classification.c_hgvs_best(preferred_genome_build=genome_build)
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """
