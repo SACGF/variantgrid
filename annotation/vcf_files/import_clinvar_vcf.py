@@ -46,12 +46,15 @@ class BulkClinVarInserter:
         "Pathogenic": 5,
     }
 
+    MAX_CONFLICTING_RECORDS_MISSING_CLINSIGCONF = 1000
+
     def __init__(self, clinvar_version, upload_step):
         self.clinvar_version = clinvar_version
         self.variant_by_variant_hash = {}
         self.upload_step = upload_step
         self.items_processed = 0
         self.batch_id = 0
+        self.conflicting_missing_clinsigconf = 0
         self.variant_pk_lookup = VariantPKLookup(clinvar_version.genome_build)
         review_status_vcf_mappings_dict = dict(ClinVarReviewStatus.VCF_MAPPINGS)
         self.field_formatters = {
@@ -74,7 +77,11 @@ class BulkClinVarInserter:
         self.variant_pk_lookup.batch_check()
         for variant_hash, variant_pk in self.variant_pk_lookup.variant_pk_by_hash.items():
             v = self.variant_by_variant_hash[variant_hash]
-            cv = self.create_clinvar_for_variant_id(variant_pk, v)
+            try:
+                cv = self.create_clinvar_for_variant_id(variant_pk, v)
+            except:
+                logging.error("Could not process ClinVar variant: '%s'", v)
+                raise
             clinvar_list.append(cv)
 
         # I messed up the alt for reference being '=' vs None and found it with this check. Could possibly remove...
@@ -130,9 +137,22 @@ class BulkClinVarInserter:
             else:
                 multiple_clinical_significances = clinical_significance
 
-            for clnsig, pathogenicity in BulkClinVarInserter.CLINSIG_TO_PATHOGENICITY.items():  # low->high
-                if clnsig in multiple_clinical_significances:
-                    highest_pathogenicity = pathogenicity
+            if multiple_clinical_significances:
+                for clnsig, pathogenicity in BulkClinVarInserter.CLINSIG_TO_PATHOGENICITY.items():  # low->high
+                    if clnsig in multiple_clinical_significances:
+                        highest_pathogenicity = pathogenicity
+            else:
+                # 3 out of 50504 records in 20210828 with Conflicting_interpretations_of_pathogenicity are missing
+                # CLNSIGCONF (conflicting_clinical_significance), eg see
+                # https://www.ncbi.nlm.nih.gov/clinvar/variation/161486/
+                # As this is really low we'll just skip setting highest pathogenicity in those ones, but will die
+                # If there are a few as that could mean ClinVar has changed the INFO fields
+                self.conflicting_missing_clinsigconf += 1
+                if self.conflicting_missing_clinsigconf > self.MAX_CONFLICTING_RECORDS_MISSING_CLINSIGCONF:
+                    message = f"{self.MAX_CONFLICTING_RECORDS_MISSING_CLINSIGCONF} records had " \
+                              f"CLINSIG=Conflicting_interpretations_of_pathogenicity but no CLNSIGCONF. " \
+                              f"A few missing are expected but this many is likely due to INFO field changes"
+                    raise ValueError(message)
 
             kwargs["highest_pathogenicity"] = highest_pathogenicity
             kwargs["drug_response"] = drug_response
