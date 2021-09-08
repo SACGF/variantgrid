@@ -1,6 +1,8 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models import Value as V, QuerySet, F
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
@@ -166,7 +168,15 @@ class Allele(FlagsMixin, models.Model):
                 other_fc.classification_set.update(flag_collection=self.flag_collection)
             existing_allele_cc_names = self.clinicalcontext_set.values_list("name", flat=True)
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
-            other_allele.variantallele_set.update(allele=self, conversion_tool=conversion_tool)
+            for va in other_allele.variantallele_set.all():
+                try:
+                    va.allele = self
+                    va.conversion_tool = conversion_tool
+                    va.save()
+                except IntegrityError:
+                    logging.warning("VariantAllele exists with allele/build/variant of %s/%s/%s - deleting this one",
+                                    va.allele, va.genome_build, va.variant)
+                    va.delete()
 
     @property
     def build_names(self) -> str:
