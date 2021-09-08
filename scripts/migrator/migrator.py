@@ -3,6 +3,7 @@ import subprocess
 import sys
 import traceback
 from enum import Enum, auto
+from functools import partial
 from subprocess import Popen
 from typing import List, Optional, Dict
 
@@ -15,14 +16,20 @@ COMMAND_ALIASES = {
     "python": "python3.8"
 }
 
-def print_red(skk): print("\033[91m{}\033[00m" .format(skk))
-def print_green(skk): print("\033[92m{}\033[00m" .format(skk))
-def print_yellow(skk): print("\033[93m{}\033[00m" .format(skk))
-def print_light_purple(skk): print("\033[94m{}\033[00m" .format(skk))
-def print_purple(skk): print("\033[95m{}\033[00m" .format(skk))
-def print_cyan(skk): print("\033[96m{}\033[00m" .format(skk))
-def print_light_gray(skk): print("\033[97m{}\033[00m" .format(skk))
-def print_black(skk): print("\033[98m{}\033[00m" .format(skk))
+
+def print_color(color: str, skk: str):
+    print((color + "{}\033[00m").format(skk))
+
+
+print_red = partial(print_color, "\033[91m")
+print_green = partial(print_color, "\033[92m")
+print_yellow = partial(print_color, "\033[93m")
+print_light_purple = partial(print_color, "\033[94m")
+print_purple = partial(print_color, "\033[95m")
+print_cyan = partial(print_color, "\033[96m")
+print_light_gray = partial(print_color, "\033[97m")
+print_black = partial(print_color, "\033[98m")
+
 
 def substitute_aliases(args: List[str]):
     return [COMMAND_ALIASES.get(arg, arg) for arg in args]
