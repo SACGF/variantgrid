@@ -542,7 +542,14 @@ class HGVSMatcher:
         hgvs_name = HGVSName(hgvs_string)
         if self._is_lrg(hgvs_name):
             variant_tuple = self._lrg_get_variant_tuple(hgvs_string)
-        elif transcript_accession := hgvs_name.transcript:
+        elif hgvs_name.kind == 'c':
+            transcript_accession = hgvs_name.transcript
+            if not transcript_accession:
+                msg = f"Could not parse: '{hgvs_name}' c.HGVS requires a transcript or LRG."
+                if hgvs_name.gene:
+                    msg += f" Gene={hgvs_name.gene}"
+                raise ValueError(msg)
+
             variant_tuple = None
             hgvs_methods = []
             for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession):
@@ -566,11 +573,13 @@ class HGVSMatcher:
                             logging.error(error_message, cga_se)
                 if variant_tuple:
                     break
-            attempts = ", ".join(hgvs_methods)
+
             if variant_tuple is None:
-                raise ValueError(f"Could not convert {hgvs_string} - tried: {attempts}")
-            # else:
-            # logging.debug("HGVS methods tried: %s", attempts)
+                if hgvs_methods:
+                    attempts = ", ".join(hgvs_methods)
+                    raise ValueError(f"Could not convert {hgvs_string} - tried: {attempts}")
+                else:
+                    raise ValueError(f"'{transcript_accession}': No transcripts found")
         else:
             variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string, None)
 
