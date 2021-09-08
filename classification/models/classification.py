@@ -1402,6 +1402,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         transcript_key = SpecialEKeys.REFSEQ_TRANSCRIPT_ID
                         if transcript.startswith('ENST'):
                             transcript_key = SpecialEKeys.ENSEMBL_TRANSCRIPT_ID
+                        elif transcript.startswith('LRG_'):
+                            transcript_key = SpecialEKeys.LRG_ID
 
                         transcript_cell = patch[transcript_key]
                         if not transcript_cell.provided:

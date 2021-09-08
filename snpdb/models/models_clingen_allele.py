@@ -93,7 +93,8 @@ class ClinGenAllele(TimeStampedModel):
         raw_hgvs_string, t_data = self._get_raw_c_hgvs_and_data(transcript_accession)
         if raw_hgvs_string:  # Has for this transcript version
             hgvs_name = HGVSName(raw_hgvs_string)
-            hgvs_name.gene = t_data.get("geneSymbol")
+            if not hgvs_name.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
+                hgvs_name.gene = t_data.get("geneSymbol")
             if hgvs_name.mutation_type in {"dup", "del", "delins"}:
                 coord = t_data["coordinates"][0]
                 if hgvs_name.mutation_type == "dup":

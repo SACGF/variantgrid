@@ -47,6 +47,7 @@ class SpecialEKeys:
     GNOMAD_OE_LOF = "gnomad_oe_lof"
     INTERNAL_SAMPLES_20X_COVERAGE = "internal_samples_100_percent_20x_gene_coverage"
     LITERATURE = "literature"
+    LRG_ID = "lrg_id"
     NUCLEIC_ACID_SOURCE = "nucleic_acid_source"
     PATIENT_ID = "patient_id"
     PHRED_LIKELIHOOD = 'phred_likelihood'

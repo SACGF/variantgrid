@@ -185,6 +185,7 @@ class EvidenceMixin:
 
         for transcript_key in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
             transcript_key = {
+                'lrg_identifier': SpecialEKeys.LRG_ID,
                 'refseq_transcript_accession': SpecialEKeys.REFSEQ_TRANSCRIPT_ID,
                 'ensembl_transcript_accession': SpecialEKeys.ENSEMBL_TRANSCRIPT_ID
             }.get(transcript_key)

@@ -878,11 +878,24 @@ class LRGRefSeqGene(models.Model):
         unique_together = ("lrg", "t")
 
     @staticmethod
+    def get_lrg_and_t(lrg_identifier: str) -> Tuple[str, Optional[str]]:
+        if m := re.match(r"(LRG_\d+)(t\d+)?", lrg_identifier, flags=re.IGNORECASE):
+            lrg, t = m.groups()
+            lrg = lrg.upper()
+            if t:
+                t = t.lower()
+        else:
+            lrg = t = None
+        return lrg, t
+
+    @staticmethod
     def get_transcript_version(genome_build: GenomeBuild, lrg_identifier: str) -> Optional[TranscriptVersion]:
         """ Attempts to load RefSeq TranscriptVersion we have from LRG identifier """
         transcript_version: Optional[TranscriptVersion] = None
-        if m := re.match("(LRG_\d+)(t\d+)", lrg_identifier):
-            lrg, t = m.groups()
+        lrg, t = LRGRefSeqGene.get_lrg_and_t(lrg_identifier)
+        if lrg:
+            if t is None:
+                raise ValueError(f"We require a t version with LRG '{lrg_identifier}'")
             if lrg_ref_seq_gene := LRGRefSeqGene.objects.filter(lrg=lrg, t=t).first():
                 transcript_version = TranscriptVersion.get_transcript_version(genome_build, lrg_ref_seq_gene.rna)
         return transcript_version
