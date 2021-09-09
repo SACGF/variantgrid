@@ -1,7 +1,7 @@
 import logging
 import operator
 from functools import reduce
-from typing import Optional
+from typing import Optional, Tuple, List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -119,13 +119,45 @@ class PhenotypeNode(AnalysisNode):
 
     def _get_method_summary(self):
         if self.modifies_parents():
-            genes_symbols_qs = GeneSymbol.objects.filter(geneversion__gene__in=self.get_gene_qs())
-            genes_symbols = ','.join(genes_symbols_qs.values_list("pk", flat=True))
-            method_summary = f"Filtering to {genes_symbols} genes"
+            method_list = self._get_short_and_long_descriptions()[1]
+
+            genes_symbols_qs = GeneSymbol.objects.filter(geneversion__gene__in=self.get_gene_qs()).distinct()
+            genes_symbols = ', '.join(genes_symbols_qs.order_by("pk").values_list("pk", flat=True))
+            method_list.append(f"Filtering to genes: {genes_symbols}")
+            method_summary = "".join([f"<p>{s}</p>" for s in method_list])
         else:
             method_summary = 'No filters applied as no human_phenotype_ontology selected.'
 
         return method_summary
+
+    def _get_short_and_long_descriptions(self) -> Tuple[List[str], List[str]]:
+        long_descriptions = []
+        short_descriptions = []
+
+        ontology_terms = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
+        hpo_list, omim_list = OntologyTerm.split_hpo_and_omim(ontology_terms)
+
+        phenotypes = []
+        for hpo in hpo_list:
+            phenotypes.append(str(hpo))
+
+        if phenotypes:
+            long_descriptions.append("Phenotype: %s" % ', '.join(phenotypes))
+            short_descriptions.append(f"{len(phenotypes)} HPO")
+
+        omims = []
+        for omim in omim_list:
+            omims.append(str(omim))
+
+        if omims:
+            long_descriptions.append("OMIM %s" % ', '.join(omims))
+            short_descriptions.append(f"{len(omims)} OMIM")
+
+        if self.text_phenotype:
+            tp_description = f"Text: {self.text_phenotype}"
+            long_descriptions.append(tp_description)
+            short_descriptions.append(tp_description)
+        return short_descriptions, long_descriptions
 
     def get_node_name(self):
         MAX_NAME_LENGTH = 50
@@ -134,32 +166,7 @@ class PhenotypeNode(AnalysisNode):
             if self.accordion_panel == self.PANEL_PATIENT and self.patient:
                 name = f"{self.patient} patient phenotypes"
             else:
-                long_descriptions = []
-                short_descriptions = []
-
-                ontology_terms = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
-                hpo_list, omim_list = OntologyTerm.split_hpo_and_omim(ontology_terms)
-
-                phenotypes = []
-                for hpo in hpo_list:
-                    phenotypes.append(str(hpo))
-
-                if phenotypes:
-                    long_descriptions.append("Phenotype: %s" % ', '.join(phenotypes))
-                    short_descriptions.append(f"{len(phenotypes)} HPO")
-
-                omims = []
-                for omim in omim_list:
-                    omims.append(str(omim))
-
-                if omims:
-                    long_descriptions.append("OMIM %s" % ', '.join(omims))
-                    short_descriptions.append(f"{len(omims)} OMIM")
-
-                if self.text_phenotype:
-                    tp_description = f"Text: {self.text_phenotype}"
-                    long_descriptions.append(tp_description)
-                    short_descriptions.append(tp_description)
+                short_descriptions, long_descriptions = self._get_short_and_long_descriptions()
 
                 long_description = ','.join(long_descriptions)
                 if len(long_description) <= MAX_NAME_LENGTH:
