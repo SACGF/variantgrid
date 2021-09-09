@@ -9,6 +9,10 @@ See https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
+AVATAR_PROVIDERS = (
+    'library.django_utils.avatar.SpaceThemedAvatarProvider'
+)
+
 CLINVAR_EXPORT = get_clinvar_export_secrets()
 
 aws_dict = get_aws_secrets()

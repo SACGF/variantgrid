@@ -12,7 +12,7 @@ from flags.models.enums import FlagStatus
 from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none
-from snpdb.models import Lab
+from snpdb.models import Lab, AvatarDetails
 from snpdb.models.models_user_settings import UserSettings
 
 
@@ -218,11 +218,12 @@ class FlagHelper:
         users_json = []
         for user in self.users.values():
             user_settings = UserSettings.get_for_user(user)
+            avatar = AvatarDetails.avatar_for(user)
             json_entry = {
                 'id': user.id,
-                'name': UserSettings.preferred_label_for(user),
-                'avatar': user_settings.avatar_url,
-                'color': user_settings.avatar_color,
+                'name': avatar.preffered_label,
+                'avatar': avatar.url,
+                'color': avatar.background_color,
                 'lab': self.lab_text(user)
             }
             users_json.append(json_entry)

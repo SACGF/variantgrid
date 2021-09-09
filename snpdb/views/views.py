@@ -65,7 +65,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
@@ -561,6 +561,7 @@ def view_user_settings(request):
         'override_source': override_source,
         'override_values': override_values,
         'labs_by_group_name': labs_by_group_name,
+        'avatar_details': AvatarDetails.avatar_for(user)
     }
     return render(request, 'snpdb/settings/view_user_settings.html', context)
 

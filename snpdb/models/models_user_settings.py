@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Tuple, Dict, Set
 
 from avatar.templatetags.avatar_tags import avatar_url
+from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -12,7 +13,9 @@ from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
 
+from library.cache import timed_cache
 from library.django_utils import thread_safe_unique_together_get_or_create
+from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.utils import rgb_invert, string_deterministic_hash
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
@@ -186,6 +189,44 @@ class UserSettingsOverride(SettingsOverride):
         return f"UserSettings for {self.user}"
 
 
+@dataclass(frozen=True)
+class AvatarDetails:
+    user: User
+
+    @staticmethod
+    def avatar_for(user: User):
+        return AvatarDetails(user=user)
+
+    @lazy
+    def preferred_label(self) -> str:
+        user = self.user
+        preferred_label = user.username
+        if user.first_name or user.last_name:
+            preferred_label = ' '.join([name for name in [user.first_name, user.last_name] if name])
+        return preferred_label
+
+    @lazy
+    def is_editable(self):
+        return 'avatar.providers.PrimaryAvatarProvider' in settings.AVATAR_PROVIDERS
+
+    @lazy
+    def url(self) -> str:
+        if self.is_editable:
+            return avatar_url(self.user)
+        else:
+            # have to hardcode reference to SpaceThemedAvatarProvider as otherwise if a custom avatar was setup, avatar_url will still keep a reference to the old image
+            return SpaceThemedAvatarProvider.get_avatar_url(self.user, 40)
+
+    @lazy
+    def background_color(self) -> str:
+        if self.user.username == 'admin_bot':
+            return '#ffffff'
+
+        if self.url.startswith('/static/icons/users/'):
+            colors = ['#ddddff', '#ffbbbb', '#aaddaa', '#dddddd', '#ddddbb']
+            return colors[string_deterministic_hash(self.user.username) % len(colors)]
+
+
 @dataclass
 class UserSettings:
     user: User
@@ -202,25 +243,6 @@ class UserSettings:
     default_lab: Optional[Lab]
     oauth_sub: str
     _settings_overrides: List[SettingsOverride]
-
-    @staticmethod
-    def preferred_label_for(user: User) -> Optional[str]:
-        if not user:
-            return None
-        if user.first_name and user.last_name:
-            return user.first_name + ' ' + user.last_name
-        return user.username
-
-    @property
-    def avatar_url(self) -> str:
-        return avatar_url(self.user)
-
-    @property
-    def avatar_color(self) -> str:
-        if self.user.username == 'admin_bot':
-            return '#ffffff'
-        colors = ['#ddddff', '#ffbbbb', '#aaddaa', '#dddddd', '#ddddbb']
-        return colors[string_deterministic_hash(self.user.username) % len(colors)]
 
     @staticmethod
     def get_settings_overrides(user=None, lab=None, organization=None) -> List[SettingsOverride]:

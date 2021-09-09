@@ -46,8 +46,13 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="" />
             {% labelled id="avatar" label="Avatar" %}
-                <div id='edit-avatar'></div>
-                {% avatar user class='circular-avatar' %}<a class="hover-link" href="javascript:changeAvatar()"><br/>Change avatar</a>
+                {% if avatar_details.is_editable %}
+                    {% avatar user  %}
+                    <div id='edit-avatar'></div>
+                    <a class="hover-link" href="javascript:changeAvatar()"><br/>Change avatar</a>
+                {% else %}
+                    {% avatar2 avatar_details %}
+                {% endif %}
             {% endlabelled %}
             {% labelled id="user_name" label="Username" %}{{ user.username }}{% endlabelled %}
             {% if use_oidc %}

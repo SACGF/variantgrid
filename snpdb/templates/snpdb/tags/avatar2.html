@@ -1,0 +1,6 @@
+{% if size == 'tiny' %}
+<div style="background-color:{{ avatar.background_color }}; background-image: url({{ avatar.url }}); height:1.3rem;width:1.3rem;border:2px solid {{ avatar.background_color }}" class="background-image d-inline-block mr-1 rounded"></div>
+{% else %}
+<div style="background-color:{{ avatar.background_color }}; background-image: url({{ avatar.url }}); height:3rem;width:3rem;border:5px solid {{ avatar.background_color }}" class="background-image mr-4 rounded flex-no-grow"></div>
+{% endif %}
+{% if show_label %}{{ avatar.preferred_label }}{% endif %}
