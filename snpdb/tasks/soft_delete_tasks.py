@@ -27,7 +27,7 @@ def soft_delete_vcfs(user, *vcf_ids):
     remove_soft_deleted_vcfs_task.apply_async(countdown=1)  # To make sure that vcfs have been set to deleted
 
 
-@celery.task(ignore_result=True)
+@celery.shared_task(ignore_result=True)
 def remove_soft_deleted_vcfs_task():
     """ This is a clean up job so only want to run 1 copy - ie on schedule_single_worker queue
 

@@ -4,7 +4,7 @@ from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models import AlleleSource
 
 
-@celery.task
+@celery.shared_task
 def populate_clingen_alleles_from_allele_source(allele_source_id, max_variants=0):
     allele_source = AlleleSource.objects.get_subclass(pk=allele_source_id)
     variants_qs = allele_source.get_variant_qs()

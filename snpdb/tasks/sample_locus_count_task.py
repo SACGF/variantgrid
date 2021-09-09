@@ -6,7 +6,7 @@ from patients.models_enums import Zygosity
 from snpdb.models import VCF, SampleLocusCount
 
 
-@celery.task
+@celery.shared_task
 def do_sample_locus_count_for_vcf_id(vcf_id):
     vcf = VCF.objects.get(pk=vcf_id)
     cohort = vcf.cohort

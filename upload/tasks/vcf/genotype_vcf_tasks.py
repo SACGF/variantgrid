@@ -182,7 +182,7 @@ class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
         create_import_success_message(vcf)
 
 
-@celery.task
+@celery.shared_task
 def reload_vcf_task(upload_pipeline_id, vcf_id):
     """ Needs to be done thread safely for zygosity count """
 

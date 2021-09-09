@@ -16,7 +16,7 @@ from library.log_utils import log_traceback, get_traceback
 from snpdb.models import ProcessingStatus
 
 
-@celery.task
+@celery.shared_task
 def dummy_task():
     pass
 
@@ -30,7 +30,7 @@ def wait_for_task(celery_task):
         result.get(timeout=MINUTE_SECS * 5)
 
 
-@celery.task(base=AbortableTask)
+@celery.shared_task(base=AbortableTask)
 def update_node_task(node_id, version):
     try:
         node = AnalysisNode.objects.get_subclass(pk=node_id, version=version)
@@ -74,7 +74,7 @@ def update_node_task(node_id, version):
         pass  # Out of date or deleted - just ignore
 
 
-@celery.task
+@celery.shared_task
 def wait_for_cache_task(node_cache_id):
     MAX_CHECKS = 60
     num_checks = 0
@@ -97,7 +97,7 @@ def wait_for_cache_task(node_cache_id):
         logging.debug(f"Waiting on {node_cache}")
 
 
-@celery.task
+@celery.shared_task
 def node_cache_task(node_id, version):
     logging.info("node_cache_task: %s/%d", node_id, version)
 
@@ -142,14 +142,14 @@ def node_cache_task(node_id, version):
         node.save()
 
 
-@celery.task
+@celery.shared_task
 def delete_old_node_versions(node_id, version):
     """ This is called before bumping the version, so delete that version and earlier """
     logging.debug(f"Deleting stale cache for node_id={node_id}, version_id={version}")
     NodeVersion.objects.filter(node_id=node_id, version__lte=version).delete()
 
 
-@celery.task
+@celery.shared_task
 def wait_for_node(node_id):
     """ Used to build a dependency on a node that's already loading.
 

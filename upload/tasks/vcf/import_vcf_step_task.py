@@ -113,7 +113,7 @@ class ImportVCFStepTask(Task):
             self.check_pipeline_stage(upload_pipeline, upload_step)
 
 
-@celery.task
+@celery.shared_task
 def schedule_pipeline_stage_steps(upload_pipeline_id, pipeline_stage):
     """ Only want to do this once per VCF import, so run in own task on single queue to avoid race conditions.
         May be executed multiple times but will only run jobs the 1st time """
@@ -154,13 +154,13 @@ def schedule_pipeline_stage_steps(upload_pipeline_id, pipeline_stage):
         upload_pipeline.error(message)
 
 
-@celery.task
+@celery.shared_task
 def pipeline_start_task(upload_pipeline_id):
     upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
     upload_pipeline.start()
 
 
-@celery.task
+@celery.shared_task
 def pipeline_success_task(upload_pipeline_id):
     upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
     if upload_pipeline.status == ProcessingStatus.PROCESSING:

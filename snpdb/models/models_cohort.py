@@ -530,7 +530,7 @@ class Trio(GuardianPermissionsMixin, SortByPKMixin, models.Model):
 
 
 # This has to be in this file so we don't end up with circular references
-@celery.task(ignore_result=False)
+@celery.shared_task(ignore_result=False)
 def delete_old_cohort_genotypes_task():
     logging.debug("About to delete old CohortGenotypeCollection")
 

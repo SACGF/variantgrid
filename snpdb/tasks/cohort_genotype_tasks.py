@@ -152,7 +152,7 @@ WHERE
     return insert_sql
 
 
-@celery.task(ignore_result=False)
+@celery.shared_task(ignore_result=False)
 def cohort_genotype_task(cohort_genotype_collection_id):
     """ This takes a cohort, performs a count on it, stores it to the database,
         and then saves the stored count to the cohort object  """

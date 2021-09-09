@@ -26,7 +26,7 @@ SAMPLE_GENE_STATS = "gene_stats"
 SAMPLE_CLINVAR_STATS = "clinvar_stats"
 
 
-@celery.task
+@celery.shared_task
 def calculate_vcf_stats(vcf_id, annotation_version_id):
     vcf = VCF.objects.get(pk=vcf_id)
     try:

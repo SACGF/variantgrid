@@ -7,7 +7,7 @@ from snpdb.models import Trio
 from snpdb.models.models_enums import ImportStatus
 
 
-@celery.task
+@celery.shared_task
 def create_genome_karyomapping_for_trio(trio_id):
     trio = Trio.objects.get(pk=trio_id)
 

@@ -233,7 +233,7 @@ def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disab
         pass  # OK as deleted elsewhere (eg version was bumped and old ones cleaned up)
 
 
-@celery.task
+@celery.shared_task
 def venn_cache_count(vennode_cache_id):
     print(f"venn_cache_count: {vennode_cache_id}")
     try:

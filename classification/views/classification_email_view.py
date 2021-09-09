@@ -92,7 +92,7 @@ class EmailSummaryData:
         return False
 
 
-@celery.task
+@celery.shared_task
 def send_summary_emails():
     report_message("Attempting to send weekly summary emails", level="info")
     for user in User.objects.filter(is_active=True):

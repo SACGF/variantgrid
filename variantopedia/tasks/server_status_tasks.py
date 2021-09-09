@@ -14,7 +14,7 @@ from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia.server_status import get_dashboard_notices
 
 
-@celery.task
+@celery.shared_task
 def notify_server_status():
     if not settings.HEALTH_CHECK_ENABLED:
         return

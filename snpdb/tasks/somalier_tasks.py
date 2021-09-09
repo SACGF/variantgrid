@@ -19,7 +19,7 @@ from snpdb.models import VCF, Cohort, Trio, SomalierVCFExtract, SomalierConfig, 
 from snpdb.variants_to_vcf import vcf_export_to_file
 
 
-@celery.task
+@celery.shared_task
 def somalier_vcf_id(vcf_id: int):
     """ Extract, Ancestry, and Relate (Cohort) """
     vcf = VCF.objects.get(pk=vcf_id)
@@ -137,21 +137,21 @@ def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
     return somalier_relate_dir
 
 
-@celery.task
+@celery.shared_task
 def somalier_cohort_relate(cohort_id: int):
     cohort = Cohort.objects.get(pk=cohort_id)
     relate = SomalierCohortRelate.objects.create(cohort=cohort, cohort_version=cohort.version)
     _somalier_relate(relate)
 
 
-@celery.task
+@celery.shared_task
 def somalier_trio_relate(trio_id: int):
     trio = Trio.objects.get(pk=trio_id)
     relate = SomalierTrioRelate.objects.create(trio=trio)
     _somalier_relate(relate)
 
 
-@celery.task
+@celery.shared_task
 def somalier_all_samples():
     somalier_settings = settings.SOMALIER["relatedness"]
     all_samples = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.PROCESSING)

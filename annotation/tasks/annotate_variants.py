@@ -20,7 +20,7 @@ from library.utils import execute_cmd
 from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT
 
 
-@celery.task
+@celery.shared_task
 def delete_annotation_run(annotation_run_id):
     try:
         annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
@@ -32,20 +32,20 @@ def delete_annotation_run(annotation_run_id):
         raise
 
 
-@celery.task
+@celery.shared_task
 def delete_annotation_run_uploaded_data(annotation_run_id):
     """ Deletes related objects but not actual run (used for retry annotation upload) """
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
     annotation_run.delete_related_objects()
 
 
-@celery.task
+@celery.shared_task
 def assign_range_lock_to_annotation_run(annotation_run_id, annotation_range_lock_id):
     # has 1-to-1 so any previous AnnotationRuns linking to AnnotationRangeLock must have been deleted
     AnnotationRun.objects.filter(pk=annotation_run_id).update(annotation_range_lock_id=annotation_range_lock_id)
 
 
-@celery.task
+@celery.shared_task
 def annotate_variants(annotation_run_id):
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
     logging.info("annotate_variants: %s", annotation_run)

@@ -27,7 +27,7 @@ from snpdb.models import DataState
 from snpdb.models.models_enums import ImportStatus
 
 
-@celery.task
+@celery.shared_task
 def calculate_gold_summary(enrichment_kit_id):
     """ Set SequencingRun.gold_standard on runs before this task is called """
 

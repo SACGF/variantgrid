@@ -47,7 +47,7 @@ def create_backend_vcf_bed_intersections(backend_vcf):
         log_traceback()
 
 
-@celery.task
+@celery.shared_task
 def vcf_bed_intersection_task(vcf_bed_intersection_id):
     vbi = VCFBedIntersection.objects.get(pk=vcf_bed_intersection_id)
     vbi.status = ProcessingStatus.PROCESSING
