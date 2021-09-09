@@ -1,5 +1,6 @@
 from typing import List
 
+from django.conf import settings
 from django.contrib import messages
 from django.views.generic import TemplateView
 
@@ -50,5 +51,8 @@ class OntologyTermView(TemplateView):
                 "patients_qs": patients_qs,
             }
 
-        messages.add_message(self.request, messages.ERROR, "This term is not stored in our database")
+        messages.add_message(self.request, messages.ERROR, "This term is not stored in our database.")
+        if term.ontology_service == OntologyService.OMIM:
+            messages.add_message(self.request, messages.WARNING, f"{settings.SITE_NAME} only stores 'phenotype' OMIM terms. Maybe this term is an OMIM gene?")
+
         return {"term": term}
