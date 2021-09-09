@@ -27,7 +27,6 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
-
 from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
@@ -206,8 +205,8 @@ class LabUser:
 
     @lazy
     def preferred_label(self) -> str:
-        from snpdb.models import UserSettings
-        return UserSettings.preferred_label_for(self.user)
+        from snpdb.models import AvatarDetails
+        return AvatarDetails.avatar_for(self.user).preferred_label
 
     def __lt__(self, other):
         return self.preferred_label < other.preferred_label
