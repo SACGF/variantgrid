@@ -125,6 +125,7 @@ class EvidenceMixin:
         build_name = self[SpecialEKeys.GENOME_BUILD]
         return GenomeBuild.get_name_or_alias(build_name)
 
+
     @lazy
     def db_refs(self) -> List[Dict]:
         all_db_refs = []

@@ -28,7 +28,7 @@ from library.utils import ArrayLength
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
-from snpdb.models import Lab
+from snpdb.models import Lab, GenomeBuild
 
 
 class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
@@ -291,14 +291,26 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return
 
         lab = classification.lab
-        gene_str = cm.get(SpecialEKeys.GENE_SYMBOL)
-        gene_symbol = GeneSymbol.objects.filter(symbol=gene_str).first()
+        gene_symbol: GeneSymbol = None
+        gene_symbol_str = cm.get(SpecialEKeys.GENE_SYMBOL)
+        if gene_symbol_str:
+            gene_symbol = GeneSymbol.objects.filter(symbol=gene_symbol_str).first()
+
+        # if the imported gene symbol doesn't work, see what gene symbols we can extract from the c.hgvs
+        if not gene_symbol:
+            try:
+                genome_build = cm.get_genome_build()
+                resolved_gene_symbol_str = cm.c_hgvs_best(genome_build).gene_symbol
+                gene_symbol = GeneSymbol.objects.filter(symbol=resolved_gene_symbol_str).first()
+            except ValueError:
+                # couldn't extract genome build
+                pass
 
         if not gene_symbol:
             report_message("Classification has blank or unrecognised gene symbol, cannot link it to condition text", extra_data={
-                "target": gene_str or "<blank>",
+                "target": gene_symbol_str or "<blank>",
                 "classification_id": classification.id,
-                "gene_symbol": gene_str
+                "gene_symbol": gene_symbol_str
             })
             return
 
