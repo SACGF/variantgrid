@@ -221,7 +221,7 @@ class FlagHelper:
             avatar = AvatarDetails.avatar_for(user)
             json_entry = {
                 'id': user.id,
-                'name': avatar.preffered_label,
+                'name': avatar.preferred_label,
                 'avatar': avatar.url,
                 'color': avatar.background_color,
                 'lab': self.lab_text(user)
