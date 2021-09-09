@@ -21,8 +21,7 @@ from annotation.models.models import AnnotationVersion
 from classification.models.classification import ClassificationModification, Classification, \
     CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias, \
-    BadTranscript
+from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
@@ -318,7 +317,7 @@ class Searcher:
         # if user can only see variants with classifications, then they def shouldn't be able to classify new variants
         self.can_create = True
         self.user = user
-        self.search_string = search_string.strip()
+        self.search_string = clean_string(search_string)
         self.classify = classify
 
         if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not user.is_superuser:
@@ -586,10 +585,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             try:
                 hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
                 if search_string != hgvs_string:
-                    cleaned_message = f"Warning: Cleaned '{search_string}' => '{hgvs_string}'"
-                    if search_string != clean_string(search_string):
-                        cleaned_message += " (removed non printable characters)"
-                    search_messages.append(cleaned_message)
+                    search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
                 variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
             except (ValueError, NotImplementedError):
                 if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
