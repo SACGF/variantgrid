@@ -278,9 +278,9 @@ class CHGVS:
             sort_str += self.genome_build.pk
 
         if self.is_normalised:
-            sort_str = "A"
+            sort_str += "A"
         else:
-            sort_str = "Z"
+            sort_str += "Z"
 
         if c_part := self.raw_c:
             if parts := CHGVS.NUM_PART.match(c_part):
