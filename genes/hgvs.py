@@ -1,16 +1,15 @@
 """
-
 I am using PyHGVS as pip package hgvs is too hard to setup locally, and SA Path
 block external postgres connections. See discussion at:
 
 https://github.com/SACGF/variantgrid/issues/839
-
 """
 import enum
 import logging
 import re
 import sys
 from dataclasses import dataclass
+from importlib.metadata import version
 from typing import List, Optional, Tuple
 
 import pyhgvs
@@ -390,7 +389,7 @@ class HGVSMatcher:
     HGVS_SLOPPY_PATTERN = re.compile(r"(\d):?(c|g|p)\.?(\d+)")
     HGVS_SLOPPY_REPLACE = r"\g<1>:\g<2>.\g<3>"
 
-    HGVS_METHOD_PYHGVS = "pyhgvs"
+    HGVS_METHOD_PYHGVS = f"pyhgvs v{version('pyhgvs')}"
     HGVS_METHOD_CLINGEN_ALLELE_REGISTRY = "ClinGen Allele Registry"
 
     class TranscriptContigMismatchError(ValueError):
@@ -491,23 +490,21 @@ class HGVSMatcher:
 
         if transcript_version := LRGRefSeqGene.get_transcript_version(genome_build, lrg_identifier):
             if HGVSMatcher._pyhgvs_ok(transcript_version):
-                logging.info("LRG %s using local transcript version: %s", lrg_identifier, transcript_version)
                 # Replace LRG transcript with local RefSeq
                 hgvs_name.gene = None
                 hgvs_name.transcript = transcript_version.accession
                 return hgvs_name, transcript_version
         return None, None
 
-    def _lrg_get_variant_tuple(self, hgvs_string: str):
+    def _lrg_get_variant_tuple(self, hgvs_string: str) -> Tuple[Tuple, str]:
         new_hgvs_name, transcript_version = self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_string)
         if new_hgvs_name:
             new_hgvs_string = new_hgvs_name.format()
-            logging.info("LRG %s - searching for '%s'", hgvs_string, new_hgvs_string)
-            return self._pyhgvs_get_variant_tuple(new_hgvs_string, transcript_version)
+            method = f"{self.HGVS_METHOD_PYHGVS} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
+            return self._pyhgvs_get_variant_tuple(new_hgvs_string, transcript_version), method
 
-        logging.info("LRG %s using ClinGen", hgvs_string)
         try:
-            return self._clingen_get_variant_tuple(hgvs_string)
+            return self._clingen_get_variant_tuple(hgvs_string), self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
         except ClinGenAlleleRegistryException as cga_re:
             raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
 
@@ -537,11 +534,15 @@ class HGVSMatcher:
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
-        """ VariantCoordinate.chrom = Contig name """
+        return self.get_variant_tuple_and_method(hgvs_string)[0]
 
+    def get_variant_tuple_and_method(self, hgvs_string: str) -> Tuple[VariantCoordinate, str]:
+        """ Returns variant_tuple and method for HGVS resolution = """
+
+        method = None
         hgvs_name = HGVSName(hgvs_string)
         if self._is_lrg(hgvs_name):
-            variant_tuple = self._lrg_get_variant_tuple(hgvs_string)
+            variant_tuple, method = self._lrg_get_variant_tuple(hgvs_string)
         elif hgvs_name.kind == 'c':
             transcript_accession = hgvs_name.transcript
             if not transcript_accession:
@@ -556,12 +557,12 @@ class HGVSMatcher:
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
                 if self._pyhgvs_ok(tv):  # Attempt to use PyHGVS 1st as it's faster
-                    hgvs_methods.append(f"{self.HGVS_METHOD_PYHGVS}: {hgvs_string_for_version}")
+                    method = self.HGVS_METHOD_PYHGVS
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
                 elif self._clingen_allele_registry_ok(tv.accession):
                     error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry"
                     try:
-                        hgvs_methods.append(f"{self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY}: {hgvs_string_for_version}")
+                        method = self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
                         variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
                     except ClinGenAlleleAPIException as cga_api:
                         logging.error(error_message, cga_api)
@@ -571,6 +572,11 @@ class HGVSMatcher:
                             self._set_clingen_allele_registry_missing_transcript(tv)
                         else:
                             logging.error(error_message, cga_se)
+
+                if hgvs_string != hgvs_string_for_version:
+                    method += f" as '{hgvs_string_for_version}'"
+                hgvs_methods.append(method)
+
                 if variant_tuple:
                     break
 
@@ -581,6 +587,7 @@ class HGVSMatcher:
                 else:
                     raise ValueError(f"'{transcript_accession}': No transcripts found")
         else:
+            method = self.HGVS_METHOD_PYHGVS
             variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string, None)
 
         (chrom, position, ref, alt) = variant_tuple
@@ -599,7 +606,7 @@ class HGVSMatcher:
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
-        return VariantCoordinate(chrom, position, ref, alt)
+        return VariantCoordinate(chrom, position, ref, alt), method
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_name: str):
         _mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)

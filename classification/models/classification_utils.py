@@ -149,19 +149,21 @@ class VariantCoordinateFromEvidence:
         from classification.models import classification_flag_types
         self.variant_coordinate = None
         self.messages = []
-        self.matching_flag = classification.flag_collection_safe.get_flag_of_type\
-            (flag_type=classification_flag_types.matching_variant_flag, open_only=True)
+        self.matching_flag = classification.flag_collection_safe.get_flag_of_type(
+            flag_type=classification_flag_types.matching_variant_flag, open_only=True)
         try:
             genome_build = classification.get_genome_build()
             self.genome_build_str = genome_build.name
         except:
             self.genome_build_str = 'No genome build'
 
-    def record(self, value: str, variant_coordinate: Optional[VariantCoordinate] = None, error: Optional[str] = None) -> None:
+    def record(self, value: str, variant_coordinate: Optional[VariantCoordinate] = None,
+               message: Optional[str] = None, error: Optional[str] = None) -> None:
         """
         Record what value we're using (or attempted to use) to get the variant coordinates
         :param value: The source value we tried to extract VariantCoordinate from e.g. a c.hgvs, g.hgvs or variant coordinate string
         :param variant_coordinate: The variant coordinate we processed from the value (or None if we couldn't)
+        :param message: If present, add message
         :param error: If present, indicates the reason why we couldn't extract a variant_coordinate from the value
         """
         if variant_coordinate:
@@ -176,6 +178,9 @@ class VariantCoordinateFromEvidence:
             self.messages.append(f'Matching on {self.genome_build_str} {value} resolved to {variant_coordinate.chrom}:{variant_coordinate.pos} {ref}->{variant_coordinate.alt}')
         else:
             self.messages.append(f'Attempted to match {self.genome_build_str} {value}, could not derive coordinate')
+
+        if message:
+            self.messages.append(message)
 
     def report(self) -> None:
         """
