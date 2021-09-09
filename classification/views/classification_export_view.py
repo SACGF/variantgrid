@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import List
 from urllib.parse import unquote_plus
 
+from django.conf import settings
 from django.db.models import QuerySet
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
@@ -90,9 +91,13 @@ def export_view(request: HttpRequest) -> Response:
         format_keys,
         format_csv,
         format_json,
-        format_mvl,
-        format_redcap,
-        format_vcf,
+        format_mvl
+    ]
+    if settings.VARIANT_CLASSIFICATION_REDCAP_EXPORT:
+        formats += [format_redcap]
+
+    formats += [
+        format_vcf
     ]
 
     context = {

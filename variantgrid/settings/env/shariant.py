@@ -13,6 +13,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 AVATAR_PROVIDERS = (
     'library.django_utils.avatar.SpaceThemedAvatarProvider'
 )
+VARIANT_CLASSIFICATION_REDCAP_EXPORT = False
 
 CLINVAR_EXPORT = get_clinvar_export_secrets()
 
