@@ -16,7 +16,7 @@ DEBUG = False
 
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 
-_BIG_DISK_BASE_DIR = "/data"
+_BIG_DISK_BASE_DIR = "/mnt"
 ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "VEP")
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
