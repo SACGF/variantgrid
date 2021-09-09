@@ -2,6 +2,7 @@ import csv
 import io
 import operator
 import math
+import string
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -505,6 +506,11 @@ def delimited_row(data: list, delimiter: str = ',') -> str:
     writer = csv.writer(out, delimiter=delimiter)
     writer.writerow(data)
     return out.getvalue()
+
+
+def clean_string(input_string: str) -> str:
+    """ Removes non-printable characters, strips whitespace """
+    return re.sub(f'[^{re.escape(string.printable)}]', '', input_string.strip())
 
 
 class IterableTransformer:

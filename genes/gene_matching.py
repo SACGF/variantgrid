@@ -10,6 +10,7 @@ from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAn
     ReleaseGeneSymbol, ReleaseGeneSymbolGene, HGNC
 from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
 from library.cache import timed_cache
+from library.utils import clean_string
 
 
 class GeneSymbolMatcher:
@@ -30,7 +31,7 @@ class GeneSymbolMatcher:
             gm.match_unmatched_in_hgnc_and_gene_lists()
 
     def get_gene_symbol_id_and_alias_id(self, original_gene_symbol: str):
-        uc_original_gene_symbol = original_gene_symbol.upper()
+        uc_original_gene_symbol = clean_string(original_gene_symbol).upper()
         gene_symbol_id = self._gene_symbol_lookup.get(uc_original_gene_symbol)
         alias_id = None
         if gene_symbol_id is None:
@@ -81,7 +82,7 @@ class HGNCMatcher:
         return {str(hgnc.gene_symbol_id).upper(): hgnc for hgnc in hgnc_qs}
 
     def match_hgnc(self, gene_symbol: str):
-        gene_symbol = gene_symbol.upper()
+        gene_symbol = clean_string(gene_symbol).upper()
         if gs := self._aliases.get(gene_symbol):
             gene_symbol = gs
         return self._hgnc_by_uc_gene_symbol.get(gene_symbol)
@@ -182,7 +183,7 @@ class GeneMatcher:
     def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> Dict[str, List]:
         gene_symbol_gene_id_and_match_info = defaultdict(list)  # list items = (gene_id, match_info)
         for gene_symbol_id in gene_symbols:
-            gene_name = str(gene_symbol_id).upper()
+            gene_name = clean_string(str(gene_symbol_id)).upper()
 
             if gene_id_list := self.genes.get(gene_name):
                 for gene_id in gene_id_list:
@@ -242,4 +243,5 @@ class GeneMatcher:
 
 def tokenize_gene_symbols(text):
     """ returns set of strings """
+    text = clean_string(text)
     return set(re.findall(r'[^,;\s]+', text.upper()))
