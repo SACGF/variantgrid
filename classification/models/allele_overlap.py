@@ -84,7 +84,7 @@ class AlleleOverlap:
         return chgvs_list
 
     def preferred_hgvses(self):
-        genome_build = GenomeBuildManager.get_current_genome_build()
+        genome_build = self.genome_build
         all_hgvses: List[CHGVS] = self.unique_hgvses
         if filtered := [hgvs for hgvs in all_hgvses if hgvs.genome_build == genome_build]:
             return filtered

@@ -22,7 +22,7 @@ class GenomeBuildManager:
             # TODO is there a better default than this?
             genome_build = GenomeBuild.builds_with_annotation()[0]
 
-        set_thread_variable("genome_build", genome_build)
+        GenomeBuildManager.set_current_genome_build(genome_build)
         return genome_build
 
     @staticmethod
