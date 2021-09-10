@@ -58,13 +58,18 @@ class AlleleOverlap:
 
         score = 0
         if self.discordance_status.lab_count > 1:
-            score += 1000
+            score += 10000
 
         level = self.discordant_level
         if level == DiscordanceLevel.DISCORDANT:
-            score += 500
+            score += 5000
         elif level == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            score += 250
+            score += 2500
+
+        score += self.discordance_status.lab_count * 100  # give more priority to shared labs
+        score += self.discordance_status.lab_count_all * 10  # but still give > 0 priority to unshared labs
+        score += len(self.ccs) # and finally number of classifications
+
         return score
 
     @lazy
@@ -117,7 +122,6 @@ class AlleleOverlap:
         if unshared:
             groups.append(AlleleOverlapClinicalGrouping(clinical_grouping=None, cms=unshared))
         return groups
-
 
 
     @staticmethod

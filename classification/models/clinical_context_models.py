@@ -82,6 +82,7 @@ class DiscordanceLevel(str, Enum):
 class DiscordanceStatus:
     level: DiscordanceLevel
     lab_count: int
+    lab_count_all: int
     counted_classifications: int
 
     @staticmethod
@@ -89,16 +90,18 @@ class DiscordanceStatus:
         cs_scores: Set[int] = set()
         cs_vuses: Set[int] = set()
         cs_values: Set[str] = set()
-        labs: Set[Lab] = set()
+        shared_labs: Set[Lab] = set()
+        all_labs: Set[Lab] = set()
 
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
         for vcm in modifications:
+            all_labs.add(vcm.classification.lab)
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
                 if strength := CS_TO_NUMBER.get(clin_sig):
                     counted_classifications += 1
-                    labs.add(vcm.classification.lab)
+                    shared_labs.add(vcm.classification.lab)
                     cs_scores.add(strength)
                     cs_values.add(clin_sig)
                 if vus_special := SPECIAL_VUS.get(clin_sig):
@@ -110,11 +113,11 @@ class DiscordanceStatus:
             # importantly you can have a VUS vs VUS_A and still be in agreement
             # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
             level = DiscordanceLevel.CONCORDANT_CONFIDENCE
-        elif len(labs) == 0:
+        elif len(shared_labs) == 0:
             level = DiscordanceLevel.NO_ENTRIES
         else:
             level = DiscordanceLevel.CONCORDANT_AGREEMENT
-        return DiscordanceStatus(level=level, lab_count=len(labs), counted_classifications=counted_classifications)
+        return DiscordanceStatus(level=level, lab_count=len(shared_labs), lab_count_all=len(all_labs), counted_classifications=counted_classifications)
 
 
 class ClinicalContext(FlagsMixin, TimeStampedModel):
