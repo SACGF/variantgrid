@@ -39,11 +39,12 @@ class FlagTypeResolution(TabularInline):
 class FlagTypeAdmin(ModelAdminBasics):
     list_display = ('id', 'context', 'label', 'description', 'help_text', 'raise_permission')
     list_filter = (('context', RelatedFieldListFilter), )
-    inlines = (FlagTypeResolution,)
 
 
 class FlagInline(TabularInline):
     model = Flag
+    fields = ("id", "flag_type", "user", "resolution", "data")
+    show_change_link = True
 
     def has_add_permission(self, request, obj):
         return False
