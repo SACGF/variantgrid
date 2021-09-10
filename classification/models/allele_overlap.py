@@ -10,7 +10,9 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
+from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
 
 
@@ -73,13 +75,20 @@ class AlleleOverlap:
         return score
 
     @lazy
-    def unique_hgvs(self):
+    def unique_hgvses(self) -> List[CHGVS]:
         all_chgvs = set()
         for vcm in self.vcms:
             all_chgvs = all_chgvs.union(vcm.classification.c_hgvs_all())
 
         (chgvs_list := list(all_chgvs)).sort()
         return chgvs_list
+
+    def preferred_hgvses(self):
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        all: List[CHGVS] = self.unique_hgvs
+        if filtered := [hgvs for hgvs in all if hgvs.genome_build == genome_build]:
+            return filtered
+        return all
 
     @lazy
     def is_multiple_labs_shared(self) -> bool:
