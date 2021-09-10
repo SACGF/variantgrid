@@ -1,5 +1,3 @@
-import logging
-from typing import Tuple
 from urllib.error import HTTPError, URLError
 
 import requests
@@ -69,7 +67,7 @@ def refseq_transcript_exists(identifier, version=None):
         accession = identifier
         if version:
             accession += "." + str(version)
-        result = Entrez.efetch(db='nuccore', id=accession, retmode='text')
+        Entrez.efetch(db='nuccore', id=accession, retmode='text')
         return True
     except HTTPError:
         return False
