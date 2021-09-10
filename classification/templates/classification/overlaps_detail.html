@@ -39,7 +39,7 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                {% for hgvs in overlap.preferred_hgves %}
+                {% for hgvs in overlap.preferred_hgvses %}
                     <div class="col-6">{% c_hgvs hgvs show_genome_build=True %}</div>
                 {% endfor %}
                 </div>

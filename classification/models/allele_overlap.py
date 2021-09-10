@@ -85,10 +85,10 @@ class AlleleOverlap:
 
     def preferred_hgvses(self):
         genome_build = GenomeBuildManager.get_current_genome_build()
-        all: List[CHGVS] = self.unique_hgvs
-        if filtered := [hgvs for hgvs in all if hgvs.genome_build == genome_build]:
+        all_hgvses: List[CHGVS] = self.unique_hgvses
+        if filtered := [hgvs for hgvs in all_hgvses if hgvs.genome_build == genome_build]:
             return filtered
-        return all
+        return all_hgvses
 
     @lazy
     def is_multiple_labs_shared(self) -> bool:
