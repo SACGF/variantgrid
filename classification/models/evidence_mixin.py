@@ -84,7 +84,6 @@ class CriteriaStrength:
             return self.ekey.pretty_label < other.ekey.pretty_label
         return self.strength_value < other.strength_value
 
-
 class EvidenceMixin:
     """
     For methods common between Classification and ClassificationModification
@@ -122,9 +121,16 @@ class EvidenceMixin:
         return value
 
     def get_genome_build(self) -> GenomeBuild:
-        build_name = self[SpecialEKeys.GENOME_BUILD]
-        return GenomeBuild.get_name_or_alias(build_name)
+        build_name: str
+        try:
+            build_name = self[SpecialEKeys.GENOME_BUILD]
+        except KeyError:
+            raise ValueError("Classification does not have a value for genome build")
 
+        try:
+            return GenomeBuild.get_name_or_alias(build_name)
+        except GenomeBuild.DoesNotExist:
+            raise ValueError(f"Unsupported GenomeBuild {build_name}")
 
     @lazy
     def db_refs(self) -> List[Dict]:

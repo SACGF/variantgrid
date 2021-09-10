@@ -144,7 +144,7 @@ class ClassificationGroup:
             try:
                 c_parts.genome_build = cm.classification.get_genome_build()
                 c_parts.is_desired_build = genome_build.name == c_parts.genome_build.name
-            except KeyError:
+            except ValueError:
                 pass
         return c_parts
 

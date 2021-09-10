@@ -758,6 +758,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if variant is None and failed:
             self.classification_import = None
 
+        # see if the clinical context is still relevant (if we have one)
+        if not variant or ((cc := self.clinical_context) and (variant.allele != cc.allele)):
+            self.clinical_context = None
+
         if not self.id:
             # need to save to have a flag collection
             self.save()
@@ -2129,7 +2133,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         c_hgvs = CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
         try:
             c_hgvs.genome_build = self.get_genome_build()
-        except KeyError:
+        except ValueError:
             pass
         c_hgvs.is_normalised = False
         c_hgvs.is_desired_build = preferred_genome_build == c_hgvs.genome_build
