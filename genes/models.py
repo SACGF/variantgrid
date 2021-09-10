@@ -687,17 +687,17 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return TranscriptVersion.objects.filter(**kwargs).order_by(order_by)
 
     @staticmethod
-    def raise_bad_or_missing_transcript(genome_build: GenomeBuild, identifier, version):
+    def raise_bad_or_missing_transcript(genome_build: GenomeBuild, transcript_accession):
         """ Checks whether a transcript we can't match is wrong (their fault) or we don't have it (our fault) """
 
-        accession = TranscriptVersion.get_accession(identifier, version)
-        annotation_consortium = AnnotationConsortium.get_from_transcript_accession(identifier).label
+        annotation_consortium = AnnotationConsortium.get_from_transcript_accession(transcript_accession).label
         try:
+            identifier, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
             if transcript_exists(genome_build, identifier, version):
-                raise MissingTranscript(f"Transcript '{accession}' valid but missing from our (build: {genome_build}) database.")
-            raise BadTranscript(f"Transcript '{accession}' does not exist in the {genome_build} {annotation_consortium} database.")
+                raise MissingTranscript(f"Transcript '{transcript_accession}' valid but missing from our (build: {genome_build}) database.")
+            raise BadTranscript(f"Transcript '{transcript_accession}' does not exist in the {genome_build} {annotation_consortium} database.")
         except ConnectionError:
-            raise NoTranscript(f"Transcript '{identifier}' missing from our DB - validity with {annotation_consortium} unknown")
+            raise NoTranscript(f"Transcript '{transcript_accession}' missing from our DB - validity with {annotation_consortium} unknown")
 
     @staticmethod
     def get_transcript_version(genome_build: GenomeBuild, transcript_name, best_attempt=True) -> Optional['TranscriptVersion']:
@@ -729,7 +729,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             transcript_version = transcript_versions_qs.last()
 
         if transcript_version is None:
-            TranscriptVersion.raise_bad_or_missing_transcript(genome_build, transcript_id, version)
+            TranscriptVersion.raise_bad_or_missing_transcript(genome_build, transcript_name)
 
         if 'id' not in transcript_version.data:
             # only going to happen if we have legacy data in the database, transcripts that use the default for data {}

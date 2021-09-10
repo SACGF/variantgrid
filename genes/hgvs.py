@@ -730,24 +730,29 @@ class HGVSMatcher:
                     # TODO: We could also use VEP then add reference bases on our HGVSs
                     hgvs_string = None
                     attempted_method = self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
-                    hgvs_methods.append(f"{attempted_method}: {transcript_version}")
+                    method_detail = f"{attempted_method}: {transcript_version}"
                     try:
                         if ca := get_clingen_allele_for_variant(self.genome_build, variant):
+                            method_detail = f"{attempted_method} ({ca}): {transcript_version}"
                             if hgvs_string := ca.get_c_hgvs(transcript_version.accession):
                                 hgvs_method = attempted_method
                     except ClinGenAlleleRegistryException as cga_re:
                         # logging.error(cga_re)
                         attempt_clingen = False
 
+                    hgvs_methods.append(method_detail)
                     if hgvs_string:
                         hgvs_name = HGVSName(hgvs_string)
                 if hgvs_name:
                     break
-            attempts = ", ".join(hgvs_methods)
-            if hgvs_name is None:
-                raise ValueError(f"Could not convert {variant} to HGVS - tried: {attempts}")
-            # else:
-            #    logging.warning("HGVS methods tried: %s", attempts)
+
+            if hgvs_methods:
+                attempts = ", ".join(hgvs_methods)
+                if hgvs_name is None:
+                    raise ValueError(f"Could not convert {variant} to HGVS - tried: {attempts}")
+            else:
+                # No methods tried, mustn't have had any transcripts
+                raise TranscriptVersion.raise_bad_or_missing_transcript(self.genome_build, transcript_name)
         else:
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                     transcript=None, max_allele_length=sys.maxsize)
