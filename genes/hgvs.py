@@ -274,9 +274,6 @@ class CHGVS:
         """
         sort_str = ""
 
-        if self.genome_build:
-            sort_str += self.genome_build.pk
-
         if self.is_normalised:
             sort_str += "A"
         else:
@@ -287,6 +284,11 @@ class CHGVS:
                 num_part = parts.group(1).rjust(10, '0')
                 extra = parts.group(2)
                 return sort_str + num_part + extra + self.transcript
+
+        # if c.hgvs identical, sort by genome build
+        if self.genome_build:
+            sort_str += self.genome_build.pk
+
         return sort_str + self.full_c_hgvs or ""
 
     @lazy
