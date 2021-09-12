@@ -1,7 +1,7 @@
 from django.dispatch.dispatcher import receiver
 
 from classification.models.classification import Classification
-from flags.models import FlagStatus
+from flags.models import FlagStatus, FlagCollection, Flag, FlagResolution
 from genes.hgvs import HGVSMatcher
 from snpdb.models import GenomeBuild
 from snpdb.models.flag_types import allele_flag_types
@@ -50,19 +50,32 @@ def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-a
             if are_same:
                 allele.close_open_flags_of_type(
                     allele_flag_types.allele_37_not_38,
-                    data={'transcript': transcript}
+                    data={'transcript': transcript},
+                    comment="37 and 38 representations are now the same"
                 )
             else:
-                comment = (
-                    f'Attached classification with transcript {transcript} appears as the following in \n\n'
-                    f'{chgvs37} (GRCh37)\n'
-                    f'{chgvs38} (GRCh38)')
-                allele.flag_collection_safe.get_or_create_open_flag_of_type(
-                    flag_type=allele_flag_types.allele_37_not_38,
-                    comment=comment,
-                    data={'transcript': transcript, 'chgvs37': chgvs37, 'chgvs38': chgvs38},
-                    close_other_data=True,
-                    only_if_new=True)
+                # have to be careful as we only want one flag per transcript, but there might be multiple transcripts per allele
+                # then for each transcript, we want to make sure the flag has the correct 37 and 38 representation (so can close and re-create if representation changes)
+                raise_new = True
+                if existing := allele.flag_collection_safe.get_flag_of_type(flag_type=allele_flag_types.allele_37_not_38, data={'transcript': transcript}):
+                    if existing.data.get('chgvs37') == chgvs37 and existing.data.get('chgvs38') == chgvs38:
+                        # record with the same transcript has the same 37 and 38 representation, no need to create a new flag
+                        raise_new = False
+                    elif existing.resolution.status == FlagStatus.OPEN:
+                        # close old flag (with wrong 37 or 38 representation) so we can create a new one
+                        existing.flag_action(comment="Resolution of 37, 38 changed", resolution=FlagResolution.objects.get(pk="closed"))
+
+                if raise_new:
+                    comment = (
+                        f'Attached classification with transcript {transcript} appears as the following in \n\n'
+                        f'{chgvs37} (GRCh37)\n'
+                        f'{chgvs38} (GRCh38)')
+                    allele.flag_collection_safe.get_or_create_open_flag_of_type(
+                        flag_type=allele_flag_types.allele_37_not_38,
+                        comment=comment,
+                        data={'transcript': transcript, 'chgvs37': chgvs37, 'chgvs38': chgvs38},
+                        only_if_new=True)
     else:
         # if there's no 37 or no 38, close any flag comparing the two
-        allele.close_open_flags_of_type(allele_flag_types.allele_37_not_38)
+        allele.close_open_flags_of_type(allele_flag_types.allele_37_not_38, comment="Lacking representation in both 37 and 38")
+
