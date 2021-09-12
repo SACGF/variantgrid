@@ -1,5 +1,5 @@
 {% if not c_hgvs.full_c_hgvs %}<span class="no-value">-</span>{% else %}
-<span class="text-monospace">
+<span class="text-monospace; display:inline-block">
     {% if c_hgvs.is_desired_build == False or c_hgvs.is_normalised == False %}
 {% comment %}Specfically check for False rather than not as these properties default to None and are rarely populated{% endcomment %}
         <div class="text-info">
@@ -9,6 +9,6 @@
     {% elif show_genome_build %}
         <span class="text-info">{{ c_hgvs.genome_build }}</span><span>&nbsp;</span>
     {% endif %}
-    <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="display:inline-block;word-break: break-all">{{ c_hgvs.raw_c }}</span>
+    <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="word-break: break-all">{{ c_hgvs.raw_c }}</span>
 </span>
 {% endif %}
