@@ -57,7 +57,8 @@ def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-a
                 # have to be careful as we only want one flag per transcript, but there might be multiple transcripts per allele
                 # then for each transcript, we want to make sure the flag has the correct 37 and 38 representation (so can close and re-create if representation changes)
                 raise_new = True
-                if existing := allele.flag_collection_safe.get_flag_of_type(flag_type=allele_flag_types.allele_37_not_38, data={'transcript': transcript}):
+
+                for existing in allele.flag_collection_safe.flag_set.filter(flag_type=allele_flag_types.allele_37_not_38, data__transcript=transcript):
                     if existing.data.get('chgvs37') == chgvs37 and existing.data.get('chgvs38') == chgvs38:
                         # record with the same transcript has the same 37 and 38 representation, no need to create a new flag
                         raise_new = False
