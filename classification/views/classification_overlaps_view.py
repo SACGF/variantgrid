@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from requests.models import Response
 
 from classification.models import ClassificationRef
-from classification.models.allele_overlap import AlleleOverlap, OverlapCounts
+from classification.models.allele_overlap import AlleleOverlap, OverlapCounts, OverlapSet
 from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
@@ -34,7 +34,7 @@ def view_overlaps_detail(request: HttpRequest) -> Response:
     overlap_counts = OverlapCounts(allele_and_vcs)
 
     context = {
-        "overlaps": allele_and_vcs,
+        "overlap_sets": OverlapSet.as_sets(allele_and_vcs),
         "overlap_counts": overlap_counts
     }
 

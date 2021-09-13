@@ -319,13 +319,24 @@ def checked(test: bool) -> str:
         return SafeString('checked="checked"')
     return ''
 
-
 @register.filter()
 def boolean(test: bool) -> str:
     if test:
         return SafeString('<i class="text-success fas fa-check-circle" style="margin-top:4px"></i>')
     else:
         return SafeString('<i class="text-secondary fas fa-times-circle" style="margin-top:4px"></i>')
+
+
+@register.filter()
+def value(value: Any) -> str:
+    if isinstance(value, bool):
+        return boolean(value)
+    if value == '' or value == 0 or value == '-':
+        return SafeString(f'<span class="no-value">{value}</span>')
+    elif isinstance(value, int):
+        return f'{value:,}'
+    else:
+        return value
 
 
 class TagUtils:

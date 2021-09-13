@@ -1,4 +1,5 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import total_ordering
 from operator import attrgetter
 from typing import Dict, List, Collection, Optional
@@ -217,6 +218,10 @@ class OverlapCounts:
         return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_AGREEMENT]
 
     @property
+    def multi_concordant_vus(self):
+        return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_DIFF_VUS]
+
+    @property
     def multi_concordant_confidence(self):
         return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_CONFIDENCE]
 
@@ -229,9 +234,34 @@ class OverlapCounts:
         return self.same_lab_counts[DiscordanceLevel.CONCORDANT_AGREEMENT]
 
     @property
+    def single_concordant_vus(self):
+        return self.same_lab_counts[DiscordanceLevel.CONCORDANT_DIFF_VUS]
+
+    @property
     def single_concordant_confidence(self):
         return self.same_lab_counts[DiscordanceLevel.CONCORDANT_CONFIDENCE]
 
     @property
     def single_discordant(self):
         return self.same_lab_counts[DiscordanceLevel.DISCORDANT]
+
+
+@dataclass(frozen=True)
+class OverlapSet:
+    label: str
+    overlaps: List[AlleleOverlap]
+
+    @staticmethod
+    def as_sets(overlaps: List[AlleleOverlap]) -> List['OverlapSet']:
+        multi_overlaps: List[AlleleOverlap] = list()
+        inter_overlaps: List[AlleleOverlap] = list()
+        for overlap in overlaps:
+            if overlap.discordance_status.lab_count_all >= 2:
+                multi_overlaps.append(overlap)
+            else:
+                inter_overlaps.append(overlap)
+
+        return [
+            OverlapSet(label="Multi-Lab", overlaps=multi_overlaps),
+            OverlapSet(label="Interal", overlaps=inter_overlaps)
+        ]

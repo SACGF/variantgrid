@@ -52,6 +52,7 @@ class DiscordanceLevel(str, Enum):
 
     NO_ENTRIES = 'no_entries'
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
+    CONCORDANT_DIFF_VUS = 'concordant_diff_vus'  # VUS-A, VUS-B vs VUS-C
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
     DISCORDANT = 'discordant'
 
@@ -59,6 +60,8 @@ class DiscordanceLevel(str, Enum):
     def label(self) -> str:
         if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
             return "Concordant (Agreement)"
+        if self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+            return "Concordant (Agreement VUS*)"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "Concordant (Confidence)"
         if self == DiscordanceLevel.NO_ENTRIES:
@@ -69,7 +72,7 @@ class DiscordanceLevel(str, Enum):
 
     @property
     def bs_status(self) -> str:
-        if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
+        if self == DiscordanceLevel.CONCORDANT_AGREEMENT or self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
             return "success"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "warning"
@@ -112,7 +115,7 @@ class DiscordanceStatus:
         elif len(cs_values) > 1 or len(cs_vuses) > 1:
             # importantly you can have a VUS vs VUS_A and still be in agreement
             # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
-            level = DiscordanceLevel.CONCORDANT_CONFIDENCE
+            level = DiscordanceLevel.CONCORDANT_DIFF_VUS
         elif len(shared_labs) == 0:
             level = DiscordanceLevel.NO_ENTRIES
         else:
