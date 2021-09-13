@@ -676,23 +676,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
                 # see if the match looks suspect
                 c_hgvs = self.get(SpecialEKeys.C_HGVS)
-                lifted_chgvs: Optional[CHGVS] = None
+                resolved_chgvs: Optional[CHGVS] = None
                 transcript_comment: Optional[str] = None
                 matching_warning_comment: Optional[str] = None
                 compare_to: Optional[str] = None
                 diff: Optional[CHGVSDiff] = None
                 if self.get(SpecialEKeys.GENOME_BUILD):
-                    current_build = self.get_genome_build()
-                    if current_build == GenomeBuild.grch37():
+                    genome_build = self.get_genome_build()
+                    if genome_build == GenomeBuild.grch37():
                         compare_to = self.chgvs_grch37
-                    elif current_build == GenomeBuild.grch38():
+                    elif genome_build == GenomeBuild.grch38():
                         compare_to = self.chgvs_grch38
 
                     if c_hgvs and compare_to:
                         original_chgvs = CHGVS(c_hgvs)
-                        lifted_chgvs = CHGVS(compare_to)
+                        resolved_chgvs = CHGVS(compare_to)
 
-                        diff = original_chgvs.diff(lifted_chgvs)
+                        diff = original_chgvs.diff(resolved_chgvs)
 
                         if diff:
                             # DIFF_RAW_CGVS_EXPANDED is minor and expected process
@@ -701,20 +701,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             if diff == CHGVSDiff.DIFF_TRANSCRIPT_VER:
                                 transcript_comment = \
                                     (f'For c.hgvs {c_hgvs} the transcripts are:\n\n'
-                                     f'{original_chgvs.transcript} (imported)\n{lifted_chgvs.transcript} (resolved)')
+                                     f'{original_chgvs.transcript} (imported)\n{resolved_chgvs.transcript} (resolved)')
                             elif diff:
                                 important_diffs = chgvs_diff_description(diff)
                                 diff_desc = ' - ' + '\n - '.join(important_diffs)
                                 matching_warning_comment = (
                                     f'Imported c.hgvs and matched c.hgvs differ in the following ways:\n\n{diff_desc}\n\n'
-                                    f'{original_chgvs.full_c_hgvs} (imported)\n{lifted_chgvs.full_c_hgvs} (resolved)')
+                                    f'{original_chgvs.full_c_hgvs} (imported)\n{resolved_chgvs.full_c_hgvs} (resolved)')
 
                 if transcript_comment:
                     flag_collection.get_or_create_open_flag_of_type(
                         flag_type=classification_flag_types.transcript_version_change_flag,
                         comment=transcript_comment,
                         only_if_new=True,
-                        data={'resolved': lifted_chgvs.transcript},
+                        data={'resolved': resolved_chgvs.transcript},
                         close_other_data=True
                     )
                 else:
@@ -725,7 +725,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         flag_type=classification_flag_types.matching_variant_warning_flag,
                         comment=matching_warning_comment,
                         only_if_new=True,
-                        data={'resolved': lifted_chgvs.full_c_hgvs},
+                        data={'resolved': resolved_chgvs.full_c_hgvs},
                         close_other_data=True
                     )
                 else:
