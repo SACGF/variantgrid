@@ -558,6 +558,7 @@ class HGVSMatcher:
             for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession):
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
+                method = None
                 if self._pyhgvs_ok(tv):  # Attempt to use PyHGVS 1st as it's faster
                     method = self.HGVS_METHOD_PYHGVS
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
@@ -575,9 +576,10 @@ class HGVSMatcher:
                         else:
                             logging.error(error_message, cga_se)
 
-                if hgvs_string != hgvs_string_for_version:
-                    method += f" as '{hgvs_string_for_version}'"
-                hgvs_methods.append(method)
+                if method:
+                    if hgvs_string != hgvs_string_for_version:
+                        method += f" as '{hgvs_string_for_version}'"
+                    hgvs_methods.append(method)
 
                 if variant_tuple:
                     break
