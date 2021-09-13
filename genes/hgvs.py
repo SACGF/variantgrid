@@ -531,8 +531,8 @@ class HGVSMatcher:
         return not cache.get(key)
 
     @staticmethod
-    def _set_clingen_allele_registry_missing_transcript(transcript_version: TranscriptVersion):
-        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_version.accession)
+    def _set_clingen_allele_registry_missing_transcript(transcript_accession: str):
+        key = HGVSMatcher._get_clingen_allele_registry_key(transcript_accession)
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
