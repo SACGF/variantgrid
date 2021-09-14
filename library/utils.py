@@ -35,6 +35,7 @@ from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
 
+from library.log_utils import report_exc_info
 from uicore.json.json_types import JsonObjType
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
@@ -813,9 +814,13 @@ class ExportRow:
 
     @classmethod
     def csv_generator(cls, data: Iterable[Any]) -> Iterator[str]:
-        yield delimited_row(cls.csv_header())
-        for raw_data in data:
-            yield delimited_row(cls(raw_data).to_csv())
+        try:
+            yield delimited_row(cls.csv_header())
+            for raw_data in data:
+                yield delimited_row(cls(raw_data).to_csv())
+        except:
+            report_exc_info(extra_data={"activity": "Exporting"})
+            yield ["File terminated due to error"]
 
     @classmethod
     def csv_header(cls) -> List[str]:
