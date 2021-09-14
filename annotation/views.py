@@ -29,7 +29,8 @@ from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
-from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
+from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias, \
+    TranscriptVersionSequenceInfoFastaFileImport, TranscriptVersionSequenceInfo
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
@@ -194,13 +195,29 @@ def annotation(request):
     if diagnostic_gene_list_count:
         diagnostic_gene_list = f"{diagnostic_gene_list_count} diagnostic gene lists"
 
-    clinvar_citations = ClinVarCitation.objects.count()
-    if clinvar_citations:
+    if clinvar_citations := ClinVarCitation.objects.count():
         num_cached_clinvar_citations = CachedCitation.objects.count()
         clinvar_citations = f"{clinvar_citations} ClinVar citations ({num_cached_clinvar_citations} cached)"
 
     hpa_version = HumanProteinAtlasAnnotationVersion.objects.order_by("-annotation_date").first()
     hpa_counts = HumanProteinAtlasAnnotation.objects.filter(version=hpa_version).count()
+
+    transcript_fasta_imports = list(TranscriptVersionSequenceInfoFastaFileImport.objects.all().order_by("created"))
+    tvi_qs = TranscriptVersionSequenceInfo.objects.all()
+    tvi_api_count = tvi_qs.filter(fasta_import__isnull=True).count()
+    tvi_fasta_count = tvi_qs.filter(fasta_import__isnull=False).count()
+    if tvi_total := tvi_api_count + tvi_fasta_count:
+        transcript_version_sequence_info = f"{tvi_total} total"
+        subtotals = []
+        if tvi_api_count:
+            subtotals.append(f"{tvi_api_count} from API")
+        if tvi_fasta_count:
+            subtotals.append(f"{tvi_fasta_count} from {len(transcript_fasta_imports)} imports")
+        if subtotals:
+            subtotal = ", ".join(subtotals)
+            transcript_version_sequence_info += f" ({subtotal})"
+    else:
+        transcript_version_sequence_info = None
 
     somalier = None
     if somalier_enabled := settings.SOMALIER.get("enabled"):
@@ -220,21 +237,25 @@ def annotation(request):
         cwr, _ = CachedWebResource.objects.get_or_create(name=cwr_name)
         cached_web_resources.append(cwr)
 
-    context = {"annotations_all_imported": annotations_all_imported,
-               "genome_build_annotations": genome_build_annotations,
-               "ensembl_biomart_transcript_genes": ensembl_biomart_transcript_genes,
-               "ontology_services": ontology_services,
-               "ontology_counts": ontology_counts,
-               "ontology_relationship_counts": ontology_relationship_counts,
-               "ontology_imports": ontology_imports,
-               "gene_symbol_alias_counts": gene_symbol_alias_counts,
-               "diagnostic_gene_list": diagnostic_gene_list,
-               "clinvar_citations": clinvar_citations,
-               "hpa_counts": hpa_counts,
-               "num_annotation_columns": VariantGridColumn.objects.count(),
-               "cached_web_resources": cached_web_resources,
-               "python_command": settings.PYTHON_COMMAND,
-               "somalier": somalier}
+    context = {
+        "annotations_all_imported": annotations_all_imported,
+        "genome_build_annotations": genome_build_annotations,
+        "ensembl_biomart_transcript_genes": ensembl_biomart_transcript_genes,
+        "ontology_services": ontology_services,
+        "ontology_counts": ontology_counts,
+        "ontology_relationship_counts": ontology_relationship_counts,
+        "ontology_imports": ontology_imports,
+        "gene_symbol_alias_counts": gene_symbol_alias_counts,
+        "diagnostic_gene_list": diagnostic_gene_list,
+        "clinvar_citations": clinvar_citations,
+        "hpa_counts": hpa_counts,
+        "transcript_version_sequence_info": transcript_version_sequence_info,
+        "transcript_fasta_imports": transcript_fasta_imports,
+        "num_annotation_columns": VariantGridColumn.objects.count(),
+        "cached_web_resources": cached_web_resources,
+        "python_command": settings.PYTHON_COMMAND,
+        "somalier": somalier
+    }
     return render(request, "annotation/annotation.html", context)
 
 

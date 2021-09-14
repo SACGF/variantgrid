@@ -553,7 +553,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         Ensembl ID info: https://m.ensembl.org/Help/Faq?id=488
 
         There's currently multiple TranscriptVersion per genome build, this should probably be changed to only having
-        1, merging in TranscriptVersionInfo and moving the data (which contains exons etc) into a related object
+        1, merging in TranscriptVersionSequenceInfo and moving the data (which contains exons etc) into a related object
 
         A useful query to get the latest version for each transcript is:
         qs.order_by("transcript_id", "-version").distinct("transcript_id")
@@ -706,7 +706,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             if message := cache.get(bad_transcript_key):
                 raise BadTranscript(message)
             try:
-                TranscriptVersionInfo.get(transcript_accession)  # Throws BadTranscript
+                TranscriptVersionSequenceInfo.get(transcript_accession)  # Throws BadTranscript
                 raise MissingTranscript(f"Transcript '{transcript_accession}' valid but missing from our database.")
             except BadTranscript as bt:
                 # Only cache if we don't have it (DB will have it if we do)
@@ -898,13 +898,17 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return f"{self.accession} ({self.gene_version.gene_symbol}/{self.genome_build.name})"
 
 
-class TranscriptVersionInfoFastaFileImport(TimeStampedModel):
+class TranscriptVersionSequenceInfoFastaFileImport(TimeStampedModel):
     md5_hash = models.CharField(max_length=32, unique=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     filename = models.TextField()
 
+    def __str__(self):
+        basename = os.path.basename(self.filename)
+        return f"{basename} ({self.get_annotation_consortium_display()})"
 
-class TranscriptVersionInfo(TimeStampedModel):
+
+class TranscriptVersionSequenceInfo(TimeStampedModel):
     """ Current main use of this is to download transcript version lengths from the web, and then
         set TranscriptVersion.alignment_gap = True if they don't match
 
@@ -912,7 +916,7 @@ class TranscriptVersionInfo(TimeStampedModel):
     transcript = models.ForeignKey(Transcript, on_delete=CASCADE)
     version = models.IntegerField()
     # Data from Fasta file will have this set, from API will be populated with api_response
-    fasta_import = models.ForeignKey(TranscriptVersionInfoFastaFileImport, null=True, on_delete=CASCADE)
+    fasta_import = models.ForeignKey(TranscriptVersionSequenceInfoFastaFileImport, null=True, on_delete=CASCADE)
     api_response = models.TextField(null=True)
     sequence = models.TextField()
     length = models.IntegerField()
@@ -928,19 +932,19 @@ class TranscriptVersionInfo(TimeStampedModel):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
 
     @staticmethod
-    def get(transcript_accession: str) -> 'TranscriptVersionInfo':
+    def get(transcript_accession: str) -> 'TranscriptVersionSequenceInfo':
         """ Returns DB copy if we have it, or retrieves + stores from API """
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        if tvi := TranscriptVersionInfo.objects.filter(transcript_id=transcript_id, version=version).first():
+        if tvi := TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id, version=version).first():
             return tvi
 
         annotation_consortium = AnnotationConsortium.get_from_transcript_accession(transcript_accession)
         if annotation_consortium == AnnotationConsortium.REFSEQ:
-            tvi = TranscriptVersionInfo._get_and_store_from_refseq_api(transcript_accession)
+            tvi = TranscriptVersionSequenceInfo._get_and_store_from_refseq_api(transcript_accession)
         else:
-            tvi = TranscriptVersionInfo._get_and_store_from_ensembl_api(transcript_accession)
-        TranscriptVersionInfo.set_transcript_version_alignment_gap_if_length_different([tvi])
+            tvi = TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession)
+        TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different([tvi])
         return tvi
 
     @staticmethod
@@ -965,8 +969,8 @@ class TranscriptVersionInfo(TimeStampedModel):
         with StringIO(api_response) as f:
             records = list(SeqIO.parse(f, "genbank"))
             record = get_single_element(records)
-            kwargs = TranscriptVersionInfo._get_kwargs_from_genbank_record(record)
-            return TranscriptVersionInfo.objects.create(**kwargs, api_response=api_response)
+            kwargs = TranscriptVersionSequenceInfo._get_kwargs_from_genbank_record(record)
+            return TranscriptVersionSequenceInfo.objects.create(**kwargs, api_response=api_response)
 
     @staticmethod
     def _get_and_store_from_ensembl_api(transcript_accession):
@@ -978,11 +982,11 @@ class TranscriptVersionInfo(TimeStampedModel):
         if r.ok:
             transcript, _ = Transcript.objects.get_or_create(identifier=data["id"],
                                                              annotation_consortium=AnnotationConsortium.ENSEMBL)
-            return TranscriptVersionInfo.objects.create(transcript=transcript,
-                                                        version=data["version"],
-                                                        api_response=r.text,
-                                                        sequence=data["seq"],
-                                                        length=len(data["seq"]))
+            return TranscriptVersionSequenceInfo.objects.create(transcript=transcript,
+                                                                version=data["version"],
+                                                                api_response=r.text,
+                                                                sequence=data["seq"],
+                                                                length=len(data["seq"]))
         else:
             error = data.get("error")
             if error:
@@ -991,13 +995,13 @@ class TranscriptVersionInfo(TimeStampedModel):
             raise NoTranscript(f"Unable to understand Ensembl API response: {data}")
 
     @staticmethod
-    def get_refseq_transcript_versions(transcript_accessions: List[str]) -> Dict[str, 'TranscriptVersionInfo']:
+    def get_refseq_transcript_versions(transcript_accessions: Iterable[str]) -> Dict[str, 'TranscriptVersionSequenceInfo']:
         """ Batch method - returns DB copies if we have it, retrieves + stores from API """
         # Find the ones we already have so we don't need to re-retrieve
         all_transcript_accessions = set(transcript_accessions)
         transcript_ids = [TranscriptVersion.get_transcript_id_and_version(a)[0] for a in transcript_accessions]
         tvi_by_id = {}
-        for tvi in TranscriptVersionInfo.objects.filter(transcript_id__in=transcript_ids):
+        for tvi in TranscriptVersionSequenceInfo.objects.filter(transcript_id__in=transcript_ids):
             if tvi.accession in all_transcript_accessions:
                 tvi_by_id[tvi.accession] = tvi
 
@@ -1015,28 +1019,34 @@ class TranscriptVersionInfo(TimeStampedModel):
                 query_key=search_results["QueryKey"],
                 idtype="acc",
             )
-            new_records = []
-            for record in SeqIO.parse(fetch_handle, "genbank"):
-                # Store raw data so that we can retrieve more stuff from it later
-                s = StringIO()
-                SeqIO.write(record, s, "genbank")
-                s.seek(0)
-                api_response = s.read()
-                kwargs = TranscriptVersionInfo._get_kwargs_from_genbank_record(record)
-                tvi = TranscriptVersionInfo(**kwargs, api_response=api_response)
-                new_records.append(tvi)
-
-            # Write them as we go so any failure only loses some
-            if new_records:
-                TranscriptVersionInfo.objects.bulk_create(new_records, ignore_conflicts=True, batch_size=2000)
-                for tvi in new_records:
-                    tvi_by_id[tvi.accession] = tvi
-                TranscriptVersionInfo.set_transcript_version_alignment_gap_if_length_different(new_records)
+            tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
 
         return tvi_by_id
 
     @staticmethod
-    def set_transcript_version_alignment_gap_if_length_different(tvis: Iterable['TranscriptVersionInfo']):
+    def _insert_from_genbank_handle(handle) -> Dict[str, 'TranscriptVersionSequenceInfo']:
+        new_records = []
+        for record in SeqIO.parse(handle, "genbank"):
+            # Store raw data so that we can retrieve more stuff from it later
+            s = StringIO()
+            SeqIO.write(record, s, "genbank")
+            s.seek(0)
+            api_response = s.read()
+            kwargs = TranscriptVersionSequenceInfo._get_kwargs_from_genbank_record(record)
+            tvi = TranscriptVersionSequenceInfo(**kwargs, api_response=api_response)
+            new_records.append(tvi)
+
+        # Write them as we go so any failure only loses some
+        tvi_by_id = {}
+        if new_records:
+            TranscriptVersionSequenceInfo.objects.bulk_create(new_records, ignore_conflicts=True, batch_size=2000)
+            for tvi in new_records:
+                tvi_by_id[tvi.accession] = tvi
+            TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different(new_records)
+        return tvi_by_id
+
+    @staticmethod
+    def set_transcript_version_alignment_gap_if_length_different(tvis: Iterable['TranscriptVersionSequenceInfo']):
         transcript_version_lengths = defaultdict(dict)
         for tvi in tvis:
             transcript_version_lengths[tvi.transcript_id][tvi.version] = tvi.length

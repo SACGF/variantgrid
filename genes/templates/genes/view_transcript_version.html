@@ -2,6 +2,7 @@
 {% load ui_help %}
 {% load js_tags %}
 {% load ui_menu_bars %}
+{% load tz %}
 {% block title %}{{ accession }}{% endblock title %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 {% block content %}
@@ -17,6 +18,36 @@
     {% endif %}
     {% if transcript.annotation_consortium == 'E' %}
         {% page_help 'genes/transcript_version_ensembl' 'Ensembl transcript versions' %}
+    {% endif %}
+
+    {% if tv_sequence_info %}
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Source</th>
+                <th>Retrieval Date</th>
+                <th>Length</th>
+            </tr>
+            </thead>
+            <tr>
+                <td>
+                    {% if tv_sequence_info.fasta_import %}
+                        Imported via {{ tv_sequence_info.fasta_import }} on {{ tv_sequence_info.fasta_import.created|localtime }}
+                    {% else %}
+                        Retrieved from {{ transcript.get_annotation_consortium_display }} API
+                    {% endif %}
+                </td>
+                <td>{{ tv_sequence_info.created|localtime }}</td>
+                <td>{{ tv_sequence_info.length }}</td>
+            </tr>
+        </table>
+    {% else %}
+        <ul class="messages">
+            <li class="warning">
+                Could not retrieve transcript sequence information from {{ transcript.get_annotation_consortium_display }} API
+                (may be temporarily down, try again later)
+            </li>
+        </ul>
     {% endif %}
 
     {% if transcript_versions_by_build %}
@@ -68,6 +99,21 @@
         </table>
     {% else %}
     <div class="alert alert-danger">We don't have any data for this transcript version on file.</div>
+    {% endif %}
+
+    {% if alignment_gap %}
+        <h3>Alignment Gap</h3>
+        <p>
+            Genomic coordinates for transcript exons/CDS etc are made by aligning cDNA sequences to the genome.
+            These sequences are not identical and the alignment may have gaps.
+            These are detected by the GFF/GTF containing a "gap_count" attribute, or the cDNA transcript length
+            from Fasta or retrieved from API having a different length than the sum of exons lengths in the alignment.
+        </p>
+        <p>
+            When a TranscriptVersion has an alignment gap, we can't use the genome to convert to/from HGVS, and so use ClinGen Allele Registry.
+            This will make conversion slower for these transcripts.
+        </p>
+
     {% endif %}
 
     {% if differences %}

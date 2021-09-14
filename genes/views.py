@@ -35,7 +35,7 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm,
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, PanelAppServer, SampleGeneList, HGNC, GeneVersion
+    PfamSequenceIdentifier, PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript
 from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
@@ -372,43 +372,53 @@ def view_transcript_version(request, transcript_id, version):
     transcript = Transcript.objects.filter(pk=transcript_id).first()
     if not transcript:
         return render(request, "genes/view_transcript.html", {'transcript_id': transcript_id})
+
+    accession = TranscriptVersion.get_accession(transcript_id, version)
+    try:
+        # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
+        # if lengths are different
+        tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
+    except NoTranscript:
+        tv_sequence_info = None
+
     tv_set = transcript.transcriptversion_set.filter(version=version)
     tv: TranscriptVersion = tv_set.first()
     data = transcript.transcriptversion_set.aggregate(Count("version", distinct=True))
     version_count = data["version__count"]
 
-    context = {"accession": TranscriptVersion.get_accession(transcript_id, version),
+    context = {"accession": accession,
                "transcript": transcript,
+               "tv_sequence_info": tv_sequence_info,
                "version_count": version_count}
 
-    if not tv:
-        return render(request, "genes/view_transcript_version.html", context)
+    if tv:
+        transcript_versions_by_build = {}
+        builds_missing_data = set()
+        alignment_gap = False
+        for tv in tv_set.order_by("genome_build__name"):
+            genome_build_id = tv.genome_build.pk
+            alignment_gap |= tv.alignment_gap
+            transcript_versions_by_build[genome_build_id] = tv
+            if not tv.has_valid_data:
+                builds_missing_data.add(tv.genome_build)
 
-    accession = tv.accession
-    transcript_versions_by_build = {}
-    builds_missing_data = set()
-    for tv in tv_set.order_by("genome_build__name"):
-        genome_build_id = tv.genome_build.pk
-        transcript_versions_by_build[genome_build_id] = tv
-        if not tv.has_valid_data:
-            builds_missing_data.add(tv.genome_build)
+        differences = []
+        if builds_missing_data:
+            builds = ', '.join([str(b) for b in builds_missing_data])
+            msg = f"Transcripts in builds {builds} missing data, no difference comparison possible"
+            messages.add_message(request, messages.WARNING, msg)
+        else:
+            for a, b in combinations(transcript_versions_by_build.keys(), 2):
+                t_a = transcript_versions_by_build[a]
+                t_b = transcript_versions_by_build[b]
+                diff = t_a.get_differences(t_b)
+                if diff:
+                    differences.append(((a, b), diff))
 
-    differences = []
-    if builds_missing_data:
-        builds = ', '.join([str(b) for b in builds_missing_data])
-        msg = f"Transcripts in builds {builds} missing data, no difference comparison possible"
-        messages.add_message(request, messages.WARNING, msg)
-    else:
-        for a, b in combinations(transcript_versions_by_build.keys(), 2):
-            t_a = transcript_versions_by_build[a]
-            t_b = transcript_versions_by_build[b]
-            diff = t_a.get_differences(t_b)
-            if diff:
-                differences.append(((a, b), diff))
-
-    context = {**context, **{"accession": accession,
-                             "transcript_versions_by_build": transcript_versions_by_build,
-                             "differences": differences}}
+        context = {**context, **{"accession": accession,
+                                 "transcript_versions_by_build": transcript_versions_by_build,
+                                 "differences": differences,
+                                 "alignment_gap": alignment_gap}}
     return render(request, "genes/view_transcript_version.html", context)
 
 

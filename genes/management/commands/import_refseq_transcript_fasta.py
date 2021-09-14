@@ -1,15 +1,11 @@
-import logging
-from collections import defaultdict
+from collections import Counter
 
 from Bio import SeqIO
 from django.core.management import BaseCommand
-from django.db.models import QuerySet
 
-from genes.models import TranscriptVersionInfo, TranscriptVersionInfoFastaFileImport, TranscriptVersion, Transcript
+from genes.models import TranscriptVersionSequenceInfo, TranscriptVersionSequenceInfoFastaFileImport, TranscriptVersion, Transcript
 from genes.models_enums import AnnotationConsortium
 from library.file_utils import file_md5sum, open_handle_gzip
-
-
 
 
 class Command(BaseCommand):
@@ -23,9 +19,9 @@ class Command(BaseCommand):
         overwrite = options["overwrite"]
 
         md5_hash = file_md5sum(filename)
-        if existing_import := TranscriptVersionInfoFastaFileImport.objects.filter(md5_hash=md5_hash).first():
+        if existing_import := TranscriptVersionSequenceInfoFastaFileImport.objects.filter(md5_hash=md5_hash).first():
             if overwrite:
-                print(f"Deleting existing TranscriptVersionInfos for fasta import {md5_hash}")
+                print(f"Deleting existing TranscriptVersionSequenceInfos for fasta import {md5_hash}")
                 existing_import.delete()
             else:
                 raise ValueError(f"Fasta import {md5_hash} exists, use --overwrite to delete old data")
@@ -34,26 +30,35 @@ class Command(BaseCommand):
         if not known_transcripts:
             raise ValueError("No transcripts! Insert them first!")
 
-        fasta_import = TranscriptVersionInfoFastaFileImport.objects.create(md5_hash=md5_hash,
-                                                                           annotation_consortium=AnnotationConsortium.REFSEQ,
-                                                                           filename=filename)
-        skipped_transcripts = 0
+        fasta_import = TranscriptVersionSequenceInfoFastaFileImport.objects.create(md5_hash=md5_hash,
+                                                                                   annotation_consortium=AnnotationConsortium.REFSEQ,
+                                                                                   filename=filename)
+        unknown_transcripts = []
+        unknown_transcript_prefixes = Counter()
         records = []
         with open_handle_gzip(filename, "rt") as f:
             for record in SeqIO.parse(f, "fasta"):
                 transcript_id, version = TranscriptVersion.get_transcript_id_and_version(record.id)
                 if transcript_id not in known_transcripts:
-                    skipped_transcripts += 1
-                    continue
+                    if transcript_id.startswith("X"):
+                        continue  # We don't want these
+                    prefix = transcript_id.split("_")[0]
+                    unknown_transcript_prefixes[prefix] += 1
+                    unknown_transcripts.append(Transcript(identifier=transcript_id,
+                                                          annotation_consortium=AnnotationConsortium.REFSEQ))
 
-                tvi = TranscriptVersionInfo(transcript_id=transcript_id, version=version,
-                                            fasta_import=fasta_import,
-                                            sequence=str(record.seq), length=len(record.seq))
+                tvi = TranscriptVersionSequenceInfo(transcript_id=transcript_id, version=version,
+                                                    fasta_import=fasta_import,
+                                                    sequence=str(record.seq), length=len(record.seq))
                 records.append(tvi)
 
-        print(f"Skipped {skipped_transcripts} transcripts not in our database")
-        if num_records := len(records):
-            print(f"Inserting {num_records} TranscriptVersionInfo records")
-            TranscriptVersionInfo.objects.bulk_create(records, ignore_conflicts=True, batch_size=2000)
+        if unknown_transcripts:
+            print(f"Inserting {len(unknown_transcripts)} unknown_transcripts")
+            print(unknown_transcript_prefixes)
+            Transcript.objects.bulk_create(unknown_transcripts, batch_size=2000)
 
-        TranscriptVersionInfo.set_transcript_version_alignment_gap_if_length_different(records)
+        if num_records := len(records):
+            print(f"Inserting {num_records} TranscriptVersionSequenceInfo records")
+            TranscriptVersionSequenceInfo.objects.bulk_create(records, ignore_conflicts=True, batch_size=2000)
+
+        TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different(records)
