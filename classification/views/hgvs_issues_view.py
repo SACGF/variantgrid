@@ -272,7 +272,7 @@ class ProblemHgvs(ExportRow):
 
     @export_column("37 != 38")
     def flag_37_not_38(self):
-        return self.flag_formatter(allele_flag_types.allele_37_not_38, data={"transcript", self.classification.transcript})
+        return self.flag_formatter(allele_flag_types.allele_37_not_38, data={"transcript": self.classification.transcript})
 
     @export_column("!37")
     def flag_37(self):
