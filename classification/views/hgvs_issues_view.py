@@ -197,7 +197,7 @@ class HgvsIssuesRow(ExportRow):
 class ProblemHgvs(ExportRow):
     classification: Classification
 
-    def flag_formatter(self, flag_type: FlagType):
+    def flag_formatter(self, flag_type: FlagType, data: Dict[str, Any]):
         qs: QuerySet[Flag]
         if flag_type.context_id == 'classification':
             qs = self.classification.flags_of_type(flag_type=flag_type)
@@ -209,9 +209,9 @@ class ProblemHgvs(ExportRow):
         else:
             raise ValueError(f"Unexpected flag context {flag_type.context_id}")
 
-        qs = qs.order_by('created')
+        qs = qs.order_by('-created')
         if last_flag := qs.first():
-            last_comment: FlagComment = last_flag.flagcomment_set.order_by('created').first()
+            last_comment: FlagComment = last_flag.flagcomment_set.order_by('-created').first()
             closed = last_flag.resolution.status == FlagStatus.CLOSED
             if closed:
                 return f"Closed : {last_comment.user.username}"
