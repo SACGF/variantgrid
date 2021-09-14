@@ -32,12 +32,15 @@
     }
 
     function alleleMissingRepFilter(data) {
+        console.log("SETTING DATA TO missing rep filter")
         data.flag = 'missing_rep';
     }
     function alleleMissingClinGenFilter(data) {
+        console.log("SETTING DATA TO missing clingen")
         data.flag = 'missing_clingen';
     }
     function alleleChgvs37not38(data) {
+        console.log("SETTING DATA TO chgvs_37_not_38")
         data.flag = 'chgvs_37_not_38'
     }
 

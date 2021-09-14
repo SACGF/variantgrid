@@ -128,25 +128,15 @@ class AlleleColumns(DatatableConfig):
 class FlagReport(ExportRow):
     flag: Flag
 
-    @property
-    def last_comment(self) -> Optional[FlagComment]:
-        if flag := self.flag:
-            return self.flag.flagcomment_set.order_by('-created').first()
-
-    @property
-    def is_closed(self) -> bool:
-        if (last_comment := self.last_comment) and (resolution := last_comment.resolution):
-            return resolution.status == FlagStatus.CLOSED
-
     @lazy
     def data(self) -> Tuple[str, datetime]:
         """
         Returns the username of who closed the flag (if the flag is closed)
         And then the closed date of the flag, or created date if not closed
         """
-        if last_comment := self.last_comment:
-            if self.is_closed:
-                return last_comment.created, last_comment.user.username
+        if last_status_comment := self.flag.flagcomment_set.order_by('-created').filter(resolution__isnull=False).first():
+            if last_status_comment.resolution.status == FlagStatus.CLOSED:
+                return last_status_comment.created, last_status_comment.user.username
             else:
                 return self.flag.created, None
 
@@ -158,6 +148,10 @@ class FlagReport(ExportRow):
     @export_column("Closed By")
     def username(self) -> str:
         return self.data[1]
+
+    @export_column("Note")
+    def note(self) -> str:
+        return self.flag.flagcomment_set.order_by('-created').first().text
 
 
 @dataclass(frozen=True)
