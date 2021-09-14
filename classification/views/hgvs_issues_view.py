@@ -232,7 +232,7 @@ class ProblemHgvs(ExportRow):
         return self.classification.get(SpecialEKeys.GENOME_BUILD)
 
     @export_column("Imported 37")
-    def imported_c_hgvs(self):
+    def imported_c_hgvs_37(self):
         if (imported_build := self.imported_build()) and '37' in imported_build:
             return self.classification.get(SpecialEKeys.C_HGVS)
 
@@ -241,7 +241,7 @@ class ProblemHgvs(ExportRow):
         return self.classification.chgvs_grch37
 
     @export_column("Imported 38")
-    def imported_c_hgvs(self):
+    def imported_c_hgvs_38(self):
         if (imported_build := self.imported_build()) and '38' in imported_build:
             return self.classification.get(SpecialEKeys.C_HGVS)
 

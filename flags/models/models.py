@@ -324,7 +324,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         if open_only:
             flag_collections = flag_collections.filter(FlagCollection.Q_OPEN_FLAGS)
         if flag_types:
-            open_flag_collections = flag_collections.filter(flag_type__in=flag_types)
+            flag_collections = flag_collections.filter(flag_type__in=flag_types)
 
         return qs.filter(flag_collection__in=Subquery(flag_collections.values('collection')))
 
