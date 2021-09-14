@@ -64,4 +64,5 @@ class ClassificationFlagTypes:
     def clinical_context_discordance(self) -> FlagType:
         return FlagType.objects.get(pk='clinical_context_discordance')
 
+
 classification_flag_types = ClassificationFlagTypes()

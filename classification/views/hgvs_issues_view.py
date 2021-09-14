@@ -1,18 +1,16 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, Iterable
-
-from django.conf import settings
+from typing import Dict, Any, Optional
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.shortcuts import render
-from django.utils.timezone import now
-from pytz import timezone
+from lazy import lazy
 from requests.models import Response
 
+from classification.enums import SpecialEKeys
 from classification.models import Classification, classification_flag_types
-from flags.models import Flag
+from flags.models import Flag, FlagStatus, FlagComment, FlagType
 from flags.models.models import FlagCollection
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
@@ -195,29 +193,132 @@ class HgvsIssuesRow(ExportRow):
             return flag.flagcomment_set.first().text
 
 
+@dataclass(frozen=True)
+class ProblemHgvs(ExportRow):
+    classification: Classification
+
+    def flag_formatter(self, flag_type: FlagType):
+        qs: QuerySet[Flag]
+        if flag_type.context_id == 'classification':
+            qs = self.classification.flags_of_type(flag_type=flag_type)
+        elif flag_type.context_id == 'allele':
+            if allele := self.allele:
+                qs = allele.flags_of_type(flag_type=flag_type)
+            else:
+                return
+        else:
+            raise ValueError(f"Unexpected flag context {flag_type.context_id}")
+
+        qs = qs.order_by('created')
+        if last_flag := qs.first():
+            last_comment: FlagComment = last_flag.flagcomment_set.order_by('created').first()
+            closed = last_flag.resolution.status == FlagStatus.CLOSED
+            if closed:
+                return f"Closed : {last_comment.user.username}"
+            else:
+                return "Open"
+
+    @lazy
+    def allele(self):
+        if variant := self.classification.variant:
+            return variant.allele
+
+    @export_column("Classification URL")
+    def classification_url(self):
+        return get_url_from_view_path(self.classification.get_absolute_url())
+
+    @export_column("Imported Build")
+    def imported_build(self):
+        return self.classification.get(SpecialEKeys.GENOME_BUILD)
+
+    @export_column("Imported 37")
+    def imported_c_hgvs(self):
+        if (imported_build := self.imported_build()) and '37' in imported_build:
+            return self.classification.get(SpecialEKeys.C_HGVS)
+
+    @export_column("Resolved 37")
+    def resolved_37(self):
+        return self.classification.chgvs_grch37
+
+    @export_column("Imported 38")
+    def imported_c_hgvs(self):
+        if (imported_build := self.imported_build()) and '38' in imported_build:
+            return self.classification.get(SpecialEKeys.C_HGVS)
+
+    @export_column("Resolved 38")
+    def resolved_38(self):
+        return self.classification.chgvs_grch38
+
+    @export_column("Flag Matching")
+    def flag_variant_matching(self):
+        return self.flag_formatter(classification_flag_types.matching_variant_flag)
+
+    @export_column("Flag Matching Warning")
+    def flag_matching_warning(self):
+        return self.flag_formatter(classification_flag_types.matching_variant_warning_flag)
+
+    @export_column("Transcript Change")
+    def flag_transcript_change(self):
+        return self.flag_formatter(classification_flag_types.transcript_version_change_flag)
+
+    @export_column("Allele URL")
+    def allele_url(self):
+        if allele := self.allele:
+            return get_url_from_view_path(allele.get_absolute_url())
+
+    @export_column("37 != 38")
+    def flag_37_not_38(self):
+        return self.flag_formatter(allele_flag_types.allele_37_not_38)
+
+    @export_column("!37")
+    def flag_37(self):
+        return self.flag_formatter(allele_flag_types.missing_37)
+
+    @export_column("!38")
+    def flag_38(self):
+        return self.flag_formatter(allele_flag_types.missing_38)
+
+
 @user_passes_test(is_superuser)
 def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
 
-    def row_generator() -> Iterable[str]:
-        yield delimited_row(HgvsIssuesRow.csv_header())
-        alleles_qs = FlagCollection.filter_for_open_flags(qs=_alleles_with_classifications_qs())
-        for allele in alleles_qs:
-            open_flags = Flag.objects.filter(collection=allele.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS)
-            for flag in open_flags:
-                yield delimited_row(HgvsIssuesRow(allele=allele, flag=flag).to_csv())
+    # source data as all classifications with a flag
+    # and all classifications attached to an allele with a flag
+    alleles_qs = FlagCollection.filter_for_flags(Allele.objects.all())
+    classification_qs = FlagCollection.filter_for_flags(Classification.objects.all(), flag_types=[
+        classification_flag_types.matching_variant_warning_flag,
+        classification_flag_types.transcript_version_change_flag,
+        classification_flag_types.matching_variant_flag
+    ])
+    complete_qs = classification_qs.union(Classification.objects.filter(variant__variantallele__allele__in=alleles_qs))
+    complete_qs = complete_qs.order_by('-variant', '-pk')
 
-        classification_hgvs_issue_flag_types = [
-            classification_flag_types.matching_variant_flag,
-            classification_flag_types.matching_variant_warning_flag,
-            classification_flag_types.transcript_version_change_flag
-        ]
-        classification_qs = FlagCollection.filter_for_open_flags(qs=Classification.objects.all(), flag_types=classification_hgvs_issue_flag_types)
-        for classification in classification_qs:
-            open_flags = Flag.objects.filter(collection=classification.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS).filter(flag_type__in=classification_hgvs_issue_flag_types)
-            for flag in open_flags:
-                allele = classification.variant.allele if classification.variant else None
-                yield delimited_row(HgvsIssuesRow(allele=allele, classification=classification, flag=flag).to_csv())
+    return ProblemHgvs.streaming_csv(complete_qs, "hgvs_issues")
 
-    response = StreamingHttpResponse(row_generator(), content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="allele_issues_{now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")}.csv"'
-    return response
+# @user_passes_test(is_superuser)
+# def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
+#
+#     def row_generator() -> Iterable[str]:
+#         yield delimited_row(HgvsIssuesRow.csv_header())
+#         alleles_qs = FlagCollection.filter_for_open_flags(qs=_alleles_with_classifications_qs())
+#         for allele in alleles_qs:
+#             open_flags = Flag.objects.filter(collection=allele.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS)
+#             for flag in open_flags:
+#                 yield delimited_row(HgvsIssuesRow(allele=allele, flag=flag).to_csv())
+#
+#         classification_hgvs_issue_flag_types = [
+#             classification_flag_types.matching_variant_flag,
+#             classification_flag_types.matching_variant_warning_flag,
+#             classification_flag_types.transcript_version_change_flag
+#         ]
+#         classification_qs = FlagCollection.filter_for_open_flags(qs=Classification.objects.all(), flag_types=classification_hgvs_issue_flag_types)
+#         for classification in classification_qs:
+#             open_flags = Flag.objects.filter(collection=classification.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS).filter(flag_type__in=classification_hgvs_issue_flag_types)
+#             for flag in open_flags:
+#                 allele = classification.variant.allele if classification.variant else None
+#                 yield delimited_row(HgvsIssuesRow(allele=allele, classification=classification, flag=flag).to_csv())
+#
+#     response = StreamingHttpResponse(row_generator(), content_type='text/csv')
+#     response['Content-Disposition'] = f'attachment; filename="allele_issues_{now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")}.csv"'
+#     return response
+

@@ -12,6 +12,7 @@ import string
 import subprocess
 import time
 import uuid
+from pytz import timezone
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -29,6 +30,7 @@ from django.conf import settings
 from django.core.serializers import serialize
 from django.db import models
 from django.db.models.query import QuerySet
+from django.http import StreamingHttpResponse
 from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
@@ -833,3 +835,11 @@ class ExportRow:
         for method in ExportRow.get_export_methods(self.__class__):
             row[method.__name__] = method(self)
         return row
+
+    @classmethod
+    def streaming_csv(cls, data: Iterable[Any], filename: str):
+        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+
+        response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
+        return response

@@ -305,21 +305,28 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
     QST = TypeVar("QST", bound='FlagsMixin')
 
     @staticmethod
-    def filter_for_open_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet[QST]:
+    def filter_for_open_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None) -> QuerySet[QST]:
+        """
+        @deprecated use filter_for_flags
+        """
+        return FlagCollection.filter_for_flags(qs=qs, flag_types=flag_types, open_only=True)
+
+    @staticmethod
+    def filter_for_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None, open_only: bool = True) -> QuerySet[QST]:
         """
         Takes the QuerySet and returns a filtered version where the item contain at least one of the provided flag_types
         e.g. if you passed in a QuerySet of Alleles and a missing 38 flag type, the resulting QuerySet will still be Alleles
+        @param qs A QuerySet of models that have FlaxMixin
         @param flag_types if provided one of these flag types have to be included (otherwise any open flag can be included)
-        @param exclude_flag_types if provided then these flags can't be included (typically used with withdrawn)
+        @param open_only if True (default) closed flags will be ignored
         """
-
-        open_flag_collections = Flag.objects.filter(FlagCollection.Q_OPEN_FLAGS)
+        flag_collections = Flag.objects.all()
+        if open_only:
+            flag_collections = flag_collections.filter(FlagCollection.Q_OPEN_FLAGS)
         if flag_types:
-            open_flag_collections = open_flag_collections.filter(flag_type__in=flag_types)
-        if exclude_flag_types:
-            open_flag_collections = open_flag_collections.exclude(flag_type__in=exclude_flag_types)
+            open_flag_collections = flag_collections.filter(flag_type__in=flag_types)
 
-        return qs.filter(flag_collection__in=Subquery(open_flag_collections.values('collection')))
+        return qs.filter(flag_collection__in=Subquery(flag_collections.values('collection')))
 
     @staticmethod
     def filter_for_starred(qs: QuerySet, user: User) -> QuerySet:
@@ -564,7 +571,7 @@ class FlagsMixin(models.Model):
             return FlagPermissionLevel.USERS if self.can_view(user) else FlagPermissionLevel.NO_PERM
         return FlagPermissionLevel.USERS
 
-    def flags_of_type(self, flag_type: FlagType) -> QuerySet:
+    def flags_of_type(self, flag_type: FlagType) -> QuerySet[Flag]:
         if not self.flag_collection:
             return Flag.objects.none()
         return Flag.objects.filter(collection=self.flag_collection, flag_type=flag_type)
