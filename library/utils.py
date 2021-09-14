@@ -34,8 +34,6 @@ from django.http import StreamingHttpResponse
 from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
-
-from library.log_utils import report_exc_info
 from uicore.json.json_types import JsonObjType
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
@@ -819,6 +817,7 @@ class ExportRow:
             for raw_data in data:
                 yield delimited_row(cls(raw_data).to_csv())
         except:
+            from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
             yield ["File terminated due to error"]
 
