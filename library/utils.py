@@ -21,7 +21,7 @@ from enum import Enum
 from itertools import islice
 from json.encoder import JSONEncoder
 from operator import attrgetter
-from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable
+from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
@@ -777,11 +777,12 @@ def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P]
     return passes, fails
 
 
-def export_column(label: Optional[str] = None):
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
     :param label: The label that will appear in the CSV header
+    :param sub_data: An optional SubType of another ExportRow for nested data
     """
 
     def decorator(method):
@@ -792,6 +793,7 @@ def export_column(label: Optional[str] = None):
         wrapper.label = label
         wrapper.__name__ = method.__name__
         wrapper.is_export = True
+        wrapper.sub_data = sub_data
         return wrapper
     return decorator
 
@@ -820,24 +822,49 @@ class ExportRow:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
             yield "** File terminated due to error"
+            raise
 
     @classmethod
     def csv_header(cls) -> List[str]:
         row = list()
         for method in ExportRow.get_export_methods(cls):
-            row.append(method.label or method.__name__)
+            label = method.label or method.__name__
+            if sub_data := method.sub_data:
+                sub_header = sub_data.csv_header()
+                for sub in sub_header:
+                    row.append(label + "." + sub)
+            else:
+                row.append(label)
         return row
 
     def to_csv(self) -> List[str]:
         row = list()
         for method in ExportRow.get_export_methods(self.__class__):
-            row.append(method(self))
+            result = method(self)
+            if sub_data := method.sub_data:
+                if result is None:
+                    for entry in sub_data.csv_header():
+                        row.append("")
+                else:
+                    row += result.to_csv()
+            else:
+                row.append(result)
         return row
 
     def to_json(self) -> JsonObjType:
         row = dict()
         for method in ExportRow.get_export_methods(self.__class__):
-            row[method.__name__] = method(self)
+            result = method(self)
+            value: Any
+            if result is None:
+                value = None
+            elif method.sub_data:
+                value = result.to_json()
+            else:
+                value = result
+
+            row[method.__name__] = value
+
         return row
 
     @classmethod

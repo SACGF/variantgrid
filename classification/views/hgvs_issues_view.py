@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from datetime import datetime
+from typing import Dict, Any, Optional, Tuple
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
@@ -123,74 +124,40 @@ class AlleleColumns(DatatableConfig):
         return qs
 
 
-@dataclass
-class HgvsIssuesRow(ExportRow):
-    allele: Optional[Allele] = None
-    classification: Optional[Classification] = None
-    flag: Optional[Flag] = None
+@dataclass(frozen=True)
+class FlagReport(ExportRow):
+    flag: Flag
 
-    @export_column("Allele ID")
-    def allele_id(self) -> Optional[str]:
-        if allele := self.allele:
-            return str(allele.id)
-
-    @export_column("Allele URL")
-    def allele_url(self) -> Optional[str]:
-        if allele := self.allele:
-            return get_url_from_view_path(allele.get_absolute_url())
-
-    @export_column("ClinGen Allele ID")
-    def clingen_allele_id(self) -> Optional[str]:
-        if allele := self.allele:
-            return allele.clingen_allele_id
-
-    @export_column("Best Transcript Gene")
-    def allele_gene_symbol(self) -> Optional[str]:
-        if allele := self.allele:
-            for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
-                try:
-                    variant = self.allele.variant_for_build(genome_build, best_attempt=False)
-                    if variant_annotation := variant.get_best_variant_transcript_annotation(genome_build):
-                        if gene := variant_annotation.gene:
-                            if gene_symbol := gene.get_gene_symbol(genome_build):
-                                return gene_symbol.symbol
-                except ValueError:
-                    pass
-
-    @export_column("Allele GRCh37")
-    def allele_grch37(self) -> Optional[str]:
-        if allele := self.allele:
-            return str(allele.grch37)
-
-    @export_column("Allele GRCh38")
-    def allele_grch38(self) -> Optional[str]:
-        if allele := self.allele:
-            return str(allele.grch38)
-
-    @export_column("Classification URL")
-    def classification_url(self):
-        if classification := self.classification:
-            return get_url_from_view_path(classification.get_absolute_url())
-
-    @export_column("Classification GRCh37")
-    def classification_37(self):
-        if classification := self.classification:
-            return classification.chgvs_grch37
-
-    @export_column("Classification GRCh38")
-    def classification_38(self):
-        if classification := self.classification:
-            return classification.chgvs_grch38
-
-    @export_column("Issue Type")
-    def issue_type(self):
+    @property
+    def last_comment(self) -> Optional[FlagComment]:
         if flag := self.flag:
-            return flag.flag_type.label
+            return self.flag.flagcomment_set.order_by('-created').first()
 
-    @export_column("Issue Text")
-    def issue_text(self):
-        if flag := self.flag:
-            return flag.flagcomment_set.first().text
+    @property
+    def is_closed(self) -> bool:
+        if (last_comment := self.last_comment) and (resolution := last_comment.resolution):
+            return resolution.status == FlagStatus.CLOSED
+
+    @lazy
+    def data(self) -> Tuple[str, datetime]:
+        """
+        Returns the username of who closed the flag (if the flag is closed)
+        And then the closed date of the flag, or created date if not closed
+        """
+        if last_comment := self.last_comment:
+            if self.is_closed:
+                return last_comment.created, last_comment.user.username
+            else:
+                return self.flag.created, None
+
+    @export_column("Date")
+    def date(self) -> str:
+        if date := self.data[0]:
+            return date.strftime("%Y-%m-%d")
+
+    @export_column("Closed By")
+    def username(self) -> str:
+        return self.data[1]
 
 
 @dataclass(frozen=True)
@@ -215,12 +182,7 @@ class ProblemHgvs(ExportRow):
                 qs = qs.filter(**{f'data__{key}': value})
 
         if last_flag := qs.first():
-            last_comment: FlagComment = last_flag.flagcomment_set.order_by('-created').first()
-            closed = last_flag.resolution.status == FlagStatus.CLOSED
-            if closed:
-                return f"Closed : {last_comment.user.username}"
-            else:
-                return "Open"
+            return FlagReport(last_flag)
 
     @lazy
     def allele(self):
@@ -253,15 +215,15 @@ class ProblemHgvs(ExportRow):
     def resolved_38(self):
         return self.classification.chgvs_grch38
 
-    @export_column("Flag Matching")
+    @export_column("Flag Matching", sub_data=FlagReport)
     def flag_variant_matching(self):
         return self.flag_formatter(classification_flag_types.matching_variant_flag)
 
-    @export_column("Flag Matching Warning")
+    @export_column("Flag Matching Warning", sub_data=FlagReport)
     def flag_matching_warning(self):
         return self.flag_formatter(classification_flag_types.matching_variant_warning_flag)
 
-    @export_column("Transcript Change")
+    @export_column("Transcript Change", sub_data=FlagReport)
     def flag_transcript_change(self):
         return self.flag_formatter(classification_flag_types.transcript_version_change_flag)
 
@@ -270,15 +232,15 @@ class ProblemHgvs(ExportRow):
         if allele := self.allele:
             return get_url_from_view_path(allele.get_absolute_url())
 
-    @export_column("37 != 38")
+    @export_column("37 != 38", sub_data=FlagReport)
     def flag_37_not_38(self):
         return self.flag_formatter(allele_flag_types.allele_37_not_38, data={"transcript": self.classification.transcript})
 
-    @export_column("!37")
+    @export_column("!37", sub_data=FlagReport)
     def flag_37(self):
         return self.flag_formatter(allele_flag_types.missing_37)
 
-    @export_column("!38")
+    @export_column("!38", sub_data=FlagReport)
     def flag_38(self):
         return self.flag_formatter(allele_flag_types.missing_38)
 
@@ -298,31 +260,4 @@ def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
     complete_qs = complete_qs.order_by('-variant', '-pk')
 
     return ProblemHgvs.streaming_csv(complete_qs, "hgvs_issues")
-
-# @user_passes_test(is_superuser)
-# def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
-#
-#     def row_generator() -> Iterable[str]:
-#         yield delimited_row(HgvsIssuesRow.csv_header())
-#         alleles_qs = FlagCollection.filter_for_open_flags(qs=_alleles_with_classifications_qs())
-#         for allele in alleles_qs:
-#             open_flags = Flag.objects.filter(collection=allele.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS)
-#             for flag in open_flags:
-#                 yield delimited_row(HgvsIssuesRow(allele=allele, flag=flag).to_csv())
-#
-#         classification_hgvs_issue_flag_types = [
-#             classification_flag_types.matching_variant_flag,
-#             classification_flag_types.matching_variant_warning_flag,
-#             classification_flag_types.transcript_version_change_flag
-#         ]
-#         classification_qs = FlagCollection.filter_for_open_flags(qs=Classification.objects.all(), flag_types=classification_hgvs_issue_flag_types)
-#         for classification in classification_qs:
-#             open_flags = Flag.objects.filter(collection=classification.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS).filter(flag_type__in=classification_hgvs_issue_flag_types)
-#             for flag in open_flags:
-#                 allele = classification.variant.allele if classification.variant else None
-#                 yield delimited_row(HgvsIssuesRow(allele=allele, classification=classification, flag=flag).to_csv())
-#
-#     response = StreamingHttpResponse(row_generator(), content_type='text/csv')
-#     response['Content-Disposition'] = f'attachment; filename="allele_issues_{now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")}.csv"'
-#     return response
 
