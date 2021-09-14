@@ -197,7 +197,7 @@ class HgvsIssuesRow(ExportRow):
 class ProblemHgvs(ExportRow):
     classification: Classification
 
-    def flag_formatter(self, flag_type: FlagType, data: Dict[str, Any]):
+    def flag_formatter(self, flag_type: FlagType, data: Dict[str, Any] = None):
         qs: QuerySet[Flag]
         if flag_type.context_id == 'classification':
             qs = self.classification.flags_of_type(flag_type=flag_type)
@@ -210,6 +210,10 @@ class ProblemHgvs(ExportRow):
             raise ValueError(f"Unexpected flag context {flag_type.context_id}")
 
         qs = qs.order_by('-created')
+        if data:
+            for key, value in data.items():
+                qs = qs.filter(**{f'data__{key}': value})
+
         if last_flag := qs.first():
             last_comment: FlagComment = last_flag.flagcomment_set.order_by('-created').first()
             closed = last_flag.resolution.status == FlagStatus.CLOSED
@@ -268,7 +272,7 @@ class ProblemHgvs(ExportRow):
 
     @export_column("37 != 38")
     def flag_37_not_38(self):
-        return self.flag_formatter(allele_flag_types.allele_37_not_38)
+        return self.flag_formatter(allele_flag_types.allele_37_not_38, data={"transcript", self.classification.transcript})
 
     @export_column("!37")
     def flag_37(self):

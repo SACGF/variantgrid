@@ -819,7 +819,7 @@ class ExportRow:
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
-            yield ["File terminated due to error"]
+            yield "** File terminated due to error"
 
     @classmethod
     def csv_header(cls) -> List[str]:
