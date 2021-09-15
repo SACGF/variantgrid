@@ -131,7 +131,7 @@ class Allele(FlagsMixin, models.Model):
 
         return conversion_tool, variant_tuple
 
-    def merge(self, conversion_tool, other_allele: "Allele"):
+    def merge(self, conversion_tool, other_allele: "Allele") -> bool:
         """ Merge other_allele into this allele """
 
         if self == other_allele:
@@ -177,6 +177,8 @@ class Allele(FlagsMixin, models.Model):
                     logging.warning("VariantAllele exists with allele/build/variant of %s/%s/%s - deleting this one",
                                     va.allele, va.genome_build, va.variant)
                     va.delete()
+
+        return can_merge
 
     @property
     def build_names(self) -> str:

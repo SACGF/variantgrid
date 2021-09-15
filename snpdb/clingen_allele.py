@@ -442,11 +442,15 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
 
             if variant:
                 defaults = {"origin": AlleleOrigin.variant_origin(variant, allele, genome_build),
-                            "conversion_tool": conversion_tool}
+                            "conversion_tool": conversion_tool,
+                            "allele": allele}
                 va, _ = VariantAllele.objects.get_or_create(variant=variant,
                                                             genome_build=genome_build,
-                                                            allele=allele,
                                                             defaults=defaults)
+                if va.allele != allele:  # Existing!
+                    if not va.allele.merge(conversion_tool, allele):
+                        logging.warning("Couldn't merge 2xAlleles (ClinGen Allele Registry)")
+
                 variant_allele_by_build[genome_build] = va
         except Variant.DoesNotExist:
             pass  # Variant may not be created for build
