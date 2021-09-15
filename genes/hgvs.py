@@ -428,14 +428,25 @@ class HGVSMatcher:
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
 
     def _pyhgvs_get_variant_tuple(self, hgvs_string: str, transcript_version):
+        # Check transcript bounds
+        if transcript_version:
+            # @see https://varnomen.hgvs.org/bg-material/numbering/
+            # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
+            # reference sequence using the reference sequence
+            hgvs_name = HGVSName(hgvs_string)
+            outside_transcript = False
+            if hgvs_name.cdna_start.landmark == 'cdna_start':
+                outside_transcript = hgvs_name.cdna_start.coord < 1
+            if hgvs_name.cdna_end.landmark == 'cdna_start':
+                outside_transcript |= hgvs_name.cdna_end.coord > transcript_version.length
+
+            if outside_transcript:
+                reason = f"Outside boundaries of transcript {transcript_version}: ({transcript_version.length}bp)"
+                raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
+
         mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_string)
-
-        def get_transcript(_transcript_name):
-            # Already know what transcript it is
-            return self._create_pyhgvs_transcript(transcript_version)
-
         variant_tuple = pyhgvs.parse_hgvs_name(lookup_hgvs_name, self.genome_build.genome_fasta.fasta,
-                                               get_transcript=get_transcript,
+                                               transcript=self._create_pyhgvs_transcript(transcript_version),
                                                indels_start_with_same_base=False)
 
         (chrom, position, ref, alt) = variant_tuple
@@ -444,19 +455,6 @@ class HGVSMatcher:
             reason = f"chrom: {chrom} ({contig}/{contig.get_molecule_type_display()}) is not mitochondrial!"
             raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
         chrom = contig.name
-
-        # @see https://varnomen.hgvs.org/bg-material/numbering/
-        # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
-        # reference sequence using the reference sequence
-        if transcript_version:
-            # Only check SNVs so we don't run into normalization problems
-            if len(ref) == len(alt) == 1:
-                tv_start = transcript_version.data["start"]
-                tv_end = transcript_version.data["end"]
-                if not (tv_start <= position <= tv_end):
-                    reason = f"Outside boundaries of transcript {transcript_version}: {transcript_version.coordinates}"
-                    raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
-
         return chrom, position, ref, alt
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
