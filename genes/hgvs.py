@@ -545,7 +545,7 @@ class HGVSMatcher:
         hgvs_name = HGVSName(hgvs_string)
         if self._is_lrg(hgvs_name):
             variant_tuple, method = self._lrg_get_variant_tuple(hgvs_string)
-        elif hgvs_name.kind == 'c':
+        elif hgvs_name.kind in ('c', 'n'):
             transcript_accession = hgvs_name.transcript
             if not transcript_accession:
                 msg = f"Could not parse: '{hgvs_name}' c.HGVS requires a transcript or LRG."
