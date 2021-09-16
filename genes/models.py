@@ -573,16 +573,38 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         unique_together = ("transcript", "version", "genome_build")
 
     @lazy
-    def cds(self):
+    def _transcript_regions(self) -> Tuple[List, List, List]:
         cds_start = self.data["cds_start"]
         cds_end = self.data["cds_end"]
+        fivep_utr = []
         cds = []
+        threep_utr = []
         for exon_start, exon_end in self.data["exons"]:
+            if exon_start < cds_start:
+                fivep_end = min(cds_start, exon_end)
+                fivep_utr.append((exon_start, fivep_end))
+
             if exon_end > cds_start and exon_start < cds_end:
                 start = max(exon_start, cds_start)
                 end = min(exon_end, cds_end)
                 cds.append((start, end))
-        return cds
+
+            if exon_end > cds_end:
+                threep_start = max(exon_start, cds_end)
+                threep_utr.append((threep_start, exon_end))
+        return fivep_utr, cds, threep_utr
+
+    @lazy
+    def fivep_utr(self):
+        return self._transcript_regions[0]
+
+    @lazy
+    def cds(self):
+        return self._transcript_regions[1]
+
+    @lazy
+    def threep_utr(self):
+        return self._transcript_regions[2]
 
     @staticmethod
     def transcript_parts(identifier: str) -> TranscriptParts:
@@ -765,15 +787,27 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             transcript_version = TranscriptVersion.get_transcript_version(genome_build, "NM_004006.2")
         return transcript_version
 
+    @staticmethod
+    def _sum_intervals(intervals: List[Tuple]):
+        return sum([b - a for a, b in intervals])
+
     @property
     def length(self) -> Optional[int]:
         if 'exons' in self.data:
-            return sum([e - s for s, e in self.data["exons"]])
+            return self._sum_intervals(self.data["exons"])
         return None
 
     @property
+    def fivep_utr_length(self) -> int:
+        return self._sum_intervals(self.fivep_utr)
+
+    @property
     def coding_length(self) -> int:
-        return sum([b-a for a, b in self.cds])
+        return self._sum_intervals(self.cds)
+
+    @property
+    def threep_utr_length(self) -> int:
+        return self._sum_intervals(self.threep_utr)
 
     @property
     def num_codons(self) -> int:
