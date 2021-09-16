@@ -784,11 +784,16 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return self.num_codons - 1  # stop codon doesn't count
 
     @property
+    def chrom(self):
+        raw_chrom = self.data["chrom"]  # Could be stored as contig
+        return self.genome_build.chrom_contig_mappings[raw_chrom].name
+
+    @property
     def coordinates(self):
         """ 1-based for humans """
         coords = None
         if self.data:
-            coords = f"{self.data['chrom']}:{self.data['start'] + 1}-{self.data['end']} ({self.data['strand']})"
+            coords = f"{self.chrom}:{self.data['start'] + 1}-{self.data['end']} ({self.data['strand']})"
         return coords
 
     @property
@@ -816,10 +821,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             if my_chrom != other_chrom:
                 try:
                     # Could be different but map to the same thing - try resolving it to contig name
-                    my_cleaned_chrom = self.genome_build.chrom_contig_mappings[my_chrom].name
                     other_cleaned_chrom = transcript_version.genome_build.chrom_contig_mappings[other_chrom].name
-                    if my_cleaned_chrom != other_cleaned_chrom:
-                        differences["contig"] = (f"{my_chrom} (contig name: {my_cleaned_chrom})",
+                    if self.chrom != other_cleaned_chrom:
+                        differences["contig"] = (f"{my_chrom} (contig name: {self.chrom})",
                                                  f"{other_chrom} (contig name: {other_cleaned_chrom})")
                 except:
                     # Can't convert - just show differences
