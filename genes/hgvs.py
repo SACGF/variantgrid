@@ -434,16 +434,19 @@ class HGVSMatcher:
             # @see https://varnomen.hgvs.org/bg-material/numbering/
             # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
             # reference sequence using the reference sequence
-            hgvs_name = HGVSName(hgvs_string)
-            outside_transcript = False
-            if hgvs_name.cdna_start.landmark == 'cdna_start':
-                outside_transcript = hgvs_name.cdna_start.coord < 1
-            if hgvs_name.cdna_end.landmark == 'cdna_start':
-                outside_transcript |= hgvs_name.cdna_end.coord > transcript_version.length
 
-            if outside_transcript:
-                reason = f"Outside boundaries of transcript {transcript_version}: ({transcript_version.length}bp)"
-                raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
+            # Temporarily disabling this - see issue #487
+
+            # hgvs_name = HGVSName(hgvs_string)
+            # outside_transcript = False
+            # if hgvs_name.cdna_start.landmark == 'cdna_start':
+            #     outside_transcript = hgvs_name.cdna_start.coord < 1
+            # if hgvs_name.cdna_end.landmark == 'cdna_start':
+            #     outside_transcript |= hgvs_name.cdna_end.coord > transcript_version.length
+            #
+            # if outside_transcript:
+            #     reason = f"Outside boundaries of transcript {transcript_version}: ({transcript_version.length}bp)"
+            #     raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
 
             pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
 
