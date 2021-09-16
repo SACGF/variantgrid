@@ -124,7 +124,8 @@ class ClassificationChanges:
             vcm_q = vcm_q & Q(classification=classification)
             flags_q = flags_q & Q(flag__collection=classification.flag_collection_safe)
         else:
-            pass
+            # can't currently render clinical context flags
+            flags_q = flags_q & Q(flag__collection__context__id__in=['classification', 'allele'])
 
         # Variant Classification Changes
         vcm_qs = ClassificationModification.objects.filter(vcm_q) \
