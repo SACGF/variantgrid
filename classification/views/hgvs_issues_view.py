@@ -248,8 +248,12 @@ class ClassificationResolution(ExportRow):
     _chgvs_grch38: str
 
     @export_column("Import Key")
-    def key(self):
+    def key_import(self):
         return (self._imported_genome_build or "") + "#" + (self._chgvs_imported or "")
+
+    @export_column("Export Key")
+    def key_export(self):
+        return (self._chgvs_grch37 or "") + "#" + (self._chgvs_grch38 or "")
 
     @export_column("Imported Build")
     def imported_build(self):
